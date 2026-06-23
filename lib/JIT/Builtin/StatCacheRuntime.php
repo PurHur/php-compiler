@@ -4,34 +4,41 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM stat/realpath cache for JIT/AOT (issue #9110).
+ * JIT/AOT link for stat cache via StatCacheJitHelper PHP (#9110, #9244).
  *
- * Mirrors {@see \PHPCompiler\ext\standard\VmStatCache} / php-src ext/standard/filestat.c.
+ * Replaces LLVM hashtable stat/realpath cache with compiled {@see VmStatCache} helpers.
+ * php-src: ext/standard/filestat.c — php_clear_stat_cache(), php_stat()
  */
 final class StatCacheRuntime
 {
-    private const STAT_BUF_SIZE = 144;
+    private const HELPER_PATH = '/ext/standard/StatCacheJitHelper.php';
 
-    private const STAT_MODE_OFFSET = 24;
+    private const MODE_CACHED_HELPER = 'PHPCompiler\\ext\\standard\\StatCacheJitHelper::modeCached';
 
-    private const REALPATH_BUF_SIZE = 4096;
+    private const CLEAR_ALL_HELPER = 'PHPCompiler\\ext\\standard\\StatCacheJitHelper::clearAll';
 
-    private const GLOBAL_STAT_MODE_CACHE = 'phpc_stat_mode_cache';
+    private const CLEAR_FLAG_HELPER = 'PHPCompiler\\ext\\standard\\StatCacheJitHelper::clearWithFlag';
 
-    private const GLOBAL_LSTAT_MODE_CACHE = 'phpc_lstat_mode_cache';
-
-    private const GLOBAL_REALPATH_CACHE = 'phpc_realpath_cache';
+    private const CLEAR_PATH_HELPER = 'PHPCompiler\\ext\\standard\\StatCacheJitHelper::clearPath';
 
     public const FN_CLEAR = '__compiler_clearstatcache';
 
     public const FN_MODE_CACHED = '__phpc_jit_stat_mode_cached';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::MODE_CACHED_HELPER,
+        self::CLEAR_ALL_HELPER,
+        self::CLEAR_FLAG_HELPER,
+        self::CLEAR_PATH_HELPER,
+    ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -53,441 +60,176 @@ final class StatCacheRuntime
             return;
         }
 
-        self::ensureGlobals($context);
-        self::ensureLibc($context);
-        self::ensureHashtableHelpers($context);
-        self::ensureValueHelpers($context);
-
-        self::implementIfMissing($context, self::FN_MODE_CACHED, self::emitModeCached(...));
-        self::implementIfMissing($context, self::FN_CLEAR, self::emitClear(...));
-
+        self::ensureJitHelperCompiled($context);
+        self::implementModeCachedBridge($context);
+        self::implementClearBridge($context);
         self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
+    private static function implementModeCachedBridge(Context $context): void
     {
-        $probe = $context->module->getNamedFunction($name);
+        $abiName = self::FN_MODE_CACHED;
+        $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
+            $context->registerFunction($abiName, $probe);
 
             return;
         }
 
-        $fn = self::declareFunction($context, $name);
-        $saved = $context->builder;
-        $context->builder = $context->context->builderCreate();
-        try {
-            $emit($context, $fn);
-        } finally {
-            $context->builder->clearInsertionPosition();
-            $context->builder = $saved;
-        }
-        $context->registerFunction($name, $fn);
-    }
-
-    private static function declareFunction(Context $context, string $name): LlvmFunction
-    {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
-        }
-
+        $strPtr = $context->getTypeFromString('__string__*');
         $i32 = $context->getTypeFromString('int32');
-        $i1 = $context->getTypeFromString('int1');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($i32, false, $strPtr, $i32);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $fn = match ($name) {
-            self::FN_MODE_CACHED => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i32, false, $strPtr, $i32)
-            ),
-            self::FN_CLEAR => $context->module->addFunction(
-                $name,
-                $context->context->functionType($voidTy, false, $i32, $i1, $strPtr)
-            ),
-            default => throw new \LogicException('Unknown stat cache JIT function: '.$name),
-        };
-        $context->registerFunction($name, $fn);
-
-        return $fn;
-    }
-
-    private static function ensureGlobals(Context $context): void
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $null = $htPtr->constNull();
-        foreach ([
-            self::GLOBAL_STAT_MODE_CACHE,
-            self::GLOBAL_LSTAT_MODE_CACHE,
-            self::GLOBAL_REALPATH_CACHE,
-        ] as $name) {
-            if (null === $context->module->getNamedGlobal($name)) {
-                $global = $context->module->addGlobal($htPtr, $name);
-                $global->setInitializer($null);
-            }
-        }
-    }
-
-    private static function ensureLibc(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $charPtr = $context->getTypeFromString('char*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $voidTy = $context->getTypeFromString('void');
-
-        foreach ([
-            ['stat', $i32, [$i8p, $i8p]],
-            ['lstat', $i32, [$i8p, $i8p]],
-            ['realpath', $charPtr, [$i8p, $charPtr]],
-            ['strlen', $i64, [$i8p]],
-            ['__mm__free', $voidTy, [$i8p]],
-            ['__string__init', $strPtr, [$i64, $i8p]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
-        }
-    }
-
-    private static function ensureHashtableHelpers(Context $context): void
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $voidTy = $context->getTypeFromString('void');
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-
-        foreach ([
-            ['__hashtable__alloc', $htPtr, []],
-            ['__hashtable__offsetIsSetStringKey', $i1, [$htPtr, $strPtr]],
-            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
-            ['__hashtable__unsetStringKey', $voidTy, [$htPtr, $strPtr]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
-        }
-    }
-
-    private static function ensureValueHelpers(Context $context): void
-    {
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-
-        foreach ([
-            ['__hashtable__readStringKeyValue', $valuePtr, [$htPtr, $strPtr]],
-            ['__value__readLong', $i64, [$valuePtr]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
-        }
-    }
-
-    private static function ensureExternal(Context $context, string $name, $ft): void
-    {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function globalHt(Context $context, string $name): Value
-    {
-        $global = $context->module->getNamedGlobal($name);
-        if (null === $global) {
-            throw new \LogicException('StatCacheRuntime global missing: '.$name);
-        }
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-
-        return $context->builder->load($context->builder->pointerCast($global, $htPtr->pointerType(0)));
-    }
-
-    private static function storeGlobalHt(Context $context, string $name, Value $ht): void
-    {
-        $global = $context->module->getNamedGlobal($name);
-        if (null === $global) {
-            throw new \LogicException('StatCacheRuntime global missing: '.$name);
-        }
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $context->builder->store($ht, $context->builder->pointerCast($global, $htPtr->pointerType(0)));
-    }
-
-    private static function ensureHtGlobal(Context $context, LlvmFunction $fn, string $globalName): Value
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ht = self::globalHt($context, $globalName);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $allocBlock = $fn->appendBasicBlock('stat_cache_alloc_'.$globalName);
-        $doneBlock = $fn->appendBasicBlock('stat_cache_done_'.$globalName);
-        $beforeBranch = $context->builder->getInsertBlock();
-        $context->builder->branchIf($isNull, $allocBlock, $doneBlock);
-
-        $context->builder->positionAtEnd($allocBlock);
-        $fresh = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        self::storeGlobalHt($context, $globalName, $fresh);
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-        $phi = $context->builder->phi($htPtr);
-        $phi->addIncoming($fresh, $allocBlock);
-        $phi->addIncoming($ht, $beforeBranch);
-
-        return $phi;
-    }
-
-    private static function stringData(Context $context, Value $strObj): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-
-        return $context->builder->structGep($strObj, $map['value']);
-    }
-
-    private static function stackBytesPtr(Context $context, Value $slot): Value
-    {
-        return $context->builder->pointerCast($slot, $context->getTypeFromString('int8*'));
-    }
-
-    private static function loadModeFromLibc(Context $context, Value $pathPtr, bool $lstat): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $buf = $context->builder->alloca($i8->arrayType(self::STAT_BUF_SIZE), 1, 'stat_cache_buf');
-        $bufPtr = self::stackBytesPtr($context, $buf);
-        $fn = $lstat ? 'lstat' : 'stat';
-        $rc = $context->builder->call($context->lookupFunction($fn), $pathPtr, $bufPtr);
-        $zero = $i32->constInt(0, false);
-        $failed = $context->builder->icmp(Builder::INT_NE, $rc, $zero);
-        $modePtr = $context->builder->pointerCast(
-            $context->builder->gep($bufPtr, $i64->constInt(self::STAT_MODE_OFFSET, false)),
-            $i32->pointerType(0)
-        );
-        $mode = $context->builder->load($modePtr);
-        $minusOne = $i32->constInt(-1, true);
-
-        return $context->builder->select($failed, $minusOne, $mode);
-    }
-
-    private static function storeModeEntry(Context $context, Value $ht, Value $pathStr, Value $modeI32): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $modeI64 = $context->builder->sext($modeI32, $i64);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
-            $ht,
-            $pathStr,
-            $modeI64
-        );
-    }
-
-    private static function emitModeCached(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
+        $entry = $fn->appendBasicBlock('stat_mode_cached_bridge_entry');
+        $fail = $fn->appendBasicBlock('stat_mode_cached_bridge_fail');
+        $run = $fn->appendBasicBlock('stat_mode_cached_bridge_run');
         $context->builder->positionAtEnd($entry);
-
         $path = $fn->getParam(0);
-        $useLstat = $fn->getParam(1);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i32->constInt(0, false);
-        $minusOne = $i32->constInt(-1, true);
-
         $nullPath = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
-        $fail = $fn->appendBasicBlock('mode_cached_fail');
-        $run = $fn->appendBasicBlock('mode_cached_run');
         $context->builder->branchIf($nullPath, $fail, $run);
 
         $context->builder->positionAtEnd($run);
-        $isLstat = $context->builder->icmp(Builder::INT_NE, $useLstat, $zero);
-        $pickLstat = $fn->appendBasicBlock('mode_cached_pick_lstat');
-        $pickStat = $fn->appendBasicBlock('mode_cached_pick_stat');
-        $afterPick = $fn->appendBasicBlock('mode_cached_after_pick');
-        $context->builder->branchIf($isLstat, $pickLstat, $pickStat);
-
-        $context->builder->positionAtEnd($pickLstat);
-        $htL = self::ensureHtGlobal($context, $fn, self::GLOBAL_LSTAT_MODE_CACHE);
-        $context->builder->branch($afterPick);
-        $pickLstatTail = $context->builder->getInsertBlock();
-
-        $context->builder->positionAtEnd($pickStat);
-        $htS = self::ensureHtGlobal($context, $fn, self::GLOBAL_STAT_MODE_CACHE);
-        $context->builder->branch($afterPick);
-        $pickStatTail = $context->builder->getInsertBlock();
-
-        $context->builder->positionAtEnd($afterPick);
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        $htPhi = $context->builder->phi($htPtrTy);
-        $htPhi->addIncoming($htL, $pickLstatTail);
-        $htPhi->addIncoming($htS, $pickStatTail);
-
-        $hit = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-            $htPhi,
-            $path
+        $useLstat = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $useLstatI64 = $useLstat->typeOf() === $i64
+            ? $useLstat
+            : $context->builder->sext($useLstat, $i64);
+        $modeI64 = $context->builder->call(
+            self::helperFunction($context, self::MODE_CACHED_HELPER),
+            $path,
+            $useLstatI64
         );
-        $hitBlock = $fn->appendBasicBlock('mode_cached_hit');
-        $missBlock = $fn->appendBasicBlock('mode_cached_miss');
-        $context->builder->branchIf($hit, $hitBlock, $missBlock);
-
-        $context->builder->positionAtEnd($hitBlock);
-        $val = $context->builder->call(
-            $context->lookupFunction('__hashtable__readStringKeyValue'),
-            $htPhi,
-            $path
-        );
-        $modeI64 = $context->builder->call($context->lookupFunction('__value__readLong'), $val);
-        $cachedMode = $context->builder->truncOrBitCast($modeI64, $i32);
-        $context->builder->returnValue($cachedMode);
-
-        $context->builder->positionAtEnd($missBlock);
-        $pathCstr = self::stringData($context, $path);
-        $doLstat = $fn->appendBasicBlock('mode_cached_do_lstat');
-        $doStat = $fn->appendBasicBlock('mode_cached_do_stat');
-        $afterLibc = $fn->appendBasicBlock('mode_cached_after_libc');
-        $context->builder->branchIf($isLstat, $doLstat, $doStat);
-
-        $context->builder->positionAtEnd($doStat);
-        $modeStat = self::loadModeFromLibc($context, $pathCstr, false);
-        $context->builder->branch($afterLibc);
-        $doStatTail = $context->builder->getInsertBlock();
-
-        $context->builder->positionAtEnd($doLstat);
-        $modeLstat = self::loadModeFromLibc($context, $pathCstr, true);
-        $context->builder->branch($afterLibc);
-        $doLstatTail = $context->builder->getInsertBlock();
-
-        $context->builder->positionAtEnd($afterLibc);
-        $modePhi = $context->builder->phi($i32);
-        $modePhi->addIncoming($modeStat, $doStatTail);
-        $modePhi->addIncoming($modeLstat, $doLstatTail);
-        self::storeModeEntry($context, $htPhi, $path, $modePhi);
-        $context->builder->returnValue($modePhi);
+        $mode = $modeI64->typeOf() === $i32
+            ? $modeI64
+            : $context->builder->truncOrBitCast($modeI64, $i32);
+        $context->builder->returnValue($mode);
 
         $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($minusOne);
+        $context->builder->returnValue($i32->constInt(-1, true));
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function resetGlobalHt(Context $context, string $name): void
+    private static function implementClearBridge(Context $context): void
     {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        self::storeGlobalHt($context, $name, $htPtr->constNull());
-    }
+        $abiName = self::FN_CLEAR;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-    private static int $unsetBlockSerial = 0;
+            return;
+        }
 
-    private static function unsetPathFromHt(Context $context, LlvmFunction $fn, string $globalName, Value $pathStr): void
-    {
-        $tag = (string) (++self::$unsetBlockSerial);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ht = self::globalHt($context, $globalName);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $skip = $fn->appendBasicBlock('stat_cache_unset_skip_'.$globalName.'_'.$tag);
-        $run = $fn->appendBasicBlock('stat_cache_unset_run_'.$globalName.'_'.$tag);
-        $done = $fn->appendBasicBlock('stat_cache_unset_done_'.$globalName.'_'.$tag);
-        $from = $context->builder->getInsertBlock();
-        $context->builder->branchIf($isNull, $skip, $run);
+        $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i32, $i1, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $context->builder->positionAtEnd($run);
-        $context->builder->call($context->lookupFunction('__hashtable__unsetStringKey'), $ht, $pathStr);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($skip);
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function emitClear(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
+        $entry = $fn->appendBasicBlock('clearstatcache_bridge_entry');
+        $perPath = $fn->appendBasicBlock('clearstatcache_bridge_per_path');
+        $flagOnly = $fn->appendBasicBlock('clearstatcache_bridge_flag_only');
+        $all = $fn->appendBasicBlock('clearstatcache_bridge_all');
         $context->builder->positionAtEnd($entry);
 
         $argc = $fn->getParam(0);
-        $clearRealpath = $fn->getParam(1);
-        $filename = $fn->getParam(2);
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
         $two = $i32->constInt(2, false);
-
+        $one = $i32->constInt(1, false);
         $isTwo = $context->builder->icmp(Builder::INT_EQ, $argc, $two);
-        $perPath = $fn->appendBasicBlock('clear_per_path');
-        $all = $fn->appendBasicBlock('clear_all');
-        $context->builder->branchIf($isTwo, $perPath, $all);
+        $isOne = $context->builder->icmp(Builder::INT_EQ, $argc, $one);
+        $afterOne = $fn->appendBasicBlock('clearstatcache_bridge_after_one');
+        $context->builder->branchIf($isTwo, $perPath, $afterOne);
+        $context->builder->positionAtEnd($afterOne);
+        $context->builder->branchIf($isOne, $flagOnly, $all);
+
+        $i64 = $context->getTypeFromString('int64');
+        $clearRealpathI64 = $context->builder->zext($fn->getParam(1), $i64);
 
         $context->builder->positionAtEnd($all);
-        self::resetGlobalHt($context, self::GLOBAL_STAT_MODE_CACHE);
-        self::resetGlobalHt($context, self::GLOBAL_LSTAT_MODE_CACHE);
-        $doRealpathAll = $fn->appendBasicBlock('clear_realpath_all');
-        $doneAll = $fn->appendBasicBlock('clear_done_all');
-        $context->builder->branchIf($clearRealpath, $doRealpathAll, $doneAll);
-        $context->builder->positionAtEnd($doRealpathAll);
-        self::resetGlobalHt($context, self::GLOBAL_REALPATH_CACHE);
-        $context->builder->branch($doneAll);
-        $context->builder->positionAtEnd($doneAll);
+        $context->builder->call(self::helperFunction($context, self::CLEAR_ALL_HELPER));
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($flagOnly);
+        $context->builder->call(self::helperFunction($context, self::CLEAR_FLAG_HELPER), $clearRealpathI64);
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($perPath);
+        $filename = $fn->getParam(2);
         $nullFile = $context->builder->icmp(Builder::INT_EQ, $filename, $strPtr->constNull());
-        $perPathDone = $fn->appendBasicBlock('clear_per_path_done');
-        $perPathRun = $fn->appendBasicBlock('clear_per_path_run');
+        $perPathDone = $fn->appendBasicBlock('clearstatcache_bridge_per_path_done');
+        $perPathRun = $fn->appendBasicBlock('clearstatcache_bridge_per_path_run');
         $context->builder->branchIf($nullFile, $perPathDone, $perPathRun);
 
         $context->builder->positionAtEnd($perPathRun);
-        self::unsetPathFromHt($context, $fn, self::GLOBAL_STAT_MODE_CACHE, $filename);
-        self::unsetPathFromHt($context, $fn, self::GLOBAL_LSTAT_MODE_CACHE, $filename);
-
-        $doRealpathPath = $fn->appendBasicBlock('clear_realpath_path');
-        $context->builder->branchIf($clearRealpath, $doRealpathPath, $perPathDone);
-
-        $context->builder->positionAtEnd($doRealpathPath);
-        $pathCstr = self::stringData($context, $filename);
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $charPtr = $context->getTypeFromString('char*');
-        $resolvedSlot = $context->builder->alloca($i8->arrayType(self::REALPATH_BUF_SIZE), 1, 'clear_realpath_buf');
-        $resolvedBuf = self::stackBytesPtr($context, $resolvedSlot);
-        $resolved = $context->builder->call(
-            $context->lookupFunction('realpath'),
-            $pathCstr,
-            $resolvedBuf
+        $context->builder->call(
+            self::helperFunction($context, self::CLEAR_PATH_HELPER),
+            $clearRealpathI64,
+            $filename
         );
-        $resolvedOk = $context->builder->icmp(Builder::INT_NE, $resolved, $charPtr->constNull());
-        $resolveOk = $fn->appendBasicBlock('clear_resolved_ok');
-        $afterRealpathPath = $fn->appendBasicBlock('clear_after_realpath_path');
-        $context->builder->branchIf($resolvedOk, $resolveOk, $afterRealpathPath);
-
-        $context->builder->positionAtEnd($resolveOk);
-        $i64 = $context->getTypeFromString('int64');
-        $len = $context->builder->call($context->lookupFunction('strlen'), $resolved);
-        $resolvedStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt($len, $i64),
-            $context->builder->pointerCast($resolved, $i8p)
-        );
-        self::unsetPathFromHt($context, $fn, self::GLOBAL_STAT_MODE_CACHE, $resolvedStr);
-        self::unsetPathFromHt($context, $fn, self::GLOBAL_LSTAT_MODE_CACHE, $resolvedStr);
-        $context->builder->branch($afterRealpathPath);
-
-        $context->builder->positionAtEnd($afterRealpathPath);
-        self::unsetPathFromHt($context, $fn, self::GLOBAL_REALPATH_CACHE, $filename);
         $context->builder->branch($perPathDone);
 
         $context->builder->positionAtEnd($perPathDone);
         $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StatCacheJitHelper compile (#9244)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StatCacheJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StatCacheJitHelper.php parseAndCompile failed (#9244)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9244)');
+            }
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
-            if (null !== $fn) {
-                $context->registerFunction($name, $fn);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StatCacheRuntime bridge (#9244)');
             }
+            $context->registerFunction($name, $fn);
         }
     }
 }

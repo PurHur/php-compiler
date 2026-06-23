@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** clearstatcache() — VM via VmStatCache; JIT/AOT via StatCacheRuntime (#9110). */
+/** clearstatcache() — VM via VmStatCache; JIT/AOT via StatCacheJitHelper (#9110, #9244). */
 final class clearstatcache_ extends Internal
 {
     public function __construct()
