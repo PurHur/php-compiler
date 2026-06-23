@@ -177,6 +177,17 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', 'ini_set'));
     }
 
+    /** @covers issue #10126 */
+    public function testProcOpenNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('proc_open');
+        self::assertSame(['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'command', 'proc_open'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'descriptor_spec', 'proc_open'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'pipes', 'proc_open'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cwd', 'proc_open'));
+    }
+
     /** @covers issue #10043 */
     public function testRandomIntNamedParameters(): void
     {
