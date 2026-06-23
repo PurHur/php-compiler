@@ -28,6 +28,7 @@ final class NestedJitCompileScopeLintTest extends TestCase
             'lib/JIT/Builtin/GcToggleRuntime.php',
             'lib/JIT/Builtin/ProgressNoteRuntime.php',
             'lib/JIT/Builtin/LastErrorRuntime.php',
+            'lib/JIT/Builtin/ErrorHandlerJitRuntime.php',
             'lib/JIT/Builtin/RewriteVarsRuntime.php',
             'lib/JIT/Builtin/DefineRuntime.php',
             'lib/JIT/Builtin/TokenGetAll.php',
