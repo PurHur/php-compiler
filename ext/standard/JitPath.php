@@ -311,6 +311,9 @@ final class JitPath
         $i32 = $context->getTypeFromString('int32');
         $byte = $context->builder->zExt($ch, $i32);
         $slash = $context->builder->icmp(Builder::INT_EQ, $byte, $i32->constInt(ord('/'), false));
+        if ('Windows' !== \PHP_OS_FAMILY) {
+            return $slash;
+        }
         $back = $context->builder->icmp(Builder::INT_EQ, $byte, $i32->constInt(ord('\\'), false));
 
         return $context->builder->or($slash, $back);
