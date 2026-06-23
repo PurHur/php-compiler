@@ -44,6 +44,17 @@ final class HashTableMergeRecursiveTest extends TestCase
         );
     }
 
+    public function testScalarPlusAssociativeArrayPreservesStringKeys(): void
+    {
+        $left = $this->array(['color' => 'red']);
+        $right = $this->array(['color' => ['favorite' => 'green']]);
+        $merged = $left->mergeRecursiveCopy($right);
+        $this->assertSame(
+            ['color' => [0 => 'red', 'favorite' => 'green']],
+            $this->export($merged)
+        );
+    }
+
     /** @param array<string|int, mixed> $data */
     private function array(array $data): HashTable
     {

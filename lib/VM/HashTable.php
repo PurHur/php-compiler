@@ -1083,14 +1083,15 @@ final class HashTable {
             $elementCopy->copyFrom($overlay);
             $ht->append($elementCopy);
         } elseif (Variable::TYPE_ARRAY === $overlay->type) {
-            $elementCopy = new Variable();
-            $elementCopy->copyFrom($existing);
-            $ht->append($elementCopy);
-            foreach ($overlay->toArray()->iterate(true) as $element) {
-                $elemCopy = new Variable();
-                $elemCopy->copyFrom($element);
-                $ht->append($elemCopy);
-            }
+            $base = new self();
+            $scalarCopy = new Variable();
+            $scalarCopy->copyFrom($existing);
+            $base->addIndex(0, $scalarCopy);
+            $merged = $base->mergeRecursiveCopy($overlay->toArray());
+            $out = new Variable();
+            $out->array($merged);
+
+            return $out;
         } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($existing);
