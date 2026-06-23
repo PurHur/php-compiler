@@ -12135,6 +12135,21 @@ class Compiler {
 
                 return null;
             }
+            // preg_replace_callback($pat, fn(...), $arr) — closure arg 1, array arg 2 (#10652).
+            if (
+                null !== $closureProducerIndex
+                && null !== $arrayProducerIndex
+                && 'preg_replace_callback' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                if (1 === $argIndex) {
+                    return $producers[$closureProducerIndex];
+                }
+                if (2 === $argIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+
+                return null;
+            }
             // array_map(fn(...), [...]) / array_reduce([...], fn(...)) — closure + inline Array_ (#10651, #10775).
             if (null !== $closureProducerIndex && null !== $arrayProducerIndex) {
                 $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex(
@@ -12264,6 +12279,21 @@ class Compiler {
                     && $this->operandsReferToSameVariable($next->expr, $producer->result)
                 ) {
                     continue;
+                }
+                // array_fill_keys([new C()], 1) — New_ prelude is array element, not the keys arg (#10849).
+                if (
+                    $next instanceof Op\Expr\Array_
+                    && property_exists($next, 'values')
+                    && \is_array($next->values)
+                ) {
+                    foreach ($next->values as $entryValue) {
+                        if (
+                            $entryValue instanceof Operand
+                            && $this->operandsReferToSameVariable($entryValue, $producer->result)
+                        ) {
+                            continue 2;
+                        }
+                    }
                 }
             }
             $filtered[] = $producer;
