@@ -5678,6 +5678,9 @@ class Compiler {
         array $defaultBlockChildren = [],
         bool $materializeEnumCase = false
     ): ?Variable {
+        if ($expr instanceof Op\Expr\BinaryOp\Coalesce) {
+            return null;
+        }
         $opCode = $this->getOpCodeTypeFromBinaryOp($expr);
         if (!ClassConstExpr::isSupportedOpcode($opCode)) {
             return null;
@@ -10540,6 +10543,19 @@ class Compiler {
                         return $prev;
                     }
                     break;
+                }
+                if (
+                    $prev instanceof Op\Expr\Assign
+                    && $j > 0
+                ) {
+                    $maybeCoalesce = $block->orig->children[$j - 1];
+                    if (
+                        $maybeCoalesce instanceof Op\Expr\BinaryOp\Coalesce
+                        && $this->isCoalesceAssignTail($prev, $maybeCoalesce)
+                    ) {
+                        // ??= expression value before call — php-cfg inserts Assign between Coalesce and FuncCall (#5337, #10898).
+                        return $maybeCoalesce;
+                    }
                 }
                 if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                     break;
