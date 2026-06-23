@@ -4,356 +4,277 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT memory_get_usage()/memory_get_peak_usage() — PHP LLVM lowering (#3134, #5377).
+ * JIT/AOT link for memory introspection via MemoryJitHelper PHP (#9377).
  *
- * Replaces {@see lib/AOT/runtime/phpc_memory.c}; semantics match {@see \PHPCompiler\ext\standard\VmMemory}.
+ * Replaces RSS/statm LLVM + emalloc globals; SSOT {@see \PHPCompiler\ext\standard\MemoryJitHelper}.
+ * php-src: ext/standard/basic_functions.c, ext/standard/php_gc.c
  */
 final class MemoryRuntime
 {
-    public const GLOBAL_PEAK_EMALLOC = '__phpc_memory_peak_emalloc';
-
-    public const GLOBAL_PEAK_REAL = '__phpc_memory_peak_real';
-
-    public const GLOBAL_CURRENT_EMALLOC = '__phpc_memory_current_emalloc';
-
-    public const READ_RSS = '__phpc_memory_read_rss_bytes';
-
-    public const READ_EMALLOC = '__phpc_memory_read_emalloc_bytes';
-
     public const NOTE_ALLOC = '__phpc_memory_note_alloc';
 
     public const GC_MEM_CACHES = '__phpc_gc_mem_caches';
 
-    /** @var Value|null */
-    public static $peakEmallocGlobal = null;
+    private const GET_USAGE = '__phpc_memory_get_usage';
 
-    /** @var Value|null */
-    public static $peakRealGlobal = null;
+    private const GET_PEAK_USAGE = '__phpc_memory_get_peak_usage';
 
-    /** @var Value|null */
-    public static $currentEmallocGlobal = null;
+    private const RESET_PEAK_USAGE = '__phpc_memory_reset_peak_usage';
+
+    private const HELPER_PATH = '/ext/standard/MemoryJitHelper.php';
+
+    private const GET_USAGE_HELPER = 'PHPCompiler\\ext\\standard\\MemoryJitHelper::getUsage';
+
+    private const GET_PEAK_USAGE_HELPER = 'PHPCompiler\\ext\\standard\\MemoryJitHelper::getPeakUsage';
+
+    private const RESET_PEAK_USAGE_HELPER = 'PHPCompiler\\ext\\standard\\MemoryJitHelper::resetPeakUsage';
+
+    private const NOTE_ALLOC_HELPER = 'PHPCompiler\\ext\\standard\\MemoryJitHelper::noteAlloc';
+
+    private const GC_MEM_CACHES_HELPER = 'PHPCompiler\\ext\\standard\\MemoryJitHelper::gcMemCaches';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::GET_USAGE_HELPER,
+        self::GET_PEAK_USAGE_HELPER,
+        self::RESET_PEAK_USAGE_HELPER,
+        self::NOTE_ALLOC_HELPER,
+        self::GC_MEM_CACHES_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
     }
 
-    public static function peakGlobal(Context $context, bool $realUsage): Value
+    public static function getUsageValue(Context $context, Value $realUsage): Value
     {
         self::ensureLinked($context);
-        $global = $realUsage ? self::$peakRealGlobal : self::$peakEmallocGlobal;
-        if (null === $global) {
-            throw new \LogicException('MemoryRuntime peak global missing after ensureLinked');
-        }
 
-        return $global;
+        return $context->builder->call(
+            $context->lookupFunction(self::GET_USAGE),
+            $realUsage
+        );
     }
 
-    public static function readRssBytes(Context $context): Value
+    public static function getPeakUsageValue(Context $context, Value $realUsage): Value
     {
         self::ensureLinked($context);
 
-        return $context->builder->call($context->lookupFunction(self::READ_RSS));
+        return $context->builder->call(
+            $context->lookupFunction(self::GET_PEAK_USAGE),
+            $realUsage
+        );
     }
 
-    public static function readEmallocBytes(Context $context): Value
+    public static function resetPeakUsage(Context $context, Value $realUsage): void
     {
         self::ensureLinked($context);
-
-        return $context->builder->call($context->lookupFunction(self::READ_EMALLOC));
+        $context->builder->call(
+            $context->lookupFunction(self::RESET_PEAK_USAGE),
+            $realUsage
+        );
     }
 
     public static function noteAlloc(Context $context, Value $delta): void
     {
         self::ensureLinked($context);
-        $context->builder->call($context->lookupFunction(self::NOTE_ALLOC), $delta);
+        $context->builder->call(
+            $context->lookupFunction(self::NOTE_ALLOC),
+            $delta
+        );
     }
 
     public static function gcMemCaches(Context $context): Value
     {
         self::ensureLinked($context);
-        self::ensureGcMemCaches($context);
 
         return $context->builder->call($context->lookupFunction(self::GC_MEM_CACHES));
     }
 
     private static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::READ_RSS);
+        $probe = $context->module->getNamedFunction(self::GET_USAGE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::$peakEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
-            self::$peakRealGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL);
-            self::$currentEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
-            self::ensureGcMemCaches($context);
+            self::registerLinkedRuntime($context);
 
             return;
         }
 
-        $restoreBlock = self::captureInsertBlock($context);
-        $i64 = $context->getTypeFromString('int64');
-
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC)) {
-            self::$peakEmallocGlobal = $context->module->addGlobal($i64, self::GLOBAL_PEAK_EMALLOC);
-            self::$peakEmallocGlobal->setInitializer($i64->constInt(0, false));
-        } else {
-            self::$peakEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
-        }
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL)) {
-            self::$peakRealGlobal = $context->module->addGlobal($i64, self::GLOBAL_PEAK_REAL);
-            self::$peakRealGlobal->setInitializer($i64->constInt(0, false));
-        } else {
-            self::$peakRealGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_REAL);
-        }
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC)) {
-            self::$currentEmallocGlobal = $context->module->addGlobal($i64, self::GLOBAL_CURRENT_EMALLOC);
-            self::$currentEmallocGlobal->setInitializer($i64->constInt(0, false));
-        } else {
-            self::$currentEmallocGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
-        }
-
-        self::ensureLibcForStatm($context);
-        self::emitReadRssBytes($context);
-        self::emitReadEmallocBytes($context);
-        self::emitNoteAlloc($context);
-        self::ensureGcMemCaches($context);
-        self::restoreInsertBlock($context, $restoreBlock);
+        self::ensureJitHelperCompiled($context);
+        self::implementBoolToI64Bridge($context, self::GET_USAGE, self::GET_USAGE_HELPER);
+        self::implementBoolToI64Bridge($context, self::GET_PEAK_USAGE, self::GET_PEAK_USAGE_HELPER);
+        self::implementBoolVoidBridge($context, self::RESET_PEAK_USAGE, self::RESET_PEAK_USAGE_HELPER);
+        self::implementI64VoidBridge($context, self::NOTE_ALLOC, self::NOTE_ALLOC_HELPER);
+        self::implementZeroArgI64Bridge($context, self::GC_MEM_CACHES, self::GC_MEM_CACHES_HELPER);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function ensureGcMemCaches(Context $context): void
-    {
-        $probe = $context->module->getNamedFunction(self::GC_MEM_CACHES);
+    private static function implementBoolToI64Bridge(
+        Context $context,
+        string $abiName,
+        string $helperLogical
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::GC_MEM_CACHES, $probe);
+            $context->registerFunction($abiName, $probe);
 
             return;
         }
 
-        $restoreBlock = self::captureInsertBlock($context);
+        $i1 = $context->getTypeFromString('int1');
         $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($i64, false, $i1);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction(
-                self::GC_MEM_CACHES,
-                $context->context->functionType($i64, false)
-            );
+            : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('gc_mem_caches_entry');
+        $entry = $fn->appendBasicBlock('memory_bridge_entry');
         $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            $fn->getParam(0)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
 
-        $peakGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
-        $currentGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
-        if (null === $peakGlobal || null === $currentGlobal) {
-            throw new \LogicException('MemoryRuntime peak/current globals missing for gc_mem_caches');
+    private static function implementBoolVoidBridge(
+        Context $context,
+        string $abiName,
+        string $helperLogical
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
         }
 
-        $peak = $context->builder->load($peakGlobal);
-        $current = $context->builder->load($currentGlobal);
-        $zero = $i64->constInt(0, false);
-        $freed = $context->builder->sub($peak, $current);
-        $positive = $context->builder->icmp(Builder::INT_SGT, $freed, $zero);
-        $ret = $context->builder->select($positive, $freed, $zero);
-        $context->builder->store($current, $peakGlobal);
-        $context->builder->returnValue($ret);
-        $context->builder->clearInsertionPosition();
-        $context->registerFunction(self::GC_MEM_CACHES, $fn);
-        self::restoreInsertBlock($context, $restoreBlock);
-    }
+        $i1 = $context->getTypeFromString('int1');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i1);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-    private static function captureInsertBlock(Context $context): ?Value
-    {
-        try {
-            return $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-            return null;
-        }
-    }
-
-    private static function restoreInsertBlock(Context $context, ?Value $block): void
-    {
-        if (null !== $block) {
-            $context->builder->positionAtEnd($block);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
-    }
-
-    private static function emitReadRssBytes(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zeroI32 = $i32->constInt(0, false);
-
-        $fn = $context->module->addFunction(
-            self::READ_RSS,
-            $context->context->functionType($i64, false)
-        );
-        $context->registerFunction(self::READ_RSS, $fn);
-
-        $entry = $fn->appendBasicBlock('mem_rss_entry');
+        $entry = $fn->appendBasicBlock('memory_void_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $bufLen = 128;
-        $buf = $context->builder->alloca($i8, $i64->constInt($bufLen, false), 'mem_statm_buf');
-        $path = self::cstring($context, '/proc/self/statm');
-
-        $fd = $context->builder->call(
-            $context->lookupFunction('open'),
-            $path,
-            $i32->constInt(0, false),
-            $i32->constInt(0, false)
-        );
-        $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
-        $failBlock = $fn->appendBasicBlock('mem_rss_fail');
-        $openOk = $fn->appendBasicBlock('mem_rss_open_ok');
-        $context->builder->branchIf($openFail, $failBlock, $openOk);
-
-        $context->builder->positionAtEnd($openOk);
-        $nRead = $context->builder->call(
-            $context->lookupFunction('read'),
-            $fd,
-            $context->builder->pointerCast($buf, $i8p),
-            $context->builder->truncOrBitCast($i64->constInt($bufLen - 1, false), $sizeT)
-        );
-        $context->builder->call($context->lookupFunction('close'), $fd);
-
-        $readFail = $context->builder->icmp(Builder::INT_SLE, $nRead, $i64->constInt(0, false));
-        $parseBlock = $fn->appendBasicBlock('mem_rss_parse');
-        $context->builder->branchIf($readFail, $failBlock, $parseBlock);
-
-        $context->builder->positionAtEnd($parseBlock);
-        $context->builder->store($i8->constInt(0, false), $context->builder->inBoundsGEP($buf, $nRead));
-
-        $endPtrSlot = $context->builder->alloca($i8p, 1, 'mem_rss_end');
-        $context->builder->store($i8p->constNull(), $endPtrSlot);
-        $context->builder->call(
-            $context->lookupFunction('strtol'),
-            $context->builder->pointerCast($buf, $i8p),
-            $endPtrSlot,
-            $i32->constInt(10, false)
-        );
-        $rssStart = $context->builder->load($endPtrSlot);
-        $rssPages = $context->builder->call(
-            $context->lookupFunction('strtol'),
-            $rssStart,
-            $endPtrSlot,
-            $i32->constInt(10, false)
-        );
-        $rssPages64 = $context->builder->truncOrBitCast($rssPages, $i64);
-        $bytes = $context->builder->mul($rssPages64, $i64->constInt(4096, false));
-        $context->builder->returnValue($bytes);
-
-        $context->builder->positionAtEnd($failBlock);
-        $context->builder->returnValue($i64->constInt(0, false));
-
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitReadEmallocBytes(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            self::READ_EMALLOC,
-            $context->context->functionType($i64, false)
-        );
-        $context->registerFunction(self::READ_EMALLOC, $fn);
-        $entry = $fn->appendBasicBlock('mem_emalloc_entry');
-        $context->builder->positionAtEnd($entry);
-        $current = $context->builder->load(
-            $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC)
-        );
-        $context->builder->returnValue($current);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitNoteAlloc(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            self::NOTE_ALLOC,
-            $context->context->functionType($context->getTypeFromString('void'), false, $i64)
-        );
-        $context->registerFunction(self::NOTE_ALLOC, $fn);
-        $entry = $fn->appendBasicBlock('mem_note_entry');
-        $context->builder->positionAtEnd($entry);
-        $delta = $fn->getParam(0);
-        $currentGlobal = $context->module->getNamedGlobal(self::GLOBAL_CURRENT_EMALLOC);
-        $peakGlobal = $context->module->getNamedGlobal(self::GLOBAL_PEAK_EMALLOC);
-        $oldCurrent = $context->builder->load($currentGlobal);
-        $newCurrent = $context->builder->add($oldCurrent, $delta);
-        $zero = $i64->constInt(0, false);
-        $isNegative = $context->builder->icmp(Builder::INT_SLT, $newCurrent, $zero);
-        $clamped = $context->builder->select($isNegative, $zero, $newCurrent);
-        $context->builder->store($clamped, $currentGlobal);
-        $oldPeak = $context->builder->load($peakGlobal);
-        $isGreater = $context->builder->icmp(Builder::INT_SGT, $clamped, $oldPeak);
-        $newPeak = $context->builder->select($isGreater, $clamped, $oldPeak);
-        $context->builder->store($newPeak, $peakGlobal);
+        $context->builder->call(self::helperFunction($context, $helperLogical), $fn->getParam(0));
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function cstring(Context $context, string $text): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $len = strlen($text) + 1;
-        $buf = BasicBlockHelper::entryAlloca($context, $i8->arrayType($len));
-        $ptr = $context->builder->pointerCast($buf, $i8p);
-        for ($i = 0; $i < strlen($text); ++$i) {
-            $context->builder->store(
-                $i8->constInt(ord($text[$i]), false),
-                $context->builder->inBoundsGEP($ptr, $context->getTypeFromString('int64')->constInt($i, false))
-            );
+    private static function implementI64VoidBridge(
+        Context $context,
+        string $abiName,
+        string $helperLogical
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
         }
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($ptr, $context->getTypeFromString('int64')->constInt(strlen($text), false))
-        );
 
-        return $ptr;
-    }
-
-    private static function ensureLibcForStatm(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $context->getTypeFromString('int8**');
-        $sizeT = $context->getTypeFromString('size_t');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        self::ensureExternal(
-            $context,
-            'read',
-            $context->context->functionType($sizeT, false, $i32, $i8p, $sizeT)
-        );
-        self::ensureExternal(
-            $context,
-            'close',
-            $context->context->functionType($i32, false, $i32)
-        );
-        self::ensureExternal(
-            $context,
-            'strtol',
-            $context->context->functionType($i64, false, $i8p, $i8pp, $i32)
-        );
+        $entry = $fn->appendBasicBlock('memory_note_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->call(self::helperFunction($context, $helperLogical), $fn->getParam(0));
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
+    private static function implementZeroArgI64Bridge(
+        Context $context,
+        string $abiName,
+        string $helperLogical
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($i64, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('memory_gc_caches_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(self::helperFunction($context, $helperLogical));
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after MemoryJitHelper compile (#9377)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'MemoryJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('MemoryJitHelper.php parseAndCompile failed (#9377)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9377)');
+            }
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach ([self::GET_USAGE, self::GET_PEAK_USAGE, self::RESET_PEAK_USAGE, self::NOTE_ALLOC, self::GC_MEM_CACHES] as $abi) {
+            $fn = $context->module->getNamedFunction($abi);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($abi.' missing after MemoryRuntime bridge (#9377)');
+            }
+            $context->registerFunction($abi, $fn);
         }
     }
 }
