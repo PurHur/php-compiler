@@ -40,10 +40,12 @@ final class ModuleRegistryTest extends TestCase
 
     public function testStringInfoJitUsesModuleRegistry(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringInfo.php');
-        $this->assertStringContainsString('ModuleRegistry::getLoadedExtensions', $source);
-        $this->assertStringContainsString('ModuleRegistry::extensionFunctionMap', $source);
-        $this->assertStringNotContainsString('LOADED_EXTENSIONS', $source);
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringInfo.php');
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/InfoJitHelper.php');
+        $this->assertStringContainsString('InfoJitHelper', $bridge);
+        $this->assertStringContainsString('ModuleRegistry::getLoadedExtensions', $helper);
+        $this->assertStringContainsString('ModuleRegistry::getExtensionFunctions', $helper);
+        $this->assertStringNotContainsString('ModuleRegistry::extensionFunctionMap', $bridge);
     }
 
     public function testGetExtensionFunctionsReturnsNullWhenNotLoaded(): void
