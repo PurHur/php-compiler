@@ -10960,6 +10960,12 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\New_) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
@@ -11792,6 +11798,10 @@ class Compiler {
                     }
                     // Inline eval() call arg — php-cfg dead temp vs TYPE_EVAL producer (#10661, zif_eval).
                     if ($last instanceof Op\Expr\Eval_) {
+                        return $last;
+                    }
+                    // is_countable(new ArrayIterator([])) — ctor Array_ prelude + inline New_ (#10900).
+                    if ($last instanceof Op\Expr\New_) {
                         return $last;
                     }
                 }
@@ -16372,25 +16382,28 @@ class Compiler {
                                 $valueSlot = $arraySlot;
                             }
                         }
-                    } elseif (1 === $argIndex) {
-                        foreach ($block->orig->children as $i => $child) {
-                            if ($child === $cfgCallOp) {
-                                $prev = $block->orig->children[$i - 1] ?? null;
-                                if ($prev instanceof Op\Expr\ConstFetch) {
-                                    $name = $this->staticNameFromOperand($prev->name);
-                                    if (null !== $name && 'null' === strtolower($name)) {
-                                        if (null === $block->slotForOperand($prev->result)) {
-                                            foreach ($this->compileExpr($prev, $block) as $op) {
-                                                $sends[] = $op;
+                    } elseif (1 === $argIndex || 2 === $argIndex) {
+                        $nullTarget = $this->arrayColumnNullPreludeArgIndex($cfgCallOp);
+                        if ($nullTarget === $argIndex) {
+                            foreach ($block->orig->children as $i => $child) {
+                                if ($child === $cfgCallOp) {
+                                    $prev = $block->orig->children[$i - 1] ?? null;
+                                    if ($prev instanceof Op\Expr\ConstFetch) {
+                                        $name = $this->staticNameFromOperand($prev->name);
+                                        if (null !== $name && 'null' === strtolower($name)) {
+                                            if (null === $block->slotForOperand($prev->result)) {
+                                                foreach ($this->compileExpr($prev, $block) as $op) {
+                                                    $sends[] = $op;
+                                                }
+                                            }
+                                            $nullSlot = $block->slotForOperand($prev->result);
+                                            if (null !== $nullSlot) {
+                                                $valueSlot = $nullSlot;
                                             }
                                         }
-                                        $nullSlot = $block->slotForOperand($prev->result);
-                                        if (null !== $nullSlot) {
-                                            $valueSlot = $nullSlot;
-                                        }
                                     }
+                                    break;
                                 }
-                                break;
                             }
                         }
                     }
@@ -16409,6 +16422,34 @@ class Compiler {
         }
 
         return $sends;
+    }
+
+    /**
+     * Hoisted null ConstFetch before array_column() maps to column_key or index_key (#4306, #9305, #10535).
+     */
+    private function arrayColumnNullPreludeArgIndex(?Op $cfgCallOp): ?int
+    {
+        if (null === $cfgCallOp || !\is_array($cfgCallOp->args ?? null)) {
+            return null;
+        }
+        $args = $cfgCallOp->args;
+        $argc = \count($args);
+        if (2 === $argc) {
+            return 1;
+        }
+        if (3 !== $argc) {
+            return null;
+        }
+        $columnEmbedded = $this->isEmbeddedCallLiteralArg($args[1] ?? null);
+        $indexEmbedded = $this->isEmbeddedCallLiteralArg($args[2] ?? null);
+        if ($columnEmbedded && !$indexEmbedded) {
+            return 2;
+        }
+        if (!$columnEmbedded && $indexEmbedded) {
+            return 1;
+        }
+
+        return null;
     }
 
     /**
