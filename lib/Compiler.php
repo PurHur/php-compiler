@@ -12535,8 +12535,16 @@ class Compiler {
         if ($distance < 1 || $distance > $argCount) {
             return false;
         }
-        // Producer at distance d supplies consumer arg d-1; literals may follow (#10402).
-        $targetArg = $consumer->args[$distance - 1] ?? null;
+        $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $producerIndex,
+            $consumerIndex,
+            $cfgChildren
+        );
+        if (null === $targetArgIndex) {
+            return false;
+        }
+        // Producer at distance d supplies consumer arg d-1; UnaryMinus prelude shifts arg 0 (#10673).
+        $targetArg = $consumer->args[$targetArgIndex] ?? null;
         if (!$targetArg instanceof Operand\Temporary) {
             return false;
         }
@@ -12548,6 +12556,13 @@ class Compiler {
             ) {
                 continue;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                if (2 === $distance && $j === $producerIndex + 1) {
+                    continue;
+                }
+
+                return false;
+            }
             if (
                 !$mid instanceof Op\Expr\FuncCall
                 && !$mid instanceof Op\Expr\NsFuncCall
@@ -12557,6 +12572,34 @@ class Compiler {
         }
 
         return true;
+    }
+
+    private function isUnaryInlineSiblingCallArgExpr(?Op $op): bool
+    {
+        return $op instanceof Op\Expr\UnaryMinus
+            || $op instanceof Op\Expr\UnaryPlus
+            || $op instanceof Op\Expr\BitwiseNot
+            || $op instanceof Op\Expr\BooleanNot;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingMultiArgFuncCallProducerTargetArgIndex(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): ?int {
+        $distance = $consumerIndex - $producerIndex;
+        if ($distance < 1) {
+            return null;
+        }
+        $mid = $cfgChildren[$producerIndex + 1] ?? null;
+        if (2 === $distance && $this->isUnaryInlineSiblingCallArgExpr($mid)) {
+            return 0;
+        }
+
+        return $distance - 1;
     }
 
     private function isAdjacentNestedFuncCallProducer(
