@@ -11638,6 +11638,12 @@ class Compiler {
             return null;
         }
         $callArg = $callArgs[$argIndex] ?? null;
+        if (null !== $callArg) {
+            $booleanProducer = $this->matchBooleanBinaryOpInlineCallArgProducer($producers, $callArg);
+            if (null !== $booleanProducer) {
+                return $booleanProducer;
+            }
+        }
         if ($this->callArgIsNewExpression($callArg)) {
             foreach ($producers as $producer) {
                 if ($producer instanceof Op\Expr\New_) {
@@ -11657,6 +11663,24 @@ class Compiler {
                     }
 
                     return $trailing[$argIndex - 1] ?? null;
+                }
+            }
+            // php-cfg hoists compare/array-dim preludes before trailing literal args (#5901, #9660).
+            if ($argIndex < $argCount - 1) {
+                $trailingForLaterArgs = $argCount - 1 - $argIndex;
+                $prefixEnd = $producerCount - $trailingForLaterArgs;
+                if ($prefixEnd > 0) {
+                    $prefixLast = $producers[$prefixEnd - 1] ?? null;
+                    if (
+                        $prefixLast instanceof Op\Expr\BinaryOp\Identical
+                        || $prefixLast instanceof Op\Expr\BinaryOp\NotIdentical
+                        || $prefixLast instanceof Op\Expr\BinaryOp\Equal
+                        || $prefixLast instanceof Op\Expr\BinaryOp\NotEqual
+                        || $prefixLast instanceof Op\Expr\InstanceOf_
+                        || $prefixLast instanceof Op\Expr\In_
+                    ) {
+                        return $prefixLast;
+                    }
                 }
             }
             $extra = $producerCount - $argCount;
@@ -12168,6 +12192,31 @@ class Compiler {
         }
 
         return $filtered;
+    }
+
+    /**
+     * php-cfg dead temps for `var_export(C::AR[0] === E::X, true)` — Identical feeds arg 0, not ClassConstFetch (#5901, #9660).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchBooleanBinaryOpInlineCallArgProducer(array $producers, Operand $callArg): ?Op\Expr
+    {
+        foreach (array_reverse($producers) as $producer) {
+            if (
+                $producer instanceof Op\Expr\BinaryOp\Identical
+                || $producer instanceof Op\Expr\BinaryOp\NotIdentical
+                || $producer instanceof Op\Expr\BinaryOp\Equal
+                || $producer instanceof Op\Expr\BinaryOp\NotEqual
+                || $producer instanceof Op\Expr\InstanceOf_
+                || $producer instanceof Op\Expr\In_
+            ) {
+                if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+                    return $producer;
+                }
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -14185,6 +14234,26 @@ class Compiler {
     ): bool {
         if ($this->callArgOperandIsClosureValue($arg, $block)) {
             return false;
+        }
+        if (null !== $cfgCallOp && null !== $block->orig && is_array($cfgCallOp->args ?? null)) {
+            $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+            if (null !== $callSite) {
+                [$callOp, $siteArgIndex] = $callSite;
+                $callArg = $callOp->args[$siteArgIndex] ?? null;
+                if (null !== $callArg) {
+                    $callArgRoot = $this->unwrapOperandChain($callArg);
+                    if ($callArgRoot instanceof Op\Expr\BinaryOp) {
+                        return false;
+                    }
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $callOp
+                    );
+                    if (null !== $this->matchBooleanBinaryOpInlineCallArgProducer($producers, $callArg)) {
+                        return false;
+                    }
+                }
+            }
         }
         $argRoot = $this->unwrapOperandChain($arg);
         // Guard ordinal/hoisted binding: don't inject enum const fetch ops for scalar-typed call args.

@@ -818,6 +818,40 @@ PHP;
         self::assertNotSame($identSlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #5901 — var_export(C::AR[0] === E::X, true) wires Identical producer, not ClassConstFetch prelude. */
+    public function testVarExportClassConstArrayDimIdenticalUsesIdenticalProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case X = 1; case Y = 2; }
+class C { public const AR = [E::X, E::Y]; }
+echo var_export(C::AR[0] === E::X, true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'class_const_enum_identical_var_export.php');
+
+        $identSlot = null;
+        $classConstSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_IDENTICAL === $op->type) {
+                $identSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CLASS_CONST_FETCH === $op->type && null === $classConstSlot) {
+                $classConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($identSlot);
+        self::assertNotNull($classConstSlot);
+        self::assertCount(2, $sendSlots);
+        self::assertSame($identSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($classConstSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #9888 / #8796 — in_array(enum, [enum, ...], true) wires enum needle + inline haystack slots. */
     public function testInArrayEnumNeedleInlineHaystackStrictUsesEnumAndArraySlots(): void
     {
