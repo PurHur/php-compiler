@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in static property initializers and class constants rejected (#10391, Zend/zend_compile.c). */
+/** `new` in static/typed instance property initializers and class constants rejected (#10391, #10693, Zend/zend_compile.c). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -37,6 +37,16 @@ PHP);
 <?php
 class C {
     public static DateTime $d = new DateTime('2020-01-01');
+}
+PHP);
+    }
+
+    public function testInstanceTypedPropertyDefaultNewCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public DateTime $d = new DateTime('2020-01-01');
 }
 PHP);
     }
