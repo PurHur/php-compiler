@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** checkdate() — validate Gregorian calendar date (ext/standard/datetime.c, #3292). */
@@ -26,6 +27,9 @@ final class checkdate extends Internal
                 'checkdate() expects exactly 3 arguments, '.\count($frame->calledArgs).' given'
             );
         }
+        InternalStrictArg::rejectNullInt($frame->calledArgs[0], 'checkdate', 'month', 0);
+        InternalStrictArg::rejectNullInt($frame->calledArgs[1], 'checkdate', 'day', 1);
+        InternalStrictArg::rejectNullInt($frame->calledArgs[2], 'checkdate', 'year', 2);
         $month = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'checkdate', 1, 'month');
         $day = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'checkdate', 2, 'day');
         $year = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'checkdate', 3, 'year');

@@ -87,6 +87,98 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    /** Reject null for internal int parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED). */
+    public static function rejectNullInt(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::raiseTypeErrorAndAbort(
+                $context,
+                self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_reject_null_int_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_reject_null_int_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    /** Reject null for internal bool parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED). */
+    public static function rejectNullBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::raiseTypeErrorAndAbort(
+                $context,
+                self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_reject_null_bool_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_reject_null_bool_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     public static function requireBool(
         Context $context,
         Variable $arg,
