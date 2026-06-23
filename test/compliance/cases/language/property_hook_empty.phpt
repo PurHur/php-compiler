@@ -1,5 +1,5 @@
 --TEST--
-empty() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832)
+empty() on property hooks — get hook runs when present; set-only probes backing (#10680, #9832)
 --FILE--
 <?php
 class VirtualGetOnly {
@@ -48,6 +48,7 @@ try {
 get runs for empty()
 bool(true)
 virtual ok
+get runs for empty()
 bool(false)
 ok
 bool(true)

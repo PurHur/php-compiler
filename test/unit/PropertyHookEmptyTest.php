@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** empty() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832). */
+/** empty() on property hooks — get hook runs when present; set-only probes backing (#10680, #9832). */
 final class PropertyHookEmptyTest extends TestCase
 {
     public function testVmEmptyOnVirtualGetHookInvokesGet(): void
@@ -30,7 +30,7 @@ PHP;
         self::assertSame("get runs for empty\nbool(true)\nok\n", ob_get_clean());
     }
 
-    public function testVmEmptyOnSeparateBackingDoesNotInvokeGetHookWhenInitialized(): void
+    public function testVmEmptyOnSeparateBackingInvokesGetHook(): void
     {
         $code = <<<'PHP'
 <?php
@@ -48,6 +48,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(false)\n", ob_get_clean());
+        self::assertSame("get runs for empty\nbool(false)\n", ob_get_clean());
     }
 }
