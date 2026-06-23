@@ -196,8 +196,14 @@ final class VmDateTimeNative
                 3 => 'Not enough data available to satisfy format',
             ]);
         }
+        $normalized = self::normalizeMatchedComponents($matched);
+        $result = self::parseResultFromComponents($normalized['components']);
+        if ([] !== $normalized['warnings']) {
+            $result['warning_count'] = \count($normalized['warnings']);
+            $result['warnings'] = $normalized['warnings'];
+        }
 
-        return self::parseResultFromComponents($matched);
+        return $result;
     }
 
     /**
@@ -209,6 +215,8 @@ final class VmDateTimeNative
         if (false === $matched) {
             return false;
         }
+        $normalized = self::normalizeMatchedComponents($matched);
+        $matched = $normalized['components'];
         $year = $matched['year'] ?? false;
         $month = $matched['month'] ?? false;
         $day = $matched['day'] ?? false;
@@ -228,6 +236,57 @@ final class VmDateTimeNative
         } catch (NativeDateMalformedStringException) {
             return false;
         }
+    }
+
+    /**
+     * php-src PHP_FUNCTION(strtotime) — natural-language / relative timestamps (#10742).
+     */
+    public static function strtotime(string $time, ?int $now = null): int|false
+    {
+        $time = trim($time);
+        if ('' === $time) {
+            return false;
+        }
+        $tzName = VmDate::defaultTimezoneGet();
+        try {
+            self::validateTimezoneId($tzName);
+        } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+            return false;
+        }
+        $base = $now ?? self::readNow()['timestamp'];
+        if (1 === preg_match(
+            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::nextWeekdayTimestamp(strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
+            $time
+        )) {
+            try {
+                return self::modifyRelative($base, $time, $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return false;
+            }
+        }
+        try {
+            $parsed = self::parseDateTime($time, $tzName);
+
+            return $parsed['timestamp'];
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
+    }
+
+    /** Zend DateTime serialize wire: `Y-m-d H:i:s.u` with six-digit fraction (#10710). */
+    public static function formatZendDateWire(int $timestamp, int $microsecond, string $tzName): string
+    {
+        $date = self::format($timestamp, $microsecond, $tzName, 'Y-m-d H:i:s');
+        $frac = \str_pad((string) $microsecond, 6, '0', STR_PAD_LEFT);
+
+        return $date.'.'.$frac;
     }
 
     /**
@@ -357,6 +416,11 @@ final class VmDateTimeNative
      */
     private static function matchFormatComponents(string $format, string $time): array|false
     {
+        $bangReset = false;
+        if (\str_starts_with($format, '!')) {
+            $bangReset = true;
+            $format = \substr($format, 1);
+        }
         $pos = 0;
         $timeLen = \strlen($time);
         $components = [
@@ -500,8 +564,94 @@ final class VmDateTimeNative
         if ($pos !== $timeLen) {
             return false;
         }
+        if ($bangReset) {
+            foreach ([
+                'year' => 1970,
+                'month' => 1,
+                'day' => 1,
+                'hour' => 0,
+                'minute' => 0,
+                'second' => 0,
+            ] as $key => $default) {
+                if (false === $components[$key]) {
+                    $components[$key] = $default;
+                }
+            }
+        }
 
         return $components;
+    }
+
+    /**
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float
+     * } $components
+     *
+     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     */
+    private static function normalizeMatchedComponents(array $components): array
+    {
+        $warnings = [];
+        $year = $components['year'];
+        $month = $components['month'];
+        $day = $components['day'];
+        if (false !== $year && false !== $month && false !== $day) {
+            $invalid = false;
+            while ($day > self::daysInMonth($year, $month)) {
+                $day -= self::daysInMonth($year, $month);
+                ++$month;
+                if ($month > 12) {
+                    $month = 1;
+                    ++$year;
+                }
+                $invalid = true;
+            }
+            if ($invalid) {
+                $warnings[10] = 'The parsed date was invalid';
+            }
+            $components['year'] = $year;
+            $components['month'] = $month;
+            $components['day'] = $day;
+        }
+
+        return ['components' => $components, 'warnings' => $warnings];
+    }
+
+    private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return false;
+        }
+        $target = match ($weekday) {
+            'sunday' => 0,
+            'monday' => 1,
+            'tuesday' => 2,
+            'wednesday' => 3,
+            'thursday' => 4,
+            'friday' => 5,
+            'saturday' => 6,
+            default => -1,
+        };
+        if ($target < 0) {
+            return false;
+        }
+        $current = (int) $tm->tm_wday;
+        $days = ($target - $current + 7) % 7;
+        if (0 === $days) {
+            $days = 7;
+        }
+        try {
+            return self::modifyRelative($base, '+'.$days.' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
     }
 
     private static function readDigits(string $time, int &$pos, int $min, ?int $max): string|false

@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmDateTimeNative;
+use PHPCompiler\ext\standard\VmSerialize;
 
 /**
  * Shared helpers for DateTime / DateTimeZone VM builtins (issue #3072, #7082).
@@ -333,7 +334,17 @@ final class DateTimeSupport
 
             return null;
         }
-        self::clearCreateFromFormatLastErrors();
+        $components = VmDateTimeNative::parseFromFormatComponents($format, $time);
+        if ($components['warning_count'] > 0) {
+            self::$createFromFormatLastErrors = [
+                'warning_count' => $components['warning_count'],
+                'warnings' => $components['warnings'],
+                'error_count' => 0,
+                'errors' => [],
+            ];
+        } else {
+            self::clearCreateFromFormatLastErrors();
+        }
         $entry = new ObjectEntry($class);
         self::applyParsedState($entry, $parsed, $tzName);
         $entry->constructed = true;
@@ -629,8 +640,8 @@ final class DateTimeSupport
         self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated);
     }
 
-    /** php-src zim_DateTimeImmutable_modify — returns new instance (#6132). */
-    public static function withModify(ObjectEntry $dt, string $modifier): ObjectEntry
+    /** @return bool false when modifier string is unparseable (php-src date_object_modify, #10733). */
+    public static function tryModify(ObjectEntry $dt, string $modifier): bool
     {
         $label = self::classLabel($dt);
         self::requireInitializedDateTimeLike($dt, "{$label}::modify()");
@@ -638,11 +649,41 @@ final class DateTimeSupport
         $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
         try {
             $updated = VmDateTimeNative::modifyRelative($timestamp, $modifier, $tzName);
-        } catch (NativeDateMalformedStringException $e) {
-            self::throwDateMalformedStringException($e->getMessage());
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated);
+
+        return true;
+    }
+
+    /** @return ObjectEntry|false */
+    public static function tryWithModify(ObjectEntry $dt, string $modifier): ObjectEntry|false
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::modify()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        try {
+            $updated = VmDateTimeNative::modifyRelative($timestamp, $modifier, $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return false;
         }
         $clone = self::cloneDateTimeObject($dt);
         self::requireIntProperty($clone, self::TS_PROPERTY, $label)->int($updated);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTimeImmutable_modify — returns new instance (#6132). */
+    public static function withModify(ObjectEntry $dt, string $modifier): ObjectEntry
+    {
+        $clone = self::tryWithModify($dt, $modifier);
+        if (false === $clone) {
+            self::throwDateMalformedStringException(
+                'Failed to parse time string ('.$modifier.') at position 0 ('.('' !== $modifier ? $modifier[0] : '').'): Unexpected character'
+            );
+        }
 
         return $clone;
     }
@@ -802,5 +843,52 @@ final class DateTimeSupport
         }
 
         return $var;
+    }
+
+    /** php-src php_date_serialize — Zend `date` / `timezone_type` / `timezone` wire (#10710). */
+    public static function encodeZendSerializeWire(ObjectEntry $dt): string
+    {
+        self::requireInitializedDateTimeLike($dt, self::classLabel($dt));
+        $className = self::classLabel($dt);
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $className)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $className)->toInt();
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $className)->toString();
+        $dateWire = VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName);
+
+        return VmSerialize::encodeExportedPropertyBag($className, [
+            'date' => $dateWire,
+            'timezone_type' => 3,
+            'timezone' => $tzName,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data Zend DateTime unserialize payload
+     */
+    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ?ObjectEntry
+    {
+        $dateWire = $data['date'] ?? null;
+        if (!\is_string($dateWire)) {
+            return null;
+        }
+        $tzName = isset($data['timezone']) && \is_string($data['timezone'])
+            ? $data['timezone']
+            : VmDate::defaultTimezoneGet();
+        try {
+            VmDateTimeNative::validateTimezoneId($tzName);
+            $parsed = VmDateTimeNative::parseDateTime($dateWire, $tzName);
+        } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
+            return null;
+        }
+        $class = $ctx->classes[$classKey] ?? null;
+        if (null === $class) {
+            return null;
+        }
+        $entry = new ObjectEntry($class);
+        self::applyParsedState($entry, $parsed, $tzName);
+        $entry->constructed = true;
+        self::markDateTimeLikeInitialized($entry);
+
+        return $entry;
     }
 }

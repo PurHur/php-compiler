@@ -834,6 +834,7 @@ class Module extends ModuleAbstract
             new gmgetdate(),
             new gmmktime(),
             new mktime(),
+            new strtotime(),
             new checkdate(),
             new date_default_timezone_get(),
             new date_default_timezone_set(),
