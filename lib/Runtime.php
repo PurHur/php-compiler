@@ -170,6 +170,7 @@ class Runtime {
     /** VMContext only; `new VM` deferred to run() (#1494). */
     private function initVmContext(): void {
         $this->vmContext = new VMContext($this);
+        Web\VendorSpineAutoload::register($this);
     }
 
     private function ensureVm(): void {
