@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\ProcessRuntime;
 use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\LibcExtern;
@@ -25,6 +26,8 @@ final class JitExec
         if ($argc < 1 || $argc > 3) {
             throw new \LogicException('exec() accepts one to three arguments in this compiler build');
         }
+
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'exec', 'command', 1);
 
         $cmd = JitStringBuiltinArg::lower($context, $args[0], 'exec', 0, 'command');
         $capture = self::capture($context, $cmd);
@@ -73,6 +76,8 @@ final class JitExec
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
 
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'passthru', 'command', 1);
+
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false);
     }
 
@@ -82,6 +87,8 @@ final class JitExec
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('system() accepts one or two arguments in this compiler build');
         }
+
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'system', 'command', 1);
 
         return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true);
     }
