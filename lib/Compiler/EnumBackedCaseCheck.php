@@ -11,9 +11,10 @@ use PHPCfg\Script;
 
 /**
  * Compile-time check: backed enum cases must declare an explicit scalar value (#5397).
+ * Duplicate case names are rejected at compile (#5218, zend_compile.c).
  * Duplicate backing values are rejected at compile when values are known (#5773, #9677, zend_enum.c).
  *
- * php-src: Zend/zend_enum.c — zend_register_enum_case
+ * php-src: Zend/zend_enum.c — zend_register_enum_case; Zend/zend_compile.c — enum case registration
  */
 final class EnumBackedCaseCheck
 {
@@ -56,6 +57,9 @@ final class EnumBackedCaseCheck
 
     private function validateEnum(Op\Stmt\Enum_ $enum): void
     {
+        $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
+        $this->validateDuplicateCaseNames($enum, $enumDisplay);
+
         if (null === $enum->backedType || !$enum->backedType instanceof Op\Type\Literal) {
             return;
         }
@@ -63,14 +67,13 @@ final class EnumBackedCaseCheck
         if ('int' !== $backedType && 'string' !== $backedType) {
             return;
         }
-        $enumDisplay = $this->operandDisplayName($enum->name, 'enum');
         $cases = [];
         $duplicateSite = null;
         foreach ($enum->stmts->children as $member) {
             if (!$member instanceof Op\Terminal\Const_) {
                 continue;
             }
-            if (property_exists($member, 'isEnumCase') && !$member->isEnumCase) {
+            if (!$this->memberIsEnumCase($member, $enum)) {
                 continue;
             }
             $caseName = $this->operandDisplayName($member->name, 'case');
@@ -98,6 +101,63 @@ final class EnumBackedCaseCheck
                 $message
             );
         }
+    }
+
+    /**
+     * Zend rejects duplicate enum case names at compile time (#5218, zend_compile.c).
+     */
+    private function validateDuplicateCaseNames(Op\Stmt\Enum_ $enum, string $enumDisplay): void
+    {
+        /** @var array<string, true> */
+        $seen = [];
+        foreach ($enum->stmts->children as $member) {
+            if (!$member instanceof Op\Terminal\Const_) {
+                continue;
+            }
+            if (!$this->memberIsEnumCase($member, $enum)) {
+                continue;
+            }
+            $caseName = $this->operandDisplayName($member->name, 'case');
+            $lc = strtolower($caseName);
+            if (isset($seen[$lc])) {
+                throw new CompileFatal(
+                    $member->getFile(),
+                    $member->getLine(),
+                    sprintf('Cannot redefine class constant %s::%s', $enumDisplay, $caseName)
+                );
+            }
+            $seen[$lc] = true;
+        }
+    }
+
+    private function memberIsEnumCase(Op\Terminal\Const_ $member, Op\Stmt\Enum_ $enum): bool
+    {
+        if (property_exists($member, 'isEnumCase')) {
+            return $member->isEnumCase;
+        }
+        if (property_exists($member, 'declaredType') && null !== $member->declaredType) {
+            return false;
+        }
+        $flags = property_exists($member, 'flags') ? (int) $member->flags : 0;
+        if (0 !== ($flags & (\PHPCfg\Func::FLAG_PROTECTED | \PHPCfg\Func::FLAG_PRIVATE | \PHPCfg\Func::FLAG_FINAL))) {
+            return false;
+        }
+        if (null === $enum->backedType || !$enum->backedType instanceof Op\Type\Literal) {
+            return 0 === $flags;
+        }
+        $backedType = $enum->backedType->name;
+        if ('int' !== $backedType && 'string' !== $backedType) {
+            return false;
+        }
+        $literal = $this->literalFromEnumCaseValue($member);
+        if (null === $literal) {
+            return false;
+        }
+        if ('int' === $backedType) {
+            return \is_int($literal->value);
+        }
+
+        return \is_string($literal->value);
     }
 
     /**

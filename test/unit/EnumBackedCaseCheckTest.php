@@ -132,6 +132,38 @@ PHP,
         );
     }
 
+    public function testUnitEnumDuplicateCaseNameFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redefine class constant E::A');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E {
+    case A;
+    case A;
+}
+PHP,
+            'enum_dup_case.php'
+        );
+    }
+
+    public function testBackedEnumDuplicateCaseNameFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Cannot redefine class constant E::A');
+        $runtime->parseAndCompile(<<<'PHP'
+<?php
+enum E: string {
+    case A = 'x';
+    case A = 'y';
+}
+PHP,
+            'enum_dup_case_backed.php'
+        );
+    }
+
     public function testDuplicateBackingErrorMessage(): void
     {
         $message = \PHPCompiler\Compiler\EnumBackedCaseCheck::duplicateBackingErrorMessage('E', [
