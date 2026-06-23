@@ -13,21 +13,17 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for strlen() string operand (php-src ext/standard/string.c, #5119, #10166). */
+/** LLVM lowering for strlen() string operand (php-src ext/standard/string.c, #5119, #10166, #10910). */
 final class JitStrlen
 {
-    private const NULL_DEPRECATION =
-        'strlen(): Passing null to parameter #1 ($string) of type string is deprecated';
-
     public static function lowerLength(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            self::emitNullDeprecation($context);
+            self::emitTypeErrorAndAbort($context, 'null');
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -127,10 +123,8 @@ final class JitStrlen
         );
         $i8 = $context->getTypeFromString('int8');
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $i64 = $context->getTypeFromString('int64');
-        $nullBlock = BasicBlockHelper::append($context, 'strlen_null_deprec');
+        $nullBlock = BasicBlockHelper::append($context, 'strlen_null_typeerror');
         $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
-        $mergeBlock = BasicBlockHelper::append($context, 'strlen_value_merge');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -141,8 +135,7 @@ final class JitStrlen
             $okBlock
         );
         $context->builder->positionAtEnd($nullBlock);
-        self::emitNullDeprecation($context);
-        $context->builder->branch($mergeBlock);
+        self::emitTypeErrorAndAbort($context, 'null');
         $context->builder->positionAtEnd($okBlock);
         $arrayTy = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
@@ -164,14 +157,8 @@ final class JitStrlen
         JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
         $context->builder->positionAtEnd($coerceBlock);
         $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
-        $len = self::loadStringLength($context, $argValue);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($mergeBlock);
-        $phi = $context->builder->phi($i64);
-        $phi->addIncoming($i64->constInt(0, false), $nullBlock);
-        $phi->addIncoming($len, $coerceBlock);
 
-        return $phi;
+        return self::loadStringLength($context, $argValue);
     }
 
     private static function loadStringLength(Context $context, Value $strPtr): Value
@@ -180,27 +167,6 @@ final class JitStrlen
 
         return $context->builder->load(
             $context->builder->structGep($strPtr, $offset)
-        );
-    }
-
-    public static function emitNullDeprecation(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast(
-            $context->constantFromString(self::NULL_DEPRECATION),
-            $i8p
-        );
-        $msgLen = $sizeT->constInt(\strlen(self::NULL_DEPRECATION), false);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $msgLen,
-            $i32->constInt(ErrorReporter::E_DEPRECATED, false),
-            $emptyFile,
-            $i32->constInt(0, false)
         );
     }
 

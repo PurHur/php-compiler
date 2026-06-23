@@ -1,7 +1,9 @@
 --TEST--
-AOT: strlen() — null deprecated, returns 0 (#5000)
+AOT: strlen() — null TypeError (#10910)
 --FILE--
 <?php
-echo strlen(null), "\n";
+declare(strict_types=1);
+strlen(null);
 --EXPECT--
-0
+--EXPECT_EXIT--
+134
