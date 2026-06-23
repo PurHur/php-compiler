@@ -151,6 +151,8 @@ final class BuiltinParamNames
                 return ['stream', 'length'];
             case 'parse_url':
                 return ['url', 'component'];
+            case 'proc_open':
+                return ['command', 'descriptor_spec', 'pipes', 'cwd', 'env', 'options'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
             case 'call_user_func':
