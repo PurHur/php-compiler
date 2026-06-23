@@ -29,15 +29,11 @@ final class GeneratorThrow implements Call
         $statePtr = GeneratorHelper::loadStateFromGeneratorObject($context, $genVar);
         $map = $context->structFieldMap['__generator_state__'];
         $i1 = $context->getTypeFromString('int1');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
         $done = $context->builder->load($context->builder->structGep($statePtr, $map['done']));
-        $resumeIp = $context->builder->load($context->builder->structGep($statePtr, $map['resume_ip']));
-        $hasCurrent = $context->builder->load($context->builder->structGep($statePtr, $map['has_current']));
         $fn = $context->builder->getInsertBlock()->getParent();
         $okBlock = $fn->appendBasicBlock('gen_throw_ok');
         $closedBlock = $fn->appendBasicBlock('gen_throw_closed');
-        $uninitFail = $fn->appendBasicBlock('gen_throw_uninit');
+        $throwOk = $fn->appendBasicBlock('gen_throw_resume');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $done, $i1->constInt(0, false)),
             $okBlock,
@@ -48,14 +44,7 @@ final class GeneratorThrow implements Call
         $context->builder->positionAtEnd($closedBlock);
         $this->emitClosedGeneratorThrowInCallerContext($context, $excObj);
         $context->builder->positionAtEnd($okBlock);
-        $started = $context->builder->or(
-            $context->builder->icmp(Builder::INT_NE, $resumeIp, $zero),
-            $context->builder->icmp(Builder::INT_NE, $hasCurrent, $i1->constInt(0, false))
-        );
-        $throwOk = $fn->appendBasicBlock('gen_throw_resume');
-        $context->builder->branchIf($started, $throwOk, $uninitFail);
-        $context->builder->positionAtEnd($uninitFail);
-        TryCatchHelper::emitCatchableClassError($context, 'Exception', 'Cannot throw to an uninitialized generator');
+        $context->builder->branch($throwOk);
         $context->builder->positionAtEnd($throwOk);
         $pendingField = $context->builder->structGep($statePtr, $map['pending_throw']);
         $context->builder->call(
