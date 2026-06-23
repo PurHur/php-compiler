@@ -37,8 +37,8 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern', 0);
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement', 1);
+        $patternVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        $replacementVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[1], 'preg_replace', 1, 'replacement');
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'preg_replace',
@@ -55,6 +55,15 @@ final class preg_replace extends Internal
             }
             $limit = $limitVar->toInt();
         }
+
+        $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        $replacement = self::patternOrReplacementOperand(
+            $replacementVar,
+            $frame->calledArgs[1],
+            'preg_replace',
+            1,
+            'replacement'
+        );
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
             $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit);
@@ -111,6 +120,12 @@ final class preg_replace extends Internal
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);
 
+        if (self::isArrayPatternOrReplacement($args[0]) || self::isArrayPatternOrReplacement($args[1])) {
+            throw new \LogicException(
+                'preg_replace() array $pattern/$replacement is not supported for JIT/AOT in this compiler build'
+            );
+        }
+
         $pattern = JitStringArg::lower($context, $args[0], 'preg_replace() pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
@@ -148,5 +163,36 @@ final class preg_replace extends Internal
         }
 
         return null;
+    }
+
+    /**
+     * @return string|list<string>
+     */
+    private static function patternOrReplacementOperand(
+        Variable $var,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): string|array {
+        if (Variable::TYPE_STRING === $var->type) {
+            return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName);
+        }
+
+        $values = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
+            $values[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName);
+        }
+
+        return $values;
+    }
+
+    private static function isArrayPatternOrReplacement(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return true;
+        }
+
+        return 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY);
     }
 }
