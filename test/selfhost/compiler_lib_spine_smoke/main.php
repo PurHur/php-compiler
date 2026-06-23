@@ -1810,6 +1810,7 @@ require_once __DIR__.'/../../../ext/standard/time_nanosleep.php';
 require_once __DIR__.'/../../../ext/standard/time_sleep_until.php';
 require_once __DIR__.'/../../../ext/standard/timezone_identifiers_list.php';
 require_once __DIR__.'/../../../ext/standard/timezone_location_get.php';
+require_once __DIR__.'/../../../ext/standard/TimezoneLocationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/timezone_offset_get.php';
 require_once __DIR__.'/../../../ext/standard/TimezoneOffsetJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/timezone_open.php';
