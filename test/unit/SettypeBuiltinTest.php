@@ -122,4 +122,25 @@ final class SettypeBuiltinTest extends TestCase
         $this->assertSame(VMVariable::TYPE_STRING, $resolved->type);
         $this->assertSame('Resource id #'.$handle, $resolved->toString());
     }
+
+    /** Issue #10812: settype($resource, 'int') → resource handle id (ext/standard/type.c). */
+    public function testSettypeResourceToInt(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        BuiltinClasses::register($ctx);
+        $frame = $this->getMockBuilder(Frame::class)->disableOriginalConstructor()->getMock();
+        $frame->vmContext = $ctx;
+
+        $var = new VMVariable();
+        $handle = \PHPCompiler\ext\standard\VmFs::fopen('php://memory', 'r+');
+        $this->assertIsInt($handle);
+        $var->streamHandle($handle, $ctx);
+
+        VmSettype::apply($var, 'int', $frame);
+
+        $resolved = $var->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_INTEGER, $resolved->type);
+        $this->assertSame($handle, $resolved->toInt());
+    }
 }
