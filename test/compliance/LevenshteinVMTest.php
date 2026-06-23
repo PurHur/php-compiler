@@ -33,6 +33,10 @@ final class LevenshteinVMTest extends BaseTest
             __DIR__.'/cases/stdlib/levenshtein_inline_str_repeat.phpt',
             'levenshtein_inline_str_repeat.phpt'
         );
+        yield 'levenshtein_dual_str_repeat.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/levenshtein_dual_str_repeat.phpt',
+            'levenshtein_dual_str_repeat.phpt'
+        );
         yield 'levenshtein_named_cost_params.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/levenshtein_named_cost_params.phpt',
             'levenshtein_named_cost_params.phpt'
