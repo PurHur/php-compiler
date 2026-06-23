@@ -36,6 +36,7 @@ final class usort_ extends Internal
             throw new \LogicException('usort() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, 'usort');
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
