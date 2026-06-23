@@ -14,9 +14,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -28,6 +30,7 @@ final class str_contains extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_contains', 2);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0);
         $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_contains',
@@ -61,6 +64,7 @@ final class str_contains extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'str_contains', 2)) {
             return $context->getTypeFromString('int1')->constInt(0, false);
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle');
 
