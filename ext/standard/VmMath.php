@@ -615,6 +615,16 @@ final class VmMath
     }
 
     /**
+     * int**int — preserves int when Zend overflow rules allow (#3678, #9515).
+     *
+     * @return int|float
+     */
+    public static function powInt(int $base, int $exp): int|float
+    {
+        return $base ** $exp;
+    }
+
+    /**
      * pow() return typing — int when both operands are int with integral result (php-src math.c, issue #3678).
      */
     public static function applyPow(Variable $returnVar, Variable $base, Variable $exp): void
@@ -623,7 +633,7 @@ final class VmMath
         $baseNum = self::parseNumberBuiltinArg($base, 'pow', 1, 'num');
         $expNum = self::parseNumberBuiltinArg($exp, 'pow', 2, 'exponent');
         if (\is_int($baseNum) && \is_int($expNum)) {
-            $result = $baseNum ** $expNum;
+            $result = self::powInt($baseNum, $expNum);
             if (\is_int($result)) {
                 $returnVar->int($result);
 
