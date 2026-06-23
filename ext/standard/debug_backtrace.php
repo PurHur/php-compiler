@@ -33,11 +33,21 @@ final class debug_backtrace extends Internal
         }
         $options = 0;
         $limit = 0;
-        if ($argc >= 1) {
-            $options = $frame->calledArgs[0]->resolveIndirect()->toInt();
+        if (isset($frame->calledArgs[0])) {
+            $options = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[0],
+                'debug_backtrace',
+                1,
+                'options'
+            );
         }
-        if ($argc >= 2) {
-            $limit = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        if (isset($frame->calledArgs[1])) {
+            $limit = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'debug_backtrace',
+                2,
+                'limit'
+            );
         }
         $frame->returnVar->copyFrom(VmDebugBacktrace::build($frame, $options, $limit));
     }

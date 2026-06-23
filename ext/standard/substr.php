@@ -36,7 +36,7 @@ final class substr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $offsetInt = VmMath::parseIntBuiltinArg($offset, 'substr', 2, 'offset');
+        $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'substr', 2, 'offset');
         if (3 === $argc) {
             $length = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL === $length->type) {
@@ -44,7 +44,7 @@ final class substr extends Internal
 
                 return;
             }
-            $lengthInt = VmMath::parseIntBuiltinArg($length, 'substr', 3, 'length');
+            $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'substr', 3, 'length');
             $frame->returnVar->string(VmString::substr($string, $offsetInt, $lengthInt));
 
             return;

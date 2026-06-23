@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /** Shared math coercion helpers for ext/standard (issue #3578) and base_convert (#3173). */
@@ -245,6 +246,30 @@ final class VmMath
         }
 
         return self::parseLongBuiltinArgCore($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * int builtin args with strict_types TypeError on float (#10468, zend_verify_arg_type).
+     */
+    public static function parseIntBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): int {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toInt();
+        }
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::parseIntBuiltinArg($var, $function, $userArgIndex, $paramName);
     }
 
     /**

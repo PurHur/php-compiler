@@ -163,6 +163,11 @@ final class BuiltinParamNames
                 return ['array', 'num'];
             case 'array_column':
                 return ['array', 'column_key', 'index_key'];
+            case 'debug_backtrace':
+            case 'get_debug_backtrace':
+                return ['options', 'limit'];
+            case 'file':
+                return ['filename', 'flags'];
         }
 
         return null;
