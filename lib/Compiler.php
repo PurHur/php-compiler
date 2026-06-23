@@ -11788,8 +11788,18 @@ class Compiler {
                     $arrayIdx = $pi;
                 }
             }
-            // array_map(callback, array) — map closure/arrow to arg 0 and Array_ to arg 1 regardless of hoist order (#10651).
+            // Closure + inline Array_ — match by dead-temp operand wiring first (#10827, array_all/any/find);
+            // array_map(callback, array) fallback when links are opaque (#10651).
             if (null !== $closureIdx && null !== $arrayIdx && 2 === $producerCount && 2 === $argCount) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (null !== $callArg) {
+                    if ($this->operandsReferToSameVariable($producers[$arrayIdx]->result, $callArg)) {
+                        return $producers[$arrayIdx];
+                    }
+                    if ($this->operandsReferToSameVariable($producers[$closureIdx]->result, $callArg)) {
+                        return $producers[$closureIdx];
+                    }
+                }
                 if (0 === $argIndex) {
                     return $producers[$closureIdx];
                 }
