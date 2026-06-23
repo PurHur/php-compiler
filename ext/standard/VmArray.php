@@ -133,6 +133,12 @@ final class VmArray
     {
         $key = $key->resolveIndirect();
         self::rejectEnumCaseKeyVariable($key);
+        $resourceKey = VmVarFormat::tryFormatPrintR($key);
+        if (null !== $resourceKey) {
+            $ht->update($resourceKey, $stored);
+
+            return;
+        }
         if (Variable::TYPE_INTEGER === $key->type) {
             $ht->updateIndex($key->toInt(), $stored);
 

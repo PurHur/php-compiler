@@ -9078,11 +9078,23 @@ final class ArrayBuiltinHelper
         $context->builder->branchIf($isLong, $longBlock, $afterLong);
 
         $context->builder->positionAtEnd($longBlock);
-        $intKey = $context->builder->truncOrBitCast(
-            $context->builder->call($context->lookupFunction('__value__readLong'), $keyEntry),
-            $sizeT
+        $longVal = $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $keyEntry
         );
+        $isResource = JitValueCompare::nativeLongIsResource($context, $longVal);
+        $longPlainBlock = BasicBlockHelper::append($context, 'array_combine_key_long_plain');
+        $longResBlock = BasicBlockHelper::append($context, 'array_combine_key_long_resource');
+        $context->builder->branchIf($isResource, $longResBlock, $longPlainBlock);
+
+        $context->builder->positionAtEnd($longPlainBlock);
+        $intKey = $context->builder->truncOrBitCast($longVal, $sizeT);
         self::storeValueEntryAtIndex($context, $dest, $intKey, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($longResBlock);
+        $keyStrFromRes = self::formatResourceIdStringKey($context, $longVal);
+        self::storeValueEntryAtStringKey($context, $dest, $keyStrFromRes, $valEntry);
         $context->builder->branch($done);
 
         $doubleBlock = BasicBlockHelper::append($context, 'array_combine_key_double');
@@ -9188,6 +9200,33 @@ final class ArrayBuiltinHelper
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmt = $context->builder->pointerCast($context->constantFromString('%G'), $charPtr);
         $written = $context->builder->call($context->lookupFunction('snprintf'), $bufChar, $bufSize, $fmt, $doubleVal);
+        $len = $context->builder->zExt($written, $i64);
+        $str = $context->builder->call($context->lookupFunction('__string__init'), $len, $bufChar);
+        $context->builder->call($context->lookupFunction('__mm__free'), $buf);
+
+        return $str;
+    }
+
+    /** php-src convert_to_key: resource handles become "Resource id #N" string keys (ext/standard/array.c, #10847). */
+    private static function formatResourceIdStringKey(Context $context, Value $handleLong): Value
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $charPtr = $context->getTypeFromString('char*');
+        $i64 = $context->getTypeFromString('int64');
+        $bufSize = $sizeT->constInt(32, false);
+        $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
+        $bufChar = $context->builder->pointerCast($buf, $charPtr);
+        $fmt = $context->builder->pointerCast(
+            $context->constantFromString(\PHPCompiler\VM\ValueEchoSupport::RESOURCE_FORMAT),
+            $charPtr
+        );
+        $written = $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $bufChar,
+            $bufSize,
+            $fmt,
+            $handleLong
+        );
         $len = $context->builder->zExt($written, $i64);
         $str = $context->builder->call($context->lookupFunction('__string__init'), $len, $bufChar);
         $context->builder->call($context->lookupFunction('__mm__free'), $buf);
