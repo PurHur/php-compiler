@@ -1364,6 +1364,9 @@ class Compiler {
         if ($this->isPropertyWriteAssign($assign, $branch)) {
             return null;
         }
+        if ($this->isArrayDimWriteAssign($assign, $branch)) {
+            return null;
+        }
         if (!$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
@@ -3288,6 +3291,16 @@ class Compiler {
 
         return null !== $this->unwrapStaticPropertyFetch($assign->var)
             || null !== $this->findStaticPropertyFetchForAssign($assign->var, $block);
+    }
+
+    /** While-loop ?: merge must not steal array-append write slots (#10702). */
+    private function isArrayDimWriteAssign(Op\Expr\Assign $assign, Block $block): bool
+    {
+        if (null !== $this->unwrapArrayDimFetch($assign->var)) {
+            return true;
+        }
+
+        return null !== $this->findArrayDimFetchForResult($assign->var, $block);
     }
 
     private function isPropertyFetchOnlyAssignVar(
@@ -15490,6 +15503,12 @@ class Compiler {
         }
         $name = Block::resolveVariableName($arg);
         if (null === $name || '' === $name) {
+            $root = Block::cfgVarRoot($arg);
+            if ($root instanceof VarOperand) {
+                $name = Block::resolveVariableName($root);
+            }
+        }
+        if (null === $name || '' === $name) {
             return $valueSlot;
         }
         if (null !== $calleeName && $name === $calleeName) {
@@ -15507,9 +15526,6 @@ class Compiler {
             return $valueSlot;
         }
         if ((int) $namedSlot === (int) $valueSlot) {
-            return $valueSlot;
-        }
-        if ($block->isNamedVariableSlot((int) $valueSlot)) {
             return $valueSlot;
         }
 
