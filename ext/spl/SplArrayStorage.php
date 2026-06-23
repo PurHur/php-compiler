@@ -125,6 +125,20 @@ final class SplArrayStorage
         return self::state($object)['table']->duplicate();
     }
 
+    /** php-src spl_array_getIteratorClass — default ArrayIterator (#10639). */
+    public static function getIteratorClass(ObjectEntry $object): string
+    {
+        $class = self::state($object)['iteratorClass'];
+
+        return null !== $class && '' !== $class ? $class : 'ArrayIterator';
+    }
+
+    /** php-src spl_array_setIteratorClass (#10639). */
+    public static function setIteratorClass(ObjectEntry $object, string $iteratorClass): void
+    {
+        self::$store[$object->id]['iteratorClass'] = $iteratorClass;
+    }
+
     /** @return array<int|string, mixed> */
     public static function hashTableToExportedArray(HashTable $table): array
     {
