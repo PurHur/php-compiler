@@ -24,13 +24,12 @@ final class JitSyslog
         StringSyslog::ensureLinked($context);
 
         $identStr = JitStringBuiltinArg::lower($context, $ident, 'openlog', 0, 'ident');
-        $identC = self::ownedCString($context, $identStr);
         $opt = self::lowerI32($context, $option, 'openlog', 1, 'option');
         $fac = self::lowerI32($context, $facility, 'openlog', 2, 'facility');
 
         $context->builder->call(
             $context->lookupFunction('__compiler_syslog_openlog'),
-            $identC,
+            $identStr,
             $opt,
             $fac
         );
@@ -44,12 +43,11 @@ final class JitSyslog
 
         $prio = self::lowerI32($context, $priority, 'syslog', 0, 'priority');
         $msgStr = JitStringBuiltinArg::lower($context, $message, 'syslog', 1, 'message');
-        $msgC = self::ownedCString($context, $msgStr);
 
         $context->builder->call(
             $context->lookupFunction('__compiler_syslog_write'),
             $prio,
-            $msgC
+            $msgStr
         );
 
         return JitReadline::invokeBool($context, true);
@@ -96,36 +94,5 @@ final class JitSyslog
         throw new \LogicException(
             $function.'(): Argument #'.($argIndex + 1).' ($'.$paramName.') must be of type int in this compiler build'
         );
-    }
-
-    private static function ownedCString(Context $context, Value $strPtr): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $len = $context->builder->load(
-            $context->builder->structGep($strPtr, $map['length'])
-        );
-        $bytes = $context->builder->structGep($strPtr, $map['value']);
-        $bufLen = $context->builder->add($len, $one);
-        try {
-            $mallocFn = $context->lookupFunction('malloc');
-        } catch (\LogicException) {
-            $ft = $context->context->functionType($i8p, false, $i64);
-            $mallocFn = $context->module->addFunction('malloc', $ft);
-            $context->registerFunction('malloc', $mallocFn);
-        }
-        $buf = $context->builder->call($mallocFn, $bufLen);
-        $cStr = $context->builder->pointerCast($buf, $i8p);
-        $context->intrinsic->memcpy($cStr, $bytes, $len, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($cStr, $len)
-        );
-
-        return $cStr;
     }
 }

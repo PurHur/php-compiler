@@ -1043,6 +1043,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
 | `ext/standard/VmSysGetloadavgNative.php` | 0 | 1 |
 | `ext/standard/VmSyslog.php` | 0 | 1 |
+| `ext/standard/SyslogJitHelper.php` | 0 | 1 |
 | `ext/standard/VmTmpfileNative.php` | 0 | 1 |
 | `ext/standard/VmTmpfilePure.php` | 0 | 1 |
 | `ext/standard/VmUnameNative.php` | 0 | 1 |
@@ -10000,6 +10001,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/standard/SyslogJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/VmTmpfileNative.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17432,7 +17438,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSyslog.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StringTriggerError.php`
 

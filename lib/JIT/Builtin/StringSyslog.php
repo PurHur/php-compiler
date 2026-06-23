@@ -4,21 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM syslog(3) helpers for openlog()/syslog()/closelog() (#3676 JIT/AOT).
+ * JIT/AOT link for __compiler_syslog_* via SyslogJitHelper PHP (#9254).
  *
- * Mirrors {@see \PHPCompiler\ext\standard\VmSyslog}. php-src: ext/standard/syslog.c
+ * Replaces libc openlog/syslog/closelog LLVM; SSOT {@see \PHPCompiler\ext\standard\VmSyslog}.
+ * php-src: ext/standard/syslog.c
  */
 final class StringSyslog
 {
-    private const G_OPENED = 'phpc_syslog_opened';
+    private const HELPER_PATH = '/ext/standard/SyslogJitHelper.php';
 
-    private const LOG_USER = 8;
+    private const OPENLOG_HELPER = 'PHPCompiler\\ext\\standard\\SyslogJitHelper::openlog';
+
+    private const WRITE_HELPER = 'PHPCompiler\\ext\\standard\\SyslogJitHelper::write';
+
+    private const CLOSELOG_HELPER = 'PHPCompiler\\ext\\standard\\SyslogJitHelper::closelog';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::OPENLOG_HELPER,
+        self::WRITE_HELPER,
+        self::CLOSELOG_HELPER,
+    ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -41,202 +53,147 @@ final class StringSyslog
             return;
         }
 
-        self::ensureGlobals($context);
-        self::ensureLibc($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementOpenlogBridge($context);
+        self::implementWriteBridge($context);
+        self::implementCloselogBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementOpenlogBridge(Context $context): void
+    {
+        $abiName = '__compiler_syslog_openlog';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($voidTy, false, $strPtr, $i32, $i32)
+            );
+
+        $entry = $fn->appendBasicBlock('sl_open_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            self::helperFunction($context, self::OPENLOG_HELPER),
+            $fn->getParam(0),
+            $context->builder->sext($fn->getParam(1), $i64),
+            $context->builder->sext($fn->getParam(2), $i64)
+        );
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementWriteBridge(Context $context): void
+    {
+        $abiName = '__compiler_syslog_write';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($voidTy, false, $i32, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sl_write_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            self::helperFunction($context, self::WRITE_HELPER),
+            $context->builder->sext($fn->getParam(0), $i64),
+            $fn->getParam(1)
+        );
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementCloselogBridge(Context $context): void
+    {
+        $abiName = '__compiler_syslog_closelog';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
 
         $voidTy = $context->getTypeFromString('void');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-
-        $openProbe = $context->module->getNamedFunction('__compiler_syslog_openlog');
-        $fnOpen = null !== $openProbe
-            ? $openProbe
+        $fn = null !== $probe
+            ? $probe
             : $context->module->addFunction(
-                '__compiler_syslog_openlog',
-                $context->context->functionType($voidTy, false, $i8p, $i32, $i32)
-            );
-        self::implementOpenlog($context, $fnOpen);
-
-        $writeProbe = $context->module->getNamedFunction('__compiler_syslog_write');
-        $fnWrite = null !== $writeProbe
-            ? $writeProbe
-            : $context->module->addFunction(
-                '__compiler_syslog_write',
-                $context->context->functionType($voidTy, false, $i32, $i8p)
-            );
-        self::implementWrite($context, $fnWrite);
-
-        $closeProbe = $context->module->getNamedFunction('__compiler_syslog_closelog');
-        $fnClose = null !== $closeProbe
-            ? $closeProbe
-            : $context->module->addFunction(
-                '__compiler_syslog_closelog',
+                $abiName,
                 $context->context->functionType($voidTy, false)
             );
-        self::implementCloselog($context, $fnClose);
 
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementOpenlog(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('sl_open_entry');
+        $entry = $fn->appendBasicBlock('sl_close_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $ident = $fn->getParam(0);
-        $option = $fn->getParam(1);
-        $facility = $fn->getParam(2);
-
-        $context->builder->call(
-            $context->lookupFunction('openlog'),
-            $ident,
-            $option,
-            $facility
-        );
-        self::setOpened($context, true);
+        $context->builder->call(self::helperFunction($context, self::CLOSELOG_HELPER));
         $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementWrite(Context $context, LlvmFunction $fn): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $entry = $fn->appendBasicBlock('sl_write_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $priority = $fn->getParam(0);
-        $message = $fn->getParam(1);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $opened = $context->builder->load(self::openedPtr($context));
-        $needsOpen = $context->builder->icmp(Builder::INT_EQ, $opened, $i8->constInt(0, false));
-
-        $openBb = $fn->appendBasicBlock('sl_write_default_open');
-        $logBb = $fn->appendBasicBlock('sl_write_log');
-        $context->builder->branchIf($needsOpen, $openBb, $logBb);
-
-        $context->builder->positionAtEnd($openBb);
-        self::emitDefaultOpenlog($context);
-        $context->builder->branch($logBb);
-
-        $context->builder->positionAtEnd($logBb);
-        $fmtPtr = self::stackCString($context, '%s');
-        $context->builder->call(
-            $context->lookupFunction('syslog'),
-            $priority,
-            $fmtPtr,
-            $message
-        );
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementCloselog(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('sl_close_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $context->builder->call($context->lookupFunction('closelog'));
-        self::setOpened($context, false);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitDefaultOpenlog(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $identPtr = self::stackCString($context, 'php');
-        $context->builder->call(
-            $context->lookupFunction('openlog'),
-            $identPtr,
-            $i32->constInt(0, false),
-            $i32->constInt(self::LOG_USER, false)
-        );
-        self::setOpened($context, true);
-    }
-
-    private static function stackCString(Context $context, string $text): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $bytes = $text."\0";
-        $len = strlen($bytes);
-        $arrTy = $i8->arrayType($len);
-        $buf = $context->builder->alloca($arrTy, 1, 'sl_cstr');
-        for ($i = 0; $i < $len; ++$i) {
-            $context->builder->store(
-                $i8->constInt(ord($bytes[$i]), false),
-                $context->builder->gep(
-                    $buf,
-                    $context->getTypeFromString('int32')->constInt(0, false),
-                    $context->getTypeFromString('int32')->constInt($i, false)
-                )
-            );
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after SyslogJitHelper compile (#9254)');
         }
 
-        return $context->builder->pointerCast($buf, $i8p);
+        return $fn;
     }
 
-    private static function setOpened(Context $context, bool $opened): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i8 = $context->getTypeFromString('int8');
-        $context->builder->store(
-            $i8->constInt($opened ? 1 : 0, false),
-            self::openedPtr($context)
-        );
-    }
-
-    private static function openedPtr(Context $context): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $global = $context->module->getNamedGlobal(self::G_OPENED);
-        if (null === $global) {
-            throw new \LogicException('Missing syslog opened global: '.self::G_OPENED);
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
         }
 
-        return $context->builder->pointerCast($global, $i8->pointerType(0));
-    }
-
-    private static function ensureGlobals(Context $context): void
-    {
-        if (null === $context->module->getNamedGlobal(self::G_OPENED)) {
-            $i8 = $context->getTypeFromString('int8');
-            $g = $context->module->addGlobal($i8, self::G_OPENED);
-            $g->setInitializer($i8->constInt(0, false));
-        }
-    }
-
-    private static function ensureLibc(Context $context): void
-    {
-        $voidTy = $context->getTypeFromString('void');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-
-        self::ensureExternal(
-            $context,
-            'openlog',
-            $context->context->functionType($voidTy, false, $i8p, $i32, $i32)
-        );
-        self::ensureExternal(
-            $context,
-            'closelog',
-            $context->context->functionType($voidTy, false)
-        );
-        self::ensureExternal(
-            $context,
-            'syslog',
-            $context->context->functionType($voidTy, false, $i32, $i8p, $i8p)
-        );
-    }
-
-    private static function ensureExternal(Context $context, string $name, $fnType): void
-    {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $fnType);
-            $context->registerFunction($name, $fn);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SyslogJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('SyslogJitHelper.php parseAndCompile failed (#9254)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9254)');
+            }
         }
     }
 
@@ -245,7 +202,7 @@ final class StringSyslog
         foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after syslog LLVM link');
+                throw new \LogicException($name.' missing after StringSyslog PHP bridge (#9254)');
             }
             $context->registerFunction($name, $fn);
         }
