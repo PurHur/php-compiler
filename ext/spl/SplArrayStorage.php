@@ -139,6 +139,16 @@ final class SplArrayStorage
         self::$store[$object->id]['iteratorClass'] = $iteratorClass;
     }
 
+    public static function getFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    public static function setFlags(ObjectEntry $object, int $flags): void
+    {
+        self::$store[$object->id]['flags'] = $flags;
+    }
+
     /** @return array<int|string, mixed> */
     public static function hashTableToExportedArray(HashTable $table): array
     {

@@ -41,19 +41,25 @@ final class stream_select extends Internal
         if ($argc >= 2) {
             $writeVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $writeVar->type) {
+                VmStreamSelectGuard::warnUnselectableStreams($frame, $frame->calledArgs[1]);
                 $writePairs = VmProcess::hostStreamsFromArray($frame->calledArgs[1]);
                 $write = array_map(static fn (array $pair): mixed => $pair[1], $writePairs);
             }
         }
 
         $except = null;
+        $exceptPairs = [];
         if ($argc >= 3) {
             $exceptVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $exceptVar->type) {
+                VmStreamSelectGuard::warnUnselectableStreams($frame, $frame->calledArgs[2]);
                 $exceptPairs = VmProcess::hostStreamsFromArray($frame->calledArgs[2]);
                 $except = array_map(static fn (array $pair): mixed => $pair[1], $exceptPairs);
             }
         }
+
+        VmStreamSelectGuard::warnUnselectableStreams($frame, $frame->calledArgs[0]);
+        VmStreamSelectGuard::ensureSelectableStreamArrays($readPairs, $writePairs, $exceptPairs);
 
         $seconds = self::requireIntArg($frame->calledArgs[3], 'stream_select', 4, 'seconds');
         $microseconds = 0;

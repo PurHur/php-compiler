@@ -39,6 +39,15 @@ final class ArrayObjectBuiltin
             $entry->interfaces[] = 'arrayaccess';
         }
 
+        foreach ([
+            'STD_PROP_LIST' => 1,
+            'ARRAY_AS_PROPS' => 2,
+        ] as $name => $value) {
+            $const = new \PHPCompiler\VM\Variable(\PHPCompiler\VM\Variable::TYPE_INTEGER);
+            $const->int($value);
+            $entry->constants[$name] = $const;
+        }
+
         $entry->constructor = new ArrayObjectConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -50,6 +59,10 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['getiteratorclass'] = $pub;
         $entry->methods['setiteratorclass'] = new ArrayObjectSetIteratorClass();
         $entry->methodVisibility['setiteratorclass'] = $pub;
+        $entry->methods['getflags'] = new ArrayObjectGetFlags();
+        $entry->methodVisibility['getflags'] = $pub;
+        $entry->methods['setflags'] = new ArrayObjectSetFlags();
+        $entry->methodVisibility['setflags'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -194,5 +207,51 @@ final class ArrayObjectSetIteratorClass extends VmClassMethod
             );
         }
         SplArrayStorage::setIteratorClass($object, $entry->name);
+    }
+}
+
+final class ArrayObjectGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplArrayStorage::getFlags($object));
+    }
+}
+
+final class ArrayObjectSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayObject::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        SplArrayStorage::setFlags($object, $flags);
     }
 }
