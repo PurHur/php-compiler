@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2961 |
-| Phase A inventory files (M2 ratio SSOT) | 2961 |
+| PHP files on vm.php path | 2966 |
+| Phase A inventory files (M2 ratio SSOT) | 2966 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7994 |
+| Source constructs flagged (warnings) | 8011 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -327,6 +327,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetoptEngine.php` | 0 | 1 |
 | `ext/standard/GetoptJitHelper.php` | 0 | 1 |
 | `ext/standard/GetrusageJitHelper.php` | 0 | 1 |
+| `ext/standard/GmgetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/HashCryptoJitHelper.php` | 0 | 1 |
 | `ext/standard/HashEqualsJitHelper.php` | 0 | 1 |
 | `ext/standard/HebrevJitHelper.php` | 0 | 1 |
@@ -340,6 +341,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HtmlspecialcharsJitHelper.php` | 0 | 1 |
 | `ext/standard/HttpResponseJitHelper.php` | 0 | 1 |
 | `ext/standard/HttpStatusEnumData.php` | 0 | 1 |
+| `ext/standard/IdateJitHelper.php` | 0 | 1 |
 | `ext/standard/Ieee754.php` | 0 | 1 |
 | `ext/standard/IncludePathJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludePathResolveJitHelper.php` | 0 | 1 |
@@ -790,6 +792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
+| `ext/standard/LocaltimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
 | `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/Module.php` | 0 | 742 |
@@ -829,6 +832,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SuperglobalNames.php` | 0 | 1 |
 | `ext/standard/SyslogJitHelper.php` | 0 | 1 |
 | `ext/standard/ThrowableManifest.php` | 0 | 1 |
+| `ext/standard/TimezoneLocationJitHelper.php` | 0 | 3 |
+| `ext/standard/TimezoneOffsetJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnserializeJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
@@ -2176,7 +2181,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGettextJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
@@ -2189,12 +2194,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringIdate.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecodeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringLocaltime.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringLocaltime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringMicrotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringMktime.php` | 0 | 1 |
@@ -2272,8 +2277,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/TimeSleepRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/TimezoneLocationRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/TimezoneOffsetRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/TimezoneLocationRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/TimezoneOffsetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/TokenGetAll.php` | 0 | 3 |
 | `lib/JIT/Builtin/Type.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/HashTable.php` | 0 | 1 |
@@ -5020,6 +5025,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/GmgetdateJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/HashCryptoJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5085,6 +5095,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/IdateJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/Ieee754.php`
 
@@ -7478,6 +7493,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/standard/LocaltimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/MemoryJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8434,6 +8454,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/TimezoneLocationJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 25)
+- new Variable (line 27)
+- 1 class method(s)
+
+### `ext/standard/TimezoneOffsetJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/UnpackEngine.php`
 
@@ -17094,7 +17126,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGmgetdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- new JIT (line 139)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringGmmktime.php`
 
@@ -17166,7 +17200,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringIdate.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- new JIT (line 99)
+- 4 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringInfo.php`
 
@@ -17193,7 +17229,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringLocaltime.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new JIT (line 142)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringLzf.php`
 
@@ -17615,12 +17653,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/TimezoneLocationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- new JIT (line 109)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/TimezoneOffsetRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new JIT (line 137)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/TokenGetAll.php`
 

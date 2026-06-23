@@ -4,60 +4,28 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_gmgetdate — gmtime + hashtable breakdown.
+ * JIT/AOT link for __compiler_gmgetdate via GmgetdateJitHelper PHP (#9181).
  *
- * Mirrors ext/standard/VmDate::gmgetdate() (issue #7001, #3510).
+ * Replaces gmtime/hashtable LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/datetime.c — PHP_FUNCTION(gmgetdate)
  */
 final class StringGmgetdate
 {
-    private const TM_SEC = 0;
+    private const HELPER_PATH = '/ext/standard/GmgetdateJitHelper.php';
 
-    private const TM_MIN = 4;
-
-    private const TM_HOUR = 8;
-
-    private const TM_MDAY = 12;
-
-    private const TM_MON = 16;
-
-    private const TM_YEAR = 20;
-
-    private const TM_WDAY = 24;
-
-    private const TM_YDAY = 28;
+    private const GMGETDATE_HELPER = 'PHPCompiler\\ext\\standard\\GmgetdateJitHelper::gmgetdate';
 
     /** @var list<string> */
-    private const WEEKDAYS = [
-        'Sunday',
-        'Monday',
-        'Tuesday',
-        'Wednesday',
-        'Thursday',
-        'Friday',
-        'Saturday',
-    ];
-
-    /** @var list<string> */
-    private const MONTHS = [
-        'January',
-        'February',
-        'March',
-        'April',
-        'May',
-        'June',
-        'July',
-        'August',
-        'September',
-        'October',
-        'November',
-        'December',
+    private const COMPILED_HELPERS = [
+        self::GMGETDATE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -74,213 +42,108 @@ final class StringGmgetdate
             return;
         }
 
-        self::ensureHashtableHelpers($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementGmgetdateBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementGmgetdateBridge(Context $context): void
+    {
+        $abiName = '__compiler_gmgetdate';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
 
         $i64 = $context->getTypeFromString('int64');
         $voidTy = $context->getTypeFromString('void');
         $valuePtr = $context->getTypeFromString('__value__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
 
         $ft = $context->context->functionType($voidTy, false, $i64, $valuePtr);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_gmgetdate', $ft);
-        self::implementGmgetdate($context, $fn);
+            : $context->module->addFunction($abiName, $ft);
 
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementGmgetdate(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('gmg_entry');
+        $entry = $fn->appendBasicBlock('gmg_bridge_entry');
+        $nullOutBb = $fn->appendBasicBlock('gmg_null_out');
+        $bodyBb = $fn->appendBasicBlock('gmg_body');
         $context->builder->positionAtEnd($entry);
 
         $timestamp = $fn->getParam(0);
         $out = $fn->getParam(1);
-
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $one = $i64->constInt(1, false);
-        $yearBase = $i32->constInt(1900, false);
-        $idx0 = $sizeT->constInt(0, false);
         $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $nullRetBb = $fn->appendBasicBlock('gmg_null_out');
-        $localBb = $fn->appendBasicBlock('gmg_gmtime');
-        $context->builder->branchIf($nullOut, $nullRetBb, $localBb);
+        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
 
-        $context->builder->positionAtEnd($nullRetBb);
+        $context->builder->positionAtEnd($nullOutBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($localBb);
-        $i64p = $context->getTypeFromString('int64*');
-        $tsSlot = $context->builder->alloca($i64, 1, 'gmg_ts');
-        $context->builder->store($timestamp, $tsSlot);
-        $tsPtr = $context->builder->pointerCast($tsSlot, $i64p);
-        $tmPtr = $context->builder->call($context->lookupFunction('gmtime'), $tsPtr);
-        $tmNull = $context->builder->icmp(Builder::INT_EQ, $tmPtr, $i8p->constNull());
-        $tmFailBb = $fn->appendBasicBlock('gmg_tm_fail');
-        $fillBb = $fn->appendBasicBlock('gmg_fill');
-        $context->builder->branchIf($tmNull, $tmFailBb, $fillBb);
-
-        $context->builder->positionAtEnd($tmFailBb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($fillBb);
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $context->builder->positionAtEnd($bodyBb);
+        $ht = $context->builder->call(
+            self::helperFunction($context, self::GMGETDATE_HELPER),
+            $timestamp
+        );
         $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $allocFailBb = $fn->appendBasicBlock('gmg_alloc_fail');
-        $keysBb = $fn->appendBasicBlock('gmg_keys');
-        $context->builder->branchIf($htNull, $allocFailBb, $keysBb);
+        $failBb = $fn->appendBasicBlock('gmg_fail');
+        $storeBb = $fn->appendBasicBlock('gmg_store');
+        $context->builder->branchIf($htNull, $failBb, $storeBb);
 
-        $context->builder->positionAtEnd($allocFailBb);
+        $context->builder->positionAtEnd($failBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($keysBb);
-        $tmSec = self::loadTmField($context, $tmPtr, self::TM_SEC);
-        $tmMin = self::loadTmField($context, $tmPtr, self::TM_MIN);
-        $tmHour = self::loadTmField($context, $tmPtr, self::TM_HOUR);
-        $tmMday = self::loadTmField($context, $tmPtr, self::TM_MDAY);
-        $tmMon = self::loadTmField($context, $tmPtr, self::TM_MON);
-        $tmYear = self::loadTmField($context, $tmPtr, self::TM_YEAR);
-        $tmWday = self::loadTmField($context, $tmPtr, self::TM_WDAY);
-        $tmYday = self::loadTmField($context, $tmPtr, self::TM_YDAY);
-
-        $year = $context->builder->add(
-            $context->builder->zExt($tmYear, $i64),
-            $context->builder->zExt($yearBase, $i64)
-        );
-        $mon = $context->builder->addNoSignedWrap($context->builder->zExt($tmMon, $i64), $one);
-        $sec = $context->builder->zExt($tmSec, $i64);
-        $min = $context->builder->zExt($tmMin, $i64);
-        $hour = $context->builder->zExt($tmHour, $i64);
-        $mday = $context->builder->zExt($tmMday, $i64);
-        $wday = $context->builder->zExt($tmWday, $i64);
-        $yday = $context->builder->zExt($tmYday, $i64);
-
-        $weekdayStr = self::selectName($context, $tmWday, self::WEEKDAYS);
-        $monthStr = self::selectName($context, $tmMon, self::MONTHS);
-
-        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
-        $setString = $context->lookupFunction('__hashtable__setStringKeyString');
-        $setAt = $context->lookupFunction('__hashtable__setLongAt');
-
-        foreach ([
-            'seconds' => $sec,
-            'minutes' => $min,
-            'hours' => $hour,
-            'mday' => $mday,
-            'wday' => $wday,
-            'mon' => $mon,
-            'year' => $year,
-            'yday' => $yday,
-        ] as $key => $val) {
-            $context->builder->call(
-                $setLong,
-                $ht,
-                self::literalString($context, $key),
-                $val
-            );
-        }
-        $context->builder->call(
-            $setString,
-            $ht,
-            self::literalString($context, 'weekday'),
-            $weekdayStr
-        );
-        $context->builder->call(
-            $setString,
-            $ht,
-            self::literalString($context, 'month'),
-            $monthStr
-        );
-        $context->builder->call($setAt, $ht, $idx0, $timestamp);
+        $context->builder->positionAtEnd($storeBb);
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
             $out,
             $ht
         );
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function loadTmField(Context $context, Value $tmPtr, int $offset): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i32p = $context->getTypeFromString('int32*');
-        $tmFields = $context->builder->pointerCast($tmPtr, $i32p);
-
-        return $context->builder->load(
-            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
-        );
-    }
-
-    /**
-     * @param list<string> $names
-     */
-    private static function selectName(Context $context, Value $indexI32, array $names): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $result = self::literalString($context, $names[0]);
-        for ($i = \count($names) - 1; $i >= 1; --$i) {
-            $eq = $context->builder->icmp(Builder::INT_EQ, $indexI32, $i32->constInt($i, false));
-            $candidate = self::literalString($context, $names[$i]);
-            $result = $context->builder->select($eq, $candidate, $result);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GmgetdateJitHelper compile (#9181)');
         }
 
-        return $result;
+        return $fn;
     }
 
-    private static function literalString(Context $context, string $text): Value
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
-    }
-
-    private static function ensureHashtableHelpers(Context $context): void
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-
-        foreach ([
-            ['__hashtable__alloc', $htPtr, []],
-            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
-            ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
-            ['__hashtable__setLongAt', $voidTy, [$htPtr, $sizeT, $i64]],
-            ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
-            ['__string__init', $strPtr, [$i64, $context->getTypeFromString('int8*')]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal(
-                $context,
-                $name,
-                $context->context->functionType($ret, false, ...$params)
-            );
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
         }
-    }
+        if (!$missing) {
+            return;
+        }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
-    {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GmgetdateJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GmgetdateJitHelper.php parseAndCompile failed (#9181)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9181)');
+            }
         }
     }
 
@@ -288,7 +151,7 @@ final class StringGmgetdate
     {
         $fn = $context->module->getNamedFunction('__compiler_gmgetdate');
         if (null === $fn) {
-            throw new \LogicException('__compiler_gmgetdate missing after StringGmgetdate LLVM implement');
+            throw new \LogicException('__compiler_gmgetdate missing after StringGmgetdate bridge (#9181)');
         }
         $context->registerFunction('__compiler_gmgetdate', $fn);
     }
