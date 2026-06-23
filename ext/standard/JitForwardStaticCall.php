@@ -51,8 +51,24 @@ final class JitForwardStaticCall
         string $builtinName
     ): Value {
         self::emitRequireEmptyParamsArray($context, $params, $builtinName);
-        $block = self::requireClassScope($context, $builtinName);
         $methodLc = self::parseMethodLc($context, $callable, $builtinName);
+        $block = $context->jitEnclosingBlock;
+        $hasClassScope = $block instanceof Block
+            && null !== $block->func
+            && null !== $block->func->class;
+        if (!$hasClassScope) {
+            $explicitClass = self::resolveExplicitClassName($context, $callable);
+            if (null === $explicitClass) {
+                ErrorRaise::registerDeclarations($context);
+                ErrorRaise::ensureLinked($context);
+                ErrorRaise::emitRaise($context, "Cannot call {$builtinName}() when no class scope is active");
+                $context->builder->call($context->lookupFunction('abort'));
+
+                return $context->getTypeFromString('__value__*')->constNull();
+            }
+
+            return self::dispatchExplicitClass($context, $explicitClass, $methodLc, []);
+        }
         $candidates = self::buildStaticMethodCandidatesByClassId($context, $methodLc);
         if ([] === $candidates) {
             throw new \LogicException(
@@ -264,6 +280,53 @@ final class JitForwardStaticCall
         }
 
         return strtolower($method);
+    }
+
+    private static function resolveExplicitClassName(Context $context, JITVariable $callable): ?string
+    {
+        $literal = JitStringArg::compileTimeLiteral($callable);
+        if (null !== $literal && str_contains($literal, '::')) {
+            [$class] = explode('::', $literal, 2);
+
+            return '' !== $class ? $class : null;
+        }
+
+        $block = $context->jitEnclosingBlock;
+        if ($block instanceof Block && isset($context->scope->argOperands[0])) {
+            $slot = $block->slotForOperand($context->scope->argOperands[0]);
+            if (null !== $slot) {
+                return BoundMethodCallableHelper::resolveBoundMethodReceiverClassName($block, $slot);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<JITVariable> $extraArgs
+     */
+    private static function dispatchExplicitClass(
+        Context $context,
+        string $className,
+        string $methodLc,
+        array $extraArgs
+    ): Value {
+        $classLc = strtolower(ltrim($className, '\\'));
+        $proxyName = self::resolveStaticProxyForClass($context, $classLc, $methodLc);
+        if (null === $proxyName || !$context->functionIsRegistered($proxyName)) {
+            throw new \LogicException(
+                "Call to undefined static method {$className}::{$methodLc}() in this compiler build"
+            );
+        }
+        $classId = $context->type->object->lookup($className);
+        $candidates = [$classId => $context->resolveFunctionProxy($proxyName)];
+
+        return self::dispatchByClassId(
+            $context,
+            $context->constantFromInteger($classId, 'int64'),
+            $candidates,
+            $extraArgs
+        );
     }
 
     private static function requireClassScope(Context $context, string $builtinName): Block
