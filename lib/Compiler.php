@@ -16035,7 +16035,10 @@ class Compiler {
             return $valueSlot;
         }
         // Inline producer temp must not replace an unbound named local (#9973, #9924).
-        if (!$this->blockHasAssignToSlot($block, (int) $namedSlot)) {
+        if (
+            !$this->blockHasAssignToSlot($block, (int) $namedSlot)
+            && !$this->blockHasAssignToSlotInParentBlocks($block, (int) $namedSlot)
+        ) {
             return $valueSlot;
         }
 
@@ -16098,6 +16101,10 @@ class Compiler {
             return [];
         }
         $destSlot = $block->getVarSlot($prev->var, false);
+        // List destruct assigns compile in the parent block; skip merge-block phi bind (#10807).
+        if (!$this->blockHasAssignToSlot($block, (int) $destSlot)) {
+            return [];
+        }
 
         return [new OpCode(
             OpCode::TYPE_ASSIGN,
@@ -16111,6 +16118,21 @@ class Compiler {
     {
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Parent CFG blocks (list destruct merge) may hold the assign lowering (#10807). */
+    private function blockHasAssignToSlotInParentBlocks(Block $block, int $destSlot): bool
+    {
+        foreach ($block->parents as $parent) {
+            if (!$parent instanceof Block) {
+                continue;
+            }
+            if ($this->blockHasAssignToSlot($parent, $destSlot)) {
                 return true;
             }
         }
