@@ -17,15 +17,6 @@ final class HrtimeJitHelper
      */
     public static function pair(): array
     {
-        if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
-            return [0, 0];
-        }
-        $raw = VmFsReadNative::read('/proc/uptime');
-        if (false === $raw) {
-            return [0, 0];
-        }
-        $parsed = VmHrtimeNative::parseUptimeRaw($raw);
-
-        return null === $parsed ? [0, 0] : $parsed;
+        return VmHrtimeNative::readMonotonic();
     }
 }
