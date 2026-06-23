@@ -358,6 +358,7 @@ require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbyaddrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbynamelJitHelper.php';
@@ -2053,6 +2054,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesCollectRuntime.ph
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcCollectCyclesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcStatusRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/GetcwdJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbynamelRuntime.php';
