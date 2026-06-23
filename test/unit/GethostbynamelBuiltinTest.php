@@ -46,6 +46,22 @@ final class GethostbynamelBuiltinTest extends TestCase
         $this->assertMatchesRegularExpression('/^\d{1,3}(\.\d{1,3}){3}$/', $first->toString());
     }
 
+    public function testLocalhostPreservesDuplicateIpv4Records(): void
+    {
+        if (!\extension_loaded('ffi')) {
+            $this->markTestSkipped('FFI required for getaddrinfo duplicate-A parity');
+        }
+        $native = \gethostbynamel('localhost');
+        if (false === $native || \count($native) < 2) {
+            $this->markTestSkipped('native gethostbynamel(localhost) has fewer than two A records');
+        }
+
+        $ips = VmDns::resolveHostnameIpv4List('localhost');
+        $this->assertSame(\count($native), \count($ips));
+        $this->assertSame($native[0], $ips[0]);
+        $this->assertSame($native[1], $ips[1]);
+    }
+
     public function testUnknownHostReturnsFalse(): void
     {
         $runtime = new Runtime();
