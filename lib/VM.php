@@ -10739,9 +10739,6 @@ restart:
             $thrown->copyFrom($exception);
             throw new VM\GeneratorUncaughtThrow($thrown);
         }
-        if (null === $gen->frame) {
-            throw new \Exception('Cannot throw to an uninitialized generator');
-        }
         $gen->pendingThrow->copyFrom($exception);
         $gen->hasPendingThrow = true;
 
@@ -10819,8 +10816,6 @@ restart:
         if ($gen->done) {
             return false;
         }
-        $this->applyGeneratorPendingSend($gen);
-        $this->applyGeneratorPendingThrow($gen);
         if (null === $gen->frame) {
             $gen->frame = $gen->func->getFrame($this->context, null);
             $gen->frame->calledArgs = $gen->calledArgs;
@@ -10830,6 +10825,8 @@ restart:
                 $this->applyClosureBinding($gen->frame, $gen->closureCall);
             }
         }
+        $this->applyGeneratorPendingSend($gen);
+        $this->applyGeneratorPendingThrow($gen);
         $gen->started = true;
         $savedStack = $this->context->swapRunStack(null);
         try {
