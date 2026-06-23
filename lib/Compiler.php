@@ -163,6 +163,9 @@ class Compiler {
     /** True while lowering switch to JUMPIF/EQUAL — skip ?: merge slot bridging (#878). */
     private bool $compilingSwitchJumpIfChain = false;
 
+    /** Force FUNCCALL_EXEC_RETURN while lowering hoisted sibling call-arg producers (#10981). */
+    private bool $forceDeferredSiblingCallReturnSlot = false;
+
     /** Catch variable name (lc) => scope slot while lowering catch bodies (#9887). */
     private array $activeCatchVarSlotsByName = [];
 
@@ -1858,6 +1861,13 @@ class Compiler {
                         && $this->isHoistedEnumCaseFetchOnlyForCaseClassPseudoConst($child, $ops, $i, $block)
                     ) {
                         // Lowered via following `Case::class` fold / call-arg compile-time value (#9426, #9518).
+                        break;
+                    } elseif (
+                        ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                        && $this->isDeferredSiblingInlineCallArgProducer($child, $ops, $i)
+                    ) {
+                        // Hoisted sibling call-arg producers compile at the consumer via
+                        // resolveSiblingInlineCallArgProducerSlot (#9463, #10981).
                         break;
                     } elseif ($this->isForeachLoopVarAssignRefFusion($ops, $i)) {
                         /** @var Op\Iterator\Value $iter */
@@ -13239,6 +13249,55 @@ class Compiler {
     }
 
     /**
+     * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall stmts before the consumer (#9463, #10981).
+     * Skip eager compileOps lowering so each producer gets its own EXEC_RETURN slot at the consumer.
+     *
+     * @param Op[] $ops
+     */
+    private function isDeferredSiblingInlineCallArgProducer(Op $op, array $ops, int $producerIndex): bool
+    {
+        $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
+        if (null === $consumerIndex) {
+            return false;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $ops);
+        if (null === $firstSibling) {
+            return false;
+        }
+
+        return ($consumerIndex - $firstSibling) >= 2;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
+    {
+        if (!$op instanceof Op\Expr\FuncCall && !$op instanceof Op\Expr\NsFuncCall) {
+            return null;
+        }
+        $opCount = \count($ops);
+        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                if ($this->isInlineExprCallArgConsumer($next)
+                    && $this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)
+                ) {
+                    return $j;
+                }
+
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($next)) {
+                continue;
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall producers with dead arg temps (#9463).
      *
      * @param list<Op> $cfgChildren
@@ -13383,6 +13442,54 @@ class Compiler {
     }
 
     /**
+     * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall stmts before the consumer (#9463, #10981).
+     * Compile each producer once with its own EXEC_RETURN slot before ARG_SEND wiring.
+     */
+    private function ensureDeferredSiblingInlineCallArgProducersCompiled(Block $block, Op $cfgCallOp): void
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return;
+        }
+        $argCount = \count($cfgCallOp->args);
+        if ($argCount < 2) {
+            return;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+        if (null === $firstSibling) {
+            return;
+        }
+        $siblingCount = $callIndex - $firstSibling;
+        if ($siblingCount < 2) {
+            return;
+        }
+        for ($argIndex = 0; $argIndex < $siblingCount; ++$argIndex) {
+            $emitOps = [];
+            $slot = $this->resolveSiblingInlineCallArgProducerSlot(
+                $block,
+                $cfgCallOp,
+                $argIndex,
+                $emitOps
+            );
+            if (null === $slot && [] === $emitOps) {
+                continue;
+            }
+            foreach ($emitOps as $op) {
+                $block->addOpCode($op);
+            }
+        }
+    }
+
+    /**
      * php-cfg `f(g(), h())` — map arg N to the Nth sibling hoisted FuncCall producer (#9463, #10917).
      */
     private function resolveSiblingInlineCallArgProducerSlot(
@@ -13438,8 +13545,14 @@ class Compiler {
             return null;
         }
         if (null === $block->slotForOperand($producer->result)) {
-            foreach ($this->compileExpr($producer, $block) as $op) {
-                $emitOps[] = $op;
+            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+            $this->forceDeferredSiblingCallReturnSlot = true;
+            try {
+                foreach ($this->compileExpr($producer, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+            } finally {
+                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
             }
         }
 
@@ -16226,6 +16339,10 @@ class Compiler {
     {
         $this->validateCallArgOrder($args);
 
+        if (null !== $cfgCallOp) {
+            $this->ensureDeferredSiblingInlineCallArgProducersCompiled($block, $cfgCallOp);
+        }
+
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $nameSlot = null;
@@ -17383,7 +17500,8 @@ class Compiler {
     ): OpCode {
         $line = $startLine > 0 ? $startLine : null;
         if (
-            $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
+            $this->forceDeferredSiblingCallReturnSlot
+            || $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
         ) {
             return new OpCode(

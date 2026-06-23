@@ -141,6 +141,25 @@ PHP;
         self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
     }
 
+    /** Issue #10981 — closure static locals in var_dump($g(), $g()) evaluate 1 then 2 at runtime. */
+    public function testClosureStaticVarDumpMultiArgRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$g = function (): int {
+    static $n = 0;
+    return ++$n;
+};
+ob_start();
+var_dump($g(), $g());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_closure_static.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("int(1)\nint(2)\n", ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
