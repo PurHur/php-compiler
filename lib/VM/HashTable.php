@@ -1512,9 +1512,15 @@ final class HashTable {
         for ($i = 0; $i < $offset; ++$i) {
             $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
         }
+        $replacementCount = null !== $replacement ? $replacement->getNumElements() : 0;
         $this->appendSpliceReplacement($newPairs, $replacement, $offset, false);
+        $nextIntKey = $replacementCount;
         for ($i = $offset + $removeLen; $i < $num; ++$i) {
-            $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
+            $pair = $this->duplicateKeyedPair($pairs[$i]);
+            if ($replacementCount > 0 && Variable::TYPE_INTEGER === $pair[0]->type) {
+                $pair[0]->int($nextIntKey++);
+            }
+            $newPairs[] = $pair;
         }
 
         $this->assignFromKeyedPairs($newPairs);
