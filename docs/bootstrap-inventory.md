@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2924 |
-| Phase A inventory files (M2 ratio SSOT) | 2924 |
+| PHP files on vm.php path | 2925 |
+| Phase A inventory files (M2 ratio SSOT) | 2925 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7911 |
+| Source constructs flagged (warnings) | 7914 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -298,6 +298,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BuiltinEnums.php` | 0 | 18 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
 | `ext/standard/CheckdateJitHelper.php` | 0 | 1 |
+| `ext/standard/CheckdnsrrJitHelper.php` | 0 | 1 |
 | `ext/standard/CliArgvJitHelper.php` | 0 | 2 |
 | `ext/standard/CloneWithJitHelper.php` | 0 | 1 |
 | `ext/standard/ConvertCyrStringJitHelper.php` | 0 | 1 |
@@ -1959,7 +1960,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 4 |
 | `lib/JIT/Builtin/CheckdateRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/CheckdnsrrRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/CliArgvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/CloneWithReinitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ConvertCyrString.php` | 0 | 2 |
@@ -4830,6 +4831,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/CheckdateJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/CheckdnsrrJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -15030,76 +15036,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10043)
 - new Operand\Temporary (line 10045)
 - new OpCode (line 10092)
-- new CfgVariable (line 13452)
-- new Literal (line 13452)
-- new Variable (line 13484)
-- new Variable (line 13538)
-- new OpCode (line 13562)
-- new OpCode (line 13786)
-- new OpCode (line 13800)
-- new OpCode (line 13807)
-- new OpCode (line 13813)
+- new CfgVariable (line 13490)
+- new Literal (line 13490)
+- new Variable (line 13522)
+- new Variable (line 13576)
+- new OpCode (line 13600)
 - new OpCode (line 13824)
-- new OpCode (line 13841)
-- new OpCode (line 13846)
-- new OpCode (line 13852)
-- new OpCode (line 13857)
-- new OpCode (line 13873)
-- new OpCode (line 13886)
-- new Variable (line 13897)
-- new Operand\Literal (line 13899)
-- new OpCode (line 13902)
-- new OpCode (line 13972)
-- new OpCode (line 13983)
-- new OpCode (line 13996)
-- new OpCode (line 14170)
-- new OpCode (line 14418)
-- new OpCode (line 14424)
-- new OpCode (line 14430)
-- new OpCode (line 14455)
-- new Variable (line 14482)
-- new Temporary (line 14484)
-- new Variable (line 14492)
-- new Temporary (line 14494)
-- new OpCode (line 14542)
-- new Operand\Temporary (line 14561)
-- new Operand\Temporary (line 14567)
-- new Operand\Temporary (line 14573)
-- new Operand\Temporary (line 14579)
-- new Operand\Temporary (line 14588)
-- new Variable (line 15389)
-- new Variable (line 15393)
-- new Variable (line 15401)
-- new Variable (line 15405)
-- new Variable (line 15625)
-- new Operand\Literal (line 15896)
-- new Variable (line 15898)
-- new OpCode (line 15988)
-- new OpCode (line 16109)
-- new OpCode (line 16345)
-- new OpCode (line 16538)
-- new OpCode (line 16548)
-- new OpCode (line 16551)
-- new Operand\Temporary (line 16583)
-- new OpCode (line 16585)
-- new OpCode (line 16596)
-- new Operand\Temporary (line 16599)
-- new OpCode (line 16601)
-- new OpCode (line 16609)
-- new OpCode (line 16616)
-- new OpCode (line 16624)
-- new OpCode (line 16627)
-- new OpCode (line 16644)
-- new OpCode (line 16669)
-- new OpCode (line 16676)
-- new OpCode (line 16731)
-- new Literal (line 16755)
-- new OpCode (line 16854)
-- new Variable (line 16861)
-- new Temporary (line 16863)
-- new OpCode (line 16866)
-- new CompileFatal (line 17164)
-- new CompileFatal (line 17203)
+- new OpCode (line 13838)
+- new OpCode (line 13845)
+- new OpCode (line 13851)
+- new OpCode (line 13862)
+- new OpCode (line 13879)
+- new OpCode (line 13884)
+- new OpCode (line 13890)
+- new OpCode (line 13895)
+- new OpCode (line 13911)
+- new OpCode (line 13924)
+- new Variable (line 13935)
+- new Operand\Literal (line 13937)
+- new OpCode (line 13940)
+- new OpCode (line 14010)
+- new OpCode (line 14021)
+- new OpCode (line 14034)
+- new OpCode (line 14208)
+- new OpCode (line 14456)
+- new OpCode (line 14462)
+- new OpCode (line 14468)
+- new OpCode (line 14493)
+- new Variable (line 14520)
+- new Temporary (line 14522)
+- new Variable (line 14530)
+- new Temporary (line 14532)
+- new OpCode (line 14580)
+- new Operand\Temporary (line 14599)
+- new Operand\Temporary (line 14605)
+- new Operand\Temporary (line 14611)
+- new Operand\Temporary (line 14617)
+- new Operand\Temporary (line 14626)
+- new Variable (line 15427)
+- new Variable (line 15431)
+- new Variable (line 15439)
+- new Variable (line 15443)
+- new Variable (line 15663)
+- new Operand\Literal (line 15934)
+- new Variable (line 15936)
+- new OpCode (line 16026)
+- new OpCode (line 16147)
+- new OpCode (line 16383)
+- new OpCode (line 16576)
+- new OpCode (line 16586)
+- new OpCode (line 16589)
+- new Operand\Temporary (line 16621)
+- new OpCode (line 16623)
+- new OpCode (line 16634)
+- new Operand\Temporary (line 16637)
+- new OpCode (line 16639)
+- new OpCode (line 16647)
+- new OpCode (line 16654)
+- new OpCode (line 16662)
+- new OpCode (line 16665)
+- new OpCode (line 16682)
+- new OpCode (line 16707)
+- new OpCode (line 16714)
+- new OpCode (line 16769)
+- new Literal (line 16793)
+- new OpCode (line 16892)
+- new Variable (line 16899)
+- new Temporary (line 16901)
+- new OpCode (line 16904)
+- new CompileFatal (line 17202)
+- new CompileFatal (line 17241)
 - 530 class method(s)
 - 17 closure(s)
 
@@ -15850,7 +15856,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CheckdnsrrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- new JIT (line 118)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/CliArgvRuntime.php`
 
