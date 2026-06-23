@@ -11276,7 +11276,7 @@ class JIT {
         if (
             Variable::TYPE_NATIVE_BOOL === $value->type
             && Variable::TYPE_STRING === $result->type
-            && Variable::KIND_VARIABLE === $result->kind
+            && (Variable::KIND_VARIABLE === $result->kind || Variable::KIND_VALUE === $result->kind)
         ) {
             // && short-circuit false branch can target a phi slot still typed from a string dim fetch (#1492).
             $this->context->setVariableOp(
@@ -11286,6 +11286,26 @@ class JIT {
                     Variable::TYPE_NATIVE_BOOL,
                     Variable::KIND_VALUE,
                     $this->context->helper->loadValue($value)
+                )
+            );
+
+            return;
+        }
+        if (
+            Variable::TYPE_NATIVE_BOOL === $value->type
+            && Variable::TYPE_NATIVE_BOOL === $result->type
+            && Variable::KIND_VALUE === $result->kind
+        ) {
+            // defined() && CONST phi merge in bin/vm.php spine guard (#1492).
+            $this->context->setVariableOp(
+                $resultOp,
+                new Variable(
+                    $this->context,
+                    Variable::TYPE_NATIVE_BOOL,
+                    Variable::KIND_VALUE,
+                    Variable::KIND_VALUE === $value->kind
+                        ? $value->value
+                        : $this->context->helper->loadValue($value)
                 )
             );
 
