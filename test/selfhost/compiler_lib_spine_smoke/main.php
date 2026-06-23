@@ -1375,6 +1375,7 @@ require_once __DIR__.'/../../../ext/standard/get_resource_type.php';
 require_once __DIR__.'/../../../ext/standard/get_resources_.php';
 require_once __DIR__.'/../../../ext/standard/getallheaders_.php';
 require_once __DIR__.'/../../../ext/standard/getcwd_.php';
+require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/getdate.php';
 require_once __DIR__.'/../../../ext/standard/getenv_.php';
 require_once __DIR__.'/../../../ext/standard/gethostbyaddr.php';
