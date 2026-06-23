@@ -327,6 +327,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetoptJitHelper.php` | 0 | 1 |
 | `ext/standard/GetrusageJitHelper.php` | 0 | 1 |
 | `ext/standard/HashEqualsJitHelper.php` | 0 | 1 |
+| `ext/standard/HashCryptoJitHelper.php` | 0 | 1 |
 | `ext/standard/HebrevJitHelper.php` | 0 | 1 |
 | `ext/standard/HighlightEngine.php` | 0 | 2 |
 | `ext/standard/HighlightJitHelper.php` | 0 | 1 |
@@ -2174,7 +2175,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHashCryptoNativeJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtime.php` | 0 | 1 |
@@ -5014,6 +5015,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/HashCryptoJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/HebrevJitHelper.php`
 
@@ -17072,10 +17078,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `lib/JIT/Builtin/StringHashCryptoNativeJit.php`
+### `lib/JIT/Builtin/StringHashCryptoPhp.php`
 
 **Warnings** (review for bootstrap subset):
-- 56 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/StringHashEquals.php`
 

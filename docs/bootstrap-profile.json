@@ -1406,7 +1406,7 @@
         "lib/JIT/Builtin/StringGmmktime.php",
         "lib/JIT/Builtin/StringHashCrypto.php",
         "lib/JIT/Builtin/StringHashCryptoJit.php",
-        "lib/JIT/Builtin/StringHashCryptoNativeJit.php",
+        "lib/JIT/Builtin/StringHashCryptoPhp.php",
         "lib/JIT/Builtin/StringHashEquals.php",
         "lib/JIT/Builtin/StringHashHmacAlgos.php",
         "lib/JIT/Builtin/StringHrtime.php",

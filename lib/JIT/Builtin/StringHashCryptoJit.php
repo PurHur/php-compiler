@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 /**
  * LLVM lowering for hash() / hash_hmac() / hash_pbkdf2() / hash_equals() / hash_hmac_algos().
  *
- * Digest helpers lowered in PHP LLVM via {@see StringHashCryptoNativeJit} (#7189, #7437).
+ * Digest helpers via {@see StringHashCryptoPhp} → HashCryptoJitHelper → VmHash (#9164).
  * hash_equals / hash_hmac_algos via {@see StringHashEquals} / {@see StringHashHmacAlgos} (#7189).
  */
 final class StringHashCryptoJit
@@ -28,7 +28,7 @@ final class StringHashCryptoJit
     {
         StringHashEquals::ensureLinked($context);
         StringHashHmacAlgos::ensureLinked($context);
-        StringHashCryptoNativeJit::implement($context);
+        StringHashCryptoPhp::implement($context);
 
         self::registerLinkedRuntime($context);
     }
