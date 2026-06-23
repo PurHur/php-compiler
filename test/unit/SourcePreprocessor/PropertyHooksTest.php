@@ -718,4 +718,35 @@ PHP;
         self::assertSame($src, $out);
     }
 
+    /** @covers bootstrap M2 spine — FFI nowdoc cdef must not match hook default scanner (ext/standard/VmDirNative.php) */
+    public function testVmDirNativeSpineFileUnchangedByPropertyHooksPreprocessor(): void
+    {
+        $path = dirname(__DIR__, 3).'/ext/standard/VmDirNative.php';
+        $src = (string) file_get_contents($path);
+        [$out] = (new PropertyHooks())->process($src, $path);
+        self::assertSame($src, $out);
+    }
+
+    public function testSkipsMethodBodyHeredocAssignmentBeforeControlFlowBrace(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private static function ffi(): ?\FFI {
+        $cdef = <<<'CDEF'
+typedef struct {
+    char d_name[256];
+} dirent;
+CDEF;
+        foreach (['a'] as $lib) {
+            return null;
+        }
+        return null;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertSame($src, $out);
+    }
+
 }

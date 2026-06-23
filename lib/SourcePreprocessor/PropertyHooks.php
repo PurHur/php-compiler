@@ -302,6 +302,13 @@ final class PropertyHooks
                 $offset = $afterVar + 1;
                 continue;
             }
+            if (
+                $this->isInsideFunctionBody($body, $varStart)
+                && !$this->isPromotedConstructorParamVar($body, $varStart)
+            ) {
+                $offset = $afterVar + 1;
+                continue;
+            }
             $declLookback = $varStart - 1;
             while ($declLookback >= 0 && ctype_space($body[$declLookback])) {
                 --$declLookback;
@@ -509,6 +516,13 @@ final class PropertyHooks
         $inString = false;
         $stringChar = '';
         for ($i = $start; $i < $len; ++$i) {
+            if ($i + 2 < $len && '<<<' === substr($body, $i, 3)) {
+                $afterHeredoc = $this->skipHeredocNowdoc($body, $i);
+                if (null !== $afterHeredoc) {
+                    $i = $afterHeredoc - 1;
+                    continue;
+                }
+            }
             $ch = $body[$i];
             if ($inString) {
                 if ('\\' === $ch) {
@@ -542,6 +556,119 @@ final class PropertyHooks
                 ++$depthBracket;
             } elseif (']' === $ch && $depthBracket > 0) {
                 --$depthBracket;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Local `$var = …` inside a method body is not a hooked property decl (#1492 bootstrap spine).
+     */
+    private function isInsideFunctionBody(string $body, int $offset): bool
+    {
+        $depth = 0;
+        for ($i = $offset - 1; $i >= 0; --$i) {
+            $ch = $body[$i];
+            if ('}' === $ch) {
+                ++$depth;
+            } elseif ('{' === $ch) {
+                if (0 === $depth) {
+                    $before = rtrim(substr($body, 0, $i));
+
+                    return (bool) preg_match(
+                        '/\bfunction\s*(?:&\s*)?[\w\\\\]*\s*\([^)]*\)\s*(?::\s*[^ {]+)?\s*$/s',
+                        $before
+                    );
+                }
+                --$depth;
+            }
+        }
+
+        return false;
+    }
+
+    private function isPromotedConstructorParamVar(string $body, int $varStart): bool
+    {
+        $prefix = substr($body, 0, $varStart);
+        if (!preg_match('/\bfunction\s+__construct\s*\(/s', $prefix)) {
+            return false;
+        }
+        $lineStart = strrpos(substr($body, 0, $varStart), "\n");
+        $lineStart = false === $lineStart ? 0 : $lineStart + 1;
+        $linePrefix = substr($body, $lineStart, $varStart - $lineStart);
+
+        return (bool) preg_match('/\b(public|protected|private)\b/', $linePrefix);
+    }
+
+    /**
+     * @return int|null position after closing heredoc/nowdoc delimiter line
+     */
+    private function skipHeredocNowdoc(string $body, int $pos): ?int
+    {
+        $len = strlen($body);
+        if ($pos + 3 > $len || '<<<' !== substr($body, $pos, 3)) {
+            return null;
+        }
+        $i = $pos + 3;
+        if ($i >= $len) {
+            return null;
+        }
+        $label = '';
+        if ("'" === $body[$i] || '"' === $body[$i]) {
+            $quote = $body[$i];
+            ++$i;
+            while ($i < $len && (ctype_alnum($body[$i]) || '_' === $body[$i])) {
+                $label .= $body[$i];
+                ++$i;
+            }
+            if ($i >= $len || $body[$i] !== $quote) {
+                return null;
+            }
+            ++$i;
+        } else {
+            while ($i < $len && (ctype_alnum($body[$i]) || '_' === $body[$i])) {
+                $label .= $body[$i];
+                ++$i;
+            }
+        }
+        if ('' === $label) {
+            return null;
+        }
+        while ($i < $len && (' ' === $body[$i] || "\t" === $body[$i])) {
+            ++$i;
+        }
+        if ($i < $len && "\r" === $body[$i]) {
+            ++$i;
+        }
+        if ($i < $len && "\n" === $body[$i]) {
+            ++$i;
+        }
+        while ($i < $len) {
+            $lineStart = $i;
+            while ($i < $len && "\n" !== $body[$i] && "\r" !== $body[$i]) {
+                ++$i;
+            }
+            $line = substr($body, $lineStart, $i - $lineStart);
+            $stripped = rtrim($line, "\r");
+            if (preg_match('/^(\s*)('.preg_quote($label, '/').')(\s*;)?\s*$/', $stripped, $m)
+                && ('' === $m[1] || ctype_space($m[1]))) {
+                if ($i < $len && "\r" === $body[$i]) {
+                    ++$i;
+                }
+                if ($i < $len && "\n" === $body[$i]) {
+                    ++$i;
+                }
+
+                return $i;
+            }
+            if ($i < $len) {
+                if ("\r" === $body[$i]) {
+                    ++$i;
+                }
+                if ($i < $len && "\n" === $body[$i]) {
+                    ++$i;
+                }
             }
         }
 
