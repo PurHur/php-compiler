@@ -15365,7 +15365,7 @@ class Compiler {
                 if (null === $valueSlot) {
                     if (
                         null === $calleeName
-                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex)
+                        || !$this->callArgRequiresByRef($calleeName, (int) $argIndex, $arg, $block)
                     ) {
                         $valueSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
                             $arg,
@@ -15590,14 +15590,70 @@ class Compiler {
         return $namedSlot;
     }
 
-    private function callArgRequiresByRef(string $calleeName, int $argIndex): bool
+    private function callArgRequiresByRef(string $calleeName, int $argIndex, ?Operand $arg = null, ?Block $block = null): bool
     {
+        if ('array_multisort' === strtolower($calleeName)) {
+            if (null !== $arg && null !== $block && $this->isArrayMultisortSortFlagOperand($arg, $block)) {
+                return false;
+            }
+
+            return true;
+        }
         if (\in_array($argIndex, BuiltinByRefParams::forFunction($calleeName), true)) {
             return true;
         }
         $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($calleeName);
 
         return null !== $variadicFrom && $argIndex >= $variadicFrom;
+    }
+
+    /**
+     * array_multisort() SORT_* / Sorting enum operands are by-value (#9481, ext/standard/array.c).
+     */
+    private function isArrayMultisortSortFlagOperand(Operand $arg, Block $block): bool
+    {
+        if ($this->operandLooksLikeArrayMultisortSortFlag($arg)) {
+            return true;
+        }
+        $slot = $this->tryFoldCallArgCompileTimeValue($arg, $block, 'array_multisort', null);
+        if (null === $slot || !isset($block->constants[$slot])) {
+            return false;
+        }
+        $const = $block->constants[$slot];
+        if (Variable::TYPE_INTEGER !== $const->type) {
+            return false;
+        }
+        $val = $const->toInt();
+        $masked = $val & ~\PHPCompiler\ext\standard\StdlibConstants::SORT_FLAG_CASE;
+
+        return \in_array($masked, [
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_ASC,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_DESC,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_REGULAR,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_NUMERIC,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_STRING,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_NATURAL,
+            \PHPCompiler\ext\standard\StdlibConstants::SORT_LOCALE_STRING,
+        ], true) || 0 !== ($val & \PHPCompiler\ext\standard\StdlibConstants::SORT_FLAG_CASE);
+    }
+
+    /** SORT_* / Sorting enum operands in array_multisort() are by-value (#9481). */
+    private function operandLooksLikeArrayMultisortSortFlag(Operand $arg): bool
+    {
+        if ($arg instanceof Op\Expr\ConstFetch) {
+            $name = $this->staticNameFromOperand($arg->name);
+            if (null !== $name && str_starts_with(strtoupper($name), 'SORT_')) {
+                return true;
+            }
+        }
+        if ($arg instanceof Op\Expr\ClassConstFetch) {
+            $class = $this->staticNameFromOperand($arg->class);
+            if (null !== $class && 0 === strcasecmp(ltrim($class, '\\'), 'Sorting')) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -15642,6 +15698,15 @@ class Compiler {
         }
         $n = \count($call->args);
         for ($i = $variadicFrom; $i < $n; ++$i) {
+            if (!isset($call->args[$i])) {
+                continue;
+            }
+            if (
+                'array_multisort' === strtolower($calleeName)
+                && $this->operandLooksLikeArrayMultisortSortFlag($call->args[$i])
+            ) {
+                continue;
+            }
             if ($this->operandsReferToSameVariable($call->args[$i], $arg)) {
                 return true;
             }

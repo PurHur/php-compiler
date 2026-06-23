@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\Variable;
+
 /**
  * By-reference parameter indices for VM builtins (issue #3578).
  *
@@ -87,5 +89,30 @@ final class BuiltinByRefParams
         }
 
         return null;
+    }
+
+    /**
+     * Whether $argIndex is ZEND_SEND_REF for $name.
+     * array_multisort() only passes array operands by reference, not SORT_* flags (#9481, ext/standard/array.c).
+     */
+    public static function isByRefArg(string $name, int $argIndex, ?Variable $runtimeValue = null): bool
+    {
+        $lc = strtolower($name);
+        if (\in_array($argIndex, self::forFunction($lc), true)) {
+            return true;
+        }
+        $variadicFrom = self::variadicByRefFromIndex($lc);
+        if (null === $variadicFrom || $argIndex < $variadicFrom) {
+            return false;
+        }
+        if ('array_multisort' === $lc) {
+            if (null === $runtimeValue) {
+                return false;
+            }
+
+            return Variable::TYPE_ARRAY === $runtimeValue->resolveIndirect()->type;
+        }
+
+        return true;
     }
 }

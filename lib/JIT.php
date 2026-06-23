@@ -14244,11 +14244,32 @@ class JIT {
                 if (null === $operand) {
                     continue;
                 }
+                if (
+                    'array_multisort' === strtolower($name)
+                    && !self::jitArgLooksLikeArray($args[$idx])
+                ) {
+                    continue;
+                }
+                if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
+                    JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+
+                    continue;
+                }
                 $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
             }
         }
 
         return $args;
+    }
+
+    private static function jitArgLooksLikeArray(JIT\Variable $arg): bool
+    {
+        if (JIT\Variable::TYPE_HASHTABLE === ($arg->type & ~JIT\Variable::IS_NATIVE_ARRAY)
+            || JIT\ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return true;
+        }
+
+        return JIT\Variable::TYPE_VALUE === $arg->type;
     }
 
     /**

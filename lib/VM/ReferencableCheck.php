@@ -100,6 +100,9 @@ final class ReferencableCheck
             if (!isset($calledArgs[$paramIdx])) {
                 continue;
             }
+            if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx])) {
+                continue;
+            }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
             self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
         }
