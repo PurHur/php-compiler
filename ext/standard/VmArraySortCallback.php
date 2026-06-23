@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Variable;
 
-/** usort/uasort/uksort and array_u* null callback → TypeError (ext/standard/array.c; #10624, #10799). */
+/** usort/uasort/uksort and array_u* null callback → TypeError (ext/standard/array.c; #10624, #10799, #10785). */
 final class VmArraySortCallback
 {
     public static function requireCallback(
@@ -21,5 +21,51 @@ final class VmArraySortCallback
                 $function.'(): Argument #'.$argNum.$paramPart.' must be a valid callback, no array or string given'
             );
         }
+    }
+
+    /**
+     * array_diff_uassoc()/array_intersect_uassoc() missing comparator (#10785, php-src array.c).
+     */
+    public static function requireUassocCallback(Variable $callback, string $function, int $argNum): void
+    {
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_NULL === $callback->type) {
+            throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
+        }
+        if (Variable::TYPE_ARRAY === $callback->type) {
+            self::rejectUassocArrayCallback($callback, $function, $argNum);
+        }
+        if (Variable::TYPE_STRING === $callback->type || VmClosureCall::isClosure($callback)) {
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $callback->type) {
+            return;
+        }
+
+        throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
+    }
+
+    private static function uassocInvalidCallbackTypeError(string $function, int $argNum): string
+    {
+        return $function.'(): Argument #'.$argNum.' must be a valid callback, no array or string given';
+    }
+
+    private static function uassocInvalidArrayCallbackTypeError(string $function, int $argNum): string
+    {
+        return $function.'(): Argument #'.$argNum.' must be a valid callback, array callback must have exactly two members';
+    }
+
+    private static function rejectUassocArrayCallback(Variable $callback, string $function, int $argNum): void
+    {
+        $table = $callback->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        $idx1 = new Variable(Variable::TYPE_INTEGER);
+        $idx1->int(1);
+        if (!$table->keyExists($idx0) || !$table->keyExists($idx1)) {
+            throw new \TypeError(self::uassocInvalidArrayCallbackTypeError($function, $argNum));
+        }
+
+        throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
     }
 }

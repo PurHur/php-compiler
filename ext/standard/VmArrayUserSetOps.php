@@ -135,9 +135,16 @@ final class VmArrayUserSetOps
     private static function runDiffUassoc(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
-                'array_diff_uassoc() expects at least 3 arguments, '.$argc.' given'
+                'array_diff_uassoc() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc < 3) {
+            VmArraySortCallback::requireUassocCallback(
+                $frame->calledArgs[$argc - 1],
+                'array_diff_uassoc',
+                $argc
             );
         }
         $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
@@ -159,9 +166,16 @@ final class VmArrayUserSetOps
     private static function runIntersectUassoc(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
-                'array_intersect_uassoc() expects at least 3 arguments, '.$argc.' given'
+                'array_intersect_uassoc() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc < 3) {
+            VmArraySortCallback::requireUassocCallback(
+                $frame->calledArgs[$argc - 1],
+                'array_intersect_uassoc',
+                $argc
             );
         }
         $dataCompare = self::resolveCompareCallback(
