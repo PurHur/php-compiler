@@ -11885,6 +11885,17 @@ class Compiler {
                     return $paired;
                 }
                 if ($argIndex < $argCount - 1) {
+                    // in_array(null, [null]) — hoisted null needle must not lose to haystack Array_ (#10909).
+                    if (
+                        $paired instanceof Op\Expr\ConstFetch
+                        && $this->operandsReferToSameVariable($paired->result, $callArgs[$argIndex] ?? null)
+                    ) {
+                        $name = $this->staticNameFromOperand($paired->name);
+                        if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                            return $paired;
+                        }
+                    }
+
                     return null;
                 }
                 if ($producerCount > 1) {
@@ -16408,6 +16419,42 @@ class Compiler {
                                 }
                             }
                         }
+                    }
+                }
+                if (
+                    \in_array(strtolower($calleeName ?? ''), ['in_array', 'array_search'], true)
+                    && 0 === $argIndex
+                ) {
+                    foreach ($block->orig->children as $i => $child) {
+                        if ($child !== $cfgCallOp) {
+                            continue;
+                        }
+                        $callArg = $cfgCallOp->args[0] ?? null;
+                        for ($j = $i - 1; $j >= 0; --$j) {
+                            $prev = $block->orig->children[$j];
+                            if ($prev instanceof Op\Expr\ConstFetch) {
+                                if (
+                                    null !== $callArg
+                                    && $this->operandsReferToSameVariable($prev->result, $callArg)
+                                ) {
+                                    if (null === $block->slotForOperand($prev->result)) {
+                                        foreach ($this->compileExpr($prev, $block) as $op) {
+                                            $sends[] = $op;
+                                        }
+                                    }
+                                    $needleSlot = $block->slotForOperand($prev->result);
+                                    if (null !== $needleSlot) {
+                                        $valueSlot = $needleSlot;
+                                    }
+                                    break 2;
+                                }
+                                continue;
+                            }
+                            if (!$this->isInlineExprCallArgProducer($prev)) {
+                                break;
+                            }
+                        }
+                        break;
                     }
                 }
             }
