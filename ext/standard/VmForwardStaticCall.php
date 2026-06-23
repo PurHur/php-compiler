@@ -22,7 +22,7 @@ final class VmForwardStaticCall
                 "{$builtinName}() requires VM context in this compiler build"
             );
         }
-        $calledScope = self::calledScopeClass($frame, $builtinName);
+        $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
         $vm = $frame->vmContext->runtime->vm;
 
@@ -51,13 +51,49 @@ final class VmForwardStaticCall
         return $args;
     }
 
-    public static function calledScopeClass(Frame $frame, string $builtinName): string
+    public static function calledScopeClass(Frame $frame, string $builtinName, Variable $callable): string
     {
         try {
             return VmReflection::getCalledClass($frame);
         } catch (\Error) {
+            // php-src: forward_static_call() rejects global scope; forward_static_call_array() does not.
+            if ('forward_static_call' === $builtinName) {
+                throw new \Error("Cannot call {$builtinName}() when no class scope is active");
+            }
+            $explicitClass = self::parseExplicitClassFromCallable($callable, $builtinName);
+            if (null !== $explicitClass) {
+                return $explicitClass;
+            }
+
             throw new \Error("Cannot call {$builtinName}() when no class scope is active");
         }
+    }
+
+    /**
+     * Explicit class from [ClassName::class, 'method'] at global scope (#10664).
+     */
+    public static function parseExplicitClassFromCallable(Variable $callable, string $builtinName): ?string
+    {
+        $callable = $callable->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $callable->type) {
+            return null;
+        }
+        $table = $callable->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        if (!$table->keyExists($idx0)) {
+            return null;
+        }
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $target->type) {
+            return null;
+        }
+        $class = $target->toString();
+        if ('' === $class) {
+            return null;
+        }
+
+        return $class;
     }
 
     public static function parseMethodName(Variable $callable, string $builtinName): string
