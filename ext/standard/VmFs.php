@@ -528,29 +528,7 @@ final class VmFs
      */
     public static function resolveIncludePath(string $filename): string|false
     {
-        if ('' === $filename || str_contains($filename, "\0")) {
-            return false;
-        }
-        if ($filename[0] === '/' || (\strlen($filename) > 1 && $filename[1] === ':')) {
-            $normalized = ScriptStack::normalize($filename);
-
-            return '' !== $normalized && VmStatPath::isFile($normalized) ? $normalized : false;
-        }
-        $includePath = VmIncludePath::get();
-        if ('' === $includePath) {
-            return false;
-        }
-        foreach (\explode(\PATH_SEPARATOR, $includePath) as $dir) {
-            if ('' === $dir) {
-                continue;
-            }
-            $candidate = ScriptStack::normalize(\rtrim($dir, '/\\').'/'.$filename);
-            if ('' !== $candidate && VmStatPath::isFile($candidate)) {
-                return $candidate;
-            }
-        }
-
-        return false;
+        return IncludePathJitHelper::resolveIncludePathZend($filename);
     }
 
     /**
