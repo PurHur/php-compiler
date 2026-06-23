@@ -28,6 +28,14 @@ final class VmHighlightTest extends TestCase
         $this->assertGreaterThan(20, \strlen($html));
     }
 
+    public function testHighlightEngineMatchesZendByteLength(): void
+    {
+        $html = HighlightEngine::render('<?php echo 1; ?>');
+        $zend = \highlight_string('<?php echo 1; ?>', true);
+        $this->assertIsString($zend);
+        $this->assertSame($zend, $html);
+    }
+
     public function testVmHighlightReturnMode(): void
     {
         $html = VmHighlight::highlightString('<?php echo 1; ?>', true);
