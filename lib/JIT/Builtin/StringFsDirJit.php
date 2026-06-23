@@ -922,10 +922,8 @@ final class StringFsDirJit
         );
 
         $dirEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($dir), $i8->constInt(0, false));
-        $pfxEmpty = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($pfx), $i8->constInt(0, false));
-        $empty = $context->builder->or($dirEmpty, $pfxEmpty);
         $normBlock = $fn->appendBasicBlock('tempnam_norm');
-        $context->builder->branchIf($empty, $fail, $normBlock);
+        $context->builder->branchIf($dirEmpty, $fail, $normBlock);
 
         $context->builder->positionAtEnd($normBlock);
         $pfxBufSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(64));

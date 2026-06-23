@@ -44,7 +44,7 @@ final class VmFsTempnam
 
     private static function tryCreate(string $dir, string $prefix): string|false
     {
-        if ('' === $dir || '' === $prefix) {
+        if ('' === $dir) {
             return false;
         }
         $ffiPath = VmFsTempnamNative::mkstemp($dir, $prefix);
