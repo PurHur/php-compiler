@@ -2104,8 +2104,18 @@ final class VmString
         if (Variable::TYPE_INTEGER !== $var->type) {
             throw new \LogicException('str_pad() pad type must be an integer in this compiler build');
         }
+        $padType = $var->toInt();
+        if (!\in_array($padType, [
+            StdlibConstants::STR_PAD_LEFT,
+            StdlibConstants::STR_PAD_RIGHT,
+            StdlibConstants::STR_PAD_BOTH,
+        ], true)) {
+            throw new \ValueError(
+                'str_pad(): Argument #4 ($pad_type) must be STR_PAD_LEFT, STR_PAD_RIGHT, or STR_PAD_BOTH'
+            );
+        }
 
-        return $var->toInt();
+        return $padType;
     }
 
     public static function padTypeIntFromEnumBacking(int $backing): int

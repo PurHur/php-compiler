@@ -893,7 +893,9 @@ final class VmArray
             $copy->copyFrom($value);
             if (Variable::TYPE_STRING === $resolvedKey->type) {
                 $raw = $resolvedKey->toString();
-                $newKey = 1 === $case ? VmString::asciiUpper($raw) : VmString::asciiLower($raw);
+                $newKey = StdlibConstants::CASE_LOWER === $case
+                    ? VmString::asciiLower($raw)
+                    : VmString::asciiUpper($raw);
                 $out->add($newKey, $copy);
             } else {
                 $out->addIndex($resolvedKey->toInt(), $copy);

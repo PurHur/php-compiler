@@ -39,7 +39,18 @@ final class highlight_file extends Internal
         if ($argc >= 2) {
             $return = VmHighlight::resolveReturnFlag($frame->calledArgs[1], $functionName);
         }
-        $result = VmHighlight::highlightFile($path, $return);
+        $contents = VmFs::fileGetContents($path);
+        if (false === $contents) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, $functionName, $path);
+            VmStreamOpenFailure::warnHighlightFailedOpening($frame, $functionName, $path);
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $result = VmHighlight::highlightString($contents, $return);
         if (null === $frame->returnVar) {
             return;
         }

@@ -30,4 +30,23 @@ final class VmStreamOpenFailure
             $frame
         );
     }
+
+    public static function warnHighlightFailedOpening(Frame $frame, string $function, string $path): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $message = \sprintf(
+            '%s(): Failed opening \'%s\' for highlighting',
+            $function,
+            $path
+        );
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
 }
