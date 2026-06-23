@@ -49,7 +49,7 @@ final class KrsortBuiltinTest extends TestCase
         $this->assertSame([30, 20, 10], $keys);
     }
 
-    public function testPackedListUnchanged(): void
+    public function testPackedListSortsByKeyDescending(): void
     {
         $runtime = new Runtime();
         $fn = new krsort_();
@@ -60,11 +60,11 @@ final class KrsortBuiltinTest extends TestCase
             $ht->addIndex($i, $val);
         }
         $sorted = $this->runKrsort($fn, $runtime, $ht);
-        $vals = [];
-        foreach ($sorted->iterate(true) as $v) {
-            $vals[] = $v->toInt();
+        $keys = [];
+        foreach ($sorted->iterateKeyed(true) as [$key]) {
+            $keys[] = $key->toInt();
         }
-        $this->assertSame([1, 2, 3], $vals);
+        $this->assertSame([2, 1, 0], $keys);
     }
 
     private function runKrsort(Internal $fn, Runtime $runtime, HashTable $array): HashTable

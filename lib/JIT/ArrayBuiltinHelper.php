@@ -10560,11 +10560,71 @@ final class ArrayBuiltinHelper
         }
         $isList = \PHPCompiler\ext\standard\JitArrayIsList::invoke($context, $array);
         $done = BasicBlockHelper::append($context, 'krsort_done');
+        $sortList = BasicBlockHelper::append($context, 'krsort_sort_list');
         $sort = BasicBlockHelper::append($context, 'krsort_sort');
-        $context->builder->branchIf($isList, $done, $sort);
+        $context->builder->branchIf($isList, $sortList, $sort);
+
+        $context->builder->positionAtEnd($sortList);
+        self::krsortPackedListByKey($context, $array);
+        $context->builder->branch($done);
 
         $context->builder->positionAtEnd($sort);
         self::sortStringKeysReverse($context, $array);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
+    /**
+     * krsort() on dense 0..n-1 lists — rebuild with keys n-1..0 (php-src; issue #10836).
+     */
+    private static function krsortPackedListByKey(Context $context, Variable $array): void
+    {
+        $src = self::loadHashTable($context, $array);
+        $sizeT = $context->getTypeFromString('size_t');
+        $i64 = $context->getTypeFromString('int64');
+        $two = $sizeT->constInt(2, false);
+        $zeroI64 = $i64->constInt(0, false);
+        $oneI64 = $i64->constInt(1, false);
+        $num = $context->builder->call(
+            $context->lookupFunction('__hashtable__getNumElements'),
+            $src
+        );
+        $tooSmall = $context->builder->icmp(Builder::INT_ULT, $num, $two);
+        $done = BasicBlockHelper::append($context, 'krsort_packed_list_done');
+        $work = BasicBlockHelper::append($context, 'krsort_packed_list_work');
+        $context->builder->branchIf($tooSmall, $done, $work);
+
+        $context->builder->positionAtEnd($work);
+        $dest = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $kSlot = $context->builder->alloca($i64, 1, 'krsort_packed_k');
+        $numI64 = $context->builder->zExt($num, $i64);
+        $context->builder->store($context->builder->subNoSignedWrap($numI64, $oneI64), $kSlot);
+
+        $loopHead = BasicBlockHelper::append($context, 'krsort_packed_head');
+        $loopBody = BasicBlockHelper::append($context, 'krsort_packed_body');
+        $loopNext = BasicBlockHelper::append($context, 'krsort_packed_next');
+        $storeDone = BasicBlockHelper::append($context, 'krsort_packed_store_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $k = $context->builder->load($kSlot);
+        $kNegative = $context->builder->icmp(Builder::INT_SLT, $k, $zeroI64);
+        $context->builder->branchIf($kNegative, $storeDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $kIndex = $context->builder->truncOrBitCast($k, $sizeT);
+        $valueBox = HashTableHelper::readIndexedToValueBox($context, $src, $kIndex);
+        $keyStr = \PHPCompiler\JIT\JitNativeString::formatIndexKey($context, $k);
+        HashTableHelper::setAtStringKey($context, $dest, $keyStr, $valueBox);
+        $context->builder->branch($loopNext);
+
+        $context->builder->positionAtEnd($loopNext);
+        $context->builder->store($context->builder->subNoSignedWrap($k, $oneI64), $kSlot);
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($storeDone);
+        HashTableHelper::storeHashtableInArrayVariable($context, $array, $dest);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
