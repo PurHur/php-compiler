@@ -83,6 +83,30 @@ final class HashTableSpliceTest extends TestCase
         $this->assertSame(2, $removed->find('b')?->resolveIndirect()->toInt());
     }
 
+    public function testSpliceMixedAssocReplacementRenumbersTrailingIntKeys(): void
+    {
+        $ht = new HashTable();
+        foreach (['x' => 1, 'y' => 2, 0 => 3] as $key => $value) {
+            $var = new Variable();
+            $var->int($value);
+            if (\is_int($key)) {
+                $ht->addIndex($key, $var);
+            } else {
+                $ht->add($key, $var);
+            }
+        }
+        $nine = new Variable();
+        $nine->int(9);
+        $repl = new HashTable();
+        $repl->add('z', $nine);
+        $ht->spliceInPlace(1, 1, $repl);
+
+        $this->assertSame(3, $ht->getNumElements());
+        $this->assertSame(1, $ht->find('x')?->resolveIndirect()->toInt());
+        $this->assertSame(9, $ht->findIndex(0)?->resolveIndirect()->toInt());
+        $this->assertSame(3, $ht->findIndex(1)?->resolveIndirect()->toInt());
+    }
+
     public function testSpliceAssociativeNegativeOffset(): void
     {
         $ht = new HashTable();
