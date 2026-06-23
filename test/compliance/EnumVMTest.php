@@ -84,6 +84,7 @@ final class EnumVMTest extends BaseTest
                 'list_destructure_enum_case.phpt',
                 'list_destructure_enum_key.phpt',
                 'enum_value_contexts.phpt',
+                'array_spread_enum_values.phpt',
                 'enum_implements_metadata.phpt',
                 'enum_implements_interface.phpt',
                 'enum_implements_interface_missing.phpt',
