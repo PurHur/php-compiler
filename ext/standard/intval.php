@@ -48,6 +48,11 @@ final class intval extends Internal
             if (0 === $base) {
                 $base = VmMath::autodetectBase($str);
             }
+            if ($base < 2 || $base > 36) {
+                $frame->returnVar->int(0);
+
+                return;
+            }
             if (10 !== $base) {
                 $result = VmMath::baseToZval($str, $base);
                 $frame->returnVar->int((int) $result);
@@ -313,12 +318,42 @@ final class intval extends Internal
 
     private function stringToIntWithBase(Context $context, Value $strPtr, Value $baseVal): Value
     {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $base = $context->builder->trunc($baseVal, $i32);
+        $zero = $i64->constInt(0, false);
+
+        $validBb = BasicBlockHelper::append($context, 'intval_strtol_valid');
+        $invalidBb = BasicBlockHelper::append($context, 'intval_strtol_invalid');
+        $doneBb = BasicBlockHelper::append($context, 'intval_strtol_done');
+
+        $isBaseZero = $context->builder->icmp(Builder::INT_EQ, $base, $i32->constInt(0, false));
+        $badBase = $context->builder->or(
+            $context->builder->icmp(Builder::INT_SLT, $base, $i32->constInt(2, false)),
+            $context->builder->icmp(Builder::INT_SGT, $base, $i32->constInt(36, false))
+        );
+        $invalid = $context->builder->and(
+            $context->builder->not($isBaseZero),
+            $badBase
+        );
+        $context->builder->branchIf($invalid, $invalidBb, $validBb);
+
+        $context->builder->positionAtEnd($invalidBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($validBb);
         $ptr = $this->stringDataPtr($context, $strPtr);
         $endPtr = $context->getTypeFromString('int8**')->constNull();
-        $base = $context->builder->trunc($baseVal, $context->getTypeFromString('int32'));
         $raw = $context->builder->call($context->lookupFunction('strtol'), $ptr, $endPtr, $base);
-        $i64 = $context->getTypeFromString('int64');
+        $parsed = $context->builder->trunc($raw, $i64);
+        $validEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBb);
 
-        return $context->builder->trunc($raw, $i64);
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($i64, 'intval_strtol_phi');
+        $phi->addIncoming($zero, $invalidBb);
+        $phi->addIncoming($parsed, $validEnd);
+
+        return $phi;
     }
 }
