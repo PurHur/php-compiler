@@ -632,17 +632,7 @@ final class VmDate
      */
     public static function checkdate(int $month, int $day, int $year): bool
     {
-        if ($year < 1 || $year > 32767) {
-            return false;
-        }
-        if ($month < 1 || $month > 12) {
-            return false;
-        }
-        if ($day < 1 || $day > self::daysInMonth($year, $month)) {
-            return false;
-        }
-
-        return true;
+        return VmCheckdate::validate($month, $day, $year);
     }
 
     /** date_default_timezone_get() — active default timezone id (#3292). */
