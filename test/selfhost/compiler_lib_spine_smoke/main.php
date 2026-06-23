@@ -396,6 +396,7 @@ require_once __DIR__.'/../../../ext/standard/JitBin2hex.php';
 require_once __DIR__.'/../../../ext/standard/JitCallUserFunc.php';
 require_once __DIR__.'/../../../ext/standard/JitChdir.php';
 require_once __DIR__.'/../../../ext/standard/JitCheckdate.php';
+require_once __DIR__.'/../../../ext/standard/CheckdnsrrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitCheckdnsrr.php';
 require_once __DIR__.'/../../../ext/standard/JitChgrp.php';
 require_once __DIR__.'/../../../ext/standard/JitChmod.php';

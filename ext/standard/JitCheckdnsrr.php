@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for checkdnsrr() / dns_check_record() via CheckdnsrrRuntime (JIT/AOT, #5983). */
+/** LLVM lowering for checkdnsrr() / dns_check_record() via CheckdnsrrRuntime PHP bridge (JIT/AOT, #9379). */
 final class JitCheckdnsrr
 {
     public static function invoke(Context $context, Value $hostname, Value $type): Value
