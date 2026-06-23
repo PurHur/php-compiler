@@ -687,8 +687,11 @@ final class VmReflection
             if (EnumCaseSupport::isEnumCase($object)) {
                 return EnumCaseSupport::propertyExistsOnCase($object->class, $property);
             }
-
-            return self::propertyExistsOnClass($object->class, $property, $ctx);
+            if (self::propertyExistsOnClass($object->class, $property, $ctx)) {
+                return true;
+            }
+            // php-src zend_property_exists: dynamic instance properties (stdClass, etc.)
+            return $object->hasProperty($property);
         }
         if (Variable::TYPE_ENUM_CASE === $objectOrClass->type) {
             return EnumCaseSupport::propertyExistsOnCase(
