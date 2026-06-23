@@ -24,6 +24,9 @@ final class CallArgv
 
     public static function implement(Context $context): void
     {
+        if (null !== self::$htGlobal) {
+            return;
+        }
         $htPtr = $context->getTypeFromString('__hashtable__*');
         self::$htGlobal = $context->module->addGlobal($htPtr, self::GLOBAL_HT);
         self::$htGlobal->setInitializer($htPtr->constNull());
@@ -31,9 +34,7 @@ final class CallArgv
 
     public static function emitStore(Context $context, Variable $packedArgv): void
     {
-        if (null === self::$htGlobal) {
-            throw new \LogicException('CallArgv global not initialized');
-        }
+        self::implement($context);
         $context->builder->store(
             $context->helper->loadValue($packedArgv),
             self::$htGlobal
@@ -42,9 +43,7 @@ final class CallArgv
 
     public static function load(Context $context): Value
     {
-        if (null === self::$htGlobal) {
-            throw new \LogicException('CallArgv global not initialized');
-        }
+        self::implement($context);
 
         return $context->builder->load(self::$htGlobal);
     }
