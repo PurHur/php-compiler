@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -59,10 +59,83 @@ final class VmCallable
     }
 
     /**
+     * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
+     */
+    public static function invokeWithArgEntries(Context $ctx, Variable $callback, array $entries): Variable
+    {
+        $callback = $callback->resolveIndirect();
+        if (VmClosureCall::isClosure($callback)) {
+            $state = VmClosureCall::resolve($callback);
+            $resolved = self::resolveEntriesForPhpFunction(
+                $state->func->block->paramNames,
+                $state->func->block->variadicParamIndex,
+                null,
+                $entries
+            );
+
+            return VmClosureCall::invoke($ctx, $state, ...$resolved);
+        }
+        if (Variable::TYPE_STRING === $callback->type) {
+            return self::invokeStringCallableWithEntries($ctx, $callback->toString(), $entries);
+        }
+        if (Variable::TYPE_ARRAY === $callback->type) {
+            $resolved = self::resolveEntriesToPositional($entries);
+
+            return self::invokeArrayCallable($ctx, $callback, ...$resolved);
+        }
+        if (Variable::TYPE_OBJECT === $callback->type) {
+            $object = $callback->toObject();
+            if (null !== $object->closureState) {
+                throw new \TypeError(self::invalidCallbackTypeError());
+            }
+            $resolved = self::resolveEntriesToPositional($entries);
+
+            return $ctx->runtime->vm->invokeInstanceMethod($object, '__invoke', ...$resolved);
+        }
+
+        throw new \TypeError(self::invalidCallbackTypeError());
+    }
+
+    /**
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    public static function arrayVariableToArgEntries(Variable $arrayVar): array
+    {
+        $entries = [];
+        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
+            [$keyVar, $value] = $pair;
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $keyResolved = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyResolved->type) {
+                $entries[] = ['p', $copy];
+                continue;
+            }
+            if (Variable::TYPE_STRING === $keyResolved->type) {
+                $key = $keyResolved->toString();
+                if ('' !== $key && ctype_digit($key)) {
+                    $entries[] = ['p', $copy];
+                    continue;
+                }
+                $entries[] = ['n', $key, $copy];
+            }
+        }
+
+        return $entries;
+    }
+
+    /**
      * @param list<Variable> $params
      */
     public static function invokeArrayParams(Context $ctx, Variable $callback, array $params): Variable
     {
+        if (1 === \count($params)) {
+            $sole = $params[0]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $sole->type) {
+                return self::invokeWithArgEntries($ctx, $callback, self::arrayVariableToArgEntries($sole));
+            }
+        }
+
         $copies = [];
         foreach ($params as $param) {
             $copy = new Variable();
@@ -258,6 +331,79 @@ final class VmCallable
         }
 
         return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
+    }
+
+    /**
+     * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
+     */
+    private static function invokeStringCallableWithEntries(Context $ctx, string $name, array $entries): Variable
+    {
+        if (str_contains($name, '::')) {
+            $resolved = self::resolveEntriesToPositional($entries);
+
+            return self::invokeStringCallable($ctx, $name, ...$resolved);
+        }
+        try {
+            $internal = VmInternalCall::resolveStringCallback($name);
+            $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
+            $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
+            $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
+            ksort($resolved);
+
+            return VmInternalCall::invoke($internal, ...array_values($resolved));
+        } catch (\LogicException) {
+            // Not a registered string builtin — try a user-defined function.
+        }
+        try {
+            $fn = VmUserCall::resolveStringCallback($ctx, $name);
+        } catch (\LogicException) {
+            throw new \TypeError(self::invalidStringCallbackTypeError($name));
+        }
+
+        return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
+    }
+
+    /**
+     * @param list<string>                                      $paramNames
+     * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
+     *
+     * @return list<Variable>
+     */
+    private static function resolveEntriesForPhpFunction(
+        array $paramNames,
+        ?int $variadicParamIndex,
+        ?string $functionName,
+        array $entries
+    ): array {
+        $resolved = NamedArgs::resolve($entries, $paramNames, $variadicParamIndex, $functionName);
+        ksort($resolved);
+
+        return array_values($resolved);
+    }
+
+    /**
+     * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
+     *
+     * @return list<Variable>
+     */
+    private static function resolveEntriesToPositional(array $entries): array
+    {
+        $out = [];
+        foreach ($entries as $entry) {
+            if ('p' === $entry[0]) {
+                $copy = new Variable();
+                $copy->copyFrom($entry[1]);
+                $out[] = $copy;
+                continue;
+            }
+            if ('n' === $entry[0]) {
+                $copy = new Variable();
+                $copy->copyFrom($entry[2]);
+                $out[] = $copy;
+            }
+        }
+
+        return $out;
     }
 
     private static function invokeArrayCallable(Context $ctx, Variable $callback, Variable ...$args): Variable

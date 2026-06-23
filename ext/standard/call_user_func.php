@@ -31,16 +31,38 @@ final class call_user_func extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $callback = $frame->calledArgs[0];
-        $extra = [];
-        for ($i = 1; $i < $argc; ++$i) {
-            $copy = new Variable();
-            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
-            $extra[] = $copy;
-        }
-        $result = VmCallable::invoke($ctx, $callback, ...$extra);
+        $entries = self::collectForwardedArgEntries($frame);
+        $result = [] === $entries
+            ? VmCallable::invoke($ctx, $callback)
+            : VmCallable::invokeWithArgEntries($ctx, $callback, $entries);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
         }
+    }
+
+    /**
+     * @return list<array{0: string, 1?: mixed, 2?: Variable}>
+     */
+    private static function collectForwardedArgEntries(Frame $frame): array
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc <= 1) {
+            return [];
+        }
+        if (2 === $argc) {
+            $sole = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_ARRAY === $sole->type) {
+                return VmCallable::arrayVariableToArgEntries($sole);
+            }
+        }
+        $entries = [];
+        for ($i = 1; $i < $argc; ++$i) {
+            $copy = new Variable();
+            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
+            $entries[] = ['p', $copy];
+        }
+
+        return $entries;
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -36,13 +36,11 @@ final class call_user_func_array extends Internal
                 .self::typeLabel($params).' given'
             );
         }
-        $packed = [];
-        foreach ($params->toArray()->iterate(true) as $value) {
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $packed[] = $copy;
-        }
-        $result = VmCallable::invokeArrayParams($ctx, $frame->calledArgs[0], $packed);
+        $result = VmCallable::invokeWithArgEntries(
+            $ctx,
+            $frame->calledArgs[0],
+            VmCallable::arrayVariableToArgEntries($params)
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($result);
         }

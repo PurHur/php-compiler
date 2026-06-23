@@ -123,6 +123,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #10637 */
+    public function testCallUserFuncVariadicNamedParamMetadata(): void
+    {
+        $names = BuiltinParamNames::forFunction('call_user_func');
+        self::assertSame(['callback'], $names);
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('call_user_func'));
+        self::assertSame(['callback', 'args'], BuiltinParamNames::forFunction('call_user_func_array'));
+    }
+
     /** @covers issue #10042 */
     public function testArrayColumnNamedParamsResolve(): void
     {

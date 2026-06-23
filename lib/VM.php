@@ -115,6 +115,29 @@ class VM {
     }
 
     /**
+     * Invoke a user function with positional/named call arg entries (call_user_func forwarding, #10637).
+     *
+     * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
+     */
+    public function invokePhpFunctionWithArgEntries(Func\PHP $func, array $entries): Variable
+    {
+        if ($this->context->coercingObjectToString) {
+            throw new \LogicException(
+                'invokePhpFunctionWithArgEntries() is not supported during object-to-string coercion'
+            );
+        }
+        $resolved = NamedArgs::resolve(
+            $entries,
+            $func->block->paramNames,
+            $func->block->variadicParamIndex,
+            $func->block->func?->name ?? null
+        );
+        ksort($resolved);
+
+        return $this->invokePhpFunctionOnStack($func, ...array_values($resolved));
+    }
+
+    /**
      * @param Variable ...$args
      */
     private function invokePhpFunctionOnStack(Func\PHP $func, ...$args): Variable
@@ -11136,7 +11159,12 @@ restart:
             return [$call->block->paramNames, $call->block->variadicParamIndex];
         }
         if ($call instanceof Func\Internal) {
-            return [BuiltinParamNames::forFunction($call->getName()) ?? [], null];
+            $name = $call->getName();
+
+            return [
+                BuiltinParamNames::forFunction($name) ?? [],
+                BuiltinParamNames::variadicParamIndexForFunction($name),
+            ];
         }
 
         return [[], null];
