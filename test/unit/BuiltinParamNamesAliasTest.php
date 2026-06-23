@@ -143,4 +143,25 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'file_get_contents'));
         self::assertSame(4, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'file_get_contents'));
     }
+
+    /** @covers issue #10060 */
+    public function testPregSplitNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('preg_split');
+        self::assertSame(['pattern', 'subject', 'limit', 'flags'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'pattern', 'preg_split'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_split'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'preg_split'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'preg_split'));
+    }
+
+    /** @covers issue #10033 */
+    public function testPregReplaceNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('preg_replace');
+        self::assertSame(['pattern', 'replacement', 'subject', 'limit', 'count'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'pattern', 'preg_replace'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'replacement', 'preg_replace'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_replace'));
+    }
 }
