@@ -26,9 +26,23 @@ PHP;
 
     private const EXPECT = "w\nok";
 
+    private const CODE_MEMORY = <<<'PHP'
+$h = fopen('php://memory', 'w+');
+fwrite($h, 'abc');
+echo fflush($h) ? 'ok' : 'no', "\n";
+fclose($h);
+PHP;
+
+    private const EXPECT_MEMORY = 'ok';
+
     public function testVmMatchesPhpSubset(): void
     {
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
+    }
+
+    public function testVmPhpMemoryFflushReturnsTrue(): void
+    {
+        $this->assertSame(self::EXPECT_MEMORY, $this->runBin('bin/vm.php', self::CODE_MEMORY));
     }
 
     /**
@@ -40,16 +54,28 @@ PHP;
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
-        $this->assertSame(self::EXPECT, $this->runAotBinary());
+        $this->assertSame(self::EXPECT, $this->runAotBinary(self::CODE));
     }
 
-    private function runAotBinary(): string
+    /**
+     * @group llvm
+     * @group jit
+     */
+    public function testAotPhpMemoryFflushReturnsTrue(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped('LLVM 9 toolchain not available');
+        }
+        $this->assertSame(self::EXPECT_MEMORY, $this->runAotBinary(self::CODE_MEMORY));
+    }
+
+    private function runAotBinary(string $code): string
     {
         $repo = dirname(__DIR__, 2);
         $tmp = tempnam(sys_get_temp_dir(), 'phpc_fflush_');
         $out = $tmp.'_bin';
         $this->assertNotFalse($tmp);
-        file_put_contents($tmp, "<?php\n".self::CODE);
+        file_put_contents($tmp, "<?php\n".$code);
         $env = $_ENV;
         LlvmToolchain::applyProcessEnv($env, $repo);
         $compile = proc_open(

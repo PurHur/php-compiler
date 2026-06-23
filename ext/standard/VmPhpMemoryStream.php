@@ -184,6 +184,14 @@ final class VmPhpMemoryStream
     }
 
     /**
+     * fflush() — in-memory streams have no userspace buffer; parity true (#10712, ext/standard/streams.c).
+     */
+    public static function flush(int $handle): bool
+    {
+        return isset(self::$streams[$handle]);
+    }
+
+    /**
      * stream_set_chunk_size() for php://memory|temp — php-src ext/standard/streams.c (#10459).
      *
      * @return int|false previous chunk size
