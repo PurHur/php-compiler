@@ -87,4 +87,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['array', 'num'], $names);
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'array_rand'));
     }
+
+    /** @covers issue #10644 */
+    public function testMicrotimeAsFloatNamedParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('microtime');
+        self::assertSame(['as_float'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'as_float', 'microtime'));
+    }
 }
