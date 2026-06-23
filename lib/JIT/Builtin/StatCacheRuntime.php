@@ -143,13 +143,13 @@ final class StatCacheRuntime
         $one = $i32->constInt(1, false);
         $isTwo = $context->builder->icmp(Builder::INT_EQ, $argc, $two);
         $isOne = $context->builder->icmp(Builder::INT_EQ, $argc, $one);
+        $i64 = $context->getTypeFromString('int64');
+        // Compute before terminators — inserting after branchIf poisons after_one (#9244).
+        $clearRealpathI64 = $context->builder->zext($fn->getParam(1), $i64);
         $afterOne = $fn->appendBasicBlock('clearstatcache_bridge_after_one');
         $context->builder->branchIf($isTwo, $perPath, $afterOne);
         $context->builder->positionAtEnd($afterOne);
         $context->builder->branchIf($isOne, $flagOnly, $all);
-
-        $i64 = $context->getTypeFromString('int64');
-        $clearRealpathI64 = $context->builder->zext($fn->getParam(1), $i64);
 
         $context->builder->positionAtEnd($all);
         $context->builder->call(self::helperFunction($context, self::CLEAR_ALL_HELPER));
