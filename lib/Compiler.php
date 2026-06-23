@@ -10201,12 +10201,20 @@ class Compiler {
     /**
      * php-cfg hoists enum `case` ClassConstFetch before inline Expr_Array call args (#5721).
      */
-    private function findInlineArrayProducerForCallArg(Operand $arg, Block $block, ?Op $cfgCallOp = null): ?Op\Expr\Array_
+    private function findInlineArrayProducerForCallArg(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp = null,
+        ?int $knownArgIndex = null
+    ): ?Op\Expr\Array_
     {
         if (null === $block->orig) {
             return null;
         }
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+        if (null === $callSite && null !== $cfgCallOp && null !== $knownArgIndex) {
+            $callSite = [$cfgCallOp, $knownArgIndex];
+        }
         if (null === $callSite) {
             return null;
         }
@@ -10237,6 +10245,19 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex);
         if ($producer instanceof Op\Expr\Array_) {
+            if (0 === $argIndex) {
+                $arrayProducers = array_values(array_filter(
+                    $producers,
+                    static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+                ));
+                if (
+                    \count($arrayProducers) >= 2
+                    && $this->producersAreNestedArrayLiteralChain($arrayProducers)
+                ) {
+                    return $arrayProducers[\count($arrayProducers) - 1];
+                }
+            }
+
             return $producer;
         }
 
@@ -11697,6 +11718,14 @@ class Compiler {
             );
         }
         if ($argIndex < $producerCount) {
+            if (
+                0 === $argIndex
+                && $this->producersAreNestedArrayLiteralChain($producers)
+            ) {
+                // Nested inline array literal is one call arg — outer Array_ is the producer (#9305, #10042).
+                return $producers[$producerCount - 1];
+            }
+
             return $producers[$argIndex];
         }
 
@@ -11806,6 +11835,26 @@ class Compiler {
                 return null;
             }
         }
+        // array_column(nested inline array, column_key, …) — lone outer Array_ is always arg 0 (#9305, #10042).
+        if (
+            1 === \count($producers)
+            && $producers[0] instanceof Op\Expr\Array_
+            && \count($nonEmbeddedArgIndices) >= 2
+            && 0 === ($nonEmbeddedArgIndices[0] ?? -1)
+            && 0 === $argIndex
+        ) {
+            return $producers[0];
+        }
+        // array_column([[..],[..]], 'name', null) — outer Array_ + trailing null ConstFetch (#9305).
+        if (
+            2 === \count($producers)
+            && $producers[0] instanceof Op\Expr\Array_
+            && $producers[1] instanceof Op\Expr\ConstFetch
+            && 0 === ($nonEmbeddedArgIndices[0] ?? -1)
+            && 0 === $argIndex
+        ) {
+            return $producers[0];
+        }
         // in_array(E::A, [E::A, E::B]) — lone Array_ maps to haystack slot, not enum needle (#8796, #9888).
         if (
             1 === \count($producers)
@@ -11816,6 +11865,15 @@ class Compiler {
             $arrayArgIndex = $nonEmbeddedArgIndices[\count($producers)];
 
             return $argIndex === $arrayArgIndex ? $producers[0] : null;
+        }
+        // array_column([['x'=>1]], 'x') — lone outer Array_ maps to first non-embedded arg (#9305, #10042).
+        if (
+            1 === \count($producers)
+            && $producers[0] instanceof Op\Expr\Array_
+            && 1 === \count($nonEmbeddedArgIndices)
+            && $argIndex === $nonEmbeddedArgIndices[0]
+        ) {
+            return $producers[0];
         }
         // array_slice($b, 1, -2) — lone UnaryMinus maps to trailing non-embedded arg (#10579).
         if (
@@ -15232,7 +15290,7 @@ class Compiler {
                     ++$callOrdinal;
                 }
             }
-            $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp);
+            $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex);
             $prefetchOps = [];
             if (null !== $inlineArray) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);

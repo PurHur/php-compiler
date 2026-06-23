@@ -159,6 +159,8 @@ final class BuiltinParamNames
                 return ['needle', 'haystack', 'strict'];
             case 'array_rand':
                 return ['array', 'num'];
+            case 'array_column':
+                return ['array', 'column_key', 'index_key'];
         }
 
         return null;
@@ -177,6 +179,12 @@ final class BuiltinParamNames
             return [
                 'glue' => 0,
                 'pieces' => 1,
+            ];
+        }
+        if ('array_column' === $lc) {
+            // php-src basic_functions.stub.php — public name `input` aliases internal `array` (#10042).
+            return [
+                'input' => 0,
             ];
         }
 
