@@ -9168,6 +9168,22 @@ final class ArrayBuiltinHelper
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($afterNull);
+        $arrayBlock = BasicBlockHelper::append($context, 'array_combine_key_array');
+        $afterArray = BasicBlockHelper::append($context, 'array_combine_after_array');
+        $isArray = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_ARRAY, false)
+        );
+        $context->builder->branchIf($isArray, $arrayBlock, $afterArray);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitBuiltinWarning($context, 'Array to string conversion');
+        $arrayKey = $context->builder->load($context->constantStringFromString('Array'));
+        self::storeValueEntryAtStringKey($context, $dest, $arrayKey, $valEntry);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($afterArray);
         $isObject = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,

@@ -129,13 +129,19 @@ final class VmArray
     /**
      * array_combine() key slot — Zend convert_to_key rules (ext/standard/array.c, #4161).
      */
-    public static function storeCombineKey(HashTable $ht, Variable $key, Variable $stored): void
+    public static function storeCombineKey(HashTable $ht, Variable $key, Variable $stored, ?Frame $frame = null): void
     {
         $key = $key->resolveIndirect();
         self::rejectEnumCaseKeyVariable($key);
         $resourceKey = VmVarFormat::tryFormatPrintR($key);
         if (null !== $resourceKey) {
             $ht->update($resourceKey, $stored);
+
+            return;
+        }
+        if (Variable::TYPE_ARRAY === $key->type) {
+            self::warnArrayToStringKeyCoercion($frame);
+            $ht->update('Array', $stored);
 
             return;
         }
@@ -484,16 +490,31 @@ final class VmArray
     /**
      * array_fill_keys() — keys from values of {@param $keys}, uniform {@param $value}.
      */
-    public static function fillKeys(HashTable $keys, Variable $value): HashTable
+    public static function fillKeys(HashTable $keys, Variable $value, ?Frame $frame = null): HashTable
     {
         $dest = new HashTable();
         foreach ($keys->iterateKeyed(true) as [, $keyValue]) {
             $stored = new Variable();
             $stored->copyFrom($value);
-            self::storeCombineKey($dest, $keyValue, $stored);
+            self::storeCombineKey($dest, $keyValue, $stored, $frame);
         }
 
         return $dest;
+    }
+
+    /** Zend _array_to_string / array key coercion — warn and use literal "Array" (#10848, ext/standard/array.c). */
+    private static function warnArrayToStringKeyCoercion(?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->languageWarning(
+            'Array to string conversion',
+            null,
+            0,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /** ksort() — return array sorted by key ascending (php-src: no list-shaped skip; #10836). */
