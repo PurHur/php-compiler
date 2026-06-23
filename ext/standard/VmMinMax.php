@@ -54,8 +54,10 @@ final class VmMinMax
             return false;
         }
 
-        $cmp = self::compareNumericScalars($a, $b);
-        $best = ($pickMin ? $cmp < 0 : $cmp > 0) ? $a : $b;
+        // php-src ZEND_FRAMELESS min/max double path: min uses `>`, max uses `>=` (#10776).
+        $best = $pickMin
+            ? (self::numericGreaterThan($a, $b) ? $b : $a)
+            : (self::numericGreaterOrEqual($a, $b) ? $a : $b);
         $frame->returnVar->copyFrom($best);
 
         return true;
@@ -83,8 +85,9 @@ final class VmMinMax
         self::assertNumericScalar($best, $name);
         foreach (\array_slice($values, 1) as $candidate) {
             self::assertNumericScalar($candidate, $name);
-            $cmp = self::compareNumericScalars($candidate, $best);
-            if ($pickMin ? $cmp < 0 : $cmp > 0) {
+            // zend_hash_minmax + php_data_compare (zend_compare) ordering (#10776).
+            $cmp = Variable::spaceshipCompare($best, $candidate);
+            if ($pickMin ? $cmp > 0 : $cmp < 0) {
                 $best = $candidate;
             }
         }
@@ -206,22 +209,44 @@ final class VmMinMax
         );
     }
 
-    private static function compareNumericScalars(Variable $a, Variable $b): int
+    private static function numericGreaterThan(Variable $a, Variable $b): bool
     {
         $av = self::numericCompareValue($a);
         $bv = self::numericCompareValue($b);
-        $useFloat = Variable::TYPE_FLOAT === $a->type
-            || Variable::TYPE_FLOAT === $b->type
-            || \is_float($av)
-            || \is_float($bv);
-        if ($useFloat) {
+        if (self::operandsUseFloatCompare($a, $b, $av, $bv)) {
             $af = \is_float($av) ? $av : (float) $av;
             $bf = \is_float($bv) ? $bv : (float) $bv;
 
-            return $af <=> $bf;
+            return $af > $bf;
         }
 
-        return (int) $av <=> (int) $bv;
+        return (int) $av > (int) $bv;
+    }
+
+    private static function numericGreaterOrEqual(Variable $a, Variable $b): bool
+    {
+        $av = self::numericCompareValue($a);
+        $bv = self::numericCompareValue($b);
+        if (self::operandsUseFloatCompare($a, $b, $av, $bv)) {
+            $af = \is_float($av) ? $av : (float) $av;
+            $bf = \is_float($bv) ? $bv : (float) $bv;
+
+            return $af >= $bf;
+        }
+
+        return (int) $av >= (int) $bv;
+    }
+
+    private static function operandsUseFloatCompare(
+        Variable $a,
+        Variable $b,
+        int|float $av,
+        int|float $bv
+    ): bool {
+        return Variable::TYPE_FLOAT === $a->type
+            || Variable::TYPE_FLOAT === $b->type
+            || \is_float($av)
+            || \is_float($bv);
     }
 
     private static function numericCompareValue(Variable $value): int|float

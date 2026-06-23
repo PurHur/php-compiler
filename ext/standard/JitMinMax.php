@@ -92,9 +92,9 @@ final class JitMinMax
         foreach (\array_slice($args, 1) as $arg) {
             $candidate = pow::toJitDouble($context, $arg, $double);
             $cmp = $context->builder->fcmp(
-                $pickMin ? Builder::REAL_OLT : Builder::REAL_OGT,
-                $candidate,
-                $best
+                $pickMin ? Builder::REAL_OGT : Builder::REAL_OGE,
+                $best,
+                $candidate
             );
             $best = $context->builder->select($cmp, $candidate, $best);
         }
@@ -113,9 +113,9 @@ final class JitMinMax
         foreach (\array_slice($args, 1) as $arg) {
             $candidate = self::toCompareDouble($context, JitValueBox::valuePtrFromVariable($context, $arg));
             $cmp = $context->builder->fcmp(
-                $pickMin ? Builder::REAL_OLT : Builder::REAL_OGT,
-                $candidate,
-                $best
+                $pickMin ? Builder::REAL_OGT : Builder::REAL_OGE,
+                $best,
+                $candidate
             );
             $best = $context->builder->select($cmp, $candidate, $best);
         }
