@@ -1270,6 +1270,7 @@ require_once __DIR__.'/../../../ext/standard/end_.php';
 require_once __DIR__.'/../../../ext/standard/enum_exists_.php';
 require_once __DIR__.'/../../../ext/standard/error_clear_last.php';
 require_once __DIR__.'/../../../ext/standard/error_get_last.php';
+require_once __DIR__.'/../../../ext/standard/ErrorLogJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/error_log.php';
 require_once __DIR__.'/../../../ext/standard/error_reporting.php';
 require_once __DIR__.'/../../../ext/standard/escapeshellarg.php';
