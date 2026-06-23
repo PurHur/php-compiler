@@ -101,14 +101,22 @@ final class JitVfscanf
         $i64 = $context->getTypeFromString('int64');
         if ([] === $outArgs) {
             $ht = VmVfscanf::parseToArray($handle, $format);
-            $htVar = JitSscanf::materializeVmHashTable($context, $ht);
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeHashtable'),
-                $ptr,
-                HashTableHelper::loadHashtablePointer($context, $htVar)
-            );
+            if (false === $ht) {
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeBool'),
+                    $ptr,
+                    $context->getTypeFromString('int32')->constInt(0, false)
+                );
+            } else {
+                $htVar = JitSscanf::materializeVmHashTable($context, $ht);
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $ptr,
+                    HashTableHelper::loadHashtablePointer($context, $htVar)
+                );
+            }
 
             return $ptr;
         }
