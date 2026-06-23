@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\session\SessionFileStorage;
-use PHPCompiler\ext\standard\VmIni;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
@@ -35,7 +34,6 @@ final class SessionStorageRuntime
         'phpc_session_unlink_file',
         'phpc_session_apply_incoming_cookie',
         'phpc_session_emit_setcookie',
-        'phpc_session_gc_expired_files',
     ];
 
     private static int $blockSuffix = 0;
@@ -72,7 +70,6 @@ final class SessionStorageRuntime
         self::implementIfMissing($context, 'phpc_session_unlink_file', self::emitUnlinkFile(...));
         self::implementIfMissing($context, 'phpc_session_apply_incoming_cookie', self::emitApplyIncomingCookie(...));
         self::implementIfMissing($context, 'phpc_session_emit_setcookie', self::emitEmitSetcookie(...));
-        self::implementIfMissing($context, 'phpc_session_gc_expired_files', self::emitGcExpiredFiles(...));
 
         self::registerLinkedRuntime($context);
     }
@@ -115,10 +112,6 @@ final class SessionStorageRuntime
             'phpc_session_apply_incoming_cookie' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i32, false)
-            ),
-            'phpc_session_gc_expired_files' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($context->getTypeFromString('int64'), false)
             ),
             default => $context->module->addFunction(
                 $name,
@@ -817,166 +810,6 @@ final class SessionStorageRuntime
             $finalLenI64,
             $outPtr
         );
-    }
-
-    private static function emitGcExpiredFiles(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('ss_gc_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $i8p->pointerType(0);
-        $sizeT = $context->getTypeFromString('size_t');
-        $zeroI32 = $i32->constInt(0, false);
-        $negOneI64 = $i64->constInt(-1, true);
-        $prefix = 'sess_';
-        $prefixLen = \strlen(SessionFileStorage::PATH_PREFIX);
-        $maxLifetime = VmIni::getSessionGcMaxLifetime();
-
-        $dirCstr = self::storageDirCstr($context);
-        $namelistSlot = BasicBlockHelper::entryAlloca($context, $i8pp);
-        $context->builder->store($i8pp->constNull(), $namelistSlot);
-        $n = $context->builder->call(
-            $context->lookupFunction('scandir'),
-            $dirCstr,
-            $namelistSlot,
-            $i8p->constNull(),
-            $i8p->constNull()
-        );
-        $scanFail = $context->builder->icmp(Builder::INT_SLT, $n, $zeroI32);
-        $bbFail = BasicBlockHelper::append($context, 'ss_gc_fail');
-        $bbLoop = BasicBlockHelper::append($context, 'ss_gc_loop_init');
-        $context->builder->branchIf($scanFail, $bbFail, $bbLoop);
-
-        $context->builder->positionAtEnd($bbFail);
-        $context->builder->returnValue($negOneI64);
-
-        $context->builder->positionAtEnd($bbLoop);
-        $deletedSlot = $context->builder->alloca($i64, 1, 'ss_gc_deleted');
-        $context->builder->store($i64->constInt(0, false), $deletedSlot);
-        $iSlot = $context->builder->alloca($i32, 1, 'ss_gc_i');
-        $context->builder->store($zeroI32, $iSlot);
-        $loopHead = BasicBlockHelper::append($context, 'ss_gc_loop_head');
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $loopDone = BasicBlockHelper::append($context, 'ss_gc_loop_done');
-        $loopBody = BasicBlockHelper::append($context, 'ss_gc_loop_body');
-        $context->builder->branchIf($context->builder->icmp(Builder::INT_SGE, $i, $n), $loopDone, $loopBody);
-
-        $context->builder->positionAtEnd($loopBody);
-        $namelist = $context->builder->load($namelistSlot);
-        $entryPtr = $context->builder->load($context->builder->inBoundsGEP($namelist, $context->builder->zExt($i, $sizeT)));
-        $nameCstr = $context->builder->pointerCast($entryPtr, $i8p);
-        $nameLen = $context->builder->call($context->lookupFunction('strlen'), $nameCstr);
-        $hasPrefix = $context->builder->icmp(
-            Builder::INT_SGE,
-            $context->builder->truncOrBitCast($nameLen, $i32),
-            $i32->constInt($prefixLen, false)
-        );
-        $bbNext = BasicBlockHelper::append($context, 'ss_gc_next');
-        $bbCheck = BasicBlockHelper::append($context, 'ss_gc_check');
-        $context->builder->branchIf($hasPrefix, $bbCheck, $bbNext);
-
-        $context->builder->positionAtEnd($bbCheck);
-        $prefixOk = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $nameCstr,
-            self::literalCstr($context, $prefix),
-            $sizeT->constInt($prefixLen, false)
-        );
-        $bbProcess = BasicBlockHelper::append($context, 'ss_gc_process');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $prefixOk, $zeroI32),
-            $bbProcess,
-            $bbNext
-        );
-
-        $context->builder->positionAtEnd($bbProcess);
-        $pathBuf = $context->builder->alloca($i8, self::PATH_CAP, 'ss_gc_path');
-        $pathPtr = $context->builder->pointerCast($pathBuf, $i8p);
-        $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $pathPtr,
-            $sizeT->constInt(self::PATH_CAP, false),
-            self::literalCstr($context, '%s/%s'),
-            $dirCstr,
-            $nameCstr
-        );
-        $statBuf = $context->builder->alloca($i8, 128, 'ss_gc_stat');
-        $statOk = $context->builder->call(
-            $context->lookupFunction('stat'),
-            $pathPtr,
-            $context->builder->pointerCast($statBuf, $i8p)
-        );
-        $bbAfterStat = BasicBlockHelper::append($context, 'ss_gc_after_stat');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $statOk, $zeroI32),
-            $bbAfterStat,
-            $bbNext
-        );
-
-        $context->builder->positionAtEnd($bbAfterStat);
-        $now = $context->builder->call($context->lookupFunction('time'), $i8p->constNull());
-        $mtimeOffset = $i64->constInt(88, false);
-        $mtimePtr = $context->builder->inBoundsGEP(
-            $context->builder->pointerCast($statBuf, $i64->pointerType(0)),
-            $mtimeOffset
-        );
-        $mtime = $context->builder->load($mtimePtr);
-        $age = $context->builder->sub($now, $mtime);
-        $expired = $context->builder->icmp(
-            Builder::INT_SGT,
-            $age,
-            $i64->constInt($maxLifetime, false)
-        );
-        $bbUnlink = BasicBlockHelper::append($context, 'ss_gc_unlink');
-        $context->builder->branchIf($expired, $bbUnlink, $bbNext);
-
-        $context->builder->positionAtEnd($bbUnlink);
-        $removed = $context->builder->call($context->lookupFunction('remove'), $pathPtr);
-        $bbIncDeleted = BasicBlockHelper::append($context, 'ss_gc_inc_deleted');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $removed, $zeroI32),
-            $bbIncDeleted,
-            $bbNext
-        );
-
-        $context->builder->positionAtEnd($bbIncDeleted);
-        $deleted = $context->builder->load($deletedSlot);
-        $context->builder->store($context->builder->add($deleted, $i64->constInt(1, false)), $deletedSlot);
-        $context->builder->branch($bbNext);
-
-        $context->builder->positionAtEnd($bbNext);
-        $context->builder->store($context->builder->add($i, $i32->constInt(1, false)), $iSlot);
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopDone);
-        $namelist = $context->builder->load($namelistSlot);
-        $jSlot = $context->builder->alloca($i32, 1, 'ss_gc_free_i');
-        $context->builder->store($zeroI32, $jSlot);
-        $freeHead = BasicBlockHelper::append($context, 'ss_gc_free_head');
-        $context->builder->branch($freeHead);
-        $freeDone = BasicBlockHelper::append($context, 'ss_gc_free_done');
-        $freeBody = BasicBlockHelper::append($context, 'ss_gc_free_body');
-        $context->builder->positionAtEnd($freeHead);
-        $j = $context->builder->load($jSlot);
-        $context->builder->branchIf($context->builder->icmp(Builder::INT_SGE, $j, $n), $freeDone, $freeBody);
-        $context->builder->positionAtEnd($freeBody);
-        $dirent = $context->builder->load($context->builder->inBoundsGEP($namelist, $context->builder->zExt($j, $sizeT)));
-        $context->builder->call($context->lookupFunction('free'), $dirent);
-        $context->builder->store($context->builder->add($j, $i32->constInt(1, false)), $jSlot);
-        $context->builder->branch($freeHead);
-        $context->builder->positionAtEnd($freeDone);
-        $context->builder->call(
-            $context->lookupFunction('free'),
-            $context->builder->pointerCast($namelist, $i8p)
-        );
-        $context->builder->returnValue($context->builder->load($deletedSlot));
     }
 
     private static function sgSessionPtr(Context $context): Value

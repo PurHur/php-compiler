@@ -372,7 +372,7 @@ final class VmSession
      *
      * @return int|false deleted count, or false when directory cannot be opened
      */
-    private static function gcExpiredFiles(): int|false
+    public static function gcExpiredFiles(): int|false
     {
         $dir = SessionFileStorage::storageDir();
         if (!VmStatPath::isDir($dir)) {

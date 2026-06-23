@@ -86,6 +86,20 @@ final class VmPreg
         int $argIndex = 2,
         string $paramName = 'subject'
     ): Variable {
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_STR_OR_ARR on preg_* $pattern / $replacement (ext/pcre/php_pcre.c).
+     *
+     * @throws \TypeError
+     */
+    public static function requireStringOrArrayArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Variable {
         $var = $var->resolveIndirect();
         if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(
@@ -206,16 +220,30 @@ final class VmPreg
     }
 
     /**
-     * @param string|list<string> $subject
+     * @param string|list<string>        $pattern
+     * @param string|list<string>        $replacement
+     * @param string|list<string>        $subject
      *
      * @return string|list<string>|false
      */
     public static function pregReplace(
-        string $pattern,
-        string $replacement,
+        string|array $pattern,
+        string|array $replacement,
         string|array $subject,
         int $limit = -1
     ) {
+        self::assertPatternReplacementTypes($pattern, $replacement);
+
+        if (\is_array($pattern)) {
+            return self::pregReplaceArrayPatterns($pattern, $replacement, $subject, $limit);
+        }
+
+        if (\is_array($replacement)) {
+            throw new \TypeError(
+                'preg_replace(): Argument #1 ($pattern) must be of type array when argument #2 ($replacement) is an array, string given'
+            );
+        }
+
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
@@ -227,6 +255,74 @@ final class VmPreg
         }
 
         return $result;
+    }
+
+    /**
+     * @param list<string>         $pattern
+     * @param list<string>|string  $replacement
+     * @param string|list<string>  $subject
+     *
+     * @return string|list<string>|false
+     */
+    private static function pregReplaceArrayPatterns(
+        array $pattern,
+        array|string $replacement,
+        string|array $subject,
+        int $limit
+    ): string|array|false {
+        $replacements = \is_array($replacement)
+            ? $replacement
+            : array_fill(0, \count($pattern), $replacement);
+        while (\count($replacements) < \count($pattern)) {
+            $replacements[] = '';
+        }
+
+        if (\is_array($subject)) {
+            $out = [];
+            foreach ($subject as $key => $item) {
+                if (!\is_string($item)) {
+                    throw new \LogicException(
+                        'preg_replace() array subject values must be strings in this compiler build'
+                    );
+                }
+                $replaced = self::pregReplaceArrayPatterns($pattern, $replacements, $item, $limit);
+                if (false === $replaced) {
+                    return false;
+                }
+                $out[$key] = $replaced;
+            }
+
+            return $out;
+        }
+
+        $result = $subject;
+        foreach ($pattern as $index => $pat) {
+            if (strlen($pat) > self::MAX_PATTERN_BYTES) {
+                return false;
+            }
+            $repl = $replacements[$index] ?? '';
+            $step = VmPregNative::pregReplace($pat, $repl, $result, $limit);
+            self::syncLastErrorFromNative();
+            if (false === $step || null === $step) {
+                return false;
+            }
+            $result = $step;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param string|list<string> $pattern
+     * @param string|list<string> $replacement
+     */
+    private static function assertPatternReplacementTypes(string|array $pattern, string|array $replacement): void
+    {
+        if (\is_string($pattern) && \is_array($replacement)) {
+            throw new \TypeError(
+                'preg_replace(): Argument #1 ($pattern) must be of type array when argument #2 ($replacement) is an array, string given'
+            );
+        }
     }
 
     /**

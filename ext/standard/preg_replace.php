@@ -10,8 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\RuntimeStrictness;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -39,18 +37,8 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $patternVar = self::requireStringOrArrayPattern(
-            $frame->calledArgs[0],
-            'preg_replace',
-            0,
-            'pattern'
-        );
-        $replacementVar = self::requireStringOrArrayPattern(
-            $frame->calledArgs[1],
-            'preg_replace',
-            1,
-            'replacement'
-        );
+        $patternVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        $replacementVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[1], 'preg_replace', 1, 'replacement');
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'preg_replace',
@@ -68,13 +56,17 @@ final class preg_replace extends Internal
             $limit = $limitVar->toInt();
         }
 
+        $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        $replacement = self::patternOrReplacementOperand(
+            $replacementVar,
+            $frame->calledArgs[1],
+            'preg_replace',
+            1,
+            'replacement'
+        );
+
         if (Variable::TYPE_STRING === $subjectVar->type) {
-            $result = self::replaceSubjectString(
-                $patternVar,
-                $replacementVar,
-                $subjectVar->toString(),
-                $limit
-            );
+            $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit);
         } elseif (Variable::TYPE_ARRAY === $subjectVar->type) {
             $host = [];
             foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -86,19 +78,9 @@ final class preg_replace extends Internal
                 $hostKey = Variable::TYPE_INTEGER === $key->type
                     ? $key->toInt()
                     : $key->toString();
-                $replaced = self::replaceSubjectString(
-                    $patternVar,
-                    $replacementVar,
-                    $value->toString(),
-                    $limit
-                );
-                if (false === $replaced) {
-                    $result = false;
-                    break;
-                }
-                $host[$hostKey] = $replaced;
+                $host[$hostKey] = $value->toString();
             }
-            $result = $result ?? $host;
+            $result = VmPreg::pregReplace($pattern, $replacement, $host, $limit);
         }
 
         if (false === $result) {
@@ -137,6 +119,12 @@ final class preg_replace extends Internal
         $limit = 4 === $argc
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);
+
+        if (self::isArrayPatternOrReplacement($args[0]) || self::isArrayPatternOrReplacement($args[1])) {
+            throw new \LogicException(
+                'preg_replace() array $pattern/$replacement is not supported for JIT/AOT in this compiler build'
+            );
+        }
 
         $pattern = JitStringArg::lower($context, $args[0], 'preg_replace() pattern');
         $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
@@ -178,120 +166,33 @@ final class preg_replace extends Internal
     }
 
     /**
-     * @return string|list<string>|false
+     * @return string|list<string>
      */
-    private static function replaceSubjectString(
-        Variable $patternVar,
-        Variable $replacementVar,
-        string $subject,
-        int $limit
-    ): string|array|false {
-        if (Variable::TYPE_STRING === $patternVar->type) {
-            if (Variable::TYPE_ARRAY === $replacementVar->type) {
-                throw new \TypeError(
-                    'preg_replace(): Argument #1 ($pattern) must be of type array when argument #2 ($replacement) is an array'
-                );
-            }
-
-            return VmPreg::pregReplace(
-                $patternVar->toString(),
-                $replacementVar->toString(),
-                $subject,
-                $limit
-            );
-        }
-
-        $patterns = self::stringListFromArrayArg($patternVar, 'preg_replace', 0, 'pattern');
-        $replacementIsArray = Variable::TYPE_ARRAY === $replacementVar->type;
-        $replacements = $replacementIsArray
-            ? self::stringListFromArrayArg($replacementVar, 'preg_replace', 1, 'replacement')
-            : null;
-        if ($replacementIsArray && \count($patterns) !== \count($replacements)) {
-            throw new \ValueError(
-                'preg_replace(): Argument #1 ($pattern) and argument #2 ($replacement) must have the same length'
-            );
-        }
-        $scalarReplacement = $replacementIsArray ? null : $replacementVar->toString();
-        $result = $subject;
-        foreach ($patterns as $i => $pattern) {
-            $replacement = null !== $replacements ? $replacements[$i] : $scalarReplacement;
-            $next = VmPreg::pregReplace($pattern, $replacement, $result, $limit);
-            if (false === $next) {
-                return false;
-            }
-            $result = $next;
-        }
-
-        return $result;
-    }
-
-    /** @return list<string> */
-    private static function stringListFromArrayArg(
+    private static function patternOrReplacementOperand(
         Variable $var,
+        Variable $arg,
         string $function,
         int $argIndex,
         string $paramName
-    ): array {
-        $list = [];
+    ): string|array {
+        if (Variable::TYPE_STRING === $var->type) {
+            return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName);
+        }
+
+        $values = [];
         foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
-            if (Variable::TYPE_STRING !== $value->type) {
-                throw new \TypeError(\sprintf(
-                    '%s(): Argument #%d ($%s) must contain only string elements',
-                    $function,
-                    $argIndex + 1,
-                    $paramName
-                ));
-            }
-            $list[] = $value->toString();
+            $values[] = VmString::coerceStringBuiltinArg($value, $function, $argIndex, $paramName);
         }
 
-        return $list;
+        return $values;
     }
 
-    private static function requireStringOrArrayPattern(
-        Variable $var,
-        string $function,
-        int $argIndex,
-        string $paramName
-    ): Variable {
-        $var = $var->resolveIndirect();
-        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type array|string, %s given',
-                $function,
-                $argIndex + 1,
-                $paramName,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
-            return $var;
-        }
-
-        throw new \TypeError(\sprintf(
-            '%s(): Argument #%d ($%s) must be of type array|string, %s given',
-            $function,
-            $argIndex + 1,
-            $paramName,
-            self::patternArgTypeLabel($var)
-        ));
-    }
-
-    private static function patternArgTypeLabel(Variable $var): string
+    private static function isArrayPatternOrReplacement(JITVariable $arg): bool
     {
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            return EnumCaseSupport::typeNameForVariable($var);
+        if (JITVariable::TYPE_HASHTABLE === $arg->type) {
+            return true;
         }
 
-        return match ($var->type) {
-            Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_FLOAT => 'float',
-            Variable::TYPE_BOOLEAN => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_NULL => 'null',
-            Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => $var->toObject()->class->name,
-            default => 'mixed',
-        };
+        return 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY);
     }
 }

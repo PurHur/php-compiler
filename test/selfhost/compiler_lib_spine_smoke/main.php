@@ -708,6 +708,7 @@ require_once __DIR__.'/../../../ext/standard/JitSerialize.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionAbort.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionCreateId.php';
 require_once __DIR__.'/../../../ext/standard/SessionCreateIdJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/SessionGcJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionDestroy.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionEncode.php';
