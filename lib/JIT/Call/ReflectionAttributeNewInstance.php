@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Call;
 
-use PHPCompiler\JIT\AttributeNewInstanceHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\AttributeNewInstanceRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionRuntime;
 use PHPCompiler\JIT\Builtin\ReflectionSetup;
 use PHPCompiler\JIT\Call;
@@ -22,12 +22,13 @@ final class ReflectionAttributeNewInstance implements Call
     public function call(Context $context, Variable ...$args): Value
     {
         ReflectionRuntime::ensureLinked($context);
+        AttributeNewInstanceRuntime::ensureLinked($context);
         if ([] === $args) {
             throw new \LogicException('ReflectionAttribute::newInstance() requires an object receiver');
         }
         $attrObj = ReflectionSetup::loadObjectFromArg($context, $args[0]);
         $nameVar = $context->type->object->propertyFetch($attrObj, 'ReflectionAttribute', 'name');
-        $classId = AttributeNewInstanceHelper::emitResolveClassId($context, $nameVar);
+        $classId = AttributeNewInstanceRuntime::emitResolveClassId($context, $nameVar);
 
         $tag = 'rani'.(string) (++self::$seq);
         $merge = BasicBlockHelper::append($context, 'attr_newinstance_merge_'.$tag);
@@ -44,7 +45,7 @@ final class ReflectionAttributeNewInstance implements Call
         $obj = $context->type->object->allocateForRuntimeClassId($classId);
         $thisVar = new Variable($context, Variable::TYPE_OBJECT, Variable::KIND_VALUE, $obj);
         $thisVar->addref();
-        $ctorArg = AttributeNewInstanceHelper::emitReadCtorArgFromAttrOwner($context, $attrObj);
+        $ctorArg = AttributeNewInstanceRuntime::emitReadCtorArgFromAttrOwner($context, $attrObj);
 
         $ctorDone = BasicBlockHelper::append($context, 'attr_newinstance_ctor_done_'.$tag);
         $userIds = [];
@@ -75,17 +76,17 @@ final class ReflectionAttributeNewInstance implements Call
                 if ($context->functionIsRegistered($proxyName)) {
                     $context->resolveFunctionProxy($proxyName)->call($context, $thisVar, $ctorArg);
                 }
-                AttributeNewInstanceHelper::emitApplyConstructorPropertyArgs($context, $obj, $id, $ctorArg);
+                AttributeNewInstanceRuntime::emitApplyConstructorPropertyArgs($context, $obj, $id, $ctorArg);
                 $context->builder->branch($ctorDone);
             }
         }
         $context->builder->positionAtEnd($ctorDone);
         ReflectionSetup::markConstructed($context, $obj);
-        $context->builder->store(AttributeNewInstanceHelper::boxObject($context, $obj), $resultSlot);
+        $context->builder->store(AttributeNewInstanceRuntime::boxObject($context, $obj), $resultSlot);
         $context->builder->branch($merge);
 
         $context->builder->positionAtEnd($missing);
-        AttributeNewInstanceHelper::emitMissingClassError($context);
+        AttributeNewInstanceRuntime::emitMissingClassError($context);
         $context->builder->store($null, $resultSlot);
         $context->builder->branch($merge);
 
