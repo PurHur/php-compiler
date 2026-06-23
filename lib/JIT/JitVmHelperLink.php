@@ -40,7 +40,7 @@ final class JitVmHelperLink
             if (null === $block) {
                 throw new \LogicException($basename.' parseAndCompile failed ('.$compileLabel.')');
             }
-            $jit = new JIT($context);
+            $jit = new \PHPCompiler\JIT($context);
             $jit->compile($block);
         });
         foreach ($compiledHelpers as $logical) {

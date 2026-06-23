@@ -961,6 +961,7 @@ require_once __DIR__.'/../../../ext/standard/VmInet.php';
 require_once __DIR__.'/../../../ext/standard/VmInetNative.php';
 require_once __DIR__.'/../../../ext/standard/VmInetPure.php';
 require_once __DIR__.'/../../../ext/standard/VmInfo.php';
+require_once __DIR__.'/../../../ext/standard/InfoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmIni.php';
 require_once __DIR__.'/../../../ext/standard/VmIniIntrospection.php';
 require_once __DIR__.'/../../../ext/standard/VmIniQuantity.php';
