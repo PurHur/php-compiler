@@ -19,7 +19,7 @@ final class VmStreamWrapperRegistry
         'ftp',
         'ftps',
         'php',
-        'zlib',
+        'compress.zlib',
         'data',
         'glob',
         'phar',

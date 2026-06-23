@@ -41,8 +41,6 @@ final class VmPhpFdStream
     /** @var array<int, PhpFdStreamState> */
     private static array $streams = [];
 
-    private static int $nextHandleId = 0;
-
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -115,7 +113,7 @@ final class VmPhpFdStream
             return false;
         }
 
-        $id = ++self::$nextHandleId;
+        $id = VmFs::allocateStreamHandleId();
         self::$streams[$id] = new PhpFdStreamState($fd, $uri, $flags['canRead'], $flags['canWrite']);
 
         return $id;

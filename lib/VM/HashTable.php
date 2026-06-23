@@ -1008,7 +1008,7 @@ final class HashTable {
         $out = new self();
         foreach ($this->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->duplicateFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
                 $out->addIndex($key->toInt(), $copy);
             } else {
@@ -1026,7 +1026,7 @@ final class HashTable {
     {
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $copy = new Variable();
-            $copy->copyFrom($value);
+            $copy->duplicateFrom($value);
             if (Variable::TYPE_INTEGER === $key->type) {
                 $dest->append($copy);
             } else {
@@ -1086,7 +1086,11 @@ final class HashTable {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($existing);
             $ht->append($elementCopy);
-            self::mergeRecursiveOverlay($ht, $overlay->toArray());
+            foreach ($overlay->toArray()->iterate(true) as $element) {
+                $elemCopy = new Variable();
+                $elemCopy->copyFrom($element);
+                $ht->append($elemCopy);
+            }
         } else {
             $elementCopy = new Variable();
             $elementCopy->copyFrom($existing);
@@ -1568,6 +1572,16 @@ final class HashTable {
         } else {
             $dest->add($key->toString(), $copy);
         }
+    }
+
+    /**
+     * Replace an associative array in key order (array_multisort single-array path; #10653).
+     *
+     * @param list<array{0: Variable, 1: Variable}> $pairs
+     */
+    public function reorderKeyedPairs(array $pairs): void
+    {
+        $this->assignFromKeyedPairs($pairs);
     }
 
     /**

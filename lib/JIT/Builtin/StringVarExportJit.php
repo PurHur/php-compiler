@@ -905,10 +905,23 @@ final class StringVarExportJit
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($blocks[JITVariable::TYPE_HASHTABLE]);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $v);
+        $isStreamCtx = \PHPCompiler\ext\standard\JitStreamContextRepresentation::isRepresentation($context, $htPtr);
+        $streamCtxBb = $fn->appendBasicBlock('ev_stream_context');
+        $arrayExportBb = $fn->appendBasicBlock('ev_array_export');
+        $context->builder->branchIf($isStreamCtx, $streamCtxBb, $arrayExportBb);
+        $context->builder->positionAtEnd($streamCtxBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ve_buf_append_cstr'),
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('NULL'), $context->getTypeFromString('int8*'))
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($arrayExportBb);
         $context->builder->call(
             $context->lookupFunction('__phpc_ve_export_array'),
             $buf,
-            $context->builder->call($context->lookupFunction('__value__readHashtable'), $v),
+            $htPtr,
             $level
         );
         $context->builder->branch($done);

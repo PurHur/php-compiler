@@ -16,8 +16,6 @@ final class VmPhpMemoryStream
     /** @var array<int, PhpMemoryStreamState> */
     private static array $streams = [];
 
-    private static int $nextHandleId = 0;
-
     public static function isSupportedUri(string $uri): bool
     {
         if ('php://memory' === $uri) {
@@ -34,7 +32,7 @@ final class VmPhpMemoryStream
             return false;
         }
 
-        $id = ++self::$nextHandleId;
+        $id = VmFs::allocateStreamHandleId();
         self::$streams[$id] = new PhpMemoryStreamState($uri, $flags);
 
         return $id;

@@ -17,8 +17,6 @@ final class VmPhpInputOutputStream
     /** @var array<int, PhpInputOutputStreamState> */
     private static array $streams = [];
 
-    private static int $nextHandleId = 0;
-
     public static function isSupportedUri(string $uri): bool
     {
         return 'php://input' === $uri || 'php://output' === $uri;
@@ -31,7 +29,7 @@ final class VmPhpInputOutputStream
             return false;
         }
 
-        $id = ++self::$nextHandleId;
+        $id = VmFs::allocateStreamHandleId();
         self::$streams[$id] = new PhpInputOutputStreamState($uri, $flags);
 
         return $id;
