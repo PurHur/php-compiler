@@ -1087,6 +1087,7 @@ require_once __DIR__.'/../../../ext/standard/VmUnamePure.php';
 require_once __DIR__.'/../../../ext/standard/VmUnserializeFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmUserCall.php';
 require_once __DIR__.'/../../../ext/standard/VmUserStream.php';
+require_once __DIR__.'/../../../ext/standard/VmPrintRFloat.php';
 require_once __DIR__.'/../../../ext/standard/VmVarExportFloat.php';
 require_once __DIR__.'/../../../ext/standard/VmVarFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmVfscanf.php';
