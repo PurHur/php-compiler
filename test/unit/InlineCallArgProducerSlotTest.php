@@ -1098,6 +1098,46 @@ PHP;
         self::assertStringContainsString("'stdClass'", $out);
     }
 
+    /** Issue #10663 — hoisted null ConstFetch must not replace concat result call arg. */
+    public function testVarExportConcatNullUsesConcatSlotNotHoistedNull(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export('a' . null);
+var_export(null . 'b');
+var_export(null . null);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'concat_null_call_arg.php');
+
+        $concatSlots = [];
+        $nullConstSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullConstSlot) {
+                $nullConstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONCAT === $op->type) {
+                $concatSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($concatSlots, $sendSlots);
+        self::assertNotSame($nullConstSlot, $sendSlots[0] ?? null);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'a'", $out);
+        self::assertStringContainsString("'b'", $out);
+        self::assertStringContainsString("''", $out);
+    }
+
     /** Issue #10453 — hoisted PASSWORD_BCRYPT ConstFetch maps to arg #2 when trailing Array_ options literal. */
     public function testPasswordHashConstFetchAndArrayOptionSlots(): void
     {

@@ -11502,6 +11502,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\BinaryOp\Plus) {
                         return $last;
                     }
+                    // Hoisted ConstFetch prelude before inline concat call arg (#10663, zend_operators.c).
+                    if ($last instanceof Op\Expr\BinaryOp\Concat) {
+                        return $last;
+                    }
                 }
 
                 return null;
@@ -14762,8 +14766,12 @@ class Compiler {
         for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 4; --$i) {
             $prev = $children[$i] ?? null;
             if (!$prev instanceof Op\Expr\ConstFetch) {
-                if ($prev instanceof Op\Expr\Assign || $prev instanceof Op\Expr\BinaryOp\Concat) {
+                if ($prev instanceof Op\Expr\Assign) {
                     continue;
+                }
+                // Hoisted null feeds Concat operands, not a trailing call arg (#10663, zend_operators.c).
+                if ($prev instanceof Op\Expr\BinaryOp\Concat) {
+                    return null;
                 }
                 break;
             }
