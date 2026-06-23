@@ -26,9 +26,7 @@ final class strncmp extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (3 !== count($frame->calledArgs)) {
-            throw new \LogicException('strncmp() requires exactly three arguments');
-        }
+        $this->requireExactArgCount($frame, 'strncmp', 3);
         $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strncmp', 0, 'string1');
         $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strncmp', 1, 'string2');
         if (null === $frame->returnVar) {
@@ -43,8 +41,8 @@ final class strncmp extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (3 !== count($args)) {
-            throw new \LogicException('strncmp() requires exactly three arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'strncmp', 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strncmp', 0, 'string1'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strncmp', 1, 'string2'));

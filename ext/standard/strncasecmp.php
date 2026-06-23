@@ -26,9 +26,7 @@ final class strncasecmp extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (3 !== count($frame->calledArgs)) {
-            throw new \LogicException('strncasecmp() requires exactly three arguments');
-        }
+        $this->requireExactArgCount($frame, 'strncasecmp', 3);
         $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strncasecmp', 0, 'string1');
         $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strncasecmp', 1, 'string2');
         if (null === $frame->returnVar) {
@@ -43,8 +41,8 @@ final class strncasecmp extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (3 !== count($args)) {
-            throw new \LogicException('strncasecmp() requires exactly three arguments');
+        if (!$this->requireExactJitArgCount($context, $args, 'strncasecmp', 3)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncasecmp', 0, 'string1'));
         $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncasecmp', 1, 'string2'));
