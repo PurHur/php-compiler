@@ -141,6 +141,10 @@ final class BuiltinParamNames
                 return ['url', 'component'];
             case 'getopt':
                 return ['short_options', 'long_options', 'rest_index'];
+            case 'call_user_func':
+                return ['callback'];
+            case 'call_user_func_array':
+                return ['callback', 'args'];
             case 'is_callable':
                 return ['value', 'syntax_only', 'callable_name'];
             case 'iterator_to_array':
@@ -178,6 +182,17 @@ final class BuiltinParamNames
         }
 
         return null;
+    }
+
+    /**
+     * Variadic parameter index for builtins that accept ...$args (issue #10637).
+     */
+    public static function variadicParamIndexForFunction(string $name): ?int
+    {
+        return match (strtolower($name)) {
+            'call_user_func' => 1,
+            default => null,
+        };
     }
 
     /**

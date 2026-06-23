@@ -13889,7 +13889,12 @@ class JIT {
             return [$names ?? [], null];
         }
         if ($toCall instanceof CoreFunc\Internal) {
-            return [BuiltinParamNames::forFunction($toCall->getName()) ?? [], null];
+            $name = $toCall->getName();
+
+            return [
+                BuiltinParamNames::forFunction($name) ?? [],
+                BuiltinParamNames::variadicParamIndexForFunction($name),
+            ];
         }
 
         return [[], null];
