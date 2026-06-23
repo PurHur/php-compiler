@@ -1282,13 +1282,6 @@ final class Variable {
                 $this->objectPropertyName = $propName;
                 $this->staticPropertyClassLc = $staticClass;
                 break;
-            case self::TYPE_ENUM_CASE:
-                $this->enumCase(new EnumCaseEntry(
-                    $var->enumCase->enumClass,
-                    $var->enumCase->caseName,
-                    clone $var->enumCase->backingValue,
-                ));
-                break;
             case self::TYPE_UNDEFINED:
                 $owner = $this->objectPropertyOwner;
                 $propName = $this->objectPropertyName;
