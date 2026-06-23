@@ -128,6 +128,10 @@ final class var_export extends Internal
         if (ResourceSupport::isVmResource($v) && !is_resource_::isResource($v)) {
             return 'NULL';
         }
+        // php-src var.c: stream contexts are resources but var_export prints NULL (#10704).
+        if (VmStreamContext::isRepresentation($v)) {
+            return 'NULL';
+        }
         if (Variable::TYPE_BOOLEAN === $v->type) {
             return $v->toBool() ? 'true' : 'false';
         }

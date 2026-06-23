@@ -18,8 +18,6 @@ final class VmUserStream
     /** @var array<int, UserStreamState> */
     private static array $streams = [];
 
-    private static int $nextHandleId = 0;
-
     public static function open(VM $vm, Context $ctx, string $uri, string $mode): int|false
     {
         $protocol = VmStreamWrapperRegistry::parseProtocol($uri);
@@ -37,7 +35,7 @@ final class VmUserStream
         if (!self::callStreamOpen($vm, $object, $uri, $mode)) {
             return false;
         }
-        $id = ++self::$nextHandleId;
+        $id = VmFs::allocateStreamHandleId();
         self::$streams[$id] = new UserStreamState($object, $uri, $protocol, $vm);
 
         return $id;

@@ -36,6 +36,12 @@ final class VmFs
 
     private static int $nextHandleId = 0;
 
+    /** Single VM stream handle namespace (php-src php_stream_alloc; fixes #10556 id collisions). */
+    public static function allocateStreamHandleId(): int
+    {
+        return ++self::$nextHandleId;
+    }
+
     /**
      * @param list<string> $names
      */
@@ -714,7 +720,7 @@ final class VmFs
         if (!\is_resource($resource)) {
             return false;
         }
-        $id = ++self::$nextHandleId;
+        $id = self::allocateStreamHandleId();
         self::$handles[$id] = $resource;
         self::$handlePaths[$id] = $uri;
         if (null !== $socketFd && $socketFd >= 0) {
