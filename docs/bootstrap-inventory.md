@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2907 |
-| Phase A inventory files (M2 ratio SSOT) | 2907 |
+| PHP files on vm.php path | 2910 |
+| Phase A inventory files (M2 ratio SSOT) | 2910 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7853 |
+| Source constructs flagged (warnings) | 7863 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -280,12 +280,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/VmSockets.php` | 0 | 1 |
 | `ext/sockets/socket_atmark.php` | 0 | 4 |
 | `ext/sockets/socket_import_stream.php` | 0 | 4 |
-| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 9 |
-| `ext/spl/BuiltinClasses.php` | 0 | 3 |
+| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 10 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 6 |
+| `ext/spl/BuiltinClasses.php` | 0 | 2 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/Module.php` | 0 | 1 |
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
+| `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
+| `ext/spl/SplArrayStorage.php` | 0 | 1 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/VmSplIterators.php` | 0 | 3 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
@@ -977,7 +980,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmRoundMode.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 4 |
 | `ext/standard/VmScope.php` | 0 | 7 |
-| `ext/standard/VmSerialize.php` | 0 | 29 |
+| `ext/standard/VmSerialize.php` | 0 | 30 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 3 |
@@ -4614,21 +4617,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/ArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 33)
-- new ArrayIteratorConstruct (line 41)
-- new ArrayIteratorCurrent (line 44)
-- new ArrayIteratorKey (line 46)
-- new ArrayIteratorNext (line 48)
-- new ArrayIteratorRewind (line 50)
-- new ArrayIteratorValid (line 52)
-- new ArrayIteratorCount (line 54)
+- new ClassEntry (line 30)
+- new ArrayIteratorConstruct (line 38)
+- new ArrayIteratorCurrent (line 41)
+- new ArrayIteratorKey (line 43)
+- new ArrayIteratorNext (line 45)
+- new ArrayIteratorRewind (line 47)
+- new ArrayIteratorValid (line 49)
+- new ArrayIteratorCount (line 51)
+- new ArrayIteratorGetArrayCopy (line 53)
 - 16 class method(s)
+
+### `ext/spl/ArrayObjectBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 28)
+- new ArrayObjectConstruct (line 39)
+- new ArrayObjectGetArrayCopy (line 42)
+- new ArrayObjectCount (line 44)
+- new HashTable (line 65)
+- 4 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 31)
-- new ClassEntry (line 43)
+- new ClassEntry (line 34)
 - 3 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
@@ -4683,6 +4696,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 134)
 - new Variable (line 147)
 - 21 class method(s)
+
+### `ext/spl/SplArraySerializeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 64)
+- 3 class method(s)
+
+### `ext/spl/SplArrayStorage.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
 
@@ -9478,34 +9502,35 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 44)
-- new Exception (line 141)
-- new Variable (line 157)
-- new Variable (line 167)
-- new ObjectEntry (line 312)
-- new Variable (line 313)
-- new ObjectEntry (line 330)
-- new Variable (line 334)
-- new ObjectEntry (line 346)
-- new Variable (line 354)
-- new ObjectEntry (line 372)
-- new Variable (line 373)
-- new Variable (line 375)
-- new Variable (line 432)
-- new Exception (line 458)
-- new VmSerializeEnumCaseRef (line 508)
-- new VmSerializeEnumCaseRef (line 513)
-- new Variable (line 576)
-- new Variable (line 589)
-- new Variable (line 676)
-- new ObjectEntry (line 706)
-- new Variable (line 710)
-- new Frame (line 729)
-- new Variable (line 732)
-- new Variable (line 753)
-- new Variable (line 772)
-- new Variable (line 798)
-- 35 class method(s)
+- new Exception (line 45)
+- new Exception (line 145)
+- new Variable (line 161)
+- new Variable (line 171)
+- new Variable (line 181)
+- new ObjectEntry (line 326)
+- new Variable (line 327)
+- new ObjectEntry (line 344)
+- new Variable (line 348)
+- new ObjectEntry (line 360)
+- new Variable (line 368)
+- new ObjectEntry (line 386)
+- new Variable (line 387)
+- new Variable (line 389)
+- new Variable (line 446)
+- new Exception (line 472)
+- new VmSerializeEnumCaseRef (line 522)
+- new VmSerializeEnumCaseRef (line 527)
+- new Variable (line 590)
+- new Variable (line 603)
+- new Variable (line 709)
+- new ObjectEntry (line 739)
+- new Variable (line 743)
+- new Frame (line 762)
+- new Variable (line 765)
+- new Variable (line 786)
+- new Variable (line 805)
+- new Variable (line 831)
+- 36 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
