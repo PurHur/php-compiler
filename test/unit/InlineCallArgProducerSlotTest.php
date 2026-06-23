@@ -536,6 +536,60 @@ PHP;
         self::assertSame("array (\n  'a' => NULL,\n)\n", ob_get_clean());
     }
 
+    /** Issue #10809 — inline assoc literal + negative offset + preserve_keys must wire array to arg #0. */
+    public function testArraySliceInlineAssocNegativeOffsetPreserveKeysCompile(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_slice(['a' => 1, 'b' => 2, 'c' => 3], -2, 1, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_inline_assoc_negative.php');
+
+        $arraySlot = null;
+        $boolSlot = null;
+        $sliceSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $boolSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $sliceSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sliceSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertCount(4, $sliceSends, 'array_slice arg sends');
+        self::assertSame($arraySlot, $sliceSends[0], 'inline array must feed arg #0');
+        self::assertNotSame($arraySlot, $sliceSends[1], 'negative offset must not reuse array slot');
+        self::assertSame($boolSlot, $sliceSends[3], 'preserve_keys must feed trailing bool');
+    }
+
+    /** Issue #10809 — inline assoc literal + negative offset + preserve_keys runtime parity. */
+    public function testArraySliceInlineAssocNegativeOffsetPreserveKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_slice(['a' => 1, 'b' => 2, 'c' => 3], -2, 1, true));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_inline_assoc_negative_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'b' => 2,\n)\n", ob_get_clean());
+    }
+
     /** Issue #10229 — var_export(array_slice($local, -2, 2, true)) folds negative offset + preserve_keys. */
     public function testVarExportArraySliceNegativeOffsetPreserveKeysCompile(): void
     {

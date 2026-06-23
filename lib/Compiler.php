@@ -12000,12 +12000,37 @@ class Compiler {
         if (\count($producers) >= 2) {
             $arrayProducerIndex = null;
             $constFetchIndices = [];
+            $unaryProducerIndex = null;
             foreach ($producers as $pi => $producer) {
                 if ($producer instanceof Op\Expr\Array_) {
                     $arrayProducerIndex = $pi;
                 } elseif ($producer instanceof Op\Expr\ConstFetch) {
                     $constFetchIndices[] = $pi;
+                } elseif ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    $unaryProducerIndex = $pi;
                 }
+            }
+            // array_slice($a, -2, 2, true) — Array_ + UnaryMinus + trailing ConstFetch (#10579, #10809).
+            if (
+                null !== $arrayProducerIndex
+                && null !== $unaryProducerIndex
+                && 1 === \count($constFetchIndices)
+                && \count($nonEmbeddedArgIndices) >= 3
+            ) {
+                $arrayArgIndex = $nonEmbeddedArgIndices[0] ?? null;
+                $offsetArgIndex = $nonEmbeddedArgIndices[1] ?? null;
+                $trailingArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                if ($argIndex === $arrayArgIndex) {
+                    return $producers[$arrayProducerIndex];
+                }
+                if ($argIndex === $offsetArgIndex) {
+                    return $producers[$unaryProducerIndex];
+                }
+                if ($argIndex === $trailingArgIndex) {
+                    return $producers[$constFetchIndices[0]];
+                }
+
+                return null;
             }
             if (null !== $arrayProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
                 $arrayArgIndex = $nonEmbeddedArgIndices[1] ?? null;
@@ -12014,26 +12039,6 @@ class Compiler {
                     return $producers[$arrayProducerIndex];
                 }
                 if ($argIndex === $literalArgIndex) {
-                    return $producers[$constFetchIndices[0]];
-                }
-
-                return null;
-            }
-            $unaryProducerIndex = null;
-            foreach ($producers as $pi => $producer) {
-                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
-                    $unaryProducerIndex = $pi;
-                    break;
-                }
-            }
-            // array_slice($a, -2, 2, true) — UnaryMinus + trailing ConstFetch map to offset/preserve_keys (#10579).
-            if (null !== $unaryProducerIndex && 1 === \count($constFetchIndices) && \count($nonEmbeddedArgIndices) >= 3) {
-                $offsetArgIndex = $nonEmbeddedArgIndices[1] ?? null;
-                $trailingArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
-                if ($argIndex === $offsetArgIndex) {
-                    return $producers[$unaryProducerIndex];
-                }
-                if ($argIndex === $trailingArgIndex) {
                     return $producers[$constFetchIndices[0]];
                 }
 
