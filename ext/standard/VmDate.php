@@ -833,12 +833,35 @@ final class VmDate
             return '';
         }
 
+        $tzName = $gmt ? 'UTC' : self::$defaultTimezone;
+        $offset = $gmt ? 0 : VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
+
+        return self::formatDateTimeFromTm($format, $timestamp, 0, $tm, $offset, $tzName);
+    }
+
+    /**
+     * @param \FFI\CData $tm struct tm from localtime_r/gmtime_r
+     */
+    public static function formatDateTimeFromTm(
+        string $format,
+        int $timestamp,
+        int $microsecond,
+        \FFI\CData $tm,
+        int $offsetSeconds,
+        string $tzName
+    ): string {
         $year = (int) $tm->tm_year + 1900;
         $month = (int) $tm->tm_mon + 1;
         $day = (int) $tm->tm_mday;
         $hour = (int) $tm->tm_hour;
         $minute = (int) $tm->tm_min;
         $second = (int) $tm->tm_sec;
+        $wday = (int) $tm->tm_wday;
+        $yday = (int) $tm->tm_yday;
+        $isdst = (int) $tm->tm_isdst;
+        $hour12 = self::hour12($hour);
+        $isoWeek = self::isoWeek($year, $month, $day);
+        $isoYear = self::isoYear($year, $month, $day);
 
         $out = '';
         $len = \strlen($format);
@@ -854,20 +877,52 @@ final class VmDate
                     $out .= (string) $timestamp;
 
                     break;
+                case 'u':
+                    $out .= self::padInt($microsecond, 6);
+
+                    break;
                 case 'Y':
                     $out .= self::padInt($year, 4);
+
+                    break;
+                case 'y':
+                    $out .= self::padInt($year % 100, 2);
+
+                    break;
+                case 'o':
+                    $out .= (string) $isoYear;
 
                     break;
                 case 'm':
                     $out .= self::padInt($month, 2);
 
                     break;
+                case 'n':
+                    $out .= (string) $month;
+
+                    break;
                 case 'd':
                     $out .= self::padInt($day, 2);
 
                     break;
+                case 'j':
+                    $out .= (string) $day;
+
+                    break;
                 case 'H':
                     $out .= self::padInt($hour, 2);
+
+                    break;
+                case 'G':
+                    $out .= (string) $hour;
+
+                    break;
+                case 'h':
+                    $out .= self::padInt($hour12, 2);
+
+                    break;
+                case 'g':
+                    $out .= (string) $hour12;
 
                     break;
                 case 'i':
@@ -876,6 +931,107 @@ final class VmDate
                     break;
                 case 's':
                     $out .= self::padInt($second, 2);
+
+                    break;
+                case 'a':
+                    $out .= $hour < 12 ? 'am' : 'pm';
+
+                    break;
+                case 'A':
+                    $out .= $hour < 12 ? 'AM' : 'PM';
+
+                    break;
+                case 'S':
+                    $out .= self::ordinalSuffix($day);
+
+                    break;
+                case 'w':
+                    $out .= (string) $wday;
+
+                    break;
+                case 'N':
+                    $out .= (string) (0 === $wday ? 7 : $wday);
+
+                    break;
+                case 'z':
+                    $out .= (string) $yday;
+
+                    break;
+                case 't':
+                    $out .= (string) self::daysInMonth($year, $month);
+
+                    break;
+                case 'L':
+                    $out .= self::isLeapYear($year) ? '1' : '0';
+
+                    break;
+                case 'W':
+                    $out .= self::padInt($isoWeek, 2);
+
+                    break;
+                case 'B':
+                    $out .= (string) self::swatchBeat($hour, $minute, $second, $wday);
+
+                    break;
+                case 'I':
+                    $out .= $isdst > 0 ? '1' : '0';
+
+                    break;
+                case 'D':
+                    $out .= self::shortWeekdayName($wday);
+
+                    break;
+                case 'l':
+                    $out .= self::weekdayName($wday);
+
+                    break;
+                case 'M':
+                    $out .= self::shortMonthName($month);
+
+                    break;
+                case 'F':
+                    $out .= self::monthName($month - 1);
+
+                    break;
+                case 'c':
+                    $out .= self::padInt($year, 4).'-'
+                        .self::padInt($month, 2).'-'
+                        .self::padInt($day, 2).'T'
+                        .self::padInt($hour, 2).':'
+                        .self::padInt($minute, 2).':'
+                        .self::padInt($second, 2)
+                        .self::formatOffsetColon($offsetSeconds);
+
+                    break;
+                case 'r':
+                    $out .= self::shortWeekdayName($wday).', '
+                        .self::padInt($day, 2).' '
+                        .self::shortMonthName($month).' '
+                        .self::padInt($year, 4).' '
+                        .self::padInt($hour, 2).':'
+                        .self::padInt($minute, 2).':'
+                        .self::padInt($second, 2).' '
+                        .self::formatOffsetCompact($offsetSeconds);
+
+                    break;
+                case 'e':
+                    $out .= $tzName;
+
+                    break;
+                case 'T':
+                    $out .= self::timezoneAbbreviation($tzName, $timestamp, $isdst);
+
+                    break;
+                case 'Z':
+                    $out .= (string) $offsetSeconds;
+
+                    break;
+                case 'O':
+                    $out .= self::formatOffsetCompact($offsetSeconds);
+
+                    break;
+                case 'P':
+                    $out .= self::formatOffsetColon($offsetSeconds);
 
                     break;
                 default:
@@ -887,6 +1043,76 @@ final class VmDate
         }
 
         return $out;
+    }
+
+    private static function ordinalSuffix(int $day): string
+    {
+        if ($day >= 11 && $day <= 13) {
+            return 'th';
+        }
+
+        return match ($day % 10) {
+            1 => 'st',
+            2 => 'nd',
+            3 => 'rd',
+            default => 'th',
+        };
+    }
+
+    private static function shortWeekdayName(int $wday): string
+    {
+        static $names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+        return $names[$wday] ?? 'Sun';
+    }
+
+    private static function shortMonthName(int $month): string
+    {
+        static $names = [
+            1 => 'Jan',
+            2 => 'Feb',
+            3 => 'Mar',
+            4 => 'Apr',
+            5 => 'May',
+            6 => 'Jun',
+            7 => 'Jul',
+            8 => 'Aug',
+            9 => 'Sep',
+            10 => 'Oct',
+            11 => 'Nov',
+            12 => 'Dec',
+        ];
+
+        return $names[$month] ?? 'Jan';
+    }
+
+    private static function formatOffsetCompact(int $offsetSeconds): string
+    {
+        $sign = $offsetSeconds >= 0 ? '+' : '-';
+        $abs = \abs($offsetSeconds);
+        $hours = (int) \floor($abs / 3600);
+        $minutes = (int) \floor(($abs % 3600) / 60);
+
+        return $sign.self::padInt($hours, 2).self::padInt($minutes, 2);
+    }
+
+    private static function formatOffsetColon(int $offsetSeconds): string
+    {
+        $sign = $offsetSeconds >= 0 ? '+' : '-';
+        $abs = \abs($offsetSeconds);
+        $hours = (int) \floor($abs / 3600);
+        $minutes = (int) \floor(($abs % 3600) / 60);
+
+        return $sign.self::padInt($hours, 2).':'.self::padInt($minutes, 2);
+    }
+
+    private static function timezoneAbbreviation(string $tzName, int $timestamp, int $isdst): string
+    {
+        if ('UTC' === $tzName) {
+            return 'UTC';
+        }
+
+        return $tzName;
     }
 
     private static function hour12(int $hour): int
@@ -939,6 +1165,24 @@ final class VmDate
      * @return array{0: int, 1: int} week number, ISO year
      */
     private static function isoWeekAndYear(int $year, int $month, int $day): array
+    {
+        $timestamp = self::gmmktime(12, 0, 0, $month, $day, $year);
+        if (false === $timestamp) {
+            return [0, $year];
+        }
+        $week = (int) self::libcStrftime('%V', $timestamp, true);
+        $isoYear = (int) self::libcStrftime('%G', $timestamp, true);
+        if ($week > 0 && $isoYear > 0) {
+            return [$week, $isoYear];
+        }
+
+        return self::isoWeekAndYearFallback($year, $month, $day);
+    }
+
+    /**
+     * @return array{0: int, 1: int}
+     */
+    private static function isoWeekAndYearFallback(int $year, int $month, int $day): array
     {
         $a = (int) \floor((14 - $month) / 12);
         $y = $year + 4800 - $a;

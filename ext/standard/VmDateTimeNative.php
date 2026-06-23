@@ -741,76 +741,9 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return '';
             }
-
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
             $offset = self::timezoneOffsetSeconds($tzName, $timestamp);
 
-            $out = '';
-            $len = \strlen($format);
-            for ($i = 0; $i < $len; ++$i) {
-                $ch = $format[$i];
-                if ('\\' === $ch && $i + 1 < $len) {
-                    $out .= $format[++$i];
-
-                    continue;
-                }
-                switch ($ch) {
-                    case 'U':
-                        $out .= (string) $timestamp;
-
-                        break;
-                    case 'Y':
-                        $out .= self::padInt($year, 4);
-
-                        break;
-                    case 'm':
-                        $out .= self::padInt($month, 2);
-
-                        break;
-                    case 'd':
-                        $out .= self::padInt($day, 2);
-
-                        break;
-                    case 'H':
-                        $out .= self::padInt($hour, 2);
-
-                        break;
-                    case 'i':
-                        $out .= self::padInt($minute, 2);
-
-                        break;
-                    case 's':
-                        $out .= self::padInt($second, 2);
-
-                        break;
-                    case 'u':
-                        $out .= self::padInt($microsecond, 6);
-
-                        break;
-                    case 'c':
-                        $out .= self::padInt($year, 4).'-'
-                            .self::padInt($month, 2).'-'
-                            .self::padInt($day, 2).'T'
-                            .self::padInt($hour, 2).':'
-                            .self::padInt($minute, 2).':'
-                            .self::padInt($second, 2)
-                            .self::formatOffset($offset);
-
-                        break;
-                    default:
-                        $out .= $ch;
-                }
-                if (\strlen($out) >= self::FORMAT_OUT_BYTES) {
-                    break;
-                }
-            }
-
-            return $out;
+            return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $offset, $tzName);
         });
     }
 
