@@ -1524,10 +1524,25 @@ class VM {
                     continue;
                 }
                 if (!$object->hasProperty($meta->name)) {
+                    if (!$meta->prototype->hasDeclaredTypeConstraint()) {
+                        $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                        $copy = new Variable();
+                        $copy->null();
+                        $result[$key] = $copy;
+                    }
+
                     continue;
                 }
                 $value = $object->getProperty($meta->name)->resolveIndirect();
                 if (VM\TypedPropertyCheck::isUninitialized($value)) {
+                    if ($meta->prototype->hasDeclaredTypeConstraint()) {
+                        continue;
+                    }
+                    $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
+                    $copy = new Variable();
+                    $copy->null();
+                    $result[$key] = $copy;
+
                     continue;
                 }
                 $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
@@ -1626,7 +1641,11 @@ class VM {
                         continue;
                     }
                     $value = $hookValue->resolveIndirect();
-                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    if ($forVarExport) {
+                        if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                            continue;
+                        }
+                    } elseif (VM\TypedPropertyCheck::isUninitialized($value)) {
                         continue;
                     }
                     $copy = new Variable();
@@ -1636,10 +1655,32 @@ class VM {
                     continue;
                 }
                 if (!$object->hasProperty($meta->name)) {
+                    if (!$forVarExport && !$meta->prototype->hasDeclaredTypeConstraint()) {
+                        if ($this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
+                            $copy = new Variable();
+                            $copy->null();
+                            $result[$meta->name] = $copy;
+                        }
+                    }
+
                     continue;
                 }
                 $value = $object->getProperty($meta->name)->resolveIndirect();
-                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                if ($forVarExport) {
+                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                        continue;
+                    }
+                } elseif (VM\TypedPropertyCheck::isUninitialized($value)) {
+                    if ($meta->prototype->hasDeclaredTypeConstraint()) {
+                        continue;
+                    }
+                    if (!$this->isPropertyAccessibleForObjectVars($meta, $callerClassLc)) {
+                        continue;
+                    }
+                    $copy = new Variable();
+                    $copy->null();
+                    $result[$meta->name] = $copy;
+
                     continue;
                 }
                 $copy = new Variable();
