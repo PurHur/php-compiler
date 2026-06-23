@@ -83,6 +83,10 @@ final class BuiltinParamNames
                 return ['filename', 'mtime', 'atime'];
             case 'getenv':
                 return ['name', 'local_only'];
+            case 'ini_get':
+                return ['option'];
+            case 'ini_set':
+                return ['option', 'value'];
             case 'define':
                 return ['constant_name', 'value', 'case_insensitive'];
             case 'vsprintf':

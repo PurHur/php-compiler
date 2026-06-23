@@ -164,6 +164,19 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'preg_split'));
     }
 
+    /** @covers issue #10028 */
+    public function testIniGetSetNamedParameters(): void
+    {
+        $get = BuiltinParamNames::forFunction('ini_get');
+        self::assertSame(['option'], $get);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($get, 'option', 'ini_get'));
+
+        $set = BuiltinParamNames::forFunction('ini_set');
+        self::assertSame(['option', 'value'], $set);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($set, 'option', 'ini_set'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($set, 'value', 'ini_set'));
+    }
+
     /** @covers issue #10033 */
     public function testPregReplaceNamedParameters(): void
     {
