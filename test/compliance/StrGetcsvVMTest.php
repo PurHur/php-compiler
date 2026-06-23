@@ -21,6 +21,10 @@ final class StrGetcsvVMTest extends BaseTest
             __DIR__.'/cases/stdlib/str_getcsv_enum_type_error.phpt',
             'str_getcsv_enum_type_error.phpt'
         );
+        yield 'str_getcsv_newline_only.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/str_getcsv_newline_only.phpt',
+            'str_getcsv_newline_only.phpt'
+        );
     }
 
     public function setUp(): void
