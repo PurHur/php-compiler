@@ -231,16 +231,37 @@ final class VmDebugBacktrace
         if (null === $frame->block || null === $frame->block->func || null === $frame->block->func->class) {
             return null;
         }
-        $thisIdx = $frame->block->slotIndexForVariableName('this');
-        if (null === $thisIdx || !isset($frame->scope[$thisIdx])) {
+        if (($frame->block->func->flags ?? 0) & Func::FLAG_STATIC) {
             return null;
         }
-        $thisVar = $frame->scope[$thisIdx]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $thisVar->type) {
-            return null;
+        $thisIdx = $frame->block->slotIndexForVariableName('this');
+        if (null !== $thisIdx && isset($frame->scope[$thisIdx])) {
+            $thisVar = $frame->scope[$thisIdx]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisVar->type) {
+                return $frame->scope[$thisIdx];
+            }
+        }
+        $fromScope = $frame->block->findVariableByRuntimeName('this', $frame);
+        if (null !== $fromScope) {
+            $thisVar = $fromScope->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thisVar->type) {
+                return $fromScope;
+            }
+        }
+        if (!empty($frame->calledArgs)) {
+            $receiver = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $receiver->type) {
+                return $frame->calledArgs[0];
+            }
+        }
+        if (!empty($frame->callArgs)) {
+            $receiver = $frame->callArgs[0]->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $receiver->type) {
+                return $frame->callArgs[0];
+            }
         }
 
-        return $thisVar;
+        return null;
     }
 
     private static function frameFunction(Frame $frame): string
