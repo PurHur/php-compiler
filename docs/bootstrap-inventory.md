@@ -5407,8 +5407,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 260)
 - new ArgumentCountError (line 263)
-- new ArgumentCountError (line 293)
-- new ArgumentCountError (line 296)
+- new ArgumentCountError (line 294)
+- new ArgumentCountError (line 297)
 - 15 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
@@ -7355,8 +7355,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTimezoneOpen.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 21)
-- new JITVariable (line 54)
+- new ArgumentCountError (line 22)
+- new JITVariable (line 57)
 - 3 class method(s)
 
 ### `ext/standard/JitTimezoneProceduralArg.php`
@@ -8761,10 +8761,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 1103)
-- new RecursiveDirectoryIterator (line 1104)
-- new RecursiveIteratorIterator (line 1205)
-- new RecursiveDirectoryIterator (line 1206)
+- new RecursiveIteratorIterator (line 1106)
+- new RecursiveDirectoryIterator (line 1107)
+- new RecursiveIteratorIterator (line 1208)
+- new RecursiveDirectoryIterator (line 1209)
 - 48 class method(s)
 - 8 closure(s)
 
@@ -10720,7 +10720,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/checkdate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -10966,7 +10966,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_create.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -10980,7 +10980,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_create_immutable.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 34)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -11233,8 +11233,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/exec.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 37)
-- new Variable (line 39)
+- new HashTable (line 39)
+- new Variable (line 41)
 - 2 class method(s)
 
 ### `ext/standard/exif_tagname.php`
@@ -13998,7 +13998,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strtotime.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/standard/strtoupper.php`
@@ -14131,7 +14131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/timezone_open.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 33)
 - 2 class method(s)
 - 2 closure(s)
 
@@ -18199,72 +18199,72 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 403)
-- new Scope (line 465)
-- new Analyzer (line 486)
-- new Helper (line 487)
-- new Builtin\Refcount (line 489)
-- new Builtin\Output (line 491)
-- new Builtin\Type (line 492)
-- new Builtin\Internal (line 493)
-- new Builtin\VarArg (line 494)
-- new Builtin\ErrorHandler (line 495)
-- new Scope (line 515)
-- new Call\ExternalMethod (line 563)
-- new Builtin\IsNullFn (line 780)
-- new Builtin\IsNullFn (line 781)
-- new Call\SplObjectStorageMethod (line 782)
-- new Call\SplObjectStorageMethod (line 783)
-- new Call\SplObjectStorageMethod (line 784)
-- new Call\SplObjectStorageMethod (line 785)
+- new Variable (line 407)
+- new Scope (line 469)
+- new Analyzer (line 490)
+- new Helper (line 491)
+- new Builtin\Refcount (line 493)
+- new Builtin\Output (line 495)
+- new Builtin\Type (line 496)
+- new Builtin\Internal (line 497)
+- new Builtin\VarArg (line 498)
+- new Builtin\ErrorHandler (line 499)
+- new Scope (line 519)
+- new Call\ExternalMethod (line 567)
+- new Builtin\IsNullFn (line 784)
+- new Builtin\IsNullFn (line 785)
 - new Call\SplObjectStorageMethod (line 786)
 - new Call\SplObjectStorageMethod (line 787)
-- new Call\WeakReferenceCreate (line 789)
-- new Call\WeakReferenceGet (line 790)
-- new Call\WeakMapMethod (line 791)
-- new Call\WeakMapMethod (line 792)
-- new Call\WeakMapMethod (line 793)
-- new Call\WeakMapMethod (line 794)
+- new Call\SplObjectStorageMethod (line 788)
+- new Call\SplObjectStorageMethod (line 789)
+- new Call\SplObjectStorageMethod (line 790)
+- new Call\SplObjectStorageMethod (line 791)
+- new Call\WeakReferenceCreate (line 793)
+- new Call\WeakReferenceGet (line 794)
 - new Call\WeakMapMethod (line 795)
-- new Call\ReflectionClassConstruct (line 797)
-- new Call\ReflectionClassGetName (line 798)
-- new Call\ReflectionClassGetAttributes (line 799)
-- new Call\ReflectionClassGetMethod (line 800)
-- new Call\ReflectionClassGetReflectionConstant (line 801)
-- new Call\ReflectionClassNewLazyProxy (line 802)
-- new Call\ReflectionClassNewLazyGhost (line 803)
-- new Call\ReflectionClassCreateLazyGhost (line 804)
-- new Call\ReflectionClassCreateLazyProxy (line 805)
-- new Call\ReflectionPropertyConstruct (line 806)
-- new Call\ReflectionPropertyGetAttributes (line 807)
-- new Call\ReflectionConstantConstruct (line 808)
-- new Call\ReflectionConstantGetAttributes (line 809)
-- new Call\ReflectionMethodGetAttributes (line 810)
-- new Call\ReflectionAttributeGetName (line 811)
-- new Call\ReflectionAttributeNewInstance (line 812)
-- new Call\ReflectionEnumConstruct (line 813)
-- new Call\ReflectionEnumGetName (line 814)
-- new Call\ReflectionEnumHasCase (line 815)
-- new Call\ReflectionEnumGetCase (line 816)
-- new Call\ReflectionEnumIsBacked (line 817)
-- new Call\ReflectionEnumUnitCaseGetName (line 818)
-- new Call\ReflectionEnumUnitCaseGetName (line 819)
-- new Call\ExceptionGetMessage (line 820)
-- new Result (line 954)
-- new Result (line 975)
-- new Variable (line 1244)
-- new Variable (line 1564)
-- new Variable (line 1822)
-- new VMVariable (line 1969)
-- new VMVariable (line 1975)
-- new VMVariable (line 1981)
-- new VMVariable (line 1987)
-- new VMVariable (line 1994)
-- new VMVariable (line 2000)
-- new VMVariable (line 2006)
-- new VMVariable (line 2012)
-- new Variable (line 2037)
-- new Variable (line 2076)
+- new Call\WeakMapMethod (line 796)
+- new Call\WeakMapMethod (line 797)
+- new Call\WeakMapMethod (line 798)
+- new Call\WeakMapMethod (line 799)
+- new Call\ReflectionClassConstruct (line 801)
+- new Call\ReflectionClassGetName (line 802)
+- new Call\ReflectionClassGetAttributes (line 803)
+- new Call\ReflectionClassGetMethod (line 804)
+- new Call\ReflectionClassGetReflectionConstant (line 805)
+- new Call\ReflectionClassNewLazyProxy (line 806)
+- new Call\ReflectionClassNewLazyGhost (line 807)
+- new Call\ReflectionClassCreateLazyGhost (line 808)
+- new Call\ReflectionClassCreateLazyProxy (line 809)
+- new Call\ReflectionPropertyConstruct (line 810)
+- new Call\ReflectionPropertyGetAttributes (line 811)
+- new Call\ReflectionConstantConstruct (line 812)
+- new Call\ReflectionConstantGetAttributes (line 813)
+- new Call\ReflectionMethodGetAttributes (line 814)
+- new Call\ReflectionAttributeGetName (line 815)
+- new Call\ReflectionAttributeNewInstance (line 816)
+- new Call\ReflectionEnumConstruct (line 817)
+- new Call\ReflectionEnumGetName (line 818)
+- new Call\ReflectionEnumHasCase (line 819)
+- new Call\ReflectionEnumGetCase (line 820)
+- new Call\ReflectionEnumIsBacked (line 821)
+- new Call\ReflectionEnumUnitCaseGetName (line 822)
+- new Call\ReflectionEnumUnitCaseGetName (line 823)
+- new Call\ExceptionGetMessage (line 824)
+- new Result (line 958)
+- new Result (line 979)
+- new Variable (line 1248)
+- new Variable (line 1568)
+- new Variable (line 1826)
+- new VMVariable (line 1973)
+- new VMVariable (line 1979)
+- new VMVariable (line 1985)
+- new VMVariable (line 1991)
+- new VMVariable (line 1998)
+- new VMVariable (line 2004)
+- new VMVariable (line 2010)
+- new VMVariable (line 2016)
+- new Variable (line 2041)
+- new Variable (line 2080)
 - 87 class method(s)
 
 ### `lib/JIT/DnfParamCheck.php`
@@ -18494,7 +18494,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `lib/JIT/IntersectionParamCheck.php`
 
@@ -21792,7 +21792,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `lib/VM/IterableCheck.php`
 
