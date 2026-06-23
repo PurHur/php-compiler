@@ -209,104 +209,16 @@ class Context {
                 $var = new Variable(Variable::TYPE_BOOLEAN);
                 $var->bool(true);
                 return $var;
-            case 'inf':
-                $var = new Variable(Variable::TYPE_FLOAT);
-                $var->float(INF);
-                return $var;
-            case 'nan':
-                $var = new Variable(Variable::TYPE_FLOAT);
-                $var->float(NAN);
-                return $var;
-            case 'password_bcrypt':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_BCRYPT);
-                return $var;
-            case 'password_default':
-                $var = new Variable(Variable::TYPE_STRING);
-                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
-                return $var;
-            case 'password_argon2i':
-                if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
-                    return null;
-                }
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2I);
-                return $var;
-            case 'password_argon2id':
-                if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
-                    return null;
-                }
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2ID);
-                return $var;
-            case 'crypt_std_des':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_STD_DES);
-                return $var;
-            case 'crypt_ext_des':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_EXT_DES);
-                return $var;
-            case 'crypt_md5':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_MD5);
-                return $var;
-            case 'crypt_blowfish':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
-                return $var;
-            case 'filter_validate_int':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_INT);
-                return $var;
-            case 'filter_validate_email':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
-                return $var;
-            case 'filter_validate_regexp':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
-                return $var;
-            case 'filter_null_on_failure':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
-                return $var;
-            case 'input_get':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
-                return $var;
-            case 'input_post':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
-                return $var;
-            case 'input_cookie':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_COOKIE);
-                return $var;
-            case 'input_env':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_ENV);
-                return $var;
-            case 'input_server':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SERVER);
-                return $var;
-            case 'input_session':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SESSION);
-                return $var;
         }
-        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
-        if (null !== $stdlibInt) {
-            $var = new Variable(Variable::TYPE_INTEGER);
-            $var->int($stdlibInt);
-            return $var;
+        $engine = $this->constantFetchEngineConstant($name);
+        if (null !== $engine) {
+            return $engine;
         }
-        $stdlibFloat = \PHPCompiler\ext\standard\StdlibConstants::CORE_FLOAT_BY_NAME[strtolower($name)] ?? null;
-        if (null !== $stdlibFloat) {
-            $var = new Variable(Variable::TYPE_FLOAT);
-            $var->float($stdlibFloat);
-            return $var;
+        if ($name !== strtoupper($name)) {
+            $engineAlias = $this->constantFetchEngineConstant(strtoupper($name));
+            if (null !== $engineAlias) {
+                return $engineAlias;
+            }
         }
         $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetch($name);
         if (null !== $phpCore) {
@@ -320,6 +232,185 @@ class Context {
         }
         if (isset($this->constants[$name])) {
             return $this->constants[$name];
+        }
+
+        return null;
+    }
+
+    /**
+     * defined()/constant() lookup — internal constant names are case-sensitive (#10635, basic_functions.c).
+     *
+     * true/false/null stay case-insensitive; user constants use exact keys; engine/stdlib names must
+     * match canonical UPPER_SNAKE spelling (PHP_VERSION yes, php_version no).
+     */
+    public function constantFetchBuiltin(string $name): ?Variable
+    {
+        switch (strtolower($name)) {
+            case 'null':
+                return new Variable(Variable::TYPE_NULL);
+            case 'false':
+                $var = new Variable(Variable::TYPE_BOOLEAN);
+                $var->bool(false);
+
+                return $var;
+            case 'true':
+                $var = new Variable(Variable::TYPE_BOOLEAN);
+                $var->bool(true);
+
+                return $var;
+        }
+        if (isset($this->constants[$name])) {
+            return $this->constants[$name];
+        }
+        if ($name !== strtoupper($name)) {
+            return null;
+        }
+
+        return $this->constantFetchEngineConstant($name);
+    }
+
+    public function constantDefinedBuiltin(string $name): bool
+    {
+        return null !== $this->constantFetchBuiltin($name);
+    }
+
+    /**
+     * Engine/stdlib constants for constantFetch() and constantFetchBuiltin() after case rules apply.
+     */
+    private function constantFetchEngineConstant(string $name): ?Variable
+    {
+        switch (strtolower($name)) {
+            case 'inf':
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float(INF);
+
+                return $var;
+            case 'nan':
+                $var = new Variable(Variable::TYPE_FLOAT);
+                $var->float(NAN);
+
+                return $var;
+            case 'password_bcrypt':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_BCRYPT);
+
+                return $var;
+            case 'password_default':
+                $var = new Variable(Variable::TYPE_STRING);
+                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_DEFAULT);
+
+                return $var;
+            case 'password_argon2i':
+                if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
+                    return null;
+                }
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2I);
+
+                return $var;
+            case 'password_argon2id':
+                if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
+                    return null;
+                }
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2ID);
+
+                return $var;
+            case 'crypt_std_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_STD_DES);
+
+                return $var;
+            case 'crypt_ext_des':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_EXT_DES);
+
+                return $var;
+            case 'crypt_md5':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_MD5);
+
+                return $var;
+            case 'crypt_blowfish':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
+
+                return $var;
+            case 'filter_validate_int':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_INT);
+
+                return $var;
+            case 'filter_validate_email':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
+
+                return $var;
+            case 'filter_validate_regexp':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
+
+                return $var;
+            case 'filter_null_on_failure':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
+
+                return $var;
+            case 'input_get':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
+
+                return $var;
+            case 'input_post':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
+
+                return $var;
+            case 'input_cookie':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_COOKIE);
+
+                return $var;
+            case 'input_env':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_ENV);
+
+                return $var;
+            case 'input_server':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SERVER);
+
+                return $var;
+            case 'input_session':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SESSION);
+
+                return $var;
+        }
+        $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($stdlibInt);
+
+            return $var;
+        }
+        $stdlibFloat = \PHPCompiler\ext\standard\StdlibConstants::CORE_FLOAT_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $stdlibFloat) {
+            $var = new Variable(Variable::TYPE_FLOAT);
+            $var->float($stdlibFloat);
+
+            return $var;
+        }
+        $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetchExact($name);
+        if (null !== $phpCore) {
+            return $phpCore;
+        }
+        $errorInt = self::errorReportingConstantExact($name);
+        if (null !== $errorInt) {
+            $var = new Variable(Variable::TYPE_INTEGER);
+            $var->int($errorInt);
+
+            return $var;
         }
 
         return null;
@@ -372,6 +463,29 @@ class Context {
             'e_deprecated' => ErrorReporter::E_DEPRECATED,
             'e_user_deprecated' => ErrorReporter::E_USER_DEPRECATED,
             'e_all' => E_ALL,
+            default => null,
+        };
+    }
+
+    public static function errorReportingConstantExact(string $name): ?int
+    {
+        return match ($name) {
+            'E_ERROR' => 1,
+            'E_WARNING' => ErrorReporter::E_WARNING,
+            'E_PARSE' => 4,
+            'E_NOTICE' => 8,
+            'E_CORE_ERROR' => 16,
+            'E_CORE_WARNING' => 32,
+            'E_COMPILE_ERROR' => 64,
+            'E_COMPILE_WARNING' => 128,
+            'E_USER_ERROR' => ErrorReporter::E_USER_ERROR,
+            'E_USER_WARNING' => ErrorReporter::E_USER_WARNING,
+            'E_USER_NOTICE' => ErrorReporter::E_USER_NOTICE,
+            'E_STRICT' => 2048,
+            'E_RECOVERABLE_ERROR' => 4096,
+            'E_DEPRECATED' => ErrorReporter::E_DEPRECATED,
+            'E_USER_DEPRECATED' => ErrorReporter::E_USER_DEPRECATED,
+            'E_ALL' => E_ALL,
             default => null,
         };
     }

@@ -77,6 +77,16 @@ final class VmPhpCoreConstants
         return self::fromPhpValue(\constant($canonical));
     }
 
+    /** Case-exact fetch for defined()/constant() (#10635, basic_functions.c). */
+    public static function fetchExact(string $name): ?Variable
+    {
+        if (!\in_array($name, self::CORE_NAMES, true) || !\defined($name)) {
+            return null;
+        }
+
+        return self::fromPhpValue(\constant($name));
+    }
+
     /**
      * @return array<string, Variable>
      */

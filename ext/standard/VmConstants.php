@@ -28,7 +28,7 @@ final class VmConstants
             return self::lookupClassConstant($ctx, $name);
         }
 
-        return $ctx->constantFetch($name);
+        return $ctx->constantFetchBuiltin($name);
     }
 
     /**
@@ -40,7 +40,7 @@ final class VmConstants
             return self::isClassConstantDefined($ctx, $name);
         }
 
-        return null !== $ctx->constantFetch($name);
+        return $ctx->constantDefinedBuiltin($name);
     }
 
     /**
