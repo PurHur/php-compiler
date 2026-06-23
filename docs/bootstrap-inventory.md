@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2937 |
-| Phase A inventory files (M2 ratio SSOT) | 2937 |
+| PHP files on vm.php path | 2941 |
+| Phase A inventory files (M2 ratio SSOT) | 2941 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7931 |
+| Source constructs flagged (warnings) | 7937 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -331,6 +331,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HtmlEntitiesJitHelper.php` | 0 | 1 |
 | `ext/standard/HtmlEntityDecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/HtmlEntityTable.php` | 0 | 1 |
+| `ext/standard/HtmlspecialcharsJitHelper.php` | 0 | 1 |
 | `ext/standard/HttpResponseJitHelper.php` | 0 | 1 |
 | `ext/standard/HttpStatusEnumData.php` | 0 | 1 |
 | `ext/standard/Ieee754.php` | 0 | 1 |
@@ -2167,8 +2168,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtimeRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 3 |
@@ -2447,7 +2449,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/TypeCheck.php` | 0 | 1 |
 | `lib/JIT/TypedPropertyUninitGuard.php` | 0 | 1 |
 | `lib/JIT/UndefinedVariableHelper.php` | 0 | 1 |
-| `lib/JIT/UnsetHelper.php` | 0 | 4 |
+| `lib/JIT/UnsetHelper.php` | 0 | 1 |
+| `lib/JIT/UnsetHelperLlvm.php` | 0 | 4 |
 | `lib/JIT/UsortCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/ValueEchoHelper.php` | 0 | 1 |
 | `lib/JIT/VarFetchHelper.php` | 0 | 1 |
@@ -2840,6 +2843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
+| `lib/VM/VmUnset.php` | 0 | 1 |
 | `lib/VM/VmVarFetch.php` | 0 | 1 |
 | `lib/VM/VmVarFetchJitHelper.php` | 0 | 1 |
 | `lib/VM/WeakMapIterator.php` | 0 | 2 |
@@ -5014,6 +5018,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/HtmlEntityTable.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/HtmlspecialcharsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -9391,11 +9400,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPreg.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 382)
-- new Variable (line 395)
-- new HashTable (line 402)
-- new Variable (line 403)
-- new Variable (line 406)
+- new HashTable (line 396)
+- new Variable (line 409)
+- new HashTable (line 416)
+- new Variable (line 417)
+- new Variable (line 420)
 - 20 class method(s)
 
 ### `ext/standard/VmPregMatches.php`
@@ -12813,9 +12822,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 96)
-- new Variable (line 98)
+- new HashTable (line 102)
 - new Variable (line 104)
+- new Variable (line 110)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`
@@ -17009,12 +17018,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new JIT (line 116)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php`
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
+
+### `lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/StringHttpBuildQuery.php`
 
@@ -18788,9 +18804,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/UnsetHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 126)
-- new Variable (line 184)
-- 6 class method(s)
+- 1 class method(s)
+
+### `lib/JIT/UnsetHelperLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 110)
+- new Variable (line 168)
+- 5 class method(s)
 - 2 closure(s)
 
 ### `lib/JIT/UsortCallbackPolicy.php`
@@ -22008,6 +22029,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/VM/VmUnset.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `lib/VM/VmVarFetch.php`
 
