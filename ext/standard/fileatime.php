@@ -25,6 +25,7 @@ final class fileatime extends Internal
         }
         $atime = VmFs::fileAtime($path);
         if (false === $atime) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'fileatime', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($atime);

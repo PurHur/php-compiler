@@ -25,6 +25,7 @@ final class fileowner extends Internal
         }
         $uid = VmFs::fileOwner($path);
         if (false === $uid) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'fileowner', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($uid);
