@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for readfile() via {@see \PHPCompiler\JIT\Builtin\StringReadfile}. */
+/** LLVM lowering for readfile() via ReadfileJitHelper PHP ({@see \PHPCompiler\JIT\Builtin\StringReadfile}, #9188). */
 final class JitReadfile
 {
     /** @return Value */
