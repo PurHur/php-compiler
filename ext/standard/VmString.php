@@ -3256,16 +3256,10 @@ final class VmString
             $ch = $string[$i];
             if ('\\' === $ch && $i + 1 < $len) {
                 $next = $string[$i + 1];
-                if ('0' === $next) {
-                    $out .= "\0";
-                    ++$i;
-                    continue;
-                }
-                if (self::needsAddslashesEscape($next)) {
-                    $out .= $next;
-                    ++$i;
-                    continue;
-                }
+                // php-src stripslashes.c: drop backslash; \0 C-escape maps to NUL (addslashes inverse).
+                $out .= '0' === $next ? "\0" : $next;
+                ++$i;
+                continue;
             }
             $out .= $ch;
         }
