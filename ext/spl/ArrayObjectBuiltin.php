@@ -206,9 +206,6 @@ final class ArrayObjectSetIteratorClass extends VmClassMethod
             0,
             'iteratorClass'
         );
-        if (null === $frame->returnVar) {
-            return;
-        }
         $entry = VmReflection::resolveClassEntry($frame->vmContext, $iteratorClass);
         if (null === $entry
             || !InterfaceCheck::entryIsInstanceOf($entry, ArrayIteratorBuiltin::CLASS_LC, $frame->vmContext)) {

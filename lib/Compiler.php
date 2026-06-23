@@ -12778,7 +12778,41 @@ class Compiler {
             array_unshift($producers, $child);
         }
 
-        return $producers;
+        return $this->filterDeadVoidStatementMethodCallProducers($producers);
+    }
+
+    /**
+     * Drop void statement MethodCalls before a sibling MethodCall inline call-arg (#10778).
+     *
+     * php-cfg: `$ao->setIteratorClass('X'); echo var_export($ao->getIteratorClass(), true);`
+     * hoists both MethodCalls; the void setter must not map to var_export arg 0.
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return list<Op\Expr>
+     */
+    private function filterDeadVoidStatementMethodCallProducers(array $producers): array
+    {
+        if (\count($producers) < 2) {
+            return $producers;
+        }
+        $filtered = [];
+        $count = \count($producers);
+        for ($i = 0; $i < $count; ++$i) {
+            $producer = $producers[$i];
+            if (
+                $producer instanceof Op\Expr\MethodCall
+                && property_exists($producer, 'result')
+                && empty($producer->result->usages)
+                && $i + 1 < $count
+                && $producers[$i + 1] instanceof Op\Expr\MethodCall
+            ) {
+                continue;
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
     }
 
     /**
