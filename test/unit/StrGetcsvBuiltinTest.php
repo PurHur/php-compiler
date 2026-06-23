@@ -83,4 +83,34 @@ final class StrGetcsvBuiltinTest extends TestCase
         $this->expectExceptionMessage('str_getcsv(): Argument #1 ($string) must be of type string, null given');
         $fn->execute($frame);
     }
+
+    /** @dataProvider newlineOnlyProvider */
+    public function testNewlineOnlyInputYieldsNullField(string $input): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string($input);
+        $frame->calledArgs = [$arg];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $ht = $frame->returnVar->toArray();
+        $this->assertSame(1, $ht->getNumElements());
+        $vals = [];
+        foreach ($ht->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->type;
+        }
+        $this->assertSame([VMVariable::TYPE_NULL], $vals);
+    }
+
+    /** @return list<array{string}> */
+    public static function newlineOnlyProvider(): array
+    {
+        return [
+            ["\n"],
+            ["\r\n"],
+            ["\r"],
+        ];
+    }
 }

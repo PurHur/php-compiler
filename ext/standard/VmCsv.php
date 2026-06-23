@@ -24,6 +24,10 @@ final class VmCsv
         if ('' === $line) {
             return [null];
         }
+        // php-src ext/standard/file.c — line-terminator-only rows yield one NULL field (#10623).
+        if (self::isLineTerminatorOnly($line)) {
+            return [null];
+        }
 
         $delim = '' === $separator ? ',' : $separator[0];
         $enc = '' === $enclosure ? '"' : $enclosure[0];
@@ -84,6 +88,23 @@ final class VmCsv
         }
 
         return $fields;
+    }
+
+    /** @return bool true when every byte is \\r or \\n (non-empty). */
+    private static function isLineTerminatorOnly(string $line): bool
+    {
+        $len = \strlen($line);
+        if (0 === $len) {
+            return false;
+        }
+        for ($i = 0; $i < $len; ++$i) {
+            $c = $line[$i];
+            if ("\n" !== $c && "\r" !== $c) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

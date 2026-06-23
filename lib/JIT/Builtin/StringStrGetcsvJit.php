@@ -331,12 +331,53 @@ final class StringStrGetcsvJit
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
 
         $emptyLineBb = $fn->appendBasicBlock('csv_empty_line');
+        $checkEolOnlyBb = $fn->appendBasicBlock('csv_check_eol_only');
         $bodyBb = $fn->appendBasicBlock('csv_body');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $lineLen, $zero),
             $emptyLineBb,
-            $bodyBb
+            $checkEolOnlyBb
         );
+
+        $context->builder->positionAtEnd($checkEolOnlyBb);
+        $scanSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($zero, $scanSlot);
+        $scanHead = $fn->appendBasicBlock('csv_eol_scan_head');
+        $scanBody = $fn->appendBasicBlock('csv_eol_scan_body');
+        $scanAllEol = $fn->appendBasicBlock('csv_eol_scan_all');
+        $scanNotEol = $fn->appendBasicBlock('csv_eol_scan_not');
+        $context->builder->branch($scanHead);
+
+        $lf = $i8->constInt(ord("\n"), false);
+        $cr = $i8->constInt(ord("\r"), false);
+
+        $context->builder->positionAtEnd($scanHead);
+        $scanI = $context->builder->load($scanSlot);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_ULT, $scanI, $lineLen),
+            $scanBody,
+            $scanAllEol
+        );
+
+        $context->builder->positionAtEnd($scanBody);
+        $scanI = $context->builder->load($scanSlot);
+        $scanC = $context->builder->load($context->builder->gep($line, $scanI));
+        $isEol = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $scanC, $lf),
+            $context->builder->icmp(Builder::INT_EQ, $scanC, $cr)
+        );
+        $scanAdvance = $fn->appendBasicBlock('csv_eol_scan_advance');
+        $context->builder->branchIf($isEol, $scanAdvance, $scanNotEol);
+
+        $context->builder->positionAtEnd($scanAdvance);
+        $context->builder->store($context->builder->add($context->builder->load($scanSlot), $one), $scanSlot);
+        $context->builder->branch($scanHead);
+
+        $context->builder->positionAtEnd($scanAllEol);
+        $context->builder->branch($emptyLineBb);
+
+        $context->builder->positionAtEnd($scanNotEol);
+        $context->builder->branch($bodyBb);
 
         $context->builder->positionAtEnd($emptyLineBb);
         $context->builder->call($context->lookupFunction('__hashtable__setNullAt'), $ht, $zero);
