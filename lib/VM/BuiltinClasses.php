@@ -72,6 +72,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
+use PHPCompiler\VM\Builtin\ReflectionClassGetLazyPropertyNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
 use PHPCompiler\VM\Builtin\ReflectionClassGetName;
 use PHPCompiler\VM\Builtin\ReflectionClassInitializeLazyObject;
@@ -532,6 +533,8 @@ final class BuiltinClasses
         $rc->methodVisibility['setstaticpropertyvalue'] = $pub;
         $rc->methods['getreadonlyproperties'] = new ReflectionClassGetReadOnlyProperties();
         $rc->methodVisibility['getreadonlyproperties'] = $pub;
+        $rc->methods['getlazypropertynames'] = new ReflectionClassGetLazyPropertyNames();
+        $rc->methodVisibility['getlazypropertynames'] = $pub;
         $rc->methods['getmethods'] = new ReflectionClassGetMethods();
         $rc->methodVisibility['getmethods'] = $pub;
         $rc->methods['getreflectionconstant'] = new ReflectionClassGetReflectionConstant();

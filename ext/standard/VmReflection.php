@@ -1759,6 +1759,51 @@ final class VmReflection
     }
 
     /**
+     * Instance properties eligible for lazy ghost initialization (#6606).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getLazyPropertyNames
+     *
+     * @return list<string>
+     */
+    public static function collectLazyPropertyNamesForReflection(ClassEntry $entry, Context $ctx): array
+    {
+        if ($entry->isInterface || $entry->isTrait || $entry->isEnum) {
+            return [];
+        }
+        if (!\PHPCompiler\VM\LazyGhostTraitSupport::classUsesLazyGhostTrait($entry, $ctx)) {
+            return [];
+        }
+        $byLc = [];
+        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
+            foreach ($class->properties as $prop) {
+                if ($prop->propertyHookVirtual) {
+                    continue;
+                }
+                $byLc[strtolower($prop->name)] = $prop->name;
+            }
+        }
+
+        return array_values($byLc);
+    }
+
+    /**
+     * ReflectionClass::getLazyPropertyNames() result array (#6606).
+     */
+    public static function reflectionLazyPropertyNamesArray(Context $ctx, ClassEntry $entry): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::collectLazyPropertyNamesForReflection($entry, $ctx) as $name) {
+            $slot = new Variable();
+            $slot->string($name);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
      * ReflectionClass::getReadOnlyProperties() result array (#7186).
      */
     public static function reflectionReadOnlyPropertiesArray(
