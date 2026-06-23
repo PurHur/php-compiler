@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -21,6 +22,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -49,6 +51,7 @@ final class implode extends Internal
                 'array'
             );
         } else {
+            self::rejectNullSeparator($frame->calledArgs[0], $this->getName());
             self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
             self::rejectArraySeparator($frame->calledArgs[0], $this->getName());
             $glue = VmString::coerceOperand($frame->calledArgs[0]);
@@ -93,6 +96,7 @@ final class implode extends Internal
 
                 return $context->getTypeFromString('__string__*')->constNull();
             }
+            self::rejectNullSeparatorJit($context, $args[0], $this->getName());
             $glue = JitStringBuiltinArg::lower(
                 $context,
                 $args[0],
@@ -185,6 +189,17 @@ final class implode extends Internal
         ));
     }
 
+    /** php-src Z_PARAM_STR on implode() separator — null must TypeError (#10292, ext/standard/string.c). */
+    private static function rejectNullSeparator(Variable $var, string $function): void
+    {
+        if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
+            throw new \TypeError(sprintf(
+                '%s(): Argument #1 ($separator) must be of type array|string, null given',
+                $function
+            ));
+        }
+    }
+
     /** php-src php_implode — two-arg form separator must not be array (#4160, ext/standard/string.c). */
     private static function rejectArraySeparator(Variable $var, string $function): void
     {
@@ -194,6 +209,51 @@ final class implode extends Internal
                 $function
             ));
         }
+    }
+
+    private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitNullSeparatorTypeErrorAndAbort($context, $function);
+
+            return;
+        }
+        if (JITVariable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'implode_sep_null_ok');
+        $failBlock = BasicBlockHelper::append($context, 'implode_sep_null_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::emitNullSeparatorTypeErrorAndAbort($context, $function);
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitNullSeparatorTypeErrorAndAbort(Context $context, string $function): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, sprintf(
+            '%s(): Argument #1 ($separator) must be of type array|string, null given',
+            $function
+        ));
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     /** AOT standalone: libc abort like JitArrayElem::emitErrorAndAbort (#4160). */
