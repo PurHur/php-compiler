@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM lowering for getrusage() via StringGetrusage (JIT/AOT, #5388/#3240). */
+/** LLVM lowering for getrusage() via GetrusageJitHelper (JIT/AOT, #5388/#9184). */
 final class JitGetrusage
 {
     public static function invoke(Context $context, ?JITVariable $who = null): Value
