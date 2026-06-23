@@ -2435,10 +2435,10 @@ final class ArrayBuiltinHelper
         $zero = $sizeT->constInt(0, false);
         $one = $sizeT->constInt(1, false);
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $caseUpper = $context->builder->icmp(
+        $caseLower = $context->builder->icmp(
             Builder::INT_EQ,
             $case,
-            $i64->constInt(\PHPCompiler\ext\standard\StdlibConstants::CASE_UPPER, false)
+            $i64->constInt(\PHPCompiler\ext\standard\StdlibConstants::CASE_LOWER, false)
         );
 
         $nextFree = $context->builder->load($context->builder->structGep($src, $map['nextFreeElement']));
@@ -2500,7 +2500,7 @@ final class ArrayBuiltinHelper
         $lowerBb = BasicBlockHelper::append($context, 'array_ckc_key_lower');
         $upperBb = BasicBlockHelper::append($context, 'array_ckc_key_upper');
         $afterCase = BasicBlockHelper::append($context, 'array_ckc_key_done');
-        $context->builder->branchIf($caseUpper, $upperBb, $lowerBb);
+        $context->builder->branchIf($caseLower, $lowerBb, $upperBb);
 
         $context->builder->positionAtEnd($lowerBb);
         lcfirst::transformAllAscii($context, $owned, ord('A'), ord('Z'), 32);
