@@ -5425,12 +5425,6 @@ class Object_ extends Type {
 
     private function enumCasePropertyFetch(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
     {
-        if ('value' === $nameLc && null === ($this->enumBackedType[$classId] ?? null)) {
-            \PHPCompiler\JIT\Builtin\ErrorRaise::emitRaise(
-                $this->context,
-                'Attempt to read property "value" on unit enum case '.$this->classNameForId($classId)
-            );
-        }
         $slot = $this->propertySlotPtr(
             $obj,
             'name' === $nameLc ? self::ENUM_CASE_SLOT_NAME : self::ENUM_CASE_SLOT_VALUE
