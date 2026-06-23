@@ -16,8 +16,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringNetworkServicesStringReturn
 {
-    private const HELPER_PATH = '/ext/standard/NetworkServicesJitHelper.php';
-
     private const GETPROTOBYNUMBER_HELPER = 'PHPCompiler\\ext\\standard\\NetworkServicesJitHelper::getprotobynumber';
 
     private const GETSERVBYPORT_HELPER = 'PHPCompiler\\ext\\standard\\NetworkServicesJitHelper::getservbyport';
@@ -124,19 +122,10 @@ final class StringNetworkServicesStringReturn
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $template = (string) \file_get_contents($path);
         $tables = VmNetworkServices::buildJitTables();
-        $source = \str_replace(
-            [
-                '__PHPC_NS_GETPROTOBYNUMBER_BODY__',
-                '__PHPC_NS_GETSERVBYPORT_BODY__',
-            ],
-            [
-                self::emitGetprotobynumberBody($tables['protoByNumber']),
-                self::emitGetservbyportBody($tables['serviceByPort']),
-            ],
-            $template
+        $source = self::buildJitHelperSource(
+            self::emitGetprotobynumberBody($tables['protoByNumber']),
+            self::emitGetservbyportBody($tables['serviceByPort'])
         );
         $block = $runtime->parseAndCompile($source, 'NetworkServicesJitHelper.php');
         if (null === $block) {
@@ -149,6 +138,29 @@ final class StringNetworkServicesStringReturn
                 throw new \LogicException($logical.' was not compiled for JIT (#9777)');
             }
         }
+    }
+
+    private static function buildJitHelperSource(string $protoBody, string $servBody): string
+    {
+        return '<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\\ext\\standard;
+
+final class NetworkServicesJitHelper
+{
+    public static function getprotobynumber(int $number): string
+    {
+'.$protoBody.'
+    }
+
+    public static function getservbyport(int $port, string $protocol): string
+    {
+'.$servBody.'
+    }
+}
+';
     }
 
     /**
