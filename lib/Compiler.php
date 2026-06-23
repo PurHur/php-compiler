@@ -12804,6 +12804,7 @@ class Compiler {
                 $producer instanceof Op\Expr\MethodCall
                 && property_exists($producer, 'result')
                 && empty($producer->result->usages)
+                && !$this->methodCallInlineProducerSuppliesCallArgValue($producer)
                 && $i + 1 < $count
                 && $producers[$i + 1] instanceof Op\Expr\MethodCall
             ) {
@@ -12813,6 +12814,36 @@ class Compiler {
         }
 
         return $filtered;
+    }
+
+    /**
+     * php-cfg dead temps for inline call args keep inferred value types (#9351, #10816);
+     * void statement calls stay inferred:unknown (#10778).
+     */
+    private function methodCallInlineProducerSuppliesCallArgValue(Op\Expr\MethodCall $producer): bool
+    {
+        if (!property_exists($producer, 'result')) {
+            return false;
+        }
+        $type = $producer->result->type ?? null;
+        if (null === $type) {
+            return true;
+        }
+        if ($type instanceof \PHPTypes\Type) {
+            return \PHPTypes\Type::TYPE_UNKNOWN !== $type->type;
+        }
+        if ($type instanceof Op\Type\Literal) {
+            $name = strtolower((string) ($type->name ?? ''));
+            if (str_starts_with($name, 'inferred:')) {
+                $inner = substr($name, 9);
+
+                return 'unknown' !== $inner && 'void' !== $inner;
+            }
+
+            return 'void' !== $name && 'never' !== $name;
+        }
+
+        return true;
     }
 
     /**
