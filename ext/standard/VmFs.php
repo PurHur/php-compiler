@@ -256,6 +256,22 @@ final class VmFs
         return $ok;
     }
 
+    /** True when $path is a directory with entries other than . and .. (php-src ENOTEMPTY parity, #10931). */
+    public static function isDirNonempty(string $path): bool
+    {
+        $names = VmDir::scandir($path, \SCANDIR_SORT_NONE);
+        if (false === $names) {
+            return false;
+        }
+        foreach ($names as $name) {
+            if ('.' !== $name && '..' !== $name) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public static function chmod(string $path, int $permissions): bool
     {
         $ok = VmFsDirNative::chmod($path, $permissions);

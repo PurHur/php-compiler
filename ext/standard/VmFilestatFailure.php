@@ -48,6 +48,11 @@ final class VmFilestatFailure
         );
     }
 
+    public static function warnRmdirNotEmpty(Frame $frame, string $path): void
+    {
+        self::triggerWarning($frame, \sprintf('rmdir(%s): Directory not empty', $path));
+    }
+
     private static function triggerWarning(Frame $frame, string $message): void
     {
         if (null === $frame->vmContext) {

@@ -27,6 +27,9 @@ final class rmdir_ extends Internal
         }
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rmdir', 0, 'directory');
         $ok = VmFs::rmdir($path);
+        if (!$ok && VmStatPath::isDir($path) && VmFs::isDirNonempty($path)) {
+            VmFilestatFailure::warnRmdirNotEmpty($frame, $path);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
