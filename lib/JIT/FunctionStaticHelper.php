@@ -4,75 +4,56 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * Lazy init for function-local static variables (issue #2286).
+ * Lazy init for function-local static variables (#2286, #10173).
+ *
+ * Init flags route through {@see Builtin\FunctionStaticRuntime} module table ABI;
+ * value materialization stays in LLVM ({@see writeDefault}).
  */
 final class FunctionStaticHelper
 {
-    /** @var array<string, Value> */
-    private static array $initFlags = [];
+    /** @var array<string, int> */
+    private static array $slotIndexByKey = [];
+
+    private static int $nextSlotIndex = 0;
 
     public static function emitLazyInit(Context $context, string $key, Variable $storage, Variable $default): void
     {
-        if (!isset(self::$initFlags[$key])) {
-            $i8 = $context->getTypeFromString('int8');
-            $flagName = 'phpc_fn_static_init_'.substr(hash('sha256', $key), 0, 16);
-            $flag = $context->module->addGlobal($i8, $flagName);
-            $flag->setInitializer($i8->constInt(0, false));
-            self::$initFlags[$key] = $flag;
-        }
-        $i8 = $context->getTypeFromString('int8');
-        $flag = self::$initFlags[$key];
-        $loaded = $context->builder->load($flag);
-        $isZero = $context->builder->icmp(
-            Builder::INT_EQ,
-            $loaded,
-            $i8->constInt(0, false)
+        $slotId = self::slotConst($context, $key);
+        $isInit = $context->builder->call(
+            $context->lookupFunction('phpc_fn_static_is_initialized'),
+            $slotId
         );
         $initBlock = BasicBlockHelper::append($context, 'fn_static_init');
         $doneBlock = BasicBlockHelper::append($context, 'fn_static_done');
-        $context->builder->branchIf($isZero, $initBlock, $doneBlock);
+        $context->builder->branchIf($isInit, $doneBlock, $initBlock);
         $context->builder->positionAtEnd($initBlock);
         self::writeDefault($context, $storage, $default);
-        $context->builder->store($i8->constInt(1, false), $flag);
+        $context->builder->call(
+            $context->lookupFunction('phpc_fn_static_mark_initialized'),
+            $slotId
+        );
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
     }
 
     public static function isInitializedCondition(Context $context, string $key): Value
     {
-        if (!isset(self::$initFlags[$key])) {
-            $i8 = $context->getTypeFromString('int8');
-            $flagName = 'phpc_fn_static_init_'.substr(hash('sha256', $key), 0, 16);
-            $flag = $context->module->addGlobal($i8, $flagName);
-            $flag->setInitializer($i8->constInt(0, false));
-            self::$initFlags[$key] = $flag;
-        }
-        $i8 = $context->getTypeFromString('int8');
-        $loaded = $context->builder->load(self::$initFlags[$key]);
-
-        return $context->builder->icmp(
-            Builder::INT_NE,
-            $loaded,
-            $i8->constInt(0, false)
+        return $context->builder->call(
+            $context->lookupFunction('phpc_fn_static_is_initialized'),
+            self::slotConst($context, $key)
         );
     }
 
     public static function emitRuntimeInitStore(Context $context, string $key, Variable $storage, Variable $value): void
     {
         self::writeDefault($context, $storage, $value);
-        if (!isset(self::$initFlags[$key])) {
-            $i8 = $context->getTypeFromString('int8');
-            $flagName = 'phpc_fn_static_init_'.substr(hash('sha256', $key), 0, 16);
-            $flag = $context->module->addGlobal($i8, $flagName);
-            $flag->setInitializer($i8->constInt(0, false));
-            self::$initFlags[$key] = $flag;
-        }
-        $i8 = $context->getTypeFromString('int8');
-        $context->builder->store($i8->constInt(1, false), self::$initFlags[$key]);
+        $context->builder->call(
+            $context->lookupFunction('phpc_fn_static_mark_initialized'),
+            self::slotConst($context, $key)
+        );
     }
 
     public static function writeDefault(Context $context, Variable $storage, Variable $default): void
@@ -150,6 +131,26 @@ final class FunctionStaticHelper
                     'Unsupported function static default JIT type '.$default->type.' (#2286)'
                 );
         }
+    }
+
+    private static function slotConst(Context $context, string $key): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $index = self::slotIndexForKey($key);
+
+        return $i64->constInt($index, false);
+    }
+
+    private static function slotIndexForKey(string $key): int
+    {
+        if (!isset(self::$slotIndexByKey[$key])) {
+            if (self::$nextSlotIndex >= 1024) {
+                throw new \LogicException('Function static slot limit exceeded (#10173)');
+            }
+            self::$slotIndexByKey[$key] = self::$nextSlotIndex++;
+        }
+
+        return self::$slotIndexByKey[$key];
     }
 
     private static function storageValuePtr(Context $context, Variable $storage): Value
