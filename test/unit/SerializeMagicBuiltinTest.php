@@ -22,6 +22,7 @@ final class SerializeMagicBuiltinTest extends BaseTest
             [
                 'serialize_magic.phpt' => __DIR__.'/../compliance/cases/stdlib/serialize_magic.phpt',
                 'serialize_magic_methods.phpt' => __DIR__.'/../compliance/cases/language/serialize_magic_methods.phpt',
+                'serialize_bad_return_type.phpt' => __DIR__.'/../compliance/cases/stdlib/serialize_bad_return_type.phpt',
             ] as $name => $path
         ) {
             yield $name => self::parsePHPT($path, $name);
