@@ -50,6 +50,9 @@ final class BuiltinParamNames
             case 'prev':
             case 'reset':
                 return ['array'];
+            case 'array_walk':
+            case 'array_walk_recursive':
+                return ['array', 'callback', 'arg'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];
             case 'array_chunk':
