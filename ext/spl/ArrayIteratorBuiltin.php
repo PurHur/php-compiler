@@ -14,14 +14,11 @@ use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
- * ArrayIterator — array as Iterator (php-src ext/spl/spl_array.c; #6304).
+ * ArrayIterator — array as Iterator (php-src ext/spl/spl_array.c; #6304, #10711).
  */
 final class ArrayIteratorBuiltin
 {
     public const CLASS_LC = 'arrayiterator';
-
-    /** @var array<int, array{keys: list<int|string>, table: HashTable, pos: int}> */
-    private static array $store = [];
 
     public static function registerClass(Context $ctx): void
     {
@@ -53,84 +50,45 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['valid'] = $pub;
         $entry->methods['count'] = new ArrayIteratorCount();
         $entry->methodVisibility['count'] = $pub;
+        $entry->methods['getarraycopy'] = new ArrayIteratorGetArrayCopy();
+        $entry->methodVisibility['getarraycopy'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
     public static function init(ObjectEntry $object, HashTable $table): void
     {
-        $keys = [];
-        foreach ($table->iterateKeyed(true) as [$keyVar, $_]) {
-            $keys[] = Variable::TYPE_INTEGER === $keyVar->type
-                ? $keyVar->toInt()
-                : $keyVar->toString();
-        }
-        self::$store[$object->id] = [
-            'keys' => $keys,
-            'table' => $table,
-            'pos' => 0,
-        ];
+        SplArrayStorage::init($object, $table, 0, null, []);
     }
 
     public static function rewind(ObjectEntry $object): void
     {
-        self::$store[$object->id]['pos'] = 0;
+        SplArrayStorage::rewindIterator($object);
     }
 
     public static function next(ObjectEntry $object): void
     {
-        ++self::$store[$object->id]['pos'];
+        SplArrayStorage::nextIterator($object);
     }
 
     public static function valid(ObjectEntry $object): bool
     {
-        $state = self::state($object);
-
-        return $state['pos'] >= 0 && $state['pos'] < \count($state['keys']);
+        return SplArrayStorage::iteratorValid($object);
     }
 
     public static function current(ObjectEntry $object): Variable
     {
-        $state = self::state($object);
-        if (!self::valid($object)) {
-            throw new \RuntimeException('Cannot fetch current() on invalid ArrayIterator position');
-        }
-        $key = $state['keys'][$state['pos']];
-        if (\is_int($key)) {
-            $var = $state['table']->findIndex($key);
-        } else {
-            $var = $state['table']->find((string) $key);
-        }
-        if (null === $var) {
-            throw new \LogicException('ArrayIterator current key missing from backing array');
-        }
-
-        return $var;
+        return SplArrayStorage::iteratorCurrent($object);
     }
 
     public static function key(ObjectEntry $object): int|string
     {
-        $state = self::state($object);
-        if (!self::valid($object)) {
-            throw new \RuntimeException('Cannot fetch key() on invalid ArrayIterator position');
-        }
-
-        return $state['keys'][$state['pos']];
+        return SplArrayStorage::iteratorKey($object);
     }
 
     public static function count(ObjectEntry $object): int
     {
-        return \count(self::state($object)['keys']);
-    }
-
-    /** @return array{keys: list<int|string>, table: HashTable, pos: int} */
-    private static function state(ObjectEntry $object): array
-    {
-        if (!isset(self::$store[$object->id])) {
-            throw new \LogicException('ArrayIterator state missing');
-        }
-
-        return self::$store[$object->id];
+        return SplArrayStorage::count($object);
     }
 }
 
@@ -276,5 +234,26 @@ final class ArrayIteratorCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(ArrayIteratorBuiltin::count($object));
+    }
+}
+
+final class ArrayIteratorGetArrayCopy extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getArrayCopy');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::getArrayCopy()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->array(SplArrayStorage::getArrayCopy($object));
     }
 }

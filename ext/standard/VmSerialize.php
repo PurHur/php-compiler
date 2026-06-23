@@ -11,6 +11,7 @@ use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\ext\spl\SplArraySerializeSupport;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -50,6 +51,9 @@ final class VmSerialize
             }
             if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
                 return DateIntervalSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+                return SplArraySerializeSupport::encodeZendSerializeWire($entry);
             }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
@@ -161,6 +165,16 @@ final class VmSerialize
             }
             if (\is_array($data) && DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
                 $restored = DateIntervalSupport::restoreFromZendSerialize($ctx, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+                $restored = SplArraySerializeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
                 if (null === $restored) {
                     return false;
                 }
@@ -621,6 +635,25 @@ final class VmSerialize
         $body = '';
         foreach ($exportedProps as $name => $exported) {
             $body .= self::encodeSerializedScalar($name);
+            $body .= self::encodeSerializedScalar($exported);
+        }
+        $count = \count($exportedProps);
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
+    }
+
+    /**
+     * Zend object wire with integer property keys (ArrayObject, ArrayIterator; spl_array.c #10711).
+     *
+     * @param array<int, mixed> $exportedProps
+     */
+    public static function encodeIntegerKeyedPropertyBag(string $className, array $exportedProps): string
+    {
+        $body = '';
+        ksort($exportedProps);
+        foreach ($exportedProps as $key => $exported) {
+            $body .= 'i:'.(int) $key.';';
             $body .= self::encodeSerializedScalar($exported);
         }
         $count = \count($exportedProps);

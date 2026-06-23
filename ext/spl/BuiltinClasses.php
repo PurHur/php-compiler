@@ -9,8 +9,6 @@ use PHPCompiler\VM\Context;
 
 /**
  * Register SPL builtin classes (php-src ext/spl; issue #4769).
- *
- * Behavior lives in follow-up issues (#3330, #4689); v1 skeleton enables class_exists() and inventory.
  */
 final class BuiltinClasses
 {
@@ -28,14 +26,7 @@ final class BuiltinClasses
 
     private static function registerArrayObject(Context $ctx): void
     {
-        $entry = new ClassEntry('ArrayObject');
-        if (isset($ctx->classes['iteratoraggregate'])) {
-            $entry->interfaces[] = 'iteratoraggregate';
-        }
-        if (isset($ctx->classes['countable'])) {
-            $entry->interfaces[] = 'countable';
-        }
-        $ctx->classes['arrayobject'] = $entry;
+        ArrayObjectBuiltin::registerClass($ctx);
     }
 
     private static function registerSplDoublyLinkedList(Context $ctx): void
