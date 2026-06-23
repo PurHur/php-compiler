@@ -53,6 +53,30 @@ final class VmFilestatFailure
         self::triggerWarning($frame, \sprintf('rmdir(%s): Directory not empty', $path));
     }
 
+    public static function warnMkdirFileExists(Frame $frame): void
+    {
+        self::triggerWarningWithHandlerFirst($frame, 'mkdir(): File exists');
+    }
+
+    public static function warnNoSuchFile(Frame $frame, string $function): void
+    {
+        self::triggerWarning($frame, \sprintf('%s(): No such file or directory', $function));
+    }
+
+    private static function triggerWarningWithHandlerFirst(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerErrorWithHandlerFirst(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
     private static function triggerWarning(Frame $frame, string $message): void
     {
         if (null === $frame->vmContext) {
