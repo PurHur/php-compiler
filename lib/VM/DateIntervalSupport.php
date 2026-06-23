@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\VmDateInterval;
+use PHPCompiler\ext\standard\VmSerialize;
 
 /**
  * Shared helpers for DateInterval VM builtins (issue #7278, php-src ext/date/php_date.c).
@@ -43,6 +44,7 @@ final class DateIntervalSupport
         self::requireFloatProperty($interval, 'f')->float($parsed['f']);
         self::requireIntProperty($interval, 'invert')->int($parsed['invert']);
         self::requireBoolProperty($interval, 'days')->bool(false);
+        self::requireBoolProperty($interval, 'from_string')->bool(false);
         $interval->constructed = true;
     }
 
@@ -153,6 +155,12 @@ final class DateIntervalSupport
         } else {
             $daysVar->bool(false);
         }
+        if ($interval->hasProperty('from_string')) {
+            $fromString = $interval->getProperty('from_string')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $fromString->type) {
+                $fromString->bool(false);
+            }
+        }
         $interval->constructed = true;
     }
 
@@ -167,6 +175,59 @@ final class DateIntervalSupport
         }
         $interval = new ObjectEntry($class);
         self::writeState($interval, $state);
+
+        return $interval;
+    }
+
+    /** php-src php_date_serialize — Zend DateInterval member order (#10692). */
+    public static function encodeZendSerializeWire(ObjectEntry $interval): string
+    {
+        $state = self::readState($interval);
+        $fromString = false;
+        if ($interval->hasProperty('from_string')) {
+            $fs = $interval->getProperty('from_string')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $fs->type) {
+                $fromString = $fs->toBool();
+            }
+        }
+
+        return VmSerialize::encodeExportedPropertyBag('DateInterval', [
+            'y' => $state['y'],
+            'm' => $state['m'],
+            'd' => $state['d'],
+            'h' => $state['h'],
+            'i' => $state['i'],
+            's' => $state['s'],
+            'f' => $state['f'],
+            'invert' => $state['invert'],
+            'days' => $state['days'],
+            'from_string' => $fromString,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    public static function restoreFromZendSerialize(Context $ctx, array $data): ?ObjectEntry
+    {
+        $state = [
+            'y' => isset($data['y']) && \is_int($data['y']) ? $data['y'] : 0,
+            'm' => isset($data['m']) && \is_int($data['m']) ? $data['m'] : 0,
+            'd' => isset($data['d']) && \is_int($data['d']) ? $data['d'] : 0,
+            'h' => isset($data['h']) && \is_int($data['h']) ? $data['h'] : 0,
+            'i' => isset($data['i']) && \is_int($data['i']) ? $data['i'] : 0,
+            's' => isset($data['s']) && \is_int($data['s']) ? $data['s'] : 0,
+            'f' => isset($data['f']) && (\is_int($data['f']) || \is_float($data['f'])) ? (float) $data['f'] : 0.0,
+            'invert' => isset($data['invert']) && \is_int($data['invert']) ? $data['invert'] : 0,
+            'days' => $data['days'] ?? false,
+        ];
+        $interval = self::createFromState($ctx, $state);
+        if ($interval->hasProperty('from_string')) {
+            $fs = $interval->getProperty('from_string')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $fs->type) {
+                $fs->bool(isset($data['from_string']) && true === $data['from_string']);
+            }
+        }
 
         return $interval;
     }

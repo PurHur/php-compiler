@@ -11,6 +11,8 @@ use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\DateIntervalSupport;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\ObjectEntry;
@@ -42,6 +44,13 @@ final class VmSerialize
                 throw new \Exception("Serialization of 'Closure' is not allowed");
             }
             $entry = $value->toObject();
+            $lcClass = strtolower($entry->class->name);
+            if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
+                return DateTimeSupport::encodeZendSerializeWire($entry);
+            }
+            if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+                return DateIntervalSupport::encodeZendSerializeWire($entry);
+            }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
                 $exported = VmJson::export($data->resolveIndirect());
@@ -137,6 +146,28 @@ final class VmSerialize
                 }
 
                 return self::instantiateIncompleteObject($ctx, $className, $data);
+            }
+            $lcClass = strtolower($className);
+            if (\is_array($data)
+                && (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass)) {
+                $restored = DateTimeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+                $restored = DateIntervalSupport::restoreFromZendSerialize($ctx, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
             }
             $class = self::resolveClassEntryForUnserialize($ctx, $className);
             if (null === $class) {
@@ -582,6 +613,20 @@ final class VmSerialize
     private static function encodeSerializedValue(Context $ctx, Variable $value): string
     {
         return self::encodeSerializedScalar(self::exportForSerialize($ctx, $value));
+    }
+
+    /** Zend object wire with named exported properties (DateTime, DateInterval, #10710, #10692). */
+    public static function encodeExportedPropertyBag(string $className, array $exportedProps): string
+    {
+        $body = '';
+        foreach ($exportedProps as $name => $exported) {
+            $body .= self::encodeSerializedScalar($name);
+            $body .= self::encodeSerializedScalar($exported);
+        }
+        $count = \count($exportedProps);
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
     }
 
     private static function encodeSerializedScalar(mixed $exported): string
