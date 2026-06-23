@@ -345,6 +345,17 @@ final class TypeCheck
         if ([] === $constraints) {
             return;
         }
+        if (Variable::TYPE_NULL === $target->type) {
+            if (\in_array(Variable::TYPE_NULL, $constraints, true)) {
+                return;
+            }
+
+            throw self::propertyTypeError(
+                $target,
+                $target->declaredTypeLabel ?? 'mixed',
+                $target
+            );
+        }
         foreach ($constraints as $constraint) {
             $trial = clone $target;
             try {
