@@ -10883,6 +10883,10 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
         if (null === $producer) {
+            $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $callOp, $argIndex);
+            if (null !== $adjacentSlot) {
+                return $adjacentSlot;
+            }
             $classConstSlot = $this->slotForHoistedClassConstFetchCallArg($arg, $block, $callOp, $argIndex);
             if (null !== $classConstSlot) {
                 return $classConstSlot;
@@ -11922,8 +11926,18 @@ class Compiler {
                 }
                 // Fall through — dead haystack temp (#9888).
             }
-            if ($argCount - 1 === $argIndex && $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
-                return $producers[0];
+            if ($argCount - 1 === $argIndex) {
+                if ($this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
+                    return $producers[0];
+                }
+                // strtotime('next Monday', strtotime('...')) — nested FuncCall feeds trailing arg (#10838).
+                if (
+                    ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+                    && null !== ($callArgs[0] ?? null)
+                    && !$this->operandsReferToSameVariable($producers[0]->result, $callArgs[0])
+                ) {
+                    return $producers[0];
+                }
             }
             if ($producers[0] instanceof Op\Expr\Array_) {
                 if (1 === $argCount) {
@@ -12037,6 +12051,15 @@ class Compiler {
             if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
                 $nonEmbeddedArgIndices[] = $i;
             }
+        }
+        // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
+        if (
+            1 === \count($producers)
+            && 1 === \count($nonEmbeddedArgIndices)
+            && ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
+            && $argIndex === $nonEmbeddedArgIndices[0]
+        ) {
+            return $producers[0];
         }
         // in_array(E::A, [E::A, E::B], true) — Array_ + trailing ConstFetch map to haystack/strict slots (#8796, #9888).
         if (\count($producers) >= 2) {
@@ -12793,7 +12816,6 @@ class Compiler {
                 && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
                 && property_exists($callOp, 'args')
                 && is_array($callOp->args)
-                && 1 === count($callOp->args)
             ) {
                 array_unshift($producers, $child);
                 break;
@@ -13198,6 +13220,61 @@ class Compiler {
         }
 
         return $distance - 1;
+    }
+
+    /**
+     * strtotime('next Monday', strtotime('...')) — adjacent nested FuncCall feeds trailing arg (#10838).
+     */
+    private function resolveAdjacentNestedFuncCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $args = $cfgCallOp->args;
+        if (\count($args) < 2 || $argIndex !== \count($args) - 1) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+            || !$this->isNestedCallArgProducerForConsumer(
+                $prev,
+                $cfgCallOp,
+                $callIndex - 1,
+                $callIndex,
+                $block->orig->children
+            )
+        ) {
+            return null;
+        }
+        $leadingArg = $args[0] ?? null;
+        if (
+            null !== $leadingArg
+            && $this->operandsReferToSameVariable($prev->result, $leadingArg)
+        ) {
+            return null;
+        }
+        if (null === $block->slotForOperand($prev->result)) {
+            foreach ($this->compileExpr($prev, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($prev->result);
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     private function isAdjacentNestedFuncCallProducer(
@@ -16007,6 +16084,9 @@ class Compiler {
                 }
                 if (null === $valueSlot) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                }
+                if (null === $valueSlot && null !== $cfgCallOp) {
+                    $valueSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 }
                 $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
                 if (null === $closureSlot && null !== $cfgCallOp) {
