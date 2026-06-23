@@ -17,9 +17,7 @@ final class JitGetcwd
 
     public static function invoke(Context $context): Value
     {
-        $dot = $context->builder->load($context->constantStringFromString('.'));
-
-        return JitRealpath::resolve($context, $dot);
+        return \PHPCompiler\JIT\Builtin\GetcwdJit::invoke($context);
     }
 
     public static function boxed(Context $context, Value $pathStr): Value

@@ -23,16 +23,70 @@ final class VmGetcwdNative
      */
     public static function resolve()
     {
+        $viaGetcwd = self::resolveViaFfiGetcwd();
+        if (false !== $viaGetcwd) {
+            return $viaGetcwd;
+        }
+
         $viaFfi = self::resolveViaFfiRealpath();
         if (false !== $viaFfi) {
-            return $viaFfi;
+            return self::validateCwd($viaFfi);
         }
 
         if ('Linux' === \PHP_OS_FAMILY) {
-            return self::resolveLinuxProcCwd();
+            $viaProc = self::resolveLinuxProcCwd();
+            if (false === $viaProc) {
+                return false;
+            }
+
+            return self::validateCwd($viaProc);
         }
 
         return false;
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function resolveViaFfiGetcwd()
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $buf = $ffi->new('char['.self::PATH_MAX.']');
+            $result = $ffi->getcwd(\FFI::addr($buf[0]), self::PATH_MAX);
+            if (null === $result) {
+                return false;
+            }
+            $path = \FFI::string($result);
+            if ('' === $path) {
+                return false;
+            }
+
+            return self::validateCwd($path);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    /**
+     * php-src getcwd(2) failure / Linux proc "(deleted)" cwd must be false (#10451).
+     *
+     * @return string|false
+     */
+    private static function validateCwd(string $path)
+    {
+        if ('' === $path || str_ends_with($path, ' (deleted)')) {
+            return false;
+        }
+        if (!is_dir($path)) {
+            return false;
+        }
+
+        return $path;
     }
 
     /**
@@ -134,6 +188,7 @@ final class VmGetcwdNative
         }
 
         $cdef = <<<'CDEF'
+char *getcwd(char *buf, size_t size);
 char *realpath(const char *path, char *resolved_path);
 ssize_t readlink(const char *pathname, char *buf, size_t bufsiz);
 void free(void *ptr);
