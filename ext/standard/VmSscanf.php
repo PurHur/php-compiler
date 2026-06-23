@@ -181,9 +181,13 @@ final class VmSscanf
         }
         $assigned = self::parse($input, $format, $temps);
         $ht = new HashTable();
-        for ($i = 0; $i < $assigned; ++$i) {
+        for ($i = 0; $i < $slots; ++$i) {
             $copy = new Variable();
-            $copy->copyFrom($temps[$i]);
+            if ($i < $assigned) {
+                $copy->copyFrom($temps[$i]);
+            } else {
+                $copy->null();
+            }
             $ht->append($copy);
         }
 
