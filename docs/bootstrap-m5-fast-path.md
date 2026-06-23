@@ -46,7 +46,7 @@ Supporting fixes from #1402:
 | `Runtime::loadJit` | `compileRuntimeLoadJitM3Native` — outer orchestration (#1495) |
 | `Runtime::createJit` / `jitContextForLoadJit` / `loadJitCompileModuleFuncs` | Separate FUNCDEFs via `compileRuntime*M3Native` → PHP CFG (#2847) |
 | `Runtime::noteParseCompileNullForScript` / `peekLastParseFailure` | On M3 allowlist; compile-driver diagnostics + last failure peek |
-| `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2848) |
+| `Block::slotIndexForVariableName` / `Block::slotForOperand` | PHP CFG via `isM3CompileDriverBlockPhpLoweringName` (#2910) |
 | `Compiler::compileFunc` | On M3 allowlist; CFG entry real-lowers on compile-driver link (#9228, #1402) |
 | `Runtime::standalone` | Compile-driver link OK (#1402, #1056) |
 | `helloworld_compile_smoke` | Deny-listed for link (LLVM 9); compile_driver bundle keeps stub; runtime emit via `compiler_helloworld_smoke/compile_driver.php` / `compiler_compile_smoke/compile_driver.php` + `PHP_COMPILER_EMIT_HELPER_LINK=1` (#1768, #1983) |
@@ -181,7 +181,7 @@ Use these during LLVM/JIT iteration — avoid full spine relink unless you chang
 | `make bootstrap-warm-m3-sidecars` | seconds–minutes | Pre-build independent M3 sidecars (parallel when `PHP_COMPILER_COMPILE_JOBS>1`) before slow emit/link |
 | `make bootstrap-gen0-refresh-sidecar` | minutes | Full spine link + copy `build/.m3_*` → `prelinked/bootstrap-gen0/` + manifest refresh ([#8704](https://github.com/PurHur/php-compiler/issues/8704)) |
 | `php script/bootstrap-inventory.php --check` | seconds | Inventory SSOT without LLVM |
-| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2868/2848**) |
+| `php script/check-selfhost-spine-coverage-sync.php` | seconds | Spine ↔ inventory coverage (**2910/2910**) |
 | `php script/check-selfhost-spine-sidecar-sync.php` | seconds | Prelinked gen-0 stamp ↔ spine entry SHA-1 ([#8703](https://github.com/PurHur/php-compiler/issues/8703)) |
 
 **Env flags**
