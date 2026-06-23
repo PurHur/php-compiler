@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2953 |
-| Phase A inventory files (M2 ratio SSOT) | 2953 |
+| PHP files on vm.php path | 2954 |
+| Phase A inventory files (M2 ratio SSOT) | 2954 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7971 |
+| Source constructs flagged (warnings) | 7974 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -310,6 +310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/EmbedObJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLastJitHelper.php` | 0 | 1 |
+| `ext/standard/ErrorLogJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorSilenceJitHelper.php` | 0 | 1 |
 | `ext/standard/ExceptionJitHelper.php` | 0 | 1 |
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
@@ -2146,7 +2147,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringEnvLocal.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringErrorLog.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringErrorLog.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
@@ -4924,6 +4925,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/standard/ErrorLogJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/ErrorSilenceJitHelper.php`
 
@@ -16924,7 +16930,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringErrorLog.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- new JIT (line 98)
+- 4 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringFgetcsvJit.php`
 

@@ -4,17 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM error_log() stderr helper (php-src _php_error_log default branch; #3380).
+ * JIT/AOT link for __compiler_error_log via ErrorLogJitHelper PHP (#9253).
+ *
+ * Replaces fprintf(stderr) LLVM; SSOT {@see \PHPCompiler\ext\standard\VmErrorLog}.
+ * php-src: ext/standard/basic_functions.c — _php_error_log
  */
 final class StringErrorLog
 {
-    private const RUNTIME_FUNCTION = '__compiler_error_log';
+    private const HELPER_PATH = '/ext/standard/ErrorLogJitHelper.php';
+
+    private const LOG_STDERR_HELPER = 'PHPCompiler\\ext\\standard\\ErrorLogJitHelper::logStderr';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::LOG_STDERR_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -23,114 +33,76 @@ final class StringErrorLog
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::RUNTIME_FUNCTION);
+        $abiName = '__compiler_error_log';
+        $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
+            $context->registerFunction($abiName, $probe);
 
             return;
         }
 
-        self::ensureGlobals($context);
-        self::ensureLibc($context);
+        self::ensureJitHelperCompiled($context);
 
-        $fn = $context->lookupFunction(self::RUNTIME_FUNCTION);
-        self::implementErrorLog($context, $fn);
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementErrorLog(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('el_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $message = $fn->getParam(0);
-        $msgLen = $context->builder->call(
-            $context->lookupFunction('__string__strlen'),
-            $message
-        );
-        $msgCStr = self::stringToCString($context, $message, $msgLen, 'el_msg');
-        self::emitStderrWrite($context, $msgCStr);
-    }
-
-    private static function emitStderrWrite(Context $context, Value $msgCStr): void
-    {
-        $i1 = $context->getTypeFromString('int1');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $stderrPtr = StringTriggerErrorJit::stderrFilePtr($context);
-        $rc = $context->builder->call(
-            $context->lookupFunction('fprintf'),
-            $stderrPtr,
-            $context->builder->pointerCast($context->constantFromString('%s\n'), $i8p),
-            $msgCStr
-        );
-        $context->builder->returnValue(
-            $context->builder->icmp(Builder::INT_SGE, $rc, $i32->constInt(0, false))
-        );
-    }
-
-    private static function stringToCString(Context $context, Value $str, Value $len, string $prefix): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $one = $context->getTypeFromString('int64')->constInt(1, false);
-        $bytes = $context->builder->structGep($str, $map['value']);
-        $bufLen = $context->builder->add($len, $one);
-        $buf = $context->builder->alloca($i8, $bufLen, $prefix);
-        $cStr = $context->builder->pointerCast($buf, $i8p);
-        $context->intrinsic->memcpy($cStr, $bytes, $len, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($cStr, $len)
-        );
-
-        return $cStr;
-    }
-
-    private static function ensureGlobals(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        if (null === $context->module->getNamedGlobal('stderr')) {
-            $context->module->addGlobal($i8p, 'stderr');
-        }
-    }
-
-    private static function ensureLibc(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-
-        foreach ([
-            ['fprintf', $i32, [$i8p, $i8p, $i8p]],
-            ['__string__strlen', $i64, [$strPtr]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal(
-                $context,
-                $name,
-                $context->context->functionType($ret, 'fprintf' === $name, ...$params)
+        $i1 = $context->getTypeFromString('int1');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i1, false, $strPtr)
             );
-        }
+
+        $entry = $fn->appendBasicBlock('error_log_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::LOG_STDERR_HELPER),
+            $fn->getParam(0)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function ensureExternal(Context $context, string $name, $fnType): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $fnType);
-            $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function registerLinkedRuntime(Context $context): void
-    {
-        $fn = $context->module->getNamedFunction(self::RUNTIME_FUNCTION);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
-            throw new \LogicException(self::RUNTIME_FUNCTION.' missing after error_log LLVM link');
+            throw new \LogicException($logical.' missing after ErrorLogJitHelper compile (#9253)');
         }
-        $context->registerFunction(self::RUNTIME_FUNCTION, $fn);
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ErrorLogJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ErrorLogJitHelper.php parseAndCompile failed (#9253)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9253)');
+            }
+        }
     }
 }
