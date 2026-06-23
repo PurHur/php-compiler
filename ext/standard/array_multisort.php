@@ -116,19 +116,41 @@ final class array_multisort extends Internal
             return;
         }
         $values = [];
-        foreach ($ht->iterate(true) as $value) {
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $values[] = $copy;
+        $pairs = [];
+        $isPacked = $ht->isPackedList();
+        if ($isPacked) {
+            foreach ($ht->iterate(true) as $value) {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $values[] = $copy;
+            }
+        } else {
+            foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+                $keyCopy = new Variable();
+                $keyCopy->copyFrom($key);
+                $copy = new Variable();
+                $copy->copyFrom($value);
+                $pairs[] = [$keyCopy, $copy];
+                $values[] = $copy;
+            }
         }
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, [0 => $values], [$entry]);
-        $reordered = [];
-        foreach ($indices as $idx) {
-            $reordered[] = $values[$idx];
-        }
         $array->separateArrayForWrite();
-        $array->resolveIndirect()->toArray()->replacePackedValues($reordered);
+        $target = $array->resolveIndirect()->toArray();
+        if ($isPacked) {
+            $reordered = [];
+            foreach ($indices as $idx) {
+                $reordered[] = $values[$idx];
+            }
+            $target->replacePackedValues($reordered);
+        } else {
+            $reorderedPairs = [];
+            foreach ($indices as $idx) {
+                $reorderedPairs[] = $pairs[$idx];
+            }
+            $target->reorderKeyedPairs($reorderedPairs);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }

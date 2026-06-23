@@ -40,7 +40,7 @@ final class array_merge_recursive extends Internal
             throw new \LogicException('array_merge_recursive() first argument must be an array in this compiler build');
         }
         if (1 === $argc) {
-            $frame->returnVar->array(VmArray::merge($first->toArray()));
+            $frame->returnVar->array($first->toArray()->duplicate());
 
             return;
         }
@@ -50,9 +50,9 @@ final class array_merge_recursive extends Internal
             if (Variable::TYPE_ARRAY !== $arg->type) {
                 throw new \LogicException('array_merge_recursive() arguments must be arrays in this compiler build');
             }
-            $others[] = $arg->toArray();
+            $others[] = $arg->toArray()->duplicate();
         }
-        $frame->returnVar->array($first->toArray()->mergeRecursiveCopy(...$others));
+        $frame->returnVar->array($first->toArray()->duplicate()->mergeRecursiveCopy(...$others));
     }
 
     public Context $context;
