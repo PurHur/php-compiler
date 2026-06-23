@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -92,13 +91,6 @@ final class ProgressNoteRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::$blockSuffix = 0;
         self::$bufGlobal = null;
         self::$lenGlobal = null;
@@ -117,12 +109,6 @@ final class ProgressNoteRuntime
     /** Register Progress::{noteFunction,notePhase,noteEntry} before spine callees compile (#8560). */
     private static function registerStaticProxies(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProgressNoteRuntimeLlvm::registerStaticProxies($context);
-
-            return;
-        }
-
         $voidTy = $context->getTypeFromString('void');
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($voidTy, false, $strPtr);
