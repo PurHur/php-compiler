@@ -94,6 +94,61 @@ final class AssertOptionsRuntime
         }
     }
 
+    /** Assert INI emit path: compile helper on JIT embed; standalone uses const defaults (#9894). */
+    public static function ensureAssertIniLinked(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            self::ensureJitHelperCompiled($context);
+            self::ensureValueHelpers($context);
+        }
+    }
+
+    public static function emitLoadBoolHelper(Context $context, string $helperLogical, bool $standaloneDefault): Value
+    {
+        $i1 = $context->getTypeFromString('int1');
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return $i1->constInt($standaloneDefault ? 1 : 0, false);
+        }
+        self::ensureAssertIniLinked($context);
+
+        return $context->builder->call(self::lookupHelper($context, $helperLogical));
+    }
+
+    public static function emitIniGetToValue(
+        Context $context,
+        string $helperLogical,
+        Value $out,
+        string $standaloneLiteral
+    ): void {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::writeValueStringFromLiteral($context, $out, $standaloneLiteral);
+
+            return;
+        }
+        self::ensureAssertIniLinked($context);
+        $str = $context->builder->call(self::lookupHelper($context, $helperLogical));
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
+    }
+
+    public static function emitIniSetFromCstr(Context $context, string $helperLogical, Value $valCstr): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return;
+        }
+        self::ensureAssertIniLinked($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $valCstr);
+        $valStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $context->builder->pointerCast($valCstr, $context->getTypeFromString('char*'))
+        );
+        $context->builder->call(self::lookupHelper($context, $helperLogical), $valStr);
+        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
+    }
+
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::implementStandaloneStubs($context);
@@ -120,23 +175,13 @@ final class AssertOptionsRuntime
 
         self::ensureJitHelperCompiled($context);
         self::ensureValueHelpers($context);
-        self::implementAbiBridges($context);
         self::implementAssertOptions($context, $probe);
     }
 
-    /** Standalone AOT: const/default ABI stubs without nested AssertOptionsJitHelper JIT (#9225). */
+    /** Standalone AOT: const/default assert_options stub without nested AssertOptionsJitHelper JIT (#9225). */
     private static function implementStandaloneStubs(Context $context): void
     {
         $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
-
-        self::implementStandaloneConstBoolBridge($context, AssertIniRuntime::ABI_ENABLED, false);
-        self::implementStandaloneConstBoolBridge($context, AssertIniRuntime::ABI_EXCEPTION_MODE, true);
-        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_ZEND_ASSERTIONS, '-1');
-        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_ACTIVE, '1');
-        self::implementStandaloneIniGetBridge($context, AssertIniRuntime::ABI_INI_GET_EXCEPTION, '1');
-        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_ZEND_ASSERTIONS);
-        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_ACTIVE);
-        self::implementStandaloneIniSetNoopBridge($context, AssertIniRuntime::ABI_INI_SET_EXCEPTION);
 
         $probe = $context->module->getNamedFunction('__compiler_assert_options');
         if (null !== $probe && 0 === $probe->countBasicBlocks()) {
@@ -154,45 +199,8 @@ final class AssertOptionsRuntime
         }
     }
 
-    private static function implementStandaloneConstBoolBridge(Context $context, string $abiName, bool $value): void
+    private static function writeValueStringFromLiteral(Context $context, Value $out, string $literal): void
     {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($i1, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_abi_standalone_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($i1->constInt($value ? 1 : 0, false));
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementStandaloneIniGetBridge(Context $context, string $abiName, string $literal): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_ini_get_standalone_entry');
-        $context->builder->positionAtEnd($entry);
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
         $cstr = $context->constantFromString($literal);
@@ -202,129 +210,13 @@ final class AssertOptionsRuntime
             $context->builder->sext($len, $i64),
             $context->builder->pointerCast($cstr, $context->getTypeFromString('char*'))
         );
-        $context->builder->call($context->lookupFunction('__value__writeString'), $fn->getParam(0), $str);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
         self::ensureExternal($context, '__string__init', $context->context->functionType(
             $context->getTypeFromString('__string__*'),
             false,
             $i64,
             $context->getTypeFromString('char*')
         ));
-    }
-
-    private static function implementStandaloneIniSetNoopBridge(Context $context, string $abiName): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i8p = $context->getTypeFromString('int8*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i8p);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_ini_set_standalone_entry');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementAbiBridges(Context $context): void
-    {
-        self::implementBoolAbiBridge($context, AssertIniRuntime::ABI_ENABLED, self::IS_ENABLED);
-        self::implementBoolAbiBridge($context, AssertIniRuntime::ABI_EXCEPTION_MODE, self::EXCEPTION_MODE);
-        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_ZEND_ASSERTIONS, self::INI_GET_ZEND_ASSERTIONS);
-        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_ACTIVE, self::INI_GET_ACTIVE);
-        self::implementIniGetAbiBridge($context, AssertIniRuntime::ABI_INI_GET_EXCEPTION, self::INI_GET_EXCEPTION);
-        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_ZEND_ASSERTIONS, self::INI_SET_ZEND_ASSERTIONS);
-        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_ACTIVE, self::INI_SET_ACTIVE);
-        self::implementIniSetAbiBridge($context, AssertIniRuntime::ABI_INI_SET_EXCEPTION, self::INI_SET_EXCEPTION);
-    }
-
-    private static function implementBoolAbiBridge(Context $context, string $abiName, string $helperLogical): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($i1, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_abi_entry');
-        $context->builder->positionAtEnd($entry);
-        $enabled = $context->builder->call(self::lookupHelper($context, $helperLogical));
-        $context->builder->returnValue($enabled);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementIniGetAbiBridge(Context $context, string $abiName, string $helperLogical): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_ini_get_entry');
-        $context->builder->positionAtEnd($entry);
-        $out = $fn->getParam(0);
-        $str = $context->builder->call(self::lookupHelper($context, $helperLogical));
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementIniSetAbiBridge(Context $context, string $abiName, string $helperLogical): void
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $i8p);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('assert_ini_set_entry');
-        $context->builder->positionAtEnd($entry);
-        $cstr = $fn->getParam(0);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
-        $valStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $context->builder->pointerCast($cstr, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call(self::lookupHelper($context, $helperLogical), $valStr);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
     }
 
     private static function implementAssertOptions(Context $context, Value $fn): void
