@@ -21,6 +21,9 @@ final class ModuleRegistry
     /** @var array<string, list<string>> */
     private static array $extensionFunctions = [];
 
+    /** @var array<string, string> lowercase extension name => module version */
+    private static array $extensionVersions = [];
+
     /** @var list<string> */
     private const DATE_EXTENSION_FUNCTIONS = [
         'checkdate',
@@ -43,26 +46,33 @@ final class ModuleRegistry
     {
         self::$loaded = [];
         self::$extensionFunctions = [];
+        self::$extensionVersions = [];
     }
 
-    public static function register(string $extensionName): void
+    public static function register(string $extensionName, ?string $version = null): void
     {
         $name = strtolower($extensionName);
         if ('' === $name) {
             return;
         }
-        if (\in_array($name, self::$loaded, true)) {
-            return;
+        if (!\in_array($name, self::$loaded, true)) {
+            self::$loaded[] = $name;
         }
-        self::$loaded[] = $name;
+        if (null !== $version && '' !== $version) {
+            self::$extensionVersions[$name] = $version;
+        }
     }
 
     public static function registerModule(Module $module): void
     {
-        self::register($module->getExtensionName());
+        $moduleVersion = $module->getExtensionVersion();
+        $additionalVersions = $module->getAdditionalExtensionVersions();
+        self::register($module->getExtensionName(), $moduleVersion);
         $additional = $module->getAdditionalExtensionNames();
         foreach ($additional as $name) {
-            self::register($name);
+            $logical = strtolower($name);
+            $version = $additionalVersions[$logical] ?? $moduleVersion;
+            self::register($name, $version);
         }
 
         $primary = strtolower($module->getExtensionName());
@@ -79,6 +89,19 @@ final class ModuleRegistry
     public static function extensionLoaded(string $extension): bool
     {
         return \in_array(strtolower($extension), self::$loaded, true);
+    }
+
+    /**
+     * php-src zend_get_module_version() — null when extension is not loaded.
+     */
+    public static function getExtensionVersion(string $extension): ?string
+    {
+        $ext = strtolower($extension);
+        if (!self::extensionLoaded($ext)) {
+            return null;
+        }
+
+        return self::$extensionVersions[$ext] ?? null;
     }
 
     /**

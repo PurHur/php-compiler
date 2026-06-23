@@ -17,10 +17,20 @@ interface Module
 
     public function getExtensionName(): string;
 
+    /** php-src zend_module_entry version — reported by phpversion($extension). */
+    public function getExtensionVersion(): string;
+
     /**
      * @return list<string>
      */
     public function getAdditionalExtensionNames(): array;
+
+    /**
+     * Logical extension versions bundled with this module (e.g. pcre in standard).
+     *
+     * @return array<string, string> lowercase extension name => version
+     */
+    public function getAdditionalExtensionVersions(): array;
 
     public function getFunctions(): array;
 

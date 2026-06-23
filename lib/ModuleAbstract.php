@@ -29,12 +29,26 @@ abstract class ModuleAbstract implements Module {
         return strtolower(preg_replace('#.*\\\\([^\\\\]+)$#', '$1', $class));
     }
 
+    /** php-src zend_module_entry version — reported by phpversion($extension). */
+    public function getExtensionVersion(): string
+    {
+        return CompilerVersion::VERSION;
+    }
+
     /**
      * Logical extensions bundled with this module (e.g. json/date handlers in standard).
      *
      * @return list<string>
      */
     public function getAdditionalExtensionNames(): array
+    {
+        return [];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    public function getAdditionalExtensionVersions(): array
     {
         return [];
     }

@@ -24,6 +24,18 @@ class Module extends ModuleAbstract
         return ['json', 'date', 'pcre', 'zlib'];
     }
 
+    /**
+     * php-src bundled extension versions (ext/pcre/php_pcre.c PCRE2_CONFIG_VERSION, etc.).
+     *
+     * @return array<string, string>
+     */
+    public function getAdditionalExtensionVersions(): array
+    {
+        return [
+            'pcre' => '10.44',
+        ];
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
