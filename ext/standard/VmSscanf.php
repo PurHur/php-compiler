@@ -147,6 +147,19 @@ final class VmSscanf
                     ++$outIdx;
                     ++$assigned;
                     break;
+                case 'e':
+                case 'E':
+                case 'g':
+                case 'G':
+                    [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen, $width, true);
+                    if (null === $flt) {
+                        return [$assigned, $inPos];
+                    }
+                    self::assignFloat($outVars[$outIdx], $flt);
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
                 default:
                     throw new \ValueError('Bad scan conversion character "'.$spec.'"');
             }
@@ -274,7 +287,7 @@ final class VmSscanf
 
     private static function isSupportedConversionSpec(string $spec): bool
     {
-        return \in_array($spec, ['d', 'u', 'f', 's', 'x', 'X', 'o', 'c'], true);
+        return \in_array($spec, ['d', 'u', 'f', 'e', 'E', 'g', 'G', 's', 'x', 'X', 'o', 'c'], true);
     }
 
     /**
@@ -485,7 +498,7 @@ final class VmSscanf
     /**
      * @return array{0: ?float, 1: int}
      */
-    private static function scanFloat(string $input, int $pos, int $len, ?int $maxWidth = null): array
+    private static function scanFloat(string $input, int $pos, int $len, ?int $maxWidth = null, bool $allowExponent = false): array
     {
         $orig = $pos;
         $pos = self::skipSpace($input, $pos, $len);
@@ -517,6 +530,34 @@ final class VmSscanf
                     $any = true;
                     ++$pos;
                     ++$read;
+                }
+            }
+        }
+        if ($allowExponent && $pos < $len && ('e' === $input[$pos] || 'E' === $input[$pos])) {
+            if (null === $maxWidth || $read < $maxWidth) {
+                $expPos = $pos;
+                ++$pos;
+                ++$read;
+                if ($pos < $len && ('+' === $input[$pos] || '-' === $input[$pos])) {
+                    if (null !== $maxWidth && $read >= $maxWidth) {
+                        $pos = $expPos;
+                    } else {
+                        ++$pos;
+                        ++$read;
+                    }
+                }
+                $expDigits = false;
+                while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
+                    if (null !== $maxWidth && $read >= $maxWidth) {
+                        break;
+                    }
+                    $expDigits = true;
+                    $any = true;
+                    ++$pos;
+                    ++$read;
+                }
+                if (!$expDigits) {
+                    $pos = $expPos;
                 }
             }
         }

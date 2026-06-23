@@ -10,6 +10,8 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\RuntimeStrictness;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -37,8 +39,18 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_replace() pattern', 0);
-        $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_replace() replacement', 1);
+        $patternVar = self::requireStringOrArrayPattern(
+            $frame->calledArgs[0],
+            'preg_replace',
+            0,
+            'pattern'
+        );
+        $replacementVar = self::requireStringOrArrayPattern(
+            $frame->calledArgs[1],
+            'preg_replace',
+            1,
+            'replacement'
+        );
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'preg_replace',
@@ -57,7 +69,12 @@ final class preg_replace extends Internal
         }
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
-            $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit);
+            $result = self::replaceSubjectString(
+                $patternVar,
+                $replacementVar,
+                $subjectVar->toString(),
+                $limit
+            );
         } elseif (Variable::TYPE_ARRAY === $subjectVar->type) {
             $host = [];
             foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -69,9 +86,19 @@ final class preg_replace extends Internal
                 $hostKey = Variable::TYPE_INTEGER === $key->type
                     ? $key->toInt()
                     : $key->toString();
-                $host[$hostKey] = $value->toString();
+                $replaced = self::replaceSubjectString(
+                    $patternVar,
+                    $replacementVar,
+                    $value->toString(),
+                    $limit
+                );
+                if (false === $replaced) {
+                    $result = false;
+                    break;
+                }
+                $host[$hostKey] = $replaced;
             }
-            $result = VmPreg::pregReplace($pattern, $replacement, $host, $limit);
+            $result = $result ?? $host;
         }
 
         if (false === $result) {
@@ -148,5 +175,123 @@ final class preg_replace extends Internal
         }
 
         return null;
+    }
+
+    /**
+     * @return string|list<string>|false
+     */
+    private static function replaceSubjectString(
+        Variable $patternVar,
+        Variable $replacementVar,
+        string $subject,
+        int $limit
+    ): string|array|false {
+        if (Variable::TYPE_STRING === $patternVar->type) {
+            if (Variable::TYPE_ARRAY === $replacementVar->type) {
+                throw new \TypeError(
+                    'preg_replace(): Argument #1 ($pattern) must be of type array when argument #2 ($replacement) is an array'
+                );
+            }
+
+            return VmPreg::pregReplace(
+                $patternVar->toString(),
+                $replacementVar->toString(),
+                $subject,
+                $limit
+            );
+        }
+
+        $patterns = self::stringListFromArrayArg($patternVar, 'preg_replace', 0, 'pattern');
+        $replacementIsArray = Variable::TYPE_ARRAY === $replacementVar->type;
+        $replacements = $replacementIsArray
+            ? self::stringListFromArrayArg($replacementVar, 'preg_replace', 1, 'replacement')
+            : null;
+        if ($replacementIsArray && \count($patterns) !== \count($replacements)) {
+            throw new \ValueError(
+                'preg_replace(): Argument #1 ($pattern) and argument #2 ($replacement) must have the same length'
+            );
+        }
+        $scalarReplacement = $replacementIsArray ? null : $replacementVar->toString();
+        $result = $subject;
+        foreach ($patterns as $i => $pattern) {
+            $replacement = null !== $replacements ? $replacements[$i] : $scalarReplacement;
+            $next = VmPreg::pregReplace($pattern, $replacement, $result, $limit);
+            if (false === $next) {
+                return false;
+            }
+            $result = $next;
+        }
+
+        return $result;
+    }
+
+    /** @return list<string> */
+    private static function stringListFromArrayArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): array {
+        $list = [];
+        foreach ($var->toArray()->iterateKeyed(true) as [, $value]) {
+            if (Variable::TYPE_STRING !== $value->type) {
+                throw new \TypeError(\sprintf(
+                    '%s(): Argument #%d ($%s) must contain only string elements',
+                    $function,
+                    $argIndex + 1,
+                    $paramName
+                ));
+            }
+            $list[] = $value->toString();
+        }
+
+        return $list;
+    }
+
+    private static function requireStringOrArrayPattern(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array|string, %s given',
+                $function,
+                $argIndex + 1,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
+            return $var;
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type array|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            self::patternArgTypeLabel($var)
+        ));
+    }
+
+    private static function patternArgTypeLabel(Variable $var): string
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            return EnumCaseSupport::typeNameForVariable($var);
+        }
+
+        return match ($var->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $var->toObject()->class->name,
+            default => 'mixed',
+        };
     }
 }
