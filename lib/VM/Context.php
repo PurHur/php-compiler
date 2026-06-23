@@ -855,12 +855,12 @@ class Context {
 
     public function isFunctionStaticInitialized(string $storageKey): bool
     {
-        return isset($this->functionStaticInitialized[$storageKey]);
+        return VmFunctionStatic::isInitialized($storageKey, $this->functionStaticInitialized);
     }
 
     public function markFunctionStaticInitialized(string $storageKey): void
     {
-        $this->functionStaticInitialized[$storageKey] = true;
+        VmFunctionStatic::markInitialized($storageKey, $this->functionStaticInitialized);
     }
 
     public function save(Frame $frame): RunStackEntry {

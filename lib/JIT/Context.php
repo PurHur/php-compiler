@@ -751,6 +751,7 @@ class Context {
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             Builtin\StringFormat::ensureStandaloneBodies($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
+            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
             Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
             Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
