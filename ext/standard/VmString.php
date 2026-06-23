@@ -4696,7 +4696,10 @@ final class VmString
      * @return string|false
      */
     public static function realpath(string $path) {
-        if ('' === $path || str_contains($path, "\0")) {
+        if ('' === $path) {
+            $path = '.';
+        }
+        if (str_contains($path, "\0")) {
             return false;
         }
         if (VmStatNative::available()) {

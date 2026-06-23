@@ -39,6 +39,9 @@ final class VmStatNative
 
     public static function realpath(string $path): string|false
     {
+        if ('' === $path) {
+            $path = '.';
+        }
         if (str_contains($path, "\0")) {
             return false;
         }

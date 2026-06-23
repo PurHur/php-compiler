@@ -59,6 +59,13 @@ final class JitRealpath
     {
         $id = (string) (++self::$blockSerial);
         $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($str, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
+        $dotStr = $context->builder->load($context->constantStringFromString('.'));
+        $str = $context->builder->select($isEmpty, $dotStr, $str);
         $pathPtr = $context->builder->structGep($str, $map['value']);
         $charPtr = $context->getTypeFromString('char*');
         $null = $charPtr->constNull();
