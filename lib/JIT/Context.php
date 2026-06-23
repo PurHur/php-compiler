@@ -335,6 +335,17 @@ class Context {
         return str_ends_with($entry, '/test/selfhost/compiler_lib_spine_smoke/main.php');
     }
 
+    /**
+     * M3 compile-driver emit calls PHP main() directly; env-probe LLVM gate segfaults during
+     * gen-0 native emit at c:main_before_php (#10938, #8719).
+     */
+    private function shouldSkipStandaloneMainEnvProbeGate(): bool
+    {
+        $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
     public function hasJitIncludedFileCompiled(string $path): bool
     {
         $resolved = realpath($path);
@@ -869,7 +880,8 @@ class Context {
                 ExceptionBridge::emitClearForStandaloneMain($this);
             }
             Progress::emitNativeNote($this, 'c:main_before_php');
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
+                && !$this->shouldSkipStandaloneMainEnvProbeGate()) {
                 VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main);
             } else {
                 $this->builder->call($this->main);
