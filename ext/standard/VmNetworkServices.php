@@ -15,12 +15,10 @@ final class VmNetworkServices
 {
     private const PROTOCOLS_PATHS = [
         '/etc/protocols',
-        __DIR__.'/data/protocols',
     ];
 
     private const SERVICES_PATHS = [
         '/etc/services',
-        __DIR__.'/data/services',
     ];
 
     /** @var list<array{name: string, number: int, aliases: list<string>}>|null */
