@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for __compiler_pack (issue #5231, #6607).
+ * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133).
  *
- * LLVM bodies from {@see StringPackJit}; semantics SSOT {@see \PHPCompiler\ext\standard\PackEngine}.
+ * Replaces LLVM {@see StringPackJit} for JIT modules; standalone keeps StringPackJit.
+ * SSOT: {@see \PHPCompiler\ext\standard\PackEngine}.
  */
 final class PackJitRuntime
 {
@@ -21,7 +22,7 @@ final class PackJitRuntime
         } catch (\Throwable) {
         }
 
-        StringPackJit::implement($context);
+        StringPack::ensureLinked($context);
 
         if (null !== $resume) {
             $context->builder->positionAtEnd($resume);

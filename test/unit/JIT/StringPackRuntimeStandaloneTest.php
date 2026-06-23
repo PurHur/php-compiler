@@ -15,14 +15,16 @@ use PHPUnit\Framework\TestCase;
  */
 final class StringPackRuntimeStandaloneTest extends TestCase
 {
-    public function testRuntimeShrinkRemovesPackJitC(): void
+    public function testRuntimeShrinkRoutesPackThroughPhpHelper(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/pack_jit_runtime.c');
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPackJit.php');
-        $this->assertStringContainsString('__compiler_pack', $jit);
+        $this->assertStringContainsString('StringPackJit', $jit);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PackJitRuntime.php');
-        $this->assertStringContainsString('StringPackJit', $runtime);
+        $this->assertStringContainsString('StringPack', $runtime);
         $this->assertStringNotContainsString('pack_jit_runtime.c', $runtime);
+        $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPack.php');
+        $this->assertStringContainsString('PackJitHelper', $bridge);
         $engine = (string) file_get_contents(__DIR__.'/../../../ext/standard/PackEngine.php');
         $this->assertStringContainsString('PackEngine', $engine);
     }
