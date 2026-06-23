@@ -450,14 +450,23 @@ final class ClassConstFetchHelper
         return null;
     }
 
+    public static function jitLateStaticClassNameForBlock(Object_ $objectType, Block $block): ?string
+    {
+        return self::jitLateStaticClassName($objectType, $block);
+    }
+
     private static function jitLateStaticClassName(Object_ $objectType, Block $block): ?string
     {
         $called = $objectType->jitContext()->scope->calledClassName ?? '';
-        if ('' !== $called) {
-            return $called;
+        $declaring = self::jitScopeClassName($objectType, $block);
+        if (null === $declaring) {
+            return '' !== $called ? $called : null;
         }
 
-        return self::jitScopeClassName($objectType, $block);
+        return \PHPCompiler\VM\LateStaticBinding::resolveLateStaticClassLc(
+            '' !== $called ? $called : null,
+            $declaring
+        );
     }
 
     /**
