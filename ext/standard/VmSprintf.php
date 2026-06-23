@@ -296,6 +296,7 @@ final class VmSprintf
             case 'd':
                 return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':
+            case 'F':
                 return self::formatFixed(self::argToFloat($var, $frame), $floatPrec);
             case 'b':
                 return self::formatRadix(self::argToInt($var, $frame), 2, false);
