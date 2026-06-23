@@ -13,10 +13,6 @@ use PHPLLVM\Value;
  */
 final class StringStripslashes
 {
-    /** @var list<int> */
-    /** @var list<int> chars unescaped after backslash; '0' (48) maps to NUL in write loop */
-    private const UNESCAPE_ORDS = [92, 39, 34, 48];
-
     public static function implement(Context $context): void
     {
         $fn = $context->lookupFunction('__string__stripslashes');
@@ -108,28 +104,16 @@ final class StringStripslashes
 
         $unescapeBlock = $fn->appendBasicBlock('stripslashes_count_unescape');
         $plainBlock = $fn->appendBasicBlock('stripslashes_count_plain');
-        $afterBlock = $fn->appendBasicBlock('stripslashes_count_after');
         $context->builder->branchIf($canUnescape, $unescapeBlock, $plainBlock);
 
         $context->builder->positionAtEnd($unescapeBlock);
-        $nextCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $one)));
-        $nextI64 = $context->builder->zExt($nextCh, $i64);
-        $specialUnescape = self::isSpecial($context, $nextI64);
-        $context->builder->branch($afterBlock);
+        $context->builder->store($context->builder->addNoSignedWrap($context->builder->load($outLenSlot), $one), $outLenSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($i, $two), $iSlot);
+        $context->builder->branch($head);
 
         $context->builder->positionAtEnd($plainBlock);
-        $specialPlain = $context->getTypeFromString('int1')->constInt(0, false);
-        $context->builder->branch($afterBlock);
-
-        $context->builder->positionAtEnd($afterBlock);
-        $mergedSpecial = $context->builder->phi($specialUnescape->typeOf());
-        $mergedSpecial->addIncoming($specialUnescape, $unescapeBlock);
-        $mergedSpecial->addIncoming($specialPlain, $plainBlock);
-
-        $advance = $context->builder->select($mergedSpecial, $two, $one);
-        $outLen = $context->builder->load($outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($outLen, $one), $outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $advance), $iSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($context->builder->load($outLenSlot), $one), $outLenSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
@@ -172,53 +156,23 @@ final class StringStripslashes
 
         $unescapeBlock = $fn->appendBasicBlock('stripslashes_write_unescape');
         $plainBlock = $fn->appendBasicBlock('stripslashes_write_plain');
-        $afterBlock = $fn->appendBasicBlock('stripslashes_write_after');
         $context->builder->branchIf($canUnescape, $unescapeBlock, $plainBlock);
 
         $context->builder->positionAtEnd($unescapeBlock);
         $nextCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $one)));
-        $nextI64 = $context->builder->zExt($nextCh, $i64);
-        $special = self::isSpecial($context, $nextI64);
-
-        $doUnescape = $fn->appendBasicBlock('stripslashes_write_do_unescape');
-        $writePlainFromUnescape = $fn->appendBasicBlock('stripslashes_write_plain_from_unescape');
-        $context->builder->branchIf($special, $doUnescape, $writePlainFromUnescape);
-
-        $context->builder->positionAtEnd($doUnescape);
         $isZeroDigit = $context->builder->icmp(Builder::INT_EQ, $nextCh, $zeroDigit);
         $unescapedByte = $context->builder->select($isZeroDigit, $nulByte, $nextCh);
         $context->builder->store($unescapedByte, $destAt);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $two), $iSlot);
-        $context->builder->branch($afterBlock);
-
-        $context->builder->positionAtEnd($writePlainFromUnescape);
-        $context->builder->store($ch, $destAt);
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($afterBlock);
+        $context->builder->branch($head);
 
         $context->builder->positionAtEnd($plainBlock);
         $context->builder->store($ch, $destAt);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
         $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($afterBlock);
-
-        $context->builder->positionAtEnd($afterBlock);
         $context->builder->branch($head);
 
         $context->builder->positionAtEnd($done);
-    }
-
-    private static function isSpecial(Context $context, Value $chI64): Value
-    {
-        $i64 = $chI64->typeOf();
-        $special = $context->getTypeFromString('int1')->constInt(0, false);
-        foreach (self::UNESCAPE_ORDS as $ord) {
-            $match = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt($ord, false));
-            $special = $context->builder->or($special, $match);
-        }
-
-        return $special;
     }
 }

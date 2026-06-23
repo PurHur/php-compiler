@@ -16,11 +16,12 @@ echo addslashes("O'Reilly"), "\n";
 echo addslashes('a"b'), "\n";
 echo stripslashes("O\\'Reilly"), "\n";
 echo stripslashes(addslashes('x\\y')), "\n";
+echo stripslashes('a\\b'), "\n";
 echo bin2hex(addslashes("a\0b")), "\n";
 echo bin2hex(stripslashes('a\\0b')), "\n";
 PHP;
 
-    private const EXPECT = "O\\'Reilly\na\\\"b\nO'Reilly\nx\\y\n615c3062\n610062\n";
+    private const EXPECT = "O\\'Reilly\na\\\"b\nO'Reilly\nx\\y\nab\n615c3062\n610062\n";
 
     public function testVmMatchesPhpSubset(): void
     {
