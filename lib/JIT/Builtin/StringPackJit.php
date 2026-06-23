@@ -13,8 +13,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM __compiler_pack (mirrors pack_jit_runtime.c, issue #6607).
+ * LLVM __compiler_pack for AOT standalone link only (#6607, #9133).
  *
+ * JIT/normal modules use {@see StringPack} + {@see PackJitHelper} PHP path.
  * php-src reference: ext/standard/pack.c — php_pack()
  */
 final class StringPackJit
