@@ -30,7 +30,8 @@ final class HighlightEngine
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
 
-        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span></code>';
+        // php-src ext/standard/php_highlight.h — outer wrapper newlines match Zend byte-for-byte (#10308).
+        return '<code><span style="color: '.self::COLOR_DEFAULT.'">'."\n".$body."\n".'</span>'."\n".'</code>';
     }
 
     /**
@@ -40,6 +41,20 @@ final class HighlightEngine
     {
         $out = '';
         $lastColor = self::COLOR_DEFAULT;
+        $spanText = '';
+        $spanColor = null;
+
+        $flushSpan = static function () use (&$out, &$spanText, &$spanColor): void {
+            if (null === $spanColor || '' === $spanText) {
+                $spanText = '';
+                $spanColor = null;
+
+                return;
+            }
+            $out .= '<span style="color: '.$spanColor.'">'.self::escapeAndFormat($spanText).'</span>';
+            $spanText = '';
+            $spanColor = null;
+        };
 
         foreach ($tokens as $token) {
             if (\is_string($token)) {
@@ -54,8 +69,15 @@ final class HighlightEngine
             } else {
                 $lastColor = $color;
             }
-            $out .= '<span style="color: '.$color.'">'.self::escapeAndFormat($text).'</span>';
+            if (null !== $spanColor && $color !== $spanColor) {
+                $flushSpan();
+            }
+            if (null === $spanColor) {
+                $spanColor = $color;
+            }
+            $spanText .= $text;
         }
+        $flushSpan();
 
         return $out;
     }
