@@ -60,7 +60,7 @@ final class VmFilestatFailure
 
     public static function warnNoSuchFile(Frame $frame, string $function): void
     {
-        self::triggerWarning($frame, \sprintf('%s(): No such file or directory', $function));
+        self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): No such file or directory', $function));
     }
 
     private static function triggerWarningWithHandlerFirst(Frame $frame, string $message): void

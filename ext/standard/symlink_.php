@@ -30,6 +30,9 @@ final class symlink_ extends Internal
             throw new \LogicException('symlink() requires string paths in this compiler build');
         }
         $ok = VmFs::symlink($targetVar->toString(), $linkVar->toString());
+        if (!$ok) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'symlink');
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
