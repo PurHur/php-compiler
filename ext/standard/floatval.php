@@ -66,6 +66,11 @@ final class floatval extends Internal
 
             return;
         }
+        if (Variable::TYPE_ARRAY === $v->type || Variable::TYPE_OBJECT === $v->type) {
+            $frame->returnVar->float(VmScalarType::zendFloatvalOperand($v, $frame));
+
+            return;
+        }
         throw new \LogicException('floatval() only supports integers, floats, booleans, strings, and null in this compiler build');
     }
 
@@ -93,6 +98,8 @@ final class floatval extends Internal
                 return $context->builder->call($context->lookupFunction('strtod'), $ptr, $endPtr);
             case JITVariable::TYPE_NULL:
                 return $double->constReal(0.0);
+            case JITVariable::TYPE_HASHTABLE:
+                return JitScalarTypeCoerce::hashtableToDouble($context, $v);
             case JITVariable::TYPE_VALUE:
                 return $this->valueToFloat($context, $args[0]);
             default:
@@ -116,6 +123,8 @@ final class floatval extends Internal
         $boolBlock = BasicBlockHelper::append($context, 'floatval_value_bool');
         $doubleBlock = BasicBlockHelper::append($context, 'floatval_value_double');
         $stringBlock = BasicBlockHelper::append($context, 'floatval_value_string');
+        $arrayBlock = BasicBlockHelper::append($context, 'floatval_value_array');
+        $plainObjectBlock = BasicBlockHelper::append($context, 'floatval_value_plain_object');
         $doneBlock = BasicBlockHelper::append($context, 'floatval_value_done');
 
         $afterNull = BasicBlockHelper::append($context, 'floatval_value_after_null');
@@ -195,12 +204,40 @@ final class floatval extends Internal
             $context->builder->branch($doneBlock);
         }
         $context->builder->positionAtEnd($afterEnumDispatch);
+        $afterArray = BasicBlockHelper::append($context, 'floatval_value_after_array');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_HASHTABLE, false)),
+            $arrayBlock,
+            $afterArray
+        );
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $htPtr = $context->builder->call($context->lookupFunction('__value__readHashtable'), $valuePtr);
+        $arrayFloat = JitScalarTypeCoerce::hashtableToDouble($context, $htPtr);
+        $arrayEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterArray);
         $fallbackBlock = BasicBlockHelper::append($context, 'floatval_value_fallback');
+        $unknownBlock = BasicBlockHelper::append($context, 'floatval_value_unknown');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_STRING, false)),
             $stringBlock,
             $fallbackBlock
         );
+
+        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(JITVariable::TYPE_OBJECT, false)),
+            $plainObjectBlock,
+            $unknownBlock
+        );
+
+        $context->builder->positionAtEnd($plainObjectBlock);
+        $plainObjPtr = $context->builder->call($context->lookupFunction('__value__readObject'), $valuePtr);
+        $plainObjectFloat = JitScalarTypeCoerce::emitPlainObjectToScalar($context, $plainObjPtr, 'float');
+        $plainObjectEndBlock = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($stringBlock);
         $stringVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
@@ -210,7 +247,7 @@ final class floatval extends Internal
         $stringEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
-        $context->builder->positionAtEnd($fallbackBlock);
+        $context->builder->positionAtEnd($unknownBlock);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
@@ -220,10 +257,12 @@ final class floatval extends Internal
         $phi->addIncoming($boolFloat, $boolEndBlock);
         $phi->addIncoming($doubleVal, $doubleEndBlock);
         $phi->addIncoming($stringFloat, $stringEndBlock);
+        $phi->addIncoming($arrayFloat, $arrayEndBlock);
+        $phi->addIncoming($plainObjectFloat, $plainObjectEndBlock);
         if (null !== $enumDouble && null !== $enumEndBlock) {
             $phi->addIncoming($enumDouble, $enumEndBlock);
         }
-        $phi->addIncoming($zero, $fallbackBlock);
+        $phi->addIncoming($zero, $unknownBlock);
 
         return $phi;
     }
