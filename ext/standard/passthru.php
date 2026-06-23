@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -28,6 +29,7 @@ final class passthru extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('passthru() accepts one or two arguments in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'passthru', 'command', 0);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'passthru', 0, 'command');
         $result = VmExecNative::run($command);
         if (false !== $result) {

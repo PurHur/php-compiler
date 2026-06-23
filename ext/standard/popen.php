@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,6 +34,7 @@ final class popen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'popen', 'command', 0);
         $command = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'popen',
@@ -58,6 +61,8 @@ final class popen extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('popen() requires exactly two arguments in this compiler build');
         }
+
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'popen', 'command', 1);
 
         return JitPopen::invoke(
             $context,
