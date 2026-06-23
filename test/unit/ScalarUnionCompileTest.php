@@ -33,6 +33,47 @@ PHP;
         $this->assertSame('1zok', ob_get_clean());
     }
 
+    public function test_scalar_union_null_assignment_throws_type_error(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class T {
+    public int|string $x;
+}
+$t = new T();
+try {
+    $t->x = null;
+    echo "assigned='", $t->x, "'";
+} catch (TypeError $e) {
+    echo $e->getMessage();
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'scalar_union_null.php'));
+        $this->assertSame(
+            'Cannot assign null to property T::$x of type int|string',
+            ob_get_clean()
+        );
+    }
+
+    public function test_scalar_union_nullable_property_accepts_null(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class T {
+    public int|string|null $x;
+}
+$t = new T();
+$t->x = null;
+echo var_export($t->x, true);
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'scalar_union_nullable.php'));
+        $this->assertSame('NULL', ob_get_clean());
+    }
+
     public function test_scalar_union_uninitialized_property_read_throws_error(): void
     {
         $runtime = new Runtime();
