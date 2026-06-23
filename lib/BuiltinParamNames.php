@@ -104,6 +104,12 @@ final class BuiltinParamNames
                 return ['num1', 'num2'];
             case 'hex2bin':
                 return ['data', 'strict'];
+            case 'hash':
+                return ['algo', 'data', 'binary'];
+            case 'hash_hmac':
+                return ['algo', 'data', 'key', 'binary'];
+            case 'hash_pbkdf2':
+                return ['algo', 'password', 'salt', 'iterations', 'length', 'binary'];
             case 'base64_decode':
                 return ['string', 'strict'];
             case 'resetaslazyghost':

@@ -230,12 +230,13 @@ final class VmPreg
         string|array $pattern,
         string|array $replacement,
         string|array $subject,
-        int $limit = -1
+        int $limit = -1,
+        ?int &$count = null
     ) {
         self::assertPatternReplacementTypes($pattern, $replacement);
 
         if (\is_array($pattern)) {
-            return self::pregReplaceArrayPatterns($pattern, $replacement, $subject, $limit);
+            return self::pregReplaceArrayPatterns($pattern, $replacement, $subject, $limit, $count);
         }
 
         if (\is_array($replacement)) {
@@ -248,7 +249,7 @@ final class VmPreg
             return false;
         }
 
-        $result = VmPregNative::pregReplace($pattern, $replacement, $subject, $limit);
+        $result = VmPregNative::pregReplace($pattern, $replacement, $subject, $limit, $count);
         self::syncLastErrorFromNative();
         if (null === $result) {
             return false;
@@ -268,7 +269,8 @@ final class VmPreg
         array $pattern,
         array|string $replacement,
         string|array $subject,
-        int $limit
+        int $limit,
+        ?int &$count = null
     ): string|array|false {
         $replacements = \is_array($replacement)
             ? $replacement
@@ -279,34 +281,46 @@ final class VmPreg
 
         if (\is_array($subject)) {
             $out = [];
+            $totalCount = 0;
             foreach ($subject as $key => $item) {
                 if (!\is_string($item)) {
                     throw new \LogicException(
                         'preg_replace() array subject values must be strings in this compiler build'
                     );
                 }
-                $replaced = self::pregReplaceArrayPatterns($pattern, $replacements, $item, $limit);
+                $elemCount = 0;
+                $replaced = self::pregReplaceArrayPatterns($pattern, $replacements, $item, $limit, $elemCount);
                 if (false === $replaced) {
                     return false;
                 }
                 $out[$key] = $replaced;
+                $totalCount += $elemCount;
+            }
+            if (null !== $count) {
+                $count = $totalCount;
             }
 
             return $out;
         }
 
         $result = $subject;
+        $totalCount = 0;
         foreach ($pattern as $index => $pat) {
             if (strlen($pat) > self::MAX_PATTERN_BYTES) {
                 return false;
             }
             $repl = $replacements[$index] ?? '';
-            $step = VmPregNative::pregReplace($pat, $repl, $result, $limit);
+            $stepCount = 0;
+            $step = VmPregNative::pregReplace($pat, $repl, $result, $limit, $stepCount);
             self::syncLastErrorFromNative();
             if (false === $step || null === $step) {
                 return false;
             }
             $result = $step;
+            $totalCount += $stepCount;
+        }
+        if (null !== $count) {
+            $count = $totalCount;
         }
 
         return $result;

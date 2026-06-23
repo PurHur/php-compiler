@@ -29,9 +29,9 @@ final class preg_replace extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
+        if ($argc < 3 || $argc > 5) {
             throw new \LogicException(
-                'preg_replace() expects 3 to 4 arguments in this compiler build'
+                'preg_replace() expects 3 to 5 arguments in this compiler build'
             );
         }
         if (null === $frame->returnVar) {
@@ -64,9 +64,11 @@ final class preg_replace extends Internal
             1,
             'replacement'
         );
+        $hasCount = $argc >= 5;
+        $count = 0;
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
-            $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit);
+            $result = VmPreg::pregReplace($pattern, $replacement, $subjectVar->toString(), $limit, $count);
         } elseif (Variable::TYPE_ARRAY === $subjectVar->type) {
             $host = [];
             foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -80,7 +82,11 @@ final class preg_replace extends Internal
                     : $key->toString();
                 $host[$hostKey] = $value->toString();
             }
-            $result = VmPreg::pregReplace($pattern, $replacement, $host, $limit);
+            $result = VmPreg::pregReplace($pattern, $replacement, $host, $limit, $count);
+        }
+
+        if ($hasCount) {
+            $frame->calledArgs[4]->resolveIndirect()->int($count);
         }
 
         if (false === $result) {
