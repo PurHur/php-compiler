@@ -11446,6 +11446,17 @@ class Compiler {
             return null;
         }
         if ($argCount < $producerCount) {
+            $nestedArrayTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+            if (null !== $nestedArrayTrailing) {
+                [$arrayChain, $trailing] = $nestedArrayTrailing;
+                if (1 + \count($trailing) === $argCount) {
+                    if (0 === $argIndex) {
+                        return $arrayChain[\count($arrayChain) - 1];
+                    }
+
+                    return $trailing[$argIndex - 1] ?? null;
+                }
+            }
             $extra = $producerCount - $argCount;
             $tail = array_slice($producers, -$extra);
             if (
@@ -12126,6 +12137,39 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Nested inline Array_ preludes for one call arg plus trailing hoisted producers (#10566).
+     *
+     * e.g. count([1, [2, 3]], COUNT_RECURSIVE) — producers [inner Array_, outer Array_, ConstFetch].
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return array{0: list<Op\Expr\Array_>, 1: list<Op\Expr>}|null
+     */
+    private function splitNestedArrayLiteralChainWithTrailingProducers(array $producers): ?array
+    {
+        $count = \count($producers);
+        if ($count < 2) {
+            return null;
+        }
+        $trailing = [];
+        $i = $count - 1;
+        while ($i >= 0 && !($producers[$i] instanceof Op\Expr\Array_)) {
+            $trailing[] = $producers[$i];
+            --$i;
+        }
+        if ([] === $trailing) {
+            return null;
+        }
+        $trailing = array_reverse($trailing);
+        $arrayChain = array_slice($producers, 0, $i + 1);
+        if ([] === $arrayChain || !$this->producersAreNestedArrayLiteralChain($arrayChain)) {
+            return null;
+        }
+
+        return [$arrayChain, $trailing];
     }
 
     /**

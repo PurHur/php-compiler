@@ -1208,4 +1208,55 @@ PHP;
         self::assertSame($constSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
         self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #10566 — count([nested inline], COUNT_RECURSIVE) wires outer Array_ + mode const. */
+    public function testCountNestedInlineLiteralRecursiveUsesArrayAndModeSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$n = count([1, [2, 3]], COUNT_RECURSIVE);
+echo "count={$n}\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'count_recursive_inline_literal.php');
+
+        $arraySlots = [];
+        $modeSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $modeSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertNotNull($modeSlot);
+        self::assertSame($arraySlots[1], $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($modeSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #10566 — count([nested inline], COUNT_RECURSIVE) runtime parity with Zend. */
+    public function testCountNestedInlineLiteralRecursiveRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$n = count([1, [2, 3]], COUNT_RECURSIVE);
+echo "count={$n}\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'count_recursive_inline_literal_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("count=4\n", ob_get_clean());
+    }
 }
