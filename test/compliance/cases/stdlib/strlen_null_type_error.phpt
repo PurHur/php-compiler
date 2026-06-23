@@ -2,8 +2,12 @@
 stdlib strlen() — null deprecated, returns 0 (PHP 8.2+, #5000, ext/standard/string.c)
 --FILE--
 <?php
-echo strlen(null), "\n";
+try {
+    echo strlen(null), "\n";
+} catch (TypeError $e) {
+    echo $e->getMessage(), "\n";
+}
 echo strlen(''), "\n";
 --EXPECT--
-0
+strlen(): Argument #1 ($string) must be of type string, null given
 0
