@@ -992,6 +992,13 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $priv = CfgFunc::FLAG_PRIVATE;
+        $isErrorFamily = ThrowableManifest::LC_ERROR === $lcKey
+            || ThrowableManifest::isDescendantOf($lcKey, ThrowableManifest::LC_ERROR);
+        $privateDeclaringLc = $isErrorFamily
+            ? ThrowableManifest::LC_ERROR
+            : ThrowableManifest::LC_EXCEPTION;
 
         $entry = new ClassEntry($name);
         if (null !== $parentLc) {
@@ -1003,12 +1010,39 @@ final class BuiltinClasses
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $emptyTrace = new Variable();
         $emptyTrace->newArray();
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto);
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto);
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto);
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto);
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_PREVIOUS, null, $nullProto);
-        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_TRACE, $emptyTrace, $arrayProto);
+        // php-src zend_exceptions.stub.php — protected message/code/file/line; private trace/previous (+ string on Exception).
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_MESSAGE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_CODE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_FILE, null, $strProto, false, $prot);
+        $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_LINE, null, $intProto, false, $prot);
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_PREVIOUS,
+            null,
+            $nullProto,
+            false,
+            $priv,
+            $privateDeclaringLc
+        );
+        $entry->properties[] = new ClassProperty(
+            ExceptionSupport::PROP_TRACE,
+            $emptyTrace,
+            $arrayProto,
+            false,
+            $priv,
+            $privateDeclaringLc
+        );
+        if (!$isErrorFamily) {
+            $emptyString = new Variable(Variable::TYPE_STRING);
+            $emptyString->string('');
+            $entry->properties[] = new ClassProperty(
+                ExceptionSupport::PROP_STRING,
+                $emptyString,
+                $strProto,
+                false,
+                $priv,
+                ThrowableManifest::LC_EXCEPTION
+            );
+        }
         if (ThrowableManifest::LC_ERROR_EXCEPTION === $lcKey) {
             $entry->properties[] = new ClassProperty(ExceptionSupport::PROP_SEVERITY, null, $intProto);
             $entry->constructor = new ErrorExceptionConstruct();

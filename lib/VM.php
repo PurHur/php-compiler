@@ -1494,7 +1494,7 @@ class VM {
                         continue;
                     }
                     $value = $hookValue->resolveIndirect();
-                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    if (VM\TypedPropertyCheck::isUninitialized($value)) {
                         continue;
                     }
                     $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
@@ -1508,7 +1508,7 @@ class VM {
                     continue;
                 }
                 $value = $object->getProperty($meta->name)->resolveIndirect();
-                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                if (VM\TypedPropertyCheck::isUninitialized($value)) {
                     continue;
                 }
                 $key = \PHPCompiler\ext\standard\VmReflection::manglePropertyKey($meta, $ctx);
@@ -1523,7 +1523,7 @@ class VM {
                 continue;
             }
             $value = $prop->resolveIndirect();
-            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+            if (VM\TypedPropertyCheck::isUninitialized($value)) {
                 continue;
             }
             $copy = new Variable();
