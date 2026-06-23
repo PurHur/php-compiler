@@ -1065,6 +1065,7 @@ require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilterChain.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilters.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamMeta.php';
+require_once __DIR__.'/../../../ext/standard/StreamNotificationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamNotification.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamOpenFailure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketNative.php';
