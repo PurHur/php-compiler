@@ -121,9 +121,13 @@ final class BuiltinExceptionSupport
         Context $ctx,
         string $message,
         string $file = '',
-        int $line = 0
+        int $line = 0,
+        int $code = 0
     ): Variable {
-        return self::materializeThrowable($ctx, self::CLASS_JSON_EXCEPTION, $message, $file, $line);
+        $var = self::materializeThrowable($ctx, self::CLASS_JSON_EXCEPTION, $message, $file, $line);
+        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
     }
 
     public static function materializeDateInvalidTimeZoneException(
