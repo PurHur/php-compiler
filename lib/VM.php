@@ -4725,11 +4725,11 @@ restart:
                     }
                     $argSlot = (int) $op->arg1;
                     $argIndex = \count($frame->callArgEntries);
-                    $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex);
+                    $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
+                    $needsRef = $this->outgoingCallArgNeedsReference($frame, $argIndex, $value);
                     if (!$needsRef) {
                         $this->warnUndefinedVariableForScopeRead($frame, $argSlot);
                     }
-                    $value = $this->resolveOutgoingCallArgValue($frame, $argSlot);
                     if (
                         !$needsRef
                         && $this->isUnboundLocalScopeRead($frame, $argSlot)
@@ -10948,7 +10948,10 @@ restart:
         }
         $n = \count($calledArgs);
         for ($i = $variadicFrom; $i < $n; ++$i) {
-            if (isset($calledArgs[$i])) {
+            if (
+                isset($calledArgs[$i])
+                && BuiltinByRefParams::isByRefArg($name, $i, $calledArgs[$i])
+            ) {
                 $calledArgs[$i]->separateArrayForWrite();
             }
         }
@@ -11011,19 +11014,15 @@ restart:
     /**
      * Whether an outgoing call argument binds by reference (Zend ZEND_SEND_REF).
      */
-    private function outgoingCallArgNeedsReference(Frame $frame, int $argIndex): bool
+    private function outgoingCallArgNeedsReference(Frame $frame, int $argIndex, ?Variable $value = null): bool
     {
         if (null === $frame->call) {
             return false;
         }
         if ($frame->call instanceof Func\Internal) {
             $name = $frame->call->getName();
-            if (\in_array($argIndex, BuiltinByRefParams::forFunction($name), true)) {
-                return true;
-            }
-            $variadicFrom = BuiltinByRefParams::variadicByRefFromIndex($name);
 
-            return null !== $variadicFrom && $argIndex >= $variadicFrom;
+            return BuiltinByRefParams::isByRefArg($name, $argIndex, $value);
         }
         if ($frame->call instanceof Func\PHP) {
             $block = $frame->call->block;
