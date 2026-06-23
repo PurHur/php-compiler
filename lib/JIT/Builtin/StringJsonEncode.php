@@ -303,7 +303,7 @@ final class StringJsonEncode
         $context->builder->positionAtEnd($afterCommaBb);
         $context->builder->store($i8->constInt(0, false), $firstSlot);
 
-        $quotedKey = self::indexKeyString($context, $idx);
+        $quotedKey = self::indexKeyString($context, $fn, $idx, $flags);
         $acc = $context->builder->load($resultSlot);
         $acc = JitStringConcat::concat($context, $acc, $quotedKey);
         $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ':'));
@@ -443,7 +443,7 @@ final class StringJsonEncode
         $context->builder->store($i8->constInt(0, false), $firstSlot);
 
         $nodeKey = $context->builder->load($context->builder->structGep($nodePtr, $nodeMap['key']));
-        $quotedKey = self::quoteString($context, $nodeKey);
+        $quotedKey = self::quoteString($context, $fn, $nodeKey, $flags);
         $acc = $context->builder->load($resultSlot);
         $acc = JitStringConcat::concat($context, $acc, $quotedKey);
         $acc = JitStringConcat::concat($context, $acc, self::literalString($context, ':'));
@@ -580,8 +580,23 @@ final class StringJsonEncode
         );
         $nonFinite = $context->builder->or($isNan, $isInf);
         $bbDoubleFail = $fn->appendBasicBlock('je_scalar_double_fail');
+        $bbDoublePartial = $fn->appendBasicBlock('je_scalar_double_partial');
         $bbDoubleOk = $fn->appendBasicBlock('je_scalar_double_ok');
-        $context->builder->branchIf($nonFinite, $bbDoubleFail, $bbDoubleOk);
+        $partialOutput = self::flagIsSet($context, $flags, VmJsonFlags::PARTIAL_OUTPUT_ON_ERROR);
+        $bbDoubleCheckPartial = $fn->appendBasicBlock('je_scalar_double_check_partial');
+        $context->builder->branchIf($nonFinite, $bbDoubleCheckPartial, $bbDoubleOk);
+
+        $context->builder->positionAtEnd($bbDoubleCheckPartial);
+        $context->builder->branchIf($partialOutput, $bbDoublePartial, $bbDoubleFail);
+
+        $context->builder->positionAtEnd($bbDoublePartial);
+        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $context->builder->store(
+            $i32->constInt(StringJsonDecodeJit::errorInfOrNan(), false),
+            $lastErr
+        );
+        $context->builder->store(self::literalString($context, '0'), $resultSlot);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDoubleFail);
         $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
@@ -683,7 +698,7 @@ final class StringJsonEncode
         return $context->builder->icmp(Builder::INT_NE, $masked, $i64->constInt(0, false));
     }
 
-    private static function indexKeyString(Context $context, Value $idx): Value
+    private static function indexKeyString(Context $context, LlvmFunction $fn, Value $idx, Value $flags): Value
     {
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
@@ -697,7 +712,7 @@ final class StringJsonEncode
         $lenI64 = $len->typeOf() === $i64 ? $len : $context->builder->zExt($len, $i64);
         $keyStr = $context->builder->call($context->lookupFunction('__string__init'), $lenI64, $bufC);
 
-        return self::quoteString($context, $keyStr);
+        return self::quoteString($context, $fn, $keyStr, $flags);
     }
 
     private static function literalString(Context $context, string $text): Value
@@ -712,13 +727,176 @@ final class StringJsonEncode
         );
     }
 
-    private static function quoteString(Context $context, Value $str): Value
+    private static function quoteString(Context $context, LlvmFunction $fn, Value $str, ?Value $flags = null): Value
     {
+        if (null !== $flags) {
+            return self::quoteEscapedString($context, $fn, $str, $flags);
+        }
+
         $open = self::literalString($context, '"');
         $close = self::literalString($context, '"');
         $quoted = JitStringConcat::concat($context, $open, $str);
 
         return JitStringConcat::concat($context, $quoted, $close);
+    }
+
+    /**
+     * Quote a __string__* with JSON escapes (mirrors VmJsonFormat::escapeString + quotes).
+     */
+    private static function quoteEscapedString(Context $context, LlvmFunction $fn, Value $raw, Value $flags): Value
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $strPtr = $context->getTypeFromString('__string__*');
+        $len = $context->builder->load($context->builder->structGep($raw, $strMap['length']));
+        $chars = $context->builder->structGep($raw, $strMap['value']);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $idxSlot = $context->builder->alloca($i64, 1, 'je_esc_i');
+        $accSlot = $context->builder->alloca($strPtr, 1, 'je_esc_acc');
+        $resultSlot = $context->builder->alloca($strPtr, 1, 'je_esc_result');
+        $context->builder->store($zero, $idxSlot);
+        $context->builder->store(self::literalString($context, '"'), $accSlot);
+
+        $headBb = $fn->appendBasicBlock('je_esc_head');
+        $bodyBb = $fn->appendBasicBlock('je_esc_body');
+        $doneBb = $fn->appendBasicBlock('je_esc_done');
+        $mergeBb = $fn->appendBasicBlock('je_esc_merge');
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($headBb);
+        $idx = $context->builder->load($idxSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $len);
+        $context->builder->branchIf($atEnd, $doneBb, $bodyBb);
+
+        $context->builder->positionAtEnd($bodyBb);
+        $ch = $context->builder->load($context->builder->gep($chars, $idx));
+        $escaped = self::jsonEscapeByte($context, $ch, $flags);
+        $acc = $context->builder->load($accSlot);
+        $context->builder->store(JitStringConcat::concat($context, $acc, $escaped), $accSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
+        $context->builder->branch($headBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $acc = $context->builder->load($accSlot);
+        $context->builder->store(
+            JitStringConcat::concat($context, $acc, self::literalString($context, '"')),
+            $resultSlot
+        );
+        $context->builder->branch($mergeBb);
+
+        $context->builder->positionAtEnd($mergeBb);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function jsonEscapeByte(Context $context, Value $ch, Value $flags): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $ord = $context->builder->zExt($ch, $i32);
+        $hexTag = self::flagIsSet($context, $flags, VmJsonFlags::HEX_TAG);
+        $hexAmp = self::flagIsSet($context, $flags, VmJsonFlags::HEX_AMP);
+        $hexApos = self::flagIsSet($context, $flags, VmJsonFlags::HEX_APOS);
+        $hexQuot = self::flagIsSet($context, $flags, VmJsonFlags::HEX_QUOT);
+        $unescapedSlashes = self::flagIsSet($context, $flags, VmJsonFlags::UNESCAPED_SLASHES);
+
+        $lt = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(60, false));
+        $gt = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(62, false));
+        $amp = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(38, false));
+        $apos = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(39, false));
+        $quot = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(34, false));
+        $bs = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(92, false));
+        $slash = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(47, false));
+        $nl = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(10, false));
+        $cr = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(13, false));
+        $tab = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(9, false));
+        $ff = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(12, false));
+        $bsChar = $context->builder->icmp(Builder::INT_EQ, $ord, $i32->constInt(8, false));
+        $ctrl = $context->builder->icmp(Builder::INT_ULT, $ord, $i32->constInt(32, false));
+
+        $useHexLt = $context->builder->and($lt, $hexTag);
+        $useHexGt = $context->builder->and($gt, $hexTag);
+        $useHexAmp = $context->builder->and($amp, $hexAmp);
+        $useHexApos = $context->builder->and($apos, $hexApos);
+        $useHexQuot = $context->builder->and($quot, $hexQuot);
+        $escapeSlash = $context->builder->and($slash, $context->builder->not($unescapedSlashes));
+
+        return $context->builder->select(
+            $useHexLt,
+            self::literalString($context, '\\u003C'),
+            $context->builder->select(
+                $useHexGt,
+                self::literalString($context, '\\u003E'),
+                $context->builder->select(
+                    $useHexAmp,
+                    self::literalString($context, '\\u0026'),
+                    $context->builder->select(
+                        $useHexApos,
+                        self::literalString($context, '\\u0027'),
+                        $context->builder->select(
+                            $useHexQuot,
+                            self::literalString($context, '\\u0022'),
+                            $context->builder->select(
+                                $quot,
+                                self::literalString($context, '\\"'),
+                                $context->builder->select(
+                                    $bs,
+                                    self::literalString($context, '\\\\'),
+                                    $context->builder->select(
+                                        $escapeSlash,
+                                        self::literalString($context, '\\/'),
+                                        $context->builder->select(
+                                            $nl,
+                                            self::literalString($context, '\\n'),
+                                            $context->builder->select(
+                                                $cr,
+                                                self::literalString($context, '\\r'),
+                                                $context->builder->select(
+                                                    $tab,
+                                                    self::literalString($context, '\\t'),
+                                                    $context->builder->select(
+                                                        $ff,
+                                                        self::literalString($context, '\\f'),
+                                                        $context->builder->select(
+                                                            $bsChar,
+                                                            self::literalString($context, '\\b'),
+                                                            $context->builder->select(
+                                                                $ctrl,
+                                                                self::literalString($context, '\\u0000'),
+                                                                self::singleByteString($context, $ch)
+                                                            )
+                                                        )
+                                                    )
+                                                )
+                                            )
+                                        )
+                                    )
+                                )
+                            )
+                        )
+                    )
+                )
+            )
+        );
+    }
+
+    private static function singleByteString(Context $context, Value $ch): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $buf = $context->builder->alloca($i8, $i64->constInt(2, false), 'je_one_byte');
+        $zero = $i64->constInt(0, false);
+        $one = $i64->constInt(1, false);
+        $context->builder->store($ch, $context->builder->gep($buf, $zero));
+        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $one));
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $one,
+            $context->builder->pointerCast($buf, $i8p)
+        );
     }
 
     /**
@@ -842,7 +1020,7 @@ final class StringJsonEncode
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbQuote);
-        $context->builder->store(self::quoteString($context, $raw), $outSlot);
+        $context->builder->store(self::quoteString($context, $fn, $raw, $flags), $outSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);

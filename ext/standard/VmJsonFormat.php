@@ -231,6 +231,11 @@ final class VmJsonFormat
     private static function encodeFloat(float $num, int $flags): string
     {
         if (is_nan($num) || is_infinite($num)) {
+            if (VmJsonFlags::partialOutputOnError($flags)) {
+                VmJson::setLastError(VmJson::ERROR_INF_OR_NAN);
+
+                return '0';
+            }
             throw new VmJsonExportException(VmJson::ERROR_INF_OR_NAN);
         }
         $preserveZero = 0 !== ($flags & VmJsonFlags::PRESERVE_ZERO_FRACTION);
@@ -270,8 +275,16 @@ final class VmJsonFormat
                     continue;
                 }
             }
+            $hexTag = 0 !== ($flags & VmJsonFlags::HEX_TAG);
+            $hexAmp = 0 !== ($flags & VmJsonFlags::HEX_AMP);
+            $hexApos = 0 !== ($flags & VmJsonFlags::HEX_APOS);
+            $hexQuot = 0 !== ($flags & VmJsonFlags::HEX_QUOT);
             $out .= match ($c) {
-                '"' => '\\"',
+                '<' => $hexTag ? '\\u003C' : '<',
+                '>' => $hexTag ? '\\u003E' : '>',
+                '&' => $hexAmp ? '\\u0026' : '&',
+                "'" => $hexApos ? '\\u0027' : "'",
+                '"' => $hexQuot ? '\\u0022' : '\\"',
                 '\\' => '\\\\',
                 '/' => $unescapedSlashes ? '/' : '\\/',
                 "\n" => '\\n',
