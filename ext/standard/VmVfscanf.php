@@ -34,19 +34,19 @@ final class VmVfscanf
     }
 
     /** Two-arg fscanf()/vfscanf(): return parsed values as a list array (php-src ext/standard/fscanf.c, #9284). */
-    public static function parseToArray(int $handle, string $format): HashTable
+    public static function parseToArray(int $handle, string $format): HashTable|false
     {
         $start = VmFs::ftell($handle);
         if (false === $start) {
-            return new HashTable();
+            return false;
         }
         $data = VmFs::streamGetContents($handle, -1, -1);
         if (false === $data) {
-            return new HashTable();
+            return false;
         }
         $slots = VmSscanf::countConversionSpecs($format);
         if (0 === $slots) {
-            return new HashTable();
+            return '' === $data ? false : new HashTable();
         }
         $temps = [];
         for ($i = 0; $i < $slots; ++$i) {
@@ -56,10 +56,17 @@ final class VmVfscanf
         if ($consumed > 0) {
             VmFs::fseek($handle, $start + $consumed, \SEEK_SET);
         }
+        if (0 === $assigned && '' === $data) {
+            return false;
+        }
         $ht = new HashTable();
-        for ($i = 0; $i < $assigned; ++$i) {
+        for ($i = 0; $i < $slots; ++$i) {
             $copy = new Variable();
-            $copy->copyFrom($temps[$i]);
+            if ($i < $assigned) {
+                $copy->copyFrom($temps[$i]);
+            } else {
+                $copy->null();
+            }
             $ht->append($copy);
         }
 

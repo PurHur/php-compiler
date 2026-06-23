@@ -44,7 +44,12 @@ final class fscanf extends Internal
             return;
         }
         if ([] === $outVars) {
-            $frame->returnVar->array(VmVfscanf::parseToArray($handle, $format));
+            $parsed = VmVfscanf::parseToArray($handle, $format);
+            if (false === $parsed) {
+                $frame->returnVar->bool(false);
+            } else {
+                $frame->returnVar->array($parsed);
+            }
 
             return;
         }
