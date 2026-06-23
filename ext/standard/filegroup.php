@@ -25,6 +25,7 @@ final class filegroup extends Internal
         }
         $gid = VmFs::fileGroup($path);
         if (false === $gid) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'filegroup', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($gid);

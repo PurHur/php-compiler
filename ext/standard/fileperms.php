@@ -25,6 +25,7 @@ final class fileperms extends Internal
         }
         $mode = VmFs::filePerms($path);
         if (false === $mode) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'fileperms', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($mode);

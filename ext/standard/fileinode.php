@@ -25,6 +25,7 @@ final class fileinode extends Internal
         }
         $inode = VmFs::fileInode($path);
         if (false === $inode) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'fileinode', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($inode);
