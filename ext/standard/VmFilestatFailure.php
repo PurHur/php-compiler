@@ -19,6 +19,40 @@ final class VmFilestatFailure
         }
         $op = $lstat ? 'Lstat' : 'stat';
         $message = \sprintf('%s(): %s failed for %s', $function, $op, $path);
+        self::triggerWarning($frame, $message);
+    }
+
+    public static function warnChmodFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarning($frame, \sprintf('chmod(): No such file or directory'));
+    }
+
+    public static function warnUnlinkFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarning($frame, \sprintf('unlink(%s): No such file or directory', $path));
+    }
+
+    public static function warnTouchCreateFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarning(
+            $frame,
+            \sprintf('touch(): Unable to create file %s because No such file or directory', $path)
+        );
+    }
+
+    public static function warnRenameFailed(Frame $frame, string $from, string $to): void
+    {
+        self::triggerWarning(
+            $frame,
+            \sprintf('rename(%s,%s): No such file or directory', $from, $to)
+        );
+    }
+
+    private static function triggerWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
         $frame->vmContext->errors->triggerError(
             $message,
             ErrorReporter::E_WARNING,

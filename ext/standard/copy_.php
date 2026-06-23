@@ -27,6 +27,9 @@ final class copy_ extends Internal
         $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'copy', 0, 'from');
         $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'copy', 1, 'to');
         $ok = VmFs::copy($from, $to);
+        if (!$ok) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'copy', $from);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

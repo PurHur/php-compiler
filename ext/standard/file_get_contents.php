@@ -100,6 +100,7 @@ final class file_get_contents extends Internal
             $frame->vmContext
         );
         if (false === $data) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'file_get_contents', $filename);
             $frame->returnVar->bool(false);
 
             return;

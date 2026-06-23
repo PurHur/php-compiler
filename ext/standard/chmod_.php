@@ -29,7 +29,11 @@ final class chmod_ extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmFs::chmod($path, $mode));
+        $ok = VmFs::chmod($path, $mode);
+        if (!$ok) {
+            VmFilestatFailure::warnChmodFailed($frame, $path);
+        }
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value

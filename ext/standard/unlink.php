@@ -22,6 +22,9 @@ final class unlink extends Internal
         }
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
         $ok = VmFs::unlink($path);
+        if (!$ok) {
+            VmFilestatFailure::warnUnlinkFailed($frame, $path);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

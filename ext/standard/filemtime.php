@@ -25,6 +25,7 @@ final class filemtime extends Internal
         }
         $mtime = VmFs::fileMtime($path);
         if (false === $mtime) {
+            VmFilestatFailure::warnPathStatFailed($frame, 'filemtime', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($mtime);
