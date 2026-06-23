@@ -165,27 +165,34 @@ final class VmPregNative
         string $pattern,
         string $replacement,
         string|array $subject,
-        int $limit = -1
+        int $limit = -1,
+        ?int &$count = null
     ): string|array|null|false {
         if (\is_array($subject)) {
             $out = [];
+            $totalCount = 0;
             foreach ($subject as $key => $item) {
                 if (!\is_string($item)) {
                     throw new \LogicException(
                         'preg_replace() array subject values must be strings in this compiler build'
                     );
                 }
-                $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit);
+                $elemCount = 0;
+                $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $elemCount);
                 if (false === $replaced) {
                     return false;
                 }
                 $out[$key] = $replaced;
+                $totalCount += $elemCount;
+            }
+            if (null !== $count) {
+                $count = $totalCount;
             }
 
             return $out;
         }
 
-        return self::pregReplaceString($pattern, $replacement, $subject, $limit);
+        return self::pregReplaceString($pattern, $replacement, $subject, $limit, $count);
     }
 
     /**
@@ -328,7 +335,8 @@ final class VmPregNative
         string $pattern,
         string $replacement,
         string $subject,
-        int $limit
+        int $limit,
+        ?int &$count = null
     ): string|false {
         $compiled = self::compile($pattern);
         if (null === $compiled) {
@@ -386,6 +394,9 @@ final class VmPregNative
             }
 
             self::$lastError = 0;
+            if (null !== $count) {
+                $count = $replacements;
+            }
 
             return $out;
         } finally {
