@@ -1572,6 +1572,14 @@ class VM {
             $scopeFrame = $frame;
         }
         $callerClassLc = $forVarExport ? null : $this->callerClassLc($scopeFrame);
+        if (
+            !$forVarExport
+            && null === $callerClassLc
+            && $object->class->isInternal
+            && !$object->class->allowsDynamicProperties
+        ) {
+            return [];
+        }
         $hookBackingLc = $forVarExport ? $this->separatePropertyHookBackingNameSet($object) : [];
         /** @var array<string, Variable> $result */
         $result = [];
