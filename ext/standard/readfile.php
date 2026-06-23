@@ -32,6 +32,7 @@ final class readfile extends Internal
         }
         $result = VmFs::readfile($path);
         if (false === $result) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'readfile', $path);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($result);
