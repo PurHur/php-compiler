@@ -145,8 +145,8 @@ final class JitInfo
         StringVersionCompare::ensureLinked($context);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
-            JitStringBuiltinArg::lower($context, $ver1, 'version_compare', 0, 'version1'),
-            JitStringBuiltinArg::lower($context, $ver2, 'version_compare', 1, 'version2')
+            JitStringBuiltinArg::lowerRequiredString($context, $ver1, 'version_compare', 0, 'version1'),
+            JitStringBuiltinArg::lowerRequiredString($context, $ver2, 'version_compare', 1, 'version2')
         );
         if (null === $operator) {
             $slot = JitValueBox::alloc($context);
