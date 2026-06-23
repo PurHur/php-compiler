@@ -7737,7 +7737,13 @@ restart:
      */
     private function dispatchVmValueError(\ValueError $error, Frame $frame): ?Frame
     {
-        $thrown = VM\BuiltinExceptionSupport::materializeValueError($this->context, $error->getMessage());
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeValueError(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
