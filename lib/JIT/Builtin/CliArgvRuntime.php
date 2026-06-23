@@ -297,7 +297,11 @@ final class CliArgvRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $ht = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
+        $htObj = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $ht = $htObj->typeOf() === $htPtrTy
+            ? $htObj
+            : $context->builder->pointerCast($htObj, $htPtrTy);
 
         $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
         $iSlot = $context->builder->alloca($i32, 1, 'cli_argv_i');

@@ -7,16 +7,15 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\DateIntervalFormatJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** DateIntervalFormatRuntime must route through DateIntervalFormatJitHelper PHP, not LLVM format walk (#9499). */
+/** DateIntervalFormatRuntime: standalone LLVM walk + embed DateIntervalFormatJitHelper PHP (#9499). */
 final class DateIntervalFormatRuntimeShrinkTest extends TestCase
 {
-    public function testDateIntervalFormatRuntimeUsesJitHelperNotLlvmFormatWalk(): void
+    public function testDateIntervalFormatRuntimeUsesDualPath(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatRuntime.php');
         $this->assertStringContainsString('formatFromScalars', $source);
-        $this->assertStringNotContainsString('emitFormatCode', $source);
-        $this->assertStringNotContainsString('__phpc_fmt_append_char', $source);
-        $this->assertStringNotContainsString('appendPadded2', $source);
+        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('implementStandaloneLlvm', $source);
     }
 
     public function testDateIntervalFormatJitHelperDelegatesToVmDateInterval(): void

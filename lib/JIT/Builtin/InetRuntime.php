@@ -463,7 +463,7 @@ final class InetRuntime
         $context->builder->clearInsertionPosition();
 
         $context->builder->positionAtEnd($v4Bb);
-        $src4 = $context->builder->pointerCast($context->builder->structGep($inArg, $map['value']), $i8p);
+        $src4 = $context->bytePtr($context->builder->structGep($inArg, $map['value']));
         $outbuf4 = $context->builder->alloca($i8, self::INET_ADDRSTRLEN, 'ntop_buf4');
         $ntop4 = $context->builder->call(
             $context->lookupFunction('inet_ntop'),
@@ -492,7 +492,7 @@ final class InetRuntime
         $context->builder->clearInsertionPosition();
 
         $context->builder->positionAtEnd($v6Bb);
-        $src6 = $context->builder->pointerCast($context->builder->structGep($inArg, $map['value']), $i8p);
+        $src6 = $context->bytePtr($context->builder->structGep($inArg, $map['value']));
         $outbuf6 = $context->builder->alloca($i8, self::INET6_ADDRSTRLEN, 'ntop_buf6');
         $ntop6 = $context->builder->call(
             $context->lookupFunction('inet_ntop'),
@@ -541,12 +541,12 @@ final class InetRuntime
         self::ensureExternal(
             $context,
             'inet_pton',
-            $context->context->functionType($i32, false, $i32, $i8p, $voidPtr)
+            $context->context->functionType($i32, false, $i32, $i8p, $i8p)
         );
         self::ensureExternal(
             $context,
             'inet_ntop',
-            $context->context->functionType($i8p, false, $i32, $voidPtr, $i8p, $sizeT)
+            $context->context->functionType($i8p, false, $i32, $i8p, $i8p, $sizeT)
         );
         self::ensureExternal(
             $context,
