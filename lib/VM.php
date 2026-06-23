@@ -11419,11 +11419,10 @@ restart:
 
     protected function lateStaticClassLc(Frame $frame): string
     {
-        if (null !== $frame->calledClass && '' !== $frame->calledClass) {
-            return strtolower($frame->calledClass);
-        }
-
-        return $this->declaringClassLc($frame, 'static');
+        return VM\LateStaticBinding::resolveLateStaticClassLc(
+            $frame->calledClass,
+            $this->declaringClassLc($frame, 'static')
+        );
     }
 
     protected function inferCalledClass(Frame $frame): ?string

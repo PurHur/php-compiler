@@ -3,63 +3,36 @@
 declare(strict_types=1);
 
 /**
- * Runtime late-static class id for AOT / standalone JIT (issue #4792, Zend get_called_scope).
+ * Runtime late-static class id for AOT / standalone JIT (issue #4792, #10247).
  *
  * php-src: {@see https://github.com/php/php-src/blob/master/Zend/zend_execute.c}
+ * SSOT: {@see \PHPCompiler\VM\LateStaticBinding}
  */
 
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block;
+use PHPCompiler\JIT\Builtin\LateStaticBindingRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCfg\Operand;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 final class LateStaticBindingHelper
 {
-    private static ?Value $classIdGlobal = null;
-
-    /** @var object|null LLVM module identity — static Value must not leak across Context instances */
-    private static $classIdModule = null;
-
     public static function useRuntimeLateStatic(Context $context): bool
     {
         return Builtin::LOAD_TYPE_STANDALONE === $context->loadType;
     }
 
-    public static function ensureClassIdGlobal(Context $context): Value
-    {
-        $module = $context->module;
-        if (null !== self::$classIdGlobal && self::$classIdModule === $module) {
-            return self::$classIdGlobal;
-        }
-
-        $existing = $module->getNamedGlobal('phpc_late_static_class_id');
-        if (null !== $existing) {
-            self::$classIdGlobal = $existing;
-            self::$classIdModule = $module;
-
-            return self::$classIdGlobal;
-        }
-
-        $i64 = $context->getTypeFromString('int64');
-        self::$classIdGlobal = $module->addGlobal($i64, 'phpc_late_static_class_id');
-        self::$classIdGlobal->setInitializer($i64->constInt(0, false));
-        self::$classIdModule = $module;
-
-        return self::$classIdGlobal;
-    }
-
     public static function emitStoreClassId(Context $context, Value $classId): void
     {
-        $context->builder->store($classId, self::ensureClassIdGlobal($context));
+        LateStaticBindingRuntime::emitStoreClassId($context, $classId);
     }
 
     public static function emitLoadClassId(Context $context): Value
     {
-        return $context->builder->load(self::ensureClassIdGlobal($context));
+        return LateStaticBindingRuntime::emitLoadClassId($context);
     }
 
     /**
@@ -69,22 +42,7 @@ final class LateStaticBindingHelper
         Object_ $objectType,
         Block $block
     ): Value {
-        $context = $objectType->jitContext();
-        $runtimeId = self::emitLoadClassId($context);
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
-        $scopeClass = ClassConstFetchHelper::resolveJitScopeClassNameForBlock($objectType, $block);
-        if (null === $scopeClass) {
-            return $runtimeId;
-        }
-        $fallbackId = $objectType->lookup($scopeClass);
-        $hasRuntime = $context->builder->icmp(Builder::INT_NE, $runtimeId, $zero);
-
-        return $context->builder->select(
-            $hasRuntime,
-            $runtimeId,
-            $context->constantFromInteger($fallbackId, 'int64')
-        );
+        return LateStaticBindingRuntime::emitEffectiveLateStaticClassId($objectType, $block);
     }
 
     /**
@@ -97,7 +55,7 @@ final class LateStaticBindingHelper
     ): Value {
         $context = $objectType->jitContext();
         if (!self::useRuntimeLateStatic($context)) {
-            $fallback = self::jitLateStaticClassName($objectType, $block) ?? $scopeClass;
+            $fallback = ClassConstFetchHelper::jitLateStaticClassNameForBlock($objectType, $block) ?? $scopeClass;
 
             return $context->builder->load($context->constantStringFromString($fallback));
         }
