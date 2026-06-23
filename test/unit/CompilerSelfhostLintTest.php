@@ -103,6 +103,7 @@ final class CompilerSelfhostLintTest extends TestCase
             'lib/JIT/Helper.php',
             'lib/JIT/IncludeHelper.php',
             'lib/JIT/IssetHelper.php',
+            'lib/JIT/IssetHelperLlvm.php',
             'lib/JIT/IteratorHelper.php',
             'lib/JIT/JitBoolArg.php',
             'lib/JIT/JitLongArg.php',

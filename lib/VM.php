@@ -43,6 +43,7 @@ use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\TypedPropertyReadSignal;
 use PHPCompiler\VM\VmVarFetch;
+use PHPCompiler\VM\VmIsset;
 use PHPCompiler\VM\WeakRefRegistry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -642,12 +643,7 @@ class VM {
         }
         $props = $object->getRawProperties();
         if (isset($props[$propName])) {
-            $value = $props[$propName]->resolveIndirect();
-            if (!$value->isUndefined() && Variable::TYPE_NULL !== $value->type) {
-                return true;
-            }
-
-            return false;
+            return VmIsset::storedPropertyIsSet($props[$propName]);
         }
         if ($this->hasInstanceMethod($object->class, '__isset')) {
             $key = new Variable();
