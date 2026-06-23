@@ -13,7 +13,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -67,8 +66,6 @@ final class JitStrIncdec
 
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        ErrorRaise::registerDeclarations($context);
-        ErrorRaise::ensureLinked($context);
 
         return self::emitDecrement($context, $input);
     }
@@ -429,7 +426,7 @@ final class JitStrIncdec
         );
         $msgLen = $context->builder->call($context->lookupFunction('strlen'), $bufPtr);
         $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_error'),
+            $context->lookupFunction('__compiler_jit_raise_value_error'),
             $bufPtr,
             $msgLen
         );

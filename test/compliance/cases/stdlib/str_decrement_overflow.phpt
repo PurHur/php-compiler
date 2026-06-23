@@ -1,5 +1,5 @@
 --TEST--
-str_decrement(): single-char underflow throws Error (#4847, ext/standard/string.c)
+str_decrement(): single-char underflow throws ValueError (#4847, ext/standard/string.c)
 --FILE--
 <?php
 try {
@@ -9,5 +9,5 @@ try {
     echo $e->getMessage(), "\n";
 }
 --EXPECT--
-Error
+ValueError
 str_decrement(): Argument #1 ($string) "a" is out of decrement range
