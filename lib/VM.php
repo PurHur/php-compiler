@@ -3661,6 +3661,7 @@ restart:
                         $frame->suppressNextEcho = true;
                         break;
                     }
+                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_ECHO:
                     if ($frame->suppressNextEcho) {

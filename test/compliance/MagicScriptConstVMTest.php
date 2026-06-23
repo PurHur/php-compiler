@@ -76,6 +76,39 @@ final class MagicScriptConstVMTest extends TestCase
         $this->assertGreaterThanOrEqual(1, (int) ($lines[4] ?? 0));
     }
 
+    public function test_magic_script_const_dir_concat_assign_no_undefined_warning(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $script = __DIR__.'/cases/language/magic_script_const/dir_concat_assign.php';
+        if (!is_file($script)) {
+            $this->markTestSkipped('fixture missing');
+        }
+
+        $cmd = [
+            PHP_BINARY,
+            '-d', 'display_errors=0',
+            '-d', 'error_reporting=E_ALL',
+            $root.'/bin/vm.php',
+            $script,
+        ];
+        $proc = proc_open(
+            $cmd,
+            [1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            dirname($script)
+        );
+        $this->assertIsResource($proc);
+        $stdout = stream_get_contents($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+
+        $this->assertSame(0, $exit, trim((string) $stderr));
+        $this->assertStringNotContainsString('Undefined variable', (string) $stderr);
+        $this->assertStringStartsWith('string', trim((string) $stdout));
+    }
+
     public function test_magic_script_const_jit(): void
     {
         $root = dirname(__DIR__, 2);

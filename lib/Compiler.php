@@ -7133,6 +7133,12 @@ class Compiler {
             return [];
         }
         if ($expr instanceof Op\Expr\BinaryOp) {
+            if (null !== $expr->left) {
+                $this->compileEmbeddedExprForOperand($expr->left, $block);
+            }
+            if (null !== $expr->right) {
+                $this->compileEmbeddedExprForOperand($expr->right, $block);
+            }
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
                 $this->compileOperand($expr->result, $block, false),
@@ -15599,6 +15605,8 @@ class Compiler {
 
         $sends = [];
         foreach ($args as $argIndex => $arg) {
+            $nameSlot = null;
+            $unpackFlag = null;
             $callOrdinal = 0;
             foreach ($block->opCodes as $op) {
                 if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
@@ -15849,7 +15857,6 @@ class Compiler {
                     );
                 }
             }
-            $nameSlot = null;
             $argName = $this->callArgName($arg);
             if (null !== $argName) {
                 $nameOp = new Operand\Literal($argName);
@@ -15935,6 +15942,15 @@ class Compiler {
                     }
                 }
             }
+            foreach ($this->tryEmitAdjacentAssignForInlineCallArg(
+                $arg,
+                null !== $valueSlot ? (string) $valueSlot : null,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            ) as $assignOp) {
+                $sends[] = $assignOp;
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -15984,8 +16000,88 @@ class Compiler {
         if ((int) $namedSlot === (int) $valueSlot) {
             return $valueSlot;
         }
+        // Inline producer temp must not replace an unbound named local (#9973, #9924).
+        if (!$this->blockHasAssignToSlot($block, (int) $namedSlot)) {
+            return $valueSlot;
+        }
 
         return $namedSlot;
+    }
+
+    /**
+     * `$path = __DIR__ . '/x'; f($path)` — bind the named local when Concat is inlined (#9973).
+     *
+     * @return list<OpCode>
+     */
+    private function tryEmitAdjacentAssignForInlineCallArg(
+        Operand $arg,
+        ?string $valueSlot,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): array {
+        if (null === $valueSlot || null === $cfgCallOp || null === $block->orig) {
+            return [];
+        }
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return [];
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (null === $callArg || !$this->operandsReferToSameVariable($arg, $callArg)) {
+            return [];
+        }
+        $children = $block->orig->children;
+        $prev = null;
+        foreach ($children as $i => $child) {
+            if (
+                !($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                || !property_exists($child, 'args')
+                || !is_array($child->args)
+            ) {
+                continue;
+            }
+            if ($child !== $cfgCallOp) {
+                $sameCall = false;
+                if (
+                    property_exists($cfgCallOp, 'name')
+                    && property_exists($child, 'name')
+                    && $this->operandsReferToSameVariable($child->name, $cfgCallOp->name)
+                ) {
+                    $sameCall = true;
+                }
+                if (!$sameCall) {
+                    continue;
+                }
+            }
+            $siteArg = $child->args[$argIndex] ?? null;
+            if (null === $siteArg || !$this->operandsReferToSameVariable($siteArg, $callArg)) {
+                continue;
+            }
+            $prev = $children[$i - 1] ?? null;
+            break;
+        }
+        if (!$prev instanceof Op\Expr\Assign || !$this->operandsReferToSameVariable($prev->var, $callArg)) {
+            return [];
+        }
+        $destSlot = $block->getVarSlot($prev->var, false);
+
+        return [new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $this->compileOperand($prev->result, $block, false),
+            $destSlot,
+            $valueSlot
+        )];
+    }
+
+    private function blockHasAssignToSlot(Block $block, int $destSlot): bool
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg2 === $destSlot) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function callArgRequiresByRef(string $calleeName, int $argIndex, ?Operand $arg = null, ?Block $block = null): bool
@@ -16569,9 +16665,18 @@ class Compiler {
 
         $this->lowerEmbeddedCoalesceCallArgs($args, $block);
 
-        $return = [new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName)];
-        foreach ($this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp) as $send) {
-            $return[] = $send;
+        $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
+        $return = [];
+        foreach ($argSends as $send) {
+            if (OpCode::TYPE_ASSIGN === $send->type) {
+                $return[] = $send;
+            }
+        }
+        $return[] = new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName);
+        foreach ($argSends as $send) {
+            if (OpCode::TYPE_ASSIGN !== $send->type) {
+                $return[] = $send;
+            }
         }
         $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
         return $return;
