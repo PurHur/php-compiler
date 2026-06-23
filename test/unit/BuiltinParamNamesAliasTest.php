@@ -95,4 +95,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['as_float'], $names);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'as_float', 'microtime'));
     }
+
+    /** @covers issue #10027 */
+    public function testTrimCharactersNamedParamResolves(): void
+    {
+        foreach (['trim', 'ltrim', 'rtrim'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['string', 'characters'], $names);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'characters', $fn));
+        }
+    }
 }

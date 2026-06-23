@@ -140,6 +140,10 @@ final class BuiltinParamNames
                 return ['as_number'];
             case 'microtime':
                 return ['as_float'];
+            case 'trim':
+            case 'ltrim':
+            case 'rtrim':
+                return ['string', 'characters'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':
