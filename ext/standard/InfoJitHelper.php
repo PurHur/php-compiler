@@ -30,7 +30,7 @@ final class InfoJitHelper
             return '';
         }
 
-        return self::VERSION_STRING;
+        return ModuleRegistry::getExtensionVersion($extension) ?? self::VERSION_STRING;
     }
 
     public static function php_sapi_name(): string

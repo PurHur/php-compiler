@@ -70,7 +70,7 @@ final class VmInfo
             return false;
         }
 
-        return CompilerVersion::VERSION;
+        return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
     }
 
     public static function php_sapi_name(): string
