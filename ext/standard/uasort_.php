@@ -37,6 +37,7 @@ final class uasort_ extends Internal
             throw new \LogicException('uasort() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, 'uasort');
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {

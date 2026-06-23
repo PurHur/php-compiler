@@ -37,6 +37,7 @@ final class uksort_ extends Internal
             throw new \LogicException('uksort() first argument must be an array in this compiler build');
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, 'uksort');
         $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {

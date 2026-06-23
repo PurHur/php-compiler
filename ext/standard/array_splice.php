@@ -57,13 +57,15 @@ final class array_splice extends Internal
         $replacement = null;
         if (4 === $argc) {
             $replacementArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_ARRAY === $replacementArg->type) {
-                $replacement = $replacementArg->toArray();
-            } else {
-                $replacement = new \PHPCompiler\VM\HashTable();
-                $copy = new Variable();
-                $copy->copyFrom($replacementArg);
-                $replacement->append($copy);
+            if (Variable::TYPE_NULL !== $replacementArg->type) {
+                if (Variable::TYPE_ARRAY === $replacementArg->type) {
+                    $replacement = $replacementArg->toArray();
+                } else {
+                    $replacement = new \PHPCompiler\VM\HashTable();
+                    $copy = new Variable();
+                    $copy->copyFrom($replacementArg);
+                    $replacement->append($copy);
+                }
             }
         }
 
