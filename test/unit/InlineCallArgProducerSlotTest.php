@@ -1001,6 +1001,64 @@ PHP;
         self::assertSame("2\n1\n2\n", ob_get_clean());
     }
 
+    /** Issue #10899 — inline new ArrayIterator to intersection-typed param must wire New_ slot. */
+    public function testIntersectionTypedParamInlineNewUsesNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+function ic(Countable&Traversable $x): int
+{
+    return count($x);
+}
+
+echo ic(new ArrayIterator([1, 2, 3])), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'intersection_inline_new.php');
+
+        $newSlots = [];
+        $icSendSlot = null;
+        $inIcCall = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inIcCall = true;
+            }
+            if ($inIcCall && OpCode::TYPE_ARG_SEND === $op->type) {
+                $icSendSlot = $op->arg1;
+                $inIcCall = false;
+            }
+        }
+
+        self::assertNotNull($icSendSlot, 'ic() call must emit ARG_SEND');
+        self::assertContains($icSendSlot, $newSlots, 'ic() must send New_ producer slot, not unbound temp');
+    }
+
+    /** Issue #10899 — Countable&Traversable call with inline new ArrayIterator. */
+    public function testIntersectionTypedParamInlineNewRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+function ic(Countable&Traversable $x): int
+{
+    return count($x);
+}
+
+echo ic(new ArrayIterator([1, 2, 3])), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'intersection_inline_new_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("3\n", ob_get_clean());
+    }
+
     /** Issue #9904 — invokeArgs(new C(), [...]) must send New_ object slot, not sibling Array_ producer. */
     public function testInvokeArgsNewObjectThenArrayUsesDistinctProducerSlots(): void
     {
