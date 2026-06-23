@@ -39,12 +39,7 @@ final class str_pad extends Internal
             0,
             'string'
         );
-        $padLength = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
-            'str_pad',
-            2,
-            'length'
-        );
+        $padLength = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_pad', 2, 'length');
         $padString = ' ';
         if ($argc >= 3) {
             $padString = VmString::coerceStringBuiltinArg(

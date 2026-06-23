@@ -39,12 +39,12 @@ final class array_slice extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_slice() first argument must be an array in this compiler build');
         }
-        $offsetInt = VmMath::parseIntBuiltinArg($offset, 'array_slice', 2, 'offset');
+        $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_slice', 2, 'offset');
         $length = null;
         if ($argc >= 3) {
             $lengthArg = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $lengthArg->type) {
-                $length = VmMath::parseIntBuiltinArg($lengthArg, 'array_slice', 3, 'length');
+                $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'array_slice', 3, 'length');
             }
         }
         $preserveKeys = false;

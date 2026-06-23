@@ -63,6 +63,11 @@ final class InternalStrictArg
 
     private static function callerStrict(Frame $frame): bool
     {
+        return self::isCallerStrict($frame);
+    }
+
+    public static function isCallerStrict(Frame $frame): bool
+    {
         return null !== $frame->parent && $frame->parent->block->strictTypes;
     }
 

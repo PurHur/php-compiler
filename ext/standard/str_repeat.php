@@ -35,16 +35,7 @@ final class str_repeat extends Internal
             0,
             'string'
         );
-        $timesArg = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_FLOAT === $timesArg->type && null !== $frame->vmContext) {
-            VmMath::warnFloatToIntPrecisionLoss($timesArg->toFloat(), $frame->vmContext, $frame);
-        }
-        $times = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
-            'str_repeat',
-            2,
-            'times'
-        );
+        $times = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'str_repeat', 2, 'times');
         $result = VmString::repeat($input, $times);
         if (null === $frame->returnVar) {
             return;
