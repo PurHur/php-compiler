@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2952 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7969 |
+| Source constructs flagged (warnings) | 7970 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2790,7 +2790,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/FiberTrace.php` | 0 | 4 |
 | `lib/VM/ForeachIterator.php` | 0 | 1 |
 | `lib/VM/GeneratorState.php` | 0 | 18 |
-| `lib/VM/HashTable.php` | 0 | 90 |
+| `lib/VM/HashTable.php` | 0 | 91 |
 | `lib/VM/HeaderCallbackQueue.php` | 0 | 1 |
 | `lib/VM/InOperator.php` | 0 | 1 |
 | `lib/VM/InOperatorJitHelper.php` | 0 | 1 |
@@ -9814,9 +9814,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 180)
 - new HashTable (line 183)
 - new Variable (line 185)
-- new Variable (line 615)
-- new Variable (line 622)
-- new Variable (line 629)
+- new Variable (line 619)
+- new Variable (line 626)
+- new Variable (line 633)
 - 23 class method(s)
 
 ### `ext/standard/VmStatCache.php`
@@ -14437,7 +14437,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/types/JitStrlen.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `ext/types/Module.php`
 
@@ -21616,39 +21616,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1251)
 - new Variable (line 1260)
 - new self (line 1264)
-- new self (line 1276)
-- new self (line 1292)
-- new Variable (line 1298)
-- new Variable (line 1306)
-- new self (line 1327)
-- new Variable (line 1333)
-- new self (line 1355)
-- new Variable (line 1363)
-- new self (line 1378)
-- new Variable (line 1475)
-- new Variable (line 1481)
-- new Variable (line 1487)
-- new self (line 1503)
-- new Variable (line 1541)
+- new Variable (line 1267)
+- new self (line 1278)
+- new self (line 1294)
+- new Variable (line 1300)
+- new Variable (line 1308)
+- new self (line 1329)
+- new Variable (line 1335)
+- new self (line 1357)
+- new Variable (line 1365)
+- new self (line 1380)
+- new Variable (line 1477)
+- new Variable (line 1483)
+- new Variable (line 1489)
+- new self (line 1505)
 - new Variable (line 1543)
-- new Variable (line 1558)
-- new Variable (line 1564)
-- new Variable (line 1572)
-- new self (line 1667)
-- new self (line 1672)
-- new Variable (line 1674)
-- new Variable (line 1679)
-- new Variable (line 1687)
-- new self (line 1697)
-- new self (line 1705)
-- new Variable (line 1707)
-- new Variable (line 1716)
-- new Variable (line 1724)
-- new Variable (line 1900)
-- new HashTableBucket (line 2104)
-- new Variable (line 2104)
-- new HashTableBucket (line 2115)
-- new Variable (line 2115)
+- new Variable (line 1545)
+- new Variable (line 1560)
+- new Variable (line 1566)
+- new Variable (line 1574)
+- new self (line 1669)
+- new self (line 1674)
+- new Variable (line 1676)
+- new Variable (line 1681)
+- new Variable (line 1689)
+- new self (line 1699)
+- new self (line 1707)
+- new Variable (line 1709)
+- new Variable (line 1718)
+- new Variable (line 1726)
+- new Variable (line 1902)
+- new HashTableBucket (line 2106)
+- new Variable (line 2106)
+- new HashTableBucket (line 2117)
+- new Variable (line 2117)
 - 106 class method(s)
 
 ### `lib/VM/HeaderCallbackQueue.php`
