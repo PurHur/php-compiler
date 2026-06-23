@@ -94,7 +94,7 @@ final class UnpackEngine
                 }
                 $repIdx = 0;
                 while ($pos + $unit <= $len) {
-                    if (!self::unpackOne($result, $spec, $repIdx, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $repIdx, $code, $data, $pos, $len)) {
                         return false;
                     }
                     ++$repIdx;
@@ -102,25 +102,35 @@ final class UnpackEngine
                 continue;
             }
 
-            $need = self::needBytes($code, $arg);
-            if (null === $need) {
-                self::fail('unpack(): Type '.$code.': unknown format code');
+            // php-src pack.c: repeat-count types check shortage per element in unpackOne().
+            if (!(self::argIsRepeatCount($code) && $arg > 1)) {
+                $need = self::needBytes($code, $arg);
+                if (null === $need) {
+                    self::fail('unpack(): Type '.$code.': unknown format code');
 
-                return false;
+                    return false;
+                }
+
+                if ($pos + $need > $len) {
+                    self::fail(\sprintf(
+                        'unpack(): Type %s: not enough input, need %d, have %d',
+                        $code,
+                        $need,
+                        $len - $pos
+                    ));
+
+                    return false;
+                }
+            } else {
+                $need = self::needBytes($code, $arg);
+                if (null === $need) {
+                    self::fail('unpack(): Type '.$code.': unknown format code');
+
+                    return false;
+                }
             }
 
-            if ($pos + $need > $len) {
-                self::fail(\sprintf(
-                    'unpack(): Type %s: not enough input, need %d, have %d',
-                    $code,
-                    $need,
-                    $len - $pos
-                ));
-
-                return false;
-            }
-
-            if (!self::unpackFixed($result, $spec, $code, $arg, $data, $pos, $need)) {
+            if (!self::unpackFixed($result, $spec, $code, $arg, $data, $pos, $need ?? 0)) {
                 return false;
             }
         }
@@ -319,11 +329,23 @@ final class UnpackEngine
         int $repIdx,
         string $code,
         string $data,
-        int &$pos
+        int &$pos,
+        int $dataLen
     ): bool {
         $unit = self::unitBytes($code);
         if (null === $unit) {
             self::fail('unpack(): format not supported in this compiler build');
+
+            return false;
+        }
+
+        if ($pos + $unit > $dataLen) {
+            self::fail(\sprintf(
+                'unpack(): Type %s: not enough input, need %d, have %d',
+                $code,
+                $unit,
+                $dataLen - $pos
+            ));
 
             return false;
         }
@@ -356,6 +378,7 @@ final class UnpackEngine
         int &$pos,
         int $need
     ): bool {
+        $dataLen = \strlen($data);
         switch ($code) {
             case 'a':
             case 'A':
@@ -387,7 +410,7 @@ final class UnpackEngine
             case 'c':
             case 'C':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos, $dataLen)) {
                         return false;
                     }
                 }
@@ -407,7 +430,7 @@ final class UnpackEngine
             case 'J':
             case 'P':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos, $dataLen)) {
                         return false;
                     }
                 }
@@ -419,7 +442,7 @@ final class UnpackEngine
             case 'e':
             case 'E':
                 for ($r = 0; $r < $arg; ++$r) {
-                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos)) {
+                    if (!self::unpackOne($result, $spec, $r, $code, $data, $pos, $dataLen)) {
                         return false;
                     }
                 }
