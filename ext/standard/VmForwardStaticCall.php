@@ -22,6 +22,7 @@ final class VmForwardStaticCall
                 "{$builtinName}() requires VM context in this compiler build"
             );
         }
+        self::validateCallbackAtGlobalScope($frame, $callable, $builtinName);
         $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
         $vm = $frame->vmContext->runtime->vm;
@@ -49,6 +50,75 @@ final class VmForwardStaticCall
         }
 
         return $args;
+    }
+
+    /**
+     * php-src ext/standard/basic_functions.c — zend_is_callable() rejects parent/self/static at global scope.
+     */
+    private static function validateCallbackAtGlobalScope(Frame $frame, Variable $callable, string $builtinName): void
+    {
+        if (self::hasActiveClassScope($frame)) {
+            return;
+        }
+        $magic = self::magicClassKeywordFromCallable($callable);
+        if (null === $magic) {
+            return;
+        }
+        throw new \TypeError(
+            \sprintf(
+                '%s(): Argument #1 ($callback) must be a valid callback, cannot access "%s" when no class scope is active',
+                $builtinName,
+                $magic
+            )
+        );
+    }
+
+    private static function hasActiveClassScope(Frame $frame): bool
+    {
+        try {
+            VmReflection::getCalledClass($frame);
+
+            return true;
+        } catch (\Error) {
+            return false;
+        }
+    }
+
+    private static function magicClassKeywordFromCallable(Variable $callable): ?string
+    {
+        $callable = $callable->resolveIndirect();
+        if (Variable::TYPE_STRING === $callable->type) {
+            $name = $callable->toString();
+            if (!str_contains($name, '::')) {
+                return null;
+            }
+            [$class] = explode('::', $name, 2);
+            $class = strtolower($class);
+            if (\in_array($class, ['parent', 'self', 'static'], true)) {
+                return $class;
+            }
+
+            return null;
+        }
+        if (Variable::TYPE_ARRAY !== $callable->type) {
+            return null;
+        }
+        $table = $callable->toArray();
+        $idx0 = new Variable(Variable::TYPE_INTEGER);
+        $idx0->int(0);
+        if (!$table->keyExists($idx0)) {
+            return null;
+        }
+        $target = $table->findVariable($idx0, false)->resolveIndirect();
+        if (Variable::TYPE_STRING !== $target->type) {
+            return null;
+        }
+        $class = strtolower($target->toString());
+        if (\in_array($class, ['parent', 'self', 'static'], true)) {
+            return $class;
+        }
+
+        return null;
     }
 
     public static function calledScopeClass(Frame $frame, string $builtinName, Variable $callable): string
