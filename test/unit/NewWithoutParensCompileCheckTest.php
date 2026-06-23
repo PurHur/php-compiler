@@ -8,7 +8,7 @@ use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** `new` in static/typed instance property initializers and class constants rejected (#10391, #10693, Zend/zend_compile.c). */
+/** `new` in property initializers and class constants rejected (#10391, #10693, Zend/zend_compile.c). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
@@ -51,27 +51,35 @@ class C {
 PHP);
     }
 
-    public function testInstancePropertyDefaultNewWithoutParensCompiles(): void
+    public function testInstancePropertyDefaultNewWithoutParensCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public $p = new stdClass;
 }
-PHP, 'new_without_parens_property.php');
-        $this->assertNotNull($block);
+PHP);
     }
 
-    public function testPropertyDefaultNewWithParensStillCompiles(): void
+    public function testInstancePropertyDefaultNewWithParensCompileErrors(): void
+    {
+        $this->expectCompileError(<<<'PHP'
+<?php
+class C {
+    public $p = new stdClass();
+}
+PHP);
+    }
+
+    public function testPromotedPropertyDefaultNewWithParensStillCompiles(): void
     {
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
-    public $p = new stdClass();
+    public function __construct(public stdClass $p = new stdClass()) {}
 }
-PHP, 'new_with_parens.php');
+PHP, 'promoted_new_with_parens.php');
         $this->assertNotNull($block);
     }
 
