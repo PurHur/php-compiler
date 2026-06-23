@@ -2,152 +2,103 @@
 
 declare(strict_types=1);
 
-/**
- * LLVM implementation of __compiler_readfile — stream a file to stdout via open/read/write.
- *
- * Returns total bytes written, or -1 when the path cannot be opened.
- */
-
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
+/**
+ * JIT/AOT link for __compiler_readfile via ReadfileJitHelper PHP (#9188).
+ *
+ * Replaces ~150-line libc open/read/write LLVM loop. SSOT: {@see \PHPCompiler\ext\standard\VmFs::readfile}.
+ * php-src: ext/standard/streamsfuncs.c — php_stream_passthru
+ */
 final class StringReadfile
 {
-    private const CHUNK = 8192;
+    private const HELPER_PATH = '/ext/standard/ReadfileJitHelper.php';
 
-    private const O_RDONLY = 0;
+    private const READFILE_HELPER = 'PHPCompiler\\ext\\standard\\ReadfileJitHelper::readfile';
 
-    private const STDOUT_FILENO = 1;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::READFILE_HELPER,
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
 
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__compiler_readfile');
-        $entry = $fn->appendBasicBlock('rf_entry');
+        $probe = $context->module->getNamedFunction('__compiler_readfile');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__compiler_readfile', $probe);
+
+            return;
+        }
+
+        $fn = null !== $probe
+            ? $probe
+            : $context->lookupFunction('__compiler_readfile');
+
+        self::ensureJitHelperCompiled($context);
+
+        $entry = $fn->appendBasicBlock('readfile_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $path = $fn->getParam(0);
-        $strMap = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $zeroI32 = $i32->constInt(0, false);
-        $oneI64 = $i64->constInt(1, false);
-        $minusOne = $i64->constInt(-1, false);
-        $chunkSize = $sizeT->constInt(self::CHUNK, false);
-        $stdoutFd = $i32->constInt(self::STDOUT_FILENO, false);
-        $oRdonly = $i32->constInt(self::O_RDONLY, false);
-
-        $pathLen = $context->builder->load(
-            $context->builder->structGep($path, $strMap['length'])
+        $result = $context->builder->call(
+            self::helperFunction($context),
+            $fn->getParam(0)
         );
-        $pathBytes = $context->builder->structGep($path, $strMap['value']);
-        $bufLen = $context->builder->add($pathLen, $oneI64);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $pathBuf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufLen);
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        } else {
-            $pathBuf = $context->builder->alloca($i8, $bufLen, 'readfile_path');
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        }
-        $context->intrinsic->memcpy($pathCStr, $pathBytes, $pathLen, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($pathCStr, $pathLen)
-        );
-
-        $fd = $context->builder->call(
-            $context->lookupFunction('open'),
-            $pathCStr,
-            $oRdonly,
-            $i32->constInt(0, false)
-        );
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
-        }
-
-        $openFail = $context->builder->icmp(Builder::INT_SLT, $fd, $zeroI32);
-        $failBlock = $fn->appendBasicBlock('rf_open_fail');
-        $okBlock = $fn->appendBasicBlock('rf_open_ok');
-        $context->builder->branchIf($openFail, $failBlock, $okBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        $context->builder->returnValue($minusOne);
-
-        $context->builder->positionAtEnd($okBlock);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $chunkBuf = $context->builder->call(
-                $context->lookupFunction('__mm__malloc'),
-                $chunkSize
-            );
-            $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
-        } else {
-            $chunkBuf = $context->builder->alloca($i8, self::CHUNK, 'readfile_chunk');
-            $chunkPtr = $context->builder->pointerCast($chunkBuf, $i8p);
-        }
-
-        $totalSlot = $context->builder->alloca($i64, 1, 'readfile_total');
-        $context->builder->store($i64->constInt(0, false), $totalSlot);
-
-        $loopHead = BasicBlockHelper::append($context, 'rf_loop_head');
-        $loopBody = BasicBlockHelper::append($context, 'rf_loop_body');
-        $loopDone = BasicBlockHelper::append($context, 'rf_loop_done');
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopHead);
-        $nRead = $context->builder->call(
-            $context->lookupFunction('read'),
-            $fd,
-            $chunkPtr,
-            $chunkSize
-        );
-        $noMore = $context->builder->icmp(Builder::INT_SLE, $nRead, $i64->constInt(0, false));
-        $context->builder->branchIf($noMore, $loopDone, $loopBody);
-
-        $context->builder->positionAtEnd($loopBody);
-        $nSizeT = $context->builder->truncOrBitCast($nRead, $sizeT);
-        $nWritten = $context->builder->call(
-            $context->lookupFunction('write'),
-            $stdoutFd,
-            $chunkPtr,
-            $nSizeT
-        );
-        $nWrittenAsRead = $context->builder->truncOrBitCast($nWritten, $i64);
-        $writeFail = $context->builder->or(
-            $context->builder->icmp(Builder::INT_SLT, $nWritten, $i64->constInt(0, false)),
-            $context->builder->icmp(Builder::INT_NE, $nWrittenAsRead, $nRead)
-        );
-        $writeFailBlock = BasicBlockHelper::append($context, 'rf_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'rf_write_ok');
-        $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
-
-        $context->builder->positionAtEnd($writeFailBlock);
-        $context->builder->call($context->lookupFunction('close'), $fd);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
-        }
-        $context->builder->returnValue($minusOne);
-
-        $context->builder->positionAtEnd($writeOkBlock);
-        $total = $context->builder->load($totalSlot);
-        $context->builder->store(
-            $context->builder->add($total, $nRead),
-            $totalSlot
-        );
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopDone);
-        $context->builder->call($context->lookupFunction('close'), $fd);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $chunkBuf);
-        }
-        $context->builder->returnValue($context->builder->load($totalSlot));
-
+        $context->builder->returnValue($result);
+        $context->registerFunction('__compiler_readfile', $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function helperFunction(Context $context): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower(self::READFILE_HELPER);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException(self::READFILE_HELPER.' missing after ReadfileJitHelper compile (#9188)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ReadfileJitHelper.php');
+        if (null === $block) {
+            throw new \LogicException('ReadfileJitHelper.php parseAndCompile failed (#9188)');
+        }
+        $jit = new JIT($context);
+        $jit->compile($block);
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9188)');
+            }
+        }
     }
 }
