@@ -82,7 +82,7 @@ final class json_encode extends Internal
 
             return $context->builder->load($context->constantStringFromString($encoded));
         }
-        if (null !== $knownFlags && 0 !== ($knownFlags & ~VmJsonFlags::FORCE_OBJECT)) {
+        if (null !== $knownFlags && 0 !== ($knownFlags & ~VmJsonFlags::ENCODE_SUPPORTED)) {
             throw new \LogicException('json_encode() flags not supported at runtime in this compiler build');
         }
 

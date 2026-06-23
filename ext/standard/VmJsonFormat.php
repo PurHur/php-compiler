@@ -81,7 +81,7 @@ final class VmJsonFormat
             return self::encodeFloat($value);
         }
         if (\is_string($value)) {
-            return '"'.self::escapeString($value, $flags).'"';
+            return self::encodeStringValue($value, $flags);
         }
         if ($value instanceof \stdClass) {
             $props = get_object_vars($value);
@@ -181,6 +181,40 @@ final class VmJsonFormat
     private static function forceObject(int $flags): bool
     {
         return 0 !== ($flags & VmJsonFlags::FORCE_OBJECT);
+    }
+
+    private static function encodeStringValue(string $value, int $flags): string
+    {
+        if (0 !== ($flags & VmJsonFlags::NUMERIC_CHECK)) {
+            $numeric = self::tryEncodeNumericStringValue($value);
+            if (null !== $numeric) {
+                return $numeric;
+            }
+        }
+
+        return '"'.self::escapeString($value, $flags).'"';
+    }
+
+    /**
+     * php-src: ext/json/php_json_encoder.c — php_json_is_numeric_string / is_numeric_string.
+     */
+    private static function tryEncodeNumericStringValue(string $value): ?string
+    {
+        if ('' === $value || !is_numeric($value)) {
+            return null;
+        }
+        if (!str_contains($value, '.') && !str_contains(strtolower($value), 'e')) {
+            return (string) (int) $value;
+        }
+        $num = (float) $value;
+        if (is_nan($num) || is_infinite($num)) {
+            return null;
+        }
+        if ((float) (int) $num === $num && abs($num) < 1.0e15) {
+            return (string) (int) $num;
+        }
+
+        return self::encodeFloat($num);
     }
 
     private static function encodeFloat(float $num): string
