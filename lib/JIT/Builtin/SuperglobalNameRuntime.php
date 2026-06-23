@@ -4,18 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\SuperglobalNames;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_is_superglobal_name (issue #5391, #1056).
+ * JIT/AOT link for __compiler_is_superglobal_name via SuperglobalNameJitHelper PHP (#9271).
  *
- * Mirrors ext/standard/SuperglobalNames and lib/Web/Superglobals::isSuperglobalName().
+ * Replaces memcmp LLVM loop; SSOT {@see \PHPCompiler\ext\standard\SuperglobalNames}.
+ * php-src: Zend/zend_compile.c — zend_is_auto_global_str
  */
 final class SuperglobalNameRuntime
 {
+    private const HELPER_PATH = '/ext/standard/SuperglobalNameJitHelper.php';
+
+    private const IS_SUPERGLOBAL_HELPER = 'PHPCompiler\\ext\\standard\\SuperglobalNameJitHelper::isSuperglobalName';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::IS_SUPERGLOBAL_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -30,120 +41,86 @@ final class SuperglobalNameRuntime
             return;
         }
 
+        self::ensureJitHelperCompiled($context);
+        self::implementBridge($context, $probe);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementBridge(Context $context, ?LlvmFunction $probe): void
+    {
+        $abiName = '__compiler_is_superglobal_name';
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($i64, false, $strPtr);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_is_superglobal_name', $ft);
-        self::implementIsSuperglobalName($context, $fn);
-        self::registerLinkedRuntime($context);
-    }
-
-    private static function implementIsSuperglobalName(Context $context, Value $fn): void
-    {
-        self::ensureMemcmp($context);
-
-        $saved = $context->builder;
-        $context->builder = $context->context->builderCreate();
-        try {
-            $entry = $fn->appendBasicBlock('sg_name_entry');
-            $context->builder->positionAtEnd($entry);
-
-            $name = $fn->getParam(0);
-            $i64 = $context->getTypeFromString('int64');
-            $i1 = $context->getTypeFromString('int1');
-            $zeroI64 = $i64->constInt(0, false);
-            $falseI1 = $i1->constInt(0, false);
-
-            $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $name->typeOf()->constNull());
-            $nullBb = $fn->appendBasicBlock('sg_name_null');
-            $checkBb = $fn->appendBasicBlock('sg_name_check');
-            $context->builder->branchIf($nullName, $nullBb, $checkBb);
-
-            $context->builder->positionAtEnd($nullBb);
-            $context->builder->returnValue($zeroI64);
-
-            $context->builder->positionAtEnd($checkBb);
-            $hit = $falseI1;
-            foreach (SuperglobalNames::ALL as $idx => $literal) {
-                $match = self::identicalToAsciiLiteral($context, $fn, $name, $literal, $idx);
-                $hit = $context->builder->or($hit, $match);
-            }
-            $context->builder->returnValue(
-                $context->builder->zExt($hit, $i64)
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, $strPtr)
             );
-        } finally {
-            $context->builder->clearInsertionPosition();
-            $context->builder = $saved;
-        }
+
+        $entry = $fn->appendBasicBlock('sg_name_bridge_entry');
+        $nullBb = $fn->appendBasicBlock('sg_name_bridge_null');
+        $workBb = $fn->appendBasicBlock('sg_name_bridge_work');
+        $context->builder->positionAtEnd($entry);
+
+        $name = $fn->getParam(0);
+        $zeroI64 = $i64->constInt(0, false);
+        $nullName = $context->builder->icmp(Builder::INT_EQ, $name, $strPtr->constNull());
+        $context->builder->branchIf($nullName, $nullBb, $workBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->returnValue($zeroI64);
+
+        $context->builder->positionAtEnd($workBb);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::IS_SUPERGLOBAL_HELPER),
+            $name
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function identicalToAsciiLiteral(
-        Context $context,
-        Value $fn,
-        Value $name,
-        string $literal,
-        int $idx
-    ): Value {
-        $map = $context->structFieldMap['__string__'];
-        $nameLen = $context->builder->load(
-            $context->builder->structGep($name, $map['length'])
-        );
-        $litLen = $context->getTypeFromString('int64')->constInt(\strlen($literal), false);
-        $lenEq = $context->builder->icmp(Builder::INT_EQ, $nameLen, $litLen);
-        $i1 = $context->getTypeFromString('int1');
-        $falseVal = $i1->constInt(0, false);
-
-        $suffix = 'i'.$idx;
-        $lenOk = $fn->appendBasicBlock('sg_lit_len_ok_'.$suffix);
-        $lenBad = $fn->appendBasicBlock('sg_lit_len_bad_'.$suffix);
-        $merge = $fn->appendBasicBlock('sg_lit_done_'.$suffix);
-        $context->builder->branchIf($lenEq, $lenOk, $lenBad);
-
-        $context->builder->positionAtEnd($lenBad);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($lenOk);
-        $sizeT = $context->getTypeFromString('size_t');
-        $len = $context->builder->zExt($nameLen, $sizeT);
-        $i8p = $context->getTypeFromString('int8*');
-        $litGlobal = $context->constantFromString($literal);
-        $litPtr = $context->builder->pointerCast($litGlobal, $i8p);
-        $nameValPtr = $context->builder->structGep($name, $map['value']);
-        $namePtr = $context->builder->pointerCast($nameValPtr, $i8p);
-        $cmp = $context->builder->call(
-            $context->lookupFunction('memcmp'),
-            $namePtr,
-            $litPtr,
-            $len
-        );
-        $strEq = $context->builder->icmp(
-            Builder::INT_EQ,
-            $cmp,
-            $cmp->typeOf()->constInt(0, false)
-        );
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($merge);
-        $phi = $context->builder->phi($i1);
-        $phi->addIncoming($falseVal, $lenBad);
-        $phi->addIncoming($strEq, $lenOk);
-
-        return $phi;
-    }
-
-    private static function ensureMemcmp(Context $context): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        try {
-            $context->lookupFunction('memcmp');
-        } catch (\Throwable $e) {
-            $sizeT = $context->getTypeFromString('size_t');
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('memcmp', $ft);
-            $context->registerFunction('memcmp', $fn);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after SuperglobalNameJitHelper compile (#9271)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'SuperglobalNameJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('SuperglobalNameJitHelper.php parseAndCompile failed (#9271)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9271)');
+            }
         }
     }
 
@@ -151,7 +128,7 @@ final class SuperglobalNameRuntime
     {
         $fn = $context->module->getNamedFunction('__compiler_is_superglobal_name');
         if (null === $fn) {
-            throw new \LogicException('__compiler_is_superglobal_name missing after SuperglobalNameRuntime LLVM implement');
+            throw new \LogicException('__compiler_is_superglobal_name missing after SuperglobalNameRuntime bridge (#9271)');
         }
         $context->registerFunction('__compiler_is_superglobal_name', $fn);
     }
