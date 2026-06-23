@@ -48,6 +48,8 @@ final class CharsetEngine
 
         return match ($normalized) {
             'UTF8' => 'UTF-8',
+            'UTF16LE' => 'UTF-16LE',
+            'UTF16BE' => 'UTF-16BE',
             'ISO88591', 'LATIN1' => 'ISO-8859-1',
             'ASCII', 'USASCII' => 'ASCII',
             default => null,
@@ -74,6 +76,8 @@ final class CharsetEngine
             'UTF-8' => $input,
             'ISO-8859-1' => self::latin1ToUtf8($input),
             'ASCII' => self::asciiToUtf8($input, $flags),
+            'UTF-16LE' => self::utf16leToUtf8($input, $flags),
+            'UTF-16BE' => self::utf16beToUtf8($input, $flags),
             default => false,
         };
         if (false === $utf8) {
@@ -84,6 +88,8 @@ final class CharsetEngine
             'UTF-8' => $utf8,
             'ISO-8859-1' => self::utf8ToLatin1($utf8, $flags),
             'ASCII' => self::utf8ToAscii($utf8, $flags),
+            'UTF-16LE' => self::utf8ToUtf16le($utf8, $flags),
+            'UTF-16BE' => self::utf8ToUtf16be($utf8, $flags),
             default => false,
         };
     }
@@ -213,9 +219,213 @@ final class CharsetEngine
         return $out;
     }
 
+    private static function utf8ToUtf16le(string $input, int $flags): string|false
+    {
+        return self::utf8ToUtf16($input, $flags, false);
+    }
+
+    private static function utf8ToUtf16be(string $input, int $flags): string|false
+    {
+        return self::utf8ToUtf16($input, $flags, true);
+    }
+
+    private static function utf8ToUtf16(string $input, int $flags, bool $be): string|false
+    {
+        $codepoints = self::utf8Codepoints($input, $flags);
+        if (null === $codepoints) {
+            return false;
+        }
+        $out = '';
+        foreach ($codepoints as $cp) {
+            $units = self::codepointToUtf16Units($cp);
+            if (null === $units) {
+                if ($flags & self::FLAG_IGNORE) {
+                    continue;
+                }
+
+                return false;
+            }
+            foreach ($units as $unit) {
+                $out .= $be
+                    ? \chr(($unit >> 8) & 0xFF).\chr($unit & 0xFF)
+                    : \chr($unit & 0xFF).\chr(($unit >> 8) & 0xFF);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function utf16leToUtf8(string $input, int $flags): string|false
+    {
+        return self::utf16ToUtf8($input, $flags, false);
+    }
+
+    private static function utf16beToUtf8(string $input, int $flags): string|false
+    {
+        return self::utf16ToUtf8($input, $flags, true);
+    }
+
+    private static function utf16ToUtf8(string $input, int $flags, bool $be): string|false
+    {
+        $len = \strlen($input);
+        if (0 !== $len % 2) {
+            if ($flags & self::FLAG_IGNORE) {
+                $input = \substr($input, 0, $len - 1);
+                $len -= 1;
+            } else {
+                return false;
+            }
+        }
+        $codepoints = [];
+        for ($i = 0; $i < $len; $i += 2) {
+            $unit = $be
+                ? (\ord($input[$i]) << 8) | \ord($input[$i + 1])
+                : \ord($input[$i]) | (\ord($input[$i + 1]) << 8);
+            if ($unit >= 0xD800 && $unit <= 0xDBFF) {
+                if ($i + 3 >= $len) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        continue;
+                    }
+
+                    return false;
+                }
+                $low = $be
+                    ? (\ord($input[$i + 2]) << 8) | \ord($input[$i + 3])
+                    : \ord($input[$i + 2]) | (\ord($input[$i + 3]) << 8);
+                if ($low < 0xDC00 || $low > 0xDFFF) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        continue;
+                    }
+
+                    return false;
+                }
+                $codepoints[] = 0x10000 + (($unit - 0xD800) << 10) + ($low - 0xDC00);
+                $i += 2;
+                continue;
+            }
+            if ($unit >= 0xDC00 && $unit <= 0xDFFF) {
+                if ($flags & self::FLAG_IGNORE) {
+                    continue;
+                }
+
+                return false;
+            }
+            $codepoints[] = $unit;
+        }
+
+        return self::codepointsToUtf8($codepoints);
+    }
+
     /**
-     * ISO-8859-1 → ASCII approximations for //TRANSLIT (php-src ext/iconv/iconv.c).
+     * @return list<int>|null
      */
+    private static function utf8Codepoints(string $input, int $flags): ?array
+    {
+        $out = [];
+        $len = \strlen($input);
+        for ($i = 0; $i < $len;) {
+            $b = \ord($input[$i]);
+            if ($b < 0x80) {
+                $out[] = $b;
+                ++$i;
+                continue;
+            }
+            if (($b & 0xE0) === 0xC0 && $i + 1 < $len) {
+                $b2 = \ord($input[$i + 1]);
+                if (0x80 !== ($b2 & 0xC0)) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return null;
+                }
+                $out[] = (($b & 0x1F) << 6) | ($b2 & 0x3F);
+                $i += 2;
+                continue;
+            }
+            if (($b & 0xF0) === 0xE0 && $i + 2 < $len) {
+                $b2 = \ord($input[$i + 1]);
+                $b3 = \ord($input[$i + 2]);
+                if (0x80 !== ($b2 & 0xC0) || 0x80 !== ($b3 & 0xC0)) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return null;
+                }
+                $out[] = (($b & 0x0F) << 12) | (($b2 & 0x3F) << 6) | ($b3 & 0x3F);
+                $i += 3;
+                continue;
+            }
+            if (($b & 0xF8) === 0xF0 && $i + 3 < $len) {
+                $b2 = \ord($input[$i + 1]);
+                $b3 = \ord($input[$i + 2]);
+                $b4 = \ord($input[$i + 3]);
+                if (0x80 !== ($b2 & 0xC0) || 0x80 !== ($b3 & 0xC0) || 0x80 !== ($b4 & 0xC0)) {
+                    if ($flags & self::FLAG_IGNORE) {
+                        ++$i;
+                        continue;
+                    }
+
+                    return null;
+                }
+                $out[] = (($b & 0x07) << 18) | (($b2 & 0x3F) << 12) | (($b3 & 0x3F) << 6) | ($b4 & 0x3F);
+                $i += 4;
+                continue;
+            }
+            if ($flags & self::FLAG_IGNORE) {
+                ++$i;
+                continue;
+            }
+
+            return null;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param list<int> $codepoints
+     */
+    private static function codepointsToUtf8(array $codepoints): string
+    {
+        $out = '';
+        foreach ($codepoints as $cp) {
+            if ($cp <= 0x7F) {
+                $out .= \chr($cp);
+            } elseif ($cp <= 0x7FF) {
+                $out .= \chr(0xC0 | ($cp >> 6)).\chr(0x80 | ($cp & 0x3F));
+            } elseif ($cp <= 0xFFFF) {
+                $out .= \chr(0xE0 | ($cp >> 12))
+                    .\chr(0x80 | (($cp >> 6) & 0x3F))
+                    .\chr(0x80 | ($cp & 0x3F));
+            } else {
+                $out .= \chr(0xF0 | ($cp >> 18))
+                    .\chr(0x80 | (($cp >> 12) & 0x3F))
+                    .\chr(0x80 | (($cp >> 6) & 0x3F))
+                    .\chr(0x80 | ($cp & 0x3F));
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return list<int>|null */
+    private static function codepointToUtf16Units(int $cp): ?array
+    {
+        if ($cp < 0 || $cp > 0x10FFFF) {
+            return null;
+        }
+        if ($cp < 0x10000) {
+            return [$cp];
+        }
+        $cp -= 0x10000;
+
+        return [0xD800 | (($cp >> 10) & 0x3FF), 0xDC00 | ($cp & 0x3FF)];
+    }
+
     private static function transliterateLatin1(int $byte): ?string
     {
         static $map = [

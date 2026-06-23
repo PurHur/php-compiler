@@ -74,14 +74,32 @@ final class JitParseUrl
         }
 
         $comp = self::compileTimeLong($context, $component);
+        if (null === $comp) {
+            throw new \LogicException('parse_url() component must be a compile-time integer in this compiler build');
+        }
+        $comp = VmParseUrl::normalizeRawComponentInt($comp);
         $urlLiteral = $url->compileTimeString ?? null;
         if (null !== $urlLiteral) {
-            return self::materializeVmResult($context, VmString::parseUrl($urlLiteral, $comp));
+            $result = VmString::parseUrl($urlLiteral, $comp);
+            if (\is_array($result)) {
+                return self::materializeVmArray($context, $result);
+            }
+
+            return self::materializeVmResult($context, $result);
         }
 
         $urlStr = JitStringBuiltinArg::lower($context, $url, 'parse_url', 0, 'url');
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
+        if (-1 === $comp) {
+            $context->builder->call(
+                $context->lookupFunction('__phpc_parse_url_assoc'),
+                $urlStr,
+                $ptr
+            );
+
+            return $ptr;
+        }
         $i64 = $context->getTypeFromString('int64');
         $context->builder->call(
             $context->lookupFunction('__phpc_parse_url_component'),
