@@ -26,7 +26,7 @@ final class sscanf extends Internal
         if ($argc < 2) {
             throw new \LogicException('sscanf() requires at least two arguments');
         }
-        $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');
+        $input = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');
         $format = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'sscanf', 1, 'format');
         $outVars = [];
         for ($i = 2; $i < $argc; ++$i) {
