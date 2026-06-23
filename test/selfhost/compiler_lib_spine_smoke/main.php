@@ -1041,6 +1041,7 @@ require_once __DIR__.'/../../../ext/standard/VmSerialize.php';
 require_once __DIR__.'/../../../ext/standard/VmSerializeFormat.php';
 require_once __DIR__.'/../../../ext/standard/VmSession.php';
 require_once __DIR__.'/../../../ext/standard/VmSessionSerializer.php';
+require_once __DIR__.'/../../../ext/standard/VmSetcookie.php';
 require_once __DIR__.'/../../../ext/standard/VmSettype.php';
 require_once __DIR__.'/../../../ext/standard/VmShellExecNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSleep.php';
