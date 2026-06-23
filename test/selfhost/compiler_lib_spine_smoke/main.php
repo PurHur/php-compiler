@@ -806,6 +806,7 @@ require_once __DIR__.'/../../../ext/standard/VmCsv.php';
 require_once __DIR__.'/../../../ext/standard/VmCsvArg.php';
 require_once __DIR__.'/../../../ext/standard/VmDate.php';
 require_once __DIR__.'/../../../ext/standard/VmDateInterval.php';
+require_once __DIR__.'/../../../ext/standard/DateIntervalFormatJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunFunc.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunNative.php';
 require_once __DIR__.'/../../../ext/standard/VmDateTimeNative.php';
