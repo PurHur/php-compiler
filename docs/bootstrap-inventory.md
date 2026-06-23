@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2928 |
-| Phase A inventory files (M2 ratio SSOT) | 2928 |
+| PHP files on vm.php path | 2931 |
+| Phase A inventory files (M2 ratio SSOT) | 2931 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 7922 |
+| Source constructs flagged (warnings) | 7924 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1957,7 +1957,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
-| `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayValueBoxJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/CastObjectValueBoxJit.php` | 0 | 4 |
@@ -2325,8 +2325,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
 | `lib/JIT/CallUnpackHelper.php` | 0 | 8 |
+| `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
 | `lib/JIT/CastArrayShared.php` | 0 | 2 |
-| `lib/JIT/CastHelper.php` | 0 | 4 |
+| `lib/JIT/CastHelper.php` | 0 | 1 |
+| `lib/JIT/CastObjectNativeJit.php` | 0 | 2 |
+| `lib/JIT/CastUnsetJit.php` | 0 | 2 |
 | `lib/JIT/ClassConstFetchHelper.php` | 0 | 4 |
 | `lib/JIT/ClassConstVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/ClassParamCheck.php` | 0 | 1 |
@@ -8764,7 +8767,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFloatDtoa.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 23 class method(s)
 
 ### `ext/standard/VmFnmatch.php`
 
@@ -15052,77 +15055,77 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10043)
 - new Operand\Temporary (line 10045)
 - new OpCode (line 10092)
-- new CfgVariable (line 13521)
-- new Literal (line 13521)
-- new Variable (line 13553)
-- new Variable (line 13607)
-- new OpCode (line 13631)
-- new OpCode (line 13855)
-- new OpCode (line 13869)
-- new OpCode (line 13876)
-- new OpCode (line 13882)
-- new OpCode (line 13893)
-- new OpCode (line 13910)
-- new OpCode (line 13915)
-- new OpCode (line 13921)
-- new OpCode (line 13926)
-- new OpCode (line 13942)
-- new OpCode (line 13955)
-- new Variable (line 13966)
-- new Operand\Literal (line 13968)
-- new OpCode (line 13971)
-- new OpCode (line 14041)
-- new OpCode (line 14052)
-- new OpCode (line 14065)
-- new OpCode (line 14239)
-- new OpCode (line 14487)
-- new OpCode (line 14493)
-- new OpCode (line 14499)
-- new OpCode (line 14524)
-- new Variable (line 14551)
-- new Temporary (line 14553)
-- new Variable (line 14561)
-- new Temporary (line 14563)
-- new OpCode (line 14611)
-- new Operand\Temporary (line 14630)
-- new Operand\Temporary (line 14636)
-- new Operand\Temporary (line 14642)
-- new Operand\Temporary (line 14648)
+- new CfgVariable (line 13536)
+- new Literal (line 13536)
+- new Variable (line 13568)
+- new Variable (line 13622)
+- new OpCode (line 13646)
+- new OpCode (line 13870)
+- new OpCode (line 13884)
+- new OpCode (line 13891)
+- new OpCode (line 13897)
+- new OpCode (line 13908)
+- new OpCode (line 13925)
+- new OpCode (line 13930)
+- new OpCode (line 13936)
+- new OpCode (line 13941)
+- new OpCode (line 13957)
+- new OpCode (line 13970)
+- new Variable (line 13981)
+- new Operand\Literal (line 13983)
+- new OpCode (line 13986)
+- new OpCode (line 14056)
+- new OpCode (line 14067)
+- new OpCode (line 14080)
+- new OpCode (line 14254)
+- new OpCode (line 14502)
+- new OpCode (line 14508)
+- new OpCode (line 14514)
+- new OpCode (line 14539)
+- new Variable (line 14566)
+- new Temporary (line 14568)
+- new Variable (line 14576)
+- new Temporary (line 14578)
+- new OpCode (line 14626)
+- new Operand\Temporary (line 14645)
+- new Operand\Temporary (line 14651)
 - new Operand\Temporary (line 14657)
-- new Variable (line 15458)
-- new Variable (line 15462)
-- new Variable (line 15470)
-- new Variable (line 15474)
-- new Variable (line 15694)
-- new Operand\Literal (line 15965)
-- new Variable (line 15967)
-- new OpCode (line 16057)
-- new OpCode (line 16178)
-- new OpCode (line 16414)
-- new OpCode (line 16607)
-- new OpCode (line 16617)
-- new OpCode (line 16620)
-- new Operand\Temporary (line 16652)
-- new OpCode (line 16654)
-- new OpCode (line 16665)
-- new Operand\Temporary (line 16668)
-- new OpCode (line 16670)
-- new OpCode (line 16678)
-- new OpCode (line 16685)
-- new OpCode (line 16693)
-- new OpCode (line 16696)
-- new OpCode (line 16713)
-- new OpCode (line 16738)
-- new OpCode (line 16745)
-- new OpCode (line 16800)
-- new Literal (line 16824)
-- new OpCode (line 16923)
-- new Variable (line 16930)
-- new Temporary (line 16932)
-- new OpCode (line 16935)
-- new CompileFatal (line 17233)
-- new CompileFatal (line 17272)
-- 531 class method(s)
+- new Operand\Temporary (line 14663)
+- new Operand\Temporary (line 14672)
+- new Variable (line 15473)
+- new Variable (line 15477)
+- new Variable (line 15485)
+- new Variable (line 15489)
+- new Variable (line 15709)
+- new Operand\Literal (line 15980)
+- new Variable (line 15982)
+- new OpCode (line 16075)
+- new OpCode (line 16227)
+- new OpCode (line 16471)
+- new OpCode (line 16664)
+- new OpCode (line 16674)
+- new OpCode (line 16677)
+- new Operand\Temporary (line 16709)
+- new OpCode (line 16711)
+- new OpCode (line 16722)
+- new Operand\Temporary (line 16725)
+- new OpCode (line 16727)
+- new OpCode (line 16735)
+- new OpCode (line 16742)
+- new OpCode (line 16750)
+- new OpCode (line 16753)
+- new OpCode (line 16770)
+- new OpCode (line 16795)
+- new OpCode (line 16802)
+- new OpCode (line 16857)
+- new Literal (line 16881)
+- new OpCode (line 16980)
+- new Variable (line 16987)
+- new Temporary (line 16989)
+- new OpCode (line 16992)
+- new CompileFatal (line 17290)
+- new CompileFatal (line 17329)
+- 532 class method(s)
 - 17 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -15679,24 +15682,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10063)
 - new Variable (line 10071)
 - new Variable (line 10421)
-- new Variable (line 12718)
-- new Variable (line 12749)
-- new Variable (line 12766)
-- new Variable (line 12782)
-- new strval (line 12807)
-- new Variable (line 13056)
-- new Variable (line 13072)
-- new Variable (line 13245)
-- new Variable (line 13261)
-- new Variable (line 13309)
-- new Variable (line 13614)
-- new Variable (line 13623)
-- new Variable (line 14109)
-- new Variable (line 14125)
-- new Variable (line 14175)
-- new Variable (line 14681)
-- new Variable (line 14687)
-- 290 class method(s)
+- new Variable (line 12778)
+- new Variable (line 12809)
+- new Variable (line 12826)
+- new Variable (line 12842)
+- new strval (line 12867)
+- new Variable (line 13116)
+- new Variable (line 13132)
+- new Variable (line 13305)
+- new Variable (line 13321)
+- new Variable (line 13369)
+- new Variable (line 13674)
+- new Variable (line 13683)
+- new Variable (line 14169)
+- new Variable (line 14185)
+- new Variable (line 14235)
+- new Variable (line 14741)
+- new Variable (line 14747)
+- 291 class method(s)
 - 14 closure(s)
 
 ### `lib/JIT/ArrayFilterCallbackPolicy.php`
@@ -15840,8 +15843,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CastArrayRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 120)
-- 6 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/CastArrayValueBoxJit.php`
 
@@ -17878,6 +17880,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmVariable (line 238)
 - 8 class method(s)
 
+### `lib/JIT/CastArrayNativeJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 25)
+- 2 class method(s)
+
 ### `lib/JIT/CastArrayShared.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17887,10 +17895,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CastHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 32)
-- new Variable (line 90)
-- new Variable (line 123)
 - 3 class method(s)
+
+### `lib/JIT/CastObjectNativeJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 24)
+- 1 class method(s)
+
+### `lib/JIT/CastUnsetJit.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 26)
+- 1 class method(s)
 
 ### `lib/JIT/ClassConstFetchHelper.php`
 
