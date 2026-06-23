@@ -10726,6 +10726,12 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\Eval_) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
@@ -11506,6 +11512,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\BinaryOp\Concat) {
                         return $last;
                     }
+                    // Inline eval() call arg — php-cfg dead temp vs TYPE_EVAL producer (#10661, zif_eval).
+                    if ($last instanceof Op\Expr\Eval_) {
+                        return $last;
+                    }
                 }
 
                 return null;
@@ -12171,6 +12181,7 @@ class Compiler {
             || $op instanceof Op\Expr\BitwiseNot
             || $op instanceof Op\Expr\BooleanNot
             || $op instanceof Op\Expr\Empty_
+            || $op instanceof Op\Expr\Eval_
             || $op instanceof Op\Expr\Isset_
             || $op instanceof Op\Expr\InstanceOf_
             || $op instanceof Op\Expr\In_
@@ -14482,6 +14493,50 @@ class Compiler {
         return null !== $slot ? (string) $slot : null;
     }
 
+    /**
+     * php-cfg dead call-arg temp for inline eval() — TYPE_EVAL producer slot (#10661, zif_eval).
+     */
+    private function resolvePrecedingEvalCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || null === $cfgCallOp) {
+            return null;
+        }
+        $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
+        if (null === $callSite) {
+            return null;
+        }
+        [$callOp, $matchedIndex] = $callSite;
+        if ($matchedIndex !== $argIndex) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        $matched = $this->matchInlineCallArgProducer($producers, $callOp->args ?? [], $argIndex);
+        if (!$matched instanceof Op\Expr\Eval_) {
+            return null;
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_EVAL === $op->type) {
+                return (string) $op->arg1;
+            }
+        }
+        if (null === $block->slotForOperand($matched->result)) {
+            foreach ($this->compileExpr($matched, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($matched->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     protected function operandHasObjectType(Operand $operand): bool
     {
         $operand = $this->unwrapOperandChain($operand);
@@ -15284,6 +15339,15 @@ class Compiler {
                             }
                         }
                     }
+                }
+                $evalSlot = $this->resolvePrecedingEvalCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $evalSlot) {
+                    $valueSlot = $evalSlot;
                 }
                 $valueSlot = $this->preferNamedLocalCallArgSlot(
                     $arg,
