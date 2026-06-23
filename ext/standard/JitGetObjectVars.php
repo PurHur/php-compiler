@@ -141,6 +141,74 @@ final class JitGetObjectVars
 
     private static function invokeForPlainObject(Context $context, Value $obj, bool $mangledKeys): Value
     {
+        $object = $context->type->object;
+        if (
+            !$mangledKeys
+            && self::isGlobalScope($context)
+            && $object instanceof ObjectBuiltin
+        ) {
+            $guardIds = $object->internalClassIdsForObjectVarsGuard();
+            if ([] !== $guardIds) {
+                return self::invokeForPlainObjectWithInternalGlobalGuard($context, $obj, $mangledKeys, $object, $guardIds);
+            }
+        }
+
+        return self::invokeForPlainObjectUnrestricted($context, $obj, $mangledKeys);
+    }
+
+    private static function isGlobalScope(Context $context): bool
+    {
+        return 0 === $context->scope->classId && '' === $context->scope->className;
+    }
+
+    private static function invokeForPlainObjectWithInternalGlobalGuard(
+        Context $context,
+        Value $obj,
+        bool $mangledKeys,
+        ObjectBuiltin $object,
+        array $guardIds
+    ): Value {
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $fn = BasicBlockHelper::parentFunction($context);
+        $entry = $context->builder->getInsertBlock();
+        $doneBlock = $fn->appendBasicBlock('gov_internal_guard_done');
+        $plainBlock = $fn->appendBasicBlock('gov_internal_guard_plain');
+        $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
+        $checkBlock = $entry;
+        $lastIdx = \count($guardIds) - 1;
+        foreach ($guardIds as $idx => $id) {
+            $context->builder->positionAtEnd($checkBlock);
+            $match = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($id, 'int64')
+            );
+            $matchBlock = $fn->appendBasicBlock('gov_internal_guard_match_'.$id);
+            $nextBlock = $idx < $lastIdx
+                ? $fn->appendBasicBlock('gov_internal_guard_try_'.$guardIds[$idx + 1])
+                : $plainBlock;
+            $context->builder->branchIf($match, $matchBlock, $nextBlock);
+            $context->builder->positionAtEnd($matchBlock);
+            $context->builder->store(self::boxedHashtable($context, HashTableHelper::alloc($context)), $resultSlot);
+            $context->builder->branch($doneBlock);
+            $checkBlock = $nextBlock;
+        }
+        $context->builder->positionAtEnd($plainBlock);
+        $unrestrictedEntry = $fn->appendBasicBlock('gov_internal_guard_unrestricted');
+        $context->builder->branch($unrestrictedEntry);
+        $context->builder->positionAtEnd($unrestrictedEntry);
+        $context->builder->store(self::invokeForPlainObjectUnrestricted($context, $obj, $mangledKeys), $resultSlot);
+        $context->builder->branch($doneBlock);
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $context->builder->load($resultSlot);
+    }
+
+    private static function invokeForPlainObjectUnrestricted(Context $context, Value $obj, bool $mangledKeys): Value
+    {
         $objMap = $context->structFieldMap['__object__'];
         $classId = $context->builder->load(
             $context->builder->structGep($obj, $objMap['class_id'])

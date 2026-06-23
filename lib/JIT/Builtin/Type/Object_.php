@@ -2879,6 +2879,23 @@ class Object_ extends Type {
         return isset($this->externalOnlyClassIds[$classId]);
     }
 
+    /**
+     * Internal zend classes whose instance storage must not leak via get_object_vars() from global scope (#10719).
+     *
+     * @return list<int>
+     */
+    public function internalClassIdsForObjectVarsGuard(): array
+    {
+        $ids = [];
+        foreach (array_keys($this->externalOnlyClassIds) as $id) {
+            if (!isset($this->allowsDynamicPropertiesClassIds[$id])) {
+                $ids[] = $id;
+            }
+        }
+
+        return $ids;
+    }
+
     private function registerExternalClass(string $lcname, string $displayName): void
     {
         $id = count($this->classes);

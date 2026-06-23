@@ -21,6 +21,8 @@ final class GetObjectVarsBuiltinTest extends BaseTest
         foreach ([
             'get_object_vars.phpt',
             'get_object_vars_jit.phpt',
+            'get_object_vars_internal.phpt',
+            'get_object_vars_internal_jit.phpt',
             'get_object_vars_type_error.phpt',
             'get_object_vars_uninit_typed.phpt',
             'get_object_vars_uninit_typed_jit.phpt',
