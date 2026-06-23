@@ -19,6 +19,7 @@ $active = ob_end_clean();
 var_export($active);
 echo "\n";
 --EXPECT--
+PHP Notice:  ob_end_clean(): Failed to delete buffer. No buffer to delete
 0
 false
 'ob_end_clean(): Failed to delete buffer. No buffer to delete'

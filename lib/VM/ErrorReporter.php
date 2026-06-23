@@ -289,9 +289,7 @@ final class ErrorReporter
         if (0 === ($this->errorReporting & self::E_NOTICE)) {
             return;
         }
-        if ($this->displayErrors) {
-            fwrite(STDERR, $this->formatCliError(self::E_NOTICE, $message, $file, $line));
-        }
+        $this->writeCliStderr(self::E_NOTICE, $message, $file, $line);
     }
 
     private function emitWarning(
@@ -310,9 +308,7 @@ final class ErrorReporter
         if (0 === ($this->errorReporting & self::E_WARNING)) {
             return;
         }
-        if ($this->displayErrors) {
-            fwrite(STDERR, $this->formatCliError(self::E_WARNING, $message, $file, $line));
-        }
+        $this->writeCliStderr(self::E_WARNING, $message, $file, $line);
     }
 
     public function deprecatedDynamicProperty(
@@ -335,9 +331,7 @@ final class ErrorReporter
         if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
             return;
         }
-        if ($this->displayErrors) {
-            fwrite(STDERR, $this->formatCliError(self::E_DEPRECATED, $message, $file, 0));
-        }
+        $this->writeCliStderr(self::E_DEPRECATED, $message, $file, 0);
     }
 
     public function triggerError(
@@ -362,9 +356,7 @@ final class ErrorReporter
             return;
         }
         $formatted = $this->formatCliError($level, $message, $file, $line);
-        if ($this->displayErrors) {
-            fwrite(STDERR, $formatted);
-        }
+        $this->writeCliStderr($level, $message, $file, $line);
         if (self::E_USER_ERROR === $level) {
             throw new \LogicException(rtrim($formatted));
         }
@@ -389,10 +381,7 @@ final class ErrorReporter
         if (0 === ($this->errorReporting & $level)) {
             return;
         }
-        $formatted = $this->formatCliError($level, $message, $file, $line);
-        if ($this->displayErrors) {
-            fwrite(STDERR, $formatted);
-        }
+        $this->writeCliStderr($level, $message, $file, $line);
     }
 
     /**
@@ -416,6 +405,15 @@ final class ErrorReporter
         }
 
         return $formatted."\n";
+    }
+
+    /**
+     * php-src CLI: diagnostics go to stderr when error_reporting includes the level,
+     * independent of display_errors (issue #10677; matches JIT __compiler_trigger_error).
+     */
+    private function writeCliStderr(int $level, string $message, ?string $file, int $line): void
+    {
+        fwrite(STDERR, $this->formatCliError($level, $message, $file, $line));
     }
 
     /**

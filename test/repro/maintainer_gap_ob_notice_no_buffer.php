@@ -1,0 +1,21 @@
+<?php
+error_reporting(E_ALL);
+ini_set('display_errors', '0');
+var_export(ob_get_level());
+echo "\n";
+$flushOk = ob_end_flush();
+$flushLast = error_get_last();
+var_export($flushOk);
+echo "\n";
+var_export($flushLast['type'] ?? null);
+echo "\n";
+var_export($flushLast['message'] ?? null);
+echo "\n";
+$cleanOk = ob_end_clean();
+$cleanLast = error_get_last();
+var_export($cleanOk);
+echo "\n";
+var_export($cleanLast['type'] ?? null);
+echo "\n";
+var_export($cleanLast['message'] ?? null);
+echo "\n";
