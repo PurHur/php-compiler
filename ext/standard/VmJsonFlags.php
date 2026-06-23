@@ -54,12 +54,13 @@ final class VmJsonFlags
     /** @see JSON_THROW_ON_ERROR */
     public const THROW_ON_ERROR = 4194304;
 
-    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555). */
+    /** Flags honored by json_encode() in this compiler build (issue #3281, #10555, #10601). */
     public const ENCODE_SUPPORTED = self::UNESCAPED_SLASHES
         | self::PRETTY_PRINT
         | self::UNESCAPED_UNICODE
         | self::THROW_ON_ERROR
-        | self::FORCE_OBJECT;
+        | self::FORCE_OBJECT
+        | self::NUMERIC_CHECK;
 
     /** Flags honored by json_decode() in this compiler build (issue #3267). */
     public const DECODE_SUPPORTED = self::INVALID_UTF8_IGNORE

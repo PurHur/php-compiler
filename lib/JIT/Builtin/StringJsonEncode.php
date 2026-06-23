@@ -32,11 +32,16 @@ final class StringJsonEncode
     private static function ensureLibc(Context $context): void
     {
         $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $i8p->pointerType(0);
         $dbl = $context->getTypeFromString('double');
         foreach (
             [
                 ['isnan', $i32, [$dbl]],
                 ['isinf', $i32, [$dbl]],
+                ['strtod', $dbl, [$i8p, $i8pp]],
+                ['strtol', $i64, [$i8p, $i8pp, $i32]],
             ] as [$name, $ret, $params]
         ) {
             if (null === $context->module->getNamedFunction($name)) {
@@ -601,7 +606,7 @@ final class StringJsonEncode
 
         $context->builder->positionAtEnd($bbString);
         $raw = $context->builder->call($context->lookupFunction('__value__readString'), $valPtr);
-        $context->builder->store(self::quoteString($context, $raw), $resultSlot);
+        $context->builder->store(self::encodeStringForJson($context, $fn, $raw, $flags), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbEnum);
@@ -675,5 +680,134 @@ final class StringJsonEncode
         $quoted = JitStringConcat::concat($context, $open, $str);
 
         return JitStringConcat::concat($context, $quoted, $close);
+    }
+
+    /**
+     * Encode __string__* for json_encode — honors JSON_NUMERIC_CHECK (php-src php_json_is_numeric_string).
+     */
+    private static function encodeStringForJson(Context $context, LlvmFunction $fn, Value $raw, Value $flags): Value
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $i8p->pointerType(0);
+        $dbl = $context->getTypeFromString('double');
+        $strMap = $context->structFieldMap['__string__'];
+        $zeroI64 = $i64->constInt(0, false);
+        $tenI32 = $i32->constInt(10, false);
+
+        $outSlot = $context->builder->alloca($strPtr, 1, 'je_str_out');
+        $useNumeric = self::flagIsSet($context, $flags, VmJsonFlags::NUMERIC_CHECK);
+        $bbTry = $fn->appendBasicBlock('je_str_try_numeric');
+        $bbQuote = $fn->appendBasicBlock('je_str_quote_path');
+        $bbDone = $fn->appendBasicBlock('je_str_encode_done');
+        $context->builder->branchIf($useNumeric, $bbTry, $bbQuote);
+
+        $context->builder->positionAtEnd($bbTry);
+        $len = $context->builder->load($context->builder->structGep($raw, $strMap['length']));
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zeroI64);
+        $bbAfterEmpty = $fn->appendBasicBlock('je_str_after_empty');
+        $context->builder->branchIf($isEmpty, $bbQuote, $bbAfterEmpty);
+
+        $context->builder->positionAtEnd($bbAfterEmpty);
+        $charPtr = $context->builder->structGep($raw, $strMap['value']);
+        $endPtrSlot = $context->builder->alloca($i8p, 1, 'je_str_end');
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $context->builder->call($context->lookupFunction('strtol'), $charPtr, $endPtrSlot, $tenI32);
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $isIntNumeric = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $bbInt = $fn->appendBasicBlock('je_str_int_numeric');
+        $bbCheckDbl = $fn->appendBasicBlock('je_str_check_double');
+        $context->builder->branchIf($isIntNumeric, $bbInt, $bbCheckDbl);
+
+        $context->builder->positionAtEnd($bbInt);
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $longVal = $context->builder->call($context->lookupFunction('strtol'), $charPtr, $endPtrSlot, $tenI32);
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'je_str_int_buf');
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $longVal);
+        $bufLen = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $bufLenI64 = $bufLen->typeOf() === $i64 ? $bufLen : $context->builder->zExt($bufLen, $i64);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__string__init'), $bufLenI64, $bufC),
+            $outSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCheckDbl);
+        $context->builder->store($i8p->constNull(), $endPtrSlot);
+        $dblVal = $context->builder->call($context->lookupFunction('strtod'), $charPtr, $endPtrSlot);
+        $endPtr = $context->builder->load($endPtrSlot);
+        $endOffset = $context->builder->sub(
+            $context->builder->ptrToInt($endPtr, $i64),
+            $context->builder->ptrToInt($charPtr, $i64)
+        );
+        $isDblNumeric = $context->builder->icmp(Builder::INT_EQ, $endOffset, $len);
+        $bbDbl = $fn->appendBasicBlock('je_str_double_numeric');
+        $context->builder->branchIf($isDblNumeric, $bbDbl, $bbQuote);
+
+        $context->builder->positionAtEnd($bbDbl);
+        $isNan = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isnan'), $dblVal),
+            $i32->constInt(0, false)
+        );
+        $isInf = $context->builder->icmp(
+            Builder::INT_NE,
+            $context->builder->call($context->lookupFunction('isinf'), $dblVal),
+            $i32->constInt(0, false)
+        );
+        $nonFinite = $context->builder->or($isNan, $isInf);
+        $bbDblFinite = $fn->appendBasicBlock('je_str_double_finite');
+        $context->builder->branchIf($nonFinite, $bbQuote, $bbDblFinite);
+
+        $context->builder->positionAtEnd($bbDblFinite);
+        $trunc = $context->builder->fptosi($dblVal, $i64);
+        $roundTrip = $context->builder->sitofp($trunc, $dbl);
+        $isWhole = $context->builder->fcmp(Builder::REAL_OEQ, $dblVal, $roundTrip);
+        $bbDblWhole = $fn->appendBasicBlock('je_str_double_whole');
+        $bbDblFrac = $fn->appendBasicBlock('je_str_double_frac');
+        $context->builder->branchIf($isWhole, $bbDblWhole, $bbDblFrac);
+
+        $context->builder->positionAtEnd($bbDblWhole);
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'je_str_whole_buf');
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%lld'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $trunc);
+        $bufLen = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $bufLenI64 = $bufLen->typeOf() === $i64 ? $bufLen : $context->builder->zExt($bufLen, $i64);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__string__init'), $bufLenI64, $bufC),
+            $outSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDblFrac);
+        $numBuf = $context->builder->alloca($i8, $i64->constInt(32, false), 'je_str_frac_buf');
+        $bufC = $context->builder->pointerCast($numBuf, $i8p);
+        $fmt = $context->builder->pointerCast($context->constantFromString('%.16G'), $i8p);
+        $context->builder->call($context->lookupFunction('sprintf'), $bufC, $fmt, $dblVal);
+        $bufLen = $context->builder->call($context->lookupFunction('strlen'), $bufC);
+        $bufLenI64 = $bufLen->typeOf() === $i64 ? $bufLen : $context->builder->zExt($bufLen, $i64);
+        $context->builder->store(
+            $context->builder->call($context->lookupFunction('__string__init'), $bufLenI64, $bufC),
+            $outSlot
+        );
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbQuote);
+        $context->builder->store(self::quoteString($context, $raw), $outSlot);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbDone);
+
+        return $context->builder->load($outSlot);
     }
 }
