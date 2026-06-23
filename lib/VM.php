@@ -3638,9 +3638,14 @@ restart:
                         }
                     }
                     try {
-                        $arg2 = $this->coerceVariableToString($frame->scope[$op->arg2], $frame);
-                        $arg3 = $this->coerceVariableToString($frame->scope[$op->arg3], $frame);
-                        $arg1->string($arg2 . $arg3);
+                        $left = $op->arg1 === $op->arg2
+                            ? $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)
+                            : $this->readRuntimeOperandForConcat($frame, (int) $op->arg2);
+                        $right = $this->readRuntimeOperandForConcat($frame, (int) $op->arg3);
+                        $arg1->string(
+                            $this->coerceVariableToString($left, $frame)
+                            . $this->coerceVariableToString($right, $frame)
+                        );
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
@@ -3661,6 +3666,7 @@ restart:
                         $frame->suppressNextEcho = true;
                         break;
                     }
+                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_ECHO:
                     if ($frame->suppressNextEcho) {
@@ -6972,6 +6978,16 @@ restart:
         }
 
         return $operand;
+    }
+
+    /** TYPE_CONCAT operands may be literal constant slots colliding with assign dest (#9973, #9063). */
+    private function readRuntimeOperandForConcat(Frame $frame, int $slot): Variable
+    {
+        if (isset($frame->block->constants[$slot])) {
+            return $frame->block->constants[$slot];
+        }
+
+        return $this->readScopeOperandForRuntimeRead($frame, $slot);
     }
 
     private function isUnboundLocalScopeRead(Frame $frame, int $slot): bool
