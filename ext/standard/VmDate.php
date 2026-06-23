@@ -850,6 +850,10 @@ final class VmDate
                 continue;
             }
             switch ($ch) {
+                case 'U':
+                    $out .= (string) $timestamp;
+
+                    break;
                 case 'Y':
                     $out .= self::padInt($year, 4);
 
