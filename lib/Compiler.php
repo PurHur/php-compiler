@@ -11520,9 +11520,15 @@ class Compiler {
 
                 return null;
             }
-            $mappedIndex = 1 === $argCount
-                ? $producerCount - 1
-                : ($argIndex + ($argIndex > 0 ? $extra : 0));
+            // php-cfg emits inner-then-outer Array_ per inline arg (#4738, #10196, #10662).
+            if ($this->producersAreNestedArrayLiteralChain($producers) && 0 === $producerCount % $argCount) {
+                $depth = intdiv($producerCount, $argCount);
+                $mappedIndex = $argIndex * $depth + ($depth - 1);
+            } elseif (1 === $argCount) {
+                $mappedIndex = $producerCount - 1;
+            } else {
+                $mappedIndex = $argIndex + ($argIndex > 0 ? $extra : 0);
+            }
             if ($mappedIndex >= $producerCount || $mappedIndex < 0) {
                 return null;
             }
@@ -12353,7 +12359,8 @@ class Compiler {
                 // Nested element literals (`array_column([[...], [...]], ...)`) are not call-arg producers (#9305).
                 if ($prev instanceof Op\Expr\Array_) {
                     if ($this->cfgExprUsesOperand($child, $prev->result)) {
-                        break;
+                        // Inner→outer nesting within one inline call arg (#10196, #10662); keep walking for siblings.
+                        continue;
                     }
 
                     continue;
