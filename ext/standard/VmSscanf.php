@@ -169,7 +169,7 @@ final class VmSscanf
     }
 
     /** Two-arg sscanf(): return parsed values as a list array (php-src ext/standard/sscanf.c, #4201). */
-    public static function parseToArray(string $input, string $format): HashTable
+    public static function parseToArray(string $input, string $format): ?HashTable
     {
         $slots = self::countConversionSpecs($format);
         if (0 === $slots) {
@@ -180,6 +180,9 @@ final class VmSscanf
             $temps[] = new Variable();
         }
         $assigned = self::parse($input, $format, $temps);
+        if (0 === $assigned && '' === $input) {
+            return null;
+        }
         $ht = new HashTable();
         for ($i = 0; $i < $slots; ++$i) {
             $copy = new Variable();
