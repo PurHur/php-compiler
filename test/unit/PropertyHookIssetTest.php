@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** isset() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832). */
+/** isset() on property hooks — get hook runs when present; set-only probes backing (#10680, #9832). */
 final class PropertyHookIssetTest extends TestCase
 {
     public function testVmIssetOnVirtualGetHookInvokesGet(): void
@@ -30,7 +30,7 @@ PHP;
         self::assertSame("get runs for isset\nbool(false)\nok\n", ob_get_clean());
     }
 
-    public function testVmIssetOnSeparateBackingDoesNotInvokeGetHookWhenInitialized(): void
+    public function testVmIssetOnSeparateBackingInvokesGetHook(): void
     {
         $code = <<<'PHP'
 <?php
@@ -48,6 +48,6 @@ PHP;
         $block = $rt->parseAndCompile($code, 'test.php');
         ob_start();
         $rt->run($block);
-        self::assertSame("bool(true)\n", ob_get_clean());
+        self::assertSame("get runs for isset\nbool(true)\n", ob_get_clean());
     }
 }

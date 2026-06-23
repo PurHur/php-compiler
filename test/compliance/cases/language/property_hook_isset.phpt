@@ -1,5 +1,5 @@
 --TEST--
-isset()/empty() on property hooks — get+set probes backing; get-only virtual invokes get (#10392, #9832)
+isset()/empty() on property hooks — get hook runs when present; get-only virtual invokes get (#10680, #9832)
 --FILE--
 <?php
 class Box {
