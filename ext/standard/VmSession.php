@@ -489,7 +489,36 @@ final class VmSession
 
     private static function generateId(): string
     {
-        return bin2hex(VmString::randomBytes(16));
+        $sidLength = 26;
+        $bitsPerChar = 5;
+
+        return self::binToReadable(VmString::randomBytes($sidLength), $sidLength, $bitsPerChar);
+    }
+
+    /** php-src ext/session/session.c bin_to_readable() — default sid_length=26, sid_bits_per_character=5 (#10864). */
+    private static function binToReadable(string $bytes, int $outLength, int $bitsPerChar): string
+    {
+        static $map = '0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ,-';
+        $out = '';
+        $byteLen = \strlen($bytes);
+        $p = 0;
+        $w = 0;
+        $have = 0;
+        $mask = (1 << $bitsPerChar) - 1;
+        for ($i = 0; $i < $outLength; ++$i) {
+            while ($have < $bitsPerChar) {
+                if ($p >= $byteLen) {
+                    break;
+                }
+                $w |= (\ord($bytes[$p++]) << $have);
+                $have += 8;
+            }
+            $out .= $map[$w & $mask];
+            $w >>= $bitsPerChar;
+            $have -= $bitsPerChar;
+        }
+
+        return $out;
     }
 
     private static function sanitizeId(string $id): string

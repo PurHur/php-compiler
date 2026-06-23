@@ -30,6 +30,7 @@ final class VmDns
     private const MAX_ADDRS = 64;
 
     private const AF_INET = 2;
+    private const AF_INET6 = 10;
 
     private const SOCK_STREAM = 1;
 
@@ -266,6 +267,7 @@ final class VmDns
             $chunk = match ($flag) {
                 0x00000001 => self::collectARecords($hostname),
                 0x00000040 => self::collectMxRecords($hostname),
+                0x00000100 => self::collectAaaaRecords($hostname),
                 default => [],
             };
             foreach ($chunk as $record) {
@@ -326,16 +328,66 @@ final class VmDns
         }
 
         $records = [];
+        $seen = [];
         foreach ($list->iterateKeyed(true) as $pair) {
             [, $ipVar] = $pair;
             $ipVar = $ipVar->resolveIndirect();
             if (Variable::TYPE_STRING !== $ipVar->type) {
                 continue;
             }
-            $records[] = self::makeDnsRecord($hostname, 'A', ['ttl' => 0, 'ip' => $ipVar->toString()]);
+            $ip = $ipVar->toString();
+            if (isset($seen[$ip])) {
+                continue;
+            }
+            $seen[$ip] = true;
+            $records[] = self::makeDnsRecord($hostname, 'A', ['ttl' => 0, 'ip' => $ip]);
         }
 
         return $records;
+    }
+
+    /** @return list<HashTable> */
+    private static function collectAaaaRecords(string $hostname): array
+    {
+        $ips = self::resolveHostnameIpv6List($hostname);
+        if ([] === $ips) {
+            return [];
+        }
+
+        $records = [];
+        $seen = [];
+        foreach ($ips as $ip) {
+            if (isset($seen[$ip])) {
+                continue;
+            }
+            $seen[$ip] = true;
+            $records[] = self::makeDnsRecord($hostname, 'AAAA', ['ttl' => 0, 'ipv6' => $ip]);
+        }
+
+        return $records;
+    }
+
+    /**
+     * @return list<string>
+     */
+    public static function resolveHostnameIpv6List(string $hostname): array
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return [];
+        }
+
+        $ips = null;
+        if (self::ffiEnabled()) {
+            $ips = self::resolveIpv6ViaGetaddrinfo($hostname);
+        }
+        if (null === $ips || [] === $ips) {
+            $ips = self::resolveIpv6ViaEtcHosts($hostname);
+        }
+        if (null === $ips || [] === $ips) {
+            return [];
+        }
+
+        return $ips;
     }
 
     /** @return list<HashTable> */
@@ -552,6 +604,103 @@ final class VmDns
             $rp = $rp->ai_next;
         }
         $ffi->freeaddrinfo($resHead);
+
+        return $stored;
+    }
+
+    /**
+     * @return list<string>|null null when libc FFI path unavailable
+     */
+    private static function resolveIpv6ViaGetaddrinfo(string $hostname): ?array
+    {
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+        try {
+            $ffi = self::ffi();
+        } catch (\Throwable) {
+            return null;
+        }
+
+        $hints = $ffi->new('struct addrinfo');
+        $hints->ai_family = self::AF_INET6;
+        $hints->ai_socktype = self::SOCK_STREAM;
+        $hints->ai_flags = 0;
+        $hints->ai_protocol = 0;
+
+        $resHead = $ffi->new('struct addrinfo *');
+        $rc = (int) $ffi->getaddrinfo($hostname, null, \FFI::addr($hints), \FFI::addr($resHead));
+        if (0 !== $rc) {
+            return null;
+        }
+
+        $stored = [];
+        $rp = $resHead[0];
+        while (null !== $rp) {
+            if (self::AF_INET6 === (int) $rp->ai_family && null !== $rp->ai_addr) {
+                $sin6 = $ffi->cast('struct sockaddr_in6 *', $rp->ai_addr);
+                $buf = $ffi->new('char[46]');
+                $ntop = $ffi->inet_ntop(
+                    self::AF_INET6,
+                    \FFI::addr($sin6->sin6_addr),
+                    $buf,
+                    46
+                );
+                if (null !== $ntop) {
+                    $ip = \FFI::string($buf);
+                    if ('' !== $ip && \count($stored) < self::MAX_ADDRS) {
+                        $stored[] = $ip;
+                    }
+                }
+            }
+            $rp = $rp->ai_next;
+        }
+        $ffi->freeaddrinfo($resHead);
+
+        return $stored;
+    }
+
+    /**
+     * @return list<string>|null
+     */
+    private static function resolveIpv6ViaEtcHosts(string $hostname): ?array
+    {
+        $path = '/etc/hosts';
+        if (!\is_readable($path)) {
+            return null;
+        }
+        $lines = VmFs::file(
+            $path,
+            StdlibConstants::FILE_IGNORE_NEW_LINES | StdlibConstants::FILE_SKIP_EMPTY_LINES
+        );
+        if (false === $lines) {
+            return null;
+        }
+
+        $hostname = \strtolower($hostname);
+        $stored = [];
+        foreach ($lines as $line) {
+            $line = \trim($line);
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            $parts = \preg_split('/\s+/', $line, -1, PREG_SPLIT_NO_EMPTY);
+            if (null === $parts || \count($parts) < 2) {
+                continue;
+            }
+            $ip = $parts[0];
+            if (!\str_contains($ip, ':')) {
+                continue;
+            }
+            for ($i = 1, $n = \count($parts); $i < $n; ++$i) {
+                if (\strtolower($parts[$i]) === $hostname) {
+                    if (!\in_array($ip, $stored, true) && \count($stored) < self::MAX_ADDRS) {
+                        $stored[] = $ip;
+                    }
+                    break;
+                }
+            }
+        }
 
         return $stored;
     }
@@ -882,11 +1031,23 @@ struct in_addr {
     unsigned int s_addr;
 };
 
+struct in6_addr {
+    unsigned char s6_addr[16];
+};
+
 struct sockaddr_in {
     sa_family_t sin_family;
     in_port_t sin_port;
     struct in_addr sin_addr;
     unsigned char sin_zero[8];
+};
+
+struct sockaddr_in6 {
+    sa_family_t sin6_family;
+    in_port_t sin6_port;
+    unsigned int sin6_flowinfo;
+    struct in6_addr sin6_addr;
+    unsigned int sin6_scope_id;
 };
 
 struct sockaddr {
