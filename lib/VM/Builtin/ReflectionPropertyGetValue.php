@@ -50,7 +50,9 @@ final class ReflectionPropertyGetValue extends VmClassMethod
             return;
         }
         if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ReflectionProperty::getValue() expects an object');
+            throw new \TypeError(
+                'ReflectionProperty::getValue(): Argument #1 ($object) must be provided for instance properties'
+            );
         }
         if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)) {
             $object = $frame->calledArgs[1]->resolveIndirect();
@@ -96,7 +98,10 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         }
         $object = $frame->calledArgs[1]->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $object->type) {
-            throw new \LogicException('ReflectionProperty::getValue() expects an object');
+            throw new \TypeError(
+                'ReflectionProperty::getValue(): Argument #1 ($object) must be of type ?object, '
+                .EnumCaseSupport::typeNameForVariable($object).' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;

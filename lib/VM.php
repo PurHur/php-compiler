@@ -702,6 +702,88 @@ class VM {
     }
 
     /**
+     * ReflectionProperty::setValue on static props — invoke set hook when present (#4469, php_reflection.c).
+     */
+    public function writeStaticPropertyForReflection(
+        ClassEntry $entry,
+        string $propertyName,
+        Variable $value,
+        Frame $frame
+    ): void {
+        $classLc = strtolower(ltrim($entry->name, '\\'));
+        $propLc = strtolower($propertyName);
+        $hooks = $this->resolveStaticPropertyHooks($classLc, $propLc);
+        if (null !== $hooks && !empty($hooks['set'])) {
+            $setLc = $hooks['set'];
+            if (isset($entry->methods[$setLc])) {
+                $func = $entry->methods[$setLc];
+                if ($func instanceof Func\PHP) {
+                    $this->context->propertyHookSetAborted = false;
+                    $this->invokeStaticPropertyHookRaw(
+                        $func,
+                        $propertyName,
+                        $classLc,
+                        $frame,
+                        $value->resolveIndirect()
+                    );
+
+                    return;
+                }
+            }
+        }
+        \PHPCompiler\ext\standard\VmReflection::setStaticPropertyValueForReflection(
+            $entry,
+            $this->context,
+            $propertyName,
+            $value
+        );
+    }
+
+    /**
+     * ReflectionProperty::setValue on instance props — invoke set hook when present (#4469, php_reflection.c).
+     */
+    public function writeInstancePropertyForReflection(
+        ObjectEntry $object,
+        string $instanceName,
+        ?VM\ClassProperty $meta,
+        Variable $value,
+        Frame $frame
+    ): void {
+        $setLc = $meta?->setHookMethodLc
+            ?? strtolower(SourcePreprocessor\PropertyHooks::setHookMethodName($instanceName));
+        if (isset($object->class->methods[$setLc])) {
+            $func = $object->class->methods[$setLc];
+            if ($func instanceof Func\PHP) {
+                $this->context->propertyHookSetAborted = false;
+                $thisVar = new Variable();
+                $thisVar->object($object);
+                $this->invokePhpFunctionWithPropertyHookRaw(
+                    $func,
+                    $instanceName,
+                    $frame,
+                    $thisVar,
+                    $value->resolveIndirect()
+                );
+
+                return;
+            }
+        }
+        $slot = $object->getProperty($instanceName);
+        $slot->copyFrom($value->resolveIndirect());
+        TypeCheck::coercePropertyWrite($slot, false);
+        $resolved = $slot->resolveIndirect();
+        if (null !== $resolved->dnfArms) {
+            DnfCheck::assertMatches(
+                $value,
+                $resolved->dnfArms,
+                $this->context,
+                'Property',
+                $resolved
+            );
+        }
+    }
+
+    /**
      * ?? / ??= isset probe on static hooked properties — backing only, never get hook (#9683).
      */
     public function staticPropertyIsSetForCoalesceAssign(string $classLc, string $propNameRaw): bool
