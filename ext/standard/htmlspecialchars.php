@@ -43,17 +43,17 @@ final class htmlspecialchars extends Internal
         $flags = self::DEFAULT_FLAGS;
         $encoding = 'UTF-8';
         $doubleEncode = true;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $flagsVar = $frame->calledArgs[1]->resolveIndirect();
             if (VMVariable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
         }
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
-        if (4 === $argc) {
+        if (isset($frame->calledArgs[3])) {
             $deVar = $frame->calledArgs[3]->resolveIndirect();
             if (VMVariable::TYPE_BOOLEAN !== $deVar->type) {
                 throw new \LogicException('htmlspecialchars() double_encode must be a boolean in this compiler build');

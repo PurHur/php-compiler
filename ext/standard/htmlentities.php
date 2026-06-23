@@ -39,7 +39,7 @@ final class htmlentities extends Internal
         $flags = ENT_COMPAT;
         $encoding = 'UTF-8';
         $doubleEncode = true;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $flags = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[1],
                 'htmlentities',
@@ -47,10 +47,10 @@ final class htmlentities extends Internal
                 'flags'
             );
         }
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
         }
-        if (4 === $argc) {
+        if (isset($frame->calledArgs[3])) {
             $deVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_BOOLEAN !== $deVar->type) {
                 throw new \LogicException('htmlentities() double_encode must be a boolean in this compiler build');
