@@ -10,6 +10,7 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -178,6 +179,12 @@ final class VmSettype
             return;
         }
         if (Variable::TYPE_OBJECT === $v->type) {
+            if (ResourceSupport::isResourceObject($v->toObject())) {
+                $vm = $frame?->vmContext?->runtime?->vm;
+                $result->string($v->toString($vm, $frame));
+
+                return;
+            }
             $vm = $frame?->vmContext?->runtime?->vm;
             if (null === $vm) {
                 throw new \Error(
