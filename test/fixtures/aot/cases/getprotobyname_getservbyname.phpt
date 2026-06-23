@@ -2,10 +2,10 @@
 AOT getprotobyname()/getservbyname() network lookups (#4024)
 --SKIPIF--
 <?php
-if (!is_readable('/etc/protocols') && !is_readable(__DIR__.'/../../../../ext/standard/data/protocols')) {
+if (!is_readable('/etc/protocols')) {
     echo "skip no protocols database\n";
 }
-if (!is_readable('/etc/services') && !is_readable(__DIR__.'/../../../../ext/standard/data/services')) {
+if (!is_readable('/etc/services')) {
     echo "skip no services database\n";
 }
 ?>

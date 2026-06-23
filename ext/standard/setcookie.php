@@ -14,7 +14,6 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPCompiler\Web\ResponseContext;
 use PHPLLVM\Value;
 
 /**
@@ -32,19 +31,23 @@ final class setcookie extends Internal
     public function execute(Frame $frame): void
     {
         $parsed = SetcookieOptions::parseArgs('setcookie', $frame->calledArgs);
-        ResponseContext::addHeader(SetcookieLine::build(
-            $parsed['name'],
-            $parsed['value'],
-            $parsed['expires'],
-            $parsed['path'],
-            $parsed['domain'],
-            $parsed['secure'],
-            $parsed['httponly'],
-            $parsed['samesite'],
-            $parsed['partitioned']
-        ), false);
+        $ok = VmSetcookie::emit(
+            $frame,
+            'setcookie',
+            SetcookieLine::build(
+                $parsed['name'],
+                $parsed['value'],
+                $parsed['expires'],
+                $parsed['path'],
+                $parsed['domain'],
+                $parsed['secure'],
+                $parsed['httponly'],
+                $parsed['samesite'],
+                $parsed['partitioned']
+            )
+        );
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->bool($ok);
         }
     }
 

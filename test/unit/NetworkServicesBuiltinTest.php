@@ -13,18 +13,31 @@ final class NetworkServicesBuiltinTest extends TestCase
 echo function_exists('getprotobyname') ? 'proto_yes' : 'proto_no', "\n";
 echo function_exists('getservbyname') ? 'serv_yes' : 'serv_no', "\n";
 $tcp = getprotobyname('tcp');
-echo $tcp === 6 ? "proto=6\n" : "proto_fail\n";
+if (is_readable('/etc/protocols')) {
+    echo $tcp === 6 ? "proto=6\n" : "proto_fail\n";
+} else {
+    echo false === $tcp ? "proto_false\n" : "proto_fail\n";
+}
 $http = getservbyname('http', 'tcp');
-echo $http === 80 ? "port=80\n" : "serv_fail\n";
+if (is_readable('/etc/services')) {
+    echo $http === 80 ? "port=80\n" : "serv_fail\n";
+} else {
+    echo false === $http ? "serv_false\n" : "serv_fail\n";
+}
 $bad = @getprotobyname('not_a_real_protocol_xyz');
 echo $bad === false ? "unknown_false\n" : "unknown_bad\n";
 PHP;
 
-    private const EXPECT = "proto_yes\nserv_yes\nproto=6\nport=80\nunknown_false\n";
+    private const EXPECT_WITH_ETC = "proto_yes\nserv_yes\nproto=6\nport=80\nunknown_false\n";
+
+    private const EXPECT_WITHOUT_ETC = "proto_yes\nserv_yes\nproto_false\nserv_false\nunknown_false\n";
 
     public function testVmMatchesPhpSubset(): void
     {
-        $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php'));
+        $expect = is_readable('/etc/protocols') && is_readable('/etc/services')
+            ? self::EXPECT_WITH_ETC
+            : self::EXPECT_WITHOUT_ETC;
+        $this->assertSame($expect, $this->runBin('bin/vm.php'));
     }
 
     private function runBin(string $bin): string
