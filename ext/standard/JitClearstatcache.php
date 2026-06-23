@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for clearstatcache() — clears JIT/AOT stat cache (#9110). */
+/** LLVM lowering for clearstatcache() — clears JIT/AOT stat cache via StatCacheJitHelper (#9110, #9244). */
 final class JitClearstatcache
 {
     public static function invoke(Context $context, int $argc, JITVariable ...$args): Value
