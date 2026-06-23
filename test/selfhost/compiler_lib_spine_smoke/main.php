@@ -951,6 +951,8 @@ require_once __DIR__.'/../../../ext/standard/VmHttpLastResponseHeaders.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpResponse.php';
 require_once __DIR__.'/../../../ext/standard/VmHttpTlsNative.php';
 require_once __DIR__.'/../../../ext/standard/VmImage.php';
+require_once __DIR__.'/../../../ext/standard/IncludePathJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/IncludePathResolveJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmIncludePath.php';
 require_once __DIR__.'/../../../ext/standard/VmInet.php';
 require_once __DIR__.'/../../../ext/standard/VmInetNative.php';
