@@ -1903,11 +1903,40 @@ final class StringPregMatchJit
             $context->builder->and($flagsArg, $i64->constInt(self::PREG_SPLIT_OFFSET_CAPTURE, false)),
             $i64->constInt(0, false)
         );
-        $limitNeg = $context->builder->icmp(Builder::INT_SLT, $limitArg, $i64->constInt(0, true));
+        $sizeT = $context->getTypeFromString('size_t');
+        $limitOne = $context->builder->icmp(Builder::INT_EQ, $limitArg, $i64->constInt(1, false));
+        $limitOneBb = $fn->appendBasicBlock('ps_limit_one');
+        $limitNormBb = $fn->appendBasicBlock('ps_limit_norm');
+        $context->builder->branchIf($limitOne, $limitOneBb, $limitNormBb);
+
+        $context->builder->positionAtEnd($limitOneBb);
+        $partsHtOne = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
+        $indexSlotOne = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($sizeT->constInt(0, false), $indexSlotOne);
+        $subjLenOne = $context->builder->truncOrBitCast(self::stringLen($context, $subject), $sizeT);
+        $limitOneDoneBb = $fn->appendBasicBlock('ps_limit_one_done');
+        self::emitSplitMaybeAppend(
+            $context,
+            $fn,
+            $partsHtOne,
+            $indexSlotOne,
+            $subject,
+            $sizeT->constInt(0, false),
+            $subjLenOne,
+            $offsetCapture,
+            $noEmpty,
+            $limitOneDoneBb
+        );
+        $context->builder->positionAtEnd($limitOneDoneBb);
+        $context->builder->returnValue($partsHtOne);
+
+        $context->builder->positionAtEnd($limitNormBb);
+        // php-src: limit <= 0 is unlimited (#10545).
+        $limitUnbounded = $context->builder->icmp(Builder::INT_SLE, $limitArg, $i64->constInt(0, false));
         $limitBb = $fn->appendBasicBlock('ps_limit_unbounded');
         $limitPosBb = $fn->appendBasicBlock('ps_limit_bounded');
         $limitDoneBb = $fn->appendBasicBlock('ps_limit_done');
-        $context->builder->branchIf($limitNeg, $limitBb, $limitPosBb);
+        $context->builder->branchIf($limitUnbounded, $limitBb, $limitPosBb);
         $context->builder->positionAtEnd($limitBb);
         $context->builder->branch($limitDoneBb);
         $context->builder->positionAtEnd($limitPosBb);
