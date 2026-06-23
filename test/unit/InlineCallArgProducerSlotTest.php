@@ -1098,6 +1098,45 @@ PHP;
         self::assertStringContainsString("'stdClass'", $out);
     }
 
+    /** Issue #10673 — substr(sprintf(...), -N) wires nested FuncCall + UnaryMinus producer slots. */
+    public function testSubstrNestedSprintfUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo substr(sprintf('%o', 33188), -4);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_substr_sprintf.php');
+
+        $sprintfReturnSlot = null;
+        $substrSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $substrSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $sprintfReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $substrSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($sprintfReturnSlot);
+        self::assertCount(2, $substrSends);
+        self::assertSame($sprintfReturnSlot, $substrSends[0], 'arg sends='.json_encode($substrSends));
+        self::assertNotSame($substrSends[0], $substrSends[1], 'arg sends='.json_encode($substrSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('0644', $out);
+    }
+
     /** Issue #10663 — hoisted null ConstFetch must not replace concat result call arg. */
     public function testVarExportConcatNullUsesConcatSlotNotHoistedNull(): void
     {
