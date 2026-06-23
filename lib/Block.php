@@ -317,6 +317,26 @@ class Block {
 
             return $this->scope[$operand];
         }
+        // php-cfg may wrap named locals in temporaries after while-assign conditions; bind by
+        // variable name before call-site temp clone reuse (#10702, #8560).
+        $namedRoot = self::cfgVarRoot($operand);
+        if ($namedRoot instanceof VarOperand) {
+            $name = self::resolveVariableName($namedRoot);
+            if (null !== $name) {
+                $existing = $this->slotIndexForVariableName($name);
+                if (null !== $existing) {
+                    $this->scope[$operand] = $existing;
+                    if ($isRead && $this->shouldRegisterInheritedArg($operand)) {
+                        $this->args[$operand] = $existing;
+                    }
+                    if (!$isRead) {
+                        $this->markLocallyWritten($operand);
+                    }
+
+                    return $existing;
+                }
+            }
+        }
         // Call-site arg clones wrap inline Expr temps; reuse the producer slot (#8560, #3553).
         if ($operand instanceof Temporary && null !== $operand->original && $this->scope->contains($operand->original)) {
             $existing = $this->scope[$operand->original];
