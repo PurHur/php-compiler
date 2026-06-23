@@ -71,8 +71,8 @@ final class UniqidBuiltinTest extends TestCase
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $id = $frame->returnVar->resolveIndirect()->toString();
-        $this->assertGreaterThanOrEqual(22, strlen($id));
-        $this->assertStringContainsString('.', $id);
+        $this->assertSame(23, strlen($id));
+        $this->assertMatchesRegularExpression('/^[0-9a-f]{13}[0-9]\\.[0-9]{8}$/', $id);
     }
 
     public function testMoreEntropyIntCoercion(): void
@@ -88,6 +88,6 @@ final class UniqidBuiltinTest extends TestCase
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $id = $frame->returnVar->resolveIndirect()->toString();
-        $this->assertGreaterThanOrEqual(22, strlen($id));
+        $this->assertSame(23, strlen($id));
     }
 }

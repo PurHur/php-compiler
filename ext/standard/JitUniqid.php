@@ -75,15 +75,22 @@ final class JitUniqid
                 ),
                 $context->builder->zExt($prefixLen, $i64)
             );
-            $ent32 = $context->builder->truncOrBitCast(
+            $entU32 = $context->builder->truncOrBitCast(
                 $context->builder->unsigendRem(
                     $mix,
-                    $i64->constInt(100000000, false)
+                    $i64->constInt(0x100000000, false)
                 ),
                 $i32
             );
+            $doubleTy = $context->getTypeFromString('double');
+            $entF64 = $context->builder->uitofp($entU32, $doubleTy);
+            $maxU32 = $context->builder->uitofp($i64->constInt(0xFFFFFFFF, false), $doubleTy);
+            $seed = $context->builder->fmul(
+                $context->builder->fdiv($entF64, $maxU32),
+                $doubleTy->constFloat(10.0)
+            );
             $fmtPtr = $context->builder->pointerCast(
-                $context->constantFromString('%.*s%08x%05x.%08u'),
+                $context->constantFromString('%.*s%08x%05x%.8F'),
                 $charPtr
             );
             $written = $context->builder->call(
@@ -95,7 +102,7 @@ final class JitUniqid
                 $prefixData,
                 $sec32,
                 $usec32,
-                $ent32
+                $seed
             );
         } else {
             $fmtPtr = $context->builder->pointerCast(

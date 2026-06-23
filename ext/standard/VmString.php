@@ -1785,11 +1785,12 @@ final class VmString
         if ($moreEntropy) {
             try {
                 $rnd = self::randomBytes(4);
-                $dec = \unpack('N', $rnd)[1] % 100000000;
+                $bytes = \unpack('N', $rnd)[1];
             } catch (\Throwable $e) {
-                $dec = ($tv['usec'] ^ $tv['sec']) % 100000000;
+                $bytes = ($tv['usec'] ^ $tv['sec']) & 0xFFFFFFFF;
             }
-            $core .= \sprintf('.%08u', $dec);
+            $seed = ((float) $bytes / (float) 0xFFFFFFFF) * 10.0;
+            $core .= \sprintf('%.8F', $seed);
         }
 
         return $prefix.$core;
