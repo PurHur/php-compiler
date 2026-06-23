@@ -7484,7 +7484,9 @@ class Compiler {
                         $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
                         $expr->args,
                         $expr->result,
-                        $block
+                        $block,
+                        max(0, $expr->getLine()),
+                        $expr
                     );
                 }
 
@@ -7506,7 +7508,9 @@ class Compiler {
                         $this->compileOperand(new Operand\Literal('__invoke'), $block, true),
                         $expr->args,
                         $expr->result,
-                        $block
+                        $block,
+                        max(0, $expr->getLine()),
+                        $expr
                     );
                 }
 
@@ -17385,6 +17389,7 @@ class Compiler {
         if (
             $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
+            || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
         ) {
             return new OpCode(
                 OpCode::TYPE_FUNCCALL_EXEC_RETURN,
@@ -17397,6 +17402,52 @@ class Compiler {
             OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
             $line
         );
+    }
+
+    /**
+     * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall producers with dead arg temps (#9463, #10981).
+     * Each producer must FUNCCALL_EXEC_RETURN into its result slot before the outer call sends args.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingInlineCallArgProducerNeedsReturnSlot(?Op $cfgCallOp, Block $block): bool
+    {
+        if (
+            null === $cfgCallOp
+            || null === $block->orig
+            || (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall)
+        ) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        foreach ($cfgChildren as $consumerIndex => $consumer) {
+            if (!$this->isInlineExprCallArgConsumer($consumer)) {
+                continue;
+            }
+            if (!property_exists($consumer, 'args') || !is_array($consumer->args) || \count($consumer->args) < 2) {
+                continue;
+            }
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null === $firstSibling || $consumerIndex - $firstSibling < 2) {
+                continue;
+            }
+            foreach ($cfgChildren as $producerIndex => $producer) {
+                if ($producer !== $cfgCallOp || !$producer instanceof Op\Expr) {
+                    continue;
+                }
+                if ($this->isSiblingMultiArgFuncCallProducer(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**
