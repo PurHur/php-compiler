@@ -26,6 +26,7 @@ final class fopen extends Internal
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
         $handle = VmFs::fopen($path, $mode, $frame->vmContext);
         if (false === $handle) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'fopen', $path);
             $frame->returnVar->bool(false);
 
             return;

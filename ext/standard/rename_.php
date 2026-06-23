@@ -27,6 +27,9 @@ final class rename_ extends Internal
         $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
         $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
         $ok = VmFs::rename($from, $to);
+        if (!$ok) {
+            VmFilestatFailure::warnRenameFailed($frame, $from, $to);
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
