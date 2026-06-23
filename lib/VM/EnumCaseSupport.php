@@ -222,7 +222,7 @@ final class EnumCaseSupport
         }
         if ('value' === $lc) {
             if (null === $object->class->backedType) {
-                self::warnUndefinedEnumProperty($object->class, 'value', $context, $frame);
+                // Unit enums have no backing value; Zend returns null without warning (#5731, zend_enum.c).
                 $result->null();
 
                 return $result;
