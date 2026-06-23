@@ -50,12 +50,22 @@ final class ParamTypeError
             $paramIndex + 1,
             $paramName,
             $expectedType,
-            IterableCheck::valueTypeName($argument)
+            self::givenTypeName($argument)
         );
         if ($callSiteLine > 0 && '' !== $scriptPath) {
             $message .= sprintf(', called in %s on line %d', $scriptPath, $callSiteLine);
         }
 
         return new \TypeError($message);
+    }
+
+    private static function givenTypeName(Variable $argument): string
+    {
+        $resolved = $argument->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type) {
+            return $resolved->toObject()->class->name;
+        }
+
+        return EnumCaseSupport::typeNameForVariable($argument);
     }
 }

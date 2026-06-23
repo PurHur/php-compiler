@@ -4954,6 +4954,30 @@ restart:
                                     }
                                     continue;
                                 }
+                                if (isset($calleeBlock->paramIntersectionConstraints[$slot])) {
+                                    $paramName = $calleeBlock->paramNames[$paramIdx] ?? 'param'.$paramIdx;
+                                    $expected = $calleeBlock->paramIntersectionDisplayLabels[$slot]
+                                        ?? implode('&', $calleeBlock->paramIntersectionConstraints[$slot]);
+                                    try {
+                                        TypeCheck::assertParamIntersection(
+                                            $arg,
+                                            $calleeBlock->paramIntersectionConstraints[$slot],
+                                            $this->context,
+                                            $expected
+                                        );
+                                    } catch (\TypeError $e) {
+                                        throw VM\ParamTypeError::forUserCallWithExpectedType(
+                                            $frame->call->getName(),
+                                            $paramIdx,
+                                            $paramName,
+                                            $expected,
+                                            $arg,
+                                            $frame->scriptPath,
+                                            $callSiteLine
+                                        );
+                                    }
+                                    continue;
+                                }
                                 $constraint = $calleeBlock->paramTypeConstraints[$slot] ?? null;
                                 if (null === $constraint) {
                                     continue;
