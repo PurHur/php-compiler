@@ -15992,7 +15992,8 @@ class Compiler {
                     $block->orig->children,
                     $cfgCallOp
                 );
-                if (\count($producers) >= 2) {
+                $namedLocalSlot = $this->namedLocalCallArgSlotIfBound($arg, $block, $cfgCallOp, (int) $argIndex);
+                if (\count($producers) >= 2 && null === $namedLocalSlot) {
                     $matched = $this->matchInlineCallArgProducer(
                         $producers,
                         $cfgCallOp->args ?? [],
@@ -16009,6 +16010,8 @@ class Compiler {
                             $valueSlot = $matchedSlot;
                         }
                     }
+                } elseif (null !== $namedLocalSlot) {
+                    $valueSlot = $namedLocalSlot;
                 }
                 if ('array_column' === strtolower($calleeName ?? '')) {
                     if (0 === $argIndex) {
@@ -16076,6 +16079,37 @@ class Compiler {
     }
 
     /**
+     * Named locals after ?: echo must not be remapped to merge-phi producer temps (#9487).
+     */
+    private function namedLocalCallArgSlotIfBound(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp = null,
+        ?int $argIndex = null
+    ): ?string {
+        $probe = $arg;
+        if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
+            $probe = $cfgCallOp->args[(int) $argIndex];
+        }
+        $name = Block::resolveVariableName($probe);
+        if (null === $name || '' === $name) {
+            $root = Block::cfgVarRoot($probe);
+            if ($root instanceof CfgVariable) {
+                $name = Block::resolveVariableName($root);
+            }
+        }
+        if (null === $name || '' === $name) {
+            return null;
+        }
+        $namedSlot = $block->slotIndexForVariableName($name);
+        if (null === $namedSlot || !$block->isNamedVariableSlot((int) $namedSlot)) {
+            return null;
+        }
+
+        return (string) $namedSlot;
+    }
+
+    /**
      * php-cfg may wire a later named local read to a preceding call's dead result temp (#9074).
      */
     private function preferNamedLocalCallArgSlot(
@@ -16094,7 +16128,7 @@ class Compiler {
         $name = Block::resolveVariableName($arg);
         if (null === $name || '' === $name) {
             $root = Block::cfgVarRoot($arg);
-            if ($root instanceof VarOperand) {
+            if ($root instanceof CfgVariable) {
                 $name = Block::resolveVariableName($root);
             }
         }
@@ -16210,13 +16244,21 @@ class Compiler {
     }
 
     /** Parent CFG blocks (list destruct merge) may hold the assign lowering (#10807). */
-    private function blockHasAssignToSlotInParentBlocks(Block $block, int $destSlot): bool
+    private function blockHasAssignToSlotInParentBlocks(Block $block, int $destSlot, array $visited = []): bool
     {
         foreach ($block->parents as $parent) {
             if (!$parent instanceof Block) {
                 continue;
             }
+            $id = spl_object_id($parent);
+            if (isset($visited[$id])) {
+                continue;
+            }
+            $visited[$id] = true;
             if ($this->blockHasAssignToSlot($parent, $destSlot)) {
+                return true;
+            }
+            if ($this->blockHasAssignToSlotInParentBlocks($parent, $destSlot, $visited)) {
                 return true;
             }
         }
