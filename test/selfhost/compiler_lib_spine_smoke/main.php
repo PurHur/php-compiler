@@ -683,6 +683,7 @@ require_once __DIR__.'/../../../ext/standard/JitQuotPrint.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotedPrintableEncode.php';
 require_once __DIR__.'/../../../ext/standard/JitQuotemeta.php';
+require_once __DIR__.'/../../../ext/standard/RandomBytesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitRandomBytes.php';
 require_once __DIR__.'/../../../ext/standard/JitRandomBytesArg.php';
 require_once __DIR__.'/../../../ext/standard/JitRandomInt.php';
