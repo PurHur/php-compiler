@@ -7,18 +7,23 @@ namespace PHPCompiler\ext\standard;
 /**
  * Lowered into JIT/AOT for getprotobynumber()/getservbyport() (#9777, php-in-PHP).
  *
- * Bodies are embedded at link time from {@see VmNetworkServices::buildJitTables()}.
+ * JIT/AOT compiles table lookups from {@see VmNetworkServices::buildJitTables()};
+ * VM/bootstrap uses the VmNetworkServices delegation bodies below (#9777).
  * php-src: ext/standard/network.c
  */
 final class NetworkServicesJitHelper
 {
     public static function getprotobynumber(int $number): string
     {
-        __PHPC_NS_GETPROTOBYNUMBER_BODY__
+        $name = VmNetworkServices::getprotobynumber($number);
+
+        return false === $name ? '' : (string) $name;
     }
 
     public static function getservbyport(int $port, string $protocol): string
     {
-        __PHPC_NS_GETSERVBYPORT_BODY__
+        $name = VmNetworkServices::getservbyport($port, $protocol);
+
+        return false === $name ? '' : (string) $name;
     }
 }
