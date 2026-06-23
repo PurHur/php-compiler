@@ -1566,6 +1566,7 @@ require_once __DIR__.'/../../../ext/standard/pi.php';
 require_once __DIR__.'/../../../ext/standard/popen.php';
 require_once __DIR__.'/../../../ext/standard/pos.php';
 require_once __DIR__.'/../../../ext/standard/pow.php';
+require_once __DIR__.'/../../../ext/standard/PowIntJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/preg_filter.php';
 require_once __DIR__.'/../../../ext/standard/preg_grep.php';
 require_once __DIR__.'/../../../ext/standard/preg_last_error_.php';

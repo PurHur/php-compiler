@@ -4,19 +4,35 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __phpc_pow_int (issue #3678, #5202).
+ * JIT/AOT link for __phpc_pow_int via PowIntJitHelper PHP (#9515).
  *
- * php-src: Zend/zend_operators.c — pow_function integer fast path.
+ * Integer exponent fast path delegates to {@see \PHPCompiler\ext\standard\VmMath::powInt}.
+ * php-src: Zend/zend_operators.c — pow_function integer fast path
  */
 final class PowIntRuntime
 {
-    private const LLONG_MAX = \PHP_INT_MAX;
-    private const LLONG_MIN = \PHP_INT_MIN;
+    private const HELPER_PATH = '/ext/standard/PowIntJitHelper.php';
+
+    private const COMPUTE_HELPER = 'PHPCompiler\\ext\\standard\\PowIntJitHelper::compute';
+
+    private const RESULT_INT_HELPER = 'PHPCompiler\\ext\\standard\\PowIntJitHelper::resultInt';
+
+    private const RESULT_FLOAT_HELPER = 'PHPCompiler\\ext\\standard\\PowIntJitHelper::resultFloat';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::COMPUTE_HELPER,
+        self::RESULT_INT_HELPER,
+        self::RESULT_FLOAT_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -32,236 +48,138 @@ final class PowIntRuntime
             return;
         }
 
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $valuePtr, $i64, $i64);
-        $fn = $context->module->addFunction('__phpc_pow_int', $ft);
-        self::implementPowInt($context, $fn);
+        self::ensureJitHelperCompiled($context);
+        self::implementPowIntBridge($context);
         self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function implementPowInt(Context $context, Value $fn): void
+    private static function implementPowIntBridge(Context $context): void
     {
-        $entry = $fn->appendBasicBlock('pow_int_entry');
-        $context->builder->positionAtEnd($entry);
+        $abiName = '__phpc_pow_int';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
+            return;
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $doubleTy = $context->getTypeFromString('double');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valuePtr, $i64, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('pow_int_bridge_entry');
+        $nullOut = $fn->appendBasicBlock('pow_int_bridge_null_out');
+        $work = $fn->appendBasicBlock('pow_int_bridge_work');
+        $intPath = $fn->appendBasicBlock('pow_int_bridge_int');
+        $floatPath = $fn->appendBasicBlock('pow_int_bridge_float');
+        $done = $fn->appendBasicBlock('pow_int_bridge_done');
+
+        $context->builder->positionAtEnd($entry);
         $out = $fn->getParam(0);
         $base = $fn->getParam(1);
         $exp = $fn->getParam(2);
-        $i64 = $context->getTypeFromString('int64');
-        $doubleTy = $context->getTypeFromString('double');
-        $zeroI64 = $i64->constInt(0, false);
-        $oneI64 = $i64->constInt(1, false);
-        $nullOut = $context->builder->icmp(
-            Builder::INT_EQ,
-            $out,
-            $out->typeOf()->constNull()
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $out, $out->typeOf()->constNull());
+        $context->builder->branchIf($isNull, $nullOut, $work);
+
+        $context->builder->positionAtEnd($nullOut);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($work);
+        $tag = $context->builder->call(
+            self::helperFunction($context, self::COMPUTE_HELPER),
+            $base,
+            $exp
         );
+        $tagI32 = $tag->typeOf() === $i32
+            ? $tag
+            : $context->builder->truncOrBitCast($tag, $i32);
+        $isFloat = $context->builder->icmp(Builder::INT_NE, $tagI32, $i32->constInt(0, false));
+        $context->builder->branchIf($isFloat, $floatPath, $intPath);
 
-        $resultSlot = $context->builder->alloca($i64, 1, 'pow_result');
-        $baseSlot = $context->builder->alloca($i64, 1, 'pow_b');
-        $expSlot = $context->builder->alloca($i64, 1, 'pow_e');
-
-        $nullBb = $fn->appendBasicBlock('pow_int_null_out');
-        $checkExpBb = $fn->appendBasicBlock('pow_int_check_exp');
-        $negExpBb = $fn->appendBasicBlock('pow_int_neg_exp');
-        $zeroExpBb = $fn->appendBasicBlock('pow_int_zero_exp');
-        $loopInitBb = $fn->appendBasicBlock('pow_int_loop_init');
-        $loopHeadBb = $fn->appendBasicBlock('pow_int_loop_head');
-        $loopOddBb = $fn->appendBasicBlock('pow_int_loop_odd');
-        $loopOddMulBb = $fn->appendBasicBlock('pow_int_loop_odd_mul');
-        $loopShiftBb = $fn->appendBasicBlock('pow_int_loop_shift');
-        $loopSquareBb = $fn->appendBasicBlock('pow_int_loop_square');
-        $loopSquareOkBb = $fn->appendBasicBlock('pow_int_loop_square_ok');
-        $successBb = $fn->appendBasicBlock('pow_int_success');
-        $floatBb = $fn->appendBasicBlock('pow_int_float');
-
-        $context->builder->branchIf($nullOut, $nullBb, $checkExpBb);
-
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($checkExpBb);
-        $negExp = $context->builder->icmp(Builder::INT_SLT, $exp, $zeroI64);
-        $context->builder->branchIf($negExp, $negExpBb, $zeroExpCheckBb = $fn->appendBasicBlock('pow_int_zero_exp_check'));
-
-        $context->builder->positionAtEnd($zeroExpCheckBb);
-        $zeroExp = $context->builder->icmp(Builder::INT_EQ, $exp, $zeroI64);
-        $context->builder->branchIf($zeroExp, $zeroExpBb, $loopInitBb);
-
-        $context->builder->positionAtEnd($negExpBb);
-        self::writeDoublePow($context, $out, $base, $exp, $doubleTy);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($zeroExpBb);
+        $context->builder->positionAtEnd($intPath);
+        $intResult = $context->builder->call(self::helperFunction($context, self::RESULT_INT_HELPER));
+        $intI64 = $intResult->typeOf() === $i64
+            ? $intResult
+            : $context->builder->sext($intResult, $i64);
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $out,
-            $oneI64
+            $intI64
         );
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->builder->branch($done);
 
-        $context->builder->positionAtEnd($loopInitBb);
-        $context->builder->store($oneI64, $resultSlot);
-        $context->builder->store($base, $baseSlot);
-        $context->builder->store($exp, $expSlot);
-        $context->builder->branch($loopHeadBb);
-
-        $context->builder->positionAtEnd($loopHeadBb);
-        $eVal = $context->builder->load($expSlot);
-        $eDone = $context->builder->icmp(Builder::INT_EQ, $eVal, $zeroI64);
-        $context->builder->branchIf($eDone, $successBb, $loopOddBb);
-
-        $context->builder->positionAtEnd($loopOddBb);
-        $oddBit = $context->builder->and($eVal, $oneI64);
-        $isOdd = $context->builder->icmp(Builder::INT_NE, $oddBit, $zeroI64);
-        $context->builder->branchIf($isOdd, $loopOddMulBb, $loopShiftBb);
-
-        $context->builder->positionAtEnd($loopOddMulBb);
-        $resVal = $context->builder->load($resultSlot);
-        $bVal = $context->builder->load($baseSlot);
-        $oddOverflow = self::mulOverflows($context, $resVal, $bVal);
-        $context->builder->branchIf($oddOverflow, $floatBb, $loopOddApplyBb = $fn->appendBasicBlock('pow_int_loop_odd_apply'));
-
-        $context->builder->positionAtEnd($loopOddApplyBb);
-        $context->builder->store(
-            $context->builder->mulNoSignedWrap(
-                $context->builder->load($resultSlot),
-                $context->builder->load($baseSlot)
-            ),
-            $resultSlot
-        );
-        $context->builder->branch($loopShiftBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($loopShiftBb);
-        $eVal = $context->builder->load($expSlot);
-        $context->builder->store(
-            $context->builder->lShr($eVal, $oneI64),
-            $expSlot
-        );
-        $eAfter = $context->builder->load($expSlot);
-        $needSquare = $context->builder->icmp(Builder::INT_SGT, $eAfter, $zeroI64);
-        $context->builder->branchIf($needSquare, $loopSquareBb, $loopHeadBb);
-
-        $context->builder->positionAtEnd($loopSquareBb);
-        $bVal = $context->builder->load($baseSlot);
-        $sqOverflow = self::mulOverflows($context, $bVal, $bVal);
-        $context->builder->branchIf($sqOverflow, $floatBb, $loopSquareOkBb);
-
-        $context->builder->positionAtEnd($loopSquareOkBb);
-        $bVal = $context->builder->load($baseSlot);
-        $context->builder->store(
-            $context->builder->mulNoSignedWrap($bVal, $bVal),
-            $baseSlot
-        );
-        $context->builder->branch($loopHeadBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($successBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $out,
-            $context->builder->load($resultSlot)
-        );
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($floatBb);
-        self::writeDoublePow($context, $out, $base, $exp, $doubleTy);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function ensureLibmPow(Context $context): void
-    {
-        try {
-            $context->lookupFunction('pow');
-        } catch (\Throwable $e) {
-            $double = $context->getTypeFromString('double');
-            $ft = $context->context->functionType($double, false, $double, $double);
-            $fn = $context->module->addFunction('pow', $ft);
-            $context->registerFunction('pow', $fn);
-        }
-    }
-
-    private static function writeDoublePow(
-        Context $context,
-        Value $out,
-        Value $base,
-        Value $exp,
-        $doubleTy
-    ): void {
-        self::ensureLibmPow($context);
-        $baseD = $context->builder->sitofp($base, $doubleTy);
-        $expD = $context->builder->sitofp($exp, $doubleTy);
-        $powFn = $context->lookupFunction('pow');
-        $result = $context->builder->call($powFn, $baseD, $expD);
+        $context->builder->positionAtEnd($floatPath);
+        $floatResult = $context->builder->call(self::helperFunction($context, self::RESULT_FLOAT_HELPER));
+        $floatD = $floatResult->typeOf() === $doubleTy
+            ? $floatResult
+            : $context->builder->sitofp($floatResult, $doubleTy);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $out,
-            $result
+            $floatD
         );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
     }
 
-    /** Mirrors phpc_mul_overflows in phpc_pow.c. */
-    private static function mulOverflows(Context $context, Value $a, Value $b): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $zero = $i64->constInt(0, false);
-        $falseVal = $i1->constInt(0, false);
-        $bZero = $context->builder->icmp(Builder::INT_EQ, $b, $zero);
-        $aZero = $context->builder->icmp(Builder::INT_EQ, $a, $zero);
-        $noOverflow = $context->builder->or($aZero, $bZero);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after PowIntJitHelper compile (#9515)');
+        }
 
-        $one = $i64->constInt(1, false);
-        $max = $i64->constInt(self::LLONG_MAX, false);
-        $min = $i64->constInt(self::LLONG_MIN, false);
-        $safeA = $context->builder->select($aZero, $one, $a);
-        $safeB = $context->builder->select($bZero, $one, $b);
+        return $fn;
+    }
 
-        $aPos = $context->builder->icmp(Builder::INT_SGT, $a, $zero);
-        $aNeg = $context->builder->icmp(Builder::INT_SLT, $a, $zero);
-        $bPos = $context->builder->icmp(Builder::INT_SGT, $b, $zero);
-        $bNeg = $context->builder->icmp(Builder::INT_SLT, $b, $zero);
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
 
-        $maxDivB = $context->builder->signedDiv($max, $safeB);
-        $posPos = $context->builder->and($aPos, $bPos);
-        $posPosOv = $context->builder->and($posPos, $context->builder->icmp(Builder::INT_SGT, $a, $maxDivB));
-
-        $minDivA = $context->builder->signedDiv($min, $safeA);
-        $posNeg = $context->builder->and($aPos, $bNeg);
-        $posNegOv = $context->builder->and($posNeg, $context->builder->icmp(Builder::INT_SLT, $b, $minDivA));
-
-        $minDivB = $context->builder->signedDiv($min, $safeB);
-        $negPos = $context->builder->and($aNeg, $bPos);
-        $negPosOv = $context->builder->and($negPos, $context->builder->icmp(Builder::INT_SLT, $a, $minDivB));
-
-        $maxDivA = $context->builder->signedDiv($max, $safeA);
-        $aNonZero = $context->builder->icmp(Builder::INT_NE, $a, $zero);
-        $negNeg = $context->builder->and($aNeg, $bNeg);
-        $negNegOv = $context->builder->and(
-            $negNeg,
-            $context->builder->and($aNonZero, $context->builder->icmp(Builder::INT_SLT, $b, $maxDivA))
-        );
-
-        $any = $context->builder->or($posPosOv, $posNegOv);
-        $any = $context->builder->or($any, $negPosOv);
-        $any = $context->builder->or($any, $negNegOv);
-
-        return $context->builder->select($noOverflow, $falseVal, $any);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PowIntJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('PowIntJitHelper.php parseAndCompile failed (#9515)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9515)');
+            }
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__phpc_pow_int');
         if (null === $fn) {
-            throw new \LogicException('__phpc_pow_int missing after PowIntRuntime LLVM implement');
+            throw new \LogicException('__phpc_pow_int missing after PowIntRuntime bridge (#9515)');
         }
         $context->registerFunction('__phpc_pow_int', $fn);
     }
