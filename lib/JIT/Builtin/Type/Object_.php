@@ -206,7 +206,6 @@ class Object_ extends Type {
         ];
         $this->pointer = $this->context->getTypeFromString('__object__*');
         \PHPCompiler\JIT\ReadonlyBridge::registerDeclarations($this->context);
-        \PHPCompiler\JIT\ReadonlyBridge::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::registerDeclarations($this->context);
         \PHPCompiler\JIT\Builtin\TypeErrorRaise::ensureLinked($this->context);
         \PHPCompiler\JIT\Builtin\ErrorRaise::registerDeclarations($this->context);
