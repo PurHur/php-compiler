@@ -22,6 +22,12 @@ final class VmIni
         'zend.enable_gc' => true,
     ];
 
+    /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
+    private const READONLY_STRING_DEFAULTS = [
+        'max_execution_time' => '0',
+        'default_charset' => 'UTF-8',
+    ];
+
     /** @var list<string> */
     public const SUPPORTED_KEYS = [
         'error_reporting',
@@ -34,12 +40,14 @@ final class VmIni
         'short_open_tag',
         'register_argc_argv',
         'zend.enable_gc',
+        'max_execution_time',
+        'default_charset',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
     private const CFG_DISPLAY_ERRORS = '';
 
-    private const CFG_MEMORY_LIMIT = '128M';
+    private const CFG_MEMORY_LIMIT = '-1';
 
     private const CFG_SERIALIZE_PRECISION = '-1';
 
@@ -79,6 +87,9 @@ final class VmIni
         $key = strtolower($option);
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return self::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
+        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
+            return self::READONLY_STRING_DEFAULTS[$key];
         }
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
             return VmAssertState::iniGet($option);
@@ -122,6 +133,8 @@ final class VmIni
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
+            'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
+            'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
             default => false,
         };
     }
