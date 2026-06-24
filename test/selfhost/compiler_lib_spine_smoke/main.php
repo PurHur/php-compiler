@@ -2688,6 +2688,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionGetPrevious.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionGetTrace.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionGetTraceAsString.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionToString.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionWakeup.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/FiberGetReturn.php';
