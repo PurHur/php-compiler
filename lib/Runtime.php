@@ -423,7 +423,9 @@ class Runtime {
     public function parseForIncludeDiscovery(string $code, string $filename): Script
     {
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
-        $this->compiler->setBareRethrowLines($bareRethrowLines);
+        if (method_exists($this->compiler, 'setBareRethrowLines')) {
+            $this->compiler->setBareRethrowLines($bareRethrowLines);
+        }
         $this->resetParserNameResolverState();
         try {
             $script = $this->parser->parse($code, $filename);
@@ -458,7 +460,9 @@ class Runtime {
 
     public function parse(string $code, string $filename): Script {
         [$code, $bareRethrowLines] = $this->prepareSourceForParser($code, $filename);
-        $this->compiler->setBareRethrowLines($bareRethrowLines);
+        if (method_exists($this->compiler, 'setBareRethrowLines')) {
+            $this->compiler->setBareRethrowLines($bareRethrowLines);
+        }
         $fileStrictTypes = $this->detectFileStrictTypes($code);
         $this->resetParserNameResolverState();
         try {
@@ -467,7 +471,8 @@ class Runtime {
             $this->abstractEnumMarker->clear();
         }
         $this->preprocessor->traverse($script);
-        if (!$this->isBootstrapVendorPrelinkMode()) {
+        $vendorPrelink = getenv('PHP_COMPILER_VENDOR_PRELINK');
+        if ('1' !== $vendorPrelink && 'true' !== strtolower((string) $vendorPrelink)) {
             $state = new State($script);
             $this->typeReconstructor->resolve($state);
         }

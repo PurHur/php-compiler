@@ -203,7 +203,9 @@ final class Linter
     private function parseForLint(string $code, string $filename): Script
     {
         [$code, $bareRethrowLines] = $this->runtime->prepareSourceForParser($code, $filename);
-        $this->runtime->compiler->setBareRethrowLines($bareRethrowLines);
+        if (method_exists($this->runtime->compiler, 'setBareRethrowLines')) {
+            $this->runtime->compiler->setBareRethrowLines($bareRethrowLines);
+        }
         $this->runtime->resetParserNameResolverBeforeParse();
         $script = $this->runtime->parser->parse($code, $filename);
         $this->runtime->preprocessor->traverse($script);

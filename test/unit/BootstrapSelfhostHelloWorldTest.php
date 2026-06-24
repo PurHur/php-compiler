@@ -517,6 +517,7 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringContainsString('ensureM3EmitTuCompilerRuntimeCompileDeps', $jit);
         $this->assertStringContainsString("'setpropertyhookregistry'", $jit);
         $this->assertStringContainsString("'setknownclassreadonly'", $jit);
+        $this->assertStringContainsString("'setbarerethrowlines'", $jit);
     }
 
     /** Issue #2843: inventory compile_driver links without *_m3_emit_native_entry.php. */
