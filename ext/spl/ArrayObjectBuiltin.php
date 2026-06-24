@@ -74,6 +74,8 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['offsetexists'] = $pub;
         $entry->methods['offsetunset'] = new ArrayObjectOffsetUnset();
         $entry->methodVisibility['offsetunset'] = $pub;
+        $entry->methods['append'] = new ArrayObjectAppend();
+        $entry->methodVisibility['append'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -390,5 +392,29 @@ final class ArrayObjectOffsetUnset extends VmClassMethod
             );
         }
         SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+final class ArrayObjectAppend extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('append');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::append()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayObject::append() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::append($object, $frame->calledArgs[1]);
     }
 }
