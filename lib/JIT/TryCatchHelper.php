@@ -365,7 +365,7 @@ final class TryCatchHelper
             $active,
             $objPtr->constNull()
         );
-        $throwBlock = $builder->getInsertBlock();
+        $throwBlock = self::probeInsertBlock($builder);
         if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
             $throwBlock = self::appendBlock($func, 'rethrow_check');
             $builder->positionAtEnd($throwBlock);
@@ -717,7 +717,7 @@ final class TryCatchHelper
             $context->lookupFunction('__phpc_exception_handler_dispatch'),
             $exceptionObj
         );
-        $func = $builder->getInsertBlock()->getParent();
+        $func = self::probeInsertBlock($builder)?->getParent();
         if (!$func instanceof Function_) {
             throw new \LogicException('emitUncaughtUserHandlerOrAbort requires parent function');
         }
