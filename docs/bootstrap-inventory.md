@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3028 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8159 |
+| Source constructs flagged (warnings) | 8157 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1114,7 +1114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_any.php` | 0 | 1 |
 | `ext/standard/array_change_key_case.php` | 0 | 1 |
 | `ext/standard/array_chunk.php` | 0 | 1 |
-| `ext/standard/array_column.php` | 0 | 8 |
+| `ext/standard/array_column.php` | 0 | 6 |
 | `ext/standard/array_combine.php` | 0 | 4 |
 | `ext/standard/array_count.php` | 0 | 1 |
 | `ext/standard/array_count_values.php` | 0 | 1 |
@@ -10004,11 +10004,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 102)
 - new HashTable (line 156)
 - new Variable (line 164)
-- new HashTable (line 273)
-- new Variable (line 285)
-- new HashTable (line 297)
-- new Variable (line 309)
-- 17 class method(s)
+- new HashTable (line 286)
+- new Variable (line 298)
+- new HashTable (line 310)
+- new Variable (line 322)
+- 18 class method(s)
 
 ### `ext/standard/VmSerialize.php`
 
@@ -10475,13 +10475,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 51)
-- new Variable (line 55)
-- new Variable (line 74)
-- new Variable (line 85)
-- new Variable (line 93)
-- new Variable (line 263)
-- new Variable (line 274)
-- 7 class method(s)
+- new Variable (line 58)
+- new Variable (line 82)
+- new Variable (line 91)
+- new Variable (line 276)
+- 6 class method(s)
 
 ### `ext/standard/array_combine.php`
 
@@ -19269,7 +19267,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ScopeBuiltinHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- 33 class method(s)
 
 ### `lib/JIT/ScopeVariableAssignedFlags.php`
 
