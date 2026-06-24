@@ -273,6 +273,33 @@ final class VmMath
     }
 
     /**
+     * Nullable int builtin args with strict_types TypeError on float/string (#11286, zend_verify_arg_type).
+     */
+    public static function parseNullableIntBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): ?int {
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::parseNullableIntBuiltinArg($var, $function, $userArgIndex, $paramName);
+    }
+
+    /**
      * chr() codepoint coercion (php-src ext/standard/string.c php_chr; #5085).
      *
      * Float operands truncate toward zero; non-numeric strings throw TypeError.
