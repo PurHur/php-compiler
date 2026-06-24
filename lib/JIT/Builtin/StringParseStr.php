@@ -7,17 +7,24 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for __compiler_parse_str (mirrors VmParseStr merge semantics; #6013).
+ * JIT link for __compiler_parse_str — PHP helper on embed, LLVM on standalone (#9295).
  */
 final class StringParseStr
 {
     public static function ensureLinked(Context $context): void
     {
-        StringParseStrJit::implement($context);
+        self::implement($context);
     }
 
     public static function implement(Context $context): void
     {
-        self::ensureLinked($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StringParseStrJit::implement($context);
+
+            return;
+        }
+
+        ParseStrRuntime::implement($context);
+        StringParseStrJit::ensureSubhelpers($context);
     }
 }

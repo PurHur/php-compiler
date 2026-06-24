@@ -40,4 +40,28 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('parseDelimited', $source);
         $this->assertStringContainsString('cookiePairDecode', $source);
     }
+
+    public function testStringParseStrRoutesJitEmbedThroughParseStrRuntime(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
+        $this->assertStringContainsString('ParseStrRuntime::implement', $source);
+        $this->assertStringContainsString('StringParseStrJit::ensureSubhelpers', $source);
+        $this->assertStringContainsString('StringParseStrJit::implement', $source);
+        $this->assertLessThan(35, \substr_count($source, "\n") + 1);
+    }
+
+    public function testParseStrJitHelperDelegatesToParseStrEngine(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrJitHelper.php');
+        $this->assertStringContainsString('ParseStrEngine::parse', $source);
+        $this->assertStringContainsString('VmParseStr::mergeInto', $source);
+    }
+
+    public function testSpineBundleIncludesParseStrPhpJitPath(): void
+    {
+        $spine = (string) file_get_contents($this->repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('ParseStrJitHelper.php', $spine);
+        $this->assertStringContainsString('ParseStrRuntime.php', $spine);
+        $this->assertStringContainsString('StringParseStrJit.php', $spine);
+    }
 }
