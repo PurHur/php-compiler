@@ -18,6 +18,8 @@ use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
+use PHPCompiler\ext\spl\ArrayObjectBuiltin;
+use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\VM\ForeachIterator;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CastSupport;
@@ -2570,6 +2572,10 @@ class VM {
             if (null === $frame) {
                 throw new \LogicException('iterator_to_array() on Traversable object requires VM frame');
             }
+            $arrayObjectCopy = $this->iteratorArrayObjectToArray($iterator, $preserveKeys);
+            if (null !== $arrayObjectCopy) {
+                return $arrayObjectCopy;
+            }
 
             return $this->iteratorObjectToArray($frame, $iterator, $preserveKeys);
         }
@@ -2577,6 +2583,34 @@ class VM {
         throw new \TypeError(
             'iterator_to_array(): Argument #1 ($iterator) must be of type '.IterableCheck::TYPE_LABEL
         );
+    }
+
+    private function iteratorArrayObjectToArray(Variable $iterable, bool $preserveKeys): ?HashTable
+    {
+        $iterable = $iterable->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $iterable->type) {
+            return null;
+        }
+        $entry = $iterable->toObject();
+        if (ArrayObjectBuiltin::CLASS_LC !== strtolower(ltrim($entry->class->name, '\\'))) {
+            return null;
+        }
+        if (!SplArrayStorage::hasState($entry)) {
+            return null;
+        }
+        $table = SplArrayStorage::getArrayCopy($entry);
+        if ($preserveKeys) {
+            return $table;
+        }
+        $out = new HashTable();
+        $index = 0;
+        foreach ($table->iterateKeyed(true) as [, $value]) {
+            $packedKey = new Variable();
+            $packedKey->int($index++);
+            self::appendHashTableEntry($out, $packedKey, $value);
+        }
+
+        return $out;
     }
 
     private function iteratorObjectToArray(Frame $frame, Variable $iterable, bool $preserveKeys): HashTable
