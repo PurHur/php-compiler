@@ -283,5 +283,12 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['options', 'params'], $ctx);
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctx, 'options', 'stream_context_create'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ctx, 'params', 'stream_context_create'));
+
+        $copy = BuiltinParamNames::forFunction('stream_copy_to_stream');
+        self::assertSame(['from', 'to', 'length', 'offset'], $copy);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($copy, 'from', 'stream_copy_to_stream'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($copy, 'to', 'stream_copy_to_stream'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($copy, 'length', 'stream_copy_to_stream'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($copy, 'offset', 'stream_copy_to_stream'));
     }
 }

@@ -117,6 +117,8 @@ final class BuiltinParamNames
                 return ['stream', 'fields', 'separator', 'enclosure', 'escape'];
             case 'stream_context_create':
                 return ['options', 'params'];
+            case 'stream_copy_to_stream':
+                return ['from', 'to', 'length', 'offset'];
             case 'flock':
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
