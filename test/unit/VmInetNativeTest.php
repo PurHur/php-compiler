@@ -15,8 +15,8 @@ final class VmInetNativeTest extends TestCase
     public function testVmInetDoesNotReferenceHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmInet.php');
-        $this->assertStringContainsString('VmInetNative::available()', $source);
-        $this->assertStringContainsString('VmInetPure::long2ip', $source);
+        $this->assertStringContainsString('VmInetPure::', $source);
+        $this->assertStringNotContainsString('VmInetNative::available()', $source);
         $this->assertStringNotContainsString('host Zend fallback', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\long2ip\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\ip2long\\s*\\(/', $source);

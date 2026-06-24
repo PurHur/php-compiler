@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3038 |
-| Phase A inventory files (M2 ratio SSOT) | 3038 |
+| PHP files on vm.php path | 3040 |
+| Phase A inventory files (M2 ratio SSOT) | 3040 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8193 |
+| Source constructs flagged (warnings) | 8197 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -355,6 +355,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/Ieee754.php` | 0 | 1 |
 | `ext/standard/IncludePathJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludePathResolveJitHelper.php` | 0 | 1 |
+| `ext/standard/InetJitHelper.php` | 0 | 1 |
 | `ext/standard/InfoJitHelper.php` | 0 | 1 |
 | `ext/standard/IniParseQuantityJitHelper.php` | 0 | 1 |
 | `ext/standard/JitAddcslashes.php` | 0 | 1 |
@@ -2082,7 +2083,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Iconv.php` | 0 | 1 |
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/InetRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/InetLibcBridge.php` | 0 | 1 |
+| `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
 | `lib/JIT/Builtin/IniParseQuantityRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/IniRuntime.php` | 0 | 1 |
@@ -5246,6 +5248,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/InetJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/InfoJitHelper.php`
 
@@ -9472,7 +9479,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInetNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmInetPure.php`
 
@@ -16673,10 +16680,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 21 class method(s)
 - 1 closure(s)
 
-### `lib/JIT/Builtin/InetRuntime.php`
+### `lib/JIT/Builtin/InetLibcBridge.php`
 
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
+
+### `lib/JIT/Builtin/InetRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 310)
+- 12 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/IniGet.php`
 
