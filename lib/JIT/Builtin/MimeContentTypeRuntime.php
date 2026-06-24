@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -52,10 +53,12 @@ final class MimeContentTypeRuntime
 
         $entry = $fn->appendBasicBlock('mime_content_type_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction('__compiler_mime_content_type', $fn);
         $context->builder->clearInsertionPosition();
