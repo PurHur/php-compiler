@@ -44,7 +44,7 @@ final class string_trim extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('trim() requires one or two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'trim', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'trim', 'string', 0, $frame);
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'trim', 0, 'string');
         $mask = VmString::TRIM_DEFAULT;
         $mode = VmString::TRIM_SIDE_BOTH;

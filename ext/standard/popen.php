@@ -34,7 +34,7 @@ final class popen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'popen', 'command', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'popen', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0]->resolveIndirect(),
             'popen',

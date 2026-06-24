@@ -34,7 +34,7 @@ final class lcfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('lcfirst() requires exactly one argument');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'lcfirst', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'lcfirst', 'string', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'lcfirst',

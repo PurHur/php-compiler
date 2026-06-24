@@ -30,8 +30,8 @@ final class str_starts_with extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'str_starts_with', 2);
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_starts_with', 'haystack', 0);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_starts_with', 'needle', 1);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_starts_with', 'haystack', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_starts_with', 'needle', 1, $frame);
         $haystackStr = VmString::coerceStringBuiltinArgNoObject(
             $frame->calledArgs[0],
             'str_starts_with',

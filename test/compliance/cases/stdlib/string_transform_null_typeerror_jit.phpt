@@ -1,5 +1,5 @@
 --TEST--
-stdlib nl2br/trim family JIT — null operand TypeError (#11171)
+stdlib nl2br/trim family JIT — null operand coerces when caller non-strict (#11322)
 --FILE--
 <?php
 foreach (['nl2br', 'trim', 'ucfirst'] as $fn) {
@@ -12,6 +12,6 @@ foreach (['nl2br', 'trim', 'ucfirst'] as $fn) {
 }
 ?>
 --EXPECT--
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
-trim: trim(): Argument #1 ($string) must be of type string, null given
-ucfirst: ucfirst(): Argument #1 ($string) must be of type string, null given
+nl2br: NO_THROW
+trim: NO_THROW
+ucfirst: NO_THROW

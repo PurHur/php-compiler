@@ -34,7 +34,7 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'nl2br', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'nl2br', 'string', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'nl2br',

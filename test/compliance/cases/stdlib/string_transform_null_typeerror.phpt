@@ -1,5 +1,5 @@
 --TEST--
-stdlib nl2br/trim family — null operand TypeError (#11171, ext/standard/string.c)
+stdlib nl2br/trim family — null operand coerces when caller non-strict (#11322, ext/standard/string.c)
 --FILE--
 <?php
 foreach (['nl2br', 'chop', 'rtrim', 'ltrim', 'trim', 'wordwrap', 'ucfirst', 'lcfirst', 'ucwords'] as $fn) {
@@ -12,15 +12,14 @@ foreach (['nl2br', 'chop', 'rtrim', 'ltrim', 'trim', 'wordwrap', 'ucfirst', 'lcf
 }
 echo trim('  x  '), "\n";
 ?>
---EXPECTF--
-%A
-nl2br: nl2br(): Argument #1 ($string) must be of type string, null given
-chop: chop(): Argument #1 ($string) must be of type string, null given
-rtrim: rtrim(): Argument #1 ($string) must be of type string, null given
-ltrim: ltrim(): Argument #1 ($string) must be of type string, null given
-trim: trim(): Argument #1 ($string) must be of type string, null given
-wordwrap: wordwrap(): Argument #1 ($string) must be of type string, null given
-ucfirst: ucfirst(): Argument #1 ($string) must be of type string, null given
-lcfirst: lcfirst(): Argument #1 ($string) must be of type string, null given
-ucwords: ucwords(): Argument #1 ($string) must be of type string, null given
+--EXPECT--
+nl2br: NO_THROW
+chop: NO_THROW
+rtrim: NO_THROW
+ltrim: NO_THROW
+trim: NO_THROW
+wordwrap: NO_THROW
+ucfirst: NO_THROW
+lcfirst: NO_THROW
+ucwords: NO_THROW
 x

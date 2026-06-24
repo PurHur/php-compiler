@@ -26,7 +26,7 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ucwords', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ucwords', 'string', 0, $frame);
         $string = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'ucwords',

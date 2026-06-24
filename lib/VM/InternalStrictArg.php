@@ -51,10 +51,20 @@ final class InternalStrictArg
     }
 
     /**
-     * Reject null for internal string parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED; #4365).
+     * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
+     *
+     * Non-strict callers coerce null to "" via VmString::coerceStringBuiltinArg (php-src Z_PARAM_STR).
      */
-    public static function rejectNullString(Variable $arg, string $function, string $paramName, int $argIndex = 0): void
-    {
+    public static function rejectNullString(
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argIndex,
+        Frame $frame
+    ): void {
+        if (!self::isCallerStrict($frame)) {
+            return;
+        }
         $v = $arg->resolveIndirect();
         if (Variable::TYPE_NULL === $v->type) {
             throw new \TypeError(self::message($function, $argIndex, $paramName, 'string', $v));

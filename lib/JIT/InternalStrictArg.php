@@ -40,7 +40,7 @@ final class InternalStrictArg
     }
 
     /**
-     * Reject null for internal string parameters (Zend ZEND_VERIFY_NULL_NOT_ALLOWED; #4365).
+     * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
      */
     public static function rejectNullString(
         Context $context,
@@ -49,6 +49,9 @@ final class InternalStrictArg
         string $paramName,
         int $argNumber
     ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::raiseTypeErrorAndAbort(
                 $context,

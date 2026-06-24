@@ -31,7 +31,7 @@ final class str_getcsv extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('str_getcsv() accepts one to four arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_getcsv', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_getcsv', 'string', 0, $frame);
         $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'str_getcsv', 0, 'string');
         $separator = ',';
         $enclosure = '"';
