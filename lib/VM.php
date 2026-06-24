@@ -4788,6 +4788,7 @@ restart:
                     $frame->scope[$op->arg1]->object($state->wrapObject($this->context));
                     break;
                 case OpCode::TYPE_RETURN_VOID:
+                    $frame->returnSiteLine = (int) ($op->arg1 ?? 0);
                     $finallyFrame = $this->beginReturnFinallyUnwind($frame, null, true);
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
@@ -4795,6 +4796,7 @@ restart:
                     }
                     goto return_void_complete;
                 case OpCode::TYPE_RETURN:
+                    $frame->returnSiteLine = (int) ($op->arg2 ?? 0);
                     if (null !== $op->arg1 && isset($frame->scope[$op->arg1])) {
                         $catchFrame = $this->guardUnboundThisRead($frame, (int) $op->arg1);
                         if (null !== $catchFrame) {

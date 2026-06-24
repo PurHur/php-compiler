@@ -14793,6 +14793,8 @@ class Compiler {
                     $line > 0 ? $line : null
                 )];
             case 'Terminal_Return':
+                $returnLine = $terminal->getLine();
+                $returnLineArg = $returnLine > 0 ? $returnLine : null;
                 if ($block->returnTypeNever) {
                     if (!is_null($terminal->expr)) {
                         $this->throwCompileError('A never-returning function must not return');
@@ -14802,20 +14804,23 @@ class Compiler {
                     }
                     if ($this->neverFunctionReturnIsImplicitFalloff($terminal)) {
                         return [new OpCode(
-                            OpCode::TYPE_RETURN_VOID
+                            OpCode::TYPE_RETURN_VOID,
+                            $returnLineArg
                         )];
                     }
                     $this->throwCompileError('A never-returning function must not return');
                 }
                 if (is_null($terminal->expr)) {
                     return [new OpCode(
-                        OpCode::TYPE_RETURN_VOID
+                        OpCode::TYPE_RETURN_VOID,
+                        $returnLineArg
                     )];
                 }
                 if ($block->returnTypeVoid) {
                     if ($this->voidFunctionReturnIsPhpCfgArtifact($terminal, $block)) {
                         return [new OpCode(
-                            OpCode::TYPE_RETURN_VOID
+                            OpCode::TYPE_RETURN_VOID,
+                            $returnLineArg
                         )];
                     }
                     $this->throwCompileError(
@@ -14825,7 +14830,7 @@ class Compiler {
 
                 $callResultSlot = $this->funcCallExecReturnSlotForReturn($block, $terminal->expr);
                 if (null !== $callResultSlot) {
-                    return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot)];
+                    return [new OpCode(OpCode::TYPE_RETURN, $callResultSlot, $returnLineArg)];
                 }
 
                 $returnExpr = $terminal->expr;
@@ -14844,7 +14849,8 @@ class Compiler {
 
                 return [new OpCode(
                     OpCode::TYPE_RETURN,
-                    $this->compileOperand($terminal->expr, $block, true)
+                    $this->compileOperand($terminal->expr, $block, true),
+                    $returnLineArg
                 )];
             case 'Iterator_Reset':
                 return [new OpCode(
