@@ -29,6 +29,10 @@ final class ArrayColumnVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_column_missing_key.phpt',
             'array_column_missing_key.phpt'
         );
+        yield 'array_column_object_property.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_column_object_property.phpt',
+            'array_column_object_property.phpt'
+        );
     }
 
     public function setUp(): void

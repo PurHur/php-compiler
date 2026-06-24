@@ -52,14 +52,18 @@ final class array_column extends Internal
         if (null === $columnField) {
             foreach ($ht->iterate(true) as $rowVar) {
                 $row = $rowVar->resolveIndirect();
+                if (Variable::TYPE_ARRAY !== $row->type && Variable::TYPE_OBJECT !== $row->type) {
+                    continue;
+                }
                 $stored = new Variable();
                 $stored->copyFrom($row);
-                if (null !== $indexField && Variable::TYPE_ARRAY === $row->type) {
-                    $rowHt = $row->toArray();
-                    if ($this->rowHasField($rowHt, $indexField)) {
-                        $this->storeAtKey($out, $this->readRowField($rowHt, $indexField), $stored);
+                if (null !== $indexField) {
+                    $indexVal = $this->readColumnFromRow($row, $indexField);
+                    if (null === $indexVal) {
                         continue;
                     }
+                    $this->storeAtKey($out, $indexVal, $stored);
+                    continue;
                 }
                 $out->append($stored);
             }
@@ -69,29 +73,23 @@ final class array_column extends Internal
         }
         foreach ($ht->iterate(true) as $rowVar) {
             $row = $rowVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $row->type) {
-                if (null === $indexField) {
-                    $stored = new Variable();
-                    $stored->null();
-                    $out->append($stored);
-                }
-                continue;
-            }
-            $rowHt = $row->toArray();
             if (null !== $indexField) {
-                if (!$this->rowHasField($rowHt, $indexField) || !$this->rowHasField($rowHt, $columnField)) {
+                $indexVal = $this->readColumnFromRow($row, $indexField);
+                $columnVal = $this->readColumnFromRow($row, $columnField);
+                if (null === $indexVal || null === $columnVal) {
                     continue;
                 }
                 $stored = new Variable();
-                $stored->copyFrom($this->readRowField($rowHt, $columnField));
-                $this->storeAtKey($out, $this->readRowField($rowHt, $indexField), $stored);
+                $stored->copyFrom($columnVal);
+                $this->storeAtKey($out, $indexVal, $stored);
                 continue;
             }
-            if (!$this->rowHasField($rowHt, $columnField)) {
+            $columnVal = $this->readColumnFromRow($row, $columnField);
+            if (null === $columnVal) {
                 continue;
             }
             $stored = new Variable();
-            $stored->copyFrom($this->readRowField($rowHt, $columnField));
+            $stored->copyFrom($columnVal);
             $out->append($stored);
         }
         $frame->returnVar->array($out);
@@ -249,24 +247,28 @@ final class array_column extends Internal
         );
     }
 
-    private function rowHasField(HashTable $row, string|int $field): bool
+    private function readColumnFromRow(Variable $row, string|int $field): ?Variable
     {
-        $cell = \is_int($field) ? $row->findIndex($field) : $row->find($field);
+        if (Variable::TYPE_ARRAY === $row->type) {
+            $rowHt = $row->toArray();
+            $cell = \is_int($field) ? $rowHt->findIndex($field) : $rowHt->find($field);
+            if (null === $cell || $cell->isUndefined()) {
+                return null;
+            }
 
-        return null !== $cell && !$cell->isUndefined();
-    }
+            return $cell->resolveIndirect();
+        }
+        if (Variable::TYPE_OBJECT === $row->type) {
+            $propName = \is_string($field) ? $field : (string) $field;
+            $object = $row->toObject();
+            if (!$object->hasProperty($propName)) {
+                return null;
+            }
 
-    private function readRowField(HashTable $row, string|int $field): Variable
-    {
-        $cell = \is_int($field) ? $row->findIndex($field) : $row->find($field);
-        if (null === $cell) {
-            $missing = new Variable();
-            $missing->null();
-
-            return $missing;
+            return $object->getProperty($propName)->resolveIndirect();
         }
 
-        return $cell->resolveIndirect();
+        return null;
     }
 
     private function storeAtKey(HashTable $out, Variable $key, Variable $value): void
