@@ -62,25 +62,29 @@ final class rsort_ extends Internal
                 );
             }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            $n = \count($values);
-            for ($i = 1; $i < $n; ++$i) {
-                $j = $i;
-                while ($j > 0) {
-                    $a = $values[$j - 1]->resolveIndirect();
-                    $b = $values[$j]->resolveIndirect();
-                    if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                        throw new \LogicException(
-                            'rsort() only supports homogeneous string or integer arrays in this compiler build'
-                        );
+            if (StdlibConstants::SORT_REGULAR === $sortType) {
+                $n = \count($values);
+                for ($i = 1; $i < $n; ++$i) {
+                    $j = $i;
+                    while ($j > 0) {
+                        $a = $values[$j - 1]->resolveIndirect();
+                        $b = $values[$j]->resolveIndirect();
+                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
+                            throw new \LogicException(
+                                'rsort() only supports homogeneous string or integer arrays in this compiler build'
+                            );
+                        }
+                        if ($a->toInt() >= $b->toInt()) {
+                            break;
+                        }
+                        $tmp = $values[$j - 1];
+                        $values[$j - 1] = $values[$j];
+                        $values[$j] = $tmp;
+                        --$j;
                     }
-                    if ($a->toInt() >= $b->toInt()) {
-                        break;
-                    }
-                    $tmp = $values[$j - 1];
-                    $values[$j - 1] = $values[$j];
-                    $values[$j] = $tmp;
-                    --$j;
                 }
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
             }
         } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
             VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, 'rsort()');

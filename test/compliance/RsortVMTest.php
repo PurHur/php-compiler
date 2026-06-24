@@ -13,7 +13,7 @@ final class RsortVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
-        foreach (['rsort.phpt', 'rsort_int.phpt', 'rsort_enum_case.phpt'] as $file) {
+        foreach (['rsort.phpt', 'rsort_int.phpt', 'rsort_enum_case.phpt', 'sort_sort_string_lexical.phpt'] as $file) {
             yield $file => self::parsePHPT(
                 __DIR__.'/cases/stdlib/'.$file,
                 $file
