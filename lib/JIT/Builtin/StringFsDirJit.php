@@ -610,10 +610,7 @@ final class StringFsDirJit
         $context->builder->positionAtEnd($rec);
         $isDir = self::pathIsDir($context, $p);
         $recCheckLen = $fn->appendBasicBlock('mkdir_rec_check_len');
-        $recTrue = $fn->appendBasicBlock('mkdir_rec_done_true');
-        $context->builder->branchIf($isDir, $recTrue, $recCheckLen);
-        $context->builder->positionAtEnd($recTrue);
-        $context->builder->returnValue($one);
+        $context->builder->branchIf($isDir, $fail, $recCheckLen);
 
         $context->builder->positionAtEnd($recCheckLen);
         $len = $context->builder->call($context->lookupFunction('strlen'), $p);
