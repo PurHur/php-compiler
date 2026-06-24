@@ -7116,6 +7116,10 @@ restart:
         if (null !== $name && $frame->block->declaresGlobalName($name)) {
             return false;
         }
+        // Zend ZEND_CHECK_UNDEFINED_VAR: assigned CVs (extract imports, etc.) are readable (#10590).
+        if (Variable::TYPE_NULL !== $resolved->type) {
+            return false;
+        }
 
         return !isset($frame->initializedSlots[$slot]);
     }

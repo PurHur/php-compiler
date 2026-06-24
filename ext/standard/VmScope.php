@@ -81,10 +81,10 @@ final class VmScope
             $flags = $flagsArg->toInt();
         }
 
-        return self::extractIntoCaller($caller, $array->toArray(), $flags);
+        return self::extractIntoCaller($caller, $array->toArray(), $flags, $frame);
     }
 
-    private static function extractIntoCaller(Frame $caller, HashTable $table, int $flags): int
+    private static function extractIntoCaller(Frame $caller, HashTable $table, int $flags, Frame $builtinFrame): int
     {
         $imported = 0;
         foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
@@ -92,15 +92,62 @@ final class VmScope
                 continue;
             }
             $name = $keyVar->toString();
+            if (null !== $caller->block) {
+                $written = false;
+                foreach ($caller->block->eachNamedScopeSlot() as [$slotName, $slot]) {
+                    if ($slotName !== $name) {
+                        continue;
+                    }
+                    if (!isset($caller->scope[$slot])) {
+                        $caller->scope[$slot] = new Variable();
+                    }
+                    if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($caller->scope[$slot])) {
+                        $written = true;
+                        continue;
+                    }
+                    $caller->scope[$slot]->copyFrom($valueVar);
+                    $caller->initializedSlots[$slot] = true;
+                    self::markGlobalEverAssignedForSlot($caller, $slot, $builtinFrame);
+                    $written = true;
+                }
+                if ($written) {
+                    ++$imported;
+                    continue;
+                }
+            }
             $target = self::ensureCallerVariable($caller, $name);
             if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($target)) {
                 continue;
             }
             $target->copyFrom($valueVar);
+            self::markCallerVariableInitialized($caller, $name, $builtinFrame);
             ++$imported;
         }
 
         return $imported;
+    }
+
+    /** Zend symbol-table import marks CVs initialized — no later undefined-variable warnings (#10590). */
+    private static function markCallerVariableInitialized(Frame $caller, string $name, Frame $builtinFrame): void
+    {
+        $slot = self::slotForName($caller, $name);
+        if (null !== $slot) {
+            $caller->initializedSlots[$slot] = true;
+            self::markGlobalEverAssignedForSlot($caller, $slot, $builtinFrame);
+        }
+    }
+
+    /** Script-level locals alias globalVars — mark assigned like TYPE_ASSIGN (#10590). */
+    private static function markGlobalEverAssignedForSlot(Frame $caller, int $slot, Frame $builtinFrame): void
+    {
+        $context = $caller->vmContext ?? $builtinFrame->vmContext;
+        if (null === $context || !isset($caller->scope[$slot])) {
+            return;
+        }
+        $globalName = $context->globalNameForStorage($caller->scope[$slot]);
+        if (null !== $globalName) {
+            $context->markGlobalEverAssigned($globalName);
+        }
     }
 
     public static function compact(Frame $frame): HashTable
