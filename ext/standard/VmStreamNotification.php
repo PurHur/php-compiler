@@ -75,7 +75,7 @@ final class VmStreamNotification
             }
         }
 
-        return self::$globalCallback;
+        return self::globalCallback();
     }
 
     public static function validateContextNotificationParam(Variable $callback, string $functionName): void
