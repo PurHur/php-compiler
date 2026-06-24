@@ -129,6 +129,8 @@ final class BuiltinParamNames
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
                 return ['resource_type'];
+            case 'get_browser':
+                return ['browser_name', 'return_array'];
             case 'get_defined_constants':
                 return ['categorize'];
             case 'intdiv':
