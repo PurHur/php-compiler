@@ -237,4 +237,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'break', 'wordwrap'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cut', 'wordwrap'));
     }
+
+    /** @covers issue #9646 */
+    public function testJsonEncodeNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('json_encode');
+        self::assertSame(['value', 'flags', 'depth'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'json_encode'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'flags', 'json_encode'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'depth', 'json_encode'));
+    }
 }
