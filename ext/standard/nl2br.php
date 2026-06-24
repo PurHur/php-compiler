@@ -14,10 +14,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,6 +34,7 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'nl2br', 'string', 0);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'nl2br',
@@ -54,6 +57,8 @@ final class nl2br extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('nl2br() requires one or two arguments');
         }
+
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'nl2br', 'string', 1);
 
         $strLit = JitStringArg::compileTimeLiteral($args[0]);
         $flagLit = 2 === $argc ? JitStringArg::compileTimeLiteral($args[1]) : null;

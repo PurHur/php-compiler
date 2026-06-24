@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -24,6 +26,7 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ucwords', 'string', 0);
         $string = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'ucwords',
@@ -54,6 +57,7 @@ final class ucwords extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ucwords() requires one or two arguments');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'ucwords', 'string', 1);
         $str = JitStringBuiltinArg::lower($context, $args[0], 'ucwords', 0, 'string');
         if (1 === $argc) {
             return $context->builder->call(

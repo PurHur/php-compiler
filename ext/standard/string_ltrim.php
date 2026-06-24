@@ -16,8 +16,10 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\StringTrimMask;
 use PHPCompiler\JIT\Builtin\StringTrimModeJit;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -36,6 +38,7 @@ final class string_ltrim extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ltrim() requires one or two arguments');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ltrim', 'string', 0);
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ltrim', 0, 'string');
         $mask = VmString::TRIM_DEFAULT;
         $mode = VmString::TRIM_SIDE_LEFT;
@@ -63,6 +66,7 @@ final class string_ltrim extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ltrim() requires one or two arguments');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'ltrim', 'string', 1);
         $literal = $args[0]->compileTimeString ?? null;
         $modeLiteral = (2 === $argc) ? StringTrimModeJit::compileTimeModeBitmask($context, $args[1]) : null;
         $maskLiteral = (2 === $argc && null === $modeLiteral) ? ($args[1]->compileTimeString ?? null) : null;
