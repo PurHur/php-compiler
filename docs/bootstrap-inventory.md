@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3045 |
-| Phase A inventory files (M2 ratio SSOT) | 3045 |
+| PHP files on vm.php path | 3049 |
+| Phase A inventory files (M2 ratio SSOT) | 3049 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8207 |
+| Source constructs flagged (warnings) | 8213 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -799,6 +799,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitUrlencode.php` | 0 | 1 |
 | `ext/standard/JitUtf8Latin1.php` | 0 | 1 |
 | `ext/standard/JitVarDump.php` | 0 | 1 |
+| `ext/standard/JitVarExport.php` | 0 | 1 |
 | `ext/standard/JitVfprintf.php` | 0 | 5 |
 | `ext/standard/JitVfscanf.php` | 0 | 2 |
 | `ext/standard/JitVsprintf.php` | 0 | 1 |
@@ -876,6 +877,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
 | `ext/standard/VarDumpJitHelper.php` | 0 | 1 |
+| `ext/standard/VarExportJitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
 | `ext/standard/VmArray.php` | 0 | 31 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
@@ -1107,6 +1109,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmUserCall.php` | 0 | 7 |
 | `ext/standard/VmUserStream.php` | 0 | 8 |
 | `ext/standard/VmVarDump.php` | 0 | 1 |
+| `ext/standard/VmVarExport.php` | 0 | 1 |
 | `ext/standard/VmVarExportFloat.php` | 0 | 1 |
 | `ext/standard/VmVarFormat.php` | 0 | 1 |
 | `ext/standard/VmVfscanf.php` | 0 | 5 |
@@ -2326,6 +2329,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUtf8Runtime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVarDump.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVarDumpJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringVarExport.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVarExportJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVersionCompare.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringVersionCompareJit.php` | 0 | 1 |
@@ -7596,6 +7600,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitVarExport.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/JitVfprintf.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8769,6 +8778,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/VarDumpJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/VarExportJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -10457,6 +10471,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/VmVarExport.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/standard/VmVarExportFloat.php`
 
@@ -14630,7 +14649,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/var_export.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/version_compare.php`
 
@@ -18061,6 +18080,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 24 class method(s)
+
+### `lib/JIT/Builtin/StringVarExport.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 126)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringVarExportJit.php`
 
