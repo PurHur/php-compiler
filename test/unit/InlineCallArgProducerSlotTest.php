@@ -1564,4 +1564,66 @@ PHP;
         $runtime->run($block);
         self::assertSame("object\n", ob_get_clean());
     }
+
+    /** Issue #11187 — rename($src, $dst) after file_put_contents must send path locals, not int returns. */
+    public function testRenameAfterFilePutContentsUsesNamedPathSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$base = 'test/repro/rename_overwrite_fixture';
+$src = $base . '/src.txt';
+$dst = $base . '/dst.txt';
+file_put_contents($src, 'source');
+file_put_contents($dst, 'existing');
+rename($src, $dst);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'rename_after_file_put_contents.php');
+
+        $srcSlot = null;
+        $dstSlot = null;
+        $fpcReturnSlots = [];
+        $renameSends = [];
+        $fcallOrdinal = 0;
+        $lastCallSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                $lastCallSends = [];
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $srcSlot) {
+                $srcSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $dstSlot) {
+                $dstSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && $fcallOrdinal <= 2) {
+                $fpcReturnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $lastCallSends[] = $op->arg1;
+            }
+        }
+        $renameSends = $lastCallSends;
+
+        self::assertNotNull($srcSlot);
+        self::assertNotNull($dstSlot);
+        self::assertCount(2, $renameSends, 'rename arg sends='.json_encode($renameSends));
+        self::assertSame([$srcSlot, $dstSlot], $renameSends, 'must not wire file_put_contents return ints');
+        self::assertNotContains($renameSends[0], $fpcReturnSlots, 'fpc returns='.json_encode($fpcReturnSlots));
+    }
+
+    /** Issue #11187 — rename onto existing destination overwrites (php-src ext/standard/file.c). */
+    public function testRenameOverwriteExistingDestinationRuntime(): void
+    {
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_rename_overwrite.php');
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_rename_overwrite.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("rename=true", $out);
+        self::assertStringContainsString("src_exists=false", $out);
+        self::assertStringContainsString("dst='source'", $out);
+    }
 }
