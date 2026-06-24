@@ -9,11 +9,13 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,8 +34,8 @@ final class str_ireplace extends Internal
             throw new \LogicException('str_ireplace() requires 3 or 4 arguments in this compiler build');
         }
         $hasCount = $argc >= 4;
-        $searchVar = self::requireStringOrArrayReplace($frame->calledArgs[0], 'str_ireplace', 0, 'search');
-        $replaceVar = self::requireStringOrArrayReplace($frame->calledArgs[1], 'str_ireplace', 1, 'replace');
+        $searchVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[0], 'str_ireplace', 0, 'search');
+        $replaceVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[1], 'str_ireplace', 1, 'replace');
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'str_ireplace',
@@ -118,8 +120,8 @@ final class str_ireplace extends Internal
             } else {
                 $result = JitStrIreplace::replace(
                     $context,
-                    JitStringArg::lower($context, $args[0], 'str_ireplace() search'),
-                    JitStringArg::lower($context, $args[1], 'str_ireplace() replace'),
+                    JitStringBuiltinArg::lower($context, $args[0], 'str_ireplace', 0, 'search', 'array|string'),
+                    JitStringBuiltinArg::lower($context, $args[1], 'str_ireplace', 1, 'replace', 'array|string'),
                     JitStringArg::lower($context, $args[2], 'str_ireplace() subject'),
                     $countSlot
                 );
@@ -132,8 +134,8 @@ final class str_ireplace extends Internal
             }
             $result = JitStrReplaceArray::invoke(
                 $context,
-                JitStringArg::lower($context, $args[0], 'str_ireplace() search'),
-                JitStringArg::lower($context, $args[1], 'str_ireplace() replace'),
+                JitStringBuiltinArg::lower($context, $args[0], 'str_ireplace', 0, 'search', 'array|string'),
+                JitStringBuiltinArg::lower($context, $args[1], 'str_ireplace', 1, 'replace', 'array|string'),
                 $args[2],
                 true,
                 $countSlot
@@ -191,7 +193,7 @@ final class str_ireplace extends Internal
         int $argIndex,
         string $paramName
     ): array {
-        if (Variable::TYPE_STRING === $var->type) {
+        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
             return [VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName)];
         }
 
@@ -213,7 +215,7 @@ final class str_ireplace extends Internal
         int $argIndex,
         string $paramName
     ): array|string {
-        if (Variable::TYPE_STRING === $var->type) {
+        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_NULL === $var->type) {
             return VmString::coerceStringBuiltinArg($arg, $function, $argIndex, $paramName);
         }
 
@@ -238,15 +240,24 @@ final class str_ireplace extends Internal
     }
 
     /**
-     * php-src Z_PARAM_STR on str_ireplace() search/replace — enum cases TypeError (#5889).
+     * php-src Z_PARAM_STR on str_ireplace() search/replace — null coerces outside strict_types (#11014, ext/standard/string.c).
      */
     private static function requireStringOrArrayReplace(
+        Frame $frame,
         Variable $var,
         string $function,
         int $argIndex,
         string $paramName
     ): Variable {
         $var = $var->resolveIndirect();
+        if (InternalStrictArg::isCallerStrict($frame) && Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be of type array|string, null given',
+                $function,
+                $argIndex + 1,
+                $paramName
+            ));
+        }
         if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($%s) must be of type array|string, %s given',
@@ -256,7 +267,10 @@ final class str_ireplace extends Internal
                 EnumCaseSupport::typeNameForVariable($var)
             ));
         }
-        if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
+        if (Variable::TYPE_STRING === $var->type
+            || Variable::TYPE_ARRAY === $var->type
+            || Variable::TYPE_NULL === $var->type
+        ) {
             return $var;
         }
 

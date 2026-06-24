@@ -3721,7 +3721,11 @@ final class VmString
     public static function strReplace(string $search, string $replace, string $subject, ?int &$count = null): string
     {
         if ('' === $search) {
-            throw new \LogicException('str_replace(): Argument #1 ($search) cannot be empty');
+            if (null !== $count) {
+                $count = 0;
+            }
+
+            return $subject;
         }
         $replacementCount = 0;
         $searchLen = self::byteLength($search);
@@ -3749,7 +3753,11 @@ final class VmString
     public static function strIreplace(string $search, string $replace, string $subject, ?int &$count = null): string
     {
         if ('' === $search) {
-            throw new \LogicException('str_ireplace(): Argument #1 ($search) cannot be empty');
+            if (null !== $count) {
+                $count = 0;
+            }
+
+            return $subject;
         }
         $replacementCount = 0;
         $searchLen = self::byteLength($search);
