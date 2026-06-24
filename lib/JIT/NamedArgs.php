@@ -119,6 +119,9 @@ final class NamedArgs
 
             $name = (string) $entry['name'];
             $value = $entry['value'];
+            if (null !== $functionName && BuiltinParamNames::rejectsNamedParameters($functionName)) {
+                BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            }
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 throw new \Error("Unknown named parameter \${$entry['name']}");

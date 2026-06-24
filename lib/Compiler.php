@@ -17029,10 +17029,28 @@ class Compiler {
                 && null !== $nameSlot
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
+                && null !== $block->orig
             ) {
-                $arraySlot = $this->resolveNamedDeadTempArrayCallArgSlot($cfgCallOp, $block);
-                if (null !== $arraySlot) {
-                    $valueSlot = $arraySlot;
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                    $producers,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $block
+                );
+                if ($matched instanceof Op\Expr\Array_) {
+                    if (null === $block->slotForOperand($matched->result)) {
+                        foreach ($this->compileExpr($matched, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                    }
+                    $arraySlot = $block->slotForOperand($matched->result);
+                    if (null !== $arraySlot) {
+                        $valueSlot = $arraySlot;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

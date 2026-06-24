@@ -90,6 +90,9 @@ final class NamedArgs
             $name = (string) $entry[1];
             /** @var Variable $value */
             $value = $entry[2];
+            if (null !== $functionName && BuiltinParamNames::rejectsNamedParameters($functionName)) {
+                BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            }
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {

@@ -192,6 +192,9 @@ final class CallUnpack
             }
             $hadNamed = true;
             $name = $key->toString();
+            if (null !== $functionName && BuiltinParamNames::rejectsNamedParameters($functionName)) {
+                BuiltinParamNames::throwUnknownNamedParameterError($functionName);
+            }
             $idx = BuiltinParamNames::lookupNamedParamIndex($paramNames, $name, $functionName);
             if (false === $idx) {
                 if (null !== $variadicParamIndex) {
