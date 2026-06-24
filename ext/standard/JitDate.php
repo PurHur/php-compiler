@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Block;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
+use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
 use PHPCompiler\JIT\Builtin\StringHrtime;
 use PHPCompiler\JIT\Builtin\StringMicrotime;
 use PHPCompiler\JIT\Context;
@@ -37,27 +38,22 @@ final class JitDate
 
     public static function getmypid(Context $context): Value
     {
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction('getpid'));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
+        return ProcessIdentityJit::getmypid($context);
     }
 
     public static function getmygrgid(Context $context): Value
     {
-        return self::libcUidToI64($context, 'getgid');
+        return ProcessIdentityJit::getmygid($context);
     }
 
     public static function getmyuid(Context $context): Value
     {
-        return self::libcUidToI64($context, 'getuid');
+        return ProcessIdentityJit::getmyuid($context);
     }
 
     public static function getmygid(Context $context): Value
     {
-        return self::libcUidToI64($context, 'getgid');
+        return ProcessIdentityJit::getmygid($context);
     }
 
     /** date_default_timezone_get() — process default timezone id (#3292 phase 2). */
@@ -112,16 +108,6 @@ final class JitDate
         );
 
         return $ptr;
-    }
-
-    private static function libcUidToI64(Context $context, string $fn): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $raw = $context->builder->call($context->lookupFunction($fn));
-
-        return $raw->typeOf() === $i64
-            ? $raw
-            : $context->builder->zExt($raw, $i64);
     }
 
     public static function getmyinode(Context $context): Value

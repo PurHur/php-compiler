@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc getuid/getgid/geteuid/getpwuid/getpid for VM without host PHP POSIX delegation (#7891, #8351).
+ * Process identity: /proc pure path first, libc FFI fallback (#9017, #7891, #8351).
  *
  * php-src: ext/standard/basic_functions.c — getmyuid, getmygid, get_current_user, getmypid
- * JIT/AOT: JitDate.php, JitGetCurrentUser.php (getuid/getgid/geteuid/getpwuid/getpid).
+ * JIT/AOT: ProcessIdentityJit.php via ProcessIdentityJitHelper (replaces libc getpid/getuid LLVM).
  */
 final class VmProcessIdentityNative
 {
@@ -23,6 +23,56 @@ final class VmProcessIdentityNative
 
     public static function getuid(): ?int
     {
+        $pure = VmProcessIdentityPure::getuid();
+        if (null !== $pure) {
+            return $pure;
+        }
+
+        return self::ffiGetuid();
+    }
+
+    public static function getgid(): ?int
+    {
+        $pure = VmProcessIdentityPure::getgid();
+        if (null !== $pure) {
+            return $pure;
+        }
+
+        return self::ffiGetgid();
+    }
+
+    public static function geteuid(): ?int
+    {
+        $pure = VmProcessIdentityPure::geteuid();
+        if (null !== $pure) {
+            return $pure;
+        }
+
+        return self::ffiGeteuid();
+    }
+
+    public static function getpid(): ?int
+    {
+        $pure = VmProcessIdentityPure::getpid();
+        if (null !== $pure) {
+            return $pure;
+        }
+
+        return self::ffiGetpid();
+    }
+
+    public static function getpwuidName(int $uid): ?string
+    {
+        $pure = VmProcessIdentityPure::getpwuidName($uid);
+        if (null !== $pure) {
+            return $pure;
+        }
+
+        return self::ffiGetpwuidName($uid);
+    }
+
+    private static function ffiGetuid(): ?int
+    {
         $ffi = self::ffi();
         if (null === $ffi) {
             return null;
@@ -35,7 +85,7 @@ final class VmProcessIdentityNative
         }
     }
 
-    public static function getgid(): ?int
+    private static function ffiGetgid(): ?int
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -49,7 +99,7 @@ final class VmProcessIdentityNative
         }
     }
 
-    public static function geteuid(): ?int
+    private static function ffiGeteuid(): ?int
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -63,7 +113,7 @@ final class VmProcessIdentityNative
         }
     }
 
-    public static function getpid(): ?int
+    private static function ffiGetpid(): ?int
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -77,7 +127,7 @@ final class VmProcessIdentityNative
         }
     }
 
-    public static function getpwuidName(int $uid): ?string
+    private static function ffiGetpwuidName(int $uid): ?string
     {
         $ffi = self::ffi();
         if (null === $ffi) {
