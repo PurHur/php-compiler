@@ -1379,7 +1379,7 @@ class Type extends Builtin {
         MemoryRuntime::ensureLinked($this->context);
         IniRuntime::ensureLinked($this->context);
         IncludePathRuntime::ensureLinked($this->context);
-        StringEnvLocal::ensureLinked($this->context);
+        EnvLocalRuntime::ensureLinked($this->context);
         ErrorHandlerOutput::registerExternals($this->context);
         ExceptionHandlerOutput::registerExternals($this->context);
         StringTriggerError::ensureLinked($this->context);

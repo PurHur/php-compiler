@@ -20,7 +20,7 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenv.php');
         $this->assertStringContainsString('GetenvJitHelper', $source);
-        $this->assertStringNotContainsString('StringEnvLocal', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringEnvLocal.php');
         $this->assertStringNotContainsString('__compiler_env_local_lookup', $source);
         $this->assertLessThanOrEqual(230, \substr_count($source, "\n"), 'StringGetenv overlay via PHP helper + libc miss');
     }
