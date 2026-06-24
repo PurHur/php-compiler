@@ -1568,6 +1568,37 @@ final class ReflectionSupport
     /** php-src: closure_func->common.scope (definition site). */
     public static function closureDefinitionScopeClassName(ClosureState $state): ?string
     {
+        if (null !== $state->methodName && '' !== $state->methodName) {
+            if (null !== $state->boundScopeClass && '' !== $state->boundScopeClass) {
+                return $state->boundScopeClass;
+            }
+            $wrapped = $state->wrappedFunc;
+            if ($wrapped instanceof Func\PHP) {
+                $cfgFunc = $wrapped->block->func ?? null;
+                if (null !== $cfgFunc && null !== $cfgFunc->class && null !== $cfgFunc->class->value && '' !== $cfgFunc->class->value) {
+                    return $cfgFunc->class->value;
+                }
+            }
+            if (null !== $state->methodReceiver) {
+                $recv = $state->methodReceiver->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $recv->type) {
+                    return $recv->toObject()->class->name;
+                }
+            }
+
+            return null;
+        }
+        if (null !== $state->wrappedFunc) {
+            $wrapped = $state->wrappedFunc;
+            if ($wrapped instanceof Func\PHP) {
+                $cfgFunc = $wrapped->block->func ?? null;
+                if (null !== $cfgFunc && null !== $cfgFunc->class && null !== $cfgFunc->class->value && '' !== $cfgFunc->class->value) {
+                    return $cfgFunc->class->value;
+                }
+            }
+
+            return null;
+        }
         $cfgFunc = $state->func->block->func ?? null;
         if (null === $cfgFunc || null === $cfgFunc->class || null === $cfgFunc->class->value || '' === $cfgFunc->class->value) {
             return null;
