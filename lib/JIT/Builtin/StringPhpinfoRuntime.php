@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_phpinfo / __compiler_phpcredits via PhpinfoJitHelper PHP (#9256).
  *
- * JIT uses compiled {@see \PHPCompiler\ext\standard\PhpinfoJitHelper}; AOT standalone keeps
- * {@see StringPhpinfoRuntimeLlvm} until VmInfo HTML compiles in native link (#9256).
- * php-src: ext/standard/info.c
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PhpinfoJitHelper}; thin LLVM bridges
+ * forward the ABI. php-src: ext/standard/info.c
  */
 final class StringPhpinfoRuntime
 {
@@ -41,17 +40,15 @@ final class StringPhpinfoRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_phpinfo');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPhpinfoRuntimeLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
@@ -149,25 +146,27 @@ final class StringPhpinfoRuntime
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PhpinfoJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('PhpinfoJitHelper.php parseAndCompile failed (#9256)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        } finally {
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $prevSelfHostAot): void {
             if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                \putenv('PHP_COMPILER_SELFHOST_AOT=0');
+            }
+            try {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'PhpinfoJitHelper.php');
+                if (null === $block) {
+                    throw new \LogicException('PhpinfoJitHelper.php parseAndCompile failed (#9256)');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+            } finally {
+                if (\function_exists('putenv')) {
+                    if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
+                        \putenv('PHP_COMPILER_SELFHOST_AOT=');
+                    } else {
+                        \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
+                    }
                 }
             }
-        }
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             if (!isset($context->functions[\strtolower($logical)])) {
                 throw new \LogicException($logical.' was not compiled for JIT (#9256)');

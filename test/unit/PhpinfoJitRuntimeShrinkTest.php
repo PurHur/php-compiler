@@ -23,9 +23,9 @@ final class PhpinfoJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitPhpinfoHtmlHeader', $source);
         $this->assertStringNotContainsString('emitGeneralSection', $source);
         $this->assertStringNotContainsString('emitObEchoCstr', $source);
+        $this->assertStringNotContainsString('StringPhpinfoRuntimeLlvm', $source);
         $this->assertLessThan(200, \substr_count($source, "\n"), 'StringPhpinfoRuntime must be a thin bridge');
-        $llvm = (string) \file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/StringPhpinfoRuntimeLlvm.php');
-        $this->assertStringContainsString('emitPhpinfoHtmlHeader', $llvm, 'standalone LLVM quarantined in StringPhpinfoRuntimeLlvm');
+        $this->assertFileDoesNotExist(dirname(__DIR__, 2).'/lib/JIT/Builtin/StringPhpinfoRuntimeLlvm.php');
     }
 
     public function testVmInfoExposesRenderPhpinfoForSharedSsot(): void
@@ -39,5 +39,12 @@ final class PhpinfoJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(dirname(__DIR__, 2).'/ext/standard/JitInfo.php');
         $this->assertStringContainsString('StringPhpinfoRuntime::ensureLinked', $source);
+    }
+
+    public function testSpineBundleOmitsDeletedStringPhpinfoRuntimeLlvm(): void
+    {
+        $spine = (string) \file_get_contents(dirname(__DIR__, 2).'/test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('StringPhpinfoRuntimeLlvm.php', $spine);
+        $this->assertStringContainsString('PhpinfoJitHelper.php', $spine);
     }
 }
