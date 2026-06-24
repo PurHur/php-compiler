@@ -14,7 +14,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
     /** @var list<string> */
     private const LIB_SPINE_SMOKE_NEW_UNITS = [
         'ext/standard/PhpinfoJitHelper.php',
-        'lib/JIT/Builtin/StringPhpinfoRuntimeLlvm.php',
         'lib/JIT/JitArrayUserSetOps.php',
         'lib/JIT/Builtin/CastArrayRuntime.php',
         'lib/JIT/Builtin/VarFetchRuntime.php',
