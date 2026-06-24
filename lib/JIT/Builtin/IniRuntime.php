@@ -383,6 +383,7 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($ipBb);
         IncludePathRuntime::ensureLinked($context);
+        $context->builder->positionAtEnd($ipBb);
         $context->builder->call(
             $context->lookupFunction('__compiler_set_include_path'),
             $newValue,

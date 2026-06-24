@@ -6000,6 +6000,7 @@ class JIT {
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'finally_at_entry_cont');
 
         return $exit;
     }
@@ -6243,7 +6244,10 @@ class JIT {
             return $func->appendBasicBlock('entry');
         }
         if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
-            return $this->context->scope->blockStorage[$block];
+            $cached = $this->context->scope->blockStorage[$block];
+            if (null === $entryBlock || $cached === $entryBlock) {
+                return $cached;
+            }
         }
         if (null !== $block->func) {
             JIT\Progress::noteFunction($block->func->getScopedName());
@@ -6254,8 +6258,10 @@ class JIT {
             self::$blockNumber++;
             $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
         }
-        $this->context->scope->blockStorage[$block] = $basicBlock;
-        if (!$this->context->scope->blockEntryStorage->contains($block)) {
+        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock) {
+            $this->context->scope->blockStorage[$block] = $basicBlock;
+        }
+        if (!$this->context->scope->blockEntryStorage->contains($block) || null === $entryBlock) {
             $this->context->scope->blockEntryStorage[$block] = $basicBlock;
         }
         $builder = $this->context->builder;
