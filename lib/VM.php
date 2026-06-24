@@ -803,6 +803,95 @@ class VM {
     }
 
     /**
+     * ReflectionProperty::getRawValue — read backing storage without get hook (#6451, php_reflection.c).
+     */
+    public function readInstancePropertyRawForReflection(
+        ObjectEntry $object,
+        string $instanceName,
+        ?VM\ClassProperty $meta
+    ): Variable {
+        $slot = $this->instancePropertyRawBackingSlot($object, $instanceName);
+        if (null === $slot) {
+            throw new \LogicException('Undefined property in this compiler build');
+        }
+        if (VM\TypedPropertyCheck::isUninitialized($slot)) {
+            throw new \Error(VM\TypedPropertyCheck::errorMessage($slot));
+        }
+        $out = new Variable();
+        $out->copyFrom($slot->resolveIndirect());
+
+        return $out;
+    }
+
+    /**
+     * ReflectionProperty::setRawValue — write backing storage without set hook (#6451, php_reflection.c).
+     */
+    public function writeInstancePropertyRawForReflection(
+        ObjectEntry $object,
+        string $instanceName,
+        ?VM\ClassProperty $meta,
+        Variable $value,
+        bool $strictTypes
+    ): void {
+        $slot = $this->instancePropertyRawBackingSlot($object, $instanceName);
+        if (null === $slot) {
+            throw new \LogicException('Undefined property in this compiler build');
+        }
+        if (null !== $meta) {
+            $probe = new Variable();
+            $probe->copyFrom($value);
+            $target = $probe->resolveIndirect();
+            $typeMeta = $meta->prototype->resolveIndirect();
+            $target->typeConstraint = $typeMeta->typeConstraint;
+            $target->classConstraint = $typeMeta->classConstraint;
+            $target->literalBoolType = $typeMeta->literalBoolType;
+            $target->unionTypeConstraints = $typeMeta->unionTypeConstraints;
+            $target->declaredTypeLabel = $typeMeta->declaredTypeLabel;
+            $target->genericArrayTypeSpec = $typeMeta->genericArrayTypeSpec;
+            $target->dnfArms = $typeMeta->dnfArms;
+            VM\TypeCheck::coercePropertyWrite($probe, $strictTypes);
+            $slot->copyFrom($probe);
+
+            return;
+        }
+        $slot->copyFrom($value->resolveIndirect());
+        VM\TypeCheck::coercePropertyWrite($slot, $strictTypes);
+    }
+
+    /**
+     * Writable slot for hooked or plain instance property backing (#6451).
+     */
+    private function instancePropertyRawBackingSlot(ObjectEntry $object, string $propName): ?Variable
+    {
+        if ($this->instancePropertyHasHooks($object, $propName)) {
+            $lcClass = strtolower($object->class->name);
+            $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+                ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+                ?? null;
+            if (is_array($propMeta)) {
+                $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+                if (null !== $backingName && strcasecmp($backingName, $propName) !== 0) {
+                    if ($object->hasProperty($backingName)) {
+                        return $object->getProperty($backingName);
+                    }
+
+                    return null;
+                }
+            }
+            if ($object->hasProperty($propName)) {
+                return $object->getProperty($propName);
+            }
+
+            return null;
+        }
+        if ($object->hasProperty($propName)) {
+            return $object->getProperty($propName);
+        }
+
+        return null;
+    }
+
+    /**
      * ?? / ??= isset probe on static hooked properties — backing only, never get hook (#9683).
      */
     public function staticPropertyIsSetForCoalesceAssign(string $classLc, string $propNameRaw): bool
