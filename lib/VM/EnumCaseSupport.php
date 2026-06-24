@@ -588,7 +588,7 @@ final class EnumCaseSupport
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_NULL => 'null',
             Variable::TYPE_ARRAY => 'array',
-            Variable::TYPE_OBJECT => 'object',
+            Variable::TYPE_OBJECT => $value->toObject()->class->name,
             default => 'mixed',
         };
     }

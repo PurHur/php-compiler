@@ -82,7 +82,7 @@ final class VmStreamArg
             case Variable::TYPE_ARRAY:
                 return 'array';
             case Variable::TYPE_OBJECT:
-                return 'object';
+                return $v->toObject()->class->name;
             default:
                 return 'mixed';
         }
