@@ -4,23 +4,39 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM __phpc_stream_path for fstat() JIT/AOT lowering (issue #6764).
+ * JIT/AOT link for __phpc_stream_path via StreamPathJitHelper PHP (#9480).
  *
- * Reads fopen paths from phpc_stream_paths[] LLVM global (StreamGlobalsJit.php).
- * Replaces deleted C __phpc_stream_path / __phpc_fstat. php-src: ext/standard/streams.c
+ * Replaces LLVM phpc_stream_paths[] table lookup; SSOT {@see \PHPCompiler\ext\standard\VmFs}.
+ * php-src: ext/standard/streams.c — php_stream path metadata
  */
 final class StreamPathRuntime
 {
-    private const MAX_HANDLES = 256;
+    private const HELPER_PATH = '/ext/standard/StreamPathJitHelper.php';
 
-    private const GLOBAL_HANDLES = 'phpc_stream_handles';
+    private const PATH_HELPER = 'PHPCompiler\\ext\\standard\\StreamPathJitHelper::pathForHandle';
 
-    private const GLOBAL_PATHS = 'phpc_stream_paths';
+    private const REGISTER_HELPER = 'PHPCompiler\\ext\\standard\\StreamPathJitHelper::register';
+
+    private const CLEAR_HELPER = 'PHPCompiler\\ext\\standard\\StreamPathJitHelper::clear';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::PATH_HELPER,
+        self::REGISTER_HELPER,
+        self::CLEAR_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__phpc_stream_path',
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -36,131 +52,109 @@ final class StreamPathRuntime
             return;
         }
 
-        self::ensureExternGlobals($context);
-        self::ensureExternals($context);
-
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $pathProbe = $context->module->getNamedFunction('__phpc_stream_path');
-        $fnPath = null !== $pathProbe
-            ? $pathProbe
-            : $context->module->addFunction(
-                '__phpc_stream_path',
-                $context->context->functionType($strPtr, false, $i64)
-            );
-        self::implementPathLookup($context, $fnPath);
-
+        self::ensureJitHelperCompiled($context);
+        self::implementPathBridge($context);
         self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function implementPathLookup(Context $context, Value $fn): void
+    public static function emitRegisterPath(Context $context, Value $handle, Value $pathStr): void
     {
-        $entry = $fn->appendBasicBlock('sp_path_entry');
-        $context->builder->positionAtEnd($entry);
+        self::ensureJitHelperCompiled($context);
+        $context->builder->call(
+            self::helperFunction($context, self::REGISTER_HELPER),
+            $context->builder->truncOrBitCast($handle, $context->getTypeFromString('int64')),
+            $pathStr
+        );
+    }
 
-        $handle = $fn->getParam(0);
+    public static function emitClearPath(Context $context, Value $handle): void
+    {
+        self::ensureJitHelperCompiled($context);
+        $context->builder->call(
+            self::helperFunction($context, self::CLEAR_HELPER),
+            $context->builder->truncOrBitCast($handle, $context->getTypeFromString('int64'))
+        );
+    }
+
+    private static function implementPathBridge(Context $context): void
+    {
+        $abiName = '__phpc_stream_path';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $nullStr = $strPtr->constNull();
-        $max = $i64->constInt(self::MAX_HANDLES, false);
-        $zero = $i64->constInt(0, false);
-        $zeroIdx = $i64->constInt(0, false);
+        $ft = $context->context->functionType($strPtr, false, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $badHandle = $context->builder->or(
-            $context->builder->icmp(Builder::INT_SLE, $handle, $zero),
-            $context->builder->icmp(Builder::INT_SGE, $handle, $max)
-        );
-        $failBb = $fn->appendBasicBlock('sp_path_fail');
-        $openBb = $fn->appendBasicBlock('sp_path_open');
-        $context->builder->branchIf($badHandle, $failBb, $openBb);
-
-        $context->builder->positionAtEnd($openBb);
-        $fp = self::loadTableSlot($context, self::GLOBAL_HANDLES, $handle);
-        $i8p = $context->getTypeFromString('int8*');
-        $notOpen = $context->builder->icmp(Builder::INT_EQ, $fp, $i8p->constNull());
-        $pathBb = $fn->appendBasicBlock('sp_path_path');
-        $context->builder->branchIf($notOpen, $failBb, $pathBb);
-
-        $context->builder->positionAtEnd($pathBb);
-        $pathCstr = self::loadTableSlot($context, self::GLOBAL_PATHS, $handle);
-        $noPath = $context->builder->icmp(Builder::INT_EQ, $pathCstr, $i8p->constNull());
-        $okBb = $fn->appendBasicBlock('sp_path_ok');
-        $context->builder->branchIf($noPath, $failBb, $okBb);
-
-        $context->builder->positionAtEnd($okBb);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $pathCstr);
+        $entry = $fn->appendBasicBlock('stream_path_bridge_entry');
+        $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $pathCstr
+            self::helperFunction($context, self::PATH_HELPER),
+            $fn->getParam(0)
         );
         $context->builder->returnValue($result);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($nullStr);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function loadTableSlot(Context $context, string $globalName, Value $handle): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $zero = $i64->constInt(0, false);
-        $global = $context->module->getNamedGlobal($globalName);
-        if (null === $global) {
-            throw new \LogicException('StreamPathRuntime: '.$globalName.' missing');
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StreamPathJitHelper compile (#9480)');
         }
-        $slot = $context->builder->gep($global, $zero, $handle);
 
-        return $context->builder->load($context->builder->bitcast($slot, $i8p->pointerType(0)));
+        return $fn;
     }
 
-    private static function ensureExternGlobals(Context $context): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $tableTy = $i8p->arrayType(self::MAX_HANDLES);
-        foreach ([self::GLOBAL_HANDLES, self::GLOBAL_PATHS] as $name) {
-            if (null !== $context->module->getNamedGlobal($name)) {
-                continue;
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
             }
-            $context->module->addGlobal($tableTy, $name);
         }
-    }
-
-    private static function ensureExternals(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $sizeT = $context->getTypeFromString('size_t');
-
-        foreach (
-            [
-                ['strlen', $sizeT, false, [$i8p]],
-                ['__string__init', $strPtr, false, [$i64, $i8p]],
-            ] as [$name, $ret, $vararg, $params]
-        ) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, $vararg, ...$params));
+        if (!$missing) {
+            return;
         }
-    }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
-    {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamPathJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StreamPathJitHelper.php parseAndCompile failed (#9480)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9480)');
+            }
         }
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        $fn = $context->module->getNamedFunction('__phpc_stream_path');
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException('__phpc_stream_path missing after StreamPathRuntime LLVM implement');
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StreamPathRuntime bridge (#9480)');
+            }
+            $context->registerFunction($name, $fn);
         }
-        $context->registerFunction('__phpc_stream_path', $fn);
     }
 }

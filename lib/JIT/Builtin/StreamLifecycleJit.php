@@ -278,6 +278,7 @@ final class StreamLifecycleJit
         $context->builder->positionAtEnd($freePathBb);
         $context->builder->call($context->lookupFunction('free'), $path);
         self::storeTableSlot($context, self::GLOBAL_PATHS, $handle, $nullPtr);
+        StreamPathRuntime::emitClearPath($context, $handle);
         $context->builder->branch($closeBb);
 
         $context->builder->positionAtEnd($closeBb);

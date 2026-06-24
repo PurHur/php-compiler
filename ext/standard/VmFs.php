@@ -2109,6 +2109,19 @@ final class VmFs
         return self::$handlePaths[$handle] ?? '';
     }
 
+    /** Record fopen URI for JIT/AOT stream handles ({@see StreamPathJitHelper}, #9480). */
+    public static function registerStreamPath(int $handle, string $path): void
+    {
+        if ($handle > 0 && '' !== $path) {
+            self::$handlePaths[$handle] = $path;
+        }
+    }
+
+    public static function clearStreamPath(int $handle): void
+    {
+        unset(self::$handlePaths[$handle]);
+    }
+
     public static function tempDir(): string
     {
         return VmSysGetTempDirNative::resolve();

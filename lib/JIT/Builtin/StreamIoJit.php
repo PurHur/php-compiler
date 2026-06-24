@@ -872,6 +872,7 @@ final class StreamIoJit
 
             $context->builder->positionAtEnd($doneBb);
             self::storePtrSlot($context, self::GLOBAL_PATHS, $idPhi, $dup);
+            StreamPathRuntime::emitRegisterPath($context, $idPhi, $path);
         } else {
             self::storePtrSlot($context, self::GLOBAL_PATHS, $idPhi, $nullPtr);
         }

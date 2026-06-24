@@ -1439,6 +1439,7 @@ require_once __DIR__.'/../../../ext/standard/gzwrite.php';
 require_once __DIR__.'/../../../ext/standard/halt_compiler_.php';
 require_once __DIR__.'/../../../ext/standard/hash_.php';
 require_once __DIR__.'/../../../ext/standard/HashEqualsJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/StreamPathJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HashCryptoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/hash_equals.php';
 require_once __DIR__.'/../../../ext/standard/hash_hkdf.php';
