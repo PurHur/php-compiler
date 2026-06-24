@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3030 |
-| Phase A inventory files (M2 ratio SSOT) | 3030 |
+| PHP files on vm.php path | 3032 |
+| Phase A inventory files (M2 ratio SSOT) | 3032 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8171 |
+| Source constructs flagged (warnings) | 8173 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2031,6 +2031,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ClassConstFetchRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/CliArgvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CloneWithReinitRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ClosureBindRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ConvertCyrString.php` | 0 | 2 |
 | `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 3 |
@@ -2832,6 +2833,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ClassStatic.php` | 0 | 1 |
 | `lib/VM/ClassValidator.php` | 0 | 5 |
 | `lib/VM/CloneWithSupport.php` | 0 | 1 |
+| `lib/VM/ClosureBindJitHelper.php` | 0 | 1 |
 | `lib/VM/ClosureState.php` | 0 | 24 |
 | `lib/VM/ClosureSupport.php` | 0 | 16 |
 | `lib/VM/CoalesceJitHelper.php` | 0 | 1 |
@@ -16352,6 +16354,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 158)
 - 13 class method(s)
 
+### `lib/JIT/Builtin/ClosureBindRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/ConvertCyrString.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18530,21 +18537,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/ClosureBindHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\ClosureBindTo (line 29)
-- new Call\ClosureBind (line 30)
-- new Variable (line 75)
-- new ClosureWithBinding (line 76)
-- new ClosureWithBinding (line 107)
-- new Variable (line 264)
-- new Variable (line 298)
-- new Variable (line 358)
-- new Variable (line 372)
-- new Variable (line 387)
-- new Variable (line 405)
-- new Variable (line 414)
-- new Variable (line 434)
-- new Variable (line 450)
-- 36 class method(s)
+- new Call\ClosureBindTo (line 31)
+- new Call\ClosureBind (line 32)
+- new Variable (line 77)
+- new ClosureWithBinding (line 78)
+- new ClosureWithBinding (line 109)
+- new Variable (line 266)
+- new Variable (line 300)
+- new Variable (line 360)
+- new Variable (line 374)
+- new Variable (line 389)
+- new Variable (line 407)
+- new Variable (line 416)
+- new Variable (line 436)
+- new Variable (line 452)
+- 33 class method(s)
 
 ### `lib/JIT/ClosureHelper.php`
 
@@ -21775,6 +21782,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `lib/VM/ClosureBindJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/VM/ClosureState.php`
 
