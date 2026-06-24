@@ -219,6 +219,10 @@ bootstrap_try_sidecar_emit_fallback() {
   local out=$1
   local entry=$2
   local last_code=${3:-0}
+  # Inventory argv rebuild must reach Zend when gen-0 cannot parse bin/compile.php (#11142, #2880).
+  case "${entry//\\//}" in
+    */bin/compile.php) return 1 ;;
+  esac
   if ! bootstrap_sidecar_emit_fallback_allowed "${last_code}" "${entry}"; then
     return 1
   fi
