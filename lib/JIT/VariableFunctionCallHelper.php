@@ -12,11 +12,12 @@ use PHPCompiler\OpCode;
 use PHPLLVM\Value;
 
 /**
- * LLVM lowering for dynamic variable function calls (issue #1997, phase 2 of #56).
+ * Compile-time hint scanning + candidate resolution for dynamic $fn() (issue #1997).
+ *
+ * LLVM dispatch: {@see VariableFunctionCallRuntime} via {@see VariableFunctionCallJitHelper} PHP (#10135).
  */
 final class VariableFunctionCallHelper
 {
-    private static int $blockSeq = 0;
 
     /** Lowercase names that may flow into a dynamic $fn() callee. */
     public static function hintedCalleeNames(Block $block, ?int $nameSlot): array
@@ -213,175 +214,6 @@ final class VariableFunctionCallHelper
             return JitValueBox::alloc($context);
         }
 
-        if (1 === \count($candidates)) {
-            return self::dispatchSingleCandidate($context, $nameStr, array_key_first($candidates), reset($candidates), ...$args);
-        }
-
-        $nativeLong = self::candidatesReturnNativeLong($context, $candidates);
-        $tag = 'vf'.(string) ++self::$blockSeq;
-        $merge = BasicBlockHelper::append($context, 'var_fn_merge_'.$tag);
-        $undef = BasicBlockHelper::append($context, 'var_fn_undef_'.$tag);
-        if ($nativeLong) {
-            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int64'));
-            $zero = $context->getTypeFromString('int64')->constInt(0, false);
-        } else {
-            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
-            $zero = $context->getTypeFromString('__value__*')->constNull();
-        }
-
-        $n = \count($candidates);
-        $checkBlocks = [];
-        for ($i = 0; $i < $n; ++$i) {
-            $checkBlocks[$i] = 0 === $i
-                ? $context->builder->getInsertBlock()
-                : BasicBlockHelper::append($context, 'var_fn_check_'.$tag.'_'.$i);
-        }
-
-        $i = 0;
-        foreach ($candidates as $fnName => $proxy) {
-            $context->builder->positionAtEnd($checkBlocks[$i]);
-            $literalStr = $context->builder->load($context->constantStringFromString($fnName));
-            $isMatch = JitStringCompare::identical($context, $nameStr, $literalStr);
-            $onMatch = BasicBlockHelper::append($context, 'var_fn_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $undef;
-            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-
-            $context->builder->positionAtEnd($onMatch);
-            $raw = $proxy->call($context, ...$args);
-            if ($nativeLong) {
-                $context->builder->store($raw, $resultSlot);
-            } else {
-                $boxed = self::boxCallResult($context, $proxy, $fnName, $raw);
-                $context->builder->store($boxed, $resultSlot);
-            }
-            $context->builder->branch($merge);
-            ++$i;
-        }
-
-        $context->builder->positionAtEnd($undef);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->store($zero, $resultSlot);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($merge);
-
-        return $context->builder->load($resultSlot);
-    }
-
-    private static function dispatchSingleCandidate(
-        Context $context,
-        Value $nameStr,
-        string $fnName,
-        Call $proxy,
-        Variable ...$args
-    ): Value {
-        $tag = 'vf1'.(string) ++self::$blockSeq;
-        $literalStr = $context->builder->load($context->constantStringFromString($fnName));
-        $isMatch = JitStringCompare::identical($context, $nameStr, $literalStr);
-        $onMatch = BasicBlockHelper::append($context, 'var_fn_one_match_'.$tag);
-        $onMiss = BasicBlockHelper::append($context, 'var_fn_one_miss_'.$tag);
-        $merge = BasicBlockHelper::append($context, 'var_fn_one_merge_'.$tag);
-        $nativeLong = self::candidatesReturnNativeLong($context, [$fnName => $proxy]);
-        if ($nativeLong) {
-            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('int64'));
-        } else {
-            $resultSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__*'));
-        }
-        $context->builder->branchIf($isMatch, $onMatch, $onMiss);
-        $context->builder->positionAtEnd($onMatch);
-        $raw = $proxy->call($context, ...$args);
-        if ($nativeLong) {
-            $context->builder->store($raw, $resultSlot);
-        } else {
-            $context->builder->store(self::boxCallResult($context, $proxy, $fnName, $raw), $resultSlot);
-        }
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($onMiss);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($merge);
-
-        return $context->builder->load($resultSlot);
-    }
-
-    /**
-     * @param array<string, Call> $candidates
-     */
-    private static function candidatesReturnNativeLong(Context $context, array $candidates): bool
-    {
-        foreach ($candidates as $fnName => $proxy) {
-            $lc = strtolower($fnName);
-            $retTy = $context->functionReturnType[$lc] ?? null;
-            if ('int64' === $retTy || 'strlen' === $lc) {
-                continue;
-            }
-
-            return false;
-        }
-
-        return [] !== $candidates;
-    }
-
-    private static function boxCallResult(Context $context, Call $proxy, string $fnName, Value $raw): Value
-    {
-        $slot = JitValueBox::alloc($context);
-        $rawTy = $context->getStringFromType($raw->typeOf());
-        if ('int64' === $rawTy) {
-            JitValueBox::writeLong($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        $retTy = $context->functionReturnType[strtolower($fnName)] ?? '__value__';
-        if ('int64' === $retTy) {
-            JitValueBox::writeLong($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('double' === $retTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeDouble'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('bool' === $retTy) {
-            JitValueBox::writeBool($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        $rawTy = $context->getStringFromType($raw->typeOf());
-        if ('__value__*' === $rawTy || '__value__' === $rawTy) {
-            JitValueBox::copyFromPointer(
-                $context,
-                $slot,
-                JitValueBox::normalizeValuePtr($context, $raw)
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('__string__*' === $rawTy) {
-            $context->builder->call(
-                $context->lookupFunction('__value__writeString'),
-                JitValueBox::pointer($context, $slot),
-                $raw
-            );
-
-            return JitValueBox::pointer($context, $slot);
-        }
-        if ('int1' === $rawTy) {
-            JitValueBox::writeBool($context, $slot, $raw);
-
-            return JitValueBox::pointer($context, $slot);
-        }
-
-        JitValueBox::copyFromPointer(
-            $context,
-            $slot,
-            JitValueBox::normalizeValuePtr($context, $raw)
-        );
-
-        return JitValueBox::pointer($context, $slot);
+        return VariableFunctionCallRuntime::dispatch($context, $nameStr, $candidates, ...$args);
     }
 }
