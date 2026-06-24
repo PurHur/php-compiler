@@ -654,6 +654,11 @@ final class TypeCheck
     {
         $resolved = $value->resolveIndirect();
         $classLc = strtolower(ltrim($classConstraint, '\\'));
+        // Zend IS_OBJECT return/param check accepts any object incl. anonymous classes (#11173, zend_execute.c).
+        if ('object' === $classLc) {
+            return Variable::TYPE_OBJECT === $resolved->type
+                || Variable::TYPE_ENUM_CASE === $resolved->type;
+        }
         $vm = \PHPCompiler\VM::running();
         $context = $vm?->context;
         if (null !== $context) {
