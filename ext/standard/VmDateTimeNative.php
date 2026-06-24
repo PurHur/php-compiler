@@ -170,14 +170,88 @@ final class VmDateTimeNative
         $tzName = VmDate::defaultTimezoneGet();
         try {
             VmDateTimeNative::validateTimezoneId($tzName);
-            $parsed = self::parseDateTime($date, $tzName);
 
-            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+            return self::parseDateComponents(trim($date), $tzName);
         } catch (NativeDateMalformedStringException) {
             return self::failedParseResult([
                 0 => 'The timezone could not be found in the database',
             ]);
         }
+    }
+
+    /**
+     * php-src ext/standard/parsedate.c — preserve false for calendar fields absent from input (#11068).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function parseDateComponents(string $date, string $tzName): array
+    {
+        if ('' === $date) {
+            return self::failedParseResult([0 => 'Empty string']);
+        }
+        if ('now' === strtolower($date)) {
+            return self::parseResultFromComponents([
+                'year' => false,
+                'month' => false,
+                'day' => false,
+                'hour' => false,
+                'minute' => false,
+                'second' => false,
+                'fraction' => false,
+            ]);
+        }
+        if (str_starts_with($date, '@')) {
+            $unix = substr($date, 1);
+            if ('' === $unix || !ctype_digit($unix)) {
+                self::throwMalformedDateTime($date);
+            }
+
+            return self::parseResultFromTimestamp((int) $unix, 0);
+        }
+        if (1 === preg_match('/^\d+$/', $date)) {
+            return self::parseResultFromTimestamp((int) $date, 0);
+        }
+        if (1 === preg_match(
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?$/',
+            $date,
+            $matches
+        )) {
+            $hasTime = isset($matches[4]);
+            $fraction = false;
+            if ($hasTime) {
+                $fraction = 0.0;
+                if (isset($matches[7]) && '' !== $matches[7]) {
+                    $fraction = (float) ('0.'.\str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT));
+                }
+            }
+
+            return self::parseResultFromComponents([
+                'year' => (int) $matches[1],
+                'month' => (int) $matches[2],
+                'day' => (int) $matches[3],
+                'hour' => $hasTime ? (int) $matches[4] : false,
+                'minute' => $hasTime ? (int) $matches[5] : false,
+                'second' => $hasTime ? (int) $matches[6] : false,
+                'fraction' => $fraction,
+            ]);
+        }
+
+        $parsed = self::parseDateTime($date, $tzName);
+
+        return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
     }
 
     /**
