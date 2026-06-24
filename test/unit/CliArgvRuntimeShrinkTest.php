@@ -6,16 +6,15 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** CliArgvRuntime must route hashtable materialization through CliArgvJitHelper PHP (#9439). */
+/** CliArgvRuntime LLVM uses __hashtable__alloc; VM argv SSOT is VmCliArgv (#9439, #11142). */
 final class CliArgvRuntimeShrinkTest extends TestCase
 {
-    public function testCliArgvRuntimeUsesJitHelperNotLlvmHashtableLoop(): void
+    public function testCliArgvRuntimeUsesLlvmAllocNotNestedJitHelperCompile(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CliArgvRuntime.php');
-        $this->assertStringContainsString('CliArgvJitHelper', $source);
-        $this->assertStringContainsString('VmCliArgv', $source);
-        $this->assertStringNotContainsString('__hashtable__alloc', $source);
-        $this->assertStringContainsString('CREATE_TABLE_HELPER', $source);
+        $this->assertStringContainsString('__hashtable__alloc', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
+        $this->assertStringNotContainsString('CliArgvJitHelper::createTable', $source);
     }
 
     public function testVmCliArgvBuildsIndexedArgvTable(): void
