@@ -221,6 +221,15 @@ final class SplArrayStorage
         self::state($object)['table']->offsetUnset($keyVar);
     }
 
+    /** php-src spl_array_method_append — push with next numeric index. */
+    public static function append(ObjectEntry $object, Variable $value): void
+    {
+        $resolved = $value->resolveIndirect();
+        $stored = new Variable($resolved->type);
+        $stored->copyFrom($resolved);
+        self::state($object)['table']->append($stored);
+    }
+
     private static function findOffset(\PHPCompiler\VM\HashTable $table, Variable $offset): ?Variable
     {
         [$keyVar, $isInt] = self::offsetKeyVar($offset);
