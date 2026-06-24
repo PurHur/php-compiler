@@ -1,5 +1,5 @@
 --TEST--
-Language: isset()/empty() on get+set property hooks invoke get hook (#10680, zend_std_has_property)
+Language: isset()/empty() on get+set property hooks probe backing without get hook (#11262, #10392, zend_object_handlers.c)
 --FILE--
 <?php
 class D {
@@ -24,7 +24,5 @@ $e = new E();
 var_export(isset($e->x));
 echo "\n";
 --EXPECT--
-GET
 true
-GET
 true
