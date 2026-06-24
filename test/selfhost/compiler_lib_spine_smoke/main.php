@@ -2266,6 +2266,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterEmail.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormat.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormatJit.php';
+require_once __DIR__.'/../../../ext/standard/FsDirJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/FsDirRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDirJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsGlob.php';
