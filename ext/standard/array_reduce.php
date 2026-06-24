@@ -12,8 +12,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\Func;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\Func\PHP;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
 use PHPCompiler\JIT\Context;
@@ -46,16 +46,15 @@ final class array_reduce extends Internal
         $callback = $frame->calledArgs[1];
         $hasInitial = 3 === $argc;
         $initial = $hasInitial ? $frame->calledArgs[2]->resolveIndirect() : null;
-        [$closure, $userFn] = VmReduceCallback::resolve($frame, $callback);
+        [$closure, $callbackFn] = VmReduceCallback::resolve($frame, $callback);
         if (null === $frame->returnVar) {
             return;
         }
-        self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $userFn, $frame->vmContext);
+        self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $callbackFn, $frame->vmContext);
     }
 
     /**
-     * @param ClosureState|PHP|null $closureOrNull closure callback when set
-     * @param PHP|null $userFn user-function callback when set
+     * @param ClosureState|Internal|Func\PHP|null $callbackFn
      */
     private static function reduceVm(
         Frame $frame,
@@ -63,7 +62,7 @@ final class array_reduce extends Internal
         bool $hasInitial,
         ?Variable $initial,
         ?ClosureState $closureOrNull,
-        ?PHP $userFn,
+        Internal|Func\PHP|null $callbackFn,
         VmContext $context
     ): void {
         $carry = null;
@@ -76,15 +75,23 @@ final class array_reduce extends Internal
             $empty = false;
             $item = new Variable();
             $item->copyFrom($value);
-            if (null === $carry && !$hasInitial) {
-                $carry = $item;
-                continue;
+            if ($hasInitial) {
+                $carryArg = $carry;
+            } elseif (null === $carry) {
+                $carryArg = new Variable();
+                $carryArg->null();
+            } else {
+                $carryArg = $carry;
             }
             if (null !== $closureOrNull) {
-                $carry = VmClosureCall::invoke($context, $closureOrNull, $carry, $item);
+                $carry = VmClosureCall::invoke($context, $closureOrNull, $carryArg, $item);
                 continue;
             }
-            $carry = VmUserCall::invoke($context, $userFn, $carry, $item);
+            if ($callbackFn instanceof Internal) {
+                $carry = VmInternalCall::invoke($callbackFn, $carryArg, $item);
+                continue;
+            }
+            $carry = VmUserCall::invoke($context, $callbackFn, $carryArg, $item);
         }
         if ($empty) {
             if ($hasInitial) {

@@ -2,7 +2,7 @@
 stdlib array_reduce() with user function callback
 --FILE--
 <?php
-function sum(int $carry, int $item): int
+function sum($carry, $item)
 {
     return $carry + $item;
 }

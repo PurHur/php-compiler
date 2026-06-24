@@ -326,6 +326,10 @@ final class VmInternalCompare
 
     public static function invoke(Internal $fn, Variable $a, Variable $b): int
     {
+        if (self::isStringCompareCallback($fn)) {
+            $a = self::coerceForStringSort($a);
+            $b = self::coerceForStringSort($b);
+        }
         $frame = new Frame($fn, null, null);
         $frame->calledArgs = [$a, $b];
         $out = new Variable();
@@ -333,6 +337,13 @@ final class VmInternalCompare
         $fn->execute($frame);
 
         return $out->resolveIndirect()->toInt();
+    }
+
+    private static function isStringCompareCallback(Internal $fn): bool
+    {
+        $name = strtolower($fn->getName());
+
+        return isset(self::STRING_CALLBACKS[$name]);
     }
 
     /** php-src php_array_keycompare / php_array_sort SORT_STRING — cast keys/values before strcmp. */
