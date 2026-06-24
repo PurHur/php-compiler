@@ -75,6 +75,11 @@ final class BuiltinByRefParams
                 return [2];
             case 'openssl_random_pseudo_bytes':
                 return [1];
+            case 'exec':
+                return [1, 2];
+            case 'passthru':
+            case 'system':
+                return [1];
         }
 
         return [];
