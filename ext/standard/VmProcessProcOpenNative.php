@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652).
+ * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652, #8889).
  *
  * Mirrors JIT {@see \PHPCompiler\JIT\Builtin\ProcessOpenJit} and {@see VmProcessExecCaptureNative}.
  * php-src: ext/standard/proc_open.c
@@ -35,6 +35,141 @@ final class VmProcessProcOpenNative
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$slots[$handle]) && self::$slots[$handle]['active'];
+    }
+
+    /**
+     * @param list<string> $argv
+     * @param array<int, array{0: string, 1?: string}> $descriptorSpec
+     * @param array<string, string>|null $env
+     *
+     * @return array{0: int, 1: array<int, int>}|false
+     */
+    public static function openArgv(
+        array $argv,
+        array $descriptorSpec,
+        ?string $cwd = null,
+        ?array $env = null,
+    ): array|false {
+        if ([] === $argv || '' === $argv[0]) {
+            return false;
+        }
+
+        $commandLabel = implode(' ', $argv);
+
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        $slot = self::allocateSlot();
+        if (null === $slot) {
+            return false;
+        }
+
+        try {
+            $stdinPipe = $ffi->new('int[2]');
+            $stdoutPipe = $ffi->new('int[2]');
+            $stderrPipe = $ffi->new('int[2]');
+            if (0 !== (int) $ffi->pipe($stdinPipe)
+                || 0 !== (int) $ffi->pipe($stdoutPipe)
+                || 0 !== (int) $ffi->pipe($stderrPipe)) {
+                self::releaseSlot($slot);
+
+                return false;
+            }
+
+            $pid = (int) $ffi->fork();
+            if (-1 === $pid) {
+                self::closePipePair($ffi, $stdinPipe);
+                self::closePipePair($ffi, $stdoutPipe);
+                self::closePipePair($ffi, $stderrPipe);
+                self::releaseSlot($slot);
+
+                return false;
+            }
+
+            if (0 === $pid) {
+                self::closePipeWrite($ffi, $stdinPipe);
+                self::closePipeRead($ffi, $stdoutPipe);
+                self::closePipeRead($ffi, $stderrPipe);
+                $ffi->dup2((int) $stdinPipe[0], 0);
+                $ffi->dup2((int) $stdoutPipe[1], 1);
+                $ffi->dup2((int) $stderrPipe[1], 2);
+                self::closePipePair($ffi, $stdinPipe);
+                self::closePipePair($ffi, $stdoutPipe);
+                self::closePipePair($ffi, $stderrPipe);
+                if (null !== $cwd && '' !== $cwd) {
+                    $ffi->chdir($cwd);
+                }
+                if (null !== $env) {
+                    self::applyEnv($ffi, $env);
+                }
+                self::execArgv($ffi, $argv);
+                $ffi->_exit(self::EXIT_127);
+            }
+
+            self::closePipeRead($ffi, $stdinPipe);
+            self::closePipeWrite($ffi, $stdoutPipe);
+            self::closePipeWrite($ffi, $stderrPipe);
+
+            $pipeFds = [
+                0 => (int) $stdinPipe[1],
+                1 => (int) $stdoutPipe[0],
+                2 => (int) $stderrPipe[0],
+            ];
+            $pipeHandles = [];
+            foreach ($descriptorSpec as $fd => $cells) {
+                if ('pipe' !== ($cells[0] ?? '')) {
+                    continue;
+                }
+                $osFd = $pipeFds[$fd] ?? null;
+                if (null === $osFd || $osFd < 0) {
+                    continue;
+                }
+                $mode = match ($fd) {
+                    0 => 'w',
+                    default => 'r',
+                };
+                $dupFd = (int) $ffi->dup($osFd);
+                if ($dupFd < 0) {
+                    self::killAndWait($ffi, $pid);
+                    self::closeRemainingPipeFds($ffi, $pipeFds);
+                    self::releaseSlot($slot);
+
+                    return false;
+                }
+                $handle = VmPhpFdStream::adopt($dupFd, 'pipe://proc_open/'.$fd, $mode);
+                if (false === $handle) {
+                    $ffi->close($dupFd);
+                    self::killAndWait($ffi, $pid);
+                    self::closeRemainingPipeFds($ffi, $pipeFds);
+                    self::releaseSlot($slot);
+
+                    return false;
+                }
+                $pipeHandles[$fd] = $handle;
+            }
+
+            foreach ($pipeFds as $osFd) {
+                if ($osFd >= 0) {
+                    $ffi->close($osFd);
+                }
+            }
+
+            self::$slots[$slot] = [
+                'pid' => $pid,
+                'command' => $commandLabel,
+                'statusKnown' => false,
+                'status' => 0,
+                'active' => true,
+            ];
+
+            return [$slot, $pipeHandles];
+        } catch (\Throwable) {
+            self::releaseSlot($slot);
+
+            return false;
+        }
     }
 
     /**
@@ -86,12 +221,12 @@ final class VmProcessProcOpenNative
             }
 
             if (0 === $pid) {
-                self::closePipeRead($ffi, $stdinPipe);
-                self::closePipeWrite($ffi, $stdoutPipe);
-                self::closePipeWrite($ffi, $stderrPipe);
-                $ffi->dup2((int) $stdinPipe[1], 0);
-                $ffi->dup2((int) $stdoutPipe[0], 1);
-                $ffi->dup2((int) $stderrPipe[0], 2);
+                self::closePipeWrite($ffi, $stdinPipe);
+                self::closePipeRead($ffi, $stdoutPipe);
+                self::closePipeRead($ffi, $stderrPipe);
+                $ffi->dup2((int) $stdinPipe[0], 0);
+                $ffi->dup2((int) $stdoutPipe[1], 1);
+                $ffi->dup2((int) $stderrPipe[1], 2);
                 self::closePipePair($ffi, $stdinPipe);
                 self::closePipePair($ffi, $stdoutPipe);
                 self::closePipePair($ffi, $stderrPipe);
@@ -105,9 +240,9 @@ final class VmProcessProcOpenNative
                 $ffi->_exit(self::EXIT_127);
             }
 
-            self::closePipeWrite($ffi, $stdinPipe);
-            self::closePipeRead($ffi, $stdoutPipe);
-            self::closePipeRead($ffi, $stderrPipe);
+            self::closePipeRead($ffi, $stdinPipe);
+            self::closePipeWrite($ffi, $stdoutPipe);
+            self::closePipeWrite($ffi, $stderrPipe);
 
             $pipeFds = [
                 0 => (int) $stdinPipe[1],
@@ -352,6 +487,27 @@ final class VmProcessProcOpenNative
         $ffi->waitpid($pid, \FFI::addr($status), 0);
     }
 
+    /** @param list<string> $argv */
+    private static function execArgv(\FFI $ffi, array $argv): void
+    {
+        $argc = \count($argv);
+        $argvPtr = $ffi->new('char*['.($argc + 1).']');
+        $filePtr = null;
+        foreach ($argv as $i => $arg) {
+            $len = \strlen($arg);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            \FFI::memcpy($buf, $arg, $len);
+            $buf[$len] = "\0";
+            $cast = \FFI::cast('char*', $buf);
+            $argvPtr[$i] = $cast;
+            if (0 === $i) {
+                $filePtr = $cast;
+            }
+        }
+        $argvPtr[$argc] = null;
+        $ffi->execvp($filePtr, $argvPtr);
+    }
+
     private static function ffiEnabled(): bool
     {
         $v = getenv('PHP_COMPILER_DISABLE_FFI');
@@ -390,6 +546,7 @@ int close(int fd);
 int chdir(const char *path);
 int setenv(const char *name, const char *value, int overwrite);
 int execl(const char *path, const char *arg, ...);
+int execvp(const char *file, char *const argv[]);
 void _exit(int status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int kill(pid_t pid, int sig);

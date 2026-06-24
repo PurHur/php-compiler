@@ -24,8 +24,32 @@ final class VmProcessRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessProcOpenNative.php');
         $this->assertStringContainsString('fork', $source);
+        $this->assertStringContainsString('execvp', $source);
         $this->assertStringContainsString('VmPhpFdStream::adopt', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\proc_open\\(/', $source);
+    }
+
+    public function testVmProcessRoutesArrayCommandThroughNativeWhenFfiAvailable(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcess.php');
+        $this->assertStringContainsString('VmProcessProcOpenNative::openArgv', $source);
+    }
+
+    public function testProcOpenArgvEchoWhenFfiAvailable(): void
+    {
+        if (!VmProcessProcOpenNative::available() || !VmPhpFdStream::available()) {
+            $this->markTestSkipped('libc FFI unavailable');
+        }
+
+        $desc = [1 => ['pipe', 'w']];
+        $result = VmProcess::procOpen(['echo', 'ok'], $desc);
+        $this->assertIsArray($result);
+        [$procId, $pipes] = $result;
+        $out = VmFs::fread($pipes[1], 8192);
+        VmFs::fclose($pipes[1]);
+        $code = VmProcess::procClose($procId);
+        $this->assertSame(0, $code);
+        $this->assertSame('ok', trim((string) $out));
     }
 
     public function testProcOpenEchoWhenFfiAvailable(): void

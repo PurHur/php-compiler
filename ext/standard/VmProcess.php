@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * VM process helpers — libc FFI when available (#5388, #7862, #8652).
+ * VM process helpers — libc FFI when available (#5388, #7862, #8652, #8889).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -79,11 +79,12 @@ final class VmProcess
         ?string $cwd = null,
         ?array $env = null,
     ): array|false {
-        if (\is_string($command) && VmProcessProcOpenNative::available()) {
-            $native = VmProcessProcOpenNative::open($command, $descriptorSpec, $cwd, $env);
-            if (false !== $native) {
-                return $native;
+        if (VmProcessProcOpenNative::available()) {
+            if (\is_array($command)) {
+                return VmProcessProcOpenNative::openArgv($command, $descriptorSpec, $cwd, $env);
             }
+
+            return VmProcessProcOpenNative::open($command, $descriptorSpec, $cwd, $env);
         }
 
         return self::procOpenHost($command, $descriptorSpec, $cwd, $env);
