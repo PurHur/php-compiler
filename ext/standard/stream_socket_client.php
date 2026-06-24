@@ -105,6 +105,7 @@ final class stream_socket_client extends Internal
         }
 
         if (false === $result) {
+            VmStreamSocketFailure::warnConnectFailed($frame, $remote, $errstr);
             $frame->returnVar->bool(false);
 
             return;
