@@ -181,6 +181,33 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    public function testValidateUrl(): void
+    {
+        $v = new Variable();
+        $v->string('https://example.com');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_URL);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('https://example.com', $out->toString());
+    }
+
+    public function testValidateUrlRejectsInvalid(): void
+    {
+        $v = new Variable();
+        $v->string('not a url');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_URL);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testIsValidUrlSubset(): void
+    {
+        $this->assertTrue(VmFilter::isValidUrlSubset('https://example.com'));
+        $this->assertTrue(VmFilter::isValidUrlSubset('http://127.0.0.1:8080/path?q=1#frag'));
+        $this->assertTrue(VmFilter::isValidUrlSubset('ftp://example.com'));
+        $this->assertFalse(VmFilter::isValidUrlSubset('not a url'));
+        $this->assertFalse(VmFilter::isValidUrlSubset('http://'));
+    }
+
     /** @return \PHPCompiler\VM\HashTable */
     private static function regexpOptions(string $pattern): \PHPCompiler\VM\HashTable
     {

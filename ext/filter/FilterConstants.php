@@ -17,6 +17,7 @@ final class FilterConstants
         'validate_boolean' => VmFilter::FILTER_VALIDATE_BOOLEAN,
         'validate_float' => VmFilter::FILTER_VALIDATE_FLOAT,
         'validate_regexp' => VmFilter::FILTER_VALIDATE_REGEXP,
+        'validate_url' => VmFilter::FILTER_VALIDATE_URL,
         'validate_email' => VmFilter::FILTER_VALIDATE_EMAIL,
     ];
 

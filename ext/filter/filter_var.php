@@ -106,6 +106,11 @@ final class filter_var extends Internal
             $filterVal,
             $i64->constInt(VmFilter::FILTER_VALIDATE_EMAIL, false)
         );
+        $isUrl = $context->builder->icmp(
+            Builder::INT_EQ,
+            $filterVal,
+            $i64->constInt(VmFilter::FILTER_VALIDATE_URL, false)
+        );
 
         $intBlock = BasicBlockHelper::append($context, 'filter_var_int');
         $otherBlock = BasicBlockHelper::append($context, 'filter_var_other');
@@ -114,6 +119,8 @@ final class filter_var extends Internal
         $floatBlock = BasicBlockHelper::append($context, 'filter_var_float');
         $floatOtherBlock = BasicBlockHelper::append($context, 'filter_var_float_other');
         $emailBlock = BasicBlockHelper::append($context, 'filter_var_email');
+        $emailOtherBlock = BasicBlockHelper::append($context, 'filter_var_email_other');
+        $urlBlock = BasicBlockHelper::append($context, 'filter_var_url');
         $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
         $doneBlock = BasicBlockHelper::append($context, 'filter_var_done');
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
@@ -149,7 +156,7 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($floatOtherBlock);
-        $context->builder->branchIf($isEmail, $emailBlock, $failBlock);
+        $context->builder->branchIf($isEmail, $emailBlock, $emailOtherBlock);
 
         $context->builder->positionAtEnd($emailBlock);
         $emailResult = JitFilter::validateEmail($context, $value);
@@ -157,6 +164,17 @@ final class filter_var extends Internal
             $emailResult = JitFilter::applyNullOnFailure($context, $emailResult, $nullOnFailure);
         }
         $emailTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($emailOtherBlock);
+        $context->builder->branchIf($isUrl, $urlBlock, $failBlock);
+
+        $context->builder->positionAtEnd($urlBlock);
+        $urlResult = JitFilter::validateUrl($context, $value);
+        if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
+            $urlResult = JitFilter::applyNullOnFailure($context, $urlResult, $nullOnFailure);
+        }
+        $urlTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -170,6 +188,7 @@ final class filter_var extends Internal
         $phi->addIncoming($boolResult, $boolTail);
         $phi->addIncoming($floatResult, $floatTail);
         $phi->addIncoming($emailResult, $emailTail);
+        $phi->addIncoming($urlResult, $urlTail);
         $phi->addIncoming($falseResult, $failTail);
 
         return $phi;

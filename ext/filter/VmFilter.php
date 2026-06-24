@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\VmPregNative;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -22,6 +23,8 @@ final class VmFilter
     public const FILTER_VALIDATE_FLOAT = 259;
     /** php-src ext/filter/filter_private.h — FILTER_VALIDATE_REGEXP */
     public const FILTER_VALIDATE_REGEXP = 272;
+    /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_URL */
+    public const FILTER_VALIDATE_URL = 273;
     public const FILTER_VALIDATE_EMAIL = 274;
     /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
     public const FILTER_NULL_ON_FAILURE = 134217728;
@@ -44,6 +47,7 @@ final class VmFilter
             || self::FILTER_VALIDATE_BOOLEAN === $filter
             || self::FILTER_VALIDATE_FLOAT === $filter
             || self::FILTER_VALIDATE_REGEXP === $filter
+            || self::FILTER_VALIDATE_URL === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter;
     }
 
@@ -67,6 +71,9 @@ final class VmFilter
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
             return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_URL === $filter) {
+            return self::validateUrl($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
             return self::validateEmail($value, $nullOnFailure);
@@ -416,6 +423,127 @@ final class VmFilter
         $out->string($s);
 
         return $out;
+    }
+
+    private static function validateUrl(Variable $value, bool $nullOnFailure = false): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        if (!self::isValidUrlSubset($s)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * Practical URL subset for FILTER_VALIDATE_URL (php-src ext/filter/logical_filters.c).
+     */
+    public static function isValidUrlSubset(string $s): bool
+    {
+        if ('' === $s) {
+            return false;
+        }
+        if (preg_match('/[\x00-\x1f\x7f]/', $s)) {
+            return false;
+        }
+        $parsed = VmString::parseUrl($s);
+        if (!\is_array($parsed)) {
+            return false;
+        }
+        if (!isset($parsed['scheme']) || '' === $parsed['scheme']) {
+            return false;
+        }
+        $scheme = strtolower($parsed['scheme']);
+        $host = $parsed['host'] ?? null;
+        if (null === $host || '' === $host) {
+            return \in_array($scheme, ['mailto', 'news', 'file'], true);
+        }
+        if (\in_array($scheme, ['http', 'https'], true) && !self::isValidUrlHost($host)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function isValidUrlHost(string $host): bool
+    {
+        if ('' === $host) {
+            return false;
+        }
+        if (str_starts_with($host, '[') && str_ends_with($host, ']')) {
+            return self::isValidIpv6Hostname($host);
+        }
+        if (self::isValidIpv4Hostname($host)) {
+            return true;
+        }
+
+        return self::isValidDomainHostname($host);
+    }
+
+    private static function isValidIpv4Hostname(string $host): bool
+    {
+        if (!preg_match('/^(\d{1,3}\.){3}\d{1,3}$/', $host)) {
+            return false;
+        }
+        foreach (explode('.', $host) as $octet) {
+            if ((int) $octet > 255) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** php-src ext/filter/logical_filters.c — php_filter_is_valid_ipv6_hostname (subset). */
+    private static function isValidIpv6Hostname(string $host): bool
+    {
+        if (strlen($host) < 3) {
+            return false;
+        }
+        $inner = substr($host, 1, -1);
+
+        return (bool) preg_match('/^[0-9a-fA-F:.]+$/', $inner);
+    }
+
+    /** Loose hostname check aligned with php_filter_validate_domain_ex FILTER_FLAG_HOSTNAME subset. */
+    private static function isValidDomainHostname(string $host): bool
+    {
+        if (strlen($host) > 253) {
+            return false;
+        }
+        if ('.' === $host || str_starts_with($host, '.') || str_ends_with($host, '.')) {
+            return false;
+        }
+        $labels = explode('.', $host);
+        foreach ($labels as $label) {
+            if ('' === $label || strlen($label) > 63) {
+                return false;
+            }
+            if ('-' === $label[0] || '-' === $label[strlen($label) - 1]) {
+                return false;
+            }
+            if (!self::charsMatch($label, [self::class, 'isUrlDomainLabelChar'])) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function isUrlDomainLabelChar(string $ch): bool
+    {
+        return ($ch >= 'a' && $ch <= 'z')
+            || ($ch >= 'A' && $ch <= 'Z')
+            || ($ch >= '0' && $ch <= '9')
+            || '-' === $ch;
     }
 
     public static function isIntegerString(string $s): bool
