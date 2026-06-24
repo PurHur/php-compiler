@@ -1241,15 +1241,20 @@ final class VmFs
      */
     public static function streamSupports(int $handle, int $feature): bool
     {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
+        if (!self::isValidHandle($handle)) {
             return false;
         }
         switch ($feature) {
             case VmStreamSupports::STREAM_LOCK:
+                $fp = self::lookup($handle);
+                if (null === $fp) {
+                    return false;
+                }
+
                 return \stream_supports_lock($fp);
+            case VmStreamSupports::STREAM_META_SEEKABLE:
             case VmStreamSupports::STREAM_FILTER:
-                return self::streamSupportsFilter($handle);
+                return self::streamSupportsSeekable($handle);
             case VmStreamSupports::STREAM_META_TOUCH:
             case VmStreamSupports::STREAM_META_OWNER_NAME:
             case VmStreamSupports::STREAM_META_OWNER:
@@ -1265,6 +1270,11 @@ final class VmFs
     private static function streamSupportsFilter(int $handle): bool
     {
         return VmStreamMeta::supportsFilter(self::handleUri($handle));
+    }
+
+    private static function streamSupportsSeekable(int $handle): bool
+    {
+        return VmStreamMeta::supportsSeekable(self::handleUri($handle));
     }
 
     private static function streamSupportsMetadata(int $handle): bool

@@ -17,6 +17,8 @@ final class VmStreamSupports
     public const STREAM_META_GROUP = 5;
     public const STREAM_META_ACCESS = 6;
     public const STREAM_LOCK = 7;
+    /** PHP 8.4+ stream_supports() seek probe (php-src main/php_streams.h PHP_STREAM_META_SEEKABLE). */
+    public const STREAM_META_SEEKABLE = 8;
     public const STREAM_FILTER = 8;
 
     /** @return array<string, int> */
@@ -30,6 +32,7 @@ final class VmStreamSupports
             'STREAM_META_GROUP' => self::STREAM_META_GROUP,
             'STREAM_META_ACCESS' => self::STREAM_META_ACCESS,
             'STREAM_LOCK' => self::STREAM_LOCK,
+            'STREAM_META_SEEKABLE' => self::STREAM_META_SEEKABLE,
             'STREAM_FILTER' => self::STREAM_FILTER,
         ];
     }

@@ -321,7 +321,7 @@ final class StreamCapsJit
         $isFilter = $context->builder->icmp(
             Builder::INT_EQ,
             $featureI32,
-            $i32->constInt(VmStreamSupports::STREAM_FILTER, false)
+            $i32->constInt(VmStreamSupports::STREAM_META_SEEKABLE, false)
         );
         $metaRangeBb = $fn->appendBasicBlock('caps_supports_meta_range');
         $context->builder->branchIf($isFilter, $filterBb, $metaRangeBb);
@@ -399,16 +399,44 @@ final class StreamCapsJit
         $nullPtr = $i8p->constNull();
 
         $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
-        $phpBb = $fn->appendBasicBlock('caps_supports_filter_php');
-        $okBb = $fn->appendBasicBlock('caps_supports_filter_ok');
-        $context->builder->branchIf($pathNull, $okBb, $phpBb);
+        $checkBb = $fn->appendBasicBlock('caps_supports_seek_check');
+        $context->builder->branchIf($pathNull, $failBb, $checkBb);
 
-        $context->builder->positionAtEnd($phpBb);
-        $isPhp = self::hasPrefix($context, $path, 'php://');
-        $context->builder->branchIf($isPhp, $failBb, $okBb);
+        $context->builder->positionAtEnd($checkBb);
+        $isInput = self::hasPrefix($context, $path, 'php://input');
+        $isOutput = self::hasPrefix($context, $path, 'php://output');
+        $isStdin = self::uriEquals($context, $path, 'php://stdin');
+        $isTcp = self::hasPrefix($context, $path, 'tcp://');
+        $isUdp = self::hasPrefix($context, $path, 'udp://');
+        $isUnix = self::hasPrefix($context, $path, 'unix://');
+        $isSsl = self::hasPrefix($context, $path, 'ssl://');
+        $isTls = self::hasPrefix($context, $path, 'tls://');
+        $nonSeekable = $context->builder->or(
+            $isInput,
+            $context->builder->or(
+                $isOutput,
+                $context->builder->or(
+                    $isStdin,
+                    $context->builder->or(
+                        $isTcp,
+                        $context->builder->or($isUdp, $context->builder->or($isUnix, $context->builder->or($isSsl, $isTls)))
+                    )
+                )
+            )
+        );
+        $context->builder->returnValue($context->builder->select($nonSeekable, $zero, $one));
+    }
 
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->returnValue($one);
+    private static function uriEquals(Context $context, Value $path, string $uri): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $cmp = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $path,
+            $context->builder->pointerCast($context->constantFromString($uri), $context->getTypeFromString('int8*'))
+        );
+
+        return $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
     }
 
     private static function emitSupportsMetadata(
