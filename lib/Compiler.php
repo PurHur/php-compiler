@@ -13355,6 +13355,15 @@ class Compiler {
         if ($argCount < 2) {
             return false;
         }
+        // Statement-level calls before fscanf($f, '…') are not sibling arg producers (#11093).
+        foreach ($consumer->args as $consumerArg) {
+            if ($consumerArg instanceof Operand\Literal) {
+                return false;
+            }
+            if ($consumerArg instanceof Operand && $this->isNamedVariableOperand($consumerArg)) {
+                return false;
+            }
+        }
         $distance = $consumerIndex - $producerIndex;
         if ($distance < 1 || $distance > $argCount) {
             return false;
