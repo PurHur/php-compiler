@@ -1545,6 +1545,7 @@ class JIT {
             $m3CompilerSetter = strtolower($logicalName);
             if (str_ends_with($m3CompilerSetter, '\\compiler::setpropertyhookregistry')
                 || str_ends_with($m3CompilerSetter, '\\compiler::setknownclassreadonly')
+                || str_ends_with($m3CompilerSetter, '\\compiler::setbarerethrowlines')
             ) {
                 return $this->emitM3EmitTuCompilerArrayPropertySetterVoidStub(
                     $internalName,
@@ -2580,6 +2581,7 @@ class JIT {
             'markcallerlocalsusedbyliteralinclude',
             'setpropertyhookregistry',
             'setknownclassreadonly',
+            'setbarerethrowlines',
         ];
     }
 
@@ -2721,6 +2723,7 @@ class JIT {
             'compilefirstclassstaticnameslot',
             'setpropertyhookregistry',
             'setknownclassreadonly',
+            'setbarerethrowlines',
         ];
     }
 
@@ -3953,7 +3956,7 @@ class JIT {
             return;
         }
         $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock;
-        foreach (['setpropertyhookregistry', 'setknownclassreadonly'] as $methodLc) {
+        foreach (['setpropertyhookregistry', 'setknownclassreadonly', 'setbarerethrowlines'] as $methodLc) {
             $logical = 'PHPCompiler\\Compiler::'.$methodLc;
             $lc = strtolower($logical);
             if (!isset($this->context->functions[$lc])) {
@@ -13335,6 +13338,12 @@ class JIT {
                 $methodName,
                 $receiverVar
             )) {
+                return;
+            }
+            if ($this->isBundledJitExternalClassPrefix($declaringClassLc)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [$receiverVar];
+
                 return;
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
