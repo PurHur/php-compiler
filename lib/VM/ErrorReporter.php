@@ -434,11 +434,20 @@ final class ErrorReporter
     private function resolveDisplayLocation(?Frame $frame, ?string $file, int $line): array
     {
         if (null !== $frame) {
-            if ((null === $file || '' === $file) && '' !== $frame->scriptPath) {
-                $file = $frame->scriptPath;
-            }
-            if ($line <= 0 && $frame->callSiteLine > 0) {
-                $line = $frame->callSiteLine;
+            // Builtin handlers run in Internal frames without scriptPath/callSiteLine; Zend
+            // attributes warnings to the user call site (parent frame, issue #11163).
+            $walk = $frame;
+            while (null !== $walk) {
+                if ((null === $file || '' === $file) && '' !== $walk->scriptPath) {
+                    $file = $walk->scriptPath;
+                }
+                if ($line <= 0 && $walk->callSiteLine > 0) {
+                    $line = $walk->callSiteLine;
+                }
+                if (null !== $file && '' !== $file && $line > 0) {
+                    break;
+                }
+                $walk = $walk->parent;
             }
         }
         if (null !== $file && $this->isVirtualScriptFilename($file)) {
