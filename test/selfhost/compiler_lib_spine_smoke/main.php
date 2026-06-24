@@ -214,6 +214,7 @@ require_once __DIR__.'/../../../ext/mbstring/MbStrcutJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbStrwidthJitHelper.php';
 require_once __DIR__.'/../../../ext/mbstring/MbstringConstants.php';
 require_once __DIR__.'/../../../ext/mbstring/Module.php';
+require_once __DIR__.'/../../../ext/mbstring/Utf8CaseMap.php';
 require_once __DIR__.'/../../../ext/mbstring/VmMbstring.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_check_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_convert_case.php';
@@ -2050,6 +2051,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/AttributeNewInstanceRuntime.php'
 require_once __DIR__.'/../../../lib/JIT/Builtin/AttributeRegistry.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/AttributeRegistryLowering.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/BackedEnumFromRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/Builtin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Bcmath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/BcmathJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CallArgv.php';
