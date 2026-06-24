@@ -52,6 +52,8 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['count'] = $pub;
         $entry->methods['getarraycopy'] = new ArrayIteratorGetArrayCopy();
         $entry->methodVisibility['getarraycopy'] = $pub;
+        $entry->methods['append'] = new ArrayIteratorAppend();
+        $entry->methodVisibility['append'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -255,5 +257,29 @@ final class ArrayIteratorGetArrayCopy extends VmClassMethod
             return;
         }
         $frame->returnVar->array(SplArrayStorage::getArrayCopy($object));
+    }
+}
+
+final class ArrayIteratorAppend extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('append');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::append()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::append() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::append($object, $frame->calledArgs[1]);
     }
 }
