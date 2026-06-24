@@ -31,7 +31,7 @@ final class array_intersect extends Internal
         $firstHt = $first->toArray();
         $operandTables = [$firstHt];
         if (1 === $argc) {
-            VmArray::rejectEnumCaseSetOpOperands($firstHt);
+            VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->array($firstHt->replaceCopy());
             }
@@ -47,7 +47,7 @@ final class array_intersect extends Internal
             $others[] = $arg->toArray();
             $operandTables[] = $others[\count($others) - 1];
         }
-        VmArray::rejectEnumCaseSetOpOperands(...$operandTables);
+        VmArray::rejectEnumCaseSetOpOperands($frame, ...$operandTables);
         if (null === $frame->returnVar) {
             return;
         }

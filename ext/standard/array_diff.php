@@ -39,7 +39,7 @@ final class array_diff extends Internal
         );
         $operandTables = [$firstHt];
         if (1 === $argc) {
-            VmArray::rejectEnumCaseSetOpOperands($firstHt);
+            VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->array($firstHt->replaceCopy());
             }
@@ -55,7 +55,7 @@ final class array_diff extends Internal
             );
             $operandTables[] = $others[\count($others) - 1];
         }
-        VmArray::rejectEnumCaseSetOpOperands(...$operandTables);
+        VmArray::rejectEnumCaseSetOpOperands($frame, ...$operandTables);
         if (null === $frame->returnVar) {
             return;
         }

@@ -88,28 +88,38 @@ final class VmArray
     }
 
     /**
-     * array_intersect/diff* reject enum case keys/values before string hash (#5927, php-src array.c).
+     * array_intersect/diff* reject enum case and non-stringable object operands (#5927, #11249, php-src array.c).
      */
-    public static function rejectEnumCaseSetOpOperands(HashTable ...$tables): void
+    public static function rejectEnumCaseSetOpOperands(?Frame $frame, HashTable ...$tables): void
     {
         foreach ($tables as $table) {
             foreach ($table->iterateKeyed(true) as [$key, $value]) {
-                $value = $value->resolveIndirect();
-                if (EnumCaseSupport::isEnumCaseVariable($value)) {
-                    $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
-                    throw new \Error(
-                        'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
-                    );
-                }
-                $key = $key->resolveIndirect();
-                if (EnumCaseSupport::isEnumCaseVariable($key)) {
-                    $enumClass = EnumCaseSupport::enumClassForCaseVariable($key);
-                    throw new \Error(
-                        'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
-                    );
-                }
+                self::rejectSetOpKeyOrValue($frame, $value);
+                self::rejectSetOpKeyOrValue($frame, $key);
             }
         }
+    }
+
+    private static function rejectSetOpKeyOrValue(?Frame $frame, Variable $var): void
+    {
+        $var = $var->resolveIndirect();
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+            throw new \Error(
+                'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return;
+        }
+        if (null !== $frame && null !== $frame->vmContext) {
+            $frame->vmContext->runtime->vm->castObjectToString($var->toObject());
+
+            return;
+        }
+        throw new \Error(
+            'Object of class '.$var->toObject()->class->name.' could not be converted to string'
+        );
     }
 
     /**
