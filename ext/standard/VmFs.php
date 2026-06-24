@@ -210,14 +210,20 @@ final class VmFs
     {
         $keys = ['dev', 'ino', 'mode', 'nlink', 'uid', 'gid', 'rdev', 'size', 'atime', 'mtime', 'ctime', 'blksize', 'blocks'];
         $ht = new HashTable();
+        $values = [];
         foreach ($keys as $i => $key) {
-            $val = (int) ($stat[$key] ?? $stat[$i] ?? 0);
-            $named = new Variable();
-            $named->int($val);
-            $ht->add($key, $named);
+            $values[$i] = (int) ($stat[$key] ?? $stat[$i] ?? 0);
+        }
+        // php-src filestat.c — numeric indices 0..12 precede string aliases in iteration order.
+        foreach ($values as $i => $val) {
             $indexed = new Variable();
             $indexed->int($val);
             $ht->updateIndex($i, $indexed);
+        }
+        foreach ($keys as $i => $key) {
+            $named = new Variable();
+            $named->int($values[$i]);
+            $ht->add($key, $named);
         }
 
         return $ht;

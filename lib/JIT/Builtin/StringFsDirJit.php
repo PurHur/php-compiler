@@ -459,19 +459,23 @@ final class StringFsDirJit
         $context->builder->returnValue($zero);
     }
 
-    private static function statPair(Context $context, Value $ht, int $index, string $key, Value $value): void
+    private static function statIndex(Context $context, Value $ht, int $index, Value $value): void
     {
         $sizeT = $context->getTypeFromString('size_t');
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
-            $ht,
-            self::cstrToString($context, self::literalCstr($context, $key)),
-            $value
-        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setLongAt'),
             $ht,
             $sizeT->constInt($index, false),
+            $value
+        );
+    }
+
+    private static function statKey(Context $context, Value $ht, string $key, Value $value): void
+    {
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyLong'),
+            $ht,
+            self::cstrToString($context, self::literalCstr($context, $key)),
             $value
         );
     }
@@ -526,19 +530,46 @@ final class StringFsDirJit
 
         $context->builder->positionAtEnd($fill);
         $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        self::statPair($context, $ht, 0, 'dev', self::statFieldI64($context, $stBase, self::STAT_DEV_OFFSET));
-        self::statPair($context, $ht, 1, 'ino', self::statFieldI64($context, $stBase, self::STAT_INO_OFFSET));
-        self::statPair($context, $ht, 2, 'mode', self::statFieldI32ToI64($context, $stBase, self::STAT_MODE_OFFSET));
-        self::statPair($context, $ht, 3, 'nlink', self::statFieldI64($context, $stBase, self::STAT_NLINK_OFFSET));
-        self::statPair($context, $ht, 4, 'uid', self::statFieldI32ToI64($context, $stBase, self::STAT_UID_OFFSET));
-        self::statPair($context, $ht, 5, 'gid', self::statFieldI32ToI64($context, $stBase, self::STAT_GID_OFFSET));
-        self::statPair($context, $ht, 6, 'rdev', self::statFieldI64($context, $stBase, self::STAT_RDEV_OFFSET));
-        self::statPair($context, $ht, 7, 'size', self::statFieldI64($context, $stBase, self::STAT_SIZE_OFFSET));
-        self::statPair($context, $ht, 8, 'atime', self::statFieldI64($context, $stBase, self::STAT_ATIME_OFFSET));
-        self::statPair($context, $ht, 9, 'mtime', self::statFieldI64($context, $stBase, self::STAT_MTIME_OFFSET));
-        self::statPair($context, $ht, 10, 'ctime', self::statFieldI64($context, $stBase, self::STAT_CTIME_OFFSET));
-        self::statPair($context, $ht, 11, 'blksize', self::statFieldI64($context, $stBase, self::STAT_BLKSIZE_OFFSET));
-        self::statPair($context, $ht, 12, 'blocks', self::statFieldI64($context, $stBase, self::STAT_BLOCKS_OFFSET));
+        $dev = self::statFieldI64($context, $stBase, self::STAT_DEV_OFFSET);
+        $ino = self::statFieldI64($context, $stBase, self::STAT_INO_OFFSET);
+        $mode = self::statFieldI32ToI64($context, $stBase, self::STAT_MODE_OFFSET);
+        $nlink = self::statFieldI64($context, $stBase, self::STAT_NLINK_OFFSET);
+        $uid = self::statFieldI32ToI64($context, $stBase, self::STAT_UID_OFFSET);
+        $gid = self::statFieldI32ToI64($context, $stBase, self::STAT_GID_OFFSET);
+        $rdev = self::statFieldI64($context, $stBase, self::STAT_RDEV_OFFSET);
+        $size = self::statFieldI64($context, $stBase, self::STAT_SIZE_OFFSET);
+        $atime = self::statFieldI64($context, $stBase, self::STAT_ATIME_OFFSET);
+        $mtime = self::statFieldI64($context, $stBase, self::STAT_MTIME_OFFSET);
+        $ctime = self::statFieldI64($context, $stBase, self::STAT_CTIME_OFFSET);
+        $blksize = self::statFieldI64($context, $stBase, self::STAT_BLKSIZE_OFFSET);
+        $blocks = self::statFieldI64($context, $stBase, self::STAT_BLOCKS_OFFSET);
+        // php-src filestat.c — numeric indices 0..12 precede string aliases.
+        self::statIndex($context, $ht, 0, $dev);
+        self::statIndex($context, $ht, 1, $ino);
+        self::statIndex($context, $ht, 2, $mode);
+        self::statIndex($context, $ht, 3, $nlink);
+        self::statIndex($context, $ht, 4, $uid);
+        self::statIndex($context, $ht, 5, $gid);
+        self::statIndex($context, $ht, 6, $rdev);
+        self::statIndex($context, $ht, 7, $size);
+        self::statIndex($context, $ht, 8, $atime);
+        self::statIndex($context, $ht, 9, $mtime);
+        self::statIndex($context, $ht, 10, $ctime);
+        self::statIndex($context, $ht, 11, $blksize);
+        self::statIndex($context, $ht, 12, $blocks);
+        self::statKey($context, $ht, 'dev', $dev);
+        self::statKey($context, $ht, 'ino', $ino);
+        self::statKey($context, $ht, 'mode', $mode);
+        self::statKey($context, $ht, 'nlink', $nlink);
+        self::statKey($context, $ht, 'uid', $uid);
+        self::statKey($context, $ht, 'gid', $gid);
+        self::statKey($context, $ht, 'rdev', $rdev);
+        self::statKey($context, $ht, 'size', $size);
+        self::statKey($context, $ht, 'atime', $atime);
+        self::statKey($context, $ht, 'mtime', $mtime);
+        self::statKey($context, $ht, 'ctime', $ctime);
+        self::statKey($context, $ht, 'blksize', $blksize);
+        self::statKey($context, $ht, 'blocks', $blocks);
         $context->builder->returnValue($ht);
 
         $context->builder->positionAtEnd($fail);
