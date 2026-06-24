@@ -65,4 +65,11 @@ final class BuiltinByRefParamsTest extends TestCase
             $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
         }
     }
+
+    public function testExecFamilyByRefIndices(): void
+    {
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('exec'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('passthru'));
+        $this->assertSame([1], BuiltinByRefParams::forFunction('system'));
+    }
 }
