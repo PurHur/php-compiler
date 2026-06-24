@@ -36,6 +36,8 @@ final class array_multisort extends Internal
 
         $length = null;
         $allValues = [];
+        $allPairs = [];
+        $allPacked = [];
         foreach ($entries as $entryIdx => $entry) {
             $ht = $entry['array']->resolveIndirect()->toArray();
             $count = $ht->getNumElements();
@@ -44,11 +46,27 @@ final class array_multisort extends Internal
             } elseif ($count !== $length) {
                 throw new \ValueError('Array sizes are inconsistent');
             }
+            $isPacked = $ht->isPackedList();
+            $allPacked[$entryIdx] = $isPacked;
             $values = [];
-            foreach ($ht->iterate(true) as $value) {
-                $copy = new Variable();
-                $copy->copyFrom($value);
-                $values[] = $copy;
+            if ($isPacked) {
+                foreach ($ht->iterate(true) as $value) {
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $values[] = $copy;
+                }
+                $allPairs[$entryIdx] = null;
+            } else {
+                $pairs = [];
+                foreach ($ht->iterateKeyed(true) as [$key, $value]) {
+                    $keyCopy = new Variable();
+                    $keyCopy->copyFrom($key);
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $pairs[] = [$keyCopy, $copy];
+                    $values[] = $copy;
+                }
+                $allPairs[$entryIdx] = $pairs;
             }
             $allValues[$entryIdx] = $values;
         }
@@ -64,12 +82,21 @@ final class array_multisort extends Internal
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, $allValues, $entries);
         foreach ($entries as $entryIdx => $entry) {
-            $reordered = [];
-            foreach ($indices as $idx) {
-                $reordered[] = $allValues[$entryIdx][$idx];
-            }
             $entry['array']->separateArrayForWrite();
-            $entry['array']->resolveIndirect()->toArray()->replacePackedValues($reordered);
+            $target = $entry['array']->resolveIndirect()->toArray();
+            if ($allPacked[$entryIdx]) {
+                $reordered = [];
+                foreach ($indices as $idx) {
+                    $reordered[] = $allValues[$entryIdx][$idx];
+                }
+                $target->replacePackedValues($reordered);
+            } else {
+                $reorderedPairs = [];
+                foreach ($indices as $idx) {
+                    $reorderedPairs[] = $allPairs[$entryIdx][$idx];
+                }
+                $target->reorderKeyedPairs($reorderedPairs);
+            }
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
