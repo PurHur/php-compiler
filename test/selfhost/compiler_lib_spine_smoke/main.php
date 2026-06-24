@@ -3004,6 +3004,7 @@ require_once __DIR__.'/../../../lib/VM/VmVarFetchJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/WeakMapIterator.php';
 require_once __DIR__.'/../../../lib/VM/WeakRefRegistry.php';
 require_once __DIR__.'/../../../lib/VM/WeakRefSupport.php';
+require_once __DIR__.'/../../../lib/VM/ZendDeclaredInterfaces.php';
 require_once __DIR__.'/../../../lib/Visitor/ExitFunctionResolver.php';
 require_once __DIR__.'/../../../lib/Visitor/InOperatorResolver.php';
 require_once __DIR__.'/../../../lib/Visitor/VoidCastResolver.php';
