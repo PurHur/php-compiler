@@ -53,6 +53,18 @@ final class array_column extends Internal
             foreach ($ht->iterate(true) as $rowVar) {
                 $row = $rowVar->resolveIndirect();
                 if (Variable::TYPE_ARRAY !== $row->type && Variable::TYPE_OBJECT !== $row->type) {
+                    $stored = new Variable();
+                    $stored->copyFrom($row);
+                    if (null !== $indexField) {
+                        $indexVal = $this->readColumnFromRow($row, $indexField);
+                        if (null === $indexVal) {
+                            $out->append($stored);
+                            continue;
+                        }
+                        $this->storeAtKey($out, $indexVal, $stored);
+                        continue;
+                    }
+                    $out->append($stored);
                     continue;
                 }
                 $stored = new Variable();
