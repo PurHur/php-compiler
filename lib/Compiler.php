@@ -11003,6 +11003,34 @@ class Compiler {
                     }
                 }
             }
+            if (1 === $funcCallProducerCount && 0 === $arrayProducerCount) {
+                $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall) {
+                    $producerIndex = null;
+                    foreach ($block->orig->children as $i => $child) {
+                        if ($child === $matched) {
+                            $producerIndex = $i;
+                            break;
+                        }
+                    }
+                    if (
+                        null !== $producerIndex
+                        && null !== $callIndex
+                        && $this->isAdjacentNestedFuncCallProducer($matched, $callOp, $producerIndex, $callIndex)
+                    ) {
+                        $slot = $block->slotForOperand($matched->result);
+                        if (null === $slot) {
+                            foreach ($this->compileExpr($matched, $block) as $op) {
+                                $block->addOpCode($op);
+                            }
+                            $slot = $block->slotForOperand($matched->result);
+                        }
+                        if (null !== $slot) {
+                            return (string) $slot;
+                        }
+                    }
+                }
+            }
             $prev = $block->orig->children[$callIndex - 1] ?? null;
             if ($prev instanceof Op\Expr\ConstFetch) {
                 $name = $this->staticNameFromOperand($prev->name);
@@ -11474,7 +11502,12 @@ class Compiler {
             ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
             && $this->inlineCallArgProducerFeedsConsumer($producer, $callOp)
         ) {
-            return $producerSlot;
+            if (null === $producerSlot) {
+                $producerSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $callOp, $argIndex);
+            }
+            if (null !== $producerSlot) {
+                return $producerSlot;
+            }
         }
 
         return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
@@ -13468,10 +13501,6 @@ class Compiler {
         if (!property_exists($consumer, 'args') || !is_array($consumer->args) || count($consumer->args) < 2) {
             return false;
         }
-        $firstArg = $consumer->args[0] ?? null;
-        if (!$firstArg instanceof Operand\Temporary) {
-            return false;
-        }
         $argCount = \count($consumer->args);
         $literalPreludeCount = 0;
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
@@ -13491,9 +13520,27 @@ class Compiler {
 
             return false;
         }
-        // Trailing literal preludes only (e.g. var_export(g(), true)); statement-level calls
-        // before multiple hoisted ConstFetch args must not match (#11312, zend_constants.h).
-        if ($literalPreludeCount !== $argCount - 1) {
+        $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+            $producerIndex,
+            $consumerIndex,
+            $cfgChildren
+        );
+        if (null === $targetArgIndex) {
+            $targetArgIndex = 0;
+            while (
+                $targetArgIndex < $argCount
+                && ($consumer->args[$targetArgIndex] ?? null) instanceof Operand\Literal
+            ) {
+                ++$targetArgIndex;
+            }
+        }
+        $targetArg = $consumer->args[$targetArgIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($targetArg)) {
+            return false;
+        }
+        // Trailing hoisted literal preludes only (e.g. var_export(g(), true), in_array('x', g(), true);
+        // statement-level calls before multiple hoisted ConstFetch args must not match (#11312, #11373).
+        if ($literalPreludeCount !== $argCount - 1 - $targetArgIndex) {
             return false;
         }
 
@@ -13533,7 +13580,16 @@ class Compiler {
             $next = $ops[$j];
             if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
                 if ($this->isInlineExprCallArgConsumer($next)
-                    && $this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)
+                    && (
+                        $this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)
+                        || $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                            $op,
+                            $next,
+                            $producerIndex,
+                            $j,
+                            $ops
+                        )
+                    )
                 ) {
                     return $j;
                 }
@@ -13585,9 +13641,6 @@ class Compiler {
         }
         // Statement-level calls before fscanf($f, '…') are not sibling arg producers (#11093).
         foreach ($consumer->args as $consumerArg) {
-            if ($consumerArg instanceof Operand\Literal) {
-                return false;
-            }
             if ($consumerArg instanceof Operand && $this->isNamedVariableOperand($consumerArg)) {
                 return false;
             }
@@ -13835,7 +13888,9 @@ class Compiler {
             return null;
         }
         $args = $cfgCallOp->args;
-        if (\count($args) < 2 || $argIndex !== \count($args) - 1) {
+        if (1 === \count($args) && 0 === $argIndex) {
+            // var_export(f()) — adjacent nested FuncCall feeds the sole call arg (#11373).
+        } elseif (\count($args) < 2 || $argIndex !== \count($args) - 1) {
             return null;
         }
         $callIndex = null;

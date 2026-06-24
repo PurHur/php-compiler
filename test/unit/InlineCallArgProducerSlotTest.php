@@ -1276,6 +1276,26 @@ PHP;
         self::assertStringContainsString("'b'", $out);
     }
 
+    /** Issue #11373 — in_array('md5', hash_algos(), true) nested producer runtime parity with Zend. */
+    public function testInArrayNestedHashAlgosRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(in_array('md5', hash_algos(), true));
+echo "\n";
+$src = ['a' => 1, 'b' => 2];
+var_export(in_array('a', array_keys($src), true));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_hash_algos_in_array.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("true\ntrue\n", $out);
+    }
+
     /** Issue #10351 — var_export(array_pad([...], -N, 0), true) wires nested FuncCall + Array_ + UnaryMinus. */
     public function testVarExportArrayPadNegativeLengthUsesNestedFuncCallProducerSlot(): void
     {
