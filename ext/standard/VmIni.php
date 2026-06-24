@@ -22,6 +22,7 @@ final class VmIni
         'serialize_precision',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
+        'include_path',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -55,6 +56,8 @@ final class VmIni
                 return self::setUnserializeCallbackFunc($newValue);
             case 'session.gc_maxlifetime':
                 return self::setSessionGcMaxLifetime($newValue);
+            case 'include_path':
+                return IncludePathJitHelper::push($newValue);
             default:
                 return false;
         }
@@ -83,6 +86,8 @@ final class VmIni
                 return self::$unserializeCallbackFunc;
             case 'session.gc_maxlifetime':
                 return (string) self::$sessionGcMaxLifetime;
+            case 'include_path':
+                return IncludePathJitHelper::get();
             default:
                 return false;
         }

@@ -102,6 +102,7 @@ final class IniRuntime
         $zaBb = $fn->appendBasicBlock('ig_za');
         $aaBb = $fn->appendBasicBlock('ig_aa');
         $aeBb = $fn->appendBasicBlock('ig_ae');
+        $ipBb = $fn->appendBasicBlock('ig_ip');
         $testEr = $fn->appendBasicBlock('ig_test_er');
         $testDe = $fn->appendBasicBlock('ig_test_de');
         $testMl = $fn->appendBasicBlock('ig_test_ml');
@@ -109,6 +110,7 @@ final class IniRuntime
         $testZa = $fn->appendBasicBlock('ig_test_za');
         $testAa = $fn->appendBasicBlock('ig_test_aa');
         $testAe = $fn->appendBasicBlock('ig_test_ae');
+        $testIp = $fn->appendBasicBlock('ig_test_ip');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -128,7 +130,8 @@ final class IniRuntime
         self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testZa);
         self::branchIfKey($context, $testZa, $optCstr, 'zend.assertions', $zaBb, $testAa);
         self::branchIfKey($context, $testAa, $optCstr, 'assert.active', $aaBb, $testAe);
-        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $failBb);
+        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $testIp);
+        self::branchIfKey($context, $testIp, $optCstr, 'include_path', $ipBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
         SilenceRuntime::emitIniGetErrorReporting($context, $out);
@@ -162,6 +165,12 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($aeBb);
         AssertIniRuntime::writeIniGetException($context, $out);
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($ipBb);
+        IncludePathRuntime::ensureLinked($context);
+        $context->builder->call($context->lookupFunction('__compiler_get_include_path'), $out);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -260,6 +269,7 @@ final class IniRuntime
         $zaBb = $fn->appendBasicBlock('is_za');
         $aaBb = $fn->appendBasicBlock('is_aa');
         $aeBb = $fn->appendBasicBlock('is_ae');
+        $ipBb = $fn->appendBasicBlock('is_ip');
         $mlApplyBb = $fn->appendBasicBlock('is_ml_apply');
         $testEr = $fn->appendBasicBlock('is_test_er');
         $testDe = $fn->appendBasicBlock('is_test_de');
@@ -268,6 +278,7 @@ final class IniRuntime
         $testZa = $fn->appendBasicBlock('is_test_za');
         $testAa = $fn->appendBasicBlock('is_test_aa');
         $testAe = $fn->appendBasicBlock('is_test_ae');
+        $testIp = $fn->appendBasicBlock('is_test_ip');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -289,7 +300,8 @@ final class IniRuntime
         self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testZa);
         self::branchIfKey($context, $testZa, $optCstr, 'zend.assertions', $zaBb, $testAa);
         self::branchIfKey($context, $testAa, $optCstr, 'assert.active', $aaBb, $testAe);
-        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $failBb);
+        self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $testIp);
+        self::branchIfKey($context, $testIp, $optCstr, 'include_path', $ipBb, $failBb);
 
         $i32 = $context->getTypeFromString('int32');
 
@@ -364,6 +376,16 @@ final class IniRuntime
         $context->builder->positionAtEnd($aeBb);
         AssertIniRuntime::writeIniGetException($context, $out);
         AssertIniRuntime::applyIniSetException($context, $fn, $valCstr);
+        self::freeCstrPair($context, $fn, $optCstr, $valCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($ipBb);
+        IncludePathRuntime::ensureLinked($context);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_set_include_path'),
+            $newValue,
+            $out
+        );
         self::freeCstrPair($context, $fn, $optCstr, $valCstr);
         $context->builder->returnVoid();
 
