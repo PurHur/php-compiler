@@ -53,7 +53,12 @@ final class fscanf extends Internal
 
             return;
         }
-        $frame->returnVar->int(VmVfscanf::parse($handle, $format, $outVars));
+        $parsed = VmVfscanf::parse($handle, $format, $outVars);
+        if (false === $parsed) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($parsed);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value

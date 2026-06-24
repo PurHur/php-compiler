@@ -791,10 +791,15 @@ final class SscanfJit
         $consumed = $context->builder->load($consumedSlot);
         $newPos = $context->builder->add($start, $context->builder->intCast($consumed, $i64));
         $context->builder->call($context->lookupFunction('__compiler_fseek'), $handle, $newPos, $seekSet);
-        $context->builder->returnValue($assigned);
+        $map = $context->structFieldMap['__string__'];
+        $contentLen = $context->builder->load($context->builder->structGep($content, $map['length']));
+        $emptyContent = $context->builder->icmp(Builder::INT_EQ, $contentLen, $sizeT->constInt(0, false));
+        $noAssign = $context->builder->icmp(Builder::INT_EQ, $assigned, $zero64);
+        $eofFalse = $context->builder->and($emptyContent, $noAssign);
+        $context->builder->returnValue($context->builder->select($eofFalse, $minusOne, $assigned));
 
         $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($zero64);
+        $context->builder->returnValue($minusOne);
     }
 
     private static function emitCompilerSscanfArray(Context $context, LlvmFunction $fn): void
