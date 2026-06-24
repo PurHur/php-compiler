@@ -2507,6 +2507,7 @@ require_once __DIR__.'/../../../lib/JIT/JitIterableArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitLongArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitMemoryUsageArg.php';
 require_once __DIR__.'/../../../lib/JIT/JitNativeString.php';
+require_once __DIR__.'/../../../lib/JIT/JitNestedHelperCoerce.php';
 require_once __DIR__.'/../../../lib/JIT/JitNumericDivisionGuard.php';
 require_once __DIR__.'/../../../lib/JIT/JitOperandTypeLabel.php';
 require_once __DIR__.'/../../../lib/JIT/JitPowNumericOperandGuard.php';
