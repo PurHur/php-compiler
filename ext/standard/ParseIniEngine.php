@@ -16,10 +16,16 @@ final class ParseIniEngine
     public const SCANNER_TYPED = 2;
 
     private static ?string $lastSyntaxError = null;
+    private static ?int $lastSyntaxLine = null;
 
     public static function lastSyntaxError(): ?string
     {
         return self::$lastSyntaxError;
+    }
+
+    public static function lastSyntaxLine(): ?int
+    {
+        return self::$lastSyntaxLine;
     }
 
     /**
@@ -28,6 +34,7 @@ final class ParseIniEngine
     public static function parse(string $ini, bool $processSections = false, int $scannerMode = self::SCANNER_NORMAL): array|false
     {
         self::$lastSyntaxError = null;
+        self::$lastSyntaxLine = null;
         if (self::SCANNER_NORMAL !== $scannerMode) {
             throw new \LogicException(
                 'parse_ini_string(): only INI_SCANNER_NORMAL is supported in this compiler build'
@@ -38,7 +45,7 @@ final class ParseIniEngine
         $currentSection = null;
         $sectionData = [];
 
-        foreach (self::splitLines($ini) as $line) {
+        foreach (self::splitLines($ini) as $lineNo => $line) {
             $line = self::trimWs($line);
             if ('' === $line) {
                 continue;
@@ -49,7 +56,7 @@ final class ParseIniEngine
             if ('[' === $line[0]) {
                 $sectionName = self::parseSectionHeader($line);
                 if (null === $sectionName) {
-                    self::$lastSyntaxError = "unexpected '='";
+                    self::setSyntaxError($lineNo + 1, "unexpected '='");
 
                     return false;
                 }
@@ -70,13 +77,13 @@ final class ParseIniEngine
             }
             $key = self::trimWs(substr($line, 0, $eq));
             if ('' === $key) {
-                self::$lastSyntaxError = "unexpected '='";
+                self::setSyntaxError($lineNo + 1, "unexpected '='");
 
                 return false;
             }
             $reservedToken = self::reservedKeySyntaxToken($key);
             if (null !== $reservedToken) {
-                self::$lastSyntaxError = 'unexpected '.$reservedToken;
+                self::setSyntaxError($lineNo + 1, 'unexpected '.$reservedToken);
 
                 return false;
             }
@@ -84,7 +91,7 @@ final class ParseIniEngine
             $value = self::parseValue($rawValue);
             if (false === $value) {
                 if (null === self::$lastSyntaxError) {
-                    self::$lastSyntaxError = "unexpected '='";
+                    self::setSyntaxError($lineNo + 1, "unexpected '='");
                 }
 
                 return false;
@@ -98,6 +105,12 @@ final class ParseIniEngine
         }
 
         return $result;
+    }
+
+    private static function setSyntaxError(int $line, string $detail): void
+    {
+        self::$lastSyntaxError = $detail;
+        self::$lastSyntaxLine = $line;
     }
 
     /**

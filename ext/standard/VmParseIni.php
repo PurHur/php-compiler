@@ -115,8 +115,9 @@ final class VmParseIni
             return;
         }
         $detail = ParseIniEngine::lastSyntaxError() ?? "unexpected '='";
+        $line = ParseIniEngine::lastSyntaxLine() ?? 1;
         $frame->vmContext->errors->triggerError(
-            'syntax error, '.$detail,
+            'syntax error, '.$detail.' in Unknown on line '.$line,
             ErrorReporter::E_WARNING,
             '' !== $frame->scriptPath ? $frame->scriptPath : null,
             $frame->vmContext,
