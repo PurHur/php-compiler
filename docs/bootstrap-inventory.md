@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2972 |
-| Phase A inventory files (M2 ratio SSOT) | 2972 |
+| PHP files on vm.php path | 2976 |
+| Phase A inventory files (M2 ratio SSOT) | 2976 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8029 |
+| Source constructs flagged (warnings) | 8037 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -737,6 +737,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStreamIsLocal.php` | 0 | 1 |
 | `ext/standard/JitStreamIsatty.php` | 0 | 1 |
 | `ext/standard/JitStreamNotificationCallback.php` | 0 | 2 |
+| `ext/standard/JitStreamPath.php` | 0 | 1 |
 | `ext/standard/JitStreamSetBlocking.php` | 0 | 1 |
 | `ext/standard/JitStreamSetChunkSize.php` | 0 | 1 |
 | `ext/standard/JitStreamSetReadBuffer.php` | 0 | 1 |
@@ -821,7 +822,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ReadfileJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadonlyRaiseJitHelper.php` | 0 | 1 |
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
+| `ext/standard/SerializeJitHelper.php` | 0 | 1 |
 | `ext/standard/SessionCreateIdJitHelper.php` | 0 | 1 |
+| `ext/standard/SessionEncodeJitHelper.php` | 0 | 1 |
 | `ext/standard/SessionGcJitHelper.php` | 0 | 1 |
 | `ext/standard/SetcookieLine.php` | 0 | 1 |
 | `ext/standard/SetcookieOptions.php` | 0 | 9 |
@@ -1024,7 +1027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSerialize.php` | 0 | 30 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
-| `ext/standard/VmSessionSerializer.php` | 0 | 3 |
+| `ext/standard/VmSessionSerializer.php` | 0 | 5 |
 | `ext/standard/VmSetcookie.php` | 0 | 1 |
 | `ext/standard/VmSettype.php` | 0 | 4 |
 | `ext/standard/VmShellExecNative.php` | 0 | 1 |
@@ -1047,6 +1050,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamMeta.php` | 0 | 1 |
 | `ext/standard/VmStreamNotification.php` | 0 | 3 |
 | `ext/standard/VmStreamOpenFailure.php` | 0 | 1 |
+| `ext/standard/VmStreamPath.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectGuard.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairNative.php` | 0 | 1 |
@@ -2104,7 +2108,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionAbort.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionCreateIdRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SessionDestroy.php` | 0 | 1 |
-| `lib/JIT/Builtin/SessionEncodeRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SessionEncodeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SessionGcRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SessionId.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionLifecycleRuntime.php` | 0 | 2 |
@@ -7195,6 +7199,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 19)
 - 1 class method(s)
 
+### `ext/standard/JitStreamPath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/JitStreamSetBlocking.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8394,7 +8403,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/SerializeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/SessionCreateIdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/SessionEncodeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -8802,11 +8821,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 1106)
-- new RecursiveDirectoryIterator (line 1107)
-- new RecursiveIteratorIterator (line 1208)
-- new RecursiveDirectoryIterator (line 1209)
-- 48 class method(s)
+- new RecursiveIteratorIterator (line 1180)
+- new RecursiveDirectoryIterator (line 1181)
+- new RecursiveIteratorIterator (line 1282)
+- new RecursiveDirectoryIterator (line 1283)
+- 49 class method(s)
 - 8 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -9863,9 +9882,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSessionSerializer.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 44)
-- new Variable (line 67)
-- 4 class method(s)
+- new HashTable (line 71)
+- new Variable (line 94)
+- new HashTable (line 110)
+- new Variable (line 132)
+- 6 class method(s)
 
 ### `ext/standard/VmSetcookie.php`
 
@@ -10036,6 +10057,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/VmStreamPath.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmStreamSelectGuard.php`
 
@@ -16724,7 +16750,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionEncodeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 279)
 - 11 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/SessionGcRuntime.php`
 
