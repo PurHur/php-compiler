@@ -15,19 +15,22 @@ final class VmVfscanf
     /**
      * @param list<\PHPCompiler\VM\Variable> $outVars
      */
-    public static function parse(int $handle, string $format, array $outVars): int
+    public static function parse(int $handle, string $format, array $outVars): int|false
     {
         $start = VmFs::ftell($handle);
         if (false === $start) {
-            return 0;
+            return false;
         }
         $data = VmFs::streamGetContents($handle, -1, -1);
         if (false === $data) {
-            return 0;
+            return false;
         }
         [$assigned, $consumed] = VmSscanf::parseWithConsumed($data, $format, $outVars);
         if ($consumed > 0) {
             VmFs::fseek($handle, $start + $consumed, \SEEK_SET);
+        }
+        if (0 === $assigned && '' === $data) {
+            return false;
         }
 
         return $assigned;

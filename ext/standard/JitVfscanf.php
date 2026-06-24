@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Builtin\StreamRead;
 use PHPCompiler\JIT\Context;
@@ -75,7 +76,36 @@ final class JitVfscanf
         );
         $context->builder->call($context->lookupFunction('__mm__free'), $raw);
 
-        return $context->builder->intCast($count, $i64);
+        return self::boxAssignedCount($context, $count);
+    }
+
+    private static function boxAssignedCount(Context $context, Value $raw): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $falseSentinel = $i64->constInt(-1, true);
+        $isFalse = $context->builder->icmp(\PHPLLVM\Builder::INT_EQ, $raw, $falseSentinel);
+
+        $id = (string) \spl_object_id($context);
+        $failBlock = BasicBlockHelper::append($context, 'vfscanf_false_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'vfscanf_ok_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'vfscanf_done_'.$id);
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->branchIf($isFalse, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $i1 = $context->getTypeFromString('int1');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeLong($context, $slot, $raw);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+
+        return $ptr;
     }
 
     /** Compile-time fold only when arity is valid — mismatches use runtime LLVM (#4064). */
@@ -126,6 +156,17 @@ final class JitVfscanf
             $temps[] = new VMVariable();
         }
         $assigned = VmVfscanf::parse($handle, $format, $temps);
+        if (false === $assigned) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                $ptr,
+                $context->getTypeFromString('int32')->constInt(0, false)
+            );
+
+            return $ptr;
+        }
         for ($i = 0; $i < $assigned; ++$i) {
             JitSscanf::writeVmVarToOut($context, $outArgs[$i], $temps[$i]);
         }
