@@ -2791,6 +2791,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDeclaringCla
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetMangledName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetRawValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetReadableType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetSettableType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetType.php';
@@ -2806,6 +2807,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsProtected.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsPublic.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsReadOnly.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyIsVirtual.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetRawValueWithoutLazyInitialization.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertySkipLazyInitialization.php';
