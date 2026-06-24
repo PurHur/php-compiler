@@ -386,8 +386,10 @@ final class ErrorReporter
 
     /**
      * Zend CLI stderr line (main/main.c php_error_cb).
+     *
+     * Shared by VM and {@see \PHPCompiler\ext\standard\TriggerErrorJitHelper} (#9293).
      */
-    private function formatCliError(int $level, string $message, ?string $file, int $line): string
+    public static function formatCliErrorLine(int $level, string $message, ?string $file, int $line): string
     {
         $prefix = match ($level) {
             self::E_WARNING, self::E_USER_WARNING => 'PHP Warning',
@@ -411,9 +413,19 @@ final class ErrorReporter
      * php-src CLI: diagnostics go to stderr when error_reporting includes the level,
      * independent of display_errors (issue #10677; matches JIT __compiler_trigger_error).
      */
+    public static function writeCliStderrLine(int $level, string $message, ?string $file, int $line): void
+    {
+        fwrite(STDERR, self::formatCliErrorLine($level, $message, $file, $line));
+    }
+
+    private function formatCliError(int $level, string $message, ?string $file, int $line): string
+    {
+        return self::formatCliErrorLine($level, $message, $file, $line);
+    }
+
     private function writeCliStderr(int $level, string $message, ?string $file, int $line): void
     {
-        fwrite(STDERR, $this->formatCliError($level, $message, $file, $line));
+        self::writeCliStderrLine($level, $message, $file, $line);
     }
 
     /**
