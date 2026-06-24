@@ -37,6 +37,7 @@ final class file_put_contents extends Internal
         $data = self::coerceData($dataVar);
         $written = VmFs::filePutContents($path, $data, $flags);
         if (false === $written) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'file_put_contents', $path);
             $frame->returnVar->bool(false);
 
             return;
