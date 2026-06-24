@@ -1522,4 +1522,46 @@ PHP;
         $runtime->run($block);
         self::assertSame("count=4\n", ob_get_clean());
     }
+
+    /** Issue #11304 — array_map(fn, [new C()]) wires closure + outer Array_, not embedded New_. */
+    public function testArrayMapClosureInlineObjectArrayUsesClosureAndArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_map(fn($x) => $x, [new stdClass()]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_closure_object_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(1, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'callback and array must use distinct slots');
+        self::assertSame($arraySlots[0], $sendSlots[1], 'array arg must use outer Array_ slot');
+    }
+
+    /** Issue #11304 — array_map(fn, [new C()]) runtime parity with Zend. */
+    public function testArrayMapClosureInlineObjectArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$r = array_map(fn($x) => $x, [new stdClass()]);
+echo is_object($r[0]) ? "object\n" : "not_object\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_closure_object_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("object\n", ob_get_clean());
+    }
 }

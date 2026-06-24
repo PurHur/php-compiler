@@ -13082,13 +13082,17 @@ class Compiler {
             ) {
                 continue;
             }
-            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\New_
+            ) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
                     $next instanceof Op\Expr\Array_
                     && $this->cfgExprUsesOperand($next, $child->result)
                 ) {
-                    // Hoisted scalar element inside sibling inline Array_ call arg (#10612).
+                    // Hoisted element inside sibling inline Array_ call arg (#10612, #11304).
                     continue;
                 }
                 if (
@@ -13204,6 +13208,10 @@ class Compiler {
                 }
                 // php-cfg: `invokeArgs(new C(), [...])` — New_ immediately precedes Array_ (#9904).
                 if ($prev instanceof Op\Expr\New_) {
+                    if ($this->cfgExprUsesOperand($child, $prev->result)) {
+                        // New_ is an inline array element — keep walking for closure siblings (#11304).
+                        continue;
+                    }
                     array_unshift($producers, $prev);
                     break;
                 }
