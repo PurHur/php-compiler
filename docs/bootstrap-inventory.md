@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2968 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8017 |
+| Source constructs flagged (warnings) | 8018 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1993,7 +1993,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CliArgvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/CloneWithReinitRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ConvertCyrString.php` | 0 | 2 |
-| `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 1 |
@@ -3268,7 +3268,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/ctype/JitCtype.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/ctype/Module.php`
 
@@ -10044,9 +10044,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1264)
-- new Error (line 1275)
-- 192 class method(s)
+- new Error (line 1285)
+- new Error (line 1296)
+- 193 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -16078,8 +16078,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CtypeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 285)
-- 11 class method(s)
+- new JIT (line 78)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/DateIntervalFormatRuntime.php`
 
@@ -18673,7 +18674,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitStringBuiltinArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/JitStringCompare.php`
 
