@@ -19,6 +19,11 @@ final class Utf8CaseMap
         0x3C2 => 0x3A3, // Greek final sigma -> Sigma
     ];
 
+    /** @var array<int, list<int>> Unicode simple upper expansions (1:N codepoints). */
+    private const UPPER_EXPANSION = [
+        0xDF => [0x53, 0x53], // Latin small letter sharp S -> SS (php-src libmbfl)
+    ];
+
     /** @var array<int, int> */
     private const LOWER_SPECIAL = [
         0x39C => 0xB5,
@@ -26,6 +31,18 @@ final class Utf8CaseMap
         0x49 => 0x69, // I -> i (ASCII path handles most)
         0x3A3 => 0x3C3,
     ];
+
+    /**
+     * @return list<int>
+     */
+    public static function toUpperCodepoints(int $codepoint): array
+    {
+        if (isset(self::UPPER_EXPANSION[$codepoint])) {
+            return self::UPPER_EXPANSION[$codepoint];
+        }
+
+        return [self::toUpper($codepoint)];
+    }
 
     public static function toUpper(int $codepoint): int
     {
