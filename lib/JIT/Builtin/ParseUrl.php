@@ -7,13 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for __phpc_parse_url_* (mirrors VmString::parseUrl / former phpc_parse_url.c; #5913).
+ * JIT LLVM body for __phpc_parse_url_* via ParseUrlJitHelper PHP (#9358, #5913).
  */
 final class ParseUrl
 {
     public static function ensureLinked(Context $context): void
     {
-        ParseUrlJit::implement($context);
+        ParseUrlRuntime::ensureLinked($context);
     }
 
     public static function implement(Context $context): void
