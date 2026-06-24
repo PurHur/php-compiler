@@ -48,13 +48,8 @@ final class ParseUrlRuntimeShrinkTest extends TestCase
         $this->assertSame(VmString::parseUrl($url, \PHP_URL_PORT), ParseUrlJitHelper::lastInt());
 
         $assoc = ParseUrlJitHelper::parseUrlAssoc($url);
-        $this->assertNotNull($assoc);
         $expected = VmString::parseUrl($url, -1);
         $this->assertIsArray($expected);
-        $assocCount = 0;
-        foreach ($assoc->iterateKeyed(true) as $_) {
-            ++$assocCount;
-        }
-        $this->assertSame(\count($expected), $assocCount);
+        $this->assertSame($expected, $assoc);
     }
 }

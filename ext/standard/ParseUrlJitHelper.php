@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 
 /**
  * parse_url() for compiled JIT/AOT modules (#9358, php-in-PHP).
@@ -57,8 +55,10 @@ final class ParseUrlJitHelper
         return self::$lastInt;
     }
 
-    /** @return HashTable|null null when parse_url() returns false */
-    public static function parseUrlAssoc(string $url): ?HashTable
+    /**
+     * @return array<string, int|string>|null null when parse_url() returns false
+     */
+    public static function parseUrlAssoc(string $url): ?array
     {
         $result = VmString::parseUrl($url, -1);
         if (false === $result) {
@@ -68,26 +68,7 @@ final class ParseUrlJitHelper
             throw new \LogicException('parse_url() assoc mode must yield an array in this compiler build');
         }
 
-        return self::arrayToHashTable($result);
-    }
-
-    /**
-     * @param array<string, int|string> $parts
-     */
-    private static function arrayToHashTable(array $parts): HashTable
-    {
-        $ht = new HashTable();
-        foreach ($parts as $key => $value) {
-            $slot = new Variable();
-            if (\is_int($value)) {
-                $slot->int($value);
-            } else {
-                $slot->string((string) $value);
-            }
-            $ht->add((string) $key, $slot);
-        }
-
-        return $ht;
+        return $result;
     }
 
     /** @internal test reset */
