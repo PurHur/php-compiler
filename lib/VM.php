@@ -333,7 +333,9 @@ class VM {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
         if (!$this->hasInstanceMethod($object->class, '__tostring')) {
-            return 'Object';
+            throw new \Error(
+                'Object of class '.$object->class->name.' could not be converted to string'
+            );
         }
         $this->context->coercingObjectToString = true;
         try {
