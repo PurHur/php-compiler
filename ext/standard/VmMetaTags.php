@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * get_meta_tags() — parse &lt;meta name&gt; tags from HTML (ext/standard/php_meta_tags.c).
  *
@@ -28,6 +31,29 @@ final class VmMetaTags
         }
 
         return self::parseFromHtml($html);
+    }
+
+    /** JIT/AOT bridge: hashtable result or null when file read fails (#9338). */
+    public static function getMetaTagsHashTable(string $filename, bool $useIncludePath = false): ?HashTable
+    {
+        $result = self::getMetaTags($filename, $useIncludePath);
+        if (false === $result) {
+            return null;
+        }
+
+        $ht = new HashTable();
+        foreach ($result as $key => $value) {
+            self::hashSetString($ht, (string) $key, (string) $value);
+        }
+
+        return $ht;
+    }
+
+    private static function hashSetString(HashTable $ht, string $key, string $value): void
+    {
+        $var = new Variable();
+        $var->string($value);
+        $ht->add($key, $var);
     }
 
     /**
