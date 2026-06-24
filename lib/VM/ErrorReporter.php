@@ -53,7 +53,7 @@ final class ErrorReporter
 
     public function __construct(
         int $errorReporting = self::DEFAULT_STARTUP_REPORTING,
-        bool $displayErrors = true
+        bool $displayErrors = false
     ) {
         $this->errorReporting = $errorReporting;
         $this->displayErrors = $displayErrors;
