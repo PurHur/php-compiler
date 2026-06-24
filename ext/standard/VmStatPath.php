@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM path predicates via VmStatCache + stat mode access — mirrors {@see JitStat} (#8186, #8990).
+ * VM path predicates via VmStatCache + stat mode access — JIT via StatPathRuntime (#8186, #9112).
  *
  * php-src: ext/standard/filestat.c
  */

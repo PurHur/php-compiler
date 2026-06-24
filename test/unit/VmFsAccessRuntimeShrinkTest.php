@@ -39,8 +39,9 @@ final class VmFsAccessRuntimeShrinkTest extends TestCase
     public function testJitStatDoesNotCallLibcAccess(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStat.php');
-        $this->assertStringContainsString('__phpc_jit_path_access_ok', $source);
+        $this->assertStringContainsString('StatPathRuntime::', $source);
         $this->assertDoesNotMatchRegularExpression("/lookupFunction\\('access'\\)/", $source);
+        $this->assertDoesNotMatchRegularExpression("/lookupFunction\\('stat'\\)/", $source);
     }
 
     public function testAccessChecksMatchZendOnLinuxWhenFfiAvailable(): void
