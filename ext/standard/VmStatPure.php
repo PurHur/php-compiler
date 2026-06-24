@@ -48,13 +48,18 @@ final class VmStatPure
      */
     public static function normalize(array $raw): array
     {
-        $out = [];
+        $values = [];
         $i = 0;
         foreach (self::STAT_KEYS as $key) {
-            $value = (int) ($raw[$key] ?? $raw[$i] ?? 0);
-            $out[$key] = $value;
-            $out[$i] = $value;
+            $values[] = (int) ($raw[$key] ?? $raw[$i] ?? 0);
             ++$i;
+        }
+        $out = [];
+        foreach ($values as $i => $value) {
+            $out[$i] = $value;
+        }
+        foreach (self::STAT_KEYS as $i => $key) {
+            $out[$key] = $values[$i];
         }
 
         return $out;
