@@ -103,6 +103,9 @@ final class BootstrapBootstrapLoopProbeTest extends TestCase
         $this->assertStringContainsString('php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}"', $script);
         $this->assertStringContainsString('compiler_helloworld_smoke/compile_driver.php', $script);
         $this->assertStringContainsString('inventory compile_driver (#3032)', $script);
+        $this->assertStringContainsString('bootstrap_gen0_sidecar_emit_fallback', $script);
+        $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $script);
+        $this->assertStringContainsString('#9704', $script);
         $this->assertStringContainsString('compile_smoke_m3_emit: compile OK', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_EMIT_MINIMAL=1', $script);
         $this->assertStringContainsString('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1', $script);

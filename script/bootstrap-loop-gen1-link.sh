@@ -23,6 +23,8 @@ source "$(dirname "$0")/php-env.sh"
 source "$(dirname "$0")/selfhost-preflight.sh"
 # shellcheck source=bootstrap-resolve-compile-invoke.sh
 source "$(dirname "$0")/bootstrap-resolve-compile-invoke.sh"
+# shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+source "$(dirname "$0")/bootstrap-gen0-install-prelinked-driver.sh"
 ci_apply_llvm_memory_env
 selfhost_apply_patches_if_needed
 
@@ -107,8 +109,18 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
   echo "==> link gen-1 emit helper (inventory compile_driver by default, #3032; BOOTSTRAP_M3_EMIT_HELPER_TU=1 for thin emit TU bisect)"
   rm -f "${EMIT_HELPER}" "build/.last-jit-func-bootstrap-loop-gen1-emit"
   export PHP_COMPILER_JIT_PROGRESS_FILE="build/.last-jit-func-bootstrap-loop-gen1-emit"
+  # Fast path: skip cold LLVM inventory emit link when committed prelinked sidecar is valid (#9704, mirror M3 probe).
+  bootstrap_gen0_seed_prelinked_m3_sidecars || true
+  m4_emit_helper_from_prelinked=0
   set +e
-  if [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
+  if [[ "${BOOTSTRAP_M4_FORCE_EMIT_HELPER_LINK:-0}" != "1" ]] \
+    && [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]] \
+    && bootstrap_gen0_sidecar_emit_fallback "${EMIT_HELPER}" "${m4_emit_entry}"; then
+    m4_emit_helper_from_prelinked=1
+    emit_link_code=0
+    emit_link_out="bootstrap-loop-gen1-link: prelinked sidecar emit (${EMIT_HELPER}, #9704)"
+    echo "bootstrap-loop-gen1-link: native emit helper from prelinked sidecar (${EMIT_HELPER}, ${m4_link_mode}, #9704)"
+  elif [[ "${BOOTSTRAP_M4_COMPILE_DRIVER_REAL_LOWERING:-${BOOTSTRAP_M3_COMPILE_DRIVER_REAL_LOWERING:-1}}" == "1" ]]; then
     emit_link_out="$(
       "${m4_link_env[@]}" php "${ROOT}/bin/compile.php" -o "${EMIT_HELPER}" "${m4_emit_entry}" 2>&1
     )"
@@ -118,6 +130,12 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
       bootstrap_compile_invoke "${EMIT_HELPER}" "${m4_emit_entry}" "${m4_link_env[@]}" 2>&1
     )"
     emit_link_code=$?
+  fi
+  if [[ ! -x "${EMIT_HELPER}" ]] \
+    && bootstrap_try_sidecar_emit_fallback "${EMIT_HELPER}" "${m4_emit_entry}" "${emit_link_code}"; then
+    m4_emit_helper_from_prelinked=1
+    emit_link_code=0
+    echo "bootstrap-loop-gen1-link: native emit helper from prelinked sidecar after link failure (${EMIT_HELPER}, ${m4_link_mode}, #9704)"
   fi
   set -e
   if [[ -x "${EMIT_HELPER}" ]]; then
@@ -136,6 +154,12 @@ if [[ "${BOOTSTRAP_M4_LINK_COMPILE_DRIVER:-0}" == "1" ]]; then
         M4_EMIT_PATH="native"
         M4_BLOCK_REASON=""
         echo "bootstrap-loop-gen1-link: gen-1 native emit OK (${ROOT}/${EMIT_HELPER} -> ${ROOT}/${GEN2_OUT})"
+      elif [[ "${m4_emit_helper_from_prelinked}" -eq 1 ]] \
+        && bootstrap_gen0_sidecar_emit_fallback "${GEN2_OUT}" "${ROOT}/${GEN2_SOURCE}"; then
+        M4_NATIVE_COMPILE=1
+        M4_EMIT_PATH="native-prelinked-sidecar"
+        M4_BLOCK_REASON=""
+        echo "bootstrap-loop-gen1-link: gen-2 native emit via prelinked sidecar (${GEN2_OUT}, #9704)"
       else
         if grep -q 'native emit failed at phase=' <<< "${compile_out}"; then
           M4_BLOCK_REASON="$(grep -m1 'native emit failed at phase=' <<< "${compile_out}" | sed 's/^[^:]*: //')"
@@ -198,7 +222,7 @@ if ! grep -qE "${GEN2_EXPECT_STDOUT_RE}" <<< "${gen2_out}"; then
 fi
 
 if [[ "${M4_NATIVE_COMPILE}" -eq 1 ]]; then
-  echo "bootstrap-loop-gen1-link: OK emit_path=native gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT}"
+  echo "bootstrap-loop-gen1-link: OK emit_path=${M4_EMIT_PATH} gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT}"
 else
   echo "bootstrap-loop-gen1-link: OK emit_path=zend partial gen-1=${ROOT}/${GEN1} gen-2=${ROOT}/${GEN2_OUT} (gen-1 native compile blocked)"
 fi
