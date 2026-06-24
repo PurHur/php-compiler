@@ -212,7 +212,10 @@ final class StringInfo
             self::helperFunction($context, self::EXTENSION_LOADED_HELPER),
             $name
         );
-        $context->builder->returnValue($context->builder->zext($loaded, $i32));
+        $loadedI32 = $loaded->typeOf() === $i64
+            ? $context->builder->trunc($loaded, $i32)
+            : $context->builder->zext($loaded, $i32);
+        $context->builder->returnValue($loadedI32);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->returnValue($i32->constInt(0, false));

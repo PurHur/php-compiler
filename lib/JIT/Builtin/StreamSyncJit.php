@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -132,10 +133,11 @@ final class StreamSyncJit
         $one = $i32->constInt(1, false);
         $nullFile = $i8p->constNull();
 
-        $supported = $context->builder->call(
+        $supportedRaw = $context->builder->call(
             self::helperFunction($context, self::IS_SUPPORTED_HELPER),
             $handle
         );
+        $supported = JitNestedHelperCoerce::i64ToScalar($context, $supportedRaw, $i32);
         $notSupported = $context->builder->icmp(Builder::INT_EQ, $supported, $zero);
         $warnBb = $fn->appendBasicBlock('sync_warn');
         $resolveBb = $fn->appendBasicBlock('sync_resolve');
@@ -144,7 +146,7 @@ final class StreamSyncJit
         $context->builder->positionAtEnd($warnBb);
         $context->builder->call(
             self::helperFunction($context, self::WARN_HELPER),
-            $i32->constInt($dataOnly, false)
+            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
         );
         $context->builder->returnValue($zero);
 
@@ -170,17 +172,17 @@ final class StreamSyncJit
         $context->builder->positionAtEnd($failBb);
         $context->builder->call(
             self::helperFunction($context, self::WARN_HELPER),
-            $i32->constInt($dataOnly, false)
+            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
         );
         $context->builder->returnValue($zero);
 
         $context->builder->positionAtEnd($doSyncBb);
-        $rc = $context->builder->call(
+        $rcRaw = $context->builder->call(
             self::helperFunction($context, self::SYNC_FILENO_HELPER),
-            $fd,
-            $i32->constInt($dataOnly, false)
+            JitNestedHelperCoerce::scalarToI64($context, $fd, $i32),
+            JitNestedHelperCoerce::scalarToI64($context, $i32->constInt($dataOnly, false), $i32)
         );
-        $context->builder->returnValue($rc);
+        $context->builder->returnValue(JitNestedHelperCoerce::i64ToScalar($context, $rcRaw, $i32));
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

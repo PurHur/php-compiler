@@ -870,48 +870,53 @@ class Context {
             $i8pp = $this->getTypeFromString('int8**');
             $signature = $this->context->functionType($i32, false, $i32, $i8pp);
             $main = $this->module->addFunction('main', $signature);
-            $block = $main->appendBasicBlock('main');
-            $this->builder->positionAtEnd($block);
-            $this->builder->call(
-                $this->lookupFunction('__phpc_cli_store_argv'),
-                $main->getParam(0),
-                $main->getParam(1)
-            );
-            Progress::emitNativeNote($this, 'c:main_before_init');
-            $this->builder->call($this->initFunc);
-            Progress::emitNativeNote($this, 'c:main_after_init');
+            $standaloneMainBlock = $main->appendBasicBlock('standalone_main');
+            $emitInStandaloneMain = function (callable $emit) use ($standaloneMainBlock): void {
+                $this->builder->positionAtEnd($standaloneMainBlock);
+                $emit();
+            };
+            $emitInStandaloneMain(function () use ($main): void {
+                $this->builder->call(
+                    $this->lookupFunction('__phpc_cli_store_argv'),
+                    $main->getParam(0),
+                    $main->getParam(1)
+                );
+            });
+            $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_init'));
+            $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
+            $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                Builtin\HttpResponseCode::emitResetForStandaloneMain($this);
-                Builtin\SessionId::emitResetForStandaloneMain($this);
-                Builtin\SessionName::emitResetForStandaloneMain($this);
-                Builtin\SessionModuleName::emitResetForStandaloneMain($this);
-                Builtin\PendingHeaders::emitResetForStandaloneMain($this);
-                $this->builder->call($this->lookupFunction('__superglobals__refresh'));
-                Builtin\JitThrow::registerDeclarations($this);
-                $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending'));
-                Builtin\JitReturnPending::registerDeclarations($this);
-                $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending'));
-                ErrorBridge::emitClearForStandaloneMain($this);
-                ExceptionBridge::emitClearForStandaloneMain($this);
+                $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => Builtin\SessionModuleName::emitResetForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('__superglobals__refresh')));
+                $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
+                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
+                $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
+                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
+                $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
             }
-            Progress::emitNativeNote($this, 'c:main_before_php');
+            $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType
                 && !$this->shouldSkipStandaloneMainEnvProbeGate()) {
-                VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main);
+                $emitInStandaloneMain(fn () => VmDriverExecuteNative::emitStandaloneMainEnvProbeGate($this, $this->main));
             } else {
-                $this->builder->call($this->main);
+                $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
-            Progress::emitNativeNote($this, 'c:main_after_php');
+            $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                ErrorBridge::emitAbortIfPendingForStandaloneMain($this);
-                ExceptionBridge::emitAbortIfPendingForStandaloneMain($this);
-                Builtin\PendingHeaders::emitFlushForStandalone($this);
-                Builtin\ObOutput::emitEndAllForStandalone($this);
+                $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
+                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
+                $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
             }
             // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
-            $this->type->object->emitShutdownDestructorsCall();
-            $this->builder->call($this->shutdownFunc);
-            $this->builder->returnValue($i32->constInt(0, false));
+            $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
+            $emitInStandaloneMain(fn () => $this->builder->call($this->shutdownFunc));
+            $emitInStandaloneMain(fn () => $this->builder->returnValue($i32->constInt(0, false)));
         }
         Progress::noteFunction('jit_context_compile_common_begin');
         $this->compileCommon();

@@ -102,11 +102,12 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_enc_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $encoded = $context->builder->call(
+        $encodedRaw = $context->builder->call(
             self::helperFunction($context, self::ENCODE_WIRE),
             $fn->getParam(0)
         );
         $strPtr = $context->getTypeFromString('__string__*');
+        $encoded = $context->builder->bitcast($encodedRaw, $strPtr);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $encoded, $strPtr->constNull());
         $failBb = $fn->appendBasicBlock('se_wire_enc_bridge_fail');
         $okBb = $fn->appendBasicBlock('se_wire_enc_bridge_ok');
@@ -121,11 +122,12 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_dec_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $decoded = $context->builder->call(
+        $decodedRaw = $context->builder->call(
             self::helperFunction($context, self::DECODE_WIRE),
             $fn->getParam(0)
         );
         $htPtr = $context->getTypeFromString('__hashtable__*');
+        $decoded = $context->builder->bitcast($decodedRaw, $htPtr);
         $isNull = $context->builder->icmp(Builder::INT_EQ, $decoded, $htPtr->constNull());
         $failBb = $fn->appendBasicBlock('se_wire_dec_bridge_fail');
         $okBb = $fn->appendBasicBlock('se_wire_dec_bridge_ok');

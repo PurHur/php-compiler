@@ -151,7 +151,9 @@ final class TryCatchHelper
             $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
         }
         if (!$handler->mergeBodyCompiled) {
-            $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            if (null === $mergeBb->getTerminator()) {
+                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            }
             $handler->mergeBodyCompiled = true;
         }
         if (null !== $handler->finallyOp) {
