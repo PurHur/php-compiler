@@ -87,9 +87,7 @@ final class VmReflection
     }
 
     /**
-     * get_declared_enums() — user enum class names (issue #3538).
-     *
-     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_enums)
+     * Internal enum class name list (issue #3538; not a php-src builtin — #11248).
      */
     public static function declaredEnumsTable(Context $ctx): \PHPCompiler\VM\HashTable
     {
