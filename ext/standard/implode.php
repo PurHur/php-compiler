@@ -21,6 +21,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -51,10 +52,15 @@ final class implode extends Internal
                 'array'
             );
         } else {
-            self::rejectNullSeparator($frame->calledArgs[0], $this->getName());
+            self::rejectNullSeparator($frame, $frame->calledArgs[0], $this->getName());
             self::rejectEnumSeparator($frame->calledArgs[0], $this->getName());
             self::rejectArraySeparator($frame->calledArgs[0], $this->getName());
-            $glue = VmString::coerceOperand($frame->calledArgs[0]);
+            $glue = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                $this->getName(),
+                0,
+                'separator'
+            );
             $ht = VmArray::requireArrayParam(
                 $frame->calledArgs[1],
                 $this->getName(),
@@ -189,9 +195,12 @@ final class implode extends Internal
         ));
     }
 
-    /** php-src Z_PARAM_STR on implode() separator — null must TypeError (#10292, ext/standard/string.c). */
-    private static function rejectNullSeparator(Variable $var, string $function): void
+    /** php-src Z_PARAM_STR on implode() separator — null TypeError only under strict_types (#11013, ext/standard/string.c). */
+    private static function rejectNullSeparator(Frame $frame, Variable $var, string $function): void
     {
+        if (!InternalStrictArg::isCallerStrict($frame)) {
+            return;
+        }
         if (Variable::TYPE_NULL === $var->resolveIndirect()->type) {
             throw new \TypeError(sprintf(
                 '%s(): Argument #1 ($separator) must be of type array|string, null given',
@@ -213,6 +222,9 @@ final class implode extends Internal
 
     private static function rejectNullSeparatorJit(Context $context, JITVariable $arg, string $function): void
     {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             self::emitNullSeparatorTypeErrorAndAbort($context, $function);
 
