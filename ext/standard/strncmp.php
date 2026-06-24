@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -27,8 +28,8 @@ final class strncmp extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'strncmp', 3);
-        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strncmp', 0, 'string1');
-        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strncmp', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,8 +45,8 @@ final class strncmp extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'strncmp', 3)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strncmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strncmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 JitLongArg::lower($context, $args[2], 'strncmp() length'),
@@ -57,5 +58,19 @@ final class strncmp extends Internal
         $i64 = $context->getTypeFromString('int64');
 
         return $context->builder->sExt($raw, $i64);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strncmp', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArgNoObject(
+            $frame->calledArgs[$argIndex],
+            'strncmp',
+            $argIndex,
+            $paramName
+        );
     }
 }

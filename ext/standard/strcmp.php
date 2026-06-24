@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 final class strcmp extends Internal
@@ -26,8 +27,8 @@ final class strcmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $a = VmString::requireStringBuiltinArg($frame->calledArgs[0], 'strcmp', 0, 'string1');
-        $b = VmString::requireStringBuiltinArg($frame->calledArgs[1], 'strcmp', 1, 'string2');
+        $a = self::vmStringArg($frame, 0, 'string1');
+        $b = self::vmStringArg($frame, 1, 'string2');
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,9 +43,23 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $left = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'strcmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lowerRequiredString($context, $args[1], 'strcmp', 1, 'string2');
+        $left = JitStringBuiltinArg::lower($context, $args[0], 'strcmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lower($context, $args[1], 'strcmp', 1, 'string2');
 
         return JitStringCompare::strcmp($context, $left, $right);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'strcmp', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArgNoObject(
+            $frame->calledArgs[$argIndex],
+            'strcmp',
+            $argIndex,
+            $paramName
+        );
     }
 }
