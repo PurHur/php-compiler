@@ -26,7 +26,7 @@ final class VmInetNative
 
     public static function available(): bool
     {
-        return self::ffiEnabled() && null !== self::ffi();
+        return self::ffiOptIn() && null !== self::ffi();
     }
 
     public static function long2ip(int $proper_address): string|false
@@ -177,6 +177,20 @@ CDEF;
     {
         $v = getenv('PHP_COMPILER_DISABLE_FFI');
         if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Opt-in libc fast path only; default VM/JIT uses VmInetPure (#8969). */
+    private static function ffiOptIn(): bool
+    {
+        if (!self::ffiEnabled()) {
+            return false;
+        }
+        $v = getenv('PHP_COMPILER_INET_FFI');
+        if (false === $v || '' === $v || '0' === $v || 'false' === strtolower($v)) {
             return false;
         }
 
