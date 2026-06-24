@@ -807,16 +807,26 @@ final class VmString
         }
         $lenA = self::byteLength($a);
         $lenB = self::byteLength($b);
-        $compare = $length;
-        if ($compare > $lenA) {
-            $compare = $lenA;
-        }
-        if ($compare > $lenB) {
-            $compare = $lenB;
-        }
-        for ($i = 0; $i < $compare; ++$i) {
-            $ordA = self::byteOrd($a[$i]);
-            $ordB = self::byteOrd($b[$i]);
+        for ($i = 0; $i < $length; ++$i) {
+            if ($i >= $lenA) {
+                if ($i >= $lenB) {
+                    return 0;
+                }
+                if (0 === $lenA) {
+                    return -1;
+                }
+                $ordA = 0;
+                $ordB = self::byteOrd($b[$i]);
+            } elseif ($i >= $lenB) {
+                if (0 === $lenB) {
+                    return 1;
+                }
+                $ordA = self::byteOrd($a[$i]);
+                $ordB = 0;
+            } else {
+                $ordA = self::byteOrd($a[$i]);
+                $ordB = self::byteOrd($b[$i]);
+            }
             if ($ordA !== $ordB) {
                 return $ordA - $ordB;
             }
