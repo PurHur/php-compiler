@@ -17,6 +17,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 
 use PHPCompiler\VM\Variable as VmVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 
@@ -27,7 +28,11 @@ class strlen extends Internal {
             throw new \LogicException("Expecting exactly a single argument to strlen()");
         }
         $var = $frame->calledArgs[0]->resolveIndirect();
-        $string = VmString::requireStringBuiltinArg($var, 'strlen', 0, 'string');
+        if (null !== $frame->parent && InternalStrictArg::isCallerStrict($frame)) {
+            $string = VmString::requireStringBuiltinArg($var, 'strlen', 0, 'string');
+        } else {
+            $string = VmString::coerceStringBuiltinArgNoObject($var, 'strlen', 0, 'string');
+        }
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength($string));
         }

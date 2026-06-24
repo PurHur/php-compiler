@@ -23,7 +23,11 @@ final class JitStrlen
     public static function lowerLength(Context $context, JITVariable $arg): Value
     {
         if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
-            self::emitTypeErrorAndAbort($context, 'null');
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, 'null');
+
+                return $context->getTypeFromString('int64')->constInt(0, false);
+            }
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -123,20 +127,25 @@ final class JitStrlen
         );
         $i8 = $context->getTypeFromString('int8');
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $nullBlock = BasicBlockHelper::append($context, 'strlen_null_typeerror');
+        $nullErrBlock = BasicBlockHelper::append($context, 'strlen_null_typeerror');
         $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
-        $context->builder->branchIf(
-            $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeKind,
-                $i8->constInt(VmVariable::TYPE_NULL, false)
-            ),
-            $nullBlock,
-            $okBlock
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeKind,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
         );
-        $context->builder->positionAtEnd($nullBlock);
-        self::emitTypeErrorAndAbort($context, 'null');
-        $context->builder->positionAtEnd($okBlock);
+        if ($context->callerStrictTypes) {
+            $context->builder->branchIf($isNull, $nullErrBlock, $okBlock);
+            $context->builder->positionAtEnd($nullErrBlock);
+            self::emitTypeErrorAndAbort($context, 'null');
+            $context->builder->positionAtEnd($okBlock);
+        } else {
+            $coerceFromNullBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
+            $context->builder->branchIf($isNull, $coerceFromNullBlock, $okBlock);
+            $context->builder->positionAtEnd($coerceFromNullBlock);
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
         $arrayTy = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
