@@ -31,7 +31,7 @@ final class memory_reset_peak_usage extends Internal
             return;
         }
         VmMemory::resetPeakUsage(self::resolveRealUsage($frame));
-        $frame->returnVar->bool(true);
+        $frame->returnVar->null();
     }
 
     public function call(Context $context, JITVariable ...$args): Value
