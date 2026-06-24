@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3026 |
-| Phase A inventory files (M2 ratio SSOT) | 3026 |
+| PHP files on vm.php path | 3029 |
+| Phase A inventory files (M2 ratio SSOT) | 3029 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8161 |
+| Source constructs flagged (warnings) | 8169 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -103,11 +103,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterConstants.php` | 0 | 1 |
 | `ext/filter/FilterEmailJitHelper.php` | 0 | 1 |
-| `ext/filter/JitFilter.php` | 0 | 5 |
+| `ext/filter/FilterUrlJitHelper.php` | 0 | 1 |
+| `ext/filter/JitFilter.php` | 0 | 6 |
 | `ext/filter/JitFilterId.php` | 0 | 1 |
 | `ext/filter/JitFilterList.php` | 0 | 2 |
 | `ext/filter/Module.php` | 0 | 6 |
-| `ext/filter/VmFilter.php` | 0 | 15 |
+| `ext/filter/VmFilter.php` | 0 | 16 |
 | `ext/filter/filter_id.php` | 0 | 1 |
 | `ext/filter/filter_input.php` | 0 | 5 |
 | `ext/filter/filter_list.php` | 0 | 1 |
@@ -844,6 +845,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StatCacheJitHelper.php` | 0 | 1 |
 | `ext/standard/StatFieldsJitHelper.php` | 0 | 1 |
 | `ext/standard/StatPathJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamContextJitHelper.php` | 0 | 9 |
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamNotificationJitHelper.php` | 0 | 5 |
@@ -2163,7 +2165,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Stats.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatsJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StreamBucket.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamBucketRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamBucketRuntime.php` | 0 | 5 |
 | `lib/JIT/Builtin/StreamBuffer.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBufferJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
@@ -2207,6 +2209,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFormatJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
@@ -3483,14 +3486,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/filter/FilterUrlJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/filter/JitFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 320)
-- new JITVariable (line 357)
-- new JITVariable (line 652)
-- new JITVariable (line 685)
-- 22 class method(s)
+- new JITVariable (line 371)
+- new JITVariable (line 408)
+- new JITVariable (line 443)
+- new JITVariable (line 738)
+- new JITVariable (line 771)
+- 24 class method(s)
 
 ### `ext/filter/JitFilterId.php`
 
@@ -3516,21 +3525,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/VmFilter.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 204)
-- new Variable (line 212)
-- new Variable (line 228)
-- new Variable (line 236)
-- new Variable (line 242)
-- new Variable (line 253)
-- new Variable (line 259)
-- new Variable (line 274)
-- new Variable (line 286)
-- new Variable (line 296)
-- new Variable (line 308)
-- new Variable (line 385)
-- new Variable (line 397)
-- new Variable (line 415)
-- 23 class method(s)
+- new Variable (line 211)
+- new Variable (line 219)
+- new Variable (line 235)
+- new Variable (line 243)
+- new Variable (line 249)
+- new Variable (line 260)
+- new Variable (line 266)
+- new Variable (line 281)
+- new Variable (line 293)
+- new Variable (line 303)
+- new Variable (line 315)
+- new Variable (line 392)
+- new Variable (line 404)
+- new Variable (line 422)
+- new Variable (line 440)
+- 30 class method(s)
 
 ### `ext/filter/filter_id.php`
 
@@ -8573,6 +8583,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/StreamBucketJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `ext/standard/StreamContextJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8977,11 +8992,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new RecursiveIteratorIterator (line 1227)
-- new RecursiveDirectoryIterator (line 1228)
-- new RecursiveIteratorIterator (line 1329)
-- new RecursiveDirectoryIterator (line 1330)
-- 51 class method(s)
+- new RecursiveIteratorIterator (line 1372)
+- new RecursiveDirectoryIterator (line 1373)
+- new RecursiveIteratorIterator (line 1474)
+- new RecursiveDirectoryIterator (line 1475)
+- 53 class method(s)
 - 8 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -10151,14 +10166,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 176)
-- new Variable (line 180)
-- new HashTable (line 186)
-- new Variable (line 188)
-- new Variable (line 622)
-- new Variable (line 629)
-- new Variable (line 636)
-- 23 class method(s)
+- new HashTable (line 187)
+- new Variable (line 191)
+- new HashTable (line 197)
+- new Variable (line 199)
+- new Variable (line 691)
+- new Variable (line 698)
+- new Variable (line 705)
+- 24 class method(s)
 
 ### `ext/standard/VmStatCache.php`
 
@@ -17119,9 +17134,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamBucketRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 515)
-- new JITVariable (line 531)
-- 34 class method(s)
+- new JITVariable (line 271)
+- new JITVariable (line 287)
+- new JIT (line 341)
+- 19 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamBuffer.php`
 
@@ -17352,6 +17369,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JIT (line 124)
+- 6 class method(s)
+
+### `lib/JIT/Builtin/StringFilterUrl.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 123)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringFormat.php`
