@@ -210,6 +210,16 @@ final class VmArray
         }
     }
 
+    /**
+     * @param list<Variable> $values
+     */
+    private static function rejectEnumCaseNaturalSortOperands(array $values): void
+    {
+        foreach ($values as $value) {
+            self::rejectEnumCaseNaturalSortValue($value);
+        }
+    }
+
     public static function isList(HashTable $ht): bool
     {
         $n = $ht->getNumElements();
@@ -609,6 +619,7 @@ final class VmArray
         }
         $pairs = self::copyKeyedPairs($ht);
         $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+        self::rejectEnumCaseNaturalSortOperands($values);
         if (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)) {
             VmInternalCompare::sortKeyedPairsByValue(
                 $pairs,
@@ -631,6 +642,7 @@ final class VmArray
         }
         $pairs = self::copyKeyedPairs($ht);
         $values = array_map(static fn (array $pair): Variable => $pair[1], $pairs);
+        self::rejectEnumCaseNaturalSortOperands($values);
         if (VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)) {
             VmInternalCompare::sortKeyedPairsByValue(
                 $pairs,
