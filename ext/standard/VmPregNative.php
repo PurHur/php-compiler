@@ -216,6 +216,22 @@ final class VmPregNative
      */
     public static function pregSplit(string $pattern, string $subject, int $limit = -1, int $flags = 0): array|false
     {
+        $parsed = self::parsePhpPattern($pattern);
+        if (null === $parsed) {
+            self::$lastError = 1;
+
+            return false;
+        }
+        [$regex, $opts] = $parsed;
+        if ('' === $regex) {
+            return self::pregSplitEmptyPattern(
+                $subject,
+                $limit,
+                $flags,
+                0 !== ($opts & 0x00080000)
+            );
+        }
+
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             return false;
@@ -305,6 +321,95 @@ final class VmPregNative
             self::$ffi->pcre2_match_data_free_8($matchData);
             self::$ffi->pcre2_code_free_8($code);
         }
+    }
+
+    /**
+     * php-src php_pcre_split empty-regex fast path (// and //u, #10967).
+     *
+     * @return list<string>|list<array{0: string, 1: int}>
+     */
+    private static function pregSplitEmptyPattern(
+        string $subject,
+        int $limit,
+        int $flags,
+        bool $utf8
+    ): array {
+        $offsetCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_OFFSET_CAPTURE);
+        $noEmpty = 0 !== ($flags & StdlibConstants::PREG_SPLIT_NO_EMPTY);
+        if (1 === $limit) {
+            self::$lastError = 0;
+
+            return [$offsetCapture ? [$subject, 0] : $subject];
+        }
+
+        /** @var list<array{0: string, 1: int}> $units byte offset + segment */
+        $units = [];
+        if ($utf8) {
+            $charLen = VmString::utf8CharLength($subject);
+            $bytePos = 0;
+            for ($i = 0; $i < $charLen; ++$i) {
+                $ch = VmString::utf8CharSubstr($subject, $i, 1);
+                $units[] = [$ch, $bytePos];
+                $bytePos += \strlen($ch);
+            }
+        } else {
+            $byteLen = \strlen($subject);
+            for ($i = 0; $i < $byteLen; ++$i) {
+                $units[] = [$subject[$i], $i];
+            }
+        }
+
+        $maxParts = $limit <= 0 ? \PHP_INT_MAX : $limit;
+        $parts = [];
+        $count = 0;
+        $append = static function (string $piece, int $offset) use (
+            &$parts,
+            &$count,
+            $maxParts,
+            $offsetCapture,
+            $noEmpty
+        ): bool {
+            if ($noEmpty && '' === $piece) {
+                return true;
+            }
+            if ($count >= $maxParts) {
+                return false;
+            }
+            $parts[] = $offsetCapture ? [$piece, $offset] : $piece;
+            ++$count;
+
+            return true;
+        };
+
+        if (!$append('', 0)) {
+            self::$lastError = 0;
+
+            return $parts;
+        }
+
+        $unitCount = \count($units);
+        for ($i = 0; $i < $unitCount; ++$i) {
+            if ($count >= $maxParts - 1) {
+                $tail = '';
+                for ($j = $i; $j < $unitCount; ++$j) {
+                    $tail .= $units[$j][0];
+                }
+                $append($tail, $units[$i][1]);
+                self::$lastError = 0;
+
+                return $parts;
+            }
+            if (!$append($units[$i][0], $units[$i][1])) {
+                self::$lastError = 0;
+
+                return $parts;
+            }
+        }
+
+        $append('', \strlen($subject));
+        self::$lastError = 0;
+
+        return $parts;
     }
 
     /**

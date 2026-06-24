@@ -71,6 +71,38 @@ final class preg_split extends Internal
                 'preg_split() expects 2 to 4 arguments in this compiler build'
             );
         }
+        $patternLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        $subjectLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
+        if (null !== $patternLit && null !== $subjectLit) {
+            $limit = -1;
+            $flags = 0;
+            if ($argc >= 3) {
+                if (JITVariable::TYPE_INTEGER !== $args[2]->type) {
+                    throw new \LogicException(
+                        'preg_split() limit must be an integer in this compiler build'
+                    );
+                }
+                $limit = (int) $args[2]->value->toLong();
+            }
+            if (4 === $argc) {
+                if (JITVariable::TYPE_INTEGER !== $args[3]->type) {
+                    throw new \LogicException(
+                        'preg_split() flags must be an integer in this compiler build'
+                    );
+                }
+                $flags = (int) $args[3]->value->toLong();
+            }
+            $parts = VmPreg::pregSplit($patternLit, $subjectLit, $limit, $flags);
+            if (false === $parts) {
+                return $context->getTypeFromString('bool')->constInt(0, false);
+            }
+            $ht = VmPreg::splitPartsToHashTable($parts, $flags);
+
+            return $context->constantArrayFromVmHashTable(
+                'preg_split_'.md5($patternLit."\0".$subjectLit."\0".$limit."\0".$flags),
+                $ht
+            );
+        }
         $limit = $context->getTypeFromString('int64')->constInt(-1, true);
         $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {
