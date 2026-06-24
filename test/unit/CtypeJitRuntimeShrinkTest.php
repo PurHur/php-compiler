@@ -27,8 +27,17 @@ final class CtypeJitRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CtypeRuntime.php');
         $this->assertStringContainsString('CtypeJitHelper', $source);
+        $this->assertStringNotContainsString('emitFromValueBridge', $source);
         $this->assertStringNotContainsString('emitIsDigit', $source);
         $this->assertStringNotContainsString('emitCheckChar', $source);
+        $this->assertLessThan(180, \substr_count($source, "\n") + 1);
+    }
+
+    public function testJitCtypeDispatchesFromValueWithoutCtypeFromValueAbi(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/ctype/JitCtype.php');
+        $this->assertStringContainsString('lowerFromValue', $source);
+        $this->assertStringNotContainsString('__phpc_ctype_from_value', $source);
     }
 
     public function testCtypeJitHelperSemanticsMatchVmCtype(): void
