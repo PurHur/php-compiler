@@ -12045,6 +12045,29 @@ class Compiler {
                     if ($last instanceof Op\Expr\New_) {
                         return $last;
                     }
+                    if ($last instanceof Op\Expr\BinaryOp\BitwiseOr
+                        || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
+                        || $last instanceof Op\Expr\BinaryOp\BitwiseXor
+                    ) {
+                        return $last;
+                    }
+                }
+
+                $last = $producers[$producerCount - 1] ?? null;
+                if ($last instanceof Op\Expr\BinaryOp\BitwiseOr
+                    || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
+                    || $last instanceof Op\Expr\BinaryOp\BitwiseXor
+                ) {
+                    $nonEmbeddedArgIndices = [];
+                    foreach ($callArgs as $i => $arg) {
+                        if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
+                            $nonEmbeddedArgIndices[] = $i;
+                        }
+                    }
+                    $trailingNonEmbedded = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                    if ($argIndex === $trailingNonEmbedded) {
+                        return $last;
+                    }
                 }
 
                 return null;
