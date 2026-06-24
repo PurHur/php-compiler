@@ -138,7 +138,7 @@ final class VmSscanf
                     ++$assigned;
                     break;
                 case 'f':
-                    [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen, $width);
+                    [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen, $width, true);
                     if (null === $flt) {
                         return [$assigned, $inPos];
                     }
