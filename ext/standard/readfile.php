@@ -26,7 +26,7 @@ final class readfile extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('readfile() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'readfile', 0, 'filename');
+        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'readfile');
         if (null === $frame->returnVar) {
             return;
         }
@@ -44,7 +44,7 @@ final class readfile extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('readfile() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'readfile', 0, 'filename');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'readfile');
 
         return JitReadfile::invoke($context, $path);
     }

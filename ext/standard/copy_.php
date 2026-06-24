@@ -24,8 +24,8 @@ final class copy_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('copy() requires exactly two arguments in this compiler build');
         }
-        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'copy', 0, 'from');
-        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'copy', 1, 'to');
+        $from = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'copy', 0, 'from');
+        $to = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[1], 'copy', 1, 'to');
         $ok = VmFs::copy($from, $to);
         if (!$ok) {
             VmStreamOpenFailure::warnFailedToOpen($frame, 'copy', $from);
@@ -40,8 +40,8 @@ final class copy_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('copy() requires exactly two arguments in this compiler build');
         }
-        $from = JitStringBuiltinArg::lower($context, $args[0], 'copy', 0, 'from');
-        $to = JitStringBuiltinArg::lower($context, $args[1], 'copy', 1, 'to');
+        $from = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'copy', 0, 'from');
+        $to = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'copy', 1, 'to');
 
         return JitCopy::invoke($context, $from, $to);
     }

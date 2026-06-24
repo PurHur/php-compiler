@@ -22,7 +22,7 @@ final class fopen extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'fopen');
+        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'fopen');
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
         $handle = VmFs::fopen($path, $mode, $frame->vmContext);
         if (false === $handle) {
@@ -42,7 +42,7 @@ final class fopen extends Internal
 
         return JitFopen::invoke(
             $context,
-            JitFilestatArg::lowerFilename($context, $args[0], 'fopen'),
+            JitStreamPath::lowerNonEmptyPath($context, $args[0], 'fopen'),
             JitStringBuiltinArg::lower($context, $args[1], 'fopen', 1, 'mode')
         );
     }
