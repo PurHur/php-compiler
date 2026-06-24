@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc getifaddrs(3) for VM net_get_interfaces() (#6106).
+ * net_get_interfaces(): /sys pure path first, libc getifaddrs FFI fallback (#8988, #6106).
  *
  * php-src: ext/standard/net.c — PHP_FUNCTION(net_get_interfaces)
- * JIT/AOT: lib/JIT/Builtin/StringNetInterfacesJit.php
+ * JIT/AOT: StringNetInterfacesJit.php via NetInterfacesJitHelper
  */
 final class VmNetInterfacesNative
 {
@@ -39,6 +39,19 @@ final class VmNetInterfacesNative
      * @return array<string, array{up: bool, unicast: list<array<string, int|string>>}>|false
      */
     public static function collect(): array|false
+    {
+        $pure = VmNetInterfacesPure::collect();
+        if (false !== $pure) {
+            return $pure;
+        }
+
+        return self::collectViaFfi();
+    }
+
+    /**
+     * @return array<string, array{up: bool, unicast: list<array<string, int|string>>}>|false
+     */
+    private static function collectViaFfi(): array|false
     {
         $ffi = self::ffi();
         if (null === $ffi) {
