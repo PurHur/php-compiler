@@ -14,6 +14,7 @@ use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\ValueEchoHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
@@ -26,6 +27,8 @@ use PHPLLVM\Value;
  */
 final class var_export extends Internal
 {
+    private const CIRCULAR_WARNING = 'var_export does not handle circular references';
+
     public function execute(Frame $frame): void
     {
         $argc = count($frame->calledArgs);
@@ -118,11 +121,23 @@ final class var_export extends Internal
 
     private static function exportVm(Variable $v, Frame $frame): string
     {
-        return self::exportVmNested($v, 0, $frame);
+        /** @var \SplObjectStorage<int, true> $visited */
+        $visited = new \SplObjectStorage();
+        $warned = false;
+
+        return self::exportVmNested($v, 0, $frame, $visited, $warned);
     }
 
-    private static function exportVmNested(Variable $v, int $level, Frame $frame): string
-    {
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function exportVmNested(
+        Variable $v,
+        int $level,
+        Frame $frame,
+        \SplObjectStorage $visited,
+        bool &$warned
+    ): string {
         $v = $v->resolveIndirect();
         // php-src var.c: closed/invalid resources export as NULL (#5148, #4920).
         if (ResourceSupport::isVmResource($v) && !is_resource_::isResource($v)) {
@@ -153,7 +168,18 @@ final class var_export extends Internal
             return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";
         }
         if (Variable::TYPE_ARRAY === $v->type) {
-            return self::exportVmArray($v->toArray(), $level, $frame);
+            $ht = $v->toArray();
+            if ($visited->contains($ht)) {
+                self::warnCircular($frame, $warned);
+
+                return 'NULL';
+            }
+            $visited->attach($ht);
+            try {
+                return self::exportVmArray($ht, $level, $frame, $visited, $warned);
+            } finally {
+                $visited->detach($ht);
+            }
         }
         if (Variable::TYPE_ENUM_CASE === $v->type) {
             $case = $v->toEnumCase();
@@ -161,7 +187,7 @@ final class var_export extends Internal
             return self::exportVmEnumCaseLiteral($case->enumClass->name, $case->caseName);
         }
         if (Variable::TYPE_OBJECT === $v->type) {
-            return self::exportVmObject($v, $level, $frame);
+            return self::exportVmObject($v, $level, $frame, $visited, $warned);
         }
 
         throw new \LogicException('var_export() does not support this value type in this compiler build');
@@ -175,24 +201,50 @@ final class var_export extends Internal
         return '\\'.ltrim($enumClassName, '\\').'::'.$caseName;
     }
 
-    private static function exportVmObject(Variable $v, int $level, Frame $frame): string
-    {
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function exportVmObject(
+        Variable $v,
+        int $level,
+        Frame $frame,
+        \SplObjectStorage $visited,
+        bool &$warned
+    ): string {
         $object = $v->resolveIndirect()->toObject();
-        if (EnumCaseSupport::isEnumCase($object)) {
-            return self::exportVmEnumCaseLiteral($object->class->name, $object->enumCaseName ?? '');
-        }
-        $className = $object->class->name;
-        $props = VmReflection::getVarExportObjectProperties($v, $frame);
-        $exported = self::exportVmArray($props->toArray(), $level, $frame);
-        if ('stdClass' === $className) {
-            return '(object) '.$exported;
-        }
+        if ($visited->contains($object)) {
+            self::warnCircular($frame, $warned);
 
-        return $className.'::__set_state('.$exported.')';
+            return 'NULL';
+        }
+        $visited->attach($object);
+        try {
+            if (EnumCaseSupport::isEnumCase($object)) {
+                return self::exportVmEnumCaseLiteral($object->class->name, $object->enumCaseName ?? '');
+            }
+            $className = $object->class->name;
+            $props = VmReflection::getVarExportObjectProperties($v, $frame);
+            $exported = self::exportVmArray($props->toArray(), $level, $frame, $visited, $warned);
+            if ('stdClass' === $className) {
+                return '(object) '.$exported;
+            }
+
+            return $className.'::__set_state('.$exported.')';
+        } finally {
+            $visited->detach($object);
+        }
     }
 
-    private static function exportVmArray(HashTable $ht, int $level, Frame $frame): string
-    {
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function exportVmArray(
+        HashTable $ht,
+        int $level,
+        Frame $frame,
+        \SplObjectStorage $visited,
+        bool &$warned
+    ): string {
         $indent = str_repeat('  ', $level);
         $inner = str_repeat('  ', $level + 1);
         $lines = ["array (\n"];
@@ -200,11 +252,26 @@ final class var_export extends Internal
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
                 : "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $key->toString())."'";
-            $lines[] = $inner.$k.' => '.self::exportVmNested($value->resolveIndirect(), $level + 1, $frame).",\n";
+            $lines[] = $inner.$k.' => '.self::exportVmNested($value->resolveIndirect(), $level + 1, $frame, $visited, $warned).",\n";
         }
         $lines[] = $indent.")";
 
         return implode('', $lines);
+    }
+
+    private static function warnCircular(Frame $frame, bool &$warned): void
+    {
+        if ($warned || null === $frame->vmContext) {
+            return;
+        }
+        $warned = true;
+        $frame->vmContext->errors->triggerError(
+            self::CIRCULAR_WARNING,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function echoJit(Context $context, JITVariable $arg): void

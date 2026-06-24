@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -28,6 +29,10 @@ final class StringVarExportJit
     private const BUF_OFF_CAP = 16;
 
     private const BUF_SIZE = 24;
+
+    private const CIRCULAR_WARNING = 'var_export does not handle circular references';
+
+    private const MAX_CYCLE_STACK = 64;
 
     public static function ensureLinked(Context $context): void
     {
@@ -146,11 +151,11 @@ final class StringVarExportJit
             ),
             '__phpc_ve_export_array' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $voidPtr, $htPtr, $i32)
+                $context->context->functionType($void, false, $voidPtr, $htPtr, $i32, $htPtr->pointerType(0), $i32)
             ),
             '__phpc_ve_export_value' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $voidPtr, $valuePtr, $i32)
+                $context->context->functionType($void, false, $voidPtr, $valuePtr, $i32, $htPtr->pointerType(0), $i32)
             ),
             '__compiler_var_export' => $context->module->addFunction(
                 $name,
@@ -269,11 +274,16 @@ final class StringVarExportJit
         $context->builder->branch($bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $stack = $context->builder->alloca($htPtrTy->pointerType(0), self::MAX_CYCLE_STACK, 've_cycle_stack');
+        $depthZero = $i32->constInt(0, false);
         $context->builder->call(
             $context->lookupFunction('__phpc_ve_export_value'),
             $bufVoid,
             $v,
-            $i32->constInt(0, false)
+            $i32->constInt(0, false),
+            $stack,
+            $depthZero
         );
 
         $len = $context->builder->load($context->builder->pointerCast(
@@ -644,6 +654,8 @@ final class StringVarExportJit
         $buf = $fn->getParam(0);
         $ht = $fn->getParam(1);
         $level = $fn->getParam(2);
+        $stack = $fn->getParam(3);
+        $depth = $fn->getParam(4);
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -711,7 +723,9 @@ final class StringVarExportJit
             $context->lookupFunction('__phpc_ve_export_value'),
             $buf,
             $entryPtr,
-            $context->builder->add($level, $i32->constInt(1, false))
+            $context->builder->add($level, $i32->constInt(1, false)),
+            $stack,
+            $depth
         );
         $context->builder->call(
             $context->lookupFunction('__phpc_ve_buf_append_cstr'),
@@ -769,7 +783,9 @@ final class StringVarExportJit
             $context->lookupFunction('__phpc_ve_export_value'),
             $buf,
             $valEntry,
-            $context->builder->add($level, $i32->constInt(1, false))
+            $context->builder->add($level, $i32->constInt(1, false)),
+            $stack,
+            $depth
         );
         $context->builder->call(
             $context->lookupFunction('__phpc_ve_buf_append_cstr'),
@@ -805,8 +821,11 @@ final class StringVarExportJit
         $buf = $fn->getParam(0);
         $v = $fn->getParam(1);
         $level = $fn->getParam(2);
+        $stack = $fn->getParam(3);
+        $depth = $fn->getParam(4);
         $valuePtrTy = $context->getTypeFromString('__value__*');
         $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
 
         $nullV = $context->builder->icmp(Builder::INT_EQ, $v, $valuePtrTy->constNull());
         $nullBb = $fn->appendBasicBlock('ev_null');
@@ -918,11 +937,29 @@ final class StringVarExportJit
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($arrayExportBb);
+        $cycleBb = $fn->appendBasicBlock('ev_array_cycle');
+        $pushBb = $fn->appendBasicBlock('ev_array_push');
+        self::branchIfArrayCycle($context, $fn, $htPtr, $stack, $depth, $cycleBb, $pushBb);
+        $context->builder->positionAtEnd($cycleBb);
+        self::emitCircularWarning($context);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ve_buf_append_cstr'),
+            $buf,
+            $context->builder->pointerCast($context->constantFromString('NULL'), $context->getTypeFromString('int8*'))
+        );
+        $context->builder->branch($done);
+        $context->builder->positionAtEnd($pushBb);
+        $context->builder->store(
+            $htPtr,
+            $context->builder->inBoundsGep($stack, $depth)
+        );
         $context->builder->call(
             $context->lookupFunction('__phpc_ve_export_array'),
             $buf,
             $htPtr,
-            $level
+            $level,
+            $stack,
+            $context->builder->add($depth, $i32->constInt(1, false))
         );
         $context->builder->branch($done);
 
@@ -936,6 +973,63 @@ final class StringVarExportJit
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
+    }
+
+    private static function branchIfArrayCycle(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ht,
+        Value $stack,
+        Value $depth,
+        $cycleBb,
+        $continueBb
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtrTy = $context->getTypeFromString('__hashtable__*');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+        $idxSlot = $context->builder->alloca($sizeT, 1, 've_cycle_idx');
+        $context->builder->store($zero, $idxSlot);
+        $headBb = $fn->appendBasicBlock('ve_cycle_head');
+        $bodyBb = $fn->appendBasicBlock('ve_cycle_body');
+        $matchBb = $fn->appendBasicBlock('ve_cycle_match');
+        $nextBb = $fn->appendBasicBlock('ve_cycle_next');
+        $context->builder->branch($headBb);
+        $context->builder->positionAtEnd($headBb);
+        $idx = $context->builder->load($idxSlot);
+        $doneScan = $context->builder->icmp(Builder::INT_SGE, $idx, $depth);
+        $context->builder->branchIf($doneScan, $continueBb, $bodyBb);
+        $context->builder->positionAtEnd($bodyBb);
+        $seen = $context->builder->load($context->builder->inBoundsGep($stack, $idx));
+        $isSame = $context->builder->icmp(Builder::INT_EQ, $seen, $ht);
+        $context->builder->branchIf($isSame, $matchBb, $nextBb);
+        $context->builder->positionAtEnd($matchBb);
+        $context->builder->branch($cycleBb);
+        $context->builder->positionAtEnd($nextBb);
+        $context->builder->store(
+            $context->builder->addNoUnsignedWrap($idx, $one),
+            $idxSlot
+        );
+        $context->builder->branch($headBb);
+    }
+
+    private static function emitCircularWarning(Context $context): void
+    {
+        $message = self::CIRCULAR_WARNING;
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function loadValueKind(Context $context, Value $valuePtr): Value
