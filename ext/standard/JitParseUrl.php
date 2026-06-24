@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Block;
 use PHPCompiler\JIT\Builtin\ParseUrlComponentJit;
+use PHPCompiler\JIT\Builtin\ParseUrlRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -50,6 +51,7 @@ final class JitParseUrl
 
     public static function parseUrl(Context $context, JITVariable $url, ?JITVariable $component = null): Value
     {
+        ParseUrlRuntime::ensureLinked($context);
         if (null === $component) {
             $urlLiteral = $url->compileTimeString ?? null;
             if (null !== $urlLiteral) {
