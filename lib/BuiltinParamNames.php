@@ -65,6 +65,8 @@ final class BuiltinParamNames
                 return ['array', 'callback', 'arg'];
             case 'array_slice':
                 return ['array', 'offset', 'length', 'preserve_keys'];
+            case 'array_pad':
+                return ['array', 'length', 'value'];
             case 'array_chunk':
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':

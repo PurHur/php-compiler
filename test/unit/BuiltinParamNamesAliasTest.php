@@ -260,6 +260,27 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(['array', 'flags'], BuiltinParamNames::forFunction('sort'));
     }
 
+    /** @covers issue #11147 */
+    public function testArrayPadNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_pad');
+        self::assertSame(['array', 'length', 'value'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'array_pad'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'array_pad'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'value', 'array_pad'));
+    }
+
+    /** @covers issue #11145 */
+    public function testArraySliceNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_slice');
+        self::assertSame(['array', 'offset', 'length', 'preserve_keys'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', 'array_slice'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'array_slice'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'array_slice'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'preserve_keys', 'array_slice'));
+    }
+
     /** @covers issues #11111, #11112, #11113, #11114 */
     public function testStreamFamilyNamedParameters(): void
     {
