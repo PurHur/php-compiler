@@ -161,6 +161,8 @@ final class BuiltinParamNames
             case 'fgets':
             case 'fgetss':
                 return ['stream', 'length'];
+            case 'fgetcsv':
+                return ['stream', 'length', 'separator', 'enclosure', 'escape'];
             case 'parse_url':
                 return ['url', 'component'];
             case 'proc_open':

@@ -11711,6 +11711,22 @@ class Compiler {
         if (0 === $producerCount) {
             return null;
         }
+        if ($this->callIncludesNamedParameter($cfgCallOp)) {
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (null === $callArg) {
+                return null;
+            }
+            foreach ($producers as $producer) {
+                if (
+                    null !== $producer->result
+                    && $this->operandsReferToSameVariable($producer->result, $callArg)
+                ) {
+                    return $producer;
+                }
+            }
+
+            return null;
+        }
         // php-cfg hoists `$a = [...]` as Array_+Assign before `array_key_exists('k', $a)` (#9456).
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
             return null;
@@ -13330,6 +13346,9 @@ class Compiler {
             return false;
         }
         if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        if ($this->callIncludesNamedParameter($consumer)) {
             return false;
         }
         $argCount = count($consumer->args);
@@ -17162,6 +17181,23 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * True when any call operand carries a php-cfg named-parameter label (#11052, #11105).
+     */
+    private function callIncludesNamedParameter(?Op $cfgCallOp): bool
+    {
+        if (null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        foreach ($cfgCallOp->args as $arg) {
+            if ($arg instanceof Operand && null !== $this->callArgName($arg)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
