@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -66,11 +67,12 @@ final class MetaTagsRuntime
 
         $entry = $fn->appendBasicBlock('meta_tags_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::GET_META_TAGS_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
+            [$fn->getParam(0), $fn->getParam(1)]
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->builder->returnValue($ht);
         $context->registerFunction(self::ABI_NAME, $fn);
     }

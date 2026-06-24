@@ -41,6 +41,8 @@ final class FunctionStaticRuntime
 
     public static function implement(Context $context): void
     {
+        self::ensureInitTableGlobal($context);
+
         $probe = $context->module->getNamedFunction('phpc_fn_static_is_initialized');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -48,7 +50,6 @@ final class FunctionStaticRuntime
             return;
         }
 
-        self::ensureInitTableGlobal($context);
         self::implementIsInitializedBridge($context);
         self::implementMarkInitializedBridge($context);
         self::registerLinkedRuntime($context);
@@ -63,7 +64,8 @@ final class FunctionStaticRuntime
 
         $i8 = $context->getTypeFromString('int8');
         $tableTy = $i8->arrayType(self::MAX_SLOTS);
-        $context->module->addGlobal($tableTy, self::INIT_TABLE_GLOBAL);
+        $global = $context->module->addGlobal($tableTy, self::INIT_TABLE_GLOBAL);
+        $global->setInitializer($tableTy->constNull());
     }
 
     private static function implementIsInitializedBridge(Context $context): void

@@ -169,7 +169,9 @@ final class IniRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($ipBb);
+        $savedIp = self::captureInsertBlock($context);
         IncludePathRuntime::ensureLinked($context);
+        self::restoreInsertBlock($context, $savedIp);
         $context->builder->call($context->lookupFunction('__compiler_get_include_path'), $out);
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();

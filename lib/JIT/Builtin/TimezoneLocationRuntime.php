@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -66,10 +67,12 @@ final class TimezoneLocationRuntime
 
         $entry = $fn->appendBasicBlock('tzloc_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::LOCATION_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->builder->returnValue($ht);
         $context->registerFunction(self::ABI_NAME, $fn);
     }

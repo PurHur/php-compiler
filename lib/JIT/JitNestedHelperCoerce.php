@@ -128,7 +128,7 @@ final class JitNestedHelperCoerce
             return JitValueBox::pointer($context, $slot);
         }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
-            if (('int8' === $haveStr || 'i8' === $haveStr) && ('int64' === $wantStr || 'long long' === $wantStr)) {
+            if (('int8' === $haveStr || 'i8' === $haveStr) && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
                 return $context->builder->zext($arg, $wantTy);
             }
             if ('int32' === $haveStr && ('int64' === $wantStr || 'long long' === $wantStr)) {
@@ -195,8 +195,8 @@ final class JitNestedHelperCoerce
         if ('int8' === $fromStr && ('int32' === $toStr || 'int64' === $toStr || 'long long' === $toStr)) {
             return $context->builder->zext($raw, $toType);
         }
-        if (('int64' === $fromStr || 'long long' === $fromStr) && ('int32' === $toStr || 'int1' === $toStr || 'bool' === $toStr)) {
-            return 'int1' === $toStr || 'bool' === $toStr
+        if (('int64' === $fromStr || 'long long' === $fromStr) && ('int32' === $toStr || 'int1' === $toStr || 'bool' === $toStr || 'int8' === $toStr)) {
+            return ('int1' === $toStr || 'bool' === $toStr)
                 ? $context->builder->truncOrBitCast($raw, $toType)
                 : $context->builder->trunc($raw, $toType);
         }

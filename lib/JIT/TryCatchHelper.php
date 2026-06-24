@@ -198,7 +198,9 @@ final class TryCatchHelper
         if (0 === $context->inlineIncludeDepth) {
             $context->freeDeadVariables($func, $branchBlock, $handlerBlock);
         }
-        $builder->branch($tryEntry);
+        if (null === $branchBlock->getTerminator()) {
+            $builder->branch($tryEntry);
+        }
     }
 
     /**

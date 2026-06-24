@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -142,8 +143,14 @@ final class StreamFilterJit
         $fn = self::declareOrReuse($context, $abiName, $ft);
         $entry = $fn->appendBasicBlock($abiName.'_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, $helper), $fn->getParam(0));
-        $context->builder->returnValue($result);
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helper),
+            [$fn->getParam(0)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $resultRaw, $i32)
+        );
         $context->registerFunction($abiName, $fn);
     }
 
@@ -159,12 +166,14 @@ final class StreamFilterJit
         $fn = self::declareOrReuse($context, '__compiler_stream_filter_register', $ft);
         $entry = $fn->appendBasicBlock('stream_filter_register_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::REGISTER_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
+            [$fn->getParam(0), $fn->getParam(1)]
         );
-        $context->builder->returnValue($result);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $resultRaw, $i32)
+        );
         $context->registerFunction('__compiler_stream_filter_register', $fn);
     }
 
