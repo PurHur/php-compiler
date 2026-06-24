@@ -32,7 +32,7 @@ final class ucfirst extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('ucfirst() requires exactly one argument');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ucfirst', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ucfirst', 'string', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'ucfirst',

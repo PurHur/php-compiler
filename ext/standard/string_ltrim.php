@@ -38,7 +38,7 @@ final class string_ltrim extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('ltrim() requires one or two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ltrim', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'ltrim', 'string', 0, $frame);
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'ltrim', 0, 'string');
         $mask = VmString::TRIM_DEFAULT;
         $mode = VmString::TRIM_SIDE_LEFT;

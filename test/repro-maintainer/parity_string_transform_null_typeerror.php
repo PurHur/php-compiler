@@ -1,5 +1,5 @@
 <?php
-// php-src ext/standard/string.c — null string operands must TypeError (#11171).
+// php-src ext/standard/string.c — null string operands coerce when caller non-strict (#11322).
 $funcs = [
     'nl2br' => [null],
     'chop' => [null],

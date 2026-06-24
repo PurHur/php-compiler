@@ -42,7 +42,7 @@ final class date_create extends Internal
 
         $time = 'now';
         if ($argc >= 1) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[0], 'date_create', 'datetime', 0);
+            InternalStrictArg::rejectNullString($frame->calledArgs[0], 'date_create', 'datetime', 0, $frame);
             $time = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[0],
                 'date_create',

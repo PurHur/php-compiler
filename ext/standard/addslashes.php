@@ -23,7 +23,7 @@ final class addslashes extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('addslashes() requires exactly one argument in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addslashes', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'addslashes', 'string', 0, $frame);
         $subject = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'addslashes',

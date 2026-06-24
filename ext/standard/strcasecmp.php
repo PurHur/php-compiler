@@ -30,8 +30,8 @@ final class strcasecmp extends Internal
         if (2 !== count($frame->calledArgs)) {
             throw new \LogicException('strcasecmp() requires exactly two arguments');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcasecmp', 'string1', 0);
-        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strcasecmp', 'string2', 1);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcasecmp', 'string1', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'strcasecmp', 'string2', 1, $frame);
         $a = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcasecmp', 0, 'string1');
         $b = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcasecmp', 1, 'string2');
         if (null === $frame->returnVar) {

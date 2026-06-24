@@ -31,7 +31,7 @@ final class wordwrap extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'wordwrap', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'wordwrap', 'string', 0, $frame);
         $text = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'wordwrap',

@@ -26,7 +26,7 @@ final class strcspn extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('strcspn() requires two to four arguments in this compiler build');
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcspn', 'string', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'strcspn', 'string', 0, $frame);
         $str = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'strcspn', 0, 'string');
         $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcspn', 1, 'characters');
         $offset = 0;

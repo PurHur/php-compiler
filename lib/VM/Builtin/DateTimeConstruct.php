@@ -27,7 +27,7 @@ final class DateTimeConstruct extends VmClassMethod
         $receiver = DateTimeSupport::requireDateTime($frame->calledArgs[0], 'DateTime::__construct()');
         $time = 'now';
         if ($argc >= 2) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTime::__construct', 'datetime', 0);
+            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTime::__construct', 'datetime', 0, $frame);
             $time = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
                 'DateTime::__construct',

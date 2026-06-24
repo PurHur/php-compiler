@@ -29,7 +29,7 @@ final class shell_exec extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'shell_exec', 'command', 0);
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'shell_exec', 'command', 0, $frame);
         $command = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'shell_exec', 0, 'command');
         $result = VmShellExecNative::shellExec($command);
         if (false === $result) {

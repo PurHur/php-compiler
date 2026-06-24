@@ -30,7 +30,7 @@ final class DateTimeImmutableConstruct extends VmClassMethod
         );
         $time = 'now';
         if ($argc >= 2) {
-            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTimeImmutable::__construct', 'datetime', 0);
+            InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTimeImmutable::__construct', 'datetime', 0, $frame);
             $time = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
                 'DateTimeImmutable::__construct',
