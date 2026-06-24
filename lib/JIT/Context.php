@@ -765,6 +765,7 @@ class Context {
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             Builtin\Sscanf::ensureStandaloneBodies($this);
             Builtin\StringStripTags::ensureStandaloneBodies($this);
+            Builtin\StringStrtr::ensureStandaloneBodies($this);
             Builtin\StringParseStrJit::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringMultipart::ensureStandaloneBodies($this);
