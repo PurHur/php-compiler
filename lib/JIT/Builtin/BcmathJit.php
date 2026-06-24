@@ -4,77 +4,105 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM bcmath runtime bodies for JIT/AOT (__compiler_bc*, issue #6100).
+ * JIT/AOT link for __compiler_bc* via BcmathJitHelper PHP (#6100, #9235).
  *
- * This is a pure LLVM fallback runtime (no C files) with libc parsing/formatting.
+ * Replaces ~480-line libc double-parse LLVM with thin bridges into {@see VmBcmath} SSOT.
+ * php-src: ext/bcmath/libbcmath/src/*
  */
 final class BcmathJit
 {
-    private const DEFAULT_SCALE_GLOBAL = '__phpc_bcmath_default_scale';
+    private const HELPER_PATH = '/ext/bcmath/BcmathJitHelper.php';
+
+    private const SCALE_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::bcscaleAsInt';
+
+    private const ADD_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::add';
+
+    private const SUB_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::sub';
+
+    private const MUL_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::mul';
+
+    private const DIV_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::div';
+
+    private const COMP_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::comp';
+
+    private const POWMOD_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::powmod';
+
+    private const ROUND_HELPER = 'PHPCompiler\\ext\\bcmath\\BcmathJitHelper::round';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::SCALE_HELPER,
+        self::ADD_HELPER,
+        self::SUB_HELPER,
+        self::MUL_HELPER,
+        self::DIV_HELPER,
+        self::COMP_HELPER,
+        self::POWMOD_HELPER,
+        self::ROUND_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__compiler_bcscale',
+        '__compiler_bcadd',
+        '__compiler_bcsub',
+        '__compiler_bcmul',
+        '__compiler_bcdiv',
+        '__compiler_bccomp',
+        '__compiler_bcpowmod',
+        '__compiler_bcround',
+    ];
 
     public static function implement(Context $context): void
     {
-        self::ensureExternalDeclarations($context);
-        self::ensureDefaultScaleGlobal($context);
-        self::implementIfMissing($context, '__phpc_bcmath_resolve_scale', self::emitResolveScale(...));
-        self::implementIfMissing($context, '__phpc_bcmath_read_double', self::emitReadDouble(...));
-        self::implementIfMissing($context, '__phpc_bcmath_format', self::emitFormat(...));
-        self::implementIfMissing($context, '__phpc_bcmath_trunc_scale', self::emitTruncScale(...));
-        self::implementIfMissing($context, '__phpc_bcmath_mod_pow', self::emitModPow(...));
-        self::implementIfMissing($context, '__compiler_bcscale', self::emitBcscale(...));
-        self::implementIfMissing($context, '__compiler_bcadd', self::emitBcadd(...));
-        self::implementIfMissing($context, '__compiler_bcsub', self::emitBcsub(...));
-        self::implementIfMissing($context, '__compiler_bcmul', self::emitBcmul(...));
-        self::implementIfMissing($context, '__compiler_bcdiv', self::emitBcdiv(...));
-        self::implementIfMissing($context, '__compiler_bccomp', self::emitBccomp(...));
-        self::implementIfMissing($context, '__compiler_bcpowmod', self::emitBcpowmod(...));
-        self::implementIfMissing($context, '__compiler_bcround', self::emitBcround(...));
-    }
+        $probe = $context->module->getNamedFunction('__compiler_bcadd');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
-    private static function ensureDefaultScaleGlobal(Context $context): void
-    {
-        if (null !== $context->module->getNamedGlobal(self::DEFAULT_SCALE_GLOBAL)) {
             return;
         }
-        $global = $context->module->addGlobal($context->getTypeFromString('int64'), self::DEFAULT_SCALE_GLOBAL);
-        $global->setInitializer($context->getTypeFromString('int64')->constInt(0, true));
-    }
 
-    private static function ensureExternalDeclarations(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $context->getTypeFromString('int8**');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $double = $context->getTypeFromString('double');
-        $void = $context->context->voidType();
-
-        self::ensureExternalFunction($context, 'malloc', $context->context->functionType($i8p, false, $i64));
-        self::ensureExternalFunction($context, 'free', $context->context->functionType($void, false, $i8p));
-        self::ensureExternalFunction($context, 'strlen', $context->context->functionType($i64, false, $i8p));
-        self::ensureExternalFunction($context, 'strcmp', $context->context->functionType($i32, false, $i8p, $i8p));
-        self::ensureExternalFunction($context, 'memcpy', $context->context->functionType($i8p, false, $i8p, $i8p, $i64));
-        self::ensureExternalFunction($context, 'strtod', $context->context->functionType($double, false, $i8p, $i8pp));
-        self::ensureExternalFunction($context, 'pow', $context->context->functionType($double, false, $double, $double));
-        self::ensureExternalFunction($context, 'floor', $context->context->functionType($double, false, $double));
-        self::ensureExternalFunction($context, 'round', $context->context->functionType($double, false, $double));
-        self::ensureExternalFunction($context, 'fmod', $context->context->functionType($double, false, $double, $double));
-        self::ensureExternalFunction($context, 'snprintf', $context->context->functionType($i32, true, $i8p, $i64, $i8p));
-    }
-
-    private static function ensureExternalFunction(Context $context, string $name, $signature): void
-    {
-        $fn = $context->module->getNamedFunction($name);
-        if (null === $fn) {
-            $fn = $context->module->addFunction($name, $signature);
-        }
-        $context->registerFunction($name, $fn);
+        self::ensureJitHelperCompiled($context);
+        self::implementIfMissing($context, '__compiler_bcscale', self::implementBcscaleBridge(...));
+        self::implementIfMissing(
+            $context,
+            '__compiler_bcadd',
+            static function (Context $ctx, LlvmFunction $fn): void {
+                self::implementBinaryStringBridge($ctx, $fn, self::ADD_HELPER);
+            }
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_bcsub',
+            static function (Context $ctx, LlvmFunction $fn): void {
+                self::implementBinaryStringBridge($ctx, $fn, self::SUB_HELPER);
+            }
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_bcmul',
+            static function (Context $ctx, LlvmFunction $fn): void {
+                self::implementBinaryStringBridge($ctx, $fn, self::MUL_HELPER);
+            }
+        );
+        self::implementIfMissing(
+            $context,
+            '__compiler_bcdiv',
+            static function (Context $ctx, LlvmFunction $fn): void {
+                self::implementBinaryStringBridge($ctx, $fn, self::DIV_HELPER);
+            }
+        );
+        self::implementIfMissing($context, '__compiler_bccomp', self::implementCompBridge(...));
+        self::implementIfMissing($context, '__compiler_bcpowmod', self::implementPowmodBridge(...));
+        self::implementIfMissing($context, '__compiler_bcround', self::implementRoundBridge(...));
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     /**
@@ -88,7 +116,8 @@ final class BcmathJit
 
             return;
         }
-        $fn = null !== $probe ? $probe : self::declareFunction($context, $name);
+
+        $fn = self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
@@ -96,32 +125,17 @@ final class BcmathJit
 
     private static function declareFunction(Context $context, string $name): LlvmFunction
     {
+        try {
+            return $context->lookupFunction($name);
+        } catch (\Throwable) {
+            // fall through
+        }
+
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $double = $context->getTypeFromString('double');
         $str = $context->getTypeFromString('__string__*');
 
         return match ($name) {
-            '__phpc_bcmath_resolve_scale' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i64, false, $i64, $i32)
-            ),
-            '__phpc_bcmath_read_double' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($double, false, $str)
-            ),
-            '__phpc_bcmath_format' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($str, false, $double, $i64)
-            ),
-            '__phpc_bcmath_trunc_scale' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($double, false, $double, $i64)
-            ),
-            '__phpc_bcmath_mod_pow' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i64, false, $i64, $i64, $i64)
-            ),
             '__compiler_bcscale' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $i64, $i32)
@@ -145,339 +159,133 @@ final class BcmathJit
                 $name,
                 $context->context->functionType($str, false, $str, $i64, $i64)
             ),
-            default => throw new \LogicException('Unknown bcmath runtime function: '.$name),
+            default => throw new \LogicException('Unknown bcmath JIT helper: '.$name),
         };
     }
 
-    private static function emitResolveScale(Context $context, LlvmFunction $fn): void
+    private static function implementBcscaleBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('entry');
-        $useDefault = $fn->appendBasicBlock('use_default');
-        $done = $fn->appendBasicBlock('done');
+        $entry = $fn->appendBasicBlock('bcscale_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $i32 = $context->getTypeFromString('int32');
-        $hasScale = $fn->getParam(1);
-        $isDefault = $context->builder->icmp(Builder::INT_EQ, $hasScale, $i32->constInt(-1, true));
-        $context->builder->branchIf($isDefault, $useDefault, $done);
-        $context->builder->positionAtEnd($useDefault);
-        $global = $context->module->getNamedGlobal(self::DEFAULT_SCALE_GLOBAL);
-        $resolved = $context->builder->load($global);
-        $context->builder->returnValue($resolved);
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($fn->getParam(0));
-    }
-
-    private static function emitReadDouble(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        $map = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i8pp = $context->getTypeFromString('int8**');
-        $i64 = $context->getTypeFromString('int64');
-        $src = $context->builder->call($context->lookupFunction('__string__separate'), $fn->getParam(0));
-        $len = $context->builder->load($context->builder->structGep($src, $map['length']));
-        $chars = $context->builder->structGep($src, $map['value']);
-        $allocSize = $context->builder->add($len, $i64->constInt(1, false));
-        $buf = $context->builder->call($context->lookupFunction('malloc'), $allocSize);
-        $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $buf,
-            $chars,
-            $len
+        $old = $context->builder->call(
+            self::helperFunction($context, self::SCALE_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1)
         );
-        $context->builder->store($i8->constInt(0, false), $context->builder->gep($buf, $len));
-        // Keep libc parity with C runtime code paths.
-        $context->builder->call($context->lookupFunction('strlen'), $buf);
-        $parsed = $context->builder->call(
-            $context->lookupFunction('strtod'),
-            $buf,
-            $i8pp->constNull()
-        );
-        $context->builder->call($context->lookupFunction('free'), $buf);
-        $context->builder->returnValue($parsed);
-    }
-
-    private static function emitFormat(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $check = $fn->appendBasicBlock('check');
-        $neg = $fn->appendBasicBlock('neg');
-        $ok = $fn->appendBasicBlock('ok');
-        $context->builder->positionAtEnd($entry);
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $scale = $fn->getParam(1);
-        $scaleSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $context->builder->store($scale, $scaleSlot);
-        $context->builder->branch($check);
-
-        $context->builder->positionAtEnd($check);
-        $loadedScale = $context->builder->load($scaleSlot);
-        $isNeg = $context->builder->icmp(Builder::INT_SLT, $loadedScale, $i64->constInt(0, true));
-        $context->builder->branchIf($isNeg, $neg, $ok);
-
-        $context->builder->positionAtEnd($neg);
-        $context->builder->store($i64->constInt(0, false), $scaleSlot);
-        $context->builder->branch($ok);
-
-        $context->builder->positionAtEnd($ok);
-        $buf = $context->builder->call($context->lookupFunction('malloc'), $i64->constInt(256, false));
-        $fmt = $context->builder->pointerCast($context->constantFromString('%.*f'), $i8p);
-        $scaleI32 = $context->builder->trunc($context->builder->load($scaleSlot), $i32);
-        $context->builder->call(
-            $context->lookupFunction('snprintf'),
-            $buf,
-            $i64->constInt(256, false),
-            $fmt,
-            $scaleI32,
-            $fn->getParam(0)
-        );
-        $len = $context->builder->call($context->lookupFunction('strlen'), $buf);
-        $out = $context->builder->call($context->lookupFunction('__string__init'), $len, $buf);
-        $context->builder->call($context->lookupFunction('free'), $buf);
-        $context->builder->returnValue($out);
-    }
-
-    private static function emitTruncScale(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        $double = $context->getTypeFromString('double');
-        $pow = $context->builder->call(
-            $context->lookupFunction('pow'),
-            $double->constReal(10.0),
-            $context->builder->siToFp($fn->getParam(1), $double)
-        );
-        $scaled = $context->builder->fMul($fn->getParam(0), $pow);
-        $floor = $context->builder->call($context->lookupFunction('floor'), $scaled);
-        $context->builder->returnValue($context->builder->fDiv($floor, $pow));
-    }
-
-    private static function emitModPow(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $loopHead = $fn->appendBasicBlock('loop_head');
-        $loopBody = $fn->appendBasicBlock('loop_body');
-        $done = $fn->appendBasicBlock('done');
-        $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $baseSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $expSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $resSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $mod = $fn->getParam(2);
-        $baseInit = $context->builder->signedRem($fn->getParam(0), $mod);
-        $context->builder->store($baseInit, $baseSlot);
-        $context->builder->store($fn->getParam(1), $expSlot);
-        $context->builder->store($i64->constInt(1, false), $resSlot);
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopHead);
-        $exp = $context->builder->load($expSlot);
-        $cont = $context->builder->icmp(Builder::INT_SGT, $exp, $i64->constInt(0, false));
-        $context->builder->branchIf($cont, $loopBody, $done);
-
-        $context->builder->positionAtEnd($loopBody);
-        $res = $context->builder->load($resSlot);
-        $base = $context->builder->load($baseSlot);
-        $isOdd = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->and($exp, $i64->constInt(1, false)),
-            $i64->constInt(1, false)
-        );
-        $oddBlock = $fn->appendBasicBlock('odd');
-        $afterOdd = $fn->appendBasicBlock('after_odd');
-        $context->builder->branchIf($isOdd, $oddBlock, $afterOdd);
-
-        $context->builder->positionAtEnd($oddBlock);
-        $newRes = $context->builder->signedRem($context->builder->mul($res, $base), $mod);
-        $context->builder->store($newRes, $resSlot);
-        $context->builder->branch($afterOdd);
-
-        $context->builder->positionAtEnd($afterOdd);
-        $base = $context->builder->load($baseSlot);
-        $context->builder->store($context->builder->signedRem($context->builder->mul($base, $base), $mod), $baseSlot);
-        $exp = $context->builder->load($expSlot);
-        $context->builder->store($context->builder->lShr($exp, $i64->constInt(1, false)), $expSlot);
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($context->builder->load($resSlot));
-    }
-
-    private static function emitBcscale(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $set = $fn->appendBasicBlock('set');
-        $done = $fn->appendBasicBlock('done');
-        $context->builder->positionAtEnd($entry);
-        $global = $context->module->getNamedGlobal(self::DEFAULT_SCALE_GLOBAL);
-        $old = $context->builder->load($global);
-        $hasScale = $fn->getParam(1);
-        $i32 = $context->getTypeFromString('int32');
-        $shouldSet = $context->builder->icmp(Builder::INT_NE, $hasScale, $i32->constInt(-1, true));
-        $context->builder->branchIf($shouldSet, $set, $done);
-        $context->builder->positionAtEnd($set);
-        $context->builder->store($fn->getParam(0), $global);
-        $context->builder->branch($done);
-        $context->builder->positionAtEnd($done);
         $context->builder->returnValue($old);
     }
 
-    private static function emitBcadd(Context $context, LlvmFunction $fn): void
-    {
-        self::emitBinaryMath($context, $fn, 'add');
-    }
-
-    private static function emitBcsub(Context $context, LlvmFunction $fn): void
-    {
-        self::emitBinaryMath($context, $fn, 'sub');
-    }
-
-    private static function emitBcmul(Context $context, LlvmFunction $fn): void
-    {
-        self::emitBinaryMath($context, $fn, 'mul');
-    }
-
-    private static function emitBcdiv(Context $context, LlvmFunction $fn): void
-    {
-        self::emitBinaryMath($context, $fn, 'div');
-    }
-
-    private static function emitBinaryMath(Context $context, LlvmFunction $fn, string $op): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
+    private static function implementBinaryStringBridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical
+    ): void {
+        $entry = $fn->appendBasicBlock('bcmath_bin_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $left = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(0));
-        $right = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(1));
-        $scale = $context->builder->call($context->lookupFunction('__phpc_bcmath_resolve_scale'), $fn->getParam(2), $fn->getParam(3));
-        $double = $context->getTypeFromString('double');
-        $result = match ($op) {
-            'add' => $context->builder->fAdd($left, $right),
-            'sub' => $context->builder->fSub($left, $right),
-            'mul' => $context->builder->fMul($left, $right),
-            'div' => $context->builder->select(
-                $context->builder->fcmp(Builder::REAL_OEQ, $right, $double->constReal(0.0)),
-                $double->constReal(0.0),
-                $context->builder->fDiv($left, $right)
-            ),
-            default => $double->constReal(0.0),
-        };
-        $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $result, $scale)
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3)
         );
+        $context->builder->returnValue($result);
     }
 
-    private static function emitBccomp(Context $context, LlvmFunction $fn): void
+    private static function implementCompBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('entry');
-        $lt = $fn->appendBasicBlock('lt');
-        $gt = $fn->appendBasicBlock('gt');
-        $gtRet = $fn->appendBasicBlock('gt_ret');
-        $eq = $fn->appendBasicBlock('eq');
+        $entry = $fn->appendBasicBlock('bccomp_bridge_entry');
         $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::COMP_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3)
+        );
         $i64 = $context->getTypeFromString('int64');
-        $left = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(0));
-        $right = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(1));
-        $scale = $context->builder->call($context->lookupFunction('__phpc_bcmath_resolve_scale'), $fn->getParam(2), $fn->getParam(3));
-        $left = $context->builder->call($context->lookupFunction('__phpc_bcmath_trunc_scale'), $left, $scale);
-        $right = $context->builder->call($context->lookupFunction('__phpc_bcmath_trunc_scale'), $right, $scale);
-        $isLt = $context->builder->fcmp(Builder::REAL_OLT, $left, $right);
-        $isGt = $context->builder->fcmp(Builder::REAL_OGT, $left, $right);
-        $context->builder->branchIf($isLt, $lt, $gt);
-        $context->builder->positionAtEnd($lt);
-        $context->builder->returnValue($i64->constInt(-1, true));
-        $context->builder->positionAtEnd($gt);
-        $context->builder->branchIf($isGt, $gtRet, $eq);
-        $context->builder->positionAtEnd($gtRet);
-        $context->builder->returnValue($i64->constInt(1, true));
-        $context->builder->positionAtEnd($eq);
-        $context->builder->returnValue($i64->constInt(0, false));
+        $context->builder->returnValue($context->builder->sext($result, $i64));
     }
 
-    private static function emitBcpowmod(Context $context, LlvmFunction $fn): void
+    private static function implementPowmodBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('entry');
-        $zeroMod = $fn->appendBasicBlock('zero_mod');
-        $work = $fn->appendBasicBlock('work');
+        $entry = $fn->appendBasicBlock('bcpowmod_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $double = $context->getTypeFromString('double');
-        $scale = $context->builder->call($context->lookupFunction('__phpc_bcmath_resolve_scale'), $fn->getParam(3), $fn->getParam(4));
-        $base = $context->builder->fpToSi(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(0)),
-            $i64
+        $result = $context->builder->call(
+            self::helperFunction($context, self::POWMOD_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3),
+            $fn->getParam(4)
         );
-        $exp = $context->builder->fpToSi(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(1)),
-            $i64
-        );
-        $mod = $context->builder->fpToSi(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(2)),
-            $i64
-        );
-        $isZero = $context->builder->icmp(Builder::INT_EQ, $mod, $i64->constInt(0, false));
-        $context->builder->branchIf($isZero, $zeroMod, $work);
-
-        $context->builder->positionAtEnd($zeroMod);
-        $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $double->constReal(0.0), $scale)
-        );
-
-        $context->builder->positionAtEnd($work);
-        $powmod = $context->builder->call($context->lookupFunction('__phpc_bcmath_mod_pow'), $base, $exp, $mod);
-        $context->builder->returnValue(
-            $context->builder->call(
-                $context->lookupFunction('__phpc_bcmath_format'),
-                $context->builder->siToFp($powmod, $double),
-                $scale
-            )
-        );
+        $context->builder->returnValue($result);
     }
 
-    /**
-     * Double-based bcround fallback for JIT/AOT (VM uses VmBcmath::round; issue #5935).
-     */
-    private static function emitBcround(Context $context, LlvmFunction $fn): void
+    private static function implementRoundBridge(Context $context, LlvmFunction $fn): void
     {
-        $entry = $fn->appendBasicBlock('entry');
-        $negPrecision = $fn->appendBasicBlock('neg_precision');
-        $posPrecision = $fn->appendBasicBlock('pos_precision');
+        $entry = $fn->appendBasicBlock('bcround_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $double = $context->getTypeFromString('double');
-        $i64 = $context->getTypeFromString('int64');
-        $num = $context->builder->call($context->lookupFunction('__phpc_bcmath_read_double'), $fn->getParam(0));
-        $precision = $fn->getParam(1);
-        $isNeg = $context->builder->icmp(Builder::INT_SLT, $precision, $i64->constInt(0, true));
-        $context->builder->branchIf($isNeg, $negPrecision, $posPrecision);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::ROUND_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
+        );
+        $context->builder->returnValue($result);
+    }
 
-        $context->builder->positionAtEnd($posPrecision);
-        $expPos = $context->builder->call(
-            $context->lookupFunction('pow'),
-            $double->constReal(10.0),
-            $context->builder->siToFp($precision, $double)
-        );
-        $scaledPos = $context->builder->fMul($num, $expPos);
-        $roundedPos = $context->builder->call($context->lookupFunction('round'), $scaledPos);
-        $resultPos = $context->builder->fDiv($roundedPos, $expPos);
-        $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $resultPos, $precision)
-        );
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after BcmathJitHelper compile (#9235)');
+        }
 
-        $context->builder->positionAtEnd($negPrecision);
-        $negAbs = $context->builder->sub($i64->constInt(0, false), $precision);
-        $expNeg = $context->builder->call(
-            $context->lookupFunction('pow'),
-            $double->constReal(10.0),
-            $context->builder->siToFp($negAbs, $double)
-        );
-        $scaledNeg = $context->builder->fDiv($num, $expNeg);
-        $roundedNeg = $context->builder->call($context->lookupFunction('round'), $scaledNeg);
-        $resultNeg = $context->builder->fMul($roundedNeg, $expNeg);
-        $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__phpc_bcmath_format'), $resultNeg, $i64->constInt(0, false))
-        );
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'BcmathJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('BcmathJitHelper.php parseAndCompile failed (#9235)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9235)');
+            }
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after BcmathJit bridge (#9235)');
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 }
