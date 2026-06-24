@@ -36,12 +36,7 @@ final class array_rand extends Internal
         }
         $num = 1;
         if (2 === $argc) {
-            $num = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
-                'array_rand',
-                2,
-                'num'
-            );
+            $num = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_rand', 2, 'num');
         }
         $result = VmArray::arrayRandPacked($array->toArray(), $num);
         if (null === $frame->returnVar) {

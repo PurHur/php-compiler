@@ -8,6 +8,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -33,9 +34,12 @@ final class JitArrayRand
             );
         }
         $sizeT = $context->getTypeFromString('size_t');
-        $num = isset($args[1])
-            ? JitLongArg::lower($context, $args[1], 'array_rand() num')
-            : $sizeT->constInt(1, false);
+        if (isset($args[1])) {
+            JitInternalStrictArg::requireInt($context, $args[1], 'array_rand', 'num', 2);
+            $num = JitLongArg::lower($context, $args[1], 'array_rand() num');
+        } else {
+            $num = $sizeT->constInt(1, false);
+        }
 
         $resultSlot = JitValueBox::alloc($context);
         $resultPtr = JitValueBox::pointer($context, $resultSlot);
