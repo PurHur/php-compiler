@@ -1447,6 +1447,7 @@ require_once __DIR__.'/../../../ext/standard/hash_.php';
 require_once __DIR__.'/../../../ext/standard/HashEqualsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpBuildQueryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamPathJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/StreamSyncJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HashCryptoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/hash_equals.php';
 require_once __DIR__.'/../../../ext/standard/hash_hkdf.php';

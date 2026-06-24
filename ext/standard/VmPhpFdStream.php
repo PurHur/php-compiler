@@ -298,11 +298,10 @@ final class VmPhpFdStream
         return isset(self::$streams[$handle]);
     }
 
-    /** fsync() — libc fsync(2) on stream fd (#8594, ext/standard/file.c). */
-    public static function fsync(int $handle): bool
+    /** fsync(2)/fdatasync(2) on an OS fd — shared by stream sync JIT helper (#9815). */
+    public static function syncFileno(int $fd, bool $dataOnly): bool
     {
-        $state = self::$streams[$handle] ?? null;
-        if (null === $state) {
+        if ($fd < 0) {
             return false;
         }
         $ffi = self::ffi();
@@ -311,10 +310,23 @@ final class VmPhpFdStream
         }
 
         try {
-            return 0 === (int) $ffi->fsync($state->fd);
+            $rc = $dataOnly ? (int) $ffi->fdatasync($fd) : (int) $ffi->fsync($fd);
+
+            return 0 === $rc;
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /** fsync() — libc fsync(2) on stream fd (#8594, ext/standard/file.c). */
+    public static function fsync(int $handle): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return self::syncFileno($state->fd, false);
     }
 
     /** fdatasync() — libc fdatasync(2) on stream fd (#8594, ext/standard/file.c). */
@@ -324,16 +336,8 @@ final class VmPhpFdStream
         if (null === $state) {
             return false;
         }
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
 
-        try {
-            return 0 === (int) $ffi->fdatasync($state->fd);
-        } catch (\Throwable) {
-            return false;
-        }
+        return self::syncFileno($state->fd, true);
     }
 
     public static function close(int $handle): bool
