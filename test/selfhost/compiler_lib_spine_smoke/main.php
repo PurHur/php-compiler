@@ -742,6 +742,7 @@ require_once __DIR__.'/../../../ext/standard/JitShellExec.php';
 require_once __DIR__.'/../../../ext/standard/JitSleep.php';
 require_once __DIR__.'/../../../ext/standard/JitSoundex.php';
 require_once __DIR__.'/../../../ext/standard/JitSplAutoload.php';
+require_once __DIR__.'/../../../ext/standard/SplAutoloadJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitSplObjectHash.php';
 require_once __DIR__.'/../../../ext/standard/JitSprintf.php';
 require_once __DIR__.'/../../../ext/standard/JitSscanf.php';

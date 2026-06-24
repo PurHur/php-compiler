@@ -745,6 +745,7 @@
         "ext/standard/JitSleep.php",
         "ext/standard/JitSoundex.php",
         "ext/standard/JitSplAutoload.php",
+        "ext/standard/SplAutoloadJitHelper.php",
         "ext/standard/JitSplObjectHash.php",
         "ext/standard/JitSprintf.php",
         "ext/standard/JitSscanf.php",
