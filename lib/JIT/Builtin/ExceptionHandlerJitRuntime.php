@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
@@ -13,31 +16,33 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 use llvm\LLVMValueRef_ptr;
 
 /**
- * LLVM exception-handler stack for set_exception_handler() / restore_exception_handler() (#4311, #3146).
+ * JIT/AOT link for __phpc_exception_handler_* via ExceptionHandlerJitHelper PHP (#9473).
  *
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(set_exception_handler)
+ * Stack storage lives in compiled {@see ExceptionHandlerJitHelper}; thin LLVM bridges forward the ABI.
+ * php-src: ext/standard/basic_functions.c — set_exception_handler, restore_exception_handler
  */
 final class ExceptionHandlerJitRuntime
 {
-    private const MAX = 32;
+    private const HELPER_PATH = '/ext/standard/ExceptionHandlerJitHelper.php';
 
-    private const GLOBAL_DEPTH = 'phpc_exception_handler_depth';
+    private const SET_APPLY_HELPER = 'PHPCompiler\\ext\\standard\\ExceptionHandlerJitHelper::setApply';
 
-    private const GLOBAL_FN = 'phpc_exception_handler_fn';
+    private const RESTORE_HELPER = 'PHPCompiler\\ext\\standard\\ExceptionHandlerJitHelper::restoreApply';
 
-    private const GLOBAL_NAME = 'phpc_exception_handler_name';
+    private const DEPTH_HELPER = 'PHPCompiler\\ext\\standard\\ExceptionHandlerJitHelper::currentDepth';
 
-    /** @var Value|null */
-    private static $depthGlobal = null;
-
-    /** @var Value|null */
-    private static $fnGlobal = null;
-
-    /** @var Value|null */
-    private static $nameGlobal = null;
+    private const FN_AT_HELPER = 'PHPCompiler\\ext\\standard\\ExceptionHandlerJitHelper::handlerFnAddrAt';
 
     /** @var list<string> */
-    private const RUNTIME_FNS = [
+    private const COMPILED_HELPERS = [
+        self::SET_APPLY_HELPER,
+        self::RESTORE_HELPER,
+        self::DEPTH_HELPER,
+        self::FN_AT_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
         '__phpc_exception_handler_dispatch',
         '__phpc_exception_handler_set_apply',
         '__phpc_exception_handler_restore_apply',
@@ -57,61 +62,133 @@ final class ExceptionHandlerJitRuntime
             return;
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $restoreBlock = self::captureInsertBlock($context);
+            self::ensureValueWriters($context);
+            self::implementStandaloneThinAbi($context);
+            self::registerLinkedRuntime($context);
+            self::restoreInsertBlock($context, $restoreBlock);
+
+            return;
+        }
+
         $restoreBlock = self::captureInsertBlock($context);
-        self::ensureGlobals($context);
-        self::ensureLibc($context);
+        self::ensureJitHelperCompiled($context);
         self::ensureValueWriters($context);
-
-        $i32 = $context->getTypeFromString('int32');
-        $objPtr = $context->getTypeFromString('__object__*');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-        $cbFnTy = $context->context->functionType($i32, false, $objPtr);
-        $cbPtrTy = $cbFnTy->pointerType(0);
-
-        $dispatchProbe = $context->module->getNamedFunction('__phpc_exception_handler_dispatch');
-        $ftDispatch = $context->context->functionType($i32, false, $objPtr);
-        $fnDispatch = null !== $dispatchProbe
-            ? $dispatchProbe
-            : $context->module->addFunction('__phpc_exception_handler_dispatch', $ftDispatch);
-        self::implementDispatch($context, $fnDispatch, $i32, $objPtr, $cbFnTy, $cbPtrTy);
-
-        $setProbe = $context->module->getNamedFunction('__phpc_exception_handler_set_apply');
-        $ftSet = $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p);
-        $fnSet = null !== $setProbe
-            ? $setProbe
-            : $context->module->addFunction('__phpc_exception_handler_set_apply', $ftSet);
-        self::implementSetApply($context, $fnSet, $i32, $i8p, $sizeT);
-
-        $restoreProbe = $context->module->getNamedFunction('__phpc_exception_handler_restore_apply');
-        $ftRestore = $context->context->functionType($voidTy, false, $valPtr);
-        $fnRestore = null !== $restoreProbe
-            ? $restoreProbe
-            : $context->module->addFunction('__phpc_exception_handler_restore_apply', $ftRestore);
-        self::implementRestoreApply($context, $fnRestore, $i32, $i8p);
-
+        self::implementDispatchBridge($context);
+        self::implementSetApplyBridge($context);
+        self::implementRestoreApplyBridge($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $restoreBlock);
     }
 
-    private static function implementDispatch(
-        Context $context,
-        LlvmFunction $fn,
-        $i32,
-        $objPtr,
-        $cbFnTy,
-        $cbPtrTy
-    ): void {
+    private static function implementStandaloneThinAbi(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $voidTy = $context->getTypeFromString('void');
+        $savedBuilder = $context->builder;
+
+        $dispatch = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_dispatch',
+            $context->context->functionType($i32, false, $objPtr)
+        );
+        if (0 === $dispatch->countBasicBlocks()) {
+            $entry = $dispatch->appendBasicBlock('entry');
+            $context->builder = $context->context->builderCreate();
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($i32->constInt(0, false));
+            $context->builder->clearInsertionPosition();
+        }
+        $context->registerFunction('__phpc_exception_handler_dispatch', $dispatch);
+
+        $setApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_set_apply',
+            $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p)
+        );
+        if (0 === $setApply->countBasicBlocks()) {
+            $entry = $setApply->appendBasicBlock('entry');
+            $context->builder = $context->context->builderCreate();
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $setApply->getParam(0)
+            );
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        }
+        $context->registerFunction('__phpc_exception_handler_set_apply', $setApply);
+
+        $restoreApply = self::standaloneAbiFunction(
+            $context,
+            '__phpc_exception_handler_restore_apply',
+            $context->context->functionType($voidTy, false, $valPtr)
+        );
+        if (0 === $restoreApply->countBasicBlocks()) {
+            $entry = $restoreApply->appendBasicBlock('entry');
+            $context->builder = $context->context->builderCreate();
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeBool'),
+                $restoreApply->getParam(0),
+                $i32->constInt(0, false)
+            );
+            $context->builder->returnVoid();
+            $context->builder->clearInsertionPosition();
+        }
+        $context->registerFunction('__phpc_exception_handler_restore_apply', $restoreApply);
+
+        $context->builder = $savedBuilder;
+    }
+
+    private static function standaloneAbiFunction(Context $context, string $abiName, $ft): LlvmFunction
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null === $probe) {
+            $context->module->addFunction($abiName, $ft);
+            $probe = $context->module->getNamedFunction($abiName);
+        }
+        if (null === $probe) {
+            throw new \LogicException($abiName.' missing after standalone ABI declare (#9473)');
+        }
+
+        return $probe;
+    }
+
+    private static function implementDispatchBridge(Context $context): void
+    {
+        $abiName = '__phpc_exception_handler_dispatch';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $objPtr = $context->getTypeFromString('__object__*');
+        $cbFnTy = $context->context->functionType($i32, false, $objPtr);
+        $cbPtrTy = $cbFnTy->pointerType(0);
+        $ft = $context->context->functionType($i32, false, $objPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
         $entry = $fn->appendBasicBlock('xh_dispatch_entry');
         $context->builder->positionAtEnd($entry);
 
+        $exception = $fn->getParam(0);
         $zeroI32 = $i32->constInt(0, false);
         $oneI32 = $i32->constInt(1, false);
-        $exception = $fn->getParam(0);
 
-        $depth = $context->builder->load(self::$depthGlobal);
+        $depth = $context->builder->call(self::helperFunction($context, self::DEPTH_HELPER));
         $emptyBb = $fn->appendBasicBlock('xh_dispatch_empty');
         $loopInitBb = $fn->appendBasicBlock('xh_dispatch_loop_init');
         $context->builder->branchIf(
@@ -139,11 +216,14 @@ final class ExceptionHandlerJitRuntime
         $context->builder->branchIf($continueLoop, $loopBodyBb, $loopDoneBb);
 
         $context->builder->positionAtEnd($loopBodyBb);
-        $handlerFn = $context->builder->load(self::fnSlot($context, $i32, $idx));
+        $fnAddr = $context->builder->call(
+            self::helperFunction($context, self::FN_AT_HELPER),
+            $context->builder->sext($idx, $i64)
+        );
         $noFnBb = $fn->appendBasicBlock('xh_dispatch_no_fn');
         $callBb = $fn->appendBasicBlock('xh_dispatch_call');
         $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $handlerFn, $context->getTypeFromString('int8*')->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $fnAddr, $i64->constInt(0, false)),
             $noFnBb,
             $callBb
         );
@@ -152,7 +232,8 @@ final class ExceptionHandlerJitRuntime
         $context->builder->branch($loopIncBb);
 
         $context->builder->positionAtEnd($callBb);
-        $cb = $context->builder->pointerCast($handlerFn, $cbPtrTy);
+        $fnPtr = $context->builder->intToPtr($fnAddr, $i8p);
+        $cb = $context->builder->pointerCast($fnPtr, $cbPtrTy);
         $handled = self::emitIndirectCall($context, $cbFnTy, $cb, $exception);
         $truthy = $context->builder->icmp(Builder::INT_NE, $handled, $zeroI32);
         $handledBb = $fn->appendBasicBlock('xh_dispatch_handled');
@@ -167,285 +248,148 @@ final class ExceptionHandlerJitRuntime
 
         $context->builder->positionAtEnd($loopDoneBb);
         $context->builder->returnValue($zeroI32);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementSetApply(
-        Context $context,
-        LlvmFunction $fn,
-        $i32,
-        $i8p,
-        $sizeT
-    ): void {
+    private static function implementSetApplyBridge(Context $context): void
+    {
+        $abiName = '__phpc_exception_handler_set_apply';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valPtr, $i8p, $sizeT, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
         $entry = $fn->appendBasicBlock('xh_set_entry');
         $context->builder->positionAtEnd($entry);
 
-        $zeroI32 = $i32->constInt(0, false);
-        $oneI32 = $i32->constInt(1, false);
         $out = $fn->getParam(0);
         $name = $fn->getParam(1);
         $nameLen = $fn->getParam(2);
         $fnOpaque = $fn->getParam(3);
 
-        $popBb = $fn->appendBasicBlock('xh_set_pop');
-        $pushBb = $fn->appendBasicBlock('xh_set_push');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $fnOpaque, $i8p->constNull()),
-            $popBb,
-            $pushBb
+        $fnAddr = $context->builder->ptrToInt($fnOpaque, $i64);
+        $handlerName = self::optionalCstrToString($context, $fn, $name, $nameLen);
+        $previous = $context->builder->call(
+            self::helperFunction($context, self::SET_APPLY_HELPER),
+            $fnAddr,
+            $handlerName
         );
 
-        $context->builder->positionAtEnd($popBb);
-        $depth = $context->builder->load(self::$depthGlobal);
-        $emptyPopBb = $fn->appendBasicBlock('xh_set_pop_empty');
-        $doPopBb = $fn->appendBasicBlock('xh_set_pop_do');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLE, $depth, $zeroI32),
-            $emptyPopBb,
-            $doPopBb
-        );
-
-        $context->builder->positionAtEnd($emptyPopBb);
-        self::writeValueNull($context, $out);
+        self::writeNullableStringToValue($context, $fn, $out, $previous);
         $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($doPopBb);
-        $removedIdx = $context->builder->sub($depth, $oneI32);
-        self::writeHandlerNameAtToOut($context, $fn, $out, $i32, $i8p, $removedIdx);
-        self::freeNameAt($context, $fn, $i32, $i8p, $removedIdx);
-        $context->builder->store($i8p->constNull(), self::fnSlot($context, $i32, $removedIdx));
-        $context->builder->store($i8p->constNull(), self::nameSlot($context, $i32, $removedIdx));
-        $context->builder->store($removedIdx, self::$depthGlobal);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($pushBb);
-        self::writePreviousHandlerToOut($context, $fn, $out, $i32, $i8p);
-        $depth = $context->builder->load(self::$depthGlobal);
-        $fullBb = $fn->appendBasicBlock('xh_set_full');
-        $doPushBb = $fn->appendBasicBlock('xh_set_do_push');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SGE, $depth, $i32->constInt(self::MAX, false)),
-            $fullBb,
-            $doPushBb
-        );
-
-        $context->builder->positionAtEnd($fullBb);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($doPushBb);
-        $context->builder->store($fnOpaque, self::fnSlot($context, $i32, $depth));
-        self::storeCopiedName($context, $fn, $i32, $i8p, $sizeT, $depth, $name, $nameLen);
-        $context->builder->store($context->builder->add($depth, $oneI32), self::$depthGlobal);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementRestoreApply(
-        Context $context,
-        LlvmFunction $fn,
-        $i32,
-        $i8p
-    ): void {
+    private static function implementRestoreApplyBridge(Context $context): void
+    {
+        $abiName = '__phpc_exception_handler_restore_apply';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $valPtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
         $entry = $fn->appendBasicBlock('xh_restore_entry');
         $context->builder->positionAtEnd($entry);
 
-        $zeroI32 = $i32->constInt(0, false);
-        $oneI32 = $i32->constInt(1, false);
         $out = $fn->getParam(0);
-
-        $depth = $context->builder->load(self::$depthGlobal);
-        $emptyBb = $fn->appendBasicBlock('xh_restore_empty');
-        $popBb = $fn->appendBasicBlock('xh_restore_pop');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SLE, $depth, $zeroI32),
-            $emptyBb,
-            $popBb
-        );
-
-        $context->builder->positionAtEnd($emptyBb);
-        self::writeValueBool($context, $out, $zeroI32);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($popBb);
-        $newDepth = $context->builder->sub($depth, $oneI32);
-        self::freeNameAt($context, $fn, $i32, $i8p, $newDepth);
-        $context->builder->store($i8p->constNull(), self::fnSlot($context, $i32, $newDepth));
-        $context->builder->store($i8p->constNull(), self::nameSlot($context, $i32, $newDepth));
-        $context->builder->store($newDepth, self::$depthGlobal);
-        self::writeValueBool($context, $out, $oneI32);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function writePreviousHandlerToOut(
-        Context $context,
-        LlvmFunction $fn,
-        Value $out,
-        $i32,
-        $i8p
-    ): void {
-        $zeroI32 = $i32->constInt(0, false);
-        $oneI32 = $i32->constInt(1, false);
-        $depth = $context->builder->load(self::$depthGlobal);
-        $hasPrevBb = $fn->appendBasicBlock('xh_set_has_prev');
-        $noPrevBb = $fn->appendBasicBlock('xh_set_no_prev');
-        $prevDoneBb = $fn->appendBasicBlock('xh_set_prev_done');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SGT, $depth, $zeroI32),
-            $hasPrevBb,
-            $noPrevBb
-        );
-
-        $context->builder->positionAtEnd($noPrevBb);
-        self::writeValueNull($context, $out);
-        $context->builder->branch($prevDoneBb);
-
-        $context->builder->positionAtEnd($hasPrevBb);
-        $prevIdx = $context->builder->sub($depth, $oneI32);
-        self::writeHandlerNameAtToOut($context, $fn, $out, $i32, $i8p, $prevIdx);
-        $context->builder->branch($prevDoneBb);
-
-        $context->builder->positionAtEnd($prevDoneBb);
-    }
-
-    private static function writeHandlerNameAtToOut(
-        Context $context,
-        LlvmFunction $fn,
-        Value $out,
-        $i32,
-        $i8p,
-        Value $index
-    ): void {
-        $handlerName = $context->builder->load(self::nameSlot($context, $i32, $index));
-        $nameNullBb = $fn->appendBasicBlock('xh_name_null');
-        $nameStrBb = $fn->appendBasicBlock('xh_name_str');
-        $nameDoneBb = $fn->appendBasicBlock('xh_name_done');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $handlerName, $i8p->constNull()),
-            $nameNullBb,
-            $nameStrBb
-        );
-
-        $context->builder->positionAtEnd($nameNullBb);
-        self::writeValueNull($context, $out);
-        $context->builder->branch($nameDoneBb);
-
-        $context->builder->positionAtEnd($nameStrBb);
-        self::writeValueStringFromCstr($context, $out, $handlerName);
-        $context->builder->branch($nameDoneBb);
-
-        $context->builder->positionAtEnd($nameDoneBb);
-    }
-
-    private static function storeCopiedName(
-        Context $context,
-        LlvmFunction $fn,
-        $i32,
-        $i8p,
-        $sizeT,
-        Value $depth,
-        Value $name,
-        Value $nameLen
-    ): void {
-        $hasNameBb = $fn->appendBasicBlock('xh_set_has_name');
-        $noNameBb = $fn->appendBasicBlock('xh_set_no_name');
-        $nameDoneBb = $fn->appendBasicBlock('xh_set_name_done');
-        $context->builder->branchIf(
-            $context->builder->and(
-                $context->builder->icmp(Builder::INT_NE, $name, $i8p->constNull()),
-                $context->builder->icmp(Builder::INT_UGT, $nameLen, $sizeT->constInt(0, false))
-            ),
-            $hasNameBb,
-            $noNameBb
-        );
-
-        $context->builder->positionAtEnd($hasNameBb);
-        $allocSize = $context->builder->add($nameLen, $sizeT->constInt(1, false));
-        $copy = $context->builder->call($context->lookupFunction('malloc'), $allocSize);
-        $copyPtr = $context->builder->pointerCast($copy, $i8p);
+        $restored = $context->builder->call(self::helperFunction($context, self::RESTORE_HELPER));
         $context->builder->call(
-            $context->lookupFunction('memcpy'),
-            $context->bytePtr($copyPtr),
-            $context->bytePtr($name),
-            $nameLen
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $context->builder->zext($restored, $i32)
         );
-        $term = $context->builder->gep($copyPtr, $nameLen);
-        $context->builder->store($context->getTypeFromString('int8')->constInt(0, false), $term);
-        $context->builder->store($copyPtr, self::nameSlot($context, $i32, $depth));
-        $context->builder->branch($nameDoneBb);
-
-        $context->builder->positionAtEnd($noNameBb);
-        $context->builder->store($i8p->constNull(), self::nameSlot($context, $i32, $depth));
-        $context->builder->branch($nameDoneBb);
-
-        $context->builder->positionAtEnd($nameDoneBb);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function freeNameAt(Context $context, LlvmFunction $fn, $i32, $i8p, Value $index): void
-    {
-        $storedName = $context->builder->load(self::nameSlot($context, $i32, $index));
-        $freeBb = $fn->appendBasicBlock('xh_free_name');
-        $noFreeBb = $fn->appendBasicBlock('xh_no_free');
-        $doneBb = $fn->appendBasicBlock('xh_free_done');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_NE, $storedName, $i8p->constNull()),
-            $freeBb,
-            $noFreeBb
-        );
+    private static function optionalCstrToString(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ptr,
+        Value $len
+    ): Value {
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullBb = $fn->appendBasicBlock('xh_name_null');
+        $useBb = $fn->appendBasicBlock('xh_name_use');
+        $doneBb = $fn->appendBasicBlock('xh_name_done');
 
-        $context->builder->positionAtEnd($freeBb);
-        $context->builder->call($context->lookupFunction('free'), $storedName);
+        $hasName = $context->builder->and(
+            $context->builder->icmp(Builder::INT_NE, $ptr, $i8p->constNull()),
+            $context->builder->icmp(Builder::INT_UGT, $len, $sizeT->constInt(0, false))
+        );
+        $context->builder->branchIf($hasName, $useBb, $nullBb);
+
+        $context->builder->positionAtEnd($nullBb);
         $context->builder->branch($doneBb);
 
-        $context->builder->positionAtEnd($noFreeBb);
+        $context->builder->positionAtEnd($useBb);
+        $nameStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($ptr, $context->getTypeFromString('char*'))
+        );
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($strPtr);
+        $phi->addIncoming($strPtr->constNull(), $nullBb);
+        $phi->addIncoming($nameStr, $useBb);
+
+        return $phi;
     }
 
-    private static function fnSlot(Context $context, $i32, Value $index): Value
-    {
-        return $context->builder->inBoundsGEP(
-            self::$fnGlobal,
-            $i32->constInt(0, false),
-            $index
+    private static function writeNullableStringToValue(
+        Context $context,
+        LlvmFunction $fn,
+        Value $out,
+        Value $maybeStr
+    ): void {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullBb = $fn->appendBasicBlock('xh_prev_null');
+        $strBb = $fn->appendBasicBlock('xh_prev_str');
+        $doneBb = $fn->appendBasicBlock('xh_prev_done');
+
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $maybeStr, $strPtr->constNull()),
+            $nullBb,
+            $strBb
         );
-    }
 
-    private static function nameSlot(Context $context, $i32, Value $index): Value
-    {
-        return $context->builder->inBoundsGEP(
-            self::$nameGlobal,
-            $i32->constInt(0, false),
-            $index
-        );
-    }
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $context->builder->branch($doneBb);
 
-    private static function ensureGlobals(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
+        $context->builder->positionAtEnd($strBb);
+        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $maybeStr);
+        $context->builder->branch($doneBb);
 
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_DEPTH)) {
-            self::$depthGlobal = $context->module->addGlobal($i32, self::GLOBAL_DEPTH);
-            self::$depthGlobal->setInitializer($i32->constInt(0, false));
-        } else {
-            self::$depthGlobal = $context->module->getNamedGlobal(self::GLOBAL_DEPTH);
-        }
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_FN)) {
-            $arr = $i8p->arrayType(self::MAX);
-            self::$fnGlobal = $context->module->addGlobal($arr, self::GLOBAL_FN);
-            self::$fnGlobal->setInitializer($arr->constNull());
-        } else {
-            self::$fnGlobal = $context->module->getNamedGlobal(self::GLOBAL_FN);
-        }
-        if (null === $context->module->getNamedGlobal(self::GLOBAL_NAME)) {
-            $arr = $i8p->arrayType(self::MAX);
-            self::$nameGlobal = $context->module->addGlobal($arr, self::GLOBAL_NAME);
-            self::$nameGlobal->setInitializer($arr->constNull());
-        } else {
-            self::$nameGlobal = $context->module->getNamedGlobal(self::GLOBAL_NAME);
-        }
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function emitIndirectCall(Context $context, $fnTy, Value $fnPtr, Value ...$args): Value
@@ -472,77 +416,61 @@ final class ExceptionHandlerJitRuntime
         );
     }
 
-    private static function writeValueNull(Context $context, Value $out): void
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $out
-        );
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after ExceptionHandlerJitHelper compile (#9473)');
+        }
+
+        return $fn;
     }
 
-    private static function writeValueBool(Context $context, Value $out, Value $value): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $out,
-            $value
-        );
-    }
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
 
-    private static function writeValueStringFromCstr(Context $context, Value $out, Value $cstr): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->sext($len, $i64),
-            $cstr
-        );
-        $context->builder->call($context->lookupFunction('__value__writeString'), $out, $str);
-    }
-
-    private static function ensureLibc(Context $context): void
-    {
-        $voidPtr = $context->getTypeFromString('void*');
-        $voidTy = $context->getTypeFromString('void');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i8p = $context->getTypeFromString('int8*');
-
-        self::ensureExternal($context, 'malloc', $context->context->functionType($voidPtr, false, $sizeT));
-        self::ensureExternal($context, 'free', $context->context->functionType($voidTy, false, $i8p));
-        self::ensureExternal(
-            $context,
-            'memcpy',
-            $context->context->functionType($voidPtr, false, $voidPtr, $voidPtr, $sizeT)
-        );
-        self::ensureExternal($context, 'strlen', $context->context->functionType($sizeT, false, $i8p));
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ExceptionHandlerJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('ExceptionHandlerJitHelper.php parseAndCompile failed (#9473)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9473)');
+            }
+        }
     }
 
     private static function ensureValueWriters(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
-        $objPtr = $context->getTypeFromString('__object__*');
         $valPtr = $context->getTypeFromString('__value__*');
         $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
         $voidTy = $context->getTypeFromString('void');
 
         self::ensureExternal(
             $context,
             '__string__init',
-            $context->context->functionType($strPtr, false, $i64, $i8p)
-        );
-        self::ensureExternal(
-            $context,
-            '__value__writeObject',
-            $context->context->functionType($voidTy, false, $valPtr, $objPtr)
-        );
-        self::ensureExternal(
-            $context,
-            '__value__readLong',
-            $context->context->functionType($i64, false, $valPtr)
+            $context->context->functionType($strPtr, false, $i64, $context->getTypeFromString('char*'))
         );
         self::ensureExternal(
             $context,
@@ -573,10 +501,10 @@ final class ExceptionHandlerJitRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (self::RUNTIME_FNS as $name) {
+        foreach (self::ABI_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after ExceptionHandlerJitRuntime LLVM implement');
+                throw new \LogicException($name.' missing after ExceptionHandlerJitRuntime bridge (#9473)');
             }
             $context->registerFunction($name, $fn);
         }
