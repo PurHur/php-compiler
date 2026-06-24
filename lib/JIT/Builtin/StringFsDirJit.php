@@ -17,20 +17,8 @@ final class StringFsDirJit
 {
     private const PATH_MAX = 4096;
 
-    private const PHPC_TYPE_NATIVE_LONG = 1;
-
-    private const PHPC_TYPE_STRING = 4;
-
-    private const AT_FDCWD = -100;
-
-    private const AT_SYMLINK_NOFOLLOW = 0x100;
-
     private const STAT_BUF_SIZE = 144;
     private const STAT_MODE_OFFSET = 24;
-
-    /** Linux glibc x86_64: struct passwd/group uid/gid offset. */
-    private const PW_UID_OFFSET = 16;
-    private const GR_GID_OFFSET = 16;
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -63,8 +51,7 @@ final class StringFsDirJit
         SysGetTempDirRuntime::ensureLinked($context);
         StatArrayRuntime::ensureLinked($context);
         FtokRuntime::ensureLinked($context);
-        self::implementIfMissing($context, '__compiler_chgrp', self::emitChgrp(...));
-        self::implementIfMissing($context, '__compiler_chown', self::emitChown(...));
+        ChownRuntime::ensureLinked($context);
     }
 
     /**
@@ -97,7 +84,6 @@ final class StringFsDirJit
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
 
         $fn = match ($name) {
             '__compiler_copy' => $context->module->addFunction(
@@ -128,10 +114,6 @@ final class StringFsDirJit
                 $name,
                 $context->context->functionType($strPtr, false, $strPtr, $strPtr)
             ),
-            '__compiler_chgrp', '__compiler_chown' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i32, false, $strPtr, $valuePtr, $i32)
-            ),
             '__compiler_ftok' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($i64, false, $strPtr, $i32)
@@ -148,17 +130,12 @@ final class StringFsDirJit
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
         $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
 
-        $i32 = $context->getTypeFromString('int32');
-
-        foreach ([
-            ['__string__init', $strPtr, [$i64, $i8p]],
-            ['__value__readLong', $i64, [$valuePtr]],
-            ['__value__readString', $strPtr, [$valuePtr]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
-        }
+        self::ensureExternal(
+            $context,
+            '__string__init',
+            $context->context->functionType($strPtr, false, $i64, $i8p)
+        );
     }
 
     private static function stackBytesPtr(Context $context, Value $slot): Value
@@ -425,141 +402,6 @@ final class StringFsDirJit
 
         $context->builder->positionAtEnd($retBlock);
         $context->builder->returnValue($context->builder->load($okSlot));
-
-        $context->builder->positionAtEnd($fail);
-        $context->builder->returnValue($zero);
-    }
-
-    private static function resolveIdFromValue(Context $context, Value $value, bool $group): Value
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $map = $context->structFieldMap['__value__'];
-        $typeByte = $context->builder->load($context->builder->structGep($value, $map['type']));
-        $kind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
-        $isLong = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(self::PHPC_TYPE_NATIVE_LONG, false));
-        $isStr = $context->builder->icmp(Builder::INT_EQ, $kind, $i8->constInt(self::PHPC_TYPE_STRING, false));
-
-        $idSlot = BasicBlockHelper::entryAlloca($context, $i64);
-        $context->builder->store($i64->constInt(-1, true), $idSlot);
-        $longBlock = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_long');
-        $strBlock = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_str');
-        $done = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_done');
-        $next = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_next');
-        $context->builder->branchIf($isLong, $longBlock, $next);
-
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->store($context->builder->call($context->lookupFunction('__value__readLong'), $value), $idSlot);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($next);
-        $context->builder->branchIf($isStr, $strBlock, $done);
-
-        $context->builder->positionAtEnd($strBlock);
-        $strObj = $context->builder->call($context->lookupFunction('__value__readString'), $value);
-        $c = self::stringData($context, $strObj);
-        $endSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $parsed = $context->builder->call($context->lookupFunction('strtol'), $c, $endSlot, $i32->constInt(10, false));
-        $end = $context->builder->load($endSlot);
-        $endZero = $context->builder->icmp(Builder::INT_EQ, $context->builder->load($end), $i8->constInt(0, false));
-        $endMoved = $context->builder->icmp(Builder::INT_NE, $end, $c);
-        $numeric = $context->builder->and($endZero, $endMoved);
-        $fromLookup = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_lookup');
-        $parsedBlock = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_parsed');
-        $context->builder->branchIf($numeric, $parsedBlock, $fromLookup);
-        $context->builder->positionAtEnd($parsedBlock);
-        $context->builder->store($parsed, $idSlot);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($fromLookup);
-        $entry = $context->builder->call($context->lookupFunction($group ? 'getgrnam' : 'getpwnam'), $c);
-        $found = $context->builder->icmp(Builder::INT_NE, $entry, $i8p->constNull());
-        $lookupDone = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_lookup_done');
-        $lookupSet = BasicBlockHelper::append($context, ($group ? 'gid' : 'uid').'_lookup_set');
-        $context->builder->branchIf($found, $lookupSet, $lookupDone);
-        $context->builder->positionAtEnd($lookupSet);
-        $off = $i64->constInt($group ? self::GR_GID_OFFSET : self::PW_UID_OFFSET, false);
-        $ptr = $context->builder->gep($entry, $off);
-        $id32 = $context->builder->load($context->builder->pointerCast($ptr, $i32->pointerType(0)));
-        $context->builder->store($context->builder->zExt($id32, $i64), $idSlot);
-        $context->builder->branch($lookupDone);
-        $context->builder->positionAtEnd($lookupDone);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-
-        return $context->builder->load($idSlot);
-    }
-
-    private static function emitChgrp(Context $context, LlvmFunction $fn): void
-    {
-        self::emitChx($context, $fn, true);
-    }
-
-    private static function emitChown(Context $context, LlvmFunction $fn): void
-    {
-        self::emitChx($context, $fn, false);
-    }
-
-    private static function emitChx(Context $context, LlvmFunction $fn, bool $group): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $path = $fn->getParam(0);
-        $idValue = $fn->getParam(1);
-        $lchFlag = $fn->getParam(2);
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
-
-        $bad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull()),
-            $context->builder->icmp(Builder::INT_EQ, $idValue, $valuePtr->constNull())
-        );
-        $fail = $fn->appendBasicBlock('chx_fail');
-        $body = $fn->appendBasicBlock('chx_body');
-        $context->builder->branchIf($bad, $fail, $body);
-
-        $context->builder->positionAtEnd($body);
-        $p = self::stringData($context, $path);
-        $id = self::resolveIdFromValue($context, $idValue, $group);
-        $idBad = $context->builder->icmp(Builder::INT_EQ, $id, $i64->constInt(-1, true));
-        $syscall = $fn->appendBasicBlock('chx_syscall');
-        $context->builder->branchIf($idBad, $fail, $syscall);
-
-        $context->builder->positionAtEnd($syscall);
-        $isLch = $context->builder->icmp(Builder::INT_NE, $lchFlag, $zero);
-        $doAt = $fn->appendBasicBlock('chx_do_at');
-        $doPlain = $fn->appendBasicBlock('chx_do_plain');
-        $context->builder->branchIf($isLch, $doAt, $doPlain);
-
-        $context->builder->positionAtEnd($doAt);
-        $rcAt = $context->builder->call(
-            $context->lookupFunction('fchownat'),
-            $i32->constInt(self::AT_FDCWD, true),
-            $p,
-            $group ? $i32->constInt(-1, true) : $context->builder->truncOrBitCast($id, $i32),
-            $group ? $context->builder->truncOrBitCast($id, $i32) : $i32->constInt(-1, true),
-            $i32->constInt(self::AT_SYMLINK_NOFOLLOW, false)
-        );
-        $atOk = $context->builder->icmp(Builder::INT_EQ, $rcAt, $zero);
-        $context->builder->returnValue($context->builder->select($atOk, $one, $zero));
-
-        $context->builder->positionAtEnd($doPlain);
-        $rc = $context->builder->call(
-            $context->lookupFunction('chown'),
-            $p,
-            $group ? $i32->constInt(-1, true) : $context->builder->truncOrBitCast($id, $i32),
-            $group ? $context->builder->truncOrBitCast($id, $i32) : $i32->constInt(-1, true)
-        );
-        $ok = $context->builder->icmp(Builder::INT_EQ, $rc, $zero);
-        $context->builder->returnValue($context->builder->select($ok, $one, $zero));
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($zero);
