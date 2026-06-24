@@ -13444,9 +13444,12 @@ class Compiler {
         if (!$firstArg instanceof Operand\Temporary) {
             return false;
         }
+        $argCount = \count($consumer->args);
+        $literalPreludeCount = 0;
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                ++$literalPreludeCount;
                 continue;
             }
             if (
@@ -13458,6 +13461,11 @@ class Compiler {
                 return false;
             }
 
+            return false;
+        }
+        // Trailing literal preludes only (e.g. var_export(g(), true)); statement-level calls
+        // before multiple hoisted ConstFetch args must not match (#11312, zend_constants.h).
+        if ($literalPreludeCount !== $argCount - 1) {
             return false;
         }
 
