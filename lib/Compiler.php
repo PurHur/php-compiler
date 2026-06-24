@@ -5338,7 +5338,11 @@ class Compiler {
             }
             if ([] !== $members) {
                 $var->unionTypeConstraints = $members;
-                $var->declaredTypeLabel = $type->toString();
+                $memberNames = [];
+                foreach ($type->subTypes as $sub) {
+                    $memberNames[] = $sub->toString();
+                }
+                $var->declaredTypeLabel = DnfType::zendCanonicalUnionLabel($memberNames);
             }
 
             return $return;

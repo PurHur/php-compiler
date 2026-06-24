@@ -131,4 +131,41 @@ final class DnfType
 
         return implode('|', $parts);
     }
+
+    /**
+     * Zend zend_type_to_string() pure-mask member order (PHP-8.2 Zend/zend_compile.c).
+     *
+     * @param list<string> $memberNames
+     */
+    public static function zendCanonicalUnionLabel(array $memberNames): string
+    {
+        if ([] === $memberNames) {
+            return '';
+        }
+        if (1 === \count($memberNames)) {
+            return $memberNames[0];
+        }
+        $order = [
+            'static' => 0,
+            'callable' => 1,
+            'object' => 2,
+            'array' => 3,
+            'string' => 4,
+            'int' => 5,
+            'float' => 6,
+            'bool' => 7,
+            'void' => 8,
+            'never' => 9,
+            'null' => 10,
+            'true' => 11,
+            'false' => 12,
+        ];
+        $sorted = $memberNames;
+        usort(
+            $sorted,
+            static fn (string $a, string $b): int => ($order[strtolower($a)] ?? 99) <=> ($order[strtolower($b)] ?? 99)
+        );
+
+        return implode('|', $sorted);
+    }
 }
