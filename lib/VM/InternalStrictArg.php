@@ -86,7 +86,15 @@ final class InternalStrictArg
 
     public static function isCallerStrict(Frame $frame): bool
     {
-        return null !== $frame->parent && $frame->parent->block->strictTypes;
+        $walker = $frame->parent;
+        while (null !== $walker) {
+            if ($walker->block->strictTypes) {
+                return true;
+            }
+            $walker = $walker->parent;
+        }
+
+        return false;
     }
 
     private static function message(
