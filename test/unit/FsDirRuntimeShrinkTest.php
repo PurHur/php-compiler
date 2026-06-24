@@ -21,7 +21,8 @@ final class FsDirRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('emitTempnam', $source);
         $this->assertStringNotContainsString('emitSysGetTempDir', $source);
         $this->assertStringContainsString('SysGetTempDirRuntime::ensureLinked', $source);
-        $this->assertStringNotContainsString("lookupFunction('utime')", $source);
+        $this->assertStringContainsString('StatArrayRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('emitStat', $source);
         $this->assertStringNotContainsString("lookupFunction('mkstemp')", $source);
     }
 
