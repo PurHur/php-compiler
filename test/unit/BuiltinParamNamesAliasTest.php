@@ -206,4 +206,35 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'replacement', 'preg_replace'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'subject', 'preg_replace'));
     }
+
+    /** @covers issue #10076 */
+    public function testArrayAllAnyNamedParameters(): void
+    {
+        foreach (['array_all', 'array_any', 'array_find', 'array_find_key'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['array', 'callback'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
+        }
+    }
+
+    /** @covers issue #9647 */
+    public function testDateNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('date');
+        self::assertSame(['format', 'timestamp'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'date'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'timestamp', 'date'));
+    }
+
+    /** @covers issue #9524 */
+    public function testWordwrapNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('wordwrap');
+        self::assertSame(['string', 'width', 'break', 'cut'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'wordwrap'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'width', 'wordwrap'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'break', 'wordwrap'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'cut', 'wordwrap'));
+    }
 }

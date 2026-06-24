@@ -20,6 +20,15 @@ final class BuiltinParamNames
                 return ['string'];
             case 'substr':
                 return ['string', 'offset', 'length'];
+            case 'wordwrap':
+                return ['string', 'width', 'break', 'cut'];
+            case 'date':
+                return ['format', 'timestamp'];
+            case 'array_all':
+            case 'array_any':
+            case 'array_find':
+            case 'array_find_key':
+                return ['array', 'callback'];
             case 'str_pad':
                 return ['string', 'length', 'pad_string', 'pad_type'];
             case 'str_replace':
