@@ -6102,6 +6102,18 @@ restart:
                     $once = $kind === OpCode::INCLUDE_KIND_INCLUDE_ONCE || $kind === OpCode::INCLUDE_KIND_REQUIRE_ONCE;
                     $isRequire = $kind === OpCode::INCLUDE_KIND_REQUIRE || $kind === OpCode::INCLUDE_KIND_REQUIRE_ONCE;
 
+                    if (VM\PathSupport::isEmptyPath($file)) {
+                        $catchFrame = $this->dispatchVmValueError(
+                            new \ValueError(VM\PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
+
                     $resolved = $this->resolveIncludeFilename($file, $frame);
                     if (null === $resolved) {
                         if ($isRequire) {
