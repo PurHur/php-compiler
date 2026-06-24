@@ -12,7 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** parse_url() for http(s) URLs and path/query routing (subset of PHP; JIT/AOT via ParseUrlJit). */
+/** parse_url() for http(s) URLs and path/query routing (subset of PHP; JIT/AOT via ParseUrlRuntime). */
 final class parse_url extends Internal
 {
     public function execute(Frame $frame): void
