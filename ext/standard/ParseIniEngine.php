@@ -15,11 +15,19 @@ final class ParseIniEngine
     public const SCANNER_RAW = 1;
     public const SCANNER_TYPED = 2;
 
+    private static ?string $lastSyntaxError = null;
+
+    public static function lastSyntaxError(): ?string
+    {
+        return self::$lastSyntaxError;
+    }
+
     /**
      * @return array<string, mixed>|false
      */
     public static function parse(string $ini, bool $processSections = false, int $scannerMode = self::SCANNER_NORMAL): array|false
     {
+        self::$lastSyntaxError = null;
         if (self::SCANNER_NORMAL !== $scannerMode) {
             throw new \LogicException(
                 'parse_ini_string(): only INI_SCANNER_NORMAL is supported in this compiler build'
@@ -41,6 +49,8 @@ final class ParseIniEngine
             if ('[' === $line[0]) {
                 $sectionName = self::parseSectionHeader($line);
                 if (null === $sectionName) {
+                    self::$lastSyntaxError = "unexpected '='";
+
                     return false;
                 }
                 if ($processSections) {
@@ -60,11 +70,23 @@ final class ParseIniEngine
             }
             $key = self::trimWs(substr($line, 0, $eq));
             if ('' === $key) {
+                self::$lastSyntaxError = "unexpected '='";
+
+                return false;
+            }
+            $reservedToken = self::reservedKeySyntaxToken($key);
+            if (null !== $reservedToken) {
+                self::$lastSyntaxError = 'unexpected '.$reservedToken;
+
                 return false;
             }
             $rawValue = substr($line, $eq + 1);
             $value = self::parseValue($rawValue);
             if (false === $value) {
+                if (null === self::$lastSyntaxError) {
+                    self::$lastSyntaxError = "unexpected '='";
+                }
+
                 return false;
             }
 
@@ -184,6 +206,19 @@ final class ParseIniEngine
             'yes', 'on', 'true' => '1',
             'no', 'off', 'false' => '',
             default => $raw,
+        };
+    }
+
+    /**
+     * INI_SCANNER_NORMAL rejects bool/null keyword keys (php-src ini.c ZEND_INI_PARSER).
+     */
+    private static function reservedKeySyntaxToken(string $key): ?string
+    {
+        return match (strtolower($key)) {
+            'on', 'yes', 'true' => 'BOOL_TRUE',
+            'off', 'no', 'false', 'none' => 'BOOL_FALSE',
+            'null' => 'NULL_NULL',
+            default => null,
         };
     }
 }
