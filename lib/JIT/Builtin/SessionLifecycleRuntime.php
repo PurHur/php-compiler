@@ -110,7 +110,7 @@ final class SessionLifecycleRuntime
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbStart);
-        self::emitEnsureDefaultSessionName($context);
+        SessionStorageGlobals::emitCallEnsureDefaults($context);
         $cookieOk = $context->builder->call($context->lookupFunction('phpc_session_apply_incoming_cookie'));
         $cookieFailed = $context->builder->icmp(Builder::INT_EQ, $cookieOk, $i32->constInt(0, false));
         $bbNewId = BasicBlockHelper::append($context, 'ssr_new_id');
@@ -317,38 +317,6 @@ final class SessionLifecycleRuntime
         $context->builder->positionAtEnd($bbDone);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitEnsureDefaultSessionName(Context $context): void
-    {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $zeroI64 = $i64->constInt(0, false);
-        $defaultLen = $i64->constInt(\strlen(VmSession::DEFAULT_NAME), false);
-
-        $nameLen = $context->builder->load(SessionStorageGlobals::$nameLenGlobal);
-        $needsSeed = $context->builder->icmp(Builder::INT_SLE, $nameLen, $zeroI64);
-        $fn = BasicBlockHelper::parentFunction($context);
-        $bbSeed = $fn->appendBasicBlock('slc_seed_name_'.spl_object_id($context));
-        $bbAfter = $fn->appendBasicBlock('slc_after_seed_'.spl_object_id($context));
-        $context->builder->branchIf($needsSeed, $bbSeed, $bbAfter);
-
-        $context->builder->positionAtEnd($bbSeed);
-        $context->builder->store($defaultLen, SessionStorageGlobals::$nameLenGlobal);
-        $bufPtr = $context->builder->inBoundsGEP(
-            SessionStorageGlobals::$nameBufGlobal,
-            $i32->constInt(0, false),
-            $zeroI64
-        );
-        foreach (str_split(VmSession::DEFAULT_NAME) as $i => $ch) {
-            $charPtr = $context->builder->inBoundsGEP($bufPtr, $i64->constInt($i, false));
-            $context->builder->store($i8->constInt(\ord($ch), false), $charPtr);
-        }
-        $nulPtr = $context->builder->inBoundsGEP($bufPtr, $defaultLen);
-        $context->builder->store($i8->constInt(0, false), $nulPtr);
-        $context->builder->branch($bbAfter);
-        $context->builder->positionAtEnd($bbAfter);
     }
 
     private static function emitEnsureSessionTable(Context $context): void

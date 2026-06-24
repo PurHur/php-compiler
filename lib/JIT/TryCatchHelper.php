@@ -413,7 +413,7 @@ final class TryCatchHelper
         $handler = self::resolveThrowHandler($context);
         if (null === $handler) {
             $builder = $context->builder;
-            $throwBlock = $builder->getInsertBlock();
+            $throwBlock = self::probeInsertBlock($builder);
             if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
                 $throwBlock = self::appendBlock($func, 'throw_uncaught');
                 $builder->positionAtEnd($throwBlock);
@@ -469,7 +469,7 @@ final class TryCatchHelper
         }
 
         $builder = $context->builder;
-        $throwBlock = $builder->getInsertBlock();
+        $throwBlock = self::probeInsertBlock($builder);
         if (null === $throwBlock || null !== $throwBlock->getTerminator()) {
             $throwBlock = self::appendBlock($func, 'throw_pending_'.self::blockSuffix($handler));
             $builder->positionAtEnd($throwBlock);
@@ -940,6 +940,16 @@ final class TryCatchHelper
     private static function appendBlock(Function_ $func, string $name): BasicBlock
     {
         return $func->appendBasicBlock($name);
+    }
+
+    /** NestedJitCompileScope clears LLVM insertion position — getInsertBlock() throws (#8559). */
+    private static function probeInsertBlock(Builder $builder): ?BasicBlock
+    {
+        try {
+            return $builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
     }
 }
 
