@@ -1430,9 +1430,6 @@ final class ArrayBuiltinHelper
 
         $carrySlot = JitValueBox::alloc($context);
         $carryPtr = JitValueBox::pointer($context, $carrySlot);
-        $hasCarrySlot = $context->builder->alloca($context->getTypeFromString('int1'), 1, 'array_reduce_has_carry');
-        $i1 = $context->getTypeFromString('int1');
-        $context->builder->store($i1->constInt(0, false), $hasCarrySlot);
 
         $context->builder->positionAtEnd($emptyBlock);
         if (null !== $initial) {
@@ -1456,7 +1453,11 @@ final class ArrayBuiltinHelper
                 $carrySlot,
                 JitValueBox::valuePtrFromVariable($context, $initial)
             );
-            $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $carrySlot)
+            );
         }
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_reduce_idx');
         $context->builder->store($zero, $idxSlot);
@@ -1482,28 +1483,9 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($reduceBlock);
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $idx);
-        $hasCarry = $context->builder->load($hasCarrySlot);
-        $seedBlock = BasicBlockHelper::append($context, 'array_reduce_seed');
-        $foldBlock = BasicBlockHelper::append($context, 'array_reduce_fold');
-        $afterFold = BasicBlockHelper::append($context, 'array_reduce_after_fold');
-        $context->builder->branchIf($hasCarry, $foldBlock, $seedBlock);
-
-        $context->builder->positionAtEnd($seedBlock);
-        JitValueBox::copyFromPointer(
-            $context,
-            $carrySlot,
-            JitValueBox::valuePtrFromVariable($context, $elem)
-        );
-        $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
-        $context->builder->branch($afterFold);
-
-        $context->builder->positionAtEnd($foldBlock);
         $carryVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $carryPtr);
         $folded = $proxy->call($context, $carryVar, $elem);
         self::storeReduceCarryFromCallResult($context, $carrySlot, $folded, $callbackName);
-        $context->builder->branch($afterFold);
-
-        $context->builder->positionAtEnd($afterFold);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
@@ -1542,9 +1524,6 @@ final class ArrayBuiltinHelper
 
         $carrySlot = JitValueBox::alloc($context);
         $carryPtr = JitValueBox::pointer($context, $carrySlot);
-        $hasCarrySlot = $context->builder->alloca($context->getTypeFromString('int1'), 1, 'array_reduce_closure_has_carry');
-        $i1 = $context->getTypeFromString('int1');
-        $context->builder->store($i1->constInt(0, false), $hasCarrySlot);
 
         $context->builder->positionAtEnd($emptyBlock);
         if (null !== $initial) {
@@ -1568,7 +1547,11 @@ final class ArrayBuiltinHelper
                 $carrySlot,
                 JitValueBox::valuePtrFromVariable($context, $initial)
             );
-            $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                JitValueBox::pointer($context, $carrySlot)
+            );
         }
         $idxSlot = $context->builder->alloca($sizeT, 1, 'array_reduce_closure_idx');
         $context->builder->store($zero, $idxSlot);
@@ -1594,28 +1577,9 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($reduceBlock);
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $idx);
-        $hasCarry = $context->builder->load($hasCarrySlot);
-        $seedBlock = BasicBlockHelper::append($context, 'array_reduce_closure_seed');
-        $foldBlock = BasicBlockHelper::append($context, 'array_reduce_closure_fold');
-        $afterFold = BasicBlockHelper::append($context, 'array_reduce_closure_after_fold');
-        $context->builder->branchIf($hasCarry, $foldBlock, $seedBlock);
-
-        $context->builder->positionAtEnd($seedBlock);
-        JitValueBox::copyFromPointer(
-            $context,
-            $carrySlot,
-            JitValueBox::valuePtrFromVariable($context, $elem)
-        );
-        $context->builder->store($i1->constInt(1, false), $hasCarrySlot);
-        $context->builder->branch($afterFold);
-
-        $context->builder->positionAtEnd($foldBlock);
         $carryVar = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VALUE, $carryPtr);
         $folded = $closureCall->call($context, $carryVar, $elem);
         self::storeReduceCarryFromCallResult($context, $carrySlot, $folded, '', $returnTypeTag);
-        $context->builder->branch($afterFold);
-
-        $context->builder->positionAtEnd($afterFold);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
