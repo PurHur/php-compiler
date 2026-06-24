@@ -336,13 +336,24 @@ class Context {
     }
 
     /**
-     * VM env-probe LLVM gate is only for compiler_lib_spine_smoke (#8719, #8693). Other selfhost
-     * entries (compiler_minimal, helloworld, …) call PHP main() directly — emitting the gate for
-     * them segfaults at c:main_before_php (#10938, #11005). M3 compile-driver rebuild also skips.
+     * M3/bootstrap selfhost entries under test/selfhost/ (not spine smoke) segfault when the VM
+     * env-probe LLVM gate is emitted (#11005). User AOT scripts (examples/, app code) must keep the gate.
+     */
+    public function isBootstrapNonSpineSelfhostEntry(): bool
+    {
+        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+
+        return str_contains($entry, '/test/selfhost/') && !$this->isCompilerLibSpineSmokeEntry();
+    }
+
+    /**
+     * VM env-probe LLVM gate is only for compiler_lib_spine_smoke (#8719, #8693). Bootstrap
+     * test/selfhost/* entries (compiler_minimal, helloworld, …) call PHP main() directly — emitting
+     * the gate for them segfaults at c:main_before_php (#10938, #11005). M3 compile-driver rebuild also skips.
      */
     private function shouldSkipStandaloneMainEnvProbeGate(): bool
     {
-        if (!$this->isCompilerLibSpineSmokeEntry()) {
+        if ($this->isBootstrapNonSpineSelfhostEntry()) {
             return true;
         }
         $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');

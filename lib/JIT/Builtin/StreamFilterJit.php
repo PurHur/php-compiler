@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -245,26 +246,22 @@ final class StreamFilterJit
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StreamFilterJitHelper.php');
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $real = \realpath($path) ?: $path;
+            if ($context->hasJitIncludedFileCompiled($real)) {
+                return;
+            }
+            $block = $runtime->parseAndCompile(
+                (string) \file_get_contents($path),
+                'StreamFilterJitHelper.php'
+            );
             if (null === $block) {
                 throw new \LogicException('StreamFilterJitHelper.php parseAndCompile failed (#9047)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
+            $context->markJitIncludedFileCompiled($real);
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
