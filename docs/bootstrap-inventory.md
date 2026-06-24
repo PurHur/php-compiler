@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3032 |
-| Phase A inventory files (M2 ratio SSOT) | 3032 |
+| PHP files on vm.php path | 3034 |
+| Phase A inventory files (M2 ratio SSOT) | 3034 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8174 |
+| Source constructs flagged (warnings) | 8178 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -321,6 +321,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ExceptionHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ExceptionJitHelper.php` | 0 | 1 |
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
+| `ext/standard/FsDirJitHelper.php` | 0 | 1 |
 | `ext/standard/FunctionExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesJitHelper.php` | 0 | 1 |
 | `ext/standard/GcStatusJitHelper.php` | 0 | 4 |
@@ -2054,6 +2055,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExecutionLimitsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FilterInputTypeJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
@@ -5060,6 +5062,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/FsDirJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `ext/standard/FunctionExistsJitHelper.php`
 
@@ -16495,6 +16502,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/Builtin/FsDirRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 288)
+- 10 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/FunctionExistsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17410,7 +17424,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFsDirJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 30 class method(s)
+- 22 class method(s)
 
 ### `lib/JIT/Builtin/StringFsGlob.php`
 
