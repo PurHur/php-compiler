@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
-use PHPCompiler\JIT\Builtin\StringUtf8Valid;
+use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -70,7 +70,7 @@ final class JitMbCheckEncoding
         }
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'mb_check_encoding', 0, 'var');
-        $valid = StringUtf8Valid::validFromPtr($context, $str);
+        $valid = StringUtf8Runtime::validFromPtr($context, $str);
         $zero = $context->getTypeFromString('int64')->constInt(0, false);
 
         return $context->builder->icmp(Builder::INT_NE, $valid, $zero);
