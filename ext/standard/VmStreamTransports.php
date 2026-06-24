@@ -21,6 +21,10 @@ final class VmStreamTransports
         'udg',
         'ssl',
         'tls',
+        'tlsv1.0',
+        'tlsv1.1',
+        'tlsv1.2',
+        'tlsv1.3',
     ];
 
     /** @return list<string> */
