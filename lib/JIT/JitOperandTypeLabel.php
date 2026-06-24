@@ -18,6 +18,12 @@ final class JitOperandTypeLabel
         if (null !== $enumLabel) {
             return $enumLabel;
         }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            $classLabel = self::compileTimeObjectClassName($context, $arg);
+            if (null !== $classLabel) {
+                return $classLabel;
+            }
+        }
 
         return match ($arg->type) {
             Variable::TYPE_NATIVE_LONG => 'int',

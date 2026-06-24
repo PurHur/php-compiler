@@ -394,8 +394,12 @@ final class JitStringBuiltinArg
 
             return;
         }
-        $enumNames = $jitObject->allDeclaredEnumLowerNames();
-        if ([] === $enumNames) {
+        $ids = [];
+        foreach ($jitObject->allDeclaredClassLowerNames() as $lc) {
+            $declaredId = $jitObject->lookup($lc);
+            $ids[] = [$declaredId, $jitObject->classNameForId($declaredId)];
+        }
+        if ([] === $ids) {
             self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'object', $expectedType);
 
             return;
@@ -403,27 +407,22 @@ final class JitStringBuiltinArg
         $i64 = $context->getTypeFromString('int64');
         $fn = BasicBlockHelper::parentFunction($context);
         $checkBlock = $context->builder->getInsertBlock();
-        $okBlock = BasicBlockHelper::append($context, 'str_enum_class_reject_ok');
-        $ids = [];
-        foreach ($enumNames as $lc) {
-            $enumId = $jitObject->lookup($lc);
-            $ids[] = [$enumId, $jitObject->classNameForId($enumId)];
-        }
+        $okBlock = BasicBlockHelper::append($context, 'str_class_id_reject_ok');
         $lastIdx = \count($ids) - 1;
-        foreach ($ids as $idx => [$enumId, $enumName]) {
+        foreach ($ids as $idx => [$declaredId, $className]) {
             $context->builder->positionAtEnd($checkBlock);
             $match = $context->builder->icmp(
                 Builder::INT_EQ,
                 $classId,
-                $i64->constInt($enumId, false)
+                $i64->constInt($declaredId, false)
             );
-            $rejectBlock = $fn->appendBasicBlock('str_enum_class_reject_'.$enumId);
+            $rejectBlock = $fn->appendBasicBlock('str_class_id_reject_'.$declaredId);
             $nextBlock = $idx === $lastIdx
                 ? $okBlock
-                : $fn->appendBasicBlock('str_enum_class_try_'.($idx + 1));
+                : $fn->appendBasicBlock('str_class_id_try_'.($idx + 1));
             $context->builder->branchIf($match, $rejectBlock, $nextBlock);
             $context->builder->positionAtEnd($rejectBlock);
-            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, $enumName, $expectedType);
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, $className, $expectedType);
             $checkBlock = $nextBlock;
         }
         if ($checkBlock !== $okBlock) {
