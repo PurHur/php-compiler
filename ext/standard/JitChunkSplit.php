@@ -271,7 +271,13 @@ final class JitChunkSplit
         $context->builder->branchIf($isEmpty, $emptyBlock, $workBlock);
 
         $context->builder->positionAtEnd($emptyBlock);
-        $emptyStr = $context->builder->call($context->lookupFunction('__string__alloc'), $zero);
+        $emptyStr = $context->builder->call($context->lookupFunction('__string__alloc'), $sepLen);
+        $emptyDestPtr = $context->builder->structGep($emptyStr, $map['value']);
+        $context->builder->store(
+            $sepLen,
+            $context->builder->structGep($emptyStr, $map['length'])
+        );
+        $context->intrinsic->memcpy($emptyDestPtr, $sepPtr, $sepLen, false);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($workBlock);

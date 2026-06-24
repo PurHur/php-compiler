@@ -501,7 +501,7 @@ final class VmString
         }
         $byteLen = self::byteLength($string);
         if (0 === $byteLen) {
-            return '';
+            return $separator;
         }
         $out = '';
         for ($i = 0; $i < $byteLen; $i += $length) {
