@@ -447,6 +447,9 @@ final class SscanfJit
         $context->builder->branch($afterDot);
 
         $context->builder->positionAtEnd($afterDot);
+        $afterExp = self::emitOptionalFloatExponent($context, $fn, $s, $len, $iSlot, $anySlot);
+
+        $context->builder->positionAtEnd($afterExp);
         $ok = $fn->appendBasicBlock('scan_flt_ok');
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_EQ, $context->builder->load($anySlot), $zero32),
@@ -1403,6 +1406,94 @@ final class SscanfJit
         $context->builder->positionAtEnd($loopDone);
 
         return $loopDone;
+    }
+
+    /** Optional [eE][+-]?[0-9]+ suffix for %f (php-src formatted_io.c / strtod; #11210). */
+    private static function emitOptionalFloatExponent(
+        Context $context,
+        LlvmFunction $fn,
+        Value $s,
+        Value $len,
+        Value $iSlot,
+        Value $anySlot
+    ): BasicBlock {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $oneSize = $sizeT->constInt(1, false);
+        $one32 = $i32->constInt(1, false);
+        $zero32 = $i32->constInt(0, false);
+
+        $done = $fn->appendBasicBlock('scan_flt_exp_done');
+        $expCheck = $fn->appendBasicBlock('scan_flt_exp_check');
+        $context->builder->branch($expCheck);
+
+        $context->builder->positionAtEnd($expCheck);
+        $i = $context->builder->load($iSlot);
+        $atEnd = $context->builder->icmp(Builder::INT_UGE, $i, $len);
+        $noExp = $fn->appendBasicBlock('scan_flt_exp_skip');
+        $hasExp = $fn->appendBasicBlock('scan_flt_exp_has');
+        $context->builder->branchIf($atEnd, $noExp, $hasExp);
+
+        $context->builder->positionAtEnd($hasExp);
+        $ch = $context->builder->load($context->builder->inBoundsGEP($s, $i));
+        $isExp = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(101, false)),
+            $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(69, false))
+        );
+        $expBody = $fn->appendBasicBlock('scan_flt_exp_body');
+        $context->builder->branchIf($isExp, $expBody, $noExp);
+
+        $context->builder->positionAtEnd($expBody);
+        $expPosSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->store($i, $expPosSlot);
+        $context->builder->store($context->builder->add($i, $oneSize), $iSlot);
+
+        $afterSign = $fn->appendBasicBlock('scan_flt_exp_after_sign');
+        $signBb = $fn->appendBasicBlock('scan_flt_exp_sign');
+        $i = $context->builder->load($iSlot);
+        $hasSign = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SLT, $i, $len),
+            $context->builder->or(
+                $context->builder->icmp(Builder::INT_EQ, $context->builder->load($context->builder->inBoundsGEP($s, $i)), $i8->constInt(43, false)),
+                $context->builder->icmp(Builder::INT_EQ, $context->builder->load($context->builder->inBoundsGEP($s, $i)), $i8->constInt(45, false))
+            )
+        );
+        $context->builder->branchIf($hasSign, $signBb, $afterSign);
+
+        $context->builder->positionAtEnd($signBb);
+        $context->builder->store($context->builder->add($context->builder->load($iSlot), $oneSize), $iSlot);
+        $context->builder->branch($afterSign);
+
+        $context->builder->positionAtEnd($afterSign);
+        $expDigitsSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $context->builder->store($zero32, $expDigitsSlot);
+        $afterDigits = self::emitFloatDigitRun($context, $fn, $s, $len, $iSlot, $expDigitsSlot, true);
+
+        $context->builder->positionAtEnd($afterDigits);
+        $hadDigits = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($expDigitsSlot),
+            $one32
+        );
+        $revertBb = $fn->appendBasicBlock('scan_flt_exp_revert');
+        $keepBb = $fn->appendBasicBlock('scan_flt_exp_keep');
+        $context->builder->branchIf($hadDigits, $keepBb, $revertBb);
+
+        $context->builder->positionAtEnd($revertBb);
+        $context->builder->store($context->builder->load($expPosSlot), $iSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($keepBb);
+        $context->builder->store($one32, $anySlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($noExp);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+
+        return $done;
     }
 
     private static function emitSkipOptionalFieldWidth(
