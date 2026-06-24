@@ -30,7 +30,7 @@ final class array_intersect_assoc extends Internal
         if (Variable::TYPE_ARRAY !== $first->type) {
             throw new \LogicException('array_intersect_assoc() first argument must be an array in this compiler build');
         }
-        self::guardSetOpOperands($frame->calledArgs, 'array_intersect_assoc');
+        self::guardSetOpOperands($frame, $frame->calledArgs, 'array_intersect_assoc');
         if (1 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->array($first->toArray()->replaceCopy());

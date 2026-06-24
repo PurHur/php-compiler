@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -97,7 +98,7 @@ trait VmArrayAssocSetOps
     /**
      * @param list<\PHPCompiler\VM\Variable> $calledArgs
      */
-    private static function guardSetOpOperands(array $calledArgs, string $fn): void
+    private static function guardSetOpOperands(Frame $frame, array $calledArgs, string $fn): void
     {
         $first = $calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $first->type) {
@@ -107,7 +108,7 @@ trait VmArrayAssocSetOps
         if (\count($calledArgs) > 1) {
             $tables = array_merge($tables, self::collectOtherHashTables($calledArgs, $fn));
         }
-        VmArray::rejectEnumCaseSetOpOperands(...$tables);
+        VmArray::rejectEnumCaseSetOpOperands($frame, ...$tables);
     }
 
     /**

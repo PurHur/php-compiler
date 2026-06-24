@@ -31,7 +31,7 @@ final class array_diff_key extends Internal
         if ($argc > 1) {
             $operandTables = array_merge($operandTables, self::collectTypedOtherHashTables($frame->calledArgs, 'array_diff_key'));
         }
-        VmArray::rejectEnumCaseSetOpOperands(...$operandTables);
+        VmArray::rejectEnumCaseSetOpOperands($frame, ...$operandTables);
         if (1 === $argc) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->array($firstHt->replaceCopy());
