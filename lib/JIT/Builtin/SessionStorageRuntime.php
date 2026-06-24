@@ -43,7 +43,7 @@ final class SessionStorageRuntime
         SessionStorageGlobals::ensureGlobals($context);
         PendingHeadersRuntime::ensureLinked($context);
         StringUnserialize::ensureLinked($context);
-        StringSerialize::implement($context);
+        StringSerialize::ensureLinked($context);
         StringFileGetContents::implement($context);
         StringFilePutContents::implement($context);
         self::implement($context);

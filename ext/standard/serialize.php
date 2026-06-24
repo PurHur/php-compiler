@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * serialize() — VmSerialize/VmSerializeFormat on VM; JIT/AOT via __compiler_serialize_*.
+ * serialize() — VmSerialize SSOT; JIT/AOT via SerializeJitHelper (#9180).
  */
 final class serialize extends Internal
 {

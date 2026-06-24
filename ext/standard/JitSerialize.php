@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringSerialize;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -12,6 +13,8 @@ final class JitSerialize
 {
     public static function encode(Context $context, JITVariable $arg): Value
     {
+        StringSerialize::ensureLinked($context);
+
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->builder->call(
                 $context->lookupFunction('__compiler_serialize_hashtable'),

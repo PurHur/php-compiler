@@ -2295,6 +2295,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotemeta.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRandomBytes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringReadfile.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerializeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSerializeDoubleJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarText.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSimilarTextJit.php';
