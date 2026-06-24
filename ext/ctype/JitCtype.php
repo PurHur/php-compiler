@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\ctype;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\CtypeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -66,15 +67,7 @@ final class JitCtype
             return $context->builder->icmp(Builder::INT_NE, $result, $zero);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            $result = $context->builder->call(
-                $context->lookupFunction('__phpc_ctype_from_value'),
-                JitValueBox::valuePtrFromVariable($context, $arg),
-                $kindConst,
-                $allowDigits,
-                $allowMinus
-            );
-
-            return $context->builder->icmp(Builder::INT_NE, $result, $zero);
+            return self::lowerFromValue($context, $arg, $kindConst, $allowDigits, $allowMinus, $zero);
         }
 
         return self::boolConst($context, false);
@@ -83,5 +76,82 @@ final class JitCtype
     private static function boolConst(Context $context, bool $value): Value
     {
         return $context->getTypeFromString('int1')->constInt($value ? 1 : 0, false);
+    }
+
+    private static function lowerFromValue(
+        Context $context,
+        JITVariable $arg,
+        Value $kindConst,
+        Value $allowDigits,
+        Value $allowMinus,
+        Value $zero
+    ): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+
+        $stringBlock = BasicBlockHelper::append($context, 'ctype_value_string');
+        $longBlock = BasicBlockHelper::append($context, 'ctype_value_long');
+        $falseBlock = BasicBlockHelper::append($context, 'ctype_value_false');
+        $doneBlock = BasicBlockHelper::append($context, 'ctype_value_done');
+        $afterStringCheck = BasicBlockHelper::append($context, 'ctype_value_after_string');
+
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_STRING & 0x7f, false)
+            ),
+            $stringBlock,
+            $afterStringCheck
+        );
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strPtr = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $stringResult = $context->builder->call(
+            $context->lookupFunction('__phpc_ctype_check_string'),
+            $strPtr,
+            $kindConst
+        );
+        $stringEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($afterStringCheck);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+            ),
+            $longBlock,
+            $falseBlock
+        );
+
+        $context->builder->positionAtEnd($longBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longResult = $context->builder->call(
+            $context->lookupFunction('__phpc_ctype_check_long'),
+            $longVal,
+            $kindConst,
+            $allowDigits,
+            $allowMinus
+        );
+        $longEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($falseBlock);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i32, 'ctype_value_result');
+        $phi->addIncoming($stringResult, $stringEnd);
+        $phi->addIncoming($longResult, $longEnd);
+        $phi->addIncoming($zero, $falseBlock);
+
+        return $context->builder->icmp(Builder::INT_NE, $phi, $zero);
     }
 }

@@ -24,7 +24,6 @@ final class CtypeRuntimeStandaloneTest extends TestCase
         foreach ([
             '__phpc_ctype_check_string',
             '__phpc_ctype_check_long',
-            '__phpc_ctype_from_value',
         ] as $name) {
             $fn = $ctx->lookupFunction($name);
             $this->assertNotNull($fn);
@@ -36,6 +35,7 @@ final class CtypeRuntimeStandaloneTest extends TestCase
     {
         $runtimeSource = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/CtypeRuntime.php');
         $this->assertStringContainsString('CtypeJitHelper', $runtimeSource);
+        $this->assertStringNotContainsString('emitFromValueBridge', $runtimeSource);
         $this->assertStringNotContainsString('emitIsDigit', $runtimeSource);
 
         $helperSource = (string) \file_get_contents(__DIR__.'/../../../ext/ctype/CtypeJitHelper.php');
