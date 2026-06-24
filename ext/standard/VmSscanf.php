@@ -72,8 +72,19 @@ final class VmSscanf
                 return [$assigned, $inPos];
             }
             switch ($spec) {
+                case 'D':
                 case 'd':
                     [$val, $consumed] = self::scanInt($input, $inPos, $inLen, $width);
+                    if (null === $val) {
+                        return [$assigned, $inPos];
+                    }
+                    self::assignInt($outVars[$outIdx], $val);
+                    $inPos += $consumed;
+                    ++$outIdx;
+                    ++$assigned;
+                    break;
+                case 'i':
+                    [$val, $consumed] = self::scanAutoBaseInt($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
@@ -294,7 +305,65 @@ final class VmSscanf
 
     private static function isSupportedConversionSpec(string $spec): bool
     {
-        return \in_array($spec, ['d', 'u', 'f', 'e', 'E', 'g', 'G', 's', 'x', 'X', 'o', 'c'], true);
+        return \in_array($spec, ['d', 'D', 'i', 'u', 'f', 'e', 'E', 'g', 'G', 's', 'x', 'X', 'o', 'c'], true);
+    }
+
+    /**
+     * %i — signed integer with C auto-base (0 → octal, 0x → hex; php-src formatted_io.c).
+     *
+     * @return array{0: ?int, 1: int}
+     */
+    private static function scanAutoBaseInt(string $input, int $pos, int $len, ?int $maxWidth = null): array
+    {
+        $orig = $pos;
+        $pos = self::skipSpace($input, $pos, $len);
+        if ($pos >= $len) {
+            return [null, 0];
+        }
+        $negative = false;
+        if ('-' === $input[$pos]) {
+            $negative = true;
+            ++$pos;
+        } elseif ('+' === $input[$pos]) {
+            ++$pos;
+        }
+        if ($pos >= $len) {
+            return [null, 0];
+        }
+        $remaining = $len - $pos;
+        if (null !== $maxWidth) {
+            $remaining = min($remaining, $maxWidth);
+        }
+        $slice = substr($input, $pos, $remaining);
+        if ('0' === $slice[0] && strlen($slice) > 1) {
+            if ('x' === $slice[1] || 'X' === $slice[1]) {
+                [$val, $consumed] = self::scanHex($input, $pos, $len, $maxWidth);
+                if (null === $val) {
+                    return [null, 0];
+                }
+                if ($negative) {
+                    $val = -$val;
+                }
+
+                return [$val, ($pos - $orig) + $consumed];
+            }
+
+            [$val, $consumed] = self::scanOct($input, $pos, $len, $maxWidth);
+            if (null === $val) {
+                return [null, 0];
+            }
+            if ($negative) {
+                $val = -$val;
+            }
+
+            return [$val, ($pos - $orig) + $consumed];
+        }
+        [$val, $consumed] = self::scanInt($input, $orig, $len, $maxWidth);
+        if (null === $val) {
+            return [null, 0];
+        }
+
+        return [$val, $consumed];
     }
 
     /**
