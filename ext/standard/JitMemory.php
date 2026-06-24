@@ -34,8 +34,11 @@ final class JitMemory
     {
         $real = self::resolveRealUsage($context, $realUsage, 'memory_reset_peak_usage');
         MemoryRuntime::resetPeakUsage($context, $real);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
 
-        return $context->constantFromBool(true);
+        return $ptr;
     }
 
     private static function resolveRealUsage(Context $context, ?JITVariable $realUsage, string $fn): Value

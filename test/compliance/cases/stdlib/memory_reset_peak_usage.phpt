@@ -7,7 +7,7 @@ $peak0 = memory_get_peak_usage();
 $buf = str_repeat('a', 50000);
 $peak1 = memory_get_peak_usage();
 unset($buf);
-echo memory_reset_peak_usage() ? "true\n" : "false\n";
+echo var_export(memory_reset_peak_usage(), true) . "\n";
 $peak2 = memory_get_peak_usage();
 $usage = memory_get_usage();
 echo ($peak1 >= $peak0) ? "grew\n" : "flat\n";
@@ -17,7 +17,7 @@ memory_reset_peak_usage(true);
 echo "real_ok\n";
 --EXPECT--
 exists
-true
+NULL
 grew
 reset_ok
 baseline_ok
