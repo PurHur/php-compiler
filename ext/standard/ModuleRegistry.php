@@ -92,9 +92,43 @@ final class ModuleRegistry
     }
 
     /**
+     * Built-in extensions statically linked with the engine (php-src zend_get_module_version).
+     *
+     * @return list<string>
+     */
+    public static function bundledExtensionNames(): array
+    {
+        return ['core', 'standard', 'json', 'date', 'pcre', 'zlib'];
+    }
+
+    public static function isBundledExtension(string $extension): bool
+    {
+        return \in_array(strtolower($extension), self::bundledExtensionNames(), true);
+    }
+
+    /**
      * php-src zend_get_module_version() — null when extension is not loaded.
+     *
+     * Bundled extensions report the PHP runtime version via phpversion(), not library
+     * versions (e.g. PCRE2 10.44 is phpinfo-only; issue #11162).
      */
     public static function getExtensionVersion(string $extension): ?string
+    {
+        $ext = strtolower($extension);
+        if (!self::extensionLoaded($ext)) {
+            return null;
+        }
+        if (self::isBundledExtension($ext)) {
+            return null;
+        }
+
+        return self::$extensionVersions[$ext] ?? null;
+    }
+
+    /**
+     * Library version for bundled extensions (phpinfo/credits), when distinct from runtime.
+     */
+    public static function getLibraryExtensionVersion(string $extension): ?string
     {
         $ext = strtolower($extension);
         if (!self::extensionLoaded($ext)) {

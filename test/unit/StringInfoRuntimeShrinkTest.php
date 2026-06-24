@@ -28,6 +28,7 @@ final class StringInfoRuntimeShrinkTest extends TestCase
         $this->assertSame(VmInfo::php_sapi_name(), InfoJitHelper::php_sapi_name());
         $this->assertSame(VmInfo::zend_version(), InfoJitHelper::zend_version());
         $this->assertSame(VmInfo::phpversion(), InfoJitHelper::phpversion(null));
+        $this->assertSame(VmInfo::phpversion('pcre'), InfoJitHelper::phpversion('pcre'));
         $this->assertSame(
             VmInfo::extension_loaded('standard'),
             InfoJitHelper::extension_loaded('standard')

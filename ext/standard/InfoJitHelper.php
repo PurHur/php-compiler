@@ -23,7 +23,7 @@ final class InfoJitHelper
         if (null === $extension || '' === $extension) {
             return self::VERSION_STRING;
         }
-        if (VmInfo::isEngineExtensionName($extension)) {
+        if (VmInfo::isEngineExtensionName($extension) || VmInfo::isBundledExtensionName($extension)) {
             return self::VERSION_STRING;
         }
         if (!ModuleRegistry::extensionLoaded($extension)) {
