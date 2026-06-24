@@ -44,6 +44,14 @@ final class SessionCreateIdRuntime
         self::implementIfMissing($context, '__phpc_session_create_id_apply_boxed', self::implementCreateIdApplyBoxed(...));
     }
 
+    /** Random id ABI only — avoids SessionLifecycleRuntime ↔ CreateId ensureLinked cycle (#9446). */
+    public static function ensureRandomIdStringLinked(Context $context): void
+    {
+        SessionStorageGlobals::ensureGlobals($context);
+        self::ensureJitHelperCompiled($context);
+        self::implementIfMissing($context, 'phpc_session_random_id_string', self::implementRandomIdString(...));
+    }
+
     /**
      * @param callable(Context, LlvmFunction): void $emit
      */
