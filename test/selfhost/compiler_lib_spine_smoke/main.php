@@ -28,6 +28,7 @@ require_once __DIR__.'/../../../ext/bcmath/NumberSub.php';
 require_once __DIR__.'/../../../ext/bcmath/NumberToString.php';
 require_once __DIR__.'/../../../ext/bcmath/VmBcMathNumber.php';
 require_once __DIR__.'/../../../ext/bcmath/VmBcmath.php';
+require_once __DIR__.'/../../../ext/bcmath/BcmathJitHelper.php';
 require_once __DIR__.'/../../../ext/bcmath/bcadd.php';
 require_once __DIR__.'/../../../ext/bcmath/bcceil.php';
 require_once __DIR__.'/../../../ext/bcmath/bccomp.php';

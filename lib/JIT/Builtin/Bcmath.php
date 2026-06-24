@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT/AOT link wrapper for bcmath LLVM helpers from BcmathJit (#6100). */
+/** JIT/AOT link wrapper for bcmath via BcmathJitHelper PHP bridges (#6100, #9235). */
 final class Bcmath
 {
     public static function ensureLinked(Context $context): void
