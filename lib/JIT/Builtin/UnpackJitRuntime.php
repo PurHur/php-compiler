@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for __compiler_unpack (issue #5442, #6306).
+ * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543).
  *
- * LLVM bodies from {@see StringUnpackJit}; semantics SSOT {@see \PHPCompiler\ext\standard\UnpackEngine}.
+ * Replaces LLVM {@see StringUnpackJit} for JIT modules; standalone keeps StringUnpackJit.
+ * SSOT: {@see \PHPCompiler\ext\standard\UnpackEngine}.
  */
 final class UnpackJitRuntime
 {
@@ -21,7 +22,7 @@ final class UnpackJitRuntime
         } catch (\Throwable) {
         }
 
-        StringUnpackJit::implement($context);
+        StringUnpack::ensureLinked($context);
 
         if (null !== $resume) {
             $context->builder->positionAtEnd($resume);
