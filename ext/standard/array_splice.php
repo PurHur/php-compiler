@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -37,21 +38,11 @@ final class array_splice extends Internal
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('array_splice() first argument must be an array in this compiler build');
         }
-        $offsetInt = VmMath::parseIntBuiltinArg(
-            $frame->calledArgs[1],
-            'array_splice',
-            2,
-            'offset'
-        );
+        $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_splice', 2, 'offset');
 
         $length = null;
         if ($argc >= 3) {
-            $length = VmMath::parseNullableIntBuiltinArg(
-                $frame->calledArgs[2],
-                'array_splice',
-                3,
-                'length'
-            );
+            $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 2, 'array_splice', 3, 'length');
         }
 
         $replacement = null;
@@ -84,6 +75,7 @@ final class array_splice extends Internal
         }
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
+        JitInternalStrictArg::requireInt($context, $args[1], 'array_splice', 'offset', 2);
         $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset');
         if ($argc >= 3) {
             [$hasLength, $length] = JitIntdiv::lowerSpliceLengthArg(
