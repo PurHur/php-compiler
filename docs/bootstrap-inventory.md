@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2966 |
-| Phase A inventory files (M2 ratio SSOT) | 2966 |
+| PHP files on vm.php path | 2965 |
+| Phase A inventory files (M2 ratio SSOT) | 2965 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8011 |
+| Source constructs flagged (warnings) | 8010 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2045,7 +2045,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/JitReturnPending.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitThrow.php` | 0 | 2 |
 | `lib/JIT/Builtin/LastErrorRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/LastErrorRuntimeLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/LateStaticBindingGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/LateStaticBindingRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
@@ -16381,11 +16380,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 348)
 - 18 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/LastErrorRuntimeLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 16 class method(s)
 
 ### `lib/JIT/Builtin/LateStaticBindingGlobals.php`
 

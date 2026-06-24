@@ -15,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM body for __compiler_strip_tags — AOT standalone only (#9196).
  *
  * JIT uses {@see StripTagsJitHelper} PHP; keep this until compiled PHP static storage is
- * reliable in native standalone link (same pattern as {@see LastErrorRuntimeLlvm}).
+ * reliable in native standalone link (same pattern as {@see StringPhpinfoRuntimeLlvm}).
  */
 final class StringStripTagsStandaloneLlvm
 {
