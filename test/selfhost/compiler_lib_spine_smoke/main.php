@@ -1086,6 +1086,7 @@ require_once __DIR__.'/../../../ext/standard/VmStatPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamArg.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBlockingNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBucket.php';
+require_once __DIR__.'/../../../ext/standard/StreamBucketJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilterChain.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilters.php';
