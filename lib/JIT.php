@@ -9522,6 +9522,11 @@ class JIT {
                 return $this->context->getTypeFromString('__hashtable__*')->constNull();
             }
             if ('__hashtable__*' === $expected && Variable::TYPE_HASHTABLE === $return->type) {
+                $htPtr = $this->context->getTypeFromString('__hashtable__*');
+                if ($retval->typeOf() !== $htPtr) {
+                    return $this->context->builder->bitcast($retval, $htPtr);
+                }
+
                 return $retval;
             }
             if ('__hashtable__*' === $expected && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
@@ -9588,11 +9593,20 @@ class JIT {
 
     private function alignRetvalToLlvmFnReturn(PHPLLVM\Value $retval, PHPLLVM\Value $func): PHPLLVM\Value
     {
+        $want = null;
         $sig = JIT\BasicBlockHelper::llvmFunctionSignatureType($func);
-        if (null === $sig) {
+        if (null !== $sig) {
+            $want = $sig->getReturnType();
+        }
+        if (null === $want && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+            if (null !== $expected && 'void' !== $expected) {
+                $want = $this->context->getTypeFromString($expected);
+            }
+        }
+        if (null === $want) {
             return $retval;
         }
-        $want = $sig->getReturnType();
         $have = $retval->typeOf();
         if ($want === $have) {
             return $retval;
@@ -9601,6 +9615,9 @@ class JIT {
         $haveStr = $this->context->getStringFromType($have);
         if (('int1' === $wantStr || 'bool' === $wantStr) && ('int64' === $haveStr || 'long long' === $haveStr || 'int32' === $haveStr)) {
             return $this->context->builder->truncOrBitCast($retval, $want);
+        }
+        if ('int8' === $haveStr && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
+            return $this->context->builder->zext($retval, $want);
         }
         if ('int32' === $wantStr && ('int64' === $haveStr || 'long long' === $haveStr)) {
             return $this->context->builder->trunc($retval, $want);
@@ -9626,6 +9643,12 @@ class JIT {
             );
 
             return $this->context->builder->load($slot);
+        }
+        if (\PHPLLVM\Type::KIND_INTEGER === $want->getKind() && \PHPLLVM\Type::KIND_INTEGER === $have->getKind()) {
+            return $this->context->builder->truncOrBitCast($retval, $want);
+        }
+        if (\PHPLLVM\Type::KIND_POINTER === $want->getKind() && \PHPLLVM\Type::KIND_POINTER === $have->getKind()) {
+            return $this->context->builder->bitcast($retval, $want);
         }
 
         return $retval;

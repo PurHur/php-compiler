@@ -94,29 +94,13 @@ final class JitVmHelperLink
         $entry = self::bridgeEntryForEmit($fn, $entryBlockName);
         $context->builder->positionAtEnd($entry);
         $args = [];
-        $i64 = $context->getTypeFromString('int64');
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
             $abiParam = $fn->getParam($i);
-            $abiTy = $paramTypes[$i];
             $helperTy = $helperFn->getParam($i)->typeOf();
-            if ($abiTy === $helperTy || Type::KIND_POINTER === $abiTy->getKind()) {
-                $args[] = $abiParam;
-            } elseif ($helperTy === $i64) {
-                $args[] = JitNestedHelperCoerce::scalarToI64($context, $abiParam, $abiTy);
-            } else {
-                $args[] = JitNestedHelperCoerce::i64ToScalar(
-                    $context,
-                    JitNestedHelperCoerce::scalarToI64($context, $abiParam, $abiTy),
-                    $helperTy
-                );
-            }
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper($context, $abiParam, $helperTy);
         }
         $result = $context->builder->call($helperFn, ...$args);
-        $ret = $returnType === $result->typeOf()
-            ? $result
-            : ((Type::KIND_POINTER === $returnType->getKind() || $returnType === $i64)
-                ? $result
-                : JitNestedHelperCoerce::i64ToScalar($context, $result, $returnType));
+        $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
         $context->builder->returnValue($ret);
         $context->registerFunction($abiName, $fn);
     }

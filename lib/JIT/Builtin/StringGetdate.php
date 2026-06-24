@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -42,10 +43,21 @@ final class StringGetdate
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementGetdateBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementGetdateBridge(Context $context): void
@@ -82,11 +94,13 @@ final class StringGetdate
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::GETDATE_HELPER),
-            $timestamp
+            [$timestamp]
         );
-        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $htNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
         $failBb = $fn->appendBasicBlock('gd_fail');
         $storeBb = $fn->appendBasicBlock('gd_store');
         $context->builder->branchIf($htNull, $failBb, $storeBb);

@@ -71,6 +71,12 @@ final class IncludePathRuntime
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
             self::implementStandaloneBodies($context);
         } else {
@@ -83,7 +89,12 @@ final class IncludePathRuntime
             self::implementResolveBridge($context);
         }
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementStandaloneBodies(Context $context): void

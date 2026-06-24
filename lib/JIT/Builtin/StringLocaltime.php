@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -42,10 +43,21 @@ final class StringLocaltime
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementLocaltimeBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementLocaltimeBridge(Context $context): void
@@ -84,12 +96,13 @@ final class StringLocaltime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $ht = $context->builder->call(
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::LOCALTIME_HELPER),
-            $timestamp,
-            $associative
+            [$timestamp, $associative]
         );
-        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $htNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
         $failBb = $fn->appendBasicBlock('lt_fail');
         $storeBb = $fn->appendBasicBlock('lt_store');
         $context->builder->branchIf($htNull, $failBb, $storeBb);

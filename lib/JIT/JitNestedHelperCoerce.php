@@ -128,6 +128,9 @@ final class JitNestedHelperCoerce
             return JitValueBox::pointer($context, $slot);
         }
         if (Type::KIND_INTEGER === $wantTy->getKind() && Type::KIND_INTEGER === $haveTy->getKind()) {
+            if (('int8' === $haveStr || 'i8' === $haveStr) && ('int64' === $wantStr || 'long long' === $wantStr)) {
+                return $context->builder->zext($arg, $wantTy);
+            }
             if ('int32' === $haveStr && ('int64' === $wantStr || 'long long' === $wantStr)) {
                 return $context->builder->sext($arg, $wantTy);
             }
@@ -189,6 +192,9 @@ final class JitNestedHelperCoerce
         if (('int1' === $fromStr || 'bool' === $fromStr) && ('int32' === $toStr || 'int64' === $toStr || 'long long' === $toStr)) {
             return $context->builder->zext($raw, $toType);
         }
+        if ('int8' === $fromStr && ('int32' === $toStr || 'int64' === $toStr || 'long long' === $toStr)) {
+            return $context->builder->zext($raw, $toType);
+        }
         if (('int64' === $fromStr || 'long long' === $fromStr) && ('int32' === $toStr || 'int1' === $toStr || 'bool' === $toStr)) {
             return 'int1' === $toStr || 'bool' === $toStr
                 ? $context->builder->truncOrBitCast($raw, $toType)
@@ -216,5 +222,28 @@ final class JitNestedHelperCoerce
         }
 
         return $context->builder->bitcast($raw, $strPtr);
+    }
+
+    public static function coerceBridgeResult(Context $context, Value $raw, Type $wantTy): Value
+    {
+        $haveTy = $raw->typeOf();
+        if ($haveTy === $wantTy) {
+            return $raw;
+        }
+        $wantStr = $context->getStringFromType($wantTy);
+        if ('__hashtable__*' === $wantStr) {
+            return self::coerceToHashtablePtr($context, $raw);
+        }
+        if ('__string__*' === $wantStr) {
+            return self::extractStringPtrFromHelperResult($context, $raw);
+        }
+        if (Type::KIND_INTEGER === $wantTy->getKind()) {
+            return self::coerceHelperScalarResult($context, $raw, $wantTy);
+        }
+        if (Type::KIND_POINTER === $wantTy->getKind() && Type::KIND_POINTER === $haveTy->getKind()) {
+            return $context->builder->bitcast($raw, $wantTy);
+        }
+
+        return $raw;
     }
 }

@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -38,10 +39,22 @@ final class SessionCreateIdRuntime
         SessionLifecycleRuntime::ensureLinked($context);
         SessionStorageRuntime::ensureLinked($context);
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_random_id_string', self::implementRandomIdString(...));
         self::implementIfMissing($context, '__phpc_session_create_id_apply', self::implementCreateIdApply(...));
         self::implementIfMissing($context, '__phpc_session_create_id_apply_boxed', self::implementCreateIdApplyBoxed(...));
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /** Random id ABI only — avoids SessionLifecycleRuntime ↔ CreateId ensureLinked cycle (#9446). */
@@ -114,11 +127,13 @@ final class SessionCreateIdRuntime
 
         $outPtr = $fn->getParam(0);
         $prefix = $fn->getParam(1);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::CREATE_ID),
-            $prefix
+            [$prefix]
         );
-        self::writeNullableStringResult($context, $fn, $outPtr, $result);
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
+        self::writeNullableStringResult($context, $fn, $outPtr, $result, $resultRaw);
     }
 
     private static function implementCreateIdApplyBoxed(Context $context, LlvmFunction $fn): void
@@ -172,11 +187,13 @@ final class SessionCreateIdRuntime
         Context $context,
         LlvmFunction $fn,
         $outPtr,
-        $result
+        $result,
+        $resultRaw = null
     ): void {
         $strPtr = $context->getTypeFromString('__string__*');
-        $nullPtr = $strPtr->constNull();
-        $isFail = $context->builder->icmp(Builder::INT_EQ, $result, $nullPtr);
+        $isFail = null !== $resultRaw
+            ? JitNestedHelperCoerce::isHelperResultNull($context, $resultRaw)
+            : $context->builder->icmp(Builder::INT_EQ, $result, $strPtr->constNull());
         $bbFail = BasicBlockHelper::append($context, 'scid_fail');
         $bbOk = BasicBlockHelper::append($context, 'scid_ok');
         $bbDone = BasicBlockHelper::append($context, 'scid_done');

@@ -85,6 +85,12 @@ final class StringInfo
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureHashtableHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementPhpversionBridge($context);
@@ -96,7 +102,12 @@ final class StringInfo
         self::implementGetExtensionFuncsBridge($context);
         self::implementPosixUnameBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementPhpversionBridge(Context $context): void

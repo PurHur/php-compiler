@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPLLVM\Builder;
@@ -38,12 +39,24 @@ final class SessionEncodeRuntime
         StringUnserialize::ensureLinked($context);
         SessionStorageGlobals::ensureGlobals($context);
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, 'phpc_session_encode_wire', self::implementEncodeWireBridge(...));
         self::implementIfMissing($context, 'phpc_session_decode_wire', self::implementDecodeWireBridge(...));
         self::implementIfMissing($context, '__phpc_session_encode_apply', self::implementEncodeApplyBridge(...));
         self::implementIfMissing($context, '__phpc_session_decode_apply', self::implementDecodeApplyBridge(...));
         self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
@@ -102,18 +115,18 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_enc_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $encodedRaw = $context->builder->call(
+        $encodedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::ENCODE_WIRE),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
-        $strPtr = $context->getTypeFromString('__string__*');
-        $encoded = $context->builder->bitcast($encodedRaw, $strPtr);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $encoded, $strPtr->constNull());
+        $encoded = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $encodedRaw);
+        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $encodedRaw);
         $failBb = $fn->appendBasicBlock('se_wire_enc_bridge_fail');
         $okBb = $fn->appendBasicBlock('se_wire_enc_bridge_ok');
         $context->builder->branchIf($isNull, $failBb, $okBb);
         $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($strPtr->constNull());
+        $context->builder->returnValue($context->getTypeFromString('__string__*')->constNull());
         $context->builder->positionAtEnd($okBb);
         $context->builder->returnValue($encoded);
     }
@@ -122,13 +135,14 @@ final class SessionEncodeRuntime
     {
         $entry = $fn->appendBasicBlock('se_wire_dec_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $decodedRaw = $context->builder->call(
+        $decodedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::DECODE_WIRE),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $decoded = JitNestedHelperCoerce::coerceToHashtablePtr($context, $decodedRaw);
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $decoded = $context->builder->bitcast($decodedRaw, $htPtr);
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $decoded, $htPtr->constNull());
+        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $decodedRaw);
         $failBb = $fn->appendBasicBlock('se_wire_dec_bridge_fail');
         $okBb = $fn->appendBasicBlock('se_wire_dec_bridge_ok');
         $context->builder->branchIf($isNull, $failBb, $okBb);
