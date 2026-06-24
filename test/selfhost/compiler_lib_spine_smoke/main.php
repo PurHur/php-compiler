@@ -108,6 +108,7 @@ require_once __DIR__.'/../../../ext/dom/Module.php';
 require_once __DIR__.'/../../../ext/dom/VmDom.php';
 require_once __DIR__.'/../../../ext/filter/BuiltinEnums.php';
 require_once __DIR__.'/../../../ext/filter/FilterBooleanJitHelper.php';
+require_once __DIR__.'/../../../ext/filter/FilterEmailJitHelper.php';
 require_once __DIR__.'/../../../ext/filter/FilterConstants.php';
 require_once __DIR__.'/../../../ext/filter/JitFilter.php';
 require_once __DIR__.'/../../../ext/filter/JitFilterId.php';

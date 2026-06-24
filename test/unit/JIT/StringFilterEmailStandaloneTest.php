@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issues #5199 / #6082: filter_validate.c deleted; FILTER_VALIDATE_EMAIL via PHP LLVM.
+ * Issue #9860: FILTER_VALIDATE_EMAIL JIT routes through FilterEmailJitHelper PHP, not LLVM parser.
  *
  * @group aot-lint
  */
@@ -23,6 +23,7 @@ final class StringFilterEmailStandaloneTest extends TestCase
         $jitFilter = (string) file_get_contents(__DIR__.'/../../../ext/filter/JitFilter.php');
         $this->assertStringContainsString('StringFilterEmail', $jitFilter);
         $emailJit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringFilterEmail.php');
+        $this->assertStringContainsString('FilterEmailJitHelper', $emailJit);
         $this->assertStringContainsString('__compiler_filter_validate_email', $emailJit);
     }
 
@@ -30,7 +31,7 @@ final class StringFilterEmailStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringFilterEmail::ensureLinked($ctx);
+        StringFilterEmail::implement($ctx);
         $fn = $ctx->lookupFunction('__compiler_filter_validate_email');
         $this->assertNotNull($fn);
         $this->assertGreaterThan(0, $fn->countBasicBlocks());

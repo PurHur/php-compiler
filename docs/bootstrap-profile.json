@@ -108,6 +108,7 @@
         "ext/filter/BuiltinEnums.php",
         "ext/filter/FilterBooleanJitHelper.php",
         "ext/filter/FilterConstants.php",
+        "ext/filter/FilterEmailJitHelper.php",
         "ext/filter/JitFilter.php",
         "ext/filter/JitFilterId.php",
         "ext/filter/JitFilterList.php",
@@ -877,6 +878,7 @@
         "ext/standard/ThrowableManifest.php",
         "ext/standard/TimezoneLocationJitHelper.php",
         "ext/standard/TimezoneOffsetJitHelper.php",
+        "ext/standard/TriggerErrorJitHelper.php",
         "ext/standard/UnpackEngine.php",
         "ext/standard/UnserializeJitHelper.php",
         "ext/standard/UploadTempJitHelper.php",
@@ -2901,6 +2903,7 @@
         "lib/VM/OutputBufferHandlers.php",
         "lib/VM/ParamArgumentCountError.php",
         "lib/VM/ParamTypeError.php",
+        "lib/VM/PathSupport.php",
         "lib/VM/PropertyHookFiberSuspendSignal.php",
         "lib/VM/PropertyHookRef.php",
         "lib/VM/PropertyHookRefWriteSignal.php",
@@ -3194,9 +3197,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 2966,
+        "inventory_files": 2969,
         "excluded": 0,
-        "eligible": 2966,
+        "eligible": 2969,
         "aot_lint_targets": 110,
         "aot_link_targets": 97,
         "aot_link_lib_targets": 1
