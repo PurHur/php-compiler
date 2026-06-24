@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3003 |
-| Phase A inventory files (M2 ratio SSOT) | 3003 |
+| PHP files on vm.php path | 3007 |
+| Phase A inventory files (M2 ratio SSOT) | 3007 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8096 |
+| Source constructs flagged (warnings) | 8105 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -312,6 +312,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/DefineJitHelper.php` | 0 | 2 |
 | `ext/standard/DeployPathJitHelper.php` | 0 | 1 |
 | `ext/standard/EmbedObJitHelper.php` | 0 | 1 |
+| `ext/standard/EnvLocalJitHelper.php` | 0 | 2 |
 | `ext/standard/ErrorHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLastJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLogJitHelper.php` | 0 | 1 |
@@ -326,7 +327,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetcwdJitHelper.php` | 0 | 1 |
 | `ext/standard/GetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/GetenvJitHelper.php` | 0 | 1 |
-| `ext/standard/EnvLocalJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbyaddrJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbynamelJitHelper.php` | 0 | 1 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
@@ -842,6 +842,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamNotificationJitHelper.php` | 0 | 5 |
 | `ext/standard/StreamPathJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamSyncJitHelper.php` | 0 | 1 |
 | `ext/standard/StripTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
@@ -2021,6 +2022,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ErrorHandlerOutput.php` | 0 | 1 |
@@ -2169,7 +2172,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSocketPair.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSocketPairJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSync.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 2 |
+| `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamSyncStandaloneLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
@@ -2181,8 +2185,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringErrorLog.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
@@ -4986,6 +4988,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/EnvLocalJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 31)
+- 3 class method(s)
+
 ### `ext/standard/ErrorHandlerJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5058,11 +5066,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
-
-### `ext/standard/EnvLocalJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
 
 ### `ext/standard/GethostbyaddrJitHelper.php`
 
@@ -8545,6 +8548,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/StreamSyncJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/StripTagsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9633,7 +9641,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PhpFdStreamState (line 117)
-- 27 class method(s)
+- 28 class method(s)
 
 ### `ext/standard/VmPhpFilterStream.php`
 
@@ -16278,6 +16286,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/EnvLocalRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 291)
+- 10 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 18 class method(s)
+
 ### `lib/JIT/Builtin/ErrorHandler.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17114,6 +17134,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamSyncJit.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 230)
+- 9 class method(s)
+- 3 closure(s)
+
+### `lib/JIT/Builtin/StreamSyncStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
 - 10 class method(s)
 - 2 closure(s)
 
@@ -17173,16 +17200,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 21 class method(s)
-
-### `lib/JIT/Builtin/EnvLocalRuntime.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
-
-### `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 17 class method(s)
 
 ### `lib/JIT/Builtin/StringErrorLog.php`
 
@@ -17271,7 +17288,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 13 class method(s)
 
 ### `lib/JIT/Builtin/StringGetenvLibcBridge.php`
 
