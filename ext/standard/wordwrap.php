@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -29,6 +31,7 @@ final class wordwrap extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'wordwrap', 'string', 0);
         $text = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'wordwrap',
@@ -72,6 +75,7 @@ final class wordwrap extends Internal
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'wordwrap', 'string', 1);
         $input = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
