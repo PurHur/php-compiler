@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
@@ -43,6 +44,13 @@ final class StreamSyncJit
     {
         $probe = $context->module->getNamedFunction('__compiler_fsync');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StreamSyncStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;

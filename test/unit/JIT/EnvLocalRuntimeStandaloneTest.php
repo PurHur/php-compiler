@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StringEnvLocal;
+use PHPCompiler\JIT\Builtin\EnvLocalRuntime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5345: AOT standalone must define env local helpers without phpc_env_local.c.
+ * Issue #5345 / #9814: AOT standalone must define env local helpers without phpc_env_local.c.
  *
  * @group aot-lint
  */
@@ -19,7 +19,7 @@ final class EnvLocalRuntimeStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringEnvLocal::ensureLinked($ctx);
+        EnvLocalRuntime::ensureLinked($ctx);
 
         foreach (
             [

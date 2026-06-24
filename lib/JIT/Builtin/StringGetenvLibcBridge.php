@@ -37,7 +37,7 @@ final class StringGetenvLibcBridge
 
         $fn = $context->lookupFunction('__compiler_getenv');
 
-        StringEnvLocal::ensureLinked($context);
+        EnvLocalRuntime::ensureLinked($context);
 
         $entry = $fn->appendBasicBlock('main');
         $context->builder->positionAtEnd($entry);

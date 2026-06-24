@@ -18,10 +18,6 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringGetenvAll
 {
-    private const G_ENTRIES = 'phpc_env_local_entries';
-
-    private const G_COUNT = 'phpc_env_local_count';
-
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -41,7 +37,7 @@ final class StringGetenvAll
             return;
         }
 
-        StringEnvLocal::ensureLinked($context);
+        EnvLocalRuntime::ensureLinked($context);
         self::ensureLibc($context);
         self::ensureHashtableHelpers($context);
         self::ensureEnvironGlobal($context);
@@ -87,7 +83,7 @@ final class StringGetenvAll
 
         $context->builder->positionAtEnd($fillBb);
         self::emitEnvironWalk($context, $fn, $ht);
-        self::emitLocalOverlay($context, $fn, $ht);
+        EnvLocalRuntime::emitMergeOverlay($context, $ht);
 
         $context->builder->call(
             $context->lookupFunction('__value__writeHashtable'),
@@ -172,63 +168,6 @@ final class StringGetenvAll
         $context->builder->positionAtEnd($doneBb);
     }
 
-    private static function emitLocalOverlay(Context $context, LlvmFunction $fn, Value $ht): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $null = $i8p->constNull();
-        $one = $i32->constInt(1, false);
-
-        $idxSlot = $context->builder->alloca($i32, 1, 'ga_local_i');
-        $context->builder->store($i32->constInt(0, false), $idxSlot);
-
-        $loopCheck = $fn->appendBasicBlock('ga_local_check');
-        $loopBody = $fn->appendBasicBlock('ga_local_body');
-        $loopNext = $fn->appendBasicBlock('ga_local_next');
-        $loopDone = $fn->appendBasicBlock('ga_local_done');
-        $context->builder->branch($loopCheck);
-
-        $context->builder->positionAtEnd($loopCheck);
-        $idx = $context->builder->load($idxSlot);
-        $count = $context->builder->load(self::globalPtr($context, self::G_COUNT, $i32));
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
-        $context->builder->branchIf($atEnd, $loopDone, $loopBody);
-
-        $context->builder->positionAtEnd($loopBody);
-        $entryPtr = self::entryPtr($context, $idx);
-        $entryName = $context->builder->load($context->builder->structGep($entryPtr, 0));
-        $entryValue = $context->builder->load($context->builder->structGep($entryPtr, 1));
-        $valueNull = $context->builder->icmp(Builder::INT_EQ, $entryValue, $null);
-        $skipBb = $fn->appendBasicBlock('ga_local_skip');
-        $setBb = $fn->appendBasicBlock('ga_local_set');
-        $context->builder->branchIf($valueNull, $skipBb, $setBb);
-
-        $context->builder->positionAtEnd($setBb);
-        self::setCstrPair($context, $ht, $entryName, $entryValue);
-        $context->builder->branch($loopNext);
-
-        $context->builder->positionAtEnd($skipBb);
-        $context->builder->branch($loopNext);
-
-        $context->builder->positionAtEnd($loopNext);
-        $context->builder->store($context->builder->add($idx, $one), $idxSlot);
-        $context->builder->branch($loopCheck);
-
-        $context->builder->positionAtEnd($loopDone);
-    }
-
-    private static function setCstrPair(Context $context, Value $ht, Value $keyCstr, Value $valueCstr): void
-    {
-        $keyStr = self::cstrToString($context, $keyCstr);
-        $valStr = self::cstrToString($context, $valueCstr);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $ht,
-            $keyStr,
-            $valStr
-        );
-    }
-
     private static function setBoundedKeyCstrPair(
         Context $context,
         Value $ht,
@@ -269,43 +208,6 @@ final class StringGetenvAll
             $context->builder->zExt($len, $i64),
             $context->builder->pointerCast($cstr, $charPtr)
         );
-    }
-
-    private static function entryPtr(Context $context, Value $index): Value
-    {
-        $entriesGlobal = $context->module->getNamedGlobal(self::G_ENTRIES);
-        if (null === $entriesGlobal) {
-            throw new \LogicException('Missing env local entries global');
-        }
-        $entriesPtr = $context->builder->pointerCast(
-            $entriesGlobal,
-            self::entryArrayType($context)->pointerType(0)
-        );
-        $rawPtr = $context->builder->gep($entriesPtr, $index);
-
-        return $context->builder->pointerCast($rawPtr, self::entryType($context)->pointerType(0));
-    }
-
-    private static function entryType(Context $context)
-    {
-        $i8p = $context->getTypeFromString('int8*');
-
-        return $context->context->structType(false, $i8p, $i8p);
-    }
-
-    private static function entryArrayType(Context $context)
-    {
-        return self::entryType($context)->arrayType(256);
-    }
-
-    private static function globalPtr(Context $context, string $name, $type): Value
-    {
-        $global = $context->module->getNamedGlobal($name);
-        if (null === $global) {
-            throw new \LogicException('Missing env local global: '.$name);
-        }
-
-        return $context->builder->pointerCast($global, $type->pointerType(0));
     }
 
     private static function ensureEnvironGlobal(Context $context): void

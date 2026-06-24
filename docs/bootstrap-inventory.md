@@ -326,6 +326,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetcwdJitHelper.php` | 0 | 1 |
 | `ext/standard/GetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/GetenvJitHelper.php` | 0 | 1 |
+| `ext/standard/EnvLocalJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbyaddrJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbynamelJitHelper.php` | 0 | 1 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
@@ -2180,7 +2181,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringEnvLocal.php` | 0 | 1 |
+| `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringErrorLog.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
@@ -5056,6 +5058,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/EnvLocalJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/GethostbyaddrJitHelper.php`
 
@@ -17167,10 +17174,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 21 class method(s)
 
-### `lib/JIT/Builtin/StringEnvLocal.php`
+### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 12 class method(s)
+
+### `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
 
 ### `lib/JIT/Builtin/StringErrorLog.php`
 

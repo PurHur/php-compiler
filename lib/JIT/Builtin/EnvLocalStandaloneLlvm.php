@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Replaces {@see lib/AOT/runtime/phpc_env_local.c}. Semantics mirror
  * {@see \PHPCompiler\ext\standard\VmEnv} and php-src EG(env).
  */
-final class StringEnvLocal
+final class EnvLocalStandaloneLlvm
 {
     private const MAX_ENTRIES = 256;
 
@@ -440,5 +440,76 @@ final class StringEnvLocal
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    public static function emitMergeOverlay(Context $context, Value $ht): void
+    {
+        $fn = $context->builder->getInsertBlock()->getParent();
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $null = $i8p->constNull();
+        $one = $i32->constInt(1, false);
+
+        $idxSlot = $context->builder->alloca($i32, 1, 'ga_local_i');
+        $context->builder->store($i32->constInt(0, false), $idxSlot);
+
+        $loopCheck = $fn->appendBasicBlock('ga_local_check');
+        $loopBody = $fn->appendBasicBlock('ga_local_body');
+        $loopNext = $fn->appendBasicBlock('ga_local_next');
+        $loopDone = $fn->appendBasicBlock('ga_local_done');
+        $context->builder->branch($loopCheck);
+
+        $context->builder->positionAtEnd($loopCheck);
+        $idx = $context->builder->load($idxSlot);
+        $count = $context->builder->load(self::globalPtr($context, self::G_COUNT, $i32));
+        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $count);
+        $context->builder->branchIf($atEnd, $loopDone, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $entryPtr = self::entryPtr($context, $idx);
+        $entryName = $context->builder->load($context->builder->structGep($entryPtr, 0));
+        $entryValue = $context->builder->load($context->builder->structGep($entryPtr, 1));
+        $valueNull = $context->builder->icmp(Builder::INT_EQ, $entryValue, $null);
+        $skipBb = $fn->appendBasicBlock('ga_local_skip');
+        $setBb = $fn->appendBasicBlock('ga_local_set');
+        $context->builder->branchIf($valueNull, $skipBb, $setBb);
+
+        $context->builder->positionAtEnd($setBb);
+        self::setCstrPair($context, $ht, $entryName, $entryValue);
+        $context->builder->branch($loopNext);
+
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($loopNext);
+
+        $context->builder->positionAtEnd($loopNext);
+        $context->builder->store($context->builder->add($idx, $one), $idxSlot);
+        $context->builder->branch($loopCheck);
+
+        $context->builder->positionAtEnd($loopDone);
+    }
+
+    private static function setCstrPair(Context $context, Value $ht, Value $keyCstr, Value $valueCstr): void
+    {
+        $keyStr = self::cstrToString($context, $keyCstr);
+        $valStr = self::cstrToString($context, $valueCstr);
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $valStr
+        );
+    }
+
+    private static function cstrToString(Context $context, Value $cstr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($cstr, $charPtr)
+        );
     }
 }
