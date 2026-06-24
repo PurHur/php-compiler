@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2987 |
-| Phase A inventory files (M2 ratio SSOT) | 2987 |
+| PHP files on vm.php path | 2992 |
+| Phase A inventory files (M2 ratio SSOT) | 2992 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8075 |
+| Source constructs flagged (warnings) | 8082 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -28,6 +28,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `bin/vm.php` | 0 | 1 |
 | `ext/bcmath/BcMathNumberMethod.php` | 0 | 1 |
 | `ext/bcmath/BcmathFunction.php` | 0 | 1 |
+| `ext/bcmath/BcmathJitHelper.php` | 0 | 1 |
 | `ext/bcmath/BuiltinClasses.php` | 0 | 1 |
 | `ext/bcmath/JitBcmath.php` | 0 | 4 |
 | `ext/bcmath/Module.php` | 0 | 15 |
@@ -1996,7 +1997,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 5 |
 | `lib/JIT/Builtin/BackedEnumFromRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
-| `lib/JIT/Builtin/BcmathJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayValueBoxJit.php` | 0 | 1 |
@@ -2448,7 +2449,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/LibcExtern.php` | 0 | 1 |
 | `lib/JIT/ListUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/M3EmitTuTrivialEchoAot.php` | 0 | 2 |
-| `lib/JIT/MagicMethodDispatch.php` | 0 | 8 |
+| `lib/JIT/MagicMethodDispatch.php` | 0 | 1 |
+| `lib/JIT/MagicMethodLlvm.php` | 0 | 8 |
 | `lib/JIT/McjitEmbedRuntime.php` | 0 | 1 |
 | `lib/JIT/NamedArgs.php` | 0 | 3 |
 | `lib/JIT/NamedOptionalCallArgs.php` | 0 | 2 |
@@ -2462,7 +2464,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/PregReplaceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Progress.php` | 0 | 1 |
 | `lib/JIT/PropertyHookDispatch.php` | 0 | 4 |
-| `lib/JIT/PropertyIsInitializedHelper.php` | 0 | 2 |
+| `lib/JIT/PropertyIsInitializedHelper.php` | 0 | 1 |
+| `lib/JIT/PropertyIsInitializedLlvm.php` | 0 | 2 |
 | `lib/JIT/ReadonlyBridge.php` | 0 | 1 |
 | `lib/JIT/ReadonlyClassGuard.php` | 0 | 1 |
 | `lib/JIT/ReflectionBuiltinHelper.php` | 0 | 1 |
@@ -2837,6 +2840,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/LazyGhostTraitSupport.php` | 0 | 4 |
 | `lib/VM/LazyObjectSupport.php` | 0 | 11 |
 | `lib/VM/ListUnpackJitHelper.php` | 0 | 1 |
+| `lib/VM/MagicMethodJitHelper.php` | 0 | 1 |
 | `lib/VM/MemoryAccounting.php` | 0 | 1 |
 | `lib/VM/NamedArgs.php` | 0 | 10 |
 | `lib/VM/NewCallableHandler.php` | 0 | 1 |
@@ -2859,6 +2863,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/PropertyHookRef.php` | 0 | 1 |
 | `lib/VM/PropertyInit.php` | 0 | 3 |
 | `lib/VM/PropertyIsInitializedHandler.php` | 0 | 4 |
+| `lib/VM/PropertyIsInitializedJitHelper.php` | 0 | 1 |
 | `lib/VM/PropertyMangle.php` | 0 | 1 |
 | `lib/VM/PropertyNameSupport.php` | 0 | 1 |
 | `lib/VM/Refcount.php` | 0 | 1 |
@@ -2940,6 +2945,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/bcmath/BcmathJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/bcmath/BuiltinClasses.php`
 
@@ -16109,7 +16119,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/BcmathJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 20 class method(s)
+- new JIT (line 270)
+- 11 class method(s)
+- 5 closure(s)
 
 ### `lib/JIT/Builtin/CallArgv.php`
 
@@ -18875,12 +18887,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/MagicMethodDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 145)
-- new Variable (line 179)
-- new Variable (line 185)
-- new Variable (line 318)
-- new Variable (line 332)
-- new Operand\Literal (line 348)
+- 10 class method(s)
+
+### `lib/JIT/MagicMethodLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 156)
+- new Variable (line 190)
+- new Variable (line 196)
+- new Variable (line 329)
+- new Variable (line 343)
+- new Operand\Literal (line 359)
 - 12 class method(s)
 - 1 closure(s)
 
@@ -18963,7 +18980,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/PropertyIsInitializedHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 1 class method(s)
+
+### `lib/JIT/PropertyIsInitializedLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 - 2 closure(s)
 
 ### `lib/JIT/ReadonlyBridge.php`
@@ -22001,6 +22023,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/VM/MagicMethodJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/VM/MemoryAccounting.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22133,6 +22160,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 49)
 - new ArgumentCountError (line 59)
 - 2 class method(s)
+
+### `lib/VM/PropertyIsInitializedJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/VM/PropertyMangle.php`
 
