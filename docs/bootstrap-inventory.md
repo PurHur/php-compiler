@@ -9818,9 +9818,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 32)
 - new Variable (line 34)
-- new HashTable (line 207)
-- new Variable (line 214)
-- new Variable (line 219)
+- new HashTable (line 208)
+- new Variable (line 215)
+- new Variable (line 220)
 - 12 class method(s)
 
 ### `ext/standard/VmProcessExecCaptureNative.php`
@@ -9846,7 +9846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessProcOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 19 class method(s)
 
 ### `ext/standard/VmRandom.php`
 
