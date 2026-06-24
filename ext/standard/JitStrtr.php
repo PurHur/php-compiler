@@ -10,7 +10,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** LLVM JIT/AOT helper for strtr() — VmString parity via StringStrtrJit (#5198). */
+/** JIT/AOT helper for strtr() — runtime via StrtrJitHelper PHP (#9392). */
 final class JitStrtr
 {
     public static function translate(

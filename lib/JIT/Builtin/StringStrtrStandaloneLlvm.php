@@ -11,17 +11,17 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM bodies for strtr() (former lib/AOT/runtime/strtr.c, #5198).
+ * LLVM body for __compiler_strtr_array — AOT standalone only (#9392).
  *
- * php-src: ext/standard/string.c — parity with ext/standard/VmString.php.
+ * JIT embed uses {@see StrtrArrayJitHelper} PHP; standalone keeps LLVM walker until
+ * HashTable iteration compiles in native standalone nested link.
  */
-final class StringStrtrJit
+final class StringStrtrStandaloneLlvm
 {
     private const PAIR_STRIDE = 32;
 
     public static function implement(Context $context): void
     {
-        self::implementIfMissing($context, '__compiler_strtr', self::implementTwoString(...));
         self::implementIfMissing($context, '__compiler_strtr_array', self::implementArray(...));
     }
 
@@ -40,121 +40,6 @@ final class StringStrtrJit
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementTwoString(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-        $subject = $fn->getParam(0);
-        $from = $fn->getParam(1);
-        $to = $fn->getParam(2);
-
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-
-        $flen = $context->builder->load($context->builder->structGep($from, $map['length']));
-        $emptyFrom = $fn->appendBasicBlock('strtr_empty_from');
-        $work = $fn->appendBasicBlock('strtr_work');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $flen, $zero),
-            $emptyFrom,
-            $work
-        );
-
-        $context->builder->positionAtEnd($emptyFrom);
-        $context->builder->returnValue($subject);
-
-        $context->builder->positionAtEnd($work);
-        $slen = $context->builder->load($context->builder->structGep($subject, $map['length']));
-        $tlen = $context->builder->load($context->builder->structGep($to, $map['length']));
-        $fromChars = $context->builder->structGep($from, $map['value']);
-        $toChars = $context->builder->structGep($to, $map['value']);
-
-        $tableSlot = $context->builder->alloca($i8, 256, 'strtr_table');
-        $context->intrinsic->memset($tableSlot, $i8->constInt(0, false), $i64->constInt(256, false), false);
-        $initSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $initSlot);
-        $initHead = $fn->appendBasicBlock('strtr_init_head');
-        $initBody = $fn->appendBasicBlock('strtr_init_body');
-        $initDone = $fn->appendBasicBlock('strtr_init_done');
-        $context->builder->branch($initHead);
-        $context->builder->positionAtEnd($initHead);
-        $ii = $context->builder->load($initSlot);
-        $initPast = $context->builder->icmp(Builder::INT_SGE, $ii, $i64->constInt(256, false));
-        $context->builder->branchIf($initPast, $initDone, $initBody);
-        $context->builder->positionAtEnd($initBody);
-        $context->builder->store(
-            $context->builder->trunc($ii, $i8),
-            $context->builder->gep($tableSlot, $ii)
-        );
-        $context->builder->store($context->builder->addNoSignedWrap($ii, $one), $initSlot);
-        $context->builder->branch($initHead);
-        $context->builder->positionAtEnd($initDone);
-
-        $pairSlot = $context->builder->alloca($i64, 1);
-        $plen = $context->builder->select(
-            $context->builder->icmp(Builder::INT_SLT, $flen, $tlen),
-            $flen,
-            $tlen
-        );
-        $context->builder->store($zero, $pairSlot);
-        $pairHead = $fn->appendBasicBlock('strtr_pair_head');
-        $pairBody = $fn->appendBasicBlock('strtr_pair_body');
-        $pairDone = $fn->appendBasicBlock('strtr_pair_done');
-        $context->builder->branch($pairHead);
-        $context->builder->positionAtEnd($pairHead);
-        $pi = $context->builder->load($pairSlot);
-        $pairPast = $context->builder->icmp(Builder::INT_SGE, $pi, $plen);
-        $context->builder->branchIf($pairPast, $pairDone, $pairBody);
-        $context->builder->positionAtEnd($pairBody);
-        $fromCh = $context->builder->load($context->builder->gep($fromChars, $pi));
-        $toCh = $context->builder->load($context->builder->gep($toChars, $pi));
-        $fromOrd = $context->builder->zExt($fromCh, $i64);
-        $context->builder->store($toCh, $context->builder->gep($tableSlot, $fromOrd));
-        $context->builder->store($context->builder->addNoSignedWrap($pi, $one), $pairSlot);
-        $context->builder->branch($pairHead);
-        $context->builder->positionAtEnd($pairDone);
-
-        $emptySubj = $fn->appendBasicBlock('strtr_empty_subj');
-        $apply = $fn->appendBasicBlock('strtr_apply');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $slen, $zero),
-            $emptySubj,
-            $apply
-        );
-        $context->builder->positionAtEnd($emptySubj);
-        $context->builder->returnValue(self::emptyString($context));
-
-        $context->builder->positionAtEnd($apply);
-        $src = $context->builder->call($context->lookupFunction('__string__separate'), $subject);
-        $srcChars = $context->builder->structGep($src, $map['value']);
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $slen);
-        $context->builder->store($slen, $context->builder->structGep($dest, $map['length']));
-        $destChars = $context->builder->structGep($dest, $map['value']);
-
-        $iSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $iSlot);
-        $head = $fn->appendBasicBlock('strtr_apply_head');
-        $body = $fn->appendBasicBlock('strtr_apply_body');
-        $done = $fn->appendBasicBlock('strtr_apply_done');
-        $context->builder->branch($head);
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $slen);
-        $context->builder->branchIf($atEnd, $done, $body);
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $ord = $context->builder->zExt($ch, $i64);
-        $mapped = $context->builder->load($context->builder->gep($tableSlot, $ord));
-        $context->builder->store($mapped, $context->builder->gep($destChars, $i));
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($head);
-        $context->builder->positionAtEnd($done);
-        $context->builder->returnValue($dest);
     }
 
     private static function implementArray(Context $context, LlvmFunction $fn): void
