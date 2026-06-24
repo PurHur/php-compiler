@@ -31,6 +31,7 @@ final class StreamCapsJit
     private const RUNTIME_FUNCTIONS = [
         '__compiler_stream_isatty',
         '__compiler_stream_is_local',
+        '__compiler_stream_is_local_uri',
         '__compiler_stream_supports',
     ];
 
@@ -48,6 +49,7 @@ final class StreamCapsJit
 
         self::implementIfMissing($context, '__compiler_stream_isatty', self::emitIsatty(...));
         self::implementIfMissing($context, '__compiler_stream_is_local', self::emitIsLocal(...));
+        self::implementIfMissing($context, '__compiler_stream_is_local_uri', self::emitIsLocalUri(...));
         self::implementIfMissing($context, '__compiler_stream_supports', self::emitSupports(...));
     }
 
@@ -79,8 +81,10 @@ final class StreamCapsJit
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
         $ft = match ($name) {
             '__compiler_stream_supports' => $context->context->functionType($i32, false, $i64, $i64),
+            '__compiler_stream_is_local_uri' => $context->context->functionType($i32, false, $i8p),
             default => $context->context->functionType($i32, false, $i64),
         };
         $fn = $context->module->addFunction($name, $ft);
@@ -258,6 +262,38 @@ final class StreamCapsJit
         $context->builder->positionAtEnd($pathBb);
         $urlBb = $fn->appendBasicBlock('caps_islocal_url');
         $localBb = $fn->appendBasicBlock('caps_islocal_local');
+        self::branchIfUrlPath($context, $fn, $path, $urlBb, $localBb);
+
+        $context->builder->positionAtEnd($urlBb);
+        $context->builder->returnValue($zero);
+
+        $context->builder->positionAtEnd($localBb);
+        $context->builder->returnValue($one);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($zero);
+    }
+
+    private static function emitIsLocalUri(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('caps_islocal_uri_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $path = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+        $nullPtr = $i8p->constNull();
+
+        $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
+        $failBb = $fn->appendBasicBlock('caps_islocal_uri_fail');
+        $pathBb = $fn->appendBasicBlock('caps_islocal_uri_path');
+        $context->builder->branchIf($pathNull, $failBb, $pathBb);
+
+        $context->builder->positionAtEnd($pathBb);
+        $urlBb = $fn->appendBasicBlock('caps_islocal_uri_url');
+        $localBb = $fn->appendBasicBlock('caps_islocal_uri_local');
         self::branchIfUrlPath($context, $fn, $path, $urlBb, $localBb);
 
         $context->builder->positionAtEnd($urlBb);
