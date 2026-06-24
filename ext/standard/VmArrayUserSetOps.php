@@ -121,9 +121,15 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            $present = $intersect
-                ? self::pairInAllOthers($key, $value, $others, $keyCompare, $dataCompare)
-                : self::pairInAnyOther($key, $value, $others, $keyCompare, $dataCompare);
+            if ($dualCompare) {
+                $present = $intersect
+                    ? self::pairInAllOthers($key, $value, $others, $keyCompare, $dataCompare)
+                    : self::pairInAnyOther($key, $value, $others, $keyCompare, $dataCompare);
+            } else {
+                $present = $intersect
+                    ? self::exactPairInAllOthers($key, $value, $others, $keyCompare)
+                    : self::exactPairInAnyOther($key, $value, $others, $keyCompare);
+            }
             if ($intersect ? !$present : $present) {
                 continue;
             }
