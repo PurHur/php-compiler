@@ -72,4 +72,11 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1], BuiltinByRefParams::forFunction('passthru'));
         $this->assertSame([1], BuiltinByRefParams::forFunction('system'));
     }
+
+    public function testDnsMxByRefIndices(): void
+    {
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('getmxrr'));
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('dns_get_mx'));
+        $this->assertSame([1, 2], BuiltinByRefParams::forFunction('GETMXRR'));
+    }
 }

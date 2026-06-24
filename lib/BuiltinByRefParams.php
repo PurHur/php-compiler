@@ -48,6 +48,9 @@ final class BuiltinByRefParams
                 return [1];
             case 'parse_str':
                 return [1];
+            case 'dns_get_mx':
+            case 'getmxrr':
+                return [1, 2];
             case 'stream_socket_client':
                 return [1, 2];
             case 'fsockopen':
