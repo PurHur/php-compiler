@@ -879,6 +879,7 @@
         "ext/standard/TimezoneOffsetJitHelper.php",
         "ext/standard/UnpackEngine.php",
         "ext/standard/UnserializeJitHelper.php",
+        "ext/standard/UploadTempJitHelper.php",
         "ext/standard/Utf8JitHelper.php",
         "ext/standard/Utf8Latin1JitHelper.php",
         "ext/standard/VersionCompareJitHelper.php",
@@ -3193,9 +3194,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 2965,
+        "inventory_files": 2966,
         "excluded": 0,
-        "eligible": 2965,
+        "eligible": 2966,
         "aot_lint_targets": 110,
         "aot_link_targets": 97,
         "aot_link_lib_targets": 1

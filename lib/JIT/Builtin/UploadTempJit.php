@@ -4,22 +4,41 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM upload temp validation (mirrors VmFs + former phpc_upload_temp.c, #5346).
+ * JIT/AOT link for upload temp helpers via UploadTempJitHelper PHP (#5346, #9799).
  *
+ * Replaces ~520-line LLVM path validation; SSOT {@see \PHPCompiler\ext\standard\VmFs}.
  * php-src: ext/standard/basic_functions.c — is_uploaded_file, move_uploaded_file
  */
 final class UploadTempJit
 {
-    private const PATH_MAX = 4096;
+    private const HELPER_PATH = '/ext/standard/UploadTempJitHelper.php';
 
-    private const UPLOAD_PREFIX = 'phpc_upload_';
+    private const TRAVERSAL_HELPER = 'PHPCompiler\\ext\\standard\\UploadTempJitHelper::pathHasParentTraversal';
+
+    private const TEMP_DIR_HELPER = 'PHPCompiler\\ext\\standard\\UploadTempJitHelper::tempDir';
+
+    private const VALID_TEMP_HELPER = 'PHPCompiler\\ext\\standard\\UploadTempJitHelper::isValidTemp';
+
+    private const IS_UPLOADED_HELPER = 'PHPCompiler\\ext\\standard\\UploadTempJitHelper::isUploadedFile';
+
+    private const MOVE_UPLOADED_HELPER = 'PHPCompiler\\ext\\standard\\UploadTempJitHelper::moveUploadedFile';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::TRAVERSAL_HELPER,
+        self::TEMP_DIR_HELPER,
+        self::VALID_TEMP_HELPER,
+        self::IS_UPLOADED_HELPER,
+        self::MOVE_UPLOADED_HELPER,
+    ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
@@ -39,95 +58,269 @@ final class UploadTempJit
             return;
         }
 
-        self::ensureLibc($context);
-
-        self::implementIfMissing($context, '__phpc_upload_path_has_traversal', self::emitPathHasTraversal(...));
-        self::implementIfMissing($context, '__phpc_upload_tmpdir_name', self::emitTmpdirName(...));
-        self::implementIfMissing($context, '__phpc_upload_is_valid_temp', self::emitIsValidTemp(...));
-        self::implementIfMissing($context, '__compiler_is_uploaded_file', self::emitIsUploadedFile(...));
-        self::implementIfMissing($context, '__compiler_move_uploaded_file', self::emitMoveUploadedFile(...));
+        self::ensureJitHelperCompiled($context);
+        self::implementPathHasTraversalBridge($context);
+        self::implementTempDirBridge($context);
+        self::implementIsValidTempBridge($context);
+        self::implementIsUploadedFileBridge($context);
+        self::implementMoveUploadedFileBridge($context);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
-    private static function registerLinkedRuntime(Context $context): void
+    private static function implementPathHasTraversalBridge(Context $context): void
     {
-        foreach (self::RUNTIME_FUNCTIONS as $name) {
-            $fn = $context->module->getNamedFunction($name);
-            if (null === $fn) {
-                throw new \LogicException($name.' missing after upload temp JIT link');
-            }
-            $context->registerFunction($name, $fn);
-        }
-    }
-
-    /**
-     * @param callable(Context, LlvmFunction): void $emit
-     */
-    private static function implementIfMissing(Context $context, string $name, callable $emit): void
-    {
-        $probe = $context->module->getNamedFunction($name);
+        $abiName = '__phpc_upload_path_has_traversal';
+        $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
+            $context->registerFunction($abiName, $probe);
 
             return;
         }
 
-        $fn = self::declareFunction($context, $name);
-        $emit($context, $fn);
-        $context->registerFunction($name, $fn);
-        $context->builder->clearInsertionPosition();
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($i32, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('upload_traversal_entry');
+        $context->builder->positionAtEnd($entry);
+        $path = $fn->getParam(0);
+        $pathStr = self::cstrToString($context, $path);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::TRAVERSAL_HELPER),
+            $pathStr
+        );
+        $context->builder->returnValue($context->builder->trunc($result, $i32));
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function declareFunction(Context $context, string $name): LlvmFunction
+    private static function implementTempDirBridge(Context $context): void
     {
-        try {
-            return $context->lookupFunction($name);
-        } catch (\Throwable) {
-            // fall through
+        $abiName = '__phpc_upload_tmpdir_name';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i8p, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('upload_tmpdir_entry');
+        $context->builder->positionAtEnd($entry);
+        $dirStr = $context->builder->call(self::helperFunction($context, self::TEMP_DIR_HELPER));
+        $map = $context->structFieldMap['__string__'];
+        $context->builder->returnValue($context->builder->structGep($dirStr, $map['value']));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementIsValidTempBridge(Context $context): void
+    {
+        $abiName = '__phpc_upload_is_valid_temp';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
         }
 
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
-        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i32, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $fn = match ($name) {
-            '__phpc_upload_path_has_traversal', '__phpc_upload_is_valid_temp',
-            '__compiler_is_uploaded_file', '__compiler_move_uploaded_file' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i32, false, ...match ($name) {
-                    '__phpc_upload_path_has_traversal', '__phpc_upload_is_valid_temp' => [$i8p],
-                    '__compiler_is_uploaded_file' => [$strPtr],
-                    '__compiler_move_uploaded_file' => [$strPtr, $strPtr],
-                    default => [],
-                })
-            ),
-            '__phpc_upload_tmpdir_name' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($i8p, false)
-            ),
-            default => throw new \LogicException('Unknown upload temp JIT function: '.$name),
-        };
-        $context->registerFunction($name, $fn);
+        $entry = $fn->appendBasicBlock('upload_valid_entry');
+        $context->builder->positionAtEnd($entry);
+        $pathStr = self::cstrToString($context, $fn->getParam(0));
+        $result = $context->builder->call(
+            self::helperFunction($context, self::VALID_TEMP_HELPER),
+            $pathStr
+        );
+        $context->builder->returnValue($context->builder->trunc($result, $i32));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementIsUploadedFileBridge(Context $context): void
+    {
+        $abiName = '__compiler_is_uploaded_file';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i32, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('is_uploaded_entry');
+        $failBb = $fn->appendBasicBlock('is_uploaded_fail');
+        $workBb = $fn->appendBasicBlock('is_uploaded_work');
+        $context->builder->positionAtEnd($entry);
+        $pathObj = $fn->getParam(0);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $pathObj, $strPtr->constNull());
+        $context->builder->branchIf($isNull, $failBb, $workBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $pathStr = self::stringObjectToString($context, $pathObj);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::IS_UPLOADED_HELPER),
+            $pathStr
+        );
+        $context->builder->returnValue($context->builder->trunc($result, $i32));
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementMoveUploadedFileBridge(Context $context): void
+    {
+        $abiName = '__compiler_move_uploaded_file';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($i32, false, $strPtr, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('move_uploaded_entry');
+        $failBb = $fn->appendBasicBlock('move_uploaded_fail');
+        $workBb = $fn->appendBasicBlock('move_uploaded_work');
+        $context->builder->positionAtEnd($entry);
+        $fromObj = $fn->getParam(0);
+        $toObj = $fn->getParam(1);
+        $eitherNull = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $fromObj, $strPtr->constNull()),
+            $context->builder->icmp(Builder::INT_EQ, $toObj, $strPtr->constNull())
+        );
+        $context->builder->branchIf($eitherNull, $failBb, $workBb);
+
+        $context->builder->positionAtEnd($workBb);
+        $fromStr = self::stringObjectToString($context, $fromObj);
+        $toStr = self::stringObjectToString($context, $toObj);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::MOVE_UPLOADED_HELPER),
+            $fromStr,
+            $toStr
+        );
+        $context->builder->returnValue($context->builder->trunc($result, $i32));
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function stringObjectToString(Context $context, Value $strObj): Value
+    {
+        $map = $context->structFieldMap['__string__'];
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $data = $context->builder->structGep($strObj, $map['value']);
+        $len = $context->builder->load($context->builder->structGep($strObj, $map['length']));
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $len,
+            $context->builder->pointerCast($data, $charPtr)
+        );
+    }
+
+    private static function cstrToString(Context $context, Value $cstr): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($cstr, $charPtr)
+        );
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after UploadTempJitHelper compile (#9799)');
+        }
 
         return $fn;
     }
 
-    private static function ensureLibc(Context $context): void
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-
-        foreach ([
-            ['getenv', $i8p, [$i8p]],
-            ['realpath', $i8p, [$i8p, $i8p]],
-            ['rename', $i32, [$i8p, $i8p]],
-            ['strlen', $sizeT, [$i8p]],
-            ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
-            ['strrchr', $i8p, [$i8p, $i32]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal($context, $name, $context->context->functionType($ret, false, ...$params));
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
         }
+        if (!$missing) {
+            return;
+        }
+
+        self::ensureStringInit($context);
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UploadTempJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('UploadTempJitHelper.php parseAndCompile failed (#9799)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#9799)');
+            }
+        }
+    }
+
+    private static function ensureStringInit(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::ensureExternal(
+            $context,
+            '__string__init',
+            $context->context->functionType($strPtr, false, $i64, $charPtr)
+        );
+        self::ensureExternal(
+            $context,
+            'strlen',
+            $context->context->functionType($context->getTypeFromString('size_t'), false, $context->getTypeFromString('int8*'))
+        );
     }
 
     private static function ensureExternal(Context $context, string $name, $ft): void
@@ -140,384 +333,14 @@ final class UploadTempJit
         }
     }
 
-    private static function literalCstr(Context $context, string $text): Value
+    private static function registerLinkedRuntime(Context $context): void
     {
-        $litGlobal = $context->constantStringFromString($text);
-        $litPtr = $context->builder->load($litGlobal);
-        $map = $context->structFieldMap['__string__'];
-
-        return $context->builder->structGep($litPtr, $map['value']);
-    }
-
-    private static function stringDataPtr(Context $context, Value $strObj): Value
-    {
-        $map = $context->structFieldMap['__string__'];
-
-        return $context->builder->structGep($strObj, $map['value']);
-    }
-
-    private static function emitPathHasTraversal(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $path = $fn->getParam(0);
-        $nullPtr = $i8p->constNull();
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
-        $slash = $i8->constInt(ord('/'), false);
-        $dot = $i8->constInt(ord('.'), false);
-
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
-        $nullBb = $fn->appendBasicBlock('traversal_null');
-        $loopHead = $fn->appendBasicBlock('traversal_head');
-        $context->builder->branchIf($isNull, $nullBb, $loopHead);
-
-        $context->builder->positionAtEnd($nullBb);
-        $context->builder->returnValue($one);
-
-        $context->builder->positionAtEnd($loopHead);
-        $pSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $startSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $context->builder->store($path, $pSlot);
-        $context->builder->store($path, $startSlot);
-
-        $head = $fn->appendBasicBlock('traversal_loop');
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $p = $context->builder->load($pSlot);
-        $ch = $context->builder->load($p);
-        $isNul = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(0, false));
-        $isSlash = $context->builder->icmp(Builder::INT_EQ, $ch, $slash);
-        $boundary = $context->builder->or($isNul, $isSlash);
-        $checkBb = $fn->appendBasicBlock('traversal_check');
-        $advanceBb = $fn->appendBasicBlock('traversal_advance');
-        $context->builder->branchIf($boundary, $checkBb, $advanceBb);
-
-        $context->builder->positionAtEnd($checkBb);
-        $start = $context->builder->load($startSlot);
-        $i64 = $context->getTypeFromString('int64');
-        $segLen = $context->builder->sub(
-            $context->builder->ptrToInt($p, $i64),
-            $context->builder->ptrToInt($start, $i64)
-        );
-        $isDotDot = $context->builder->and(
-            $context->builder->icmp(Builder::INT_EQ, $segLen, $i64->constInt(2, false)),
-            $context->builder->and(
-                $context->builder->icmp(Builder::INT_EQ, $context->builder->load($start), $dot),
-                $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $context->builder->load($context->builder->gep($start, $i32->constInt(1, false))),
-                    $dot
-                )
-            )
-        );
-        $foundBb = $fn->appendBasicBlock('traversal_found');
-        $afterCheckBb = $fn->appendBasicBlock('traversal_after_check');
-        $context->builder->branchIf($isDotDot, $foundBb, $afterCheckBb);
-
-        $context->builder->positionAtEnd($foundBb);
-        $context->builder->returnValue($one);
-
-        $context->builder->positionAtEnd($afterCheckBb);
-        $doneBb = $fn->appendBasicBlock('traversal_done');
-        $nextStartBb = $fn->appendBasicBlock('traversal_next_start');
-        $context->builder->branchIf($isNul, $doneBb, $nextStartBb);
-
-        $context->builder->positionAtEnd($nextStartBb);
-        $nextP = $context->builder->gep($p, $i32->constInt(1, false));
-        $context->builder->store($nextP, $pSlot);
-        $context->builder->store($nextP, $startSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($advanceBb);
-        $next = $context->builder->gep($p, $i32->constInt(1, false));
-        $context->builder->store($next, $pSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($doneBb);
-        $context->builder->returnValue($zero);
-    }
-
-    private static function emitTmpdirName(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $nullPtr = $i8p->constNull();
-        $fallback = self::literalCstr($context, '/tmp');
-
-        $next = $entry;
-        foreach (['TMPDIR', 'TEMP', 'TMP'] as $envName) {
-            $check = $fn->appendBasicBlock('tmpdir_check_'.$envName);
-            $context->builder->positionAtEnd($next);
-            $context->builder->branch($check);
-            $context->builder->positionAtEnd($check);
-
-            $val = $context->builder->call(
-                $context->lookupFunction('getenv'),
-                self::literalCstr($context, $envName)
-            );
-            $isNull = $context->builder->icmp(Builder::INT_EQ, $val, $nullPtr);
-            $tryNext = $fn->appendBasicBlock('tmpdir_next_'.$envName);
-            $testEmpty = $fn->appendBasicBlock('tmpdir_test_empty_'.$envName);
-            $context->builder->branchIf($isNull, $tryNext, $testEmpty);
-
-            $context->builder->positionAtEnd($testEmpty);
-            $empty = $context->builder->icmp(
-                Builder::INT_EQ,
-                $context->builder->load($val),
-                $i8->constInt(0, false)
-            );
-            $useBb = $fn->appendBasicBlock('tmpdir_use_'.$envName);
-            $context->builder->branchIf($empty, $tryNext, $useBb);
-
-            $context->builder->positionAtEnd($useBb);
-            $context->builder->returnValue($val);
-
-            $next = $tryNext;
-            $context->builder->positionAtEnd($tryNext);
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after UploadTempJit bridge (#9799)');
+            }
+            $context->registerFunction($name, $fn);
         }
-
-        $context->builder->returnValue($fallback);
-    }
-
-    private static function emitIsValidTemp(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $path = $fn->getParam(0);
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
-        $nullPtr = $i8p->constNull();
-        $prefixLen = \strlen(self::UPLOAD_PREFIX);
-
-        $failBb = $fn->appendBasicBlock('valid_fail');
-        $checkEmpty = $fn->appendBasicBlock('valid_check_empty');
-
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
-        $context->builder->branchIf($isNull, $failBb, $checkEmpty);
-
-        $context->builder->positionAtEnd($checkEmpty);
-        $isEmpty = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->load($path),
-            $i8->constInt(0, false)
-        );
-        $checkTraversal = $fn->appendBasicBlock('valid_check_traversal');
-        $context->builder->branchIf($isEmpty, $failBb, $checkTraversal);
-
-        $context->builder->positionAtEnd($checkTraversal);
-        $hasTraversal = $context->builder->call(
-            $context->lookupFunction('__phpc_upload_path_has_traversal'),
-            $path
-        );
-        $isTraversal = $context->builder->icmp(Builder::INT_NE, $hasTraversal, $zero);
-        $checkPrefix = $fn->appendBasicBlock('valid_check_prefix');
-        $context->builder->branchIf($isTraversal, $failBb, $checkPrefix);
-
-        $context->builder->positionAtEnd($checkPrefix);
-        $slashLit = $i32->constInt(ord('/'), false);
-        $base = $context->builder->call(
-            $context->lookupFunction('strrchr'),
-            $path,
-            $slashLit
-        );
-        $baseIsNull = $context->builder->icmp(Builder::INT_EQ, $base, $nullPtr);
-        $basePtr = $context->builder->select(
-            $baseIsNull,
-            $path,
-            $context->builder->gep($base, $i32->constInt(1, false))
-        );
-        $prefixOk = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $basePtr,
-            self::literalCstr($context, self::UPLOAD_PREFIX),
-            $sizeT->constInt($prefixLen, false)
-        );
-        $hasPrefix = $context->builder->icmp(Builder::INT_EQ, $prefixOk, $zero);
-        $realpathBb = $fn->appendBasicBlock('valid_realpath');
-        $context->builder->branchIf($hasPrefix, $realpathBb, $failBb);
-
-        $context->builder->positionAtEnd($realpathBb);
-        $resolvedTy = $i8->arrayType(self::PATH_MAX);
-        $resolvedSlot = $context->builder->alloca($resolvedTy, 1, 'upload_resolved');
-        $resolvedBase = $context->builder->inBoundsGEP(
-            $resolvedSlot,
-            $i32->constInt(0, false),
-            $i64->constInt(0, false)
-        );
-        $realFrom = $context->builder->call(
-            $context->lookupFunction('realpath'),
-            $path,
-            $resolvedBase
-        );
-        $realOk = $context->builder->icmp(Builder::INT_NE, $realFrom, $nullPtr);
-        $tmpdirBb = $fn->appendBasicBlock('valid_tmpdir');
-        $context->builder->branchIf($realOk, $tmpdirBb, $failBb);
-
-        $context->builder->positionAtEnd($tmpdirBb);
-        $tmpdirTy = $i8->arrayType(self::PATH_MAX);
-        $tmpdirSlot = $context->builder->alloca($tmpdirTy, 1, 'upload_tmpdir');
-        $tmpdirBase = $context->builder->inBoundsGEP(
-            $tmpdirSlot,
-            $i32->constInt(0, false),
-            $i64->constInt(0, false)
-        );
-        $dirName = $context->builder->call($context->lookupFunction('__phpc_upload_tmpdir_name'));
-        $realTmp = $context->builder->call(
-            $context->lookupFunction('realpath'),
-            $dirName,
-            $tmpdirBase
-        );
-        $tmpOk = $context->builder->icmp(Builder::INT_NE, $realTmp, $nullPtr);
-        $prefixCmpBb = $fn->appendBasicBlock('valid_prefix_cmp');
-        $context->builder->branchIf($tmpOk, $prefixCmpBb, $failBb);
-
-        $context->builder->positionAtEnd($prefixCmpBb);
-        $tmpLen = $context->builder->call($context->lookupFunction('strlen'), $realTmp);
-        $cmpLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $context->builder->store($tmpLen, $cmpLenSlot);
-        $lastIdx = $context->builder->sub($tmpLen, $sizeT->constInt(1, false));
-        $lastSlash = $context->builder->load(
-            $context->builder->gep($realTmp, $context->builder->trunc($lastIdx, $i32))
-        );
-        $needsSlash = $context->builder->icmp(Builder::INT_NE, $lastSlash, $i8->constInt(ord('/'), false));
-        $appendBb = $fn->appendBasicBlock('valid_append_slash');
-        $cmpBb = $fn->appendBasicBlock('valid_cmp');
-        $context->builder->branchIf($needsSlash, $appendBb, $cmpBb);
-
-        $context->builder->positionAtEnd($appendBb);
-        $slashPtr = $context->builder->gep($realTmp, $context->builder->trunc($tmpLen, $i32));
-        $context->builder->store($i8->constInt(ord('/'), false), $slashPtr);
-        $nextPtr = $context->builder->gep($slashPtr, $i32->constInt(1, false));
-        $context->builder->store($i8->constInt(0, false), $nextPtr);
-        $context->builder->store(
-            $context->builder->add($tmpLen, $sizeT->constInt(1, false)),
-            $cmpLenSlot
-        );
-        $context->builder->branch($cmpBb);
-
-        $context->builder->positionAtEnd($cmpBb);
-        $cmpLen = $context->builder->load($cmpLenSlot);
-        $prefixMatch = $context->builder->call(
-            $context->lookupFunction('strncmp'),
-            $realFrom,
-            $realTmp,
-            $cmpLen
-        );
-        $ok = $context->builder->icmp(Builder::INT_EQ, $prefixMatch, $zero);
-        $successBb = $fn->appendBasicBlock('valid_success');
-        $context->builder->branchIf($ok, $successBb, $failBb);
-
-        $context->builder->positionAtEnd($successBb);
-        $context->builder->returnValue($one);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($zero);
-    }
-
-    private static function emitIsUploadedFile(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i32 = $context->getTypeFromString('int32');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $pathObj = $fn->getParam(0);
-        $zero = $i32->constInt(0, false);
-
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $pathObj, $strPtr->constNull());
-        $failBb = $fn->appendBasicBlock('is_uploaded_fail');
-        $checkBb = $fn->appendBasicBlock('is_uploaded_check');
-        $context->builder->branchIf($isNull, $failBb, $checkBb);
-
-        $context->builder->positionAtEnd($checkBb);
-        $valid = $context->builder->call(
-            $context->lookupFunction('__phpc_upload_is_valid_temp'),
-            self::stringDataPtr($context, $pathObj)
-        );
-        $context->builder->returnValue($valid);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($zero);
-    }
-
-    private static function emitMoveUploadedFile(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $fromObj = $fn->getParam(0);
-        $toObj = $fn->getParam(1);
-        $strPtr = $context->getTypeFromString('__string__*');
-        $zero = $i32->constInt(0, false);
-        $one = $i32->constInt(1, false);
-        $nullStr = $strPtr->constNull();
-
-        $failBb = $fn->appendBasicBlock('move_uploaded_fail');
-        $checkNull = $fn->appendBasicBlock('move_uploaded_check_null');
-        $eitherNull = $context->builder->or(
-            $context->builder->icmp(Builder::INT_EQ, $fromObj, $nullStr),
-            $context->builder->icmp(Builder::INT_EQ, $toObj, $nullStr)
-        );
-        $context->builder->branchIf($eitherNull, $failBb, $checkNull);
-
-        $context->builder->positionAtEnd($checkNull);
-        $from = self::stringDataPtr($context, $fromObj);
-        $to = self::stringDataPtr($context, $toObj);
-        $validFrom = $context->builder->call(
-            $context->lookupFunction('__phpc_upload_is_valid_temp'),
-            $from
-        );
-        $fromOk = $context->builder->icmp(Builder::INT_NE, $validFrom, $zero);
-        $checkTo = $fn->appendBasicBlock('move_uploaded_check_to');
-        $context->builder->branchIf($fromOk, $checkTo, $failBb);
-
-        $context->builder->positionAtEnd($checkTo);
-        $toTraversal = $context->builder->call(
-            $context->lookupFunction('__phpc_upload_path_has_traversal'),
-            $to
-        );
-        $toHasTraversal = $context->builder->icmp(Builder::INT_NE, $toTraversal, $zero);
-        $toEmpty = $context->builder->icmp(
-            Builder::INT_EQ,
-            $context->builder->load($to),
-            $i8->constInt(0, false)
-        );
-        $toBad = $context->builder->or($toHasTraversal, $toEmpty);
-        $renameBb = $fn->appendBasicBlock('move_uploaded_rename');
-        $context->builder->branchIf($toBad, $failBb, $renameBb);
-
-        $context->builder->positionAtEnd($renameBb);
-        $renamed = $context->builder->call(
-            $context->lookupFunction('rename'),
-            $from,
-            $to
-        );
-        $ok = $context->builder->icmp(Builder::INT_EQ, $renamed, $zero);
-        $successBb = $fn->appendBasicBlock('move_uploaded_success');
-        $context->builder->branchIf($ok, $successBb, $failBb);
-
-        $context->builder->positionAtEnd($successBb);
-        $context->builder->returnValue($one);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($zero);
     }
 }
