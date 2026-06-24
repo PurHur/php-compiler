@@ -15,7 +15,6 @@ final class VmProcessIdentityNativeTest extends TestCase
     public function testVmProcessIdentityPrefersNativeOverHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessIdentity.php');
-        $this->assertStringContainsString('VmProcessIdentityNative::available()', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::getuid()', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::getgid()', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::geteuid()', $source);

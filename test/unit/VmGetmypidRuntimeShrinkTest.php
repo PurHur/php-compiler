@@ -21,8 +21,7 @@ final class VmGetmypidRuntimeShrinkTest extends TestCase
     public function testVmProcessIdentityNativeDefinesGetpid(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessIdentityNative.php');
-        $this->assertStringContainsString('pid_t getpid(void)', $source);
-        $this->assertStringContainsString('$ffi->getpid()', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::getpid()', $source);
         $this->assertDoesNotMatchRegularExpression('/@?\\\\getmypid\\s*\\(/', $source);
     }
 
