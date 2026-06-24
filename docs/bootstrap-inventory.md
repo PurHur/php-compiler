@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2992 |
-| Phase A inventory files (M2 ratio SSOT) | 2992 |
+| PHP files on vm.php path | 2998 |
+| Phase A inventory files (M2 ratio SSOT) | 2998 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8082 |
+| Source constructs flagged (warnings) | 8088 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1999,6 +1999,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
+| `lib/JIT/Builtin/CallUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayValueBoxJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastObjectFromHashtableJit.php` | 0 | 3 |
@@ -2369,7 +2370,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Call/WeakMapMethod.php` | 0 | 2 |
 | `lib/JIT/Call/WeakReferenceCreate.php` | 0 | 1 |
 | `lib/JIT/Call/WeakReferenceGet.php` | 0 | 1 |
-| `lib/JIT/CallUnpackHelper.php` | 0 | 8 |
+| `lib/JIT/CallUnpackCompileTime.php` | 0 | 7 |
+| `lib/JIT/CallUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/CastArrayNativeJit.php` | 0 | 2 |
 | `lib/JIT/CastArrayShared.php` | 0 | 2 |
 | `lib/JIT/CastHelper.php` | 0 | 1 |
@@ -2463,7 +2465,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/OperandNameNative.php` | 0 | 2 |
 | `lib/JIT/PregReplaceCallbackPolicy.php` | 0 | 1 |
 | `lib/JIT/Progress.php` | 0 | 1 |
-| `lib/JIT/PropertyHookDispatch.php` | 0 | 4 |
+| `lib/JIT/PropertyHookDispatch.php` | 0 | 1 |
+| `lib/JIT/PropertyHookDispatchLlvm.php` | 0 | 4 |
 | `lib/JIT/PropertyIsInitializedHelper.php` | 0 | 1 |
 | `lib/JIT/PropertyIsInitializedLlvm.php` | 0 | 2 |
 | `lib/JIT/ReadonlyBridge.php` | 0 | 1 |
@@ -2785,6 +2788,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/BuiltinExceptionSupport.php` | 0 | 5 |
 | `lib/VM/BuiltinExecute.php` | 0 | 1 |
 | `lib/VM/CallUnpack.php` | 0 | 7 |
+| `lib/VM/CallUnpackJitHelper.php` | 0 | 2 |
+| `lib/VM/CallUnpackSupport.php` | 0 | 1 |
 | `lib/VM/CastJitHelper.php` | 0 | 1 |
 | `lib/VM/CastSupport.php` | 0 | 9 |
 | `lib/VM/ClassAbstract.php` | 0 | 1 |
@@ -2860,6 +2865,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/ParamArgumentCountError.php` | 0 | 2 |
 | `lib/VM/ParamTypeError.php` | 0 | 1 |
 | `lib/VM/PathSupport.php` | 0 | 1 |
+| `lib/VM/PropertyHookJitHelper.php` | 0 | 1 |
 | `lib/VM/PropertyHookRef.php` | 0 | 1 |
 | `lib/VM/PropertyInit.php` | 0 | 3 |
 | `lib/VM/PropertyIsInitializedHandler.php` | 0 | 4 |
@@ -16128,6 +16134,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/CallUnpackRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/JIT/Builtin/CastArrayRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18236,17 +18247,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `lib/JIT/CallUnpackCompileTime.php`
+
+**Warnings** (review for bootstrap subset):
+- new VmVariable (line 106)
+- new VmVariable (line 169)
+- new VmVariable (line 200)
+- new VmVariable (line 206)
+- new VmVariable (line 211)
+- new VmVariable (line 217)
+- 7 class method(s)
+
 ### `lib/JIT/CallUnpackHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new VmVariable (line 105)
-- new VmVariable (line 168)
-- new VmVariable (line 179)
-- new VmVariable (line 221)
-- new VmVariable (line 227)
-- new VmVariable (line 232)
-- new VmVariable (line 238)
-- 8 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/CastArrayNativeJit.php`
 
@@ -18563,34 +18578,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/HashTableHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 59)
-- new Variable (line 152)
-- new Variable (line 262)
-- new Variable (line 278)
-- new Variable (line 391)
-- new Variable (line 409)
-- new Variable (line 433)
-- new Variable (line 881)
-- new Variable (line 1095)
-- new Variable (line 1112)
-- new Variable (line 1130)
-- new Variable (line 1148)
-- new Variable (line 1191)
-- new Variable (line 1261)
-- new Variable (line 1383)
-- new Variable (line 1625)
-- new Variable (line 1658)
-- new Variable (line 2320)
-- new Variable (line 2355)
-- new Variable (line 2398)
-- new Variable (line 2400)
-- new Variable (line 2429)
-- new Variable (line 2442)
-- new Variable (line 2452)
-- new Variable (line 2524)
-- new Variable (line 2538)
-- new Variable (line 2624)
-- new Variable (line 2631)
+- new Variable (line 60)
+- new Variable (line 153)
+- new Variable (line 263)
+- new Variable (line 279)
+- new Variable (line 392)
+- new Variable (line 410)
+- new Variable (line 434)
+- new Variable (line 882)
+- new Variable (line 1096)
+- new Variable (line 1113)
+- new Variable (line 1131)
+- new Variable (line 1149)
+- new Variable (line 1192)
+- new Variable (line 1262)
+- new Variable (line 1384)
+- new Variable (line 1626)
+- new Variable (line 1659)
+- new Variable (line 2321)
+- new Variable (line 2356)
+- new Variable (line 2399)
+- new Variable (line 2401)
+- new Variable (line 2430)
+- new Variable (line 2443)
+- new Variable (line 2453)
+- new Variable (line 2527)
+- new Variable (line 2541)
+- new Variable (line 2627)
+- new Variable (line 2634)
 - 61 class method(s)
 
 ### `lib/JIT/Helper.php`
@@ -18972,9 +18987,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/PropertyHookDispatch.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 54)
-- new Variable (line 88)
-- 17 class method(s)
+- 9 class method(s)
+
+### `lib/JIT/PropertyHookDispatchLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 55)
+- new Variable (line 89)
+- 16 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/PropertyIsInitializedHelper.php`
@@ -21427,6 +21447,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 204)
 - 7 class method(s)
 
+### `lib/VM/CallUnpackJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 20)
+- 1 class method(s)
+
+### `lib/VM/CallUnpackSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `lib/VM/CastJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22140,6 +22171,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/VM/PropertyHookJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/VM/PropertyHookRef.php`
 
