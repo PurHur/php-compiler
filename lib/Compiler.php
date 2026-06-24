@@ -10435,9 +10435,35 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        if (
+            ($this->callIncludesNamedParameter($callOp) || null !== $this->callArgName($callOp->args[$argIndex] ?? $arg))
+            && isset($callOp->args[$argIndex])
+        ) {
+            $namedCallArg = $callOp->args[$argIndex];
+            foreach ($producers as $candidate) {
+                if (
+                    $candidate instanceof Op\Expr\Array_
+                    && null !== $candidate->result
+                    && $this->operandsReferToSameVariable($candidate->result, $namedCallArg)
+                ) {
+                    return $candidate;
+                }
+            }
+            if ($this->callArgIsDeadInlineTemporary($namedCallArg)) {
+                $unassigned = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                    $producers,
+                    $callOp,
+                    $argIndex,
+                    $block
+                );
+                if ($unassigned instanceof Op\Expr\Array_) {
+                    return $unassigned;
+                }
+            }
+        }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
         if ($producer instanceof Op\Expr\Array_) {
-            if (0 === $argIndex) {
+            if (0 === $argIndex && !$this->callIncludesNamedParameter($callOp)) {
                 $arrayProducers = array_values(array_filter(
                     $producers,
                     static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
@@ -10454,6 +10480,146 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * php-cfg dead call-arg temps for named parameters — map to hoisted Array_ not assigned to a named local (#11170).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function findUnassignedInlineArrayProducerForDeadCallArg(
+        array $producers,
+        Op $callOp,
+        int $argIndex,
+        Block $block
+    ): ?Op\Expr\Array_ {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $deadArrayArgIndices = [];
+        foreach ($callOp->args as $idx => $callArg) {
+            if (!$this->callArgIsDeadInlineTemporary($callArg) || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+                $deadArrayArgIndices[] = (int) $idx;
+            }
+        }
+        $positionAmongDeadArrays = array_search($argIndex, $deadArrayArgIndices, true);
+        if (false === $positionAmongDeadArrays) {
+            return null;
+        }
+        $unassigned = [];
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->inlineProducerAssignedToNamedLocalBeforeCall($producer, $callOp, $block)) {
+                continue;
+            }
+            $unassigned[] = $producer;
+        }
+        if ([] === $unassigned) {
+            return null;
+        }
+        if (1 === \count($deadArrayArgIndices)) {
+            return $unassigned[\count($unassigned) - 1];
+        }
+
+        return $unassigned[$positionAmongDeadArrays] ?? null;
+    }
+
+    /**
+     * Named `command: [...]` style dead temps — last hoisted Array_ between call and prior Assign (#11170).
+     */
+    private function resolveNamedDeadTempArrayCallArgSlot(Op $callOp, Block $block): ?string
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $lastArray = null;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $children[$i];
+            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+                break;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                $lastArray = $child;
+            }
+        }
+        if (null === $lastArray) {
+            return null;
+        }
+        if (null === $block->slotForOperand($lastArray->result)) {
+            foreach ($this->compileExpr($lastArray, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($lastArray->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    private function inlineProducerAssignedToNamedLocalBeforeCall(
+        Op\Expr $producer,
+        Op $callOp,
+        Block $block
+    ): bool {
+        if (null === $block->orig || null === $producer->result) {
+            return false;
+        }
+        $children = $block->orig->children;
+        $producerIndex = null;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $producer) {
+                $producerIndex = $i;
+            }
+            if ($child === $callOp) {
+                $callIndex = $i;
+            }
+        }
+        if (null === $producerIndex || null === $callIndex || $producerIndex >= $callIndex) {
+            return false;
+        }
+        for ($i = $producerIndex + 1; $i < $callIndex; ++$i) {
+            $stmt = $children[$i];
+            if (
+                $stmt instanceof Op\Expr\Assign
+                && $this->operandsReferToSameVariable($stmt->expr, $producer->result)
+                && $this->isNamedVariableOperand($stmt->var)
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** Dead php-cfg call-arg temp whose inferred type is array-shaped (incl. `string[]`, #11170). */
+    private function callArgOperandExpectsArrayProducer(Operand $callArg): bool
+    {
+        $root = $this->unwrapOperandChain($callArg);
+        if (null === $root->type || !method_exists($root->type, 'toString')) {
+            return false;
+        }
+        $repr = $root->type->toString();
+        if ('array' === $repr) {
+            return true;
+        }
+
+        return str_ends_with($repr, '[]');
     }
 
     /**
@@ -10809,7 +10975,22 @@ class Compiler {
                 }
             }
             if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2) {
-                $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                $matched = null;
+                if (
+                    $this->callIncludesNamedParameter($callOp)
+                    && isset($callOp->args[$argIndex])
+                    && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex])
+                ) {
+                    $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                        $producers,
+                        $callOp,
+                        $argIndex,
+                        $block
+                    );
+                }
+                if (!$matched instanceof Op\Expr) {
+                    $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                }
                 if ($matched instanceof Op\Expr) {
                     if (null === $block->slotForOperand($matched->result)) {
                         foreach ($this->compileExpr($matched, $block) as $op) {
@@ -16608,7 +16789,7 @@ class Compiler {
                             ++$arrayProducerCount;
                         }
                     }
-                    if ($arrayProducerCount >= 2) {
+                    if ($arrayProducerCount >= 2 && !$this->callIncludesNamedParameter($cfgCallOp)) {
                         $matched = $this->matchInlineCallArgProducer(
                             $producers,
                             $cfgCallOp->args ?? [],
@@ -16792,6 +16973,17 @@ class Compiler {
                         $sends = array_merge($sends, $siblingOps);
                     }
                     $valueSlot = $siblingSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $nameSlot
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && $this->callArgOperandExpectsArrayProducer($arg)
+            ) {
+                $arraySlot = $this->resolveNamedDeadTempArrayCallArgSlot($cfgCallOp, $block);
+                if (null !== $arraySlot) {
+                    $valueSlot = $arraySlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

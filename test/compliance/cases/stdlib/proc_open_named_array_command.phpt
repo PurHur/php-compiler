@@ -1,5 +1,5 @@
 --TEST--
-stdlib proc_open() array command + cwd: named parameters (#11078, ext/standard/exec.stub.php)
+stdlib proc_open() command:/descriptor_spec:/pipes:/cwd: named parameters (#11170, ext/standard/exec.c)
 --FILE--
 <?php
 $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
@@ -11,12 +11,12 @@ $proc = proc_open(
     cwd: null,
 );
 if (!is_resource($proc)) {
-    echo "no-proc\n";
+    echo "fail\n";
     exit(1);
 }
 $out = stream_get_contents($pipes[1]);
 fclose($pipes[1]);
-$code = proc_close($proc);
-echo trim($out), ':', $code, "\n";
+proc_close($proc);
+echo trim($out) === 'hi' ? "ok\n" : "fail\n";
 --EXPECT--
-hi:0
+ok
