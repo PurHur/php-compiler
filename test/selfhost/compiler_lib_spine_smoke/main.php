@@ -352,6 +352,7 @@ require_once __DIR__.'/../../../ext/standard/EmbedObJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorHandlerJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorLastJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ErrorSilenceJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/TriggerErrorJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ExceptionJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ExecutionLimitsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
