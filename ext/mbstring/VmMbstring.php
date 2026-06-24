@@ -100,6 +100,39 @@ final class VmMbstring
         return $mode;
     }
 
+    /** php-src mbstring.c pseudo-encoding for htmlentities / html_entity_decode round-trip. */
+    public static function isHtmlEntitiesEncoding(string $encoding): bool
+    {
+        return 0 === strcasecmp($encoding, 'HTML-ENTITIES');
+    }
+
+    /**
+     * mb_convert_encoding() core — charset + HTML-ENTITIES pseudo-encoding (#11212).
+     */
+    public static function convertEncoding(string $source, string $to, string $from): string|false
+    {
+        $toHtml = self::isHtmlEntitiesEncoding($to);
+        $fromHtml = self::isHtmlEntitiesEncoding($from);
+        if ($fromHtml) {
+            $utf8 = VmString::html_entity_decode($source, ENT_COMPAT | ENT_HTML401, 'UTF-8');
+            if ($toHtml) {
+                return $utf8;
+            }
+
+            return CharsetEngine::convert('UTF-8', $to, $utf8);
+        }
+        if ($toHtml) {
+            $utf8 = CharsetEngine::convert($from, 'UTF-8', $source);
+            if (false === $utf8) {
+                return false;
+            }
+
+            return VmString::htmlentities($utf8, ENT_COMPAT, 'UTF-8', true);
+        }
+
+        return CharsetEngine::convert($from, $to, $source);
+    }
+
     public static function convertCase(string $source, int $mode, string $encoding = 'UTF-8'): string
     {
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
