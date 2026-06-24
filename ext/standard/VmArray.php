@@ -307,9 +307,9 @@ final class VmArray
 
         foreach ([$first, ...$others] as $ht) {
             if (!self::hasOnlyNumericKeys($ht)) {
-                $out = $first->replaceCopy();
+                $out = self::mergeSingleArgumentCopy($first);
                 foreach ($others as $other) {
-                    $out->mergeStringKeysFrom($other, true);
+                    self::mergeArrayInto($out, $other, true);
                 }
 
                 return $out;
@@ -330,6 +330,47 @@ final class VmArray
         }
 
         return $out;
+    }
+
+    /**
+     * Merge a subsequent array_merge() operand — string keys overwrite; integer keys append (#11155).
+     */
+    public static function mergeArrayInto(HashTable $dest, HashTable $other, bool $overwriteStringKeys): void
+    {
+        foreach ($other->iterateKeyed(true) as [$key, $value]) {
+            $key = $key->resolveIndirect();
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $dest->append($copy);
+                continue;
+            }
+            if (Variable::TYPE_STRING === $key->type) {
+                $s = $key->toString();
+                if (self::isCanonicalNonNegativeIntStringKey($s)) {
+                    $dest->append($copy);
+                    continue;
+                }
+                $existing = $dest->find($s);
+                if (null !== $existing) {
+                    if ($overwriteStringKeys) {
+                        $existing->copyFrom($copy);
+                    }
+                    continue;
+                }
+                $dest->add($s, $copy);
+                continue;
+            }
+            $sk = $key->toString();
+            $existing = $dest->find($sk);
+            if (null !== $existing) {
+                if ($overwriteStringKeys) {
+                    $existing->copyFrom($copy);
+                }
+                continue;
+            }
+            $dest->add($sk, $copy);
+        }
     }
 
     /**

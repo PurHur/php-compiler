@@ -7630,11 +7630,11 @@ final class ArrayBuiltinHelper
         $context->builder->branch($mergeDone);
 
         $context->builder->positionAtEnd($assocBb);
-        $assocResult = HashTableHelper::alloc($context);
-        self::overlayHashTable($context, $assocResult, $hts[0]);
+        $assocResult = self::mergeSingleArgumentCopy($context, $arrays[0]);
         $otherCount = \count($hts);
         for ($i = 1; $i < $otherCount; ++$i) {
             self::mergeStringKeysInto($context, $assocResult, $hts[$i]);
+            self::copyReindexableInto($context, $assocResult, $hts[$i]);
         }
         $assocEndBb = $context->builder->getInsertBlock();
         $context->builder->branch($mergeDone);
