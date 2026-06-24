@@ -7,11 +7,11 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** stream_is_local() — VM via VmFs; JIT/AOT via __compiler_stream_is_local (issue #6173). */
+/** stream_is_local() — VM via VmFs; JIT/AOT via __compiler_stream_is_local (issue #6173, #11358). */
 final class stream_is_local extends Internal
 {
     public function __construct()
@@ -24,13 +24,16 @@ final class stream_is_local extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stream_is_local() requires exactly one argument in this compiler build');
         }
-        $handle = VmStreamArg::requireStreamHandle(
-            $frame->calledArgs[0]->resolveIndirect(),
-            'stream_is_local'
-        );
         if (null === $frame->returnVar) {
             return;
         }
+        $arg = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            $frame->returnVar->bool(VmStreamMeta::isLocalUri($arg->toString()));
+
+            return;
+        }
+        $handle = VmStreamArg::requireStreamHandle($arg, 'stream_is_local');
         $frame->returnVar->bool(VmFs::streamIsLocal($handle));
     }
 
@@ -40,12 +43,6 @@ final class stream_is_local extends Internal
             throw new \LogicException('stream_is_local() requires exactly one argument in this compiler build');
         }
 
-        return JitStreamIsLocal::invoke(
-            $context,
-            $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[0], 'stream_is_local() stream'),
-                $context->getTypeFromString('int64')
-            )
-        );
+        return JitStreamIsLocal::invokeArg($context, $args[0]);
     }
 }

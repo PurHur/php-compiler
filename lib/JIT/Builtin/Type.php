@@ -453,6 +453,9 @@ class Type extends Builtin {
         $fntypeStreamIsLocal = $this->context->context->functionType($i32, false, $i64);
         $fnStreamIsLocal = $this->context->module->addFunction('__compiler_stream_is_local', $fntypeStreamIsLocal);
         $this->context->registerFunction('__compiler_stream_is_local', $fnStreamIsLocal);
+        $fntypeStreamIsLocalUri = $this->context->context->functionType($i32, false, $i8p);
+        $fnStreamIsLocalUri = $this->context->module->addFunction('__compiler_stream_is_local_uri', $fntypeStreamIsLocalUri);
+        $this->context->registerFunction('__compiler_stream_is_local_uri', $fnStreamIsLocalUri);
         $fntypeStreamIsatty = $this->context->context->functionType($i32, false, $i64);
         $fnStreamIsatty = $this->context->module->addFunction('__compiler_stream_isatty', $fntypeStreamIsatty);
         $this->context->registerFunction('__compiler_stream_isatty', $fnStreamIsatty);
