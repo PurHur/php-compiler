@@ -324,9 +324,15 @@ final class ExceptionSupport
     public static function userFatalSite(Frame $frame): array
     {
         $file = self::throwSiteFile($frame);
+        if ($frame->returnSiteLine > 0) {
+            return [$file, $frame->returnSiteLine];
+        }
         $line = $frame->callSiteLine;
         if ($line <= 0) {
             for ($f = $frame->parent; null !== $f; $f = $f->parent) {
+                if ($f->returnSiteLine > 0) {
+                    return [$file, $f->returnSiteLine];
+                }
                 if ($f->callSiteLine > 0) {
                     $line = $f->callSiteLine;
                     break;

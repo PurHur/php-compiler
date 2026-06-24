@@ -38,6 +38,9 @@ class Frame {
     /** Call-site line for the pending FUNCCALL (issue #4482). */
     public int $callSiteLine = 0;
 
+    /** Return-statement line for return-type fatals (#11381). */
+    public int $returnSiteLine = 0;
+
     /** VM context for nested builtin calls (set when invoking Internal handlers). */
     public ?Context $vmContext = null;
 
