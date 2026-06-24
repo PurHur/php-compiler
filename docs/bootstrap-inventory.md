@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2976 |
-| Phase A inventory files (M2 ratio SSOT) | 2976 |
+| PHP files on vm.php path | 2977 |
+| Phase A inventory files (M2 ratio SSOT) | 2977 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8037 |
+| Source constructs flagged (warnings) | 8040 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -306,6 +306,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/CslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/DateIntervalFormatJitHelper.php` | 0 | 1 |
 | `ext/standard/DateMutationJitHelper.php` | 0 | 1 |
+| `ext/standard/DefaultTimezoneJitHelper.php` | 0 | 1 |
 | `ext/standard/DefineJitHelper.php` | 0 | 2 |
 | `ext/standard/DeployPathJitHelper.php` | 0 | 1 |
 | `ext/standard/EmbedObJitHelper.php` | 0 | 1 |
@@ -2005,7 +2006,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 8 |
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
@@ -4925,6 +4926,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
+
+### `ext/standard/DefaultTimezoneJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/DefineJitHelper.php`
 
@@ -8345,7 +8351,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseIniEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/ParseStrEngine.php`
 
@@ -16156,7 +16162,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DefaultTimezoneRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- new JIT (line 185)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/DefineRuntime.php`
 
