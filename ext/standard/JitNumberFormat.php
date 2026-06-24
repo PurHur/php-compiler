@@ -4,10 +4,15 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable as VmVariable;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -22,6 +27,10 @@ final class JitNumberFormat
         $argc = count($args);
         if ($argc < 1 || $argc > 4) {
             throw new \LogicException('number_format() requires one to four arguments');
+        }
+
+        if ($context->callerStrictTypes) {
+            self::rejectNullNum($context, $args[0]);
         }
 
         $number = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'number_format', 'float');
@@ -43,6 +52,48 @@ final class JitNumberFormat
             $decSep,
             $thouSep
         );
+    }
+
+    private static function rejectNullNum(Context $context, JITVariable $arg): void
+    {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitNullNumTypeErrorAndAbort($context);
+
+            return;
+        }
+        if (JITVariable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'number_format_num_null_ok');
+        $failBlock = BasicBlockHelper::append($context, 'number_format_num_null_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::emitNullNumTypeErrorAndAbort($context);
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function emitNullNumTypeErrorAndAbort(Context $context): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, 'number_format(): Argument #1 ($num) must be of type float, null given');
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
 }
