@@ -25,8 +25,8 @@ final class reset_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('reset() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArrayPointer::requireByRefArray($frame->calledArgs[0], 'reset');
-        VmArrayPointer::returnValue($frame, $ht->pointerReset());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'reset', true);
+        VmArrayPointer::returnValue($frame, $target->pointerReset());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

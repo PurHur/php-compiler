@@ -25,8 +25,8 @@ final class next extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('next() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArrayPointer::requireByRefArray($frame->calledArgs[0], 'next');
-        VmArrayPointer::returnValue($frame, $ht->pointerNext());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'next', true);
+        VmArrayPointer::returnValue($frame, $target->pointerNext());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

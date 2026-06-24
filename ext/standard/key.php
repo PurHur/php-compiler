@@ -25,8 +25,8 @@ final class key extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0], 'key');
-        VmArrayPointer::returnKey($frame, $ht->pointerKey());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'key', false);
+        VmArrayPointer::returnKey($frame, $target->pointerKey());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

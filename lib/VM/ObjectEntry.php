@@ -19,7 +19,12 @@ class ObjectEntry {
     private static int $counter = 0;
     public ClassEntry $class;
     public int $id;
+    /** @var array<string, Variable> */
     private array $properties = [];
+
+    /** Zend object property internal pointer (ext/standard/array.c; #11196). */
+    private int $propertyInternalPointer = 0;
+
     public ?Func $constructor = null;
 
     /** True after `__construct` returns (or immediately when none is defined). */
@@ -307,6 +312,154 @@ class ObjectEntry {
         $clone->lazyRawInitializedProperties = $this->lazyRawInitializedProperties;
 
         return $clone;
+    }
+
+    /**
+     * Zend object property internal pointer — key() (ext/standard/array.c; #11196).
+     */
+    public function pointerKey(): ?Variable
+    {
+        if (!$this->propertyPointerIsValid()) {
+            return null;
+        }
+        $names = $this->propertyNameList();
+        $key = new Variable(Variable::TYPE_STRING);
+        $key->string($names[$this->propertyInternalPointer]);
+
+        return $key;
+    }
+
+    /**
+     * Zend object property internal pointer — current()/pos() (ext/standard/array.c; #11196).
+     */
+    public function pointerCurrent(): ?Variable
+    {
+        if (!$this->propertyPointerIsValid()) {
+            return null;
+        }
+
+        return $this->propertyValueAt($this->propertyInternalPointer);
+    }
+
+    /**
+     * Zend object property internal pointer — next() (ext/standard/array.c; #11196).
+     */
+    public function pointerNext(): ?Variable
+    {
+        $count = $this->propertyCount();
+        if (0 === $count) {
+            $this->propertyInternalPointer = self::INVALID_PROPERTY_POINTER;
+
+            return null;
+        }
+        if ($this->propertyInternalPointer >= $count) {
+            return null;
+        }
+        $start = self::INVALID_PROPERTY_POINTER === $this->propertyInternalPointer
+            ? 0
+            : $this->propertyInternalPointer + 1;
+        if ($start >= $count) {
+            $this->propertyInternalPointer = $count;
+
+            return null;
+        }
+        $this->propertyInternalPointer = $start;
+
+        return $this->propertyValueAt($start);
+    }
+
+    /**
+     * Zend object property internal pointer — prev() (ext/standard/array.c; #11196).
+     */
+    public function pointerPrev(): ?Variable
+    {
+        $count = $this->propertyCount();
+        if (0 === $count) {
+            $this->propertyInternalPointer = self::INVALID_PROPERTY_POINTER;
+
+            return null;
+        }
+        if ($this->propertyInternalPointer >= $count) {
+            $last = $count - 1;
+            $this->propertyInternalPointer = $last;
+
+            return $this->propertyValueAt($last);
+        }
+        if (self::INVALID_PROPERTY_POINTER === $this->propertyInternalPointer) {
+            return null;
+        }
+        $before = $this->propertyInternalPointer - 1;
+        if ($before < 0) {
+            $this->propertyInternalPointer = self::INVALID_PROPERTY_POINTER;
+
+            return null;
+        }
+        $this->propertyInternalPointer = $before;
+
+        return $this->propertyValueAt($before);
+    }
+
+    /**
+     * Zend object property internal pointer — reset() (ext/standard/array.c; #11196).
+     */
+    public function pointerReset(): ?Variable
+    {
+        if (0 === $this->propertyCount()) {
+            $this->propertyInternalPointer = self::INVALID_PROPERTY_POINTER;
+
+            return null;
+        }
+        $this->propertyInternalPointer = 0;
+
+        return $this->propertyValueAt(0);
+    }
+
+    /**
+     * Zend object property internal pointer — end() (ext/standard/array.c; #11196).
+     */
+    public function pointerEnd(): ?Variable
+    {
+        $count = $this->propertyCount();
+        if (0 === $count) {
+            $this->propertyInternalPointer = self::INVALID_PROPERTY_POINTER;
+
+            return null;
+        }
+        $last = $count - 1;
+        $this->propertyInternalPointer = $last;
+
+        return $this->propertyValueAt($last);
+    }
+
+    private const INVALID_PROPERTY_POINTER = -1;
+
+    /** @return list<string> */
+    private function propertyNameList(): array
+    {
+        return array_keys($this->properties);
+    }
+
+    private function propertyCount(): int
+    {
+        return \count($this->properties);
+    }
+
+    private function propertyPointerIsValid(): bool
+    {
+        return $this->propertyInternalPointer >= 0
+            && $this->propertyInternalPointer < $this->propertyCount();
+    }
+
+    private function propertyValueAt(int $index): ?Variable
+    {
+        $names = $this->propertyNameList();
+        if (!isset($names[$index])) {
+            return null;
+        }
+        $result = new Variable();
+        $result->copyFrom($this->properties[$names[$index]]->resolveIndirect());
+
+        return $result;
     }
 
 }
