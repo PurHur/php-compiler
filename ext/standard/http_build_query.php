@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * http_build_query() — query string builder (VM via VmHttpBuildQuery; JIT/AOT via __compiler_http_build_query).
+ * http_build_query() — query string builder (VM via VmHttpBuildQuery; JIT/AOT via HttpBuildQueryJitHelper PHP).
  */
 final class http_build_query extends Internal
 {
