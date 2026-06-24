@@ -4989,6 +4989,13 @@ restart:
                         try {
                             $calledArgs = $this->resolveOutgoingCallArgs($frame);
                             ReferencableCheck::assertOutgoingCallArgs($frame->call, $frame, $calledArgs);
+                        } catch (\ArgumentCountError $e) {
+                            $catchFrame = $this->dispatchVmArgumentCountError($e, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
+                            break;
                         } catch (\TypeError $e) {
                             $catchFrame = $this->dispatchVmTypeError($e, $frame);
                             if (null !== $catchFrame) {
@@ -5142,6 +5149,13 @@ restart:
                                 }
                             }
                         }
+                    } catch (\ArgumentCountError $e) {
+                        $catchFrame = $this->dispatchVmArgumentCountError($e, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {

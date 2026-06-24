@@ -281,6 +281,33 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'preserve_keys', 'array_slice'));
     }
 
+    /** @covers issue #11346 */
+    public function testArrayCombineNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('array_combine');
+        self::assertSame(['keys', 'values'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'keys', 'array_combine'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'values', 'array_combine'));
+    }
+
+    /** @covers issue #11348 */
+    public function testClearstatcacheNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('clearstatcache');
+        self::assertSame(['clear_realpath_cache', 'filename'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'clear_realpath_cache', 'clearstatcache'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', 'clearstatcache'));
+    }
+
+    /** @covers issue #11349 */
+    public function testVariadicArrayBuiltinsRejectNamedParameters(): void
+    {
+        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive'] as $fn) {
+            self::assertTrue(BuiltinParamNames::rejectsNamedParameters($fn), $fn);
+        }
+        self::assertFalse(BuiltinParamNames::rejectsNamedParameters('array_combine'));
+    }
+
     /** @covers issues #11111, #11112, #11113, #11114 */
     public function testStreamFamilyNamedParameters(): void
     {

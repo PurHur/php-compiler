@@ -67,6 +67,8 @@ final class BuiltinParamNames
                 return ['array', 'offset', 'length', 'preserve_keys'];
             case 'array_pad':
                 return ['array', 'length', 'value'];
+            case 'array_combine':
+                return ['keys', 'values'];
             case 'array_chunk':
                 return ['array', 'length', 'preserve_keys'];
             case 'similar_text':
@@ -91,6 +93,8 @@ final class BuiltinParamNames
                 return ['arg1', 'exp'];
             case 'ldexp':
                 return ['num', 'exp'];
+            case 'clearstatcache':
+                return ['clear_realpath_cache', 'filename'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'getenv':
@@ -234,6 +238,28 @@ final class BuiltinParamNames
             'call_user_func' => 1,
             default => null,
         };
+    }
+
+    /**
+     * php-src rejects all named parameters on these variadic array builtins (#11349).
+     */
+    public static function rejectsNamedParameters(string $name): bool
+    {
+        return match (strtolower($name)) {
+            'array_replace',
+            'array_merge',
+            'array_replace_recursive',
+            'array_merge_recursive' => true,
+            default => false,
+        };
+    }
+
+    /**
+     * @throws \ArgumentCountError
+     */
+    public static function throwUnknownNamedParameterError(string $name): never
+    {
+        throw new \ArgumentCountError(strtolower($name).'() does not accept unknown named parameters');
     }
 
     /**
