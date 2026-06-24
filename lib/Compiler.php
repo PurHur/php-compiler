@@ -5780,11 +5780,14 @@ class Compiler {
      * @param list<Op> $defaultBlockChildren
      */
     protected function tryFoldCompileTimeOperandDefault(
-        Operand $operand,
+        ?Operand $operand,
         Block $block,
         array $defaultBlockChildren = [],
         bool $materializeEnumCase = false
     ): ?Variable {
+        if (null === $operand) {
+            return null;
+        }
         $vm = $this->vmVariableFromCfgLiteralOperand($operand);
         if (null !== $vm) {
             return $vm;
