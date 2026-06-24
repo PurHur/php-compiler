@@ -23,8 +23,16 @@ final class UploadTempRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('phpc_upload_temp', $linker);
 
         $jit = (string) file_get_contents($root.'/lib/JIT/Builtin/UploadTempJit.php');
+        $this->assertStringContainsString('UploadTempJitHelper', $jit);
+        $this->assertStringNotContainsString('emitPathHasTraversal', $jit);
+        $this->assertStringNotContainsString('emitIsValidTemp', $jit);
         $this->assertStringContainsString('__compiler_is_uploaded_file', $jit);
         $this->assertStringContainsString('__compiler_move_uploaded_file', $jit);
+        $this->assertLessThan(360, \substr_count($jit, "\n") + 1);
+
+        $helper = (string) file_get_contents($root.'/ext/standard/UploadTempJitHelper.php');
+        $this->assertStringContainsString('VmFs::isValidUploadTempPath', $helper);
+        $this->assertStringContainsString('VmFs::moveUploadedFile', $helper);
 
         $web = (string) file_get_contents($root.'/lib/Web/UploadTemp.php');
         $this->assertStringContainsString('VmFs::UPLOAD_TEMP_PREFIX', $web);
