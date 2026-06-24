@@ -41,16 +41,20 @@ final class VmStreamSync
      */
     public static function isSupported(int $handle): bool
     {
-        if (!VmFs::isValidHandle($handle)) {
+        if ($handle <= 0) {
             return false;
         }
         if (VmPhpFdStream::isValidHandle($handle)) {
             return VmStreamMeta::supportsSync(VmFs::handleUri($handle));
         }
-        if (null === VmFs::lookupResource($handle)) {
-            return false;
+        if (VmFs::isValidHandle($handle)) {
+            return VmStreamMeta::supportsSync(VmFs::handleUri($handle));
+        }
+        $uri = VmFs::handleUri($handle);
+        if ('' !== $uri) {
+            return VmStreamMeta::supportsSync($uri);
         }
 
-        return VmStreamMeta::supportsSync(VmFs::handleUri($handle));
+        return false;
     }
 }
