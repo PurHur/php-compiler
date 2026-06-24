@@ -109,11 +109,57 @@ final class VmMbstring
         }
 
         return match ($mode) {
-            MbstringConstants::MB_CASE_UPPER => self::asciiUpper($source),
-            MbstringConstants::MB_CASE_LOWER => self::asciiLower($source),
-            MbstringConstants::MB_CASE_TITLE => self::asciiTitle($source),
+            MbstringConstants::MB_CASE_UPPER => 'UTF-8' === $encoding
+                ? self::utf8Upper($source)
+                : self::asciiUpper($source),
+            MbstringConstants::MB_CASE_LOWER => 'UTF-8' === $encoding
+                ? self::utf8Lower($source)
+                : self::asciiLower($source),
+            MbstringConstants::MB_CASE_TITLE => 'UTF-8' === $encoding
+                ? self::utf8Title($source)
+                : self::asciiTitle($source),
             default => throw new \ValueError('mb_convert_case(): Argument #2 ($mode) must be one of the MB_CASE_* constants'),
         };
+    }
+
+    private static function utf8Upper(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toUpper($cp));
+        }
+
+        return $out;
+    }
+
+    private static function utf8Lower(string $source): string
+    {
+        $out = '';
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLower($cp));
+        }
+
+        return $out;
+    }
+
+    private static function utf8Title(string $source): string
+    {
+        $out = '';
+        $upperNext = true;
+        foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
+            if ($upperNext) {
+                $cp = Utf8CaseMap::toUpper($cp);
+                $upperNext = false;
+            } else {
+                $cp = Utf8CaseMap::toLower($cp);
+            }
+            $out .= self::encodeUtf8Codepoint($cp);
+            if (Utf8CaseMap::isTitleDelimiter($cp)) {
+                $upperNext = true;
+            }
+        }
+
+        return $out;
     }
 
     private static function asciiUpper(string $source): string
