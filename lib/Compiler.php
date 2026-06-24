@@ -12101,6 +12101,11 @@ class Compiler {
                     }
                 }
                 if ($allSiblingFuncCalls) {
+                    // f(g(), h()) only — unrelated preceding stmt FuncCalls must not feed named locals (#11187).
+                    if (!$this->callArgsAreDistinctInlineTemporaries($callArgs)) {
+                        return null;
+                    }
+
                     return $producers[$argIndex];
                 }
             }
@@ -13921,6 +13926,11 @@ class Compiler {
 
     private function isNamedVariableOperand(Operand $arg): bool
     {
+        $name = Block::resolveVariableName($arg);
+        if (null !== $name && '' !== $name) {
+            return true;
+        }
+
         return $arg instanceof Operand\Variable
             && $arg->name instanceof Operand\Literal
             && is_string($arg->name->value)
