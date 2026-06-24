@@ -248,6 +248,7 @@ final class BuiltinClasses
         self::registerZendEnumInterfaces($ctx);
         self::registerSerializable($ctx);
         self::registerTraversableInterfaces($ctx);
+        ZendDeclaredInterfaces::register($ctx);
         SensitiveParamSupport::register($ctx);
         self::registerWeakReference($ctx);
         self::registerWeakMap($ctx);
