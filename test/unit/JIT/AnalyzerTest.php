@@ -13,6 +13,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Op\Expr\Array_;
 use PHPCfg\Op\Expr\StaticCall;
+use PHPCfg\Op\Expr\StaticPropertyFetch;
 use PHPCfg\Op\Terminal\StaticVar;
 use PHPCfg\Operand;
 use PHPTypes\Type;
@@ -67,6 +68,18 @@ class AnalyzerTest extends TestCase
         $staticCall = new StaticCall($class, $name, []);
 
         $this->assertNull($analyzer->computeStaticArraySize($staticCall->result));
+    }
+
+    public function testComputeStaticArraySizeStaticPropertyFetchWriteOp(): void
+    {
+        $analyzer = new Analyzer();
+        $class = new Operand\Literal('Foo');
+        $class->type = Type::string();
+        $name = new Operand\Literal('bar');
+        $name->type = Type::string();
+        $staticPropertyFetch = new StaticPropertyFetch($class, $name);
+
+        $this->assertNull($analyzer->computeStaticArraySize($staticPropertyFetch->result));
     }
 
     public function testCanEscapeFunctionStaticArrayInitOperand(): void
