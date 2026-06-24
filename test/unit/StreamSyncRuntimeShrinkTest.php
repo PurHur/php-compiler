@@ -14,10 +14,12 @@ final class StreamSyncRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamSyncJit.php');
         $this->assertStringContainsString('StreamSyncJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringNotContainsString('StreamSyncStandaloneLlvm', $source);
         $this->assertStringNotContainsString("lookupFunction('fsync')", $source);
         $this->assertStringNotContainsString("lookupFunction('fdatasync')", $source);
         $this->assertStringNotContainsString('__compiler_trigger_error', $source);
         $this->assertStringNotContainsString('emitUnsyncableWarning', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamSyncStandaloneLlvm.php');
         $this->assertLessThan(260, \substr_count($source, "\n") + 1);
     }
 

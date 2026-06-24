@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3006 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8104 |
+| Source constructs flagged (warnings) | 8103 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1063,6 +1063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamOpenFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamPath.php` | 0 | 1 |
 | `ext/standard/VmStreamSelectGuard.php` | 0 | 1 |
+| `ext/standard/VmStreamSocketFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSupports.php` | 0 | 1 |
@@ -2173,7 +2174,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSocketPairJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSync.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
-| `lib/JIT/Builtin/StreamSyncStandaloneLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
@@ -8348,7 +8348,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ModuleRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/NativeLastError.php`
 
@@ -9361,11 +9361,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInfo.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 93)
-- new Variable (line 98)
-- new HashTable (line 115)
-- new Variable (line 117)
-- 31 class method(s)
+- new HashTable (line 99)
+- new Variable (line 104)
+- new HashTable (line 121)
+- new Variable (line 123)
+- 32 class method(s)
 
 ### `ext/standard/VmIni.php`
 
@@ -10157,6 +10157,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `ext/standard/VmStreamSocketFailure.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmStreamSocketNative.php`
 
@@ -17133,15 +17138,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamSyncJit.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 230)
+- new JIT (line 222)
 - 9 class method(s)
 - 3 closure(s)
-
-### `lib/JIT/Builtin/StreamSyncStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 10 class method(s)
-- 2 closure(s)
 
 ### `lib/JIT/Builtin/StringAddslashes.php`
 

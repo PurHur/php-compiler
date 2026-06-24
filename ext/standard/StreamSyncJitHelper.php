@@ -14,6 +14,10 @@ use PHPCompiler\VM\ErrorReporter;
  */
 final class StreamSyncJitHelper
 {
+    private const FSYNC_UNSYNCABLE_WARNING = "fsync(): Can't fsync this stream!";
+
+    private const FDATASYNC_UNSYNCABLE_WARNING = "fdatasync(): Can't fsync this stream!";
+
     public static function isSyncSupported(int $handle): int
     {
         return VmStreamSync::isSupported($handle) ? 1 : 0;
@@ -22,8 +26,8 @@ final class StreamSyncJitHelper
     public static function warnUnsyncable(int $dataOnly): void
     {
         $message = 0 !== $dataOnly
-            ? VmStreamSync::FDATASYNC_UNSYNCABLE_WARNING
-            : VmStreamSync::FSYNC_UNSYNCABLE_WARNING;
+            ? self::FDATASYNC_UNSYNCABLE_WARNING
+            : self::FSYNC_UNSYNCABLE_WARNING;
         ErrorLastJitHelper::record(ErrorReporter::E_WARNING, $message, '', 0);
         if (ErrorSilenceJitHelper::isErrorLevelEnabled(ErrorReporter::E_WARNING)) {
             TriggerErrorJitHelper::stderrPrintCliError(ErrorReporter::E_WARNING, $message, '', 0);
