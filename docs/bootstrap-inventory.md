@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2969 |
-| Phase A inventory files (M2 ratio SSOT) | 2969 |
+| PHP files on vm.php path | 2970 |
+| Phase A inventory files (M2 ratio SSOT) | 2970 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8020 |
+| Source constructs flagged (warnings) | 8024 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -795,6 +795,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/LocaltimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
+| `ext/standard/MetaTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/Module.php` | 0 | 742 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
@@ -967,7 +968,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmLocaleCollate.php` | 0 | 1 |
 | `ext/standard/VmMath.php` | 0 | 1 |
 | `ext/standard/VmMemory.php` | 0 | 1 |
-| `ext/standard/VmMetaTags.php` | 0 | 1 |
+| `ext/standard/VmMetaTags.php` | 0 | 3 |
 | `ext/standard/VmMetaphone.php` | 0 | 1 |
 | `ext/standard/VmMime.php` | 0 | 1 |
 | `ext/standard/VmMinMax.php` | 0 | 2 |
@@ -2061,7 +2062,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MemoryManager/PHP.php` | 0 | 1 |
 | `lib/JIT/Builtin/MemoryRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/MemoryUsageJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NativeDlopen.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
@@ -7511,6 +7512,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/standard/MetaTagsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/MicrotimeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9376,7 +9382,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMetaTags.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new HashTable (line 44)
+- new Variable (line 54)
+- 6 class method(s)
 
 ### `ext/standard/VmMetaphone.php`
 
@@ -16477,7 +16485,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/MetaTagsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- new JIT (line 109)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/MimeContentTypeRuntime.php`
 
