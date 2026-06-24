@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -54,39 +53,12 @@ final class unpack extends Internal
 
                 return;
             }
-            $ret->array(self::importResult($result));
+            $ret->array(VmPack::importUnpackResult($result));
         });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         return \call_user_func_array([JitUnpack::class, 'unpack'], array_merge([$context], $args));
-    }
-
-    /**
-     * @param array<int|string, int|float|string> $result
-     */
-    private static function importResult(array $result): HashTable
-    {
-        $ht = new HashTable();
-        foreach ($result as $key => $value) {
-            $slot = new Variable();
-            if (\is_int($value)) {
-                $slot->int($value);
-            } elseif (\is_float($value)) {
-                $slot->float($value);
-            } elseif (\is_string($value)) {
-                $slot->string($value);
-            } else {
-                throw new \LogicException('unpack() result type not supported in this compiler build');
-            }
-            if (\is_int($key)) {
-                $ht->addIndex($key, $slot);
-            } else {
-                $ht->add($key, $slot);
-            }
-        }
-
-        return $ht;
     }
 }

@@ -21,8 +21,10 @@ final class StringUnpackRuntimeStandaloneTest extends TestCase
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringUnpackJit.php');
         $this->assertStringContainsString('__compiler_unpack', $jit);
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/UnpackJitRuntime.php');
-        $this->assertStringContainsString('StringUnpackJit', $linker);
+        $this->assertStringContainsString('StringUnpack', $linker);
         $this->assertStringNotContainsString('unpack_jit_runtime.c', $linker);
+        $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringUnpack.php');
+        $this->assertStringContainsString('UnpackJitHelper', $bridge);
         $aotLinker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_unpack.c', $aotLinker);
         $engine = (string) file_get_contents(__DIR__.'/../../../ext/standard/UnpackEngine.php');
