@@ -8,11 +8,11 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
@@ -35,19 +35,15 @@ final class constant_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('constant() requires exactly one argument');
         }
-        $nameVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $nameVar->type) {
-            throw new \TypeError(\sprintf(
-                self::NAME_TYPE_ERROR,
-                EnumCaseSupport::isEnumCaseVariable($nameVar)
-                    ? EnumCaseSupport::typeNameForVariable($nameVar)
-                    : self::vmTypeName($nameVar->type)
-            ));
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, 0, 'constant', 'name');
+            $name = $frame->calledArgs[0]->resolveIndirect()->toString();
+        } else {
+            $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'constant', 0, 'name');
         }
         if (null === $frame->vmContext) {
             throw new \LogicException('constant() requires VM context');
         }
-        $name = $nameVar->toString();
         $value = VmConstants::constantLookup($frame->vmContext, $name);
         if (null !== $value) {
             if (null !== $frame->returnVar) {
@@ -65,17 +61,30 @@ final class constant_ extends Internal
             throw new \LogicException('constant() requires exactly one argument');
         }
 
-        if (JITVariable::TYPE_VALUE === $args[0]->type || JITVariable::TYPE_OBJECT === $args[0]->type) {
-            JitStringBuiltinArg::lower($context, $args[0], 'constant', 0, 'name');
-        }
-        if (JITVariable::TYPE_STRING !== $args[0]->type) {
-            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($context, $args[0]));
-            $ptrType = $context->getTypeFromString('__value__*');
+        $nameArg = self::lowerJitNameArg($context, $args[0]);
 
-            return $ptrType->constNull();
+        return JitConstant::invoke($context, $nameArg);
+    }
+
+    private static function lowerJitNameArg(Context $context, JITVariable $arg): JITVariable
+    {
+        if ($context->callerStrictTypes) {
+            if (JITVariable::TYPE_VALUE === $arg->type || JITVariable::TYPE_OBJECT === $arg->type) {
+                JitStringBuiltinArg::lowerRequiredString($context, $arg, 'constant', 0, 'name');
+            }
+            if (JITVariable::TYPE_STRING !== $arg->type) {
+                self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($context, $arg));
+            }
+
+            return $arg;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $arg->type || 0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY)) {
+            JitStringBuiltinArg::lower($context, $arg, 'constant', 0, 'name');
+
+            return $arg;
         }
 
-        return JitConstant::invoke($context, $args[0]);
+        return JitNativeString::coerce($context, $arg);
     }
 
     private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
@@ -89,27 +98,5 @@ final class constant_ extends Internal
     private static function jitTypeErrorMessage(Context $context, JITVariable $arg): string
     {
         return \sprintf(self::NAME_TYPE_ERROR, JitOperandTypeLabel::givenLabel($context, $arg));
-    }
-
-    private static function vmTypeName(int $type): string
-    {
-        switch ($type) {
-            case Variable::TYPE_INTEGER:
-                return 'int';
-            case Variable::TYPE_FLOAT:
-                return 'float';
-            case Variable::TYPE_BOOLEAN:
-                return 'bool';
-            case Variable::TYPE_STRING:
-                return 'string';
-            case Variable::TYPE_NULL:
-                return 'null';
-            case Variable::TYPE_ARRAY:
-                return 'array';
-            case Variable::TYPE_OBJECT:
-                return 'object';
-            default:
-                return 'mixed';
-        }
     }
 }

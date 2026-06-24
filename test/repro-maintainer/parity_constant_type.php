@@ -4,8 +4,8 @@
 
 try {
     constant(1);
-} catch (TypeError $e) {
-    echo "TypeError\n";
+} catch (Error $e) {
+    echo "Error\n";
 } catch (Throwable $e) {
     echo get_class($e), "\n";
 }
