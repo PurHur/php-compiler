@@ -30,6 +30,10 @@ final class ModuleRegistryTest extends TestCase
         $this->assertNotFalse(VmInfo::phpversion('spl'));
         $this->assertFalse(VmInfo::phpversion('nonexistent_xyz'));
 
+        $core = VmInfo::phpversion();
+        $this->assertSame($core, VmInfo::phpversion('pcre'));
+        $this->assertSame('10.44', ModuleRegistry::getLibraryExtensionVersion('pcre'));
+
         $loaded = ModuleRegistry::getLoadedExtensions();
         $this->assertContains('zip', $loaded);
         $this->assertContains('spl', $loaded);

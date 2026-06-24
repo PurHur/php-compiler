@@ -61,6 +61,12 @@ final class VmInfo
         return 'core' === strtolower($extension);
     }
 
+    /** Built-in/static extensions report PHP runtime version from phpversion() (ext/standard/info.c). */
+    public static function isBundledExtensionName(string $extension): bool
+    {
+        return ModuleRegistry::isBundledExtension($extension);
+    }
+
     public static function phpversion(?string $extension = null): string|false
     {
         if (null === $extension || self::isEngineExtensionName($extension)) {
