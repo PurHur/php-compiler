@@ -14,6 +14,8 @@ final class SessionLifecycleRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SessionLifecycleRuntime.php');
         $this->assertStringContainsString('ensureRandomIdStringLinked', $source);
         $this->assertStringContainsString('phpc_session_random_id_string', $source);
+        $this->assertStringContainsString('SessionStorageGlobals::emitCallEnsureDefaults', $source);
+        $this->assertStringNotContainsString('emitEnsureDefaultSessionName', $source);
         $this->assertStringNotContainsString('__compiler_random_bytes', $source);
         $this->assertStringNotContainsString('sgen_loop_head', $source);
         $this->assertStringNotContainsString('HEX_TABLE', $source);
