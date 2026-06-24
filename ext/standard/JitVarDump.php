@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\StringVarDumpJit;
+use PHPCompiler\JIT\Builtin\StringVarDump;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -19,7 +19,7 @@ final class JitVarDump
             throw new \LogicException('var_dump() requires at least one argument');
         }
 
-        StringVarDumpJit::ensureLinked($context);
+        StringVarDump::ensureLinked($context);
         foreach ($args as $arg) {
             $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
             $context->builder->call(

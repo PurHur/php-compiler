@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringPrintRJit;
+use PHPCompiler\JIT\Builtin\StringPrintR;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\ValueEchoHelper;
@@ -22,7 +22,7 @@ final class JitPrintR
             throw new \LogicException('print_r() expects 1 or 2 arguments');
         }
 
-        StringPrintRJit::ensureLinked($context);
+        StringPrintR::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $args[0]);
         $str = $context->builder->call(
             $context->lookupFunction('__compiler_print_r'),
