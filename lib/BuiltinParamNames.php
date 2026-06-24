@@ -44,10 +44,11 @@ final class BuiltinParamNames
             case 'krsort':
             case 'natsort':
             case 'natcasesort':
+                return ['array', 'flags'];
             case 'usort':
             case 'uasort':
             case 'uksort':
-                return ['array', 'flags'];
+                return ['array', 'callback'];
             case 'array_push':
             case 'array_pop':
             case 'array_shift':
