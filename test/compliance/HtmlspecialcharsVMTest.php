@@ -25,6 +25,10 @@ final class HtmlspecialcharsVMTest extends BaseTest
             __DIR__.'/cases/stdlib/htmlspecialchars_double_encode_named.phpt',
             'htmlspecialchars_double_encode_named.phpt'
         );
+        yield 'htmlspecialchars_combined_flags.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/htmlspecialchars_combined_flags.phpt',
+            'htmlspecialchars_combined_flags.phpt'
+        );
     }
 
     public function setUp(): void

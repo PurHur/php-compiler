@@ -44,11 +44,12 @@ final class htmlspecialchars extends Internal
         $encoding = 'UTF-8';
         $doubleEncode = true;
         if (isset($frame->calledArgs[1])) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (VMVariable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException('htmlspecialchars() flags must be an integer in this compiler build');
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'htmlspecialchars',
+                2,
+                'flags'
+            );
         }
         if (isset($frame->calledArgs[2])) {
             $encoding = self::resolveEncodingVm($frame->calledArgs[2]->resolveIndirect());
