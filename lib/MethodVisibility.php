@@ -122,7 +122,15 @@ final class MethodVisibility
             return;
         }
         if ($callerClassLc === null) {
-            self::deny($visibilityFlags, $declaringClassDisplay, $methodName, null, $constructorMessage);
+            self::deny(
+                $visibilityFlags,
+                $declaringClassDisplay,
+                $methodName,
+                $callerClassDisplay,
+                $constructorMessage
+            );
+
+            return;
         }
         if (($visibilityFlags & CfgFunc::FLAG_PRIVATE) !== 0) {
             if ($callerClassLc !== $declaringClassLc) {

@@ -1985,10 +1985,7 @@ class VM {
                 ?? $resolvedClass->methodVisibility[$methodLc]
                 ?? \PHPCfg\Func::FLAG_PUBLIC;
             $callerClassLc = $this->callerClassLc($frame);
-            $callerDisplay = null;
-            if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
-                $callerDisplay = $this->context->classes[$callerClassLc]->name;
-            }
+            $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
             MethodVisibility::assertCloneCallable(
                 $vis,
                 $callerClassLc,
@@ -2019,10 +2016,7 @@ class VM {
             [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
             $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
             $callerClassLc = $this->callerClassLc($frame);
-            $callerDisplay = null;
-            if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
-                $callerDisplay = $this->context->classes[$callerClassLc]->name;
-            }
+            $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
             MethodVisibility::assertConstructorCallable(
                 $vis,
                 $callerClassLc,
@@ -10580,6 +10574,31 @@ restart:
         return $traitLc ?? $classLc;
     }
 
+    /**
+     * php-src: unbound Closure::bind/bindTo uses lexical scope "Closure" in visibility errors (zend_closures.c).
+     */
+    private function callerScopeDisplay(Frame $frame, ?string $callerClassLc): ?string
+    {
+        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
+            return $this->context->classes[$callerClassLc]->name;
+        }
+        if ($this->isUnscopedUserClosureFrame($frame)) {
+            return 'Closure';
+        }
+
+        return null;
+    }
+
+    private function isUnscopedUserClosureFrame(Frame $frame): bool
+    {
+        $state = $frame->closureCall ?? $frame->pendingClosureInvoke;
+        if (null === $state || !$state->isUserClosure()) {
+            return false;
+        }
+
+        return null === $state->boundScopeClass || '' === $state->boundScopeClass;
+    }
+
     /** Trait-sourced methods use trait scope for private member access (#4834, zend_compile.c). */
     private function traitScopeLcForFrameMethod(Frame $frame, string $classLc): ?string
     {
@@ -11767,10 +11786,7 @@ restart:
         }
         $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
         $callerClassLc = $this->callerClassLc($frame);
-        $callerDisplay = null;
-        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
-            $callerDisplay = $this->context->classes[$callerClassLc]->name;
-        }
+        $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
         $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
         try {
             MethodVisibility::assertCallable(
@@ -11882,10 +11898,7 @@ restart:
             );
         }
         $declaredName = $class->methodNames[$methodLc] ?? $methodName;
-        $callerDisplay = null;
-        if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
-            $callerDisplay = $this->context->classes[$callerClassLc]->name;
-        }
+        $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
         MethodVisibility::assertCallable(
             $vis,
             $callerClassLc,
@@ -13833,10 +13846,7 @@ restart:
                 [$declaringClass, $methodLc] = $this->resolveInstanceMethod($class, '__construct');
                 $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 $callerClassLc = $this->callerClassLc($frame);
-                $callerDisplay = null;
-                if (null !== $callerClassLc && isset($this->context->classes[$callerClassLc])) {
-                    $callerDisplay = $this->context->classes[$callerClassLc]->name;
-                }
+                $callerDisplay = $this->callerScopeDisplay($frame, $callerClassLc);
                 MethodVisibility::assertConstructorCallable(
                     $vis,
                     $callerClassLc,
