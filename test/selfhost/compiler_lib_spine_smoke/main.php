@@ -912,6 +912,7 @@ require_once __DIR__.'/../../../ext/standard/VmDebugBacktrace.php';
 require_once __DIR__.'/../../../ext/standard/VmDir.php';
 require_once __DIR__.'/../../../ext/standard/VmDirArg.php';
 require_once __DIR__.'/../../../ext/standard/VmDirNative.php';
+require_once __DIR__.'/../../../ext/standard/VmDirPure.php';
 require_once __DIR__.'/../../../ext/standard/VmDns.php';
 require_once __DIR__.'/../../../ext/standard/VmDnsMx.php';
 require_once __DIR__.'/../../../ext/standard/VmDnsUdpNative.php';

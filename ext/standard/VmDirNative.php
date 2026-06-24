@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * opendir/readdir/closedir/rewinddir via libc scandir(3) FFI — no host PHP delegation.
+ * opendir/readdir/closedir/rewinddir — libc scandir(3) FFI or {@see VmDirPure} fallback (#9034).
  *
  * Mirrors {@see \PHPCompiler\JIT\Builtin\StringDirJit} handle table (#5494, php-in-php).
  *
@@ -28,7 +28,7 @@ final class VmDirNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmDirPure::available();
     }
 
     /** @return list<string>|false */
@@ -109,25 +109,25 @@ final class VmDirNative
             return false;
         }
         $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
+        if (null !== $ffi) {
+            $namelist = $ffi->new('dirent**');
+            $count = (int) $ffi->scandir($path, \FFI::addr($namelist), null, null);
+            if ($count < 0) {
+                return false;
+            }
+
+            $entries = [];
+            for ($i = 0; $i < $count; ++$i) {
+                $entries[] = \FFI::string($namelist[$i]->d_name);
+                $ffi->free($namelist[$i]);
+            }
+            $ffi->free($namelist);
+            \sort($entries, \SORT_STRING);
+
+            return $entries;
         }
 
-        $namelist = $ffi->new('dirent**');
-        $count = (int) $ffi->scandir($path, \FFI::addr($namelist), null, null);
-        if ($count < 0) {
-            return false;
-        }
-
-        $entries = [];
-        for ($i = 0; $i < $count; ++$i) {
-            $entries[] = \FFI::string($namelist[$i]->d_name);
-            $ffi->free($namelist[$i]);
-        }
-        $ffi->free($namelist);
-        \sort($entries, \SORT_STRING);
-
-        return $entries;
+        return VmDirPure::listSorted($path);
     }
 
     /** @return int|null */
