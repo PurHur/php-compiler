@@ -346,6 +346,7 @@ require_once __DIR__.'/../../../ext/standard/ConvertCyrStringJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CslashesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CyrConvertTables.php';
 require_once __DIR__.'/../../../ext/standard/DateIntervalFormatJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/DefaultTimezoneJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DateMutationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DefineJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DeployPathJitHelper.php';
