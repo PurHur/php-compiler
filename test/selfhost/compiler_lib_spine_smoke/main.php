@@ -2749,6 +2749,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsAnonymous.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsInternal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionIsUserDefined.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodCreateFromMethodName.php';
