@@ -156,7 +156,7 @@ final class VmScope
         $result = new HashTable();
         foreach ($frame->calledArgs as $argIndex => $arg) {
             foreach (self::collectCompactNames($frame, (int) $argIndex + 1, $arg->resolveIndirect()) as $name) {
-                $value = self::callerVariable($caller, $name);
+                $value = self::resolveCompactVariable($frame, $caller, $name);
                 if (null === $value) {
                     self::compactUndefinedVariableWarning($frame, $name);
                     continue;
@@ -168,6 +168,19 @@ final class VmScope
         }
 
         return $result;
+    }
+
+    private static function resolveCompactVariable(Frame $frame, Frame $caller, string $name): ?Variable
+    {
+        $value = self::callerVariable($caller, $name);
+        if (null !== $value) {
+            return $value;
+        }
+        if (!Superglobals::isSuperglobalName($name) || null === $frame->vmContext) {
+            return null;
+        }
+
+        return $frame->vmContext->ensureSuperglobal($name);
     }
 
     /**

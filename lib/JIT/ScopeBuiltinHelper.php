@@ -46,6 +46,19 @@ final class ScopeBuiltinHelper
         return self::namedVariablesInScope($context)[$name] ?? null;
     }
 
+    public static function findCompactVariableByName(Context $context, string $name): ?Variable
+    {
+        $local = self::findVariableByName($context, $name);
+        if (null !== $local) {
+            return $local;
+        }
+        if (!Superglobals::isSuperglobalName($name)) {
+            return null;
+        }
+
+        return SuperglobalInit::load($context, $name);
+    }
+
     /**
      * @return Value
      * int64 import count
@@ -246,7 +259,7 @@ final class ScopeBuiltinHelper
 
     private static function addCompactByName(Context $context, Value $result, string $name): void
     {
-        $source = self::findVariableByName($context, $name);
+        $source = self::findCompactVariableByName($context, $name);
         if (null === $source) {
             self::emitCompactUndefinedVariableWarning($context, $name);
 
