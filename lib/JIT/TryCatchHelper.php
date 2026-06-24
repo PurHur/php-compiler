@@ -139,23 +139,45 @@ final class TryCatchHelper
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
 
         $builder = $context->builder;
-        $branchBlock = $context->scope->blockStorage[$handlerBlock] ?? $builder->getInsertBlock();
+        $branchBlock = null;
+        try {
+            $branchBlock = $builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        if (null === $branchBlock || null !== $branchBlock->getTerminator()) {
+            $cached = $context->scope->blockStorage[$handlerBlock] ?? null;
+            if (null !== $cached && null === $cached->getTerminator()) {
+                $branchBlock = $cached;
+            } elseif (null === $branchBlock || null !== $branchBlock->getTerminator()) {
+                $branchBlock = self::appendBlock($func, 'try_branch_'.self::blockSuffix($handler));
+            }
+        }
         if (null === $branchBlock) {
             throw new \LogicException('TYPE_TRY lowering requires an active LLVM basic block');
         }
+        $context->scope->blockStorage[$handlerBlock] = $branchBlock;
         $builder->positionAtEnd($branchBlock);
         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
         $builder->call($context->lookupFunction('phpc_jit_clear_return_pending'));
-        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (null === $mergeBb) {
-            $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+        $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
+        if (null === $mergeHeaderBb) {
+            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
         }
+        $mergeBb = $mergeHeaderBb;
         if (!$handler->mergeBodyCompiled) {
-            if (null === $mergeBb->getTerminator()) {
-                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
+            if (null === $mergeBodyBb->getTerminator()) {
+                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
             }
+            $builder->positionAtEnd($mergeHeaderBb);
+            if (null === $mergeHeaderBb->getTerminator()) {
+                $builder->branch($mergeBodyBb);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'try_merge_after_compile');
             $handler->mergeBodyCompiled = true;
         }
+        $builder->positionAtEnd($branchBlock);
         if (null !== $handler->finallyOp) {
             self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
         }

@@ -610,6 +610,7 @@ class JIT {
             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
         }
         $retval = $this->coerceReturnValue($return, $retval, $expected);
+        $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
         // Arm-tail ?: returns must not use merge-block dead operands — they free branch
         // locals (e.g. string params) before coerceReturnValue finishes (#8555).
         if ($this->isVoidLlvmFunction($func)) {
@@ -5944,6 +5945,7 @@ class JIT {
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'included_at_entry_cont');
 
         return $exit;
     }
@@ -7865,10 +7867,7 @@ class JIT {
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
-                    $branchBlock = $builder->getInsertBlock();
-                    if (null !== $branchBlock->getTerminator()) {
-                        break;
-                    }
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jump_cont');
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
@@ -9608,6 +9607,12 @@ class JIT {
         }
         if (('int64' === $wantStr || 'long long' === $wantStr) && ('int32' === $haveStr || 'int1' === $haveStr)) {
             return $this->context->builder->zext($retval, $want);
+        }
+        if ('__hashtable__*' === $wantStr && '__object__*' === $haveStr) {
+            return $this->context->builder->bitcast($retval, $want);
+        }
+        if ('__object__*' === $wantStr && '__hashtable__*' === $haveStr) {
+            return $this->context->builder->bitcast($retval, $want);
         }
         if ('__value__' === $wantStr && '__value__*' === $haveStr) {
             return $this->context->builder->load($retval);
