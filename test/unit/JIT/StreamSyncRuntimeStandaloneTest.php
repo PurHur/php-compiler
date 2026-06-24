@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * fsync()/fdatasync() LLVM helpers must lower without C symbols in phpc_stream.c (#6062, #6813).
+ * fsync()/fdatasync() LLVM helpers via StreamSyncJitHelper PHP (#6062, #6813, #9815).
  *
  * @group aot-lint
  */
@@ -29,5 +29,10 @@ final class StreamSyncRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn, $name);
             $this->assertGreaterThan(0, $fn->countBasicBlocks(), $name);
         }
+
+        $this->assertNotNull(
+            $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\StreamSyncJitHelper::syncFileno')] ?? null,
+            'StreamSyncJitHelper::syncFileno must be compiled into standalone module'
+        );
     }
 }

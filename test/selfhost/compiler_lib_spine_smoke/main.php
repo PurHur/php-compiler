@@ -2224,7 +2224,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketPair.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSocketPairJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSync.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSyncJit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamSyncStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringAddslashes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBitwiseNot.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringBz2.php';

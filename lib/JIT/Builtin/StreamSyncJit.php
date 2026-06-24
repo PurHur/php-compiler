@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
@@ -14,8 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_fsync / __compiler_fdatasync via StreamSyncJitHelper PHP (#9815).
  *
- * Thin LLVM resolves stream handles to OS fds; libc sync + warnings live in PHP helper.
- * php-src: ext/standard/file.c — PHP_FUNCTION(fsync), PHP_FUNCTION(fdatasync)
+ * JIT embed and AOT standalone compile {@see StreamSyncJitHelper} into the module; thin LLVM
+ * bridges forward __compiler_fsync/__compiler_fdatasync ABI. php-src: ext/standard/file.c
  */
 final class StreamSyncJit
 {
@@ -44,13 +43,6 @@ final class StreamSyncJit
     {
         $probe = $context->module->getNamedFunction('__compiler_fsync');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamSyncStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
