@@ -2051,6 +2051,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/BackedEnumFromRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Bcmath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/BcmathJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CallArgv.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/CallUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CastArrayRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CastArrayValueBoxJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CastObjectFromHashtableJit.php';
