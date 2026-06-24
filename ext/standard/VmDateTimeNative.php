@@ -281,7 +281,7 @@ final class VmDateTimeNative
                 3 => 'Not enough data available to satisfy format',
             ]);
         }
-        $normalized = self::normalizeMatchedComponents($matched);
+        $normalized = self::warnInvalidCalendarComponents($matched);
         $result = self::parseResultFromComponents($normalized['components']);
         if ([] !== $normalized['warnings']) {
             $result['warning_count'] = \count($normalized['warnings']);
@@ -680,32 +680,79 @@ final class VmDateTimeNative
      *
      * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
      */
+    private static function warnInvalidCalendarComponents(array $components): array
+    {
+        $warnings = [];
+        $year = $components['year'];
+        $month = $components['month'];
+        $day = $components['day'];
+        if (false !== $year && false !== $month && false !== $day
+            && !self::isValidCalendarDate($year, $month, $day)) {
+            $warnings[10] = 'The parsed date was invalid';
+        }
+
+        return ['components' => $components, 'warnings' => $warnings];
+    }
+
+    /**
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float
+     * } $components
+     *
+     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     */
     private static function normalizeMatchedComponents(array $components): array
     {
         $warnings = [];
         $year = $components['year'];
         $month = $components['month'];
         $day = $components['day'];
-        if (false !== $year && false !== $month && false !== $day) {
-            $invalid = false;
-            while ($day > self::daysInMonth($year, $month)) {
-                $day -= self::daysInMonth($year, $month);
-                ++$month;
-                if ($month > 12) {
-                    $month = 1;
-                    ++$year;
-                }
-                $invalid = true;
-            }
-            if ($invalid) {
-                $warnings[10] = 'The parsed date was invalid';
-            }
-            $components['year'] = $year;
-            $components['month'] = $month;
-            $components['day'] = $day;
+        if (false === $year || false === $month || false === $day) {
+            return ['components' => $components, 'warnings' => $warnings];
         }
+        $invalid = false;
+        while ($month > 12) {
+            $month -= 12;
+            ++$year;
+            $invalid = true;
+        }
+        while ($month < 1) {
+            $month += 12;
+            --$year;
+            $invalid = true;
+        }
+        while ($day > self::daysInMonth($year, $month)) {
+            $day -= self::daysInMonth($year, $month);
+            ++$month;
+            if ($month > 12) {
+                $month = 1;
+                ++$year;
+            }
+            $invalid = true;
+        }
+        if ($invalid) {
+            $warnings[10] = 'The parsed date was invalid';
+        }
+        $components['year'] = $year;
+        $components['month'] = $month;
+        $components['day'] = $day;
 
         return ['components' => $components, 'warnings' => $warnings];
+    }
+
+    private static function isValidCalendarDate(int $year, int $month, int $day): bool
+    {
+        if ($month < 1 || $month > 12 || $day < 1) {
+            return false;
+        }
+
+        return $day <= self::daysInMonth($year, $month);
     }
 
     private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
