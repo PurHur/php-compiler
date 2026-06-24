@@ -750,6 +750,7 @@ require_once __DIR__.'/../../../ext/standard/JitStrPad.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRepeat.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplace.php';
 require_once __DIR__.'/../../../ext/standard/JitStrReplaceArray.php';
+require_once __DIR__.'/../../../ext/standard/JitStrReplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRot13.php';
 require_once __DIR__.'/../../../ext/standard/JitStrShuffle.php';
 require_once __DIR__.'/../../../ext/standard/JitStrSplit.php';
