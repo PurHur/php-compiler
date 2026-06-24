@@ -1597,10 +1597,25 @@ class Object_ extends Type {
             return;
         }
         $this->zendBuiltinInterfacesSeeded = true;
+        $this->ensureTraversableBuiltinInterfaces();
         $this->markInterfaceClass('UnitEnum');
         $this->markInterfaceClass('BackedEnum');
         $this->setInterfaceExtends('BackedEnum', ['UnitEnum']);
         $this->markInterfaceClass('Serializable');
+        $this->markInterfaceClass('SeekableIterator');
+        $this->setInterfaceExtends('SeekableIterator', ['Iterator']);
+        $this->markInterfaceClass('Reflector');
+        $this->markInterfaceClass('DOMParentNode');
+        $this->markInterfaceClass('DOMChildNode');
+        $this->setInterfaceExtends('DOMChildNode', ['DOMParentNode']);
+        $this->markInterfaceClass('SessionHandlerInterface');
+        $this->markInterfaceClass('SessionIdInterface');
+        $this->setInterfaceExtends('SessionIdInterface', ['SessionHandlerInterface']);
+        $this->markInterfaceClass('SessionUpdateTimestampHandlerInterface');
+        $this->setInterfaceExtends('SessionUpdateTimestampHandlerInterface', ['SessionHandlerInterface']);
+        $this->markInterfaceClass('Random\\Engine');
+        $this->markInterfaceClass('Random\\CryptoSafeEngine');
+        $this->setInterfaceExtends('Random\\CryptoSafeEngine', ['Random\\Engine']);
     }
 
     /** Zend traversable/iterator/iteratoraggregate hierarchy for instanceof (#4754, #4771). */
