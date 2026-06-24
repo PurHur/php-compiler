@@ -25,8 +25,8 @@ final class prev extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('prev() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArrayPointer::requireByRefArray($frame->calledArgs[0], 'prev');
-        VmArrayPointer::returnValue($frame, $ht->pointerPrev());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'prev', true);
+        VmArrayPointer::returnValue($frame, $target->pointerPrev());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

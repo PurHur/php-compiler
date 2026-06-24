@@ -23,8 +23,8 @@ final class pos extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('pos() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0], 'pos');
-        VmArrayPointer::returnValue($frame, $ht->pointerCurrent());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'pos', false);
+        VmArrayPointer::returnValue($frame, $target->pointerCurrent());
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -25,8 +25,8 @@ final class current extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \ArgumentCountError('current() expects exactly 1 argument, '.\count($frame->calledArgs).' given');
         }
-        $ht = VmArray::requireArray($frame->calledArgs[0], 'current');
-        VmArrayPointer::returnValue($frame, $ht->pointerCurrent());
+        $target = VmArrayPointer::requirePointerTarget($frame->calledArgs[0], 'current', false);
+        VmArrayPointer::returnValue($frame, $target->pointerCurrent());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
