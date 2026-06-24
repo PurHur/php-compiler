@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * CSV line parsing for str_getcsv() VM path (subset of PHP; issue #2391).
  *
- * Canonical CSV parser for VM + JIT/AOT (StringStrGetcsvJit / StringFgetcsvJit, #6750).
+ * Canonical CSV parser for VM + JIT/AOT ({@see CsvJitHelper}, StringStrGetcsv, #9444).
  */
 final class VmCsv
 {

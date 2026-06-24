@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * str_getcsv() — parse a CSV line from a string (subset of PHP; issue #2391).
  *
- * VM: {@see VmCsv::parseLine()}; JIT/AOT: {@see JitStrGetcsv} via StringStrGetcsvJit.
+ * VM: {@see VmCsv::parseLine()}; JIT/AOT: {@see JitStrGetcsv} via StringStrGetcsv + CsvJitHelper (#9444).
  */
 final class str_getcsv extends Internal
 {

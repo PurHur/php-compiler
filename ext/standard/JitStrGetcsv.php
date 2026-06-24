@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Value;
 
-/** LLVM lowering for str_getcsv() via StringStrGetcsvJit (issue #5288). */
+/** LLVM lowering for str_getcsv() via StringStrGetcsv / CsvJitHelper (#5288, #9444). */
 final class JitStrGetcsv
 {
     public static function invoke(
