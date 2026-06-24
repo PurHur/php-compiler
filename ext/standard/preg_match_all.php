@@ -52,8 +52,8 @@ final class preg_match_all extends Internal
 
         if ($hasMatches) {
             $target = $frame->calledArgs[2]->resolveIndirect();
-            $replacement = VmJson::import($hostMatches);
-            $target->copyFrom($replacement);
+            $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
+            $target->array($ht);
         }
 
         if (null === $frame->returnVar) {
