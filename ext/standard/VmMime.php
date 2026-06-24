@@ -11,7 +11,7 @@ use PHPCompiler\VM\Variable;
  * MIME type sniffing for mime_content_type() (php-src ext/standard/file.c; #6196, #7865).
  *
  * VM and JIT/AOT share byte sniff via detectFromBytes() — no host fileinfo delegation.
- * JIT/AOT: lib/JIT/Builtin/MimeContentTypeRuntime.php.
+ * JIT/AOT: {@see MimeContentTypeJitHelper} via lib/JIT/Builtin/MimeContentTypeRuntime.php.
  */
 final class VmMime
 {
