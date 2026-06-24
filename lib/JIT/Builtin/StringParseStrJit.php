@@ -36,6 +36,26 @@ final class StringParseStrJit
         self::implement($context);
     }
 
+    /** Superglobals/multipart LLVM helpers only — main entry is {@see ParseStrRuntime} (#9295). */
+    public static function ensureSubhelpers(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        self::ensureLibc($context);
+        self::ensureHashtableHelpers($context);
+
+        self::implementIfMissing($context, '__phpc_parse_str_cstr_to_string', self::emitCstrToString(...));
+        self::implementIfMissing($context, '__phpc_parse_str_set_string_key', self::emitSetStringKey(...));
+        self::implementIfMissing($context, '__phpc_parse_str_url_decode_inplace', self::emitUrlDecodeInplace(...));
+        self::implementIfMissing($context, '__phpc_parse_str_trim_ws_inplace', self::emitTrimWsInplace(...));
+        self::implementIfMissing($context, '__phpc_parse_str_free_parsed_key', self::emitFreeParsedKey(...));
+        self::implementIfMissing($context, '__phpc_parse_str_parse_key_brackets', self::emitParseKeyBrackets(...));
+        self::implementIfMissing($context, '__phpc_parse_str_ensure_child', self::emitEnsureChild(...));
+        self::implementIfMissing($context, '__phpc_parse_str_set_nested_value', self::emitSetNestedValue(...));
+        self::implementIfMissing($context, '__phpc_parse_str_parse_delimited_pairs', self::emitParseDelimitedPairs(...));
+
+        self::restoreInsertBlock($context, $restore);
+    }
+
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
@@ -50,15 +70,7 @@ final class StringParseStrJit
             return;
         }
 
-        self::implementIfMissing($context, '__phpc_parse_str_cstr_to_string', self::emitCstrToString(...));
-        self::implementIfMissing($context, '__phpc_parse_str_set_string_key', self::emitSetStringKey(...));
-        self::implementIfMissing($context, '__phpc_parse_str_url_decode_inplace', self::emitUrlDecodeInplace(...));
-        self::implementIfMissing($context, '__phpc_parse_str_trim_ws_inplace', self::emitTrimWsInplace(...));
-        self::implementIfMissing($context, '__phpc_parse_str_free_parsed_key', self::emitFreeParsedKey(...));
-        self::implementIfMissing($context, '__phpc_parse_str_parse_key_brackets', self::emitParseKeyBrackets(...));
-        self::implementIfMissing($context, '__phpc_parse_str_ensure_child', self::emitEnsureChild(...));
-        self::implementIfMissing($context, '__phpc_parse_str_set_nested_value', self::emitSetNestedValue(...));
-        self::implementIfMissing($context, '__phpc_parse_str_parse_delimited_pairs', self::emitParseDelimitedPairs(...));
+        self::ensureSubhelpers($context);
         self::implementIfMissing($context, '__compiler_parse_str', self::emitCompilerParseStr(...));
 
         self::restoreInsertBlock($context, $restore);

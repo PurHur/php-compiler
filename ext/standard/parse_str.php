@@ -17,7 +17,7 @@ use PHPLLVM\Value;
 use ArgumentCountError;
 
 /**
- * parse_str() — query string parser (VM: ParseStrEngine; JIT compile-time: JitParseStrMaterializer; runtime: StringParseStrJit).
+ * parse_str() — query string parser (VM: ParseStrEngine; JIT compile-time: JitParseStrMaterializer; runtime: ParseStrRuntime).
  */
 final class parse_str extends Internal
 {
