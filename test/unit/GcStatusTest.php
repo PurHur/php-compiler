@@ -34,32 +34,54 @@ PHP;
         $this->assertStringContainsString('threshold=10001', $output);
     }
 
-    public function testGcStatusPhp84Fields(): void
+    public function testGcStatusPhpSrcShape(): void
     {
         $code = <<<'PHP'
 <?php
 $s = gc_status();
+ksort($s);
+echo implode(',', array_keys($s)), "\n";
 foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
     echo $key, '=', array_key_exists($key, $s) ? 'yes' : 'no', "\n";
-    if (array_key_exists($key, $s)) {
-        echo $key, '_type=', is_bool($s[$key]) ? 'bool' : (is_int($s[$key]) ? 'int' : 'other'), "\n";
-    }
+}
+foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
+    echo $key, '=', array_key_exists($key, $s) ? 'yes' : 'no', "\n";
 }
 PHP;
 
         $rt = new Runtime();
-        $block = $rt->parseAndCompile($code, 'gc_status_php84.php');
+        $block = $rt->parseAndCompile($code, 'gc_status_shape.php');
         ob_start();
         $rt->run($block);
         $output = ob_get_clean();
 
+        $this->assertStringContainsString('collected,roots,runs,threshold', $output);
         foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+            $this->assertStringContainsString($key.'=no', $output);
+        }
+        foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
             $this->assertStringContainsString($key.'=yes', $output);
         }
-        $this->assertStringContainsString('running_type=bool', $output);
-        $this->assertStringContainsString('protected_type=bool', $output);
-        $this->assertStringContainsString('full_type=bool', $output);
-        $this->assertStringContainsString('buffer_size_type=int', $output);
+    }
+
+    public function testGcMemCachesReturnsNonZeroOnFirstCall(): void
+    {
+        $code = <<<'PHP'
+<?php
+$first = gc_mem_caches();
+$second = gc_mem_caches();
+echo 'first=', ($first > 0 ? 'nonzero' : 'zero'), "\n";
+echo 'second=', ($second > 0 ? 'nonzero' : 'zero'), "\n";
+PHP;
+
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'gc_mem_caches_return.php');
+        ob_start();
+        $rt->run($block);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('first=nonzero', $output);
+        $this->assertStringContainsString('second=zero', $output);
     }
 
     public function testGcCollectCyclesUpdatesStatus(): void

@@ -62,29 +62,20 @@ final class CycleCollector
      */
     public static function status(Context $ctx): array
     {
-        $bufferSize = self::DEFAULT_BUFFER_SIZE;
         $roots = self::countBufferedRoots($ctx);
 
         return [
-            'running' => self::$running,
-            'protected' => self::$protected,
-            'full' => $bufferSize > self::MAX_BUFFER_SIZE,
             'runs' => self::$runs,
             'collected' => self::$totalCollected,
             'threshold' => self::ROOT_THRESHOLD,
-            'buffer_size' => $bufferSize,
             'roots' => $roots,
         ];
     }
 
-    /** Release VM allocator caches — no Zend MM layer yet (php_gc.c gc_mem_caches subset). */
+    /** Release VM allocator caches (php_gc.c gc_mem_caches / zend_mm_gc parity, #9160). */
     public static function memCaches(): int
     {
-        $peak = MemoryAccounting::peakBytes();
-        $current = MemoryAccounting::currentBytes();
-        MemoryAccounting::resetPeakToCurrent();
-
-        return max(0, $peak - $current);
+        return MemoryAccounting::releaseMmCaches();
     }
 
     public static function collect(Context $ctx): int
