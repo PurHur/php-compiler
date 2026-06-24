@@ -224,6 +224,7 @@ class Analyzer
                 || $op instanceof Op\Expr\StaticCall
                 || $op instanceof Op\Expr\MethodCall
                 || $op instanceof Op\Expr\PropertyFetch
+                || $op instanceof Op\Expr\StaticPropertyFetch
                 || $op instanceof Op\Expr\Param
                 || $op instanceof Op\Expr\ConstFetch
                 || $op instanceof FirstClassCallable
