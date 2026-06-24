@@ -858,6 +858,7 @@ require_once __DIR__.'/../../../ext/standard/PrintRJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregReplacementExpand.php';
 require_once __DIR__.'/../../../ext/standard/ProgressJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReadfileJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/MimeContentTypeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ReadonlyRaiseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RequestMethodEnumData.php';
 require_once __DIR__.'/../../../ext/standard/SetcookieLine.php';
