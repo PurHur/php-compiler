@@ -28,6 +28,8 @@ final class VmNumberFormat
             throw new \TypeError(self::numTypeError($given));
         }
         switch ($value->type) {
+            case Variable::TYPE_NULL:
+                return 0.0;
             case Variable::TYPE_INTEGER:
                 return (float) $value->toInt();
             case Variable::TYPE_FLOAT:
