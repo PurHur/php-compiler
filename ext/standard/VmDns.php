@@ -276,7 +276,7 @@ final class VmDns
         }
 
         if ([] === $records) {
-            return false;
+            return new HashTable();
         }
 
         $ht = new HashTable();
