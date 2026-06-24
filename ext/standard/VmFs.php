@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\ext\posix\VmPosix;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ScriptStack;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
@@ -840,10 +841,7 @@ final class VmFs
                 break;
             }
             $readLen = \strlen($chunk);
-            $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written || $written !== $readLen) {
-                return false;
-            }
+            OutputBuffer::append($chunk);
             $total += $readLen;
         }
 
@@ -868,10 +866,7 @@ final class VmFs
                 break;
             }
             $readLen = \strlen($chunk);
-            $written = @fwrite(\STDOUT, $chunk);
-            if (false === $written || $written !== $readLen) {
-                return false;
-            }
+            OutputBuffer::append($chunk);
             $total += $readLen;
         }
 

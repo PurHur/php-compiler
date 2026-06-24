@@ -64,6 +64,7 @@ final class StreamReadJit
 
         self::ensureLibc($context);
         StreamFilter::ensureLinked($context);
+        ObOutputRuntime::ensureLinked($context);
 
         self::implementIfMissing($context, '__phpc_read_stream_bytes', self::emitReadStreamBytes(...));
         self::implementIfMissing($context, '__compiler_flock', self::emitFlock(...));
@@ -303,7 +304,6 @@ final class StreamReadJit
         $context->builder->branchIf($fpNull, $failBb, $loopInitBb);
 
         $context->builder->positionAtEnd($loopInitBb);
-        $stdoutFp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $i64->constInt(1, false));
         $buf = $context->builder->alloca($i8, 8192, 'fpassthru_buf');
         $loopBb = $fn->appendBasicBlock('fpassthru_loop');
         $context->builder->branch($loopBb);
@@ -322,10 +322,13 @@ final class StreamReadJit
         $context->builder->branchIf($hasErr, $failBb, $doneBb);
 
         $context->builder->positionAtEnd($writeBb);
-        $wrote = $context->builder->call($context->lookupFunction('fwrite'), $buf, $oneSize, $got, $stdoutFp);
-        $writeBad = $context->builder->icmp(Builder::INT_NE, $wrote, $got);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_ob_append_bytes'),
+            $buf,
+            $got
+        );
         $loopNextBb = $fn->appendBasicBlock('fpassthru_next');
-        $context->builder->branchIf($writeBad, $failBb, $loopNextBb);
+        $context->builder->branch($loopNextBb);
 
         $context->builder->positionAtEnd($loopNextBb);
         $nextTotal = $context->builder->add($totalPhi, $context->builder->sext($got, $i64));
