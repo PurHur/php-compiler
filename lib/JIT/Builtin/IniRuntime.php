@@ -28,7 +28,7 @@ final class IniRuntime
 
     private const MEMORY_LIMIT_CAP = 64;
 
-    private const MEMORY_LIMIT_DEFAULT = '128M';
+    private const MEMORY_LIMIT_DEFAULT = '-1';
 
     private const SNPRINTF_BUF = 64;
 
@@ -106,6 +106,8 @@ final class IniRuntime
         $sotBb = $fn->appendBasicBlock('ig_sot');
         $raaBb = $fn->appendBasicBlock('ig_raa');
         $zegBb = $fn->appendBasicBlock('ig_zeg');
+        $metBb = $fn->appendBasicBlock('ig_met');
+        $dcsBb = $fn->appendBasicBlock('ig_dcs');
         $testEr = $fn->appendBasicBlock('ig_test_er');
         $testDe = $fn->appendBasicBlock('ig_test_de');
         $testMl = $fn->appendBasicBlock('ig_test_ml');
@@ -117,6 +119,8 @@ final class IniRuntime
         $testSot = $fn->appendBasicBlock('ig_test_sot');
         $testRaa = $fn->appendBasicBlock('ig_test_raa');
         $testZeg = $fn->appendBasicBlock('ig_test_zeg');
+        $testMet = $fn->appendBasicBlock('ig_test_met');
+        $testDcs = $fn->appendBasicBlock('ig_test_dcs');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -140,7 +144,9 @@ final class IniRuntime
         self::branchIfKey($context, $testIp, $optCstr, 'include_path', $ipBb, $testSot);
         self::branchIfKey($context, $testSot, $optCstr, 'short_open_tag', $sotBb, $testRaa);
         self::branchIfKey($context, $testRaa, $optCstr, 'register_argc_argv', $raaBb, $testZeg);
-        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $failBb);
+        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $testMet);
+        self::branchIfKey($context, $testMet, $optCstr, 'max_execution_time', $metBb, $testDcs);
+        self::branchIfKey($context, $testDcs, $optCstr, 'default_charset', $dcsBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
         SilenceRuntime::emitIniGetErrorReporting($context, $out);
@@ -200,6 +206,16 @@ final class IniRuntime
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
+        $context->builder->positionAtEnd($metBb);
+        self::writeIniGetLiteral($context, $out, '0');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($dcsBb);
+        self::writeIniGetLiteral($context, $out, 'UTF-8');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
         $context->builder->positionAtEnd($failBb);
         self::writeValueBoolFalse($context, $out);
         self::freeCstr($context, $fn, $optCstr);
@@ -218,6 +234,8 @@ final class IniRuntime
         $sotBb = $fn->appendBasicBlock('icg_sot');
         $raaBb = $fn->appendBasicBlock('icg_raa');
         $zegBb = $fn->appendBasicBlock('icg_zeg');
+        $metBb = $fn->appendBasicBlock('icg_met');
+        $dcsBb = $fn->appendBasicBlock('icg_dcs');
         $testEr = $fn->appendBasicBlock('icg_test_er');
         $testDe = $fn->appendBasicBlock('icg_test_de');
         $testMl = $fn->appendBasicBlock('icg_test_ml');
@@ -225,6 +243,8 @@ final class IniRuntime
         $testSot = $fn->appendBasicBlock('icg_test_sot');
         $testRaa = $fn->appendBasicBlock('icg_test_raa');
         $testZeg = $fn->appendBasicBlock('icg_test_zeg');
+        $testMet = $fn->appendBasicBlock('icg_test_met');
+        $testDcs = $fn->appendBasicBlock('icg_test_dcs');
 
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
@@ -243,7 +263,9 @@ final class IniRuntime
         self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testSot);
         self::branchIfKey($context, $testSot, $optCstr, 'short_open_tag', $sotBb, $testRaa);
         self::branchIfKey($context, $testRaa, $optCstr, 'register_argc_argv', $raaBb, $testZeg);
-        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $failBb);
+        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $testMet);
+        self::branchIfKey($context, $testMet, $optCstr, 'max_execution_time', $metBb, $testDcs);
+        self::branchIfKey($context, $testDcs, $optCstr, 'default_charset', $dcsBb, $failBb);
 
         $i8p = $context->getTypeFromString('int8*');
 
@@ -298,6 +320,16 @@ final class IniRuntime
 
         $context->builder->positionAtEnd($zegBb);
         self::writeIniGetLiteral($context, $out, '1');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($metBb);
+        self::writeIniGetLiteral($context, $out, '0');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($dcsBb);
+        self::writeIniGetLiteral($context, $out, 'UTF-8');
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 

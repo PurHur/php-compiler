@@ -9,7 +9,7 @@ echo $gid >= 0 ? "gid\n" : "bad_gid\n";
 $user = get_current_user();
 echo is_string($user) && '' !== $user ? "user\n" : "bad_user\n";
 $ml = get_cfg_var('memory_limit');
-echo $ml === '128M' ? "cfg_ml\n" : "bad_cfg\n";
+echo $ml === '-1' ? "cfg_ml\n" : "bad_cfg\n";
 --EXPECT--
 uid
 gid
