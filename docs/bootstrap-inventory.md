@@ -6412,7 +6412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitNumberFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitObClean.php`
 
@@ -12167,8 +12167,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/implode.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 151)
-- new Error (line 171)
+- new Error (line 157)
+- new Error (line 177)
 - 11 class method(s)
 
 ### `ext/standard/in_array.php`
@@ -13556,9 +13556,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_ireplace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 66)
-- new Variable (line 82)
-- new Variable (line 88)
+- new HashTable (line 68)
+- new Variable (line 84)
+- new Variable (line 90)
 - 10 class method(s)
 
 ### `ext/standard/str_pad.php`
@@ -13581,10 +13581,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 67)
-- new Variable (line 78)
-- new Variable (line 84)
-- 5 class method(s)
+- new HashTable (line 69)
+- new Variable (line 80)
+- new Variable (line 86)
+- 4 class method(s)
 
 ### `ext/standard/str_rot13.php`
 
