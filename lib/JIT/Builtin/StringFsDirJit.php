@@ -74,8 +74,8 @@ final class StringFsDirJit
         self::implementIfMissing($context, '__compiler_copy', self::emitCopy(...));
         self::implementIfMissing($context, '__compiler_resolve_sidecar_source_path', self::emitResolveSidecarSourcePath(...));
         FsDirRuntime::ensureLinked($context);
+        SysGetTempDirRuntime::ensureLinked($context);
         self::implementIfMissing($context, '__phpc_stat', self::emitStat(...));
-        self::implementIfMissing($context, '__compiler_sys_get_temp_dir', self::emitSysGetTempDir(...));
         self::implementIfMissing($context, '__compiler_chgrp', self::emitChgrp(...));
         self::implementIfMissing($context, '__compiler_chown', self::emitChown(...));
         self::implementIfMissing($context, '__compiler_ftok', self::emitFtok(...));
@@ -543,78 +543,6 @@ final class StringFsDirJit
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($nullHt);
-    }
-
-    private static function emitSysGetTempDir(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $dirSlot = BasicBlockHelper::entryAlloca($context, $i8p);
-        $context->builder->store(self::literalCstr($context, '/tmp'), $dirSlot);
-
-        $checkTmpdir = $fn->appendBasicBlock('tmpdir_check_tmpdir');
-        $checkTmpdirEmpty = $fn->appendBasicBlock('tmpdir_check_tmpdir_empty');
-        $checkTemp = $fn->appendBasicBlock('tmpdir_check_temp');
-        $checkTempEmpty = $fn->appendBasicBlock('tmpdir_check_temp_empty');
-        $checkTmp = $fn->appendBasicBlock('tmpdir_check_tmp');
-        $checkTmpEmpty = $fn->appendBasicBlock('tmpdir_check_tmp_empty');
-        $resolve = $fn->appendBasicBlock('tmpdir_resolve');
-        $context->builder->branch($checkTmpdir);
-
-        $context->builder->positionAtEnd($checkTmpdir);
-        $tmpdir = $context->builder->call($context->lookupFunction('getenv'), self::literalCstr($context, 'TMPDIR'));
-        $tmpdirOk = $context->builder->icmp(Builder::INT_NE, $tmpdir, $i8p->constNull());
-        $useTmpdir = $fn->appendBasicBlock('tmpdir_use_tmpdir');
-        $context->builder->branchIf($tmpdirOk, $checkTmpdirEmpty, $checkTemp);
-        $context->builder->positionAtEnd($checkTmpdirEmpty);
-        $tmpdirNotEmpty = $context->builder->icmp(Builder::INT_NE, $context->builder->load($tmpdir), $i8->constInt(0, false));
-        $context->builder->branchIf($tmpdirNotEmpty, $useTmpdir, $checkTemp);
-        $context->builder->positionAtEnd($useTmpdir);
-        $context->builder->store($tmpdir, $dirSlot);
-        $context->builder->branch($resolve);
-
-        $context->builder->positionAtEnd($checkTemp);
-        $temp = $context->builder->call($context->lookupFunction('getenv'), self::literalCstr($context, 'TEMP'));
-        $tempOk = $context->builder->icmp(Builder::INT_NE, $temp, $i8p->constNull());
-        $useTemp = $fn->appendBasicBlock('tmpdir_use_temp');
-        $context->builder->branchIf($tempOk, $checkTempEmpty, $checkTmp);
-        $context->builder->positionAtEnd($checkTempEmpty);
-        $tempNotEmpty = $context->builder->icmp(Builder::INT_NE, $context->builder->load($temp), $i8->constInt(0, false));
-        $context->builder->branchIf($tempNotEmpty, $useTemp, $checkTmp);
-        $context->builder->positionAtEnd($useTemp);
-        $context->builder->store($temp, $dirSlot);
-        $context->builder->branch($resolve);
-
-        $context->builder->positionAtEnd($checkTmp);
-        $tmp = $context->builder->call($context->lookupFunction('getenv'), self::literalCstr($context, 'TMP'));
-        $tmpOk = $context->builder->icmp(Builder::INT_NE, $tmp, $i8p->constNull());
-        $useTmp = $fn->appendBasicBlock('tmpdir_use_tmp');
-        $context->builder->branchIf($tmpOk, $checkTmpEmpty, $resolve);
-        $context->builder->positionAtEnd($checkTmpEmpty);
-        $tmpNotEmpty = $context->builder->icmp(Builder::INT_NE, $context->builder->load($tmp), $i8->constInt(0, false));
-        $context->builder->branchIf($tmpNotEmpty, $useTmp, $resolve);
-        $context->builder->positionAtEnd($useTmp);
-        $context->builder->store($tmp, $dirSlot);
-        $context->builder->branch($resolve);
-
-        $context->builder->positionAtEnd($resolve);
-        $resolvedSlot = BasicBlockHelper::entryAlloca($context, $i8->arrayType(self::PATH_MAX));
-        $resolved = $context->builder->pointerCast($resolvedSlot, $i8p);
-        $useDir = $context->builder->load($dirSlot);
-        $real = $context->builder->call($context->lookupFunction('realpath'), $useDir, $resolved);
-        $hasReal = $context->builder->icmp(Builder::INT_NE, $real, $i8p->constNull());
-        $retReal = $fn->appendBasicBlock('tmpdir_ret_real');
-        $retDir = $fn->appendBasicBlock('tmpdir_ret_dir');
-        $context->builder->branchIf($hasReal, $retReal, $retDir);
-
-        $context->builder->positionAtEnd($retReal);
-        $context->builder->returnValue(self::cstrToString($context, $resolved));
-
-        $context->builder->positionAtEnd($retDir);
-        $context->builder->returnValue(self::cstrToString($context, $useDir));
     }
 
     private static function resolveIdFromValue(Context $context, Value $value, bool $group): Value
