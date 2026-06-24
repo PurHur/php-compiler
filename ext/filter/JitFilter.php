@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\filter;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
+use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -300,6 +301,56 @@ final class JitFilter
         return $ptr;
     }
 
+    public static function validateUrl(Context $context, JITVariable $value): Value
+    {
+        StringFilterUrl::ensureLinked($context);
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueValidateUrl($context, $value);
+        }
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        if (JITVariable::TYPE_NULL === $value->type
+            || JITVariable::TYPE_STRING !== $value->type) {
+            JitValueBox::writeBool($context, $slot, $falseVal);
+
+            return $ptr;
+        }
+
+        $str = $context->helper->loadValue($value);
+        $validated = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_url'),
+            $str
+        );
+        $null = $context->getTypeFromString('__string__*')->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $validated, $null);
+
+        $id = (string) (++self::$blockSerial);
+        $failBlock = BasicBlockHelper::append($context, 'fvu_fail_'.$id);
+        $okBlock = BasicBlockHelper::append($context, 'fvu_ok_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvu_merge_'.$id);
+        $context->builder->branchIf($isNull, $failBlock, $okBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        $owned = $context->builder->call($context->lookupFunction('__string__separate'), $str);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $owned
+        );
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
     private static function boxValueValidateInt(Context $context, JITVariable $arg): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -356,6 +407,41 @@ final class JitFilter
         $context->builder->positionAtEnd($stringBlock);
         $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
         $stringResult = self::validateEmail($context, $strVar);
+        $stringTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($ptr->typeOf());
+        $phi->addIncoming($stringResult, $stringTail);
+        $phi->addIncoming($ptr, $failBlock);
+
+        return $phi;
+    }
+
+    private static function boxValueValidateUrl(Context $context, JITVariable $arg): Value
+    {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+
+        $stringBlock = BasicBlockHelper::append($context, 'fvu_box_string');
+        $failBlock = BasicBlockHelper::append($context, 'fvu_box_fail');
+        $doneBlock = BasicBlockHelper::append($context, 'fvu_box_done');
+
+        $context->builder->branchIf($hasString, $stringBlock, $failBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
+        $stringResult = self::validateUrl($context, $strVar);
         $stringTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
