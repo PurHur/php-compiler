@@ -52,7 +52,36 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'scalar_union_null.php'));
         $this->assertSame(
-            'Cannot assign null to property T::$x of type int|string',
+            'Cannot assign null to property T::$x of type string|int',
+            ob_get_clean()
+        );
+    }
+
+    public function test_scalar_union_decl_order_canonicalizes_like_zend(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {
+    public string|int $a;
+}
+class B {
+    public int|string $b;
+}
+foreach ([new A(), new B()] as $obj) {
+    $prop = $obj instanceof A ? 'a' : 'b';
+    try {
+        $obj->{$prop} = null;
+    } catch (TypeError $e) {
+        echo $e->getMessage(), "\n";
+    }
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'scalar_union_order.php'));
+        $this->assertSame(
+            "Cannot assign null to property A::\$a of type string|int\n"
+            . "Cannot assign null to property B::\$b of type string|int\n",
             ob_get_clean()
         );
     }
