@@ -29,7 +29,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'file', 0, 'filename');
+        $path = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'file');
         $flags = 0;
         if (2 === $argc) {
             $flags = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'file', 1, 'flags');
@@ -59,7 +59,7 @@ final class file_ extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('file() requires one or two arguments in this compiler build');
         }
-        $path = JitPathArg::lowerFilename($context, $args[0], 'file');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'file');
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
         if (2 === $argc) {

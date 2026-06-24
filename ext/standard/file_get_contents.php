@@ -31,7 +31,7 @@ final class file_get_contents extends Internal
                 'file_get_contents() expects at least 1 argument, '.\max(0, $argc - 1).' given'
             );
         }
-        $filename = VmString::coerceStringBuiltinArg(
+        $filename = VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[0],
             'file_get_contents',
             0,
@@ -126,7 +126,7 @@ final class file_get_contents extends Internal
             return JitRequestBody::readPhpInput($context);
         }
 
-        $pathStr = JitStringBuiltinArg::lower($context, $args[0], 'file_get_contents', 0, 'filename');
+        $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'file_get_contents', 0, 'filename');
         if (1 === $argc) {
             return JitFileGetContents::invoke($context, $pathStr);
         }
