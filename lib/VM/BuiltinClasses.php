@@ -129,6 +129,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
+use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
@@ -841,6 +842,13 @@ final class BuiltinClasses
             $pub,
             []
         );
+
+        $objProto = new Variable(Variable::TYPE_OBJECT);
+        $rfiber = new ClassEntry('ReflectionFiber');
+        $rfiber->properties[] = new ClassProperty(ReflectionSupport::PROP_FIBER_TARGET, null, $objProto);
+        $rfiber->methods['getexecutingfiber'] = new ReflectionFiberGetExecutingFiber();
+        $rfiber->methodVisibility['getexecutingfiber'] = $pub | CfgFunc::FLAG_STATIC;
+        $ctx->classes[ReflectionSupport::REFLECTION_FIBER] = $rfiber;
     }
 
     /**

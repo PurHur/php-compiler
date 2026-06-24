@@ -54,6 +54,8 @@ final class ReflectionSupport
 
     public const REFLECTION_INTERSECTION_TYPE = 'reflectionintersectiontype';
 
+    public const REFLECTION_FIBER = 'reflectionfiber';
+
     public const PROP_CLASS_NAME = 'name';
 
     public const PROP_METHOD_NAME = 'method';
@@ -78,6 +80,9 @@ final class ReflectionSupport
     public const PROP_ENUM_CASE_NAME = 'case';
 
     public const PROP_FUNC_NAME = 'funcName';
+
+    /** Wrapped Fiber object on ReflectionFiber instances (#6793). */
+    public const PROP_FIBER_TARGET = 'fiber';
 
     public const PROP_PARAM_INDEX = 'paramIndex';
 
@@ -580,6 +585,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_ENUM) {
             throw new \LogicException('Expected ReflectionEnum instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionFiber(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionFiber method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_FIBER) {
+            throw new \LogicException('Expected ReflectionFiber instance');
         }
 
         return $obj;
