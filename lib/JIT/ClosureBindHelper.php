@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ClosureBindRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
 use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\Native;
+use PHPCompiler\VM\ClosureBindJitHelper;
 use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -56,9 +58,9 @@ final class ClosureBindHelper
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
 
-        self::assertNullableObject($context, $newThis, self::thisArgLabel($errorContext));
+        self::assertNullableObject($context, $newThis, ClosureBindJitHelper::thisArgLabel($errorContext));
         if (null !== $newScope) {
-            self::assertNullableObjectOrString($context, $newScope, self::scopeArgLabel($errorContext));
+            self::assertNullableObjectOrString($context, $newScope, ClosureBindJitHelper::scopeArgLabel($errorContext));
         }
 
         $inner = self::resolveInnerCall($context, $closure);
@@ -321,7 +323,7 @@ final class ClosureBindHelper
             if ('' === $scope && Variable::KIND_VALUE === $newScope->kind) {
                 $scope = self::loadStringFromVariable($context, $newScope);
             }
-            if ('static' === strtolower($scope)) {
+            if (ClosureBindJitHelper::resolveStaticScopeAlias($scope)) {
                 return self::defaultScopeString($context, $newThis);
             }
 
@@ -478,7 +480,14 @@ final class ClosureBindHelper
 
             return;
         }
-        self::raiseTypeError($context, $label, '?object', self::scalarLabel($arg));
+        if (ClosureBindJitHelper::jitTypeIsInvalidNullableObject($arg->type)) {
+            self::raiseTypeError(
+                $context,
+                $label,
+                '?object',
+                ClosureBindJitHelper::jitScalarTypeLabel($arg->type)
+            );
+        }
     }
 
     private static function assertNullableObjectOrString(
@@ -497,7 +506,14 @@ final class ClosureBindHelper
 
             return;
         }
-        self::raiseTypeError($context, $label, 'object|string|null', self::scalarLabel($arg));
+        if (ClosureBindJitHelper::jitTypeIsInvalidNullableObjectOrString($arg->type)) {
+            self::raiseTypeError(
+                $context,
+                $label,
+                'object|string|null',
+                ClosureBindJitHelper::jitScalarTypeLabel($arg->type)
+            );
+        }
     }
 
     private static function emitValueBoxObjectOrNullCheck(
@@ -507,27 +523,18 @@ final class ClosureBindHelper
     ): void {
         $ptr = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeByte = self::loadValueTypeByte($context, $ptr);
-        $i8 = $context->getTypeFromString('int8');
-        $ok = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NULL, false)
-        );
-        $okBlock = BasicBlockHelper::append($context, 'closure_bind_this_null');
-        $objBlock = BasicBlockHelper::append($context, 'closure_bind_this_obj');
-        $failBlock = BasicBlockHelper::append($context, 'closure_bind_this_fail');
+        ClosureBindRuntime::ensureLinked($context);
+        $kind = ClosureBindRuntime::callValueBoxKindForNullableObject($context, $typeByte);
+        $i32 = $context->getTypeFromString('int32');
+        $invalidBlock = BasicBlockHelper::append($context, 'closure_bind_this_fail');
         $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_this_merge');
-        $context->builder->branchIf($ok, $okBlock, $objBlock);
-        $context->builder->positionAtEnd($objBlock);
-        $isObj = $context->builder->icmp(
+        $isInvalid = $context->builder->icmp(
             Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_OBJECT, false)
+            $kind,
+            $i32->constInt(ClosureBindJitHelper::KIND_INVALID, false)
         );
-        $context->builder->branchIf($isObj, $mergeBlock, $failBlock);
-        $context->builder->positionAtEnd($okBlock);
-        $context->builder->branch($mergeBlock);
-        $context->builder->positionAtEnd($failBlock);
+        $context->builder->branchIf($isInvalid, $invalidBlock, $mergeBlock);
+        $context->builder->positionAtEnd($invalidBlock);
         self::raiseTypeError($context, $label, '?object', 'int');
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
@@ -540,33 +547,18 @@ final class ClosureBindHelper
     ): void {
         $ptr = JitValueBox::valuePtrFromVariable($context, $arg);
         $typeByte = self::loadValueTypeByte($context, $ptr);
-        $i8 = $context->getTypeFromString('int8');
-        $okTypes = [
-            Variable::TYPE_NULL,
-            Variable::TYPE_OBJECT,
-            Variable::TYPE_STRING,
-        ];
-        $checkBlock = $context->builder->getInsertBlock();
-        $failBlock = BasicBlockHelper::append($context, 'closure_bind_scope_fail');
+        ClosureBindRuntime::ensureLinked($context);
+        $kind = ClosureBindRuntime::callValueBoxKindForNullableObjectOrString($context, $typeByte);
+        $i32 = $context->getTypeFromString('int32');
+        $invalidBlock = BasicBlockHelper::append($context, 'closure_bind_scope_fail');
         $mergeBlock = BasicBlockHelper::append($context, 'closure_bind_scope_merge');
-        $next = $checkBlock;
-        foreach ($okTypes as $idx => $ty) {
-            $matchBlock = BasicBlockHelper::append($context, 'closure_bind_scope_ok_'.$idx);
-            $missBlock = ($idx < \count($okTypes) - 1)
-                ? BasicBlockHelper::append($context, 'closure_bind_scope_try_'.$idx)
-                : $failBlock;
-            $context->builder->positionAtEnd($next);
-            $isTy = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt($ty, false)
-            );
-            $context->builder->branchIf($isTy, $matchBlock, $missBlock);
-            $context->builder->positionAtEnd($matchBlock);
-            $context->builder->branch($mergeBlock);
-            $next = $missBlock;
-        }
-        $context->builder->positionAtEnd($failBlock);
+        $isInvalid = $context->builder->icmp(
+            Builder::INT_EQ,
+            $kind,
+            $i32->constInt(ClosureBindJitHelper::KIND_INVALID, false)
+        );
+        $context->builder->branchIf($isInvalid, $invalidBlock, $mergeBlock);
+        $context->builder->positionAtEnd($invalidBlock);
         self::raiseTypeError($context, $label, 'object|string|null', 'int');
         $context->builder->branch($mergeBlock);
         $context->builder->positionAtEnd($mergeBlock);
@@ -595,19 +587,6 @@ final class ClosureBindHelper
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function scalarLabel(Variable $arg): string
-    {
-        return match ($arg->type) {
-            Variable::TYPE_INTEGER, Variable::TYPE_NATIVE_LONG => 'int',
-            Variable::TYPE_FLOAT, Variable::TYPE_NATIVE_DOUBLE => 'float',
-            Variable::TYPE_BOOLEAN, Variable::TYPE_NATIVE_BOOL => 'bool',
-            Variable::TYPE_STRING => 'string',
-            Variable::TYPE_ARRAY, Variable::TYPE_HASHTABLE => 'array',
-            Variable::TYPE_OBJECT => 'object',
-            default => 'mixed',
-        };
-    }
-
     /**
      * Zend zend_closure_bind(): binding an instance to a static closure warns and is a no-op.
      *
@@ -632,7 +611,7 @@ final class ClosureBindHelper
 
     private static function emitStaticClosureInstanceBindWarning(Context $context): void
     {
-        $message = 'Cannot bind an instance to a static closure';
+        $message = ClosureBindJitHelper::STATIC_BIND_WARNING;
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
@@ -649,13 +628,4 @@ final class ClosureBindHelper
         );
     }
 
-    private static function thisArgLabel(string $context): string
-    {
-        return 'Closure::bind()' === $context ? '#2 ($newThis)' : '#1 ($newThis)';
-    }
-
-    private static function scopeArgLabel(string $context): string
-    {
-        return 'Closure::bind()' === $context ? '#3 ($newScope)' : '#2 ($newScope)';
-    }
 }
