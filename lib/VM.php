@@ -635,7 +635,7 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked get+set / backed hooks probe backing only; get-only virtual hooks invoke get (#11262, #10392, zend_object_handlers.c).
+     * Hooked properties: uninitialized backing is false without get hook; initialized invokes get (#11262).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -930,7 +930,7 @@ class VM {
     }
 
     /**
-     * isset($obj->hooked) — backed hooks probe storage; get-only virtual invokes get (#11262, zend_std_has_property).
+     * isset($obj->hooked) — uninitialized backing is false without get hook; initialized invokes get (#11262, #10392).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -939,11 +939,11 @@ class VM {
         if (!$this->instancePropertyHasHooks($object, $propName)) {
             return null;
         }
-        if ($this->hookedPropertyIssetEmptyUsesBackingProbe($object, $propName)) {
-            return $this->issetHookedPropertyWithoutGetHook($object, $propName);
-        }
         if (!$this->instancePropertyHasGetHook($object, $propName)) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        }
+        if ($this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)) {
+            return false;
         }
         if (null === $frame) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
@@ -959,29 +959,6 @@ class VM {
         $value = $hookValue->resolveIndirect();
 
         return Variable::TYPE_NULL !== $value->type;
-    }
-
-    /**
-     * True when isset/empty must read hook backing storage, not invoke get hook (#11262, #10392).
-     */
-    private function hookedPropertyIssetEmptyUsesBackingProbe(ObjectEntry $object, string $propName): bool
-    {
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null !== $meta && null !== $meta->setHookMethodLc) {
-            return true;
-        }
-        $lcClass = strtolower($object->class->name);
-        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
-            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
-            ?? null;
-        if (!is_array($propMeta)) {
-            return false;
-        }
-        if (isset($propMeta['set'])) {
-            return true;
-        }
-
-        return isset($propMeta['getBacking']) || isset($propMeta['setBacking']);
     }
 
     /**
@@ -1161,6 +1138,23 @@ class VM {
     }
 
     /**
+     * isset/empty on hooked properties with real backing storage — skip get hook when typed slot is uninitialized (#11262).
+     */
+    private function hookedPropertyIssetProbesUninitializedBackingOnly(ObjectEntry $object, string $propName): bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta) || !empty($propMeta['virtual'])) {
+            return false;
+        }
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+
+        return false !== $backing && VM\TypedPropertyCheck::isUninitialized($backing);
+    }
+
+    /**
      * isset/empty/?? backing probe — never invokes get hook (#6472, #8901, #8917, #8918).
      *
      * @return Variable|false false when the property is not hooked
@@ -1277,15 +1271,14 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — backed hooks probe storage; get-only virtual invokes get (#11262, zend_object_handlers.c).
+     * empty($obj->hooked) — uninitialized backing is empty without get hook; initialized invokes get (#11262).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
         if (!$this->instancePropertyHasHooks($object, $propName)) {
             return false;
         }
-        if ($this->hookedPropertyIssetEmptyUsesBackingProbe($object, $propName)
-            || !$this->instancePropertyHasGetHook($object, $propName)) {
+        if (!$this->instancePropertyHasGetHook($object, $propName)) {
             $backing = $this->hookedPropertyBackingValue($object, $propName);
             if (false === $backing) {
                 return false;
@@ -1297,6 +1290,11 @@ class VM {
                 return true;
             }
             $dst->bool(!ext\standard\boolval::isTruthy($backing));
+
+            return true;
+        }
+        if ($this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)) {
+            $dst->bool(true);
 
             return true;
         }
