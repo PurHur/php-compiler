@@ -35,6 +35,13 @@ final class VmPregNative
         int $flags = 0,
         int $offset = 0
     ): int|false {
+        $parsed = self::parsePhpPattern($pattern);
+        if (null === $parsed) {
+            self::$lastError = 1;
+
+            return false;
+        }
+        [$regex, $_opts] = $parsed;
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             return false;
@@ -72,8 +79,10 @@ final class VmPregNative
             self::$lastError = 0;
             if (null !== $matches) {
                 $matches = self::extractMatches(
+                    $code,
                     $matchData,
                     $subject,
+                    $regex,
                     0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE),
                     0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL)
                 );
@@ -93,6 +102,13 @@ final class VmPregNative
         int $flags = 0,
         int $offset = 0
     ): int|false {
+        $parsed = self::parsePhpPattern($pattern);
+        if (null === $parsed) {
+            self::$lastError = 1;
+
+            return false;
+        }
+        [$regex, $_opts] = $parsed;
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             return false;
@@ -127,7 +143,7 @@ final class VmPregNative
                 }
                 $count++;
                 if (null !== $matches) {
-                    $one = self::extractMatches($matchData, $subject, $offsetCapture, false);
+                    $one = self::extractMatches($code, $matchData, $subject, $regex, $offsetCapture, false);
                     if ($setOrder) {
                         $allMatches[] = $one;
                     } else {
@@ -549,35 +565,87 @@ final class VmPregNative
     }
 
     /**
+     * @param mixed $code
      * @param mixed $matchData
      *
      * @return array<int|string, string|array{0: string|null, 1: int}|null>
      */
     private static function extractMatches(
+        mixed $code,
         mixed $matchData,
         string $subject,
+        string $regex,
         bool $offsetCapture,
         bool $unmatchedNull
     ): array {
         $ovector = self::$ffi->pcre2_get_ovector_pointer_8($matchData);
         $count = (int) self::$ffi->pcre2_get_ovector_count_8($matchData);
         $out = [];
-        for ($i = 0; $i < $count; $i++) {
-            $start = (int) $ovector[$i * 2];
-            $end = (int) $ovector[$i * 2 + 1];
-            if ($start < 0 || $end < 0) {
-                if ($offsetCapture) {
-                    $out[$i] = $unmatchedNull ? [null, -1] : ['', -1];
-                } else {
-                    $out[$i] = $unmatchedNull ? null : '';
-                }
-                continue;
-            }
-            $piece = \substr($subject, $start, $end - $start);
-            $out[$i] = $offsetCapture ? [$piece, $start] : $piece;
+        for ($i = 0; $i < $count; ++$i) {
+            $out[$i] = self::ovectorEntryToMatch($ovector, $i, $subject, $offsetCapture, $unmatchedNull);
         }
+        self::appendNamedCaptureGroups($code, $ovector, $subject, $regex, $out, $offsetCapture, $unmatchedNull);
 
         return $out;
+    }
+
+    /**
+     * @param mixed $ovector
+     *
+     * @return string|array{0: string|null, 1: int}|null
+     */
+    private static function ovectorEntryToMatch(
+        mixed $ovector,
+        int $index,
+        string $subject,
+        bool $offsetCapture,
+        bool $unmatchedNull
+    ): string|array|null {
+        $start = (int) $ovector[$index * 2];
+        $end = (int) $ovector[$index * 2 + 1];
+        if ($start < 0 || $end < 0) {
+            if ($offsetCapture) {
+                return $unmatchedNull ? [null, -1] : ['', -1];
+            }
+
+            return $unmatchedNull ? null : '';
+        }
+        $piece = \substr($subject, $start, $end - $start);
+
+        return $offsetCapture ? [$piece, $start] : $piece;
+    }
+
+    /**
+     * @param mixed $code
+     * @param mixed $ovector
+     * @param array<int|string, string|array{0: string|null, 1: int}|null> $out
+     */
+    private static function appendNamedCaptureGroups(
+        mixed $code,
+        mixed $ovector,
+        string $subject,
+        string $regex,
+        array &$out,
+        bool $offsetCapture,
+        bool $unmatchedNull
+    ): void {
+        if (!\preg_match_all('/\(\?(?:P<|<)([A-Za-z_]\w*)/', $regex, $names)) {
+            return;
+        }
+        foreach ($names[1] as $name) {
+            $nameC = self::stringToC($name);
+            $groupNum = (int) self::$ffi->pcre2_substring_number_from_name_8($code, $nameC);
+            if ($groupNum <= 0) {
+                continue;
+            }
+            $out[$name] = self::ovectorEntryToMatch(
+                $ovector,
+                $groupNum,
+                $subject,
+                $offsetCapture,
+                $unmatchedNull
+            );
+        }
     }
 
     private static function ensureFfi(): void
@@ -608,6 +676,7 @@ void pcre2_match_data_free_8(pcre2_match_data_8 *);
 int pcre2_match_8(const pcre2_code_8 *, PCRE2_SPTR8, PCRE2_SIZE, PCRE2_SIZE, uint32_t, pcre2_match_data_8 *, void *);
 PCRE2_SIZE *pcre2_get_ovector_pointer_8(pcre2_match_data_8 *);
 uint32_t pcre2_get_ovector_count_8(pcre2_match_data_8 *);
+int pcre2_substring_number_from_name_8(const pcre2_code_8 *, PCRE2_SPTR8);
 int pcre2_substitute_8(const pcre2_code_8 *, PCRE2_SPTR8, PCRE2_SIZE, PCRE2_SIZE, uint32_t, pcre2_match_data_8 *, void *, PCRE2_SPTR8, PCRE2_SIZE, PCRE2_UCHAR8 **, PCRE2_SIZE *);
 void pcre2_substring_free_8(PCRE2_UCHAR8 *);
 CDEF;

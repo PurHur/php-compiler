@@ -19,7 +19,12 @@ final class VmPregMatches
         $unmatchedNull = 0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL);
         $ht = new HashTable();
         foreach ($hostMatches as $key => $match) {
-            $ht->updateIndex((int) $key, self::matchEntryToVariable($match, $offsetCapture, $unmatchedNull));
+            $slot = self::matchEntryToVariable($match, $offsetCapture, $unmatchedNull);
+            if (\is_string($key)) {
+                $ht->add($key, $slot);
+            } else {
+                $ht->updateIndex((int) $key, $slot);
+            }
         }
 
         return $ht;
@@ -38,7 +43,12 @@ final class VmPregMatches
             foreach ($allMatches as $one) {
                 $row = new HashTable();
                 foreach ($one as $key => $match) {
-                    $row->updateIndex((int) $key, self::matchEntryToVariable($match, $offsetCapture, false));
+                    $slot = self::matchEntryToVariable($match, $offsetCapture, false);
+                    if (\is_string($key)) {
+                        $row->add($key, $slot);
+                    } else {
+                        $row->updateIndex((int) $key, $slot);
+                    }
                 }
                 $wrap = new Variable();
                 $wrap->array($row);
