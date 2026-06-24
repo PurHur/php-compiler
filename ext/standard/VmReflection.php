@@ -2294,6 +2294,27 @@ final class VmReflection
         return $result;
     }
 
+    /**
+     * Build a ReflectionFiber wrapper around a Fiber object (#6793, ext/reflection/php_reflection.c).
+     */
+    public static function newReflectionFiber(Context $ctx, \PHPCompiler\VM\ObjectEntry $fiberObject): \PHPCompiler\VM\ObjectEntry
+    {
+        $rfClass = $ctx->classes[\PHPCompiler\VM\ReflectionSupport::REFLECTION_FIBER] ?? null;
+        if (null === $rfClass) {
+            throw new \LogicException('ReflectionFiber is not registered in this compiler build');
+        }
+        if (null === $fiberObject->fiberState) {
+            throw new \TypeError('ReflectionFiber::__construct() expects a Fiber object');
+        }
+        $obj = new \PHPCompiler\VM\ObjectEntry($rfClass);
+        $obj->constructed = true;
+        $fiberVar = new Variable();
+        $fiberVar->object($fiberObject);
+        $obj->getProperty(\PHPCompiler\VM\ReflectionSupport::PROP_FIBER_TARGET)->copyFrom($fiberVar);
+
+        return $obj;
+    }
+
     private static function propertyExistsInvalidTypeName(int $type): string
     {
         switch ($type) {
