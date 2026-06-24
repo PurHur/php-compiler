@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\StreamContextRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -13,10 +14,12 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for stream_context_set_default() (#6367). */
+/** LLVM lowering for stream_context_set_default() (#6367, #9340). */
 final class JitStreamContextSetDefault
 {
     private const GLOBAL_DEFAULT = 'phpc_stream_context_default';
+
+    private const SET_DEFAULT_HELPER = 'PHPCompiler\\ext\\standard\\StreamContextJitHelper::setDefault';
 
     /** @return Value */
     public static function invoke(Context $context, JITVariable ...$args): Value
@@ -27,7 +30,30 @@ final class JitStreamContextSetDefault
             );
         }
 
-        $optionsHt = self::loadArrayArg($context, $args[0], 1);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            return self::invokeStandalone($context, $args[0]);
+        }
+
+        return self::invokeEmbed($context, $args[0]);
+    }
+
+    private static function invokeEmbed(Context $context, JITVariable $arg): Value
+    {
+        $optionsHt = self::loadArrayArg($context, $arg, 1);
+
+        StreamContextRuntime::ensureLinked($context);
+
+        $ht = $context->builder->call(
+            StreamContextRuntime::helperFunction($context, self::SET_DEFAULT_HELPER),
+            $optionsHt
+        );
+
+        return self::wrapHashtableResult($context, $ht);
+    }
+
+    private static function invokeStandalone(Context $context, JITVariable $arg): Value
+    {
+        $optionsHt = self::loadArrayArg($context, $arg, 1);
 
         StreamContextRuntime::ensureLinked($context);
         StreamContextRuntime::ensureDefaultGlobalDeclared($context);
@@ -64,6 +90,11 @@ final class JitStreamContextSetDefault
         $context->builder->call($fnMerge, $context->builder->load($defaultSlot), $optionsHt);
         $ht = $context->builder->load($defaultSlot);
 
+        return self::wrapHashtableResult($context, $ht);
+    }
+
+    private static function wrapHashtableResult(Context $context, Value $ht): Value
+    {
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call(

@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5392: stream_context_create() LLVM helpers replace phpc_stream_context.c.
+ * Issue #5392 / #9340: stream_context LLVM routes through StreamContextJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -22,17 +22,18 @@ final class StreamContextRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_stream_context.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php');
         $this->assertStringContainsString('__phpc_stream_context_create', $runtime);
-        $this->assertStringContainsString('phpc_stream_context.c', $runtime);
+        $this->assertStringContainsString('StreamContextJitHelper', $runtime);
+        $this->assertStringNotContainsString('implementMergeOptions', $runtime);
     }
 
     /**
      * @group aot-lint
      */
-    public function testEnsureLinkedDefinesStreamContextForStandalone(): void
+    public function testImplementDefinesStreamContextForStandalone(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StreamContextRuntime::ensureLinked($ctx);
+        StreamContextRuntime::implement($ctx);
 
         $fn = $ctx->lookupFunction('__phpc_stream_context_create');
         $this->assertNotNull($fn);
