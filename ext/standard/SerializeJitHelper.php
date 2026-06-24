@@ -4,16 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 /**
- * serialize() wire helpers for compiled JIT/AOT modules (#9440, php-in-PHP).
+ * serialize() wire helpers for compiled JIT/AOT modules (#9440, #9180, php-in-PHP).
  *
- * SSOT for session wire values without VM Context; scalars/arrays/enums only.
+ * SSOT: {@see VmSerialize} via active VM context; session wire uses scalar/array subset.
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class SerializeJitHelper
 {
+    public static function encodeValue(Variable $value): string
+    {
+        $ctx = self::requireActiveContext();
+        return VmSerialize::serializeValue($ctx, $value->resolveIndirect());
+    }
+
+    public static function encodeHashtable(HashTable $ht): string
+    {
+        $var = new Variable(Variable::TYPE_ARRAY);
+        $var->array($ht);
+
+        return self::encodeValue($var);
+    }
+
     public static function serializeSessionWireValue(Variable $value): ?string
     {
         $value = $value->resolveIndirect();
@@ -52,5 +69,15 @@ final class SerializeJitHelper
         }
 
         return VmJson::export($value);
+    }
+
+    private static function requireActiveContext(): Context
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException('serialize() JIT helper requires active VM context (#9180)');
+        }
+
+        return $ctx;
     }
 }
