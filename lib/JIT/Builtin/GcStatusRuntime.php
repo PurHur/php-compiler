@@ -7,7 +7,6 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\CycleCollector;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -106,40 +105,21 @@ final class GcStatusRuntime
         $entry = $fn->appendBasicBlock('gc_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
-        $running = self::loadGlobalBool($context, self::G_RUNNING, $i32);
-        $protected = self::loadGlobalBool($context, self::G_PROTECTED, $i32);
-        $full = self::loadGlobalBool($context, self::G_FULL, $i32);
         $runs = self::loadGlobalInt($context, self::G_RUNS, $i32, $i64);
         $collected = self::loadGlobalInt($context, self::G_TOTAL_COLLECTED, $i32, $i64);
         $threshold = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
-        $bufferSize = self::loadGlobalInt($context, self::G_BUFFER_SIZE, $i32, $i64);
         $roots = self::loadGlobalInt($context, self::G_ROOT_COUNT, $i32, $i64);
 
         $ht = $context->builder->call(
             self::helperFunction($context, self::BUILD_TABLE),
-            $running,
-            $protected,
-            $full,
             $runs,
             $collected,
             $threshold,
-            $bufferSize,
             $roots
         );
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
-    }
-
-    private static function loadGlobalBool(Context $context, string $globalName, $i32): Value
-    {
-        $global = $context->module->getNamedGlobal($globalName);
-        if (null === $global) {
-            throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
-        }
-        $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
-
-        return $context->builder->icmp(Builder::INT_NE, $loaded, $i32->constInt(0, false));
     }
 
     private static function loadGlobalInt(Context $context, string $globalName, $i32, $i64): Value

@@ -48,6 +48,7 @@ use PHPCompiler\Web\ServeCompileCache;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\Lint\LintCompiler;
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\VM\MemoryAccounting;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\ShutdownQueue;
 use PHPCompiler\ext\standard\VmObGzhandler;
@@ -958,6 +959,7 @@ class Runtime {
 
     public function run(?Block $block) {
         $this->ensureVm();
+        MemoryAccounting::beginRequest();
         Superglobals::setActiveContext($this->vmContext);
         OutputBuffer::setActiveContext($this->vmContext);
         try {

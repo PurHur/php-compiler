@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\MemoryJitHelper;
 use PHPCompiler\JIT\Builtin\MemoryRuntime;
+use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
 /** MemoryRuntime routes through MemoryJitHelper PHP not RSS/statm LLVM (#9377). */
@@ -31,7 +32,9 @@ final class MemoryRuntimeShrinkTest extends TestCase
 
     public function testMemoryJitHelperGcMemCachesReturnsInt(): void
     {
-        $this->assertIsInt(MemoryJitHelper::gcMemCaches());
+        MemoryAccounting::beginRequest();
+        $this->assertSame(65536, MemoryJitHelper::gcMemCaches());
+        $this->assertSame(0, MemoryJitHelper::gcMemCaches());
     }
 
     public function testJitMemoryUsesMemoryRuntimeBridge(): void

@@ -16,34 +16,15 @@ use PHPCompiler\VM\Variable;
  */
 final class GcStatusJitHelper
 {
-    public static function buildTable(
-        bool $running,
-        bool $protected,
-        bool $full,
-        int $runs,
-        int $collected,
-        int $threshold,
-        int $bufferSize,
-        int $roots
-    ): HashTable {
+    public static function buildTable(int $runs, int $collected, int $threshold, int $roots): HashTable
+    {
         $ht = new HashTable();
-        self::addBool($ht, 'running', $running);
-        self::addBool($ht, 'protected', $protected);
-        self::addBool($ht, 'full', $full);
         self::addInt($ht, 'runs', $runs);
         self::addInt($ht, 'collected', $collected);
         self::addInt($ht, 'threshold', $threshold);
-        self::addInt($ht, 'buffer_size', $bufferSize);
         self::addInt($ht, 'roots', $roots);
 
         return $ht;
-    }
-
-    private static function addBool(HashTable $ht, string $key, bool $value): void
-    {
-        $slot = new Variable();
-        $slot->bool($value);
-        $ht->add($key, $slot);
     }
 
     private static function addInt(HashTable $ht, string $key, int $value): void
