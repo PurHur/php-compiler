@@ -10,7 +10,7 @@ namespace PHPCompiler\ext\standard;
  * When FFI is disabled, delegates to {@see VmFsDiskPure} host bootstrap path.
  *
  * php-src: ext/standard/filestat.c — php_disk_free_space / php_disk_total_space
- * JIT/AOT: {@see JitStat::pathDiskFreeSpaceBoxed} / pathDiskTotalSpaceBoxed (unchanged).
+ * JIT/AOT: {@see StatPathRuntime} / {@see StatFieldsJitHelper} (#9112).
  */
 final class VmFsDiskNative
 {

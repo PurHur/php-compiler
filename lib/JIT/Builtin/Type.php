@@ -1360,6 +1360,7 @@ class Type extends Builtin {
         StringFsGlob::ensureLinked($this->context);
         StringFsDir::ensureLinked($this->context);
         StatCache::ensureLinked($this->context);
+        StatPath::ensureLinked($this->context);
         StreamSync::ensureLinked($this->context);
         StreamCaps::ensureLinked($this->context);
         Stats::ensureLinked($this->context);
