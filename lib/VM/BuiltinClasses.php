@@ -41,6 +41,7 @@ use PHPCompiler\VM\Builtin\ExceptionGetPrevious;
 use PHPCompiler\VM\Builtin\ExceptionGetTrace;
 use PHPCompiler\VM\Builtin\ExceptionGetTraceAsString;
 use PHPCompiler\VM\Builtin\ExceptionToString;
+use PHPCompiler\VM\Builtin\ExceptionWakeup;
 use PHPCompiler\VM\Builtin\FiberConstruct;
 use PHPCompiler\VM\Builtin\FiberGetCurrent;
 use PHPCompiler\VM\Builtin\FiberGetReturn;
@@ -1067,6 +1068,8 @@ final class BuiltinClasses
         }
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['__wakeup'] = new ExceptionWakeup();
+        $entry->methodVisibility['__wakeup'] = $pub;
         foreach (
             [
                 'getmessage' => new ExceptionGetMessage(),
