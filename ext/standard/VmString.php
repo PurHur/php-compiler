@@ -4621,22 +4621,6 @@ final class VmString
         if (0 === $len) {
             return '';
         }
-        // php-src zend_dirname(): wrapper URLs like php://memory have no path segment
-        // after "://", so dirname is scheme + ":" (not "php:/").
-        $schemeSep = strpos($path, '://');
-        if (false !== $schemeSep) {
-            $afterScheme = $schemeSep + 3;
-            $hasPathSep = false;
-            for ($i = $afterScheme; $i < $len; ++$i) {
-                if (self::isPathSeparatorByte($path[$i])) {
-                    $hasPathSep = true;
-                    break;
-                }
-            }
-            if (!$hasPathSep) {
-                return self::byteSlice($path, 0, $schemeSep + 1);
-            }
-        }
         $end = $len;
         while ($end > 0 && self::isPathSeparatorByte($path[$end - 1])) {
             --$end;
@@ -4644,14 +4628,27 @@ final class VmString
         if (0 === $end) {
             return '/' === $path[0] ? '/' : '.';
         }
+
+        // php-src zend_dirname(): only path separators after "://" count; wrapper roots
+        // like phar://archive.phar/ dirname to scheme + ":" (not "phar:/").
+        $schemeSep = strpos($path, '://');
+        $minSepIndex = 0;
+        if (false !== $schemeSep) {
+            $minSepIndex = $schemeSep + 3;
+        }
+
         $last = -1;
-        for ($i = $end - 1; $i >= 0; --$i) {
+        for ($i = $end - 1; $i >= $minSepIndex; --$i) {
             if (self::isPathSeparatorByte($path[$i])) {
                 $last = $i;
                 break;
             }
         }
         if (-1 === $last) {
+            if (false !== $schemeSep) {
+                return self::byteSlice($path, 0, $schemeSep + 1);
+            }
+
             return '.';
         }
         if (0 === $last) {
