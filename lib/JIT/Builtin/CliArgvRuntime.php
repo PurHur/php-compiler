@@ -4,20 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Progress;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439).
+ * LLVM argv storage for standalone AOT / MCJIT CLI binaries (issues #2794, #5407, #6341).
  *
- * Thin C ABI for main(argc, argv) storage; hashtable slot writes in PHP SSOT.
- * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
+ * Replaces argv logic in lib/AOT/runtime/phpc_cli_argv.c. php-src: basic_functions.c $argc/$argv.
  */
 final class CliArgvRuntime
 {
@@ -25,23 +22,7 @@ final class CliArgvRuntime
 
     private const G_ARGV = 'phpc_cli_argv_global';
 
-    private const HELPER_PATH = '/ext/standard/CliArgvJitHelper.php';
-
-    private const CREATE_TABLE_HELPER = 'PHPCompiler\\ext\\standard\\CliArgvJitHelper::createTable';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CREATE_TABLE_HELPER,
-    ];
-
-    /** @var list<string> */
-    private const ABI_FUNCTIONS = [
-        '__phpc_cli_store_argv',
-        '__phpc_cli_argc',
-        '__phpc_cli_argv_cstr',
-        '__phpc_cli_str_eq',
-        '__phpc_cli_refresh_argv_global',
-    ];
+    private static int $blockSuffix = 0;
 
     public static function ensureLinked(Context $context): void
     {
@@ -62,56 +43,65 @@ final class CliArgvRuntime
             return;
         }
 
+        self::$blockSuffix = 0;
         self::ensureGlobals($context);
         self::ensureExternals($context);
-        self::ensureJitHelperCompiled($context);
 
-        self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
-            $context->getTypeFromString('void'),
-            false,
-            $context->getTypeFromString('int32'),
-            $context->getTypeFromString('int8**')
-        )));
-        self::implementArgc($context, self::declareAbi($context, '__phpc_cli_argc', $context->context->functionType(
-            $context->getTypeFromString('int64'),
-            false
-        )));
-        self::implementArgvCstr($context, self::declareAbi($context, '__phpc_cli_argv_cstr', $context->context->functionType(
-            $context->getTypeFromString('int8*'),
-            false,
-            $context->getTypeFromString('int32')
-        )));
-        self::implementStrEq($context, self::declareAbi($context, '__phpc_cli_str_eq', $context->context->functionType(
-            $context->getTypeFromString('int32'),
-            false,
-            $context->getTypeFromString('int8*'),
-            $context->getTypeFromString('int8*')
-        )));
-        self::implementRefreshArgvGlobal($context, self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
-            $context->getTypeFromString('void'),
-            false,
-            $context->getTypeFromString('__value__*')
-        )));
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $context->getTypeFromString('int8**');
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+
+        $storeProbe = $context->module->getNamedFunction('__phpc_cli_store_argv');
+        $fnStore = null !== $storeProbe
+            ? $storeProbe
+            : $context->module->addFunction(
+                '__phpc_cli_store_argv',
+                $context->context->functionType($voidTy, false, $i32, $i8pp)
+            );
+        $context->registerFunction('__phpc_cli_store_argv', $fnStore);
+        self::implementStoreArgv($context, $fnStore);
+
+        $argcProbe = $context->module->getNamedFunction('__phpc_cli_argc');
+        $fnArgc = null !== $argcProbe
+            ? $argcProbe
+            : $context->module->addFunction('__phpc_cli_argc', $context->context->functionType($i64, false));
+        $context->registerFunction('__phpc_cli_argc', $fnArgc);
+        self::implementArgc($context, $fnArgc);
+
+        $cstrProbe = $context->module->getNamedFunction('__phpc_cli_argv_cstr');
+        $fnCstr = null !== $cstrProbe
+            ? $cstrProbe
+            : $context->module->addFunction(
+                '__phpc_cli_argv_cstr',
+                $context->context->functionType($i8p, false, $i32)
+            );
+        $context->registerFunction('__phpc_cli_argv_cstr', $fnCstr);
+        self::implementArgvCstr($context, $fnCstr);
+
+        $eqProbe = $context->module->getNamedFunction('__phpc_cli_str_eq');
+        $fnEq = null !== $eqProbe
+            ? $eqProbe
+            : $context->module->addFunction(
+                '__phpc_cli_str_eq',
+                $context->context->functionType($i32, false, $i8p, $i8p)
+            );
+        $context->registerFunction('__phpc_cli_str_eq', $fnEq);
+        self::implementStrEq($context, $fnEq);
+
+        $refreshProbe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
+        $fnRefresh = null !== $refreshProbe
+            ? $refreshProbe
+            : $context->module->addFunction(
+                '__phpc_cli_refresh_argv_global',
+                $context->context->functionType($voidTy, false, $valuePtr)
+            );
+        $context->registerFunction('__phpc_cli_refresh_argv_global', $fnRefresh);
+        self::implementRefreshArgvGlobal($context, $fnRefresh);
 
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function declareAbi(Context $context, string $name, $ft): LlvmFunction
-    {
-        $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($name, $probe);
-
-            return $probe;
-        }
-
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($name, $ft);
-        $context->registerFunction($name, $fn);
-
-        return $fn;
     }
 
     private static function ensureGlobals(Context $context): void
@@ -141,10 +131,6 @@ final class CliArgvRuntime
 
     private static function implementStoreArgv(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-
         $entry = $fn->appendBasicBlock('cli_store_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -162,10 +148,6 @@ final class CliArgvRuntime
 
     private static function implementArgc(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-
         $entry = $fn->appendBasicBlock('cli_argc_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -178,10 +160,6 @@ final class CliArgvRuntime
 
     private static function implementArgvCstr(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-
         $entry = $fn->appendBasicBlock('cli_cstr_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -220,10 +198,6 @@ final class CliArgvRuntime
 
     private static function implementStrEq(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-
         $entry = $fn->appendBasicBlock('cli_eq_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -264,14 +238,14 @@ final class CliArgvRuntime
 
     private static function implementRefreshArgvGlobal(Context $context, LlvmFunction $fn): void
     {
-        if ($fn->countBasicBlocks() > 0) {
-            return;
-        }
-
         $entry = $fn->appendBasicBlock('cli_refresh_entry');
         $context->builder->positionAtEnd($entry);
 
         $out = $fn->getParam(0);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
         $valuePtr = $context->getTypeFromString('__value__*');
 
         Progress::emitNativeNote($context, 'c:cli_refresh_argv_begin');
@@ -285,39 +259,23 @@ final class CliArgvRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($bodyBb);
-        $ht = self::emitFillArgvTableFromGlobals($context, $fn);
-        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
-        Progress::emitNativeNote($context, 'c:cli_refresh_argv_done');
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function emitFillArgvTableFromGlobals(Context $context, LlvmFunction $fn): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $htObj = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE_HELPER));
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        $ht = $htObj->typeOf() === $htPtrTy
-            ? $htObj
-            : $context->builder->pointerCast($htObj, $htPtrTy);
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
 
         $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
-        $iSlot = $context->builder->alloca($i32, 1, 'cli_argv_i');
+        $iSlot = $context->builder->alloca($i32, 1, 'cli_refresh_i');
         $context->builder->store($i32->constInt(0, false), $iSlot);
 
-        $loopHead = $fn->appendBasicBlock('cli_argv_loop_head');
-        $loopDone = $fn->appendBasicBlock('cli_argv_loop_done');
-        $loopBody = $fn->appendBasicBlock('cli_argv_loop_body');
-        $context->builder->branch($loopHead);
+        $loopHeadBb = $fn->appendBasicBlock('cli_refresh_loop_head');
+        $context->builder->branch($loopHeadBb);
 
-        $context->builder->positionAtEnd($loopHead);
+        $context->builder->positionAtEnd($loopHeadBb);
         $i = $context->builder->load($iSlot);
-        $done = $context->builder->icmp(Builder::INT_SGE, $i, $argc);
-        $context->builder->branchIf($done, $loopDone, $loopBody);
+        $doneLoop = $context->builder->icmp(Builder::INT_SGE, $i, $argc);
+        $loopDoneBb = $fn->appendBasicBlock('cli_refresh_loop_done');
+        $loopBodyBb = $fn->appendBasicBlock('cli_refresh_loop_body');
+        $context->builder->branchIf($doneLoop, $loopDoneBb, $loopBodyBb);
 
-        $context->builder->positionAtEnd($loopBody);
+        $context->builder->positionAtEnd($loopBodyBb);
         $cstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i);
         $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
         $str = $context->builder->call(
@@ -335,11 +293,13 @@ final class CliArgvRuntime
             $context->builder->add($i, $i32->constInt(1, false)),
             $iSlot
         );
-        $context->builder->branch($loopHead);
+        $context->builder->branch($loopHeadBb);
 
-        $context->builder->positionAtEnd($loopDone);
-
-        return $ht;
+        $context->builder->positionAtEnd($loopDoneBb);
+        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
+        Progress::emitNativeNote($context, 'c:cli_refresh_argv_done');
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
     }
 
     private static function ensureExternals(Context $context): void
@@ -347,7 +307,6 @@ final class CliArgvRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
         $sizeT = $context->getTypeFromString('size_t');
         $htPtr = $context->getTypeFromString('__hashtable__*');
         $strPtr = $context->getTypeFromString('__string__*');
@@ -358,8 +317,9 @@ final class CliArgvRuntime
             [
                 'strcmp' => [$i32, false, [$i8p, $i8p]],
                 'strlen' => [$sizeT, false, [$i8p]],
-                '__string__init' => [$strPtr, false, [$i64, $i8p]],
+                '__hashtable__alloc' => [$htPtr, false, []],
                 '__hashtable__setStringAt' => [$voidTy, false, [$htPtr, $sizeT, $strPtr]],
+                '__string__init' => [$strPtr, false, [$i64, $i8p]],
                 '__value__writeHashtable' => [$voidTy, false, [$valuePtr, $htPtr]],
             ] as $name => [$ret, $vararg, $params]
         ) {
@@ -382,58 +342,65 @@ final class CliArgvRuntime
     {
         self::ensureLinked($context);
 
-        return self::emitFillArgvTableFromGlobals($context, BasicBlockHelper::parentFunction($context));
-    }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
 
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after CliArgvJitHelper compile (#9439)');
-        }
+        $argc = $context->builder->load(self::globalPtr($context, self::G_ARGC, $i32));
+        $iSlot = $context->builder->alloca($i32, 1, 'getopt_argv_i');
+        $context->builder->store($i32->constInt(0, false), $iSlot);
 
-        return $fn;
-    }
+        $loopHead = BasicBlockHelper::append($context, 'getopt_argv_head');
+        $loopDone = BasicBlockHelper::append($context, 'getopt_argv_done');
+        $loopBody = BasicBlockHelper::append($context, 'getopt_argv_body');
+        $context->builder->branch($loopHead);
 
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
+        $context->builder->positionAtEnd($loopHead);
+        $i = $context->builder->load($iSlot);
+        $done = $context->builder->icmp(Builder::INT_SGE, $i, $argc);
+        $context->builder->branchIf($done, $loopDone, $loopBody);
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CliArgvJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('CliArgvJitHelper.php parseAndCompile failed (#9439)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9439)');
-            }
-        }
+        $context->builder->positionAtEnd($loopBody);
+        $cstr = $context->builder->call($context->lookupFunction('__phpc_cli_argv_cstr'), $i);
+        $len = $context->builder->call($context->lookupFunction('strlen'), $cstr);
+        $str = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->sext($len, $i64),
+            $cstr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringAt'),
+            $ht,
+            $context->builder->zExt($i, $sizeT),
+            $str
+        );
+        $context->builder->store(
+            $context->builder->add($i, $i32->constInt(1, false)),
+            $iSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopDone);
+
+        return $ht;
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (self::ABI_FUNCTIONS as $name) {
+        foreach (
+            [
+                '__phpc_cli_store_argv',
+                '__phpc_cli_argc',
+                '__phpc_cli_argv_cstr',
+                '__phpc_cli_str_eq',
+                '__phpc_cli_refresh_argv_global',
+            ] as $name
+        ) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after CliArgvRuntime bridge (#9439)');
+                throw new \LogicException($name.' missing after CliArgvRuntime LLVM implement');
             }
             $context->registerFunction($name, $fn);
         }
