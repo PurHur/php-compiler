@@ -60,6 +60,21 @@ final class VmSscanf
             if ($fpos >= $fmtLen) {
                 return [$assigned, $inPos];
             }
+            if ('[' === $format[$fpos]) {
+                [$matcher, $fpos] = self::parseScansetMatcher($format, $fpos, $fmtLen);
+                if ($outIdx >= \count($outVars)) {
+                    return [$assigned, $inPos];
+                }
+                [$str, $consumed] = self::scanScansetMatch($input, $inPos, $inLen, $matcher, $width);
+                if (null === $str) {
+                    return [$assigned, $inPos];
+                }
+                self::assignString($outVars[$outIdx], $str);
+                $inPos += $consumed;
+                ++$outIdx;
+                ++$assigned;
+                continue;
+            }
             $spec = $format[$fpos];
             if ('%' === $spec) {
                 if ($inPos >= $inLen || $input[$inPos] !== '%') {
@@ -240,6 +255,11 @@ final class VmSscanf
             if ($fpos >= $len) {
                 break;
             }
+            if ('[' === $format[$fpos]) {
+                [, $fpos] = self::parseScansetMatcher($format, $fpos, $len);
+                ++$count;
+                continue;
+            }
             $spec = $format[$fpos];
             if ('%' !== $spec) {
                 ++$count;
@@ -265,6 +285,10 @@ final class VmSscanf
             if ($fpos >= $len) {
                 break;
             }
+            if ('[' === $format[$fpos]) {
+                self::parseScansetMatcher($format, $fpos, $len);
+                continue;
+            }
             $spec = $format[$fpos];
             if ('%' === $spec) {
                 continue;
@@ -273,6 +297,95 @@ final class VmSscanf
                 throw new \ValueError('Bad scan conversion character "'.$spec.'"');
             }
         }
+    }
+
+    /**
+     * %[scanset] — php-src ext/standard/formatted_io.c scan_set_conversion().
+     *
+     * @return array{0: callable(string): bool, 1: int}
+     */
+    private static function parseScansetMatcher(string $format, int $fpos, int $fmtLen): array
+    {
+        if ($fpos >= $fmtLen || '[' !== $format[$fpos]) {
+            throw new \ValueError('Bad scan conversion character "["');
+        }
+        ++$fpos;
+        $negated = false;
+        if ($fpos < $fmtLen && '^' === $format[$fpos]) {
+            $negated = true;
+            ++$fpos;
+        }
+        /** @var array<string, true> $chars */
+        $chars = [];
+        if ($fpos >= $fmtLen) {
+            throw new \ValueError('Unmatched [ in format string');
+        }
+        if (']' === $format[$fpos]) {
+            throw new \ValueError('Unmatched [ in format string');
+        }
+        while ($fpos < $fmtLen && ']' !== $format[$fpos]) {
+            $ch = $format[$fpos];
+            if (
+                $fpos + 2 < $fmtLen
+                && '-' === $format[$fpos + 1]
+                && ']' !== $format[$fpos + 2]
+            ) {
+                $lo = $ch;
+                $hi = $format[$fpos + 2];
+                if (ord($lo) <= ord($hi)) {
+                    for ($c = ord($lo); $c <= ord($hi); ++$c) {
+                        $chars[chr($c)] = true;
+                    }
+                    $fpos += 3;
+                    continue;
+                }
+            }
+            $chars[$ch] = true;
+            ++$fpos;
+        }
+        if ($fpos >= $fmtLen || ']' !== $format[$fpos]) {
+            throw new \ValueError('Unmatched [ in format string');
+        }
+        ++$fpos;
+        $matcher = static function (string $ch) use ($chars, $negated): bool {
+            $in = isset($chars[$ch]);
+
+            return $negated ? !$in : $in;
+        };
+
+        return [$matcher, $fpos];
+    }
+
+    /**
+     * @param callable(string): bool $matcher
+     *
+     * @return array{0: ?string, 1: int}
+     */
+    private static function scanScansetMatch(
+        string $input,
+        int $pos,
+        int $len,
+        callable $matcher,
+        ?int $maxWidth = null
+    ): array {
+        $orig = $pos;
+        $start = $pos;
+        $read = 0;
+        while ($pos < $len) {
+            if (null !== $maxWidth && $read >= $maxWidth) {
+                break;
+            }
+            if (!$matcher($input[$pos])) {
+                break;
+            }
+            ++$pos;
+            ++$read;
+        }
+        if ($start === $pos) {
+            return [null, 0];
+        }
+
+        return [substr($input, $start, $pos - $start), $pos - $orig];
     }
 
     /**
