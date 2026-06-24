@@ -9063,21 +9063,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 50)
-- new Variable (line 52)
-- new HashTable (line 67)
-- new Variable (line 69)
-- new HashTable (line 211)
-- new Variable (line 214)
-- new Variable (line 217)
-- new HashTable (line 1219)
-- new Variable (line 1221)
-- new HashTable (line 2016)
-- new Variable (line 2019)
-- new Variable (line 2025)
-- new Variable (line 2031)
-- new Variable (line 2037)
-- 111 class method(s)
+- new HashTable (line 51)
+- new Variable (line 53)
+- new HashTable (line 68)
+- new Variable (line 70)
+- new HashTable (line 212)
+- new Variable (line 215)
+- new Variable (line 218)
+- new HashTable (line 1214)
+- new Variable (line 1216)
+- new HashTable (line 2021)
+- new Variable (line 2024)
+- new Variable (line 2030)
+- new Variable (line 2036)
+- new Variable (line 2042)
+- 112 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -10099,7 +10099,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamMeta.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/VmStreamNotification.php`
 
@@ -16803,8 +16803,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionCreateIdRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 225)
-- 9 class method(s)
+- new JIT (line 233)
+- 10 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/SessionDestroy.php`
@@ -16964,7 +16964,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamCapsJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 18 class method(s)
 
 ### `lib/JIT/Builtin/StreamContextRuntime.php`
 
