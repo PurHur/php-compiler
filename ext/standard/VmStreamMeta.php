@@ -78,6 +78,22 @@ final class VmStreamMeta
         return !\in_array($uri, ['php://input', 'php://output', 'php://stdin'], true);
     }
 
+    /** stream_supports(..., STREAM_META_SEEKABLE) — php-src php_stream_can_seek (PHP 8.4+). */
+    public static function supportsSeekable(string $uri): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://input')
+            || \str_starts_with($lower, 'php://output')
+            || 'php://stdin' === $lower) {
+            return false;
+        }
+        if (self::isSocketTransport($uri)) {
+            return false;
+        }
+
+        return true;
+    }
+
     public static function supportsMetadata(string $uri): bool
     {
         if (\str_starts_with($uri, 'php://')) {

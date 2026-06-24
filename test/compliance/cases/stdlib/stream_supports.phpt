@@ -8,10 +8,14 @@ echo defined('STREAM_META_TOUCH') ? '1' : '0', "\n";
 echo stream_supports($fp, STREAM_META_TOUCH) ? '1' : '0', "\n";
 echo stream_supports($fp, STREAM_LOCK) ? '1' : '0', "\n";
 echo stream_supports($fp, STREAM_FILTER) ? '1' : '0', "\n";
+echo defined('STREAM_META_SEEKABLE') ? '1' : '0', "\n";
+echo stream_supports($fp, STREAM_META_SEEKABLE) ? '1' : '0', "\n";
 fclose($fp);
 --EXPECT--
 1
 1
 0
 0
+1
+1
 1
