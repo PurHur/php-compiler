@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2971 |
-| Phase A inventory files (M2 ratio SSOT) | 2971 |
+| PHP files on vm.php path | 2972 |
+| Phase A inventory files (M2 ratio SSOT) | 2972 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8026 |
+| Source constructs flagged (warnings) | 8028 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -712,6 +712,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrRepeat.php` | 0 | 1 |
 | `ext/standard/JitStrReplace.php` | 0 | 1 |
 | `ext/standard/JitStrReplaceArray.php` | 0 | 1 |
+| `ext/standard/JitStrReplaceMulti.php` | 0 | 1 |
 | `ext/standard/JitStrRot13.php` | 0 | 1 |
 | `ext/standard/JitStrShuffle.php` | 0 | 1 |
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
@@ -1120,7 +1121,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_product.php` | 0 | 2 |
 | `ext/standard/array_push.php` | 0 | 4 |
 | `ext/standard/array_rand.php` | 0 | 1 |
-| `ext/standard/array_reduce.php` | 0 | 3 |
+| `ext/standard/array_reduce.php` | 0 | 4 |
 | `ext/standard/array_replace.php` | 0 | 3 |
 | `ext/standard/array_replace_key.php` | 0 | 3 |
 | `ext/standard/array_replace_recursive.php` | 0 | 3 |
@@ -7060,6 +7061,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/JitStrReplaceMulti.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/standard/JitStrRot13.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9284,10 +9290,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInternalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 329)
-- new Variable (line 331)
-- new Variable (line 345)
-- 39 class method(s)
+- new Frame (line 333)
+- new Variable (line 335)
+- new Variable (line 356)
+- 40 class method(s)
 
 ### `ext/standard/VmIptc.php`
 
@@ -10066,7 +10072,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1285)
 - new Error (line 1296)
-- 193 class method(s)
+- 194 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -10498,8 +10504,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_reduce.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 71)
-- new Variable (line 77)
+- new Variable (line 70)
+- new Variable (line 76)
+- new Variable (line 81)
 - 3 class method(s)
 
 ### `ext/standard/array_replace.php`
@@ -13608,10 +13615,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 69)
-- new Variable (line 80)
-- new Variable (line 86)
-- 4 class method(s)
+- new HashTable (line 66)
+- new Variable (line 82)
+- new Variable (line 88)
+- 10 class method(s)
 
 ### `ext/standard/str_rot13.php`
 
@@ -15819,84 +15826,84 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 127)
 - new Variable (line 1203)
-- new Variable (line 1501)
-- new Variable (line 1613)
-- new Variable (line 1710)
-- new Variable (line 1721)
-- new Variable (line 1742)
-- new Variable (line 1860)
-- new Variable (line 1862)
-- new Variable (line 2129)
-- new Variable (line 2187)
-- new Variable (line 2189)
-- new Variable (line 2201)
-- new Variable (line 2318)
-- new Variable (line 2320)
-- new Variable (line 3121)
-- new Variable (line 3123)
-- new Variable (line 3356)
-- new Variable (line 3358)
-- new Variable (line 3960)
-- new Variable (line 3962)
-- new Variable (line 4028)
-- new Variable (line 4167)
-- new Variable (line 4169)
-- new Variable (line 4261)
-- new Variable (line 4358)
-- new Variable (line 4363)
-- new Variable (line 4783)
-- new Variable (line 4848)
-- new Variable (line 4850)
-- new Variable (line 5067)
-- new Variable (line 5069)
-- new Variable (line 5354)
-- new Variable (line 5356)
-- new Variable (line 5424)
-- new Variable (line 5426)
-- new Variable (line 5488)
-- new Variable (line 5490)
-- new Variable (line 6078)
-- new Variable (line 6867)
-- new Variable (line 6912)
-- new Variable (line 6914)
-- new boolval (line 6924)
-- new Variable (line 7332)
-- new ArgumentCountError (line 7692)
-- new Variable (line 8703)
-- new Variable (line 8752)
-- new Variable (line 8755)
+- new Variable (line 1486)
+- new Variable (line 1580)
+- new Variable (line 1674)
+- new Variable (line 1685)
+- new Variable (line 1706)
+- new Variable (line 1824)
+- new Variable (line 1826)
+- new Variable (line 2093)
+- new Variable (line 2151)
+- new Variable (line 2153)
+- new Variable (line 2165)
+- new Variable (line 2282)
+- new Variable (line 2284)
+- new Variable (line 3085)
+- new Variable (line 3087)
+- new Variable (line 3320)
+- new Variable (line 3322)
+- new Variable (line 3924)
+- new Variable (line 3926)
+- new Variable (line 3992)
+- new Variable (line 4131)
+- new Variable (line 4133)
+- new Variable (line 4225)
+- new Variable (line 4322)
+- new Variable (line 4327)
+- new Variable (line 4747)
+- new Variable (line 4812)
+- new Variable (line 4814)
+- new Variable (line 5031)
+- new Variable (line 5033)
+- new Variable (line 5318)
+- new Variable (line 5320)
+- new Variable (line 5388)
+- new Variable (line 5390)
+- new Variable (line 5452)
+- new Variable (line 5454)
+- new Variable (line 6042)
+- new Variable (line 6831)
+- new Variable (line 6876)
+- new Variable (line 6878)
+- new boolval (line 6888)
+- new Variable (line 7296)
+- new ArgumentCountError (line 7656)
+- new Variable (line 8667)
+- new Variable (line 8716)
+- new Variable (line 8719)
+- new Variable (line 9794)
 - new Variable (line 9830)
-- new Variable (line 9866)
-- new Variable (line 9874)
-- new Variable (line 9884)
-- new Variable (line 9895)
-- new Variable (line 9903)
-- new Variable (line 9952)
-- new Variable (line 9973)
-- new Variable (line 9994)
-- new Variable (line 10018)
-- new Variable (line 10047)
-- new Variable (line 10067)
-- new Variable (line 10118)
-- new Variable (line 10126)
-- new Variable (line 10476)
-- new Variable (line 12833)
-- new Variable (line 12864)
-- new Variable (line 12881)
-- new Variable (line 12897)
-- new strval (line 12922)
-- new Variable (line 13171)
-- new Variable (line 13187)
-- new Variable (line 13360)
-- new Variable (line 13376)
-- new Variable (line 13424)
-- new Variable (line 13729)
-- new Variable (line 13738)
-- new Variable (line 14224)
-- new Variable (line 14240)
-- new Variable (line 14290)
-- new Variable (line 14796)
-- new Variable (line 14802)
+- new Variable (line 9838)
+- new Variable (line 9848)
+- new Variable (line 9859)
+- new Variable (line 9867)
+- new Variable (line 9916)
+- new Variable (line 9937)
+- new Variable (line 9958)
+- new Variable (line 9982)
+- new Variable (line 10011)
+- new Variable (line 10031)
+- new Variable (line 10082)
+- new Variable (line 10090)
+- new Variable (line 10440)
+- new Variable (line 12797)
+- new Variable (line 12828)
+- new Variable (line 12845)
+- new Variable (line 12861)
+- new strval (line 12886)
+- new Variable (line 13135)
+- new Variable (line 13151)
+- new Variable (line 13324)
+- new Variable (line 13340)
+- new Variable (line 13388)
+- new Variable (line 13693)
+- new Variable (line 13702)
+- new Variable (line 14188)
+- new Variable (line 14204)
+- new Variable (line 14254)
+- new Variable (line 14760)
+- new Variable (line 14766)
 - 292 class method(s)
 - 14 closure(s)
 
