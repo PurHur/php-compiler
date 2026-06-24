@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -13,8 +12,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_strip_tags via StripTagsJitHelper PHP (#9196).
  *
- * JIT/normal modules use compiled PHP SSOT; AOT standalone keeps {@see StringStripTagsStandaloneLlvm}
- * until native link can host compiled VmString helpers reliably.
+ * JIT embed and AOT standalone compile {@see StripTagsJitHelper} into the module; thin LLVM bridge
+ * forwards the __compiler_strip_tags ABI. php-src: ext/standard/string.c
  */
 final class StringStripTags
 {
@@ -39,12 +38,6 @@ final class StringStripTags
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringStripTagsStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         self::implementBridge($context, '__compiler_strip_tags', self::STRIP_TAGS_HELPER, 2);
     }
 
