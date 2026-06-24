@@ -1455,7 +1455,12 @@ final class VmReflection
             if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
                 continue;
             }
-            $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+            $handler = $entry->methods[$methodLc] ?? null;
+            if ($handler instanceof \PHPCompiler\Func\Internal) {
+                $names[] = $handler->getName();
+            } else {
+                $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+            }
         }
         foreach (self::syntheticEnumMethodNames($entry, $filter) as $methodName) {
             if (!in_array($methodName, $names, true)) {
