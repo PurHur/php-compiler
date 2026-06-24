@@ -1086,6 +1086,7 @@ require_once __DIR__.'/../../../ext/standard/VmStreamMeta.php';
 require_once __DIR__.'/../../../ext/standard/StreamNotificationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamNotification.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamOpenFailure.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamSocketFailure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamPath.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketPairNative.php';
