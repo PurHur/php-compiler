@@ -10950,6 +10950,11 @@ class Compiler {
         if ($this->headerScalarCallArgMustUseDirectOperand($this->funcCallExprCalleeName($callOp), $argIndex)) {
             return null;
         }
+        // Statement-level side-effect calls before f($local) are not inline arg producers (#11093, #11375).
+        $namedLocalSlot = $this->namedLocalCallArgSlotIfBound($arg, $block, $callOp, $argIndex);
+        if (null !== $namedLocalSlot) {
+            return $namedLocalSlot;
+        }
         // php-cfg may lower a boolean-producing inline Expr (e.g. `===`) to a distinct arg temp with
         // no dataflow edge, leaving the arg slot empty. Prefer the immediately preceding binary op
         // producer when its inferred type matches the arg (#9030).

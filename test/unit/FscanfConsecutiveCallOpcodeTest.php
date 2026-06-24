@@ -58,6 +58,48 @@ PHP;
         self::assertStringContainsString('42', $out);
     }
 
+    public function testVoidDiscardedFwriteBeforeStreamReadDoesNotDoubleWrite(): void
+    {
+        $code = <<<'PHP'
+<?php
+
+$fp = fopen('php://memory', 'r+');
+fwrite($fp, '077');
+rewind($fp);
+echo ftell($fp) . "\n";
+var_export(fscanf($fp, '%i'));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'void_discarded_fwrite_fscanf.php');
+
+        $fwriteInitCount = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT !== $op->type) {
+                continue;
+            }
+            $nameSlot = $op->arg1;
+            if (!isset($block->constants[$nameSlot])) {
+                continue;
+            }
+            if ('fwrite' === $block->constants[$nameSlot]->toString()) {
+                ++$fwriteInitCount;
+            }
+        }
+        self::assertSame(1, $fwriteInitCount, 'void-discarded fwrite must not be lowered twice');
+
+        ob_start();
+        try {
+            $runtime->run($block);
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            self::fail('runtime: '.$e->getMessage());
+        }
+        $out = ob_get_clean();
+        self::assertStringContainsString("0\n", $out);
+        self::assertStringContainsString('63', $out);
+    }
+
     public function testVarDumpFscanfNestedDoesNotScrambleStreamArg(): void
     {
         $code = <<<'PHP'
