@@ -14,6 +14,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\Block;
 use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ClassConstFetchRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
@@ -135,7 +136,7 @@ final class ClassConstFetchHelper
                         BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch($objectType, $jit, $block, $id);
                     }
                 }
-                self::writeConstEntry($context, $resultSlot, $entryData);
+                self::writeConstEntryForRuntime($context, $resultSlot, $entryData);
                 $context->builder->branch($merge);
             }
             $checkBlock = $nextCheck;
@@ -151,7 +152,7 @@ final class ClassConstFetchHelper
         $message = "Undefined class constant {$displayClass}::{$constName}";
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            self::messageDataPtr($context, $message),
+            self::messageDataPtrForRuntime($context, $message),
             $context->constantFromInteger(strlen($message), 'size_t')
         );
         $context->builder->returnVoid();
@@ -268,115 +269,13 @@ final class ClassConstFetchHelper
         ?Block $block = null,
         ?\PHPCompiler\JIT $jit = null
     ): Variable {
-        $context = $objectType->jitContext();
-        self::ensureStrCaseCmp($context);
-        ReadonlyBridge::ensureLinked($context);
-
-        $nativeName = JitStringArg::lower($context, $nameVar, 'class constant name');
-        $resultSlot = JitValueBox::alloc($context);
-        $fn = BasicBlockHelper::parentFunction($context);
-        $entry = $context->builder->getInsertBlock();
-        $merge = $fn->appendBasicBlock('class_const_dyn_merge');
-        $fail = $fn->appendBasicBlock('class_const_dyn_fail');
-
-        $classPseudo = $context->builder->load($context->constantStringFromString('class'));
-        $context->builder->positionAtEnd($entry);
-        $isClass = $context->builder->call(
-            $context->lookupFunction('strcasecmp'),
-            self::stringDataPtr($context, $nativeName),
-            self::stringDataPtr($context, $classPseudo)
-        );
-        $i32 = $context->getTypeFromString('int32');
-        $classMatch = $fn->appendBasicBlock('class_const_dyn_class');
-        $constChain = $fn->appendBasicBlock('class_const_dyn_chain');
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $isClass, $i32->constInt(0, false)),
-            $classMatch,
-            $constChain
-        );
-
-        $context->builder->positionAtEnd($classMatch);
-        $classNameStr = self::classNameStringFromId($objectType, $classIdVal);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            JitValueBox::pointer($context, $resultSlot),
-            $classNameStr
-        );
-        $context->builder->branch($merge);
-
-        $checkBlock = $constChain;
-        $context->builder->positionAtEnd($constChain);
-        foreach ($objectType->allClassNamesById() as $id => $_) {
-            $constants = $objectType->classConstantsForId($id);
-            foreach ($constants as [$constKey, $entry]) {
-                $nextCheck = $fn->appendBasicBlock('class_const_dyn_try_'.$id.'_'.$constKey);
-                $matchBlock = $fn->appendBasicBlock('class_const_dyn_match_'.$id.'_'.$constKey);
-                $context->builder->positionAtEnd($checkBlock);
-                $expectedId = $context->constantFromInteger($id, 'int64');
-                $isId = $context->builder->icmp(Builder::INT_EQ, $classIdVal, $expectedId);
-                $keyGlobal = $context->builder->load($context->constantStringFromString($constKey));
-                $cmp = $context->builder->call(
-                    $context->lookupFunction('strcasecmp'),
-                    self::stringDataPtr($context, $nativeName),
-                    self::stringDataPtr($context, $keyGlobal)
-                );
-                $isName = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-                $isMatch = $context->builder->and($isId, $isName);
-                $context->builder->branchIf($isMatch, $matchBlock, $nextCheck);
-
-                $context->builder->positionAtEnd($matchBlock);
-                if ($objectType->isTraitClass(strtolower(ltrim($objectType->classNameForId($id), '\\')))
-                    && !$objectType->isInTraitMethodScopeForTraitId($id, $block)) {
-                    $classLabel = $objectType->classNameForId($id);
-                    ErrorRaise::ensureLinked($context);
-                    ErrorRaise::emitRaise(
-                        $context,
-                        "Cannot access trait constant {$classLabel}::* directly"
-                    );
-                    $context->builder->branch($merge);
-                } else {
-                    if (null !== $jit) {
-                        ClassConstVisibilityJitGuard::emitBeforeFetch(
-                            $objectType,
-                            $jit,
-                            $block,
-                            $id,
-                            $objectType->classConstDisplayName($id, $constKey)
-                        );
-                        if ($objectType->isEnumClassId($id)) {
-                            BackedEnumDuplicateJitGuard::emitBeforeEnumCaseFetch($objectType, $jit, $block, $id);
-                        }
-                    }
-                    if ($objectType->isEnumClassId($id)) {
-                        self::writeEnumCaseConstEntry($objectType, $context, $resultSlot, $id, $constKey);
-                    } else {
-                        self::writeConstEntry($context, $resultSlot, $entry);
-                    }
-                    $context->builder->branch($merge);
-                }
-                $checkBlock = $nextCheck;
-            }
-        }
-        $context->builder->positionAtEnd($checkBlock);
-        $context->builder->branch($fail);
-
-        $context->builder->positionAtEnd($fail);
-        $displayClass = self::displayClassName($objectType, -1, $classOp);
-        $message = "Undefined class constant {$displayClass}::*";
-        $context->builder->call(
-            $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            self::messageDataPtr($context, $message),
-            $context->constantFromInteger(strlen($message), 'size_t')
-        );
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($merge);
-
-        return new Variable(
-            $context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $resultSlot
+        return ClassConstFetchRuntime::fetchDynamicByClassIdValue(
+            $objectType,
+            $classIdVal,
+            $nameVar,
+            $classOp,
+            $block,
+            $jit
         );
     }
 
@@ -606,7 +505,7 @@ final class ClassConstFetchHelper
         $message = 'Unknown class for constant fetch';
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_logic_exception'),
-            self::messageDataPtr($context, $message),
+            self::messageDataPtrForRuntime($context, $message),
             $context->constantFromInteger(strlen($message), 'size_t')
         );
         $context->builder->returnVoid();
@@ -618,7 +517,7 @@ final class ClassConstFetchHelper
         return $result;
     }
 
-    private static function writeEnumCaseConstEntry(
+    public static function writeEnumCaseConstEntryForRuntime(
         Object_ $objectType,
         Context $context,
         Value $slot,
@@ -645,7 +544,7 @@ final class ClassConstFetchHelper
     /**
      * @param array{type: int, value: int|float|bool|string|null} $entry
      */
-    private static function writeConstEntry(Context $context, Value $slot, array $entry): void
+    public static function writeConstEntryForRuntime(Context $context, Value $slot, array $entry): void
     {
         switch ($entry['type']) {
             case Variable::TYPE_NATIVE_LONG:
@@ -766,7 +665,7 @@ final class ClassConstFetchHelper
         return $context->builder->structGep($strPtr, $map['value']);
     }
 
-    private static function messageDataPtr(Context $context, string $message): Value
+    public static function messageDataPtrForRuntime(Context $context, string $message): Value
     {
         $strPtr = $context->builder->load($context->constantStringFromString($message));
         $strMap = $context->structFieldMap['__string__'];
