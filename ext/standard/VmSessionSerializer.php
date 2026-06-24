@@ -36,6 +36,33 @@ final class VmSessionSerializer
         return $out;
     }
 
+    /**
+     * JIT wire encode without VM Context — scalars/arrays via {@see SerializeJitHelper}.
+     *
+     * @return string|false
+     */
+    public static function encodeWireHashTable(HashTable $session): string|false
+    {
+        $out = '';
+        foreach ($session->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $keyVar = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $keyVar->type) {
+                continue;
+            }
+            $key = $keyVar->toString();
+            if (str_contains($key, '|')) {
+                return false;
+            }
+            $serialized = SerializeJitHelper::serializeSessionWireValue($valueVar);
+            if (null === $serialized) {
+                return false;
+            }
+            $out .= $key.'|'.$serialized;
+        }
+
+        return $out;
+    }
+
     public static function decodePhp(Context $ctx, string $payload): bool
     {
         $sessionVar = $ctx->ensureSuperglobal('_SESSION');
@@ -76,6 +103,43 @@ final class VmSessionSerializer
         $sessionVar->array($ht);
 
         return true;
+    }
+
+    public static function decodeWireHashTable(string $payload): ?HashTable
+    {
+        $ht = new HashTable();
+        $pos = 0;
+        $len = \strlen($payload);
+        while ($pos < $len) {
+            $pipe = strpos($payload, '|', $pos);
+            if (false === $pipe) {
+                return null;
+            }
+            $key = \substr($payload, $pos, $pipe - $pos);
+            if ('' === $key) {
+                return null;
+            }
+            $pos = $pipe + 1;
+            $span = self::serializedValueByteLength($payload, $pos);
+            if (null === $span) {
+                return null;
+            }
+            $fragment = \substr($payload, $pos, $span);
+            $decoded = VmUnserializeFormat::decodePayload($fragment);
+            if (false === $decoded && 'b:0;' !== $fragment) {
+                return null;
+            }
+            $slot = new Variable();
+            if ($decoded instanceof Variable) {
+                $slot->copyFrom($decoded);
+            } else {
+                $slot->copyFrom(VmJson::import($decoded));
+            }
+            $ht->add($key, $slot);
+            $pos += $span;
+        }
+
+        return $ht;
     }
 
     private static function serializedValueByteLength(string $payload, int $offset): ?int
