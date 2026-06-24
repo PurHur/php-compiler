@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 2972 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8028 |
+| Source constructs flagged (warnings) | 8029 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -816,6 +816,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PregExpandJitHelper.php` | 0 | 1 |
 | `ext/standard/PregReplacementExpand.php` | 0 | 1 |
 | `ext/standard/ProgressJitHelper.php` | 0 | 1 |
+| `ext/standard/QuotPrintJitHelper.php` | 0 | 1 |
 | `ext/standard/RandomBytesJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadfileJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadonlyRaiseJitHelper.php` | 0 | 1 |
@@ -2229,8 +2230,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringPregMatchJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringPregQuote.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPrintRJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringQuotPrintJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
@@ -8368,6 +8368,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/standard/QuotPrintJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/RandomBytesJitHelper.php`
 
@@ -17406,12 +17411,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotPrint.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `lib/JIT/Builtin/StringQuotPrintJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- new JIT (line 101)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringQuotemeta.php`
 
