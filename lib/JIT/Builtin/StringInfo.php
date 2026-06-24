@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -84,6 +85,12 @@ final class StringInfo
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureHashtableHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementPhpversionBridge($context);
@@ -95,7 +102,12 @@ final class StringInfo
         self::implementGetExtensionFuncsBridge($context);
         self::implementPosixUnameBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementPhpversionBridge(Context $context): void
@@ -120,10 +132,12 @@ final class StringInfo
         $okBb = $fn->appendBasicBlock('info_phpversion_ok');
 
         $context->builder->positionAtEnd($entry);
-        $versionStr = $context->builder->call(
+        $versionRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PHPVERSION_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $versionStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $versionRaw);
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load($context->builder->structGep($versionStr, $map['length']));
         $empty = $context->builder->icmp(Builder::INT_EQ, $len, $i64->constInt(0, false));
@@ -165,10 +179,12 @@ final class StringInfo
 
         $entry = $fn->appendBasicBlock('info_php_uname_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::PHP_UNAME_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
@@ -208,11 +224,13 @@ final class StringInfo
         $context->builder->branchIf($emptyName, $missBb, $callBb);
 
         $context->builder->positionAtEnd($callBb);
-        $loaded = $context->builder->call(
+        $loadedRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::EXTENSION_LOADED_HELPER),
-            $name
+            [$name]
         );
-        $context->builder->returnValue($context->builder->zext($loaded, $i32));
+        $loadedI32 = JitNestedHelperCoerce::coerceHelperScalarResult($context, $loadedRaw, $i32);
+        $context->builder->returnValue($loadedI32);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->returnValue($i32->constInt(0, false));
@@ -250,13 +268,12 @@ final class StringInfo
         $context->builder->branch($bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
-        $count = $context->builder->call(
+        $countRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::COUNT_LOADED_EXTENSIONS_HELPER),
-            $zendExtensions
+            [$zendExtensions]
         );
-        $countI64 = $count->typeOf() === $i64
-            ? $count
-            : $context->builder->sext($count, $i64);
+        $countI64 = JitNestedHelperCoerce::coerceHelperScalarResult($context, $countRaw, $i64);
         $iSlot = $context->builder->alloca($i64, 1, 'info_gle_i');
         $context->builder->store($i64->constInt(0, false), $iSlot);
         $context->builder->branch($loopHead);
@@ -267,10 +284,12 @@ final class StringInfo
         $context->builder->branchIf($done, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $literal = $context->builder->call(
+        $literalRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::LOADED_EXTENSION_AT_HELPER),
-            $i
+            [$i]
         );
+        $literal = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $literalRaw);
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $ht,
@@ -471,7 +490,12 @@ final class StringInfo
 
         $entry = $fn->appendBasicBlock('info_str_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, $helperLogical));
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            []
+        );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }

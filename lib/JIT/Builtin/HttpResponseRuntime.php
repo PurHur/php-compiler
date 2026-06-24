@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VmVariable;
@@ -59,10 +60,26 @@ final class HttpResponseRuntime
 
     public static function implement(Context $context): void
     {
+        $probe = $context->module->getNamedFunction('__phpc_http_response_code_apply');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementStatusBridges($context);
         self::implementApplyBridge($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitResetForStandaloneMain(Context $context): void
@@ -70,7 +87,8 @@ final class HttpResponseRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::ensureLinked($context);
+        // Type::initialize already linked bridges; re-entering implement() during C main
+        // wrapper emit clears the insert block and parentless-ifies session/progress IR (#11206).
         $context->builder->call($context->lookupFunction('__phpc_http_response_status_reset'));
     }
 
@@ -184,7 +202,7 @@ final class HttpResponseRuntime
             $context,
             $context->builder->call(
                 self::helperFunction($context, self::APPLY_SET_HELPER),
-                $context->builder->trunc($intval, $context->getTypeFromString('int32'))
+                $intval
             ),
             $outPtr
         );
@@ -245,7 +263,7 @@ final class HttpResponseRuntime
             $context,
             $context->builder->call(
                 self::helperFunction($context, self::APPLY_SET_HELPER),
-                $context->builder->trunc($boxedLong, $context->getTypeFromString('int32'))
+                $boxedLong
             ),
             $outPtr
         );
@@ -268,7 +286,6 @@ final class HttpResponseRuntime
 
     private static function emitWriteFromGetSentinelValue(Context $context, Value $sentinel, Value $outPtr): void
     {
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof LlvmFunction);
@@ -279,7 +296,7 @@ final class HttpResponseRuntime
         $sSet = $fn->appendBasicBlock('hr_get_set_'.$sid);
         $sDone = $fn->appendBasicBlock('hr_get_done_'.$sid);
 
-        $isUnset = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i32->constInt(-1, true));
+        $isUnset = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i64->constInt(-1, true));
         $context->builder->branchIf($isUnset, $sUnset, $sSet);
 
         $context->builder->positionAtEnd($sUnset);
@@ -290,7 +307,7 @@ final class HttpResponseRuntime
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $outPtr,
-            $context->builder->sext($sentinel, $i64)
+            $sentinel
         );
         $context->builder->branch($sDone);
 
@@ -299,7 +316,6 @@ final class HttpResponseRuntime
 
     private static function emitWriteFromSetSentinel(Context $context, Value $sentinel, Value $outPtr): void
     {
-        $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof LlvmFunction);
@@ -311,7 +327,7 @@ final class HttpResponseRuntime
         $sPrev = $fn->appendBasicBlock('hr_set_prev_'.$sid);
         $sDone = $fn->appendBasicBlock('hr_set_done_'.$sid);
 
-        $isInvalid = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i32->constInt(-1, true));
+        $isInvalid = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i64->constInt(-1, true));
         $context->builder->branchIf($isInvalid, $sInvalid, $sFirst);
 
         $context->builder->positionAtEnd($sInvalid);
@@ -319,7 +335,7 @@ final class HttpResponseRuntime
         $context->builder->branch($sDone);
 
         $context->builder->positionAtEnd($sFirst);
-        $isFirst = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i32->constInt(-2, true));
+        $isFirst = $context->builder->icmp(Builder::INT_EQ, $sentinel, $i64->constInt(-2, true));
         $trueBlock = $fn->appendBasicBlock('hr_set_true_'.$sid);
         $context->builder->branchIf($isFirst, $trueBlock, $sPrev);
 
@@ -331,7 +347,7 @@ final class HttpResponseRuntime
         $context->builder->call(
             $context->lookupFunction('__value__writeLong'),
             $outPtr,
-            $context->builder->sext($sentinel, $i64)
+            $sentinel
         );
         $context->builder->branch($sDone);
 
@@ -381,7 +397,7 @@ final class HttpResponseRuntime
             $context,
             $context->builder->call(
                 self::helperFunction($context, self::APPLY_SET_HELPER),
-                $context->builder->trunc($boxedLong, $context->getTypeFromString('int32'))
+                $boxedLong
             ),
             $outPtr
         );
@@ -419,7 +435,8 @@ final class HttpResponseRuntime
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('hr_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($context->builder->call(self::helperFunction($context, $helperLogical)));
+        $raw = $context->builder->call(self::helperFunction($context, $helperLogical));
+        $context->builder->returnValue(JitNestedHelperCoerce::i64ToScalar($context, $raw, $i32));
         $context->registerFunction($abiName, $fn);
     }
 
@@ -455,7 +472,11 @@ final class HttpResponseRuntime
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('hr_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->call(self::helperFunction($context, $helperLogical), $fn->getParam(0));
+        $i64 = $context->getTypeFromString('int64');
+        $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            JitNestedHelperCoerce::scalarToI64($context, $fn->getParam(0), $i32)
+        );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }

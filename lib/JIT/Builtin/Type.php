@@ -1354,6 +1354,7 @@ class Type extends Builtin {
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);
         StringGetenvAll::ensureLinked($this->context);
+        ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);
         StringPhpinfoRuntime::ensureLinked($this->context);
         StringDir::ensureLinked($this->context);

@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin as JitBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\BasicBlock;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -71,6 +73,8 @@ final class IncludePathRuntime
             return;
         }
 
+        $savedBlock = self::captureInsertBlock($context);
+
         if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
             self::implementStandaloneBodies($context);
         } else {
@@ -83,7 +87,7 @@ final class IncludePathRuntime
             self::implementResolveBridge($context);
         }
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        self::restoreInsertBlock($context, $savedBlock);
     }
 
     private static function implementStandaloneBodies(Context $context): void
@@ -230,7 +234,12 @@ final class IncludePathRuntime
 
         $entry = $fn->appendBasicBlock('include_path_get_bridge');
         $context->builder->positionAtEnd($entry);
-        $str = $context->builder->call(self::stackHelperFunction($context, self::GET_HELPER));
+        $strRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::stackHelperFunction($context, self::GET_HELPER),
+            []
+        );
+        $str = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $strRaw);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $fn->getParam(0),
@@ -260,10 +269,12 @@ final class IncludePathRuntime
 
         $entry = $fn->appendBasicBlock('include_path_set_bridge');
         $context->builder->positionAtEnd($entry);
-        $oldStr = $context->builder->call(
+        $oldStrRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::stackHelperFunction($context, self::PUSH_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $oldStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $oldStrRaw);
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             $fn->getParam(1),
@@ -314,10 +325,12 @@ final class IncludePathRuntime
 
         $entry = $fn->appendBasicBlock('include_path_resolve_bridge');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::resolveHelperFunction($context, self::RESOLVE_HELPER),
-            $fn->getParam(0)
+            [$fn->getParam(0)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
@@ -422,6 +435,24 @@ final class IncludePathRuntime
                 throw new \LogicException($name.' missing after IncludePathRuntime bridge (#9245)');
             }
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    private static function captureInsertBlock(Context $context): ?BasicBlock
+    {
+        try {
+            return $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private static function restoreInsertBlock(Context $context, ?BasicBlock $block): void
+    {
+        if (null !== $block) {
+            $context->builder->positionAtEnd($block);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 }

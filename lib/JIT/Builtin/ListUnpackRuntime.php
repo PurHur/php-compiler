@@ -17,6 +17,8 @@ use PHPLLVM\Value;
  */
 final class ListUnpackRuntime
 {
+    private static bool $implementing = false;
+
     private const HELPER_PATH = '/VM/ListUnpackJitHelper.php';
 
     private const VALUE_BOX_IS_ARRAY = 'PHPCompiler\\VM\\ListUnpackJitHelper::valueBoxIsArray';
@@ -45,14 +47,19 @@ final class ListUnpackRuntime
 
     public static function implement(Context $context): void
     {
+        if (self::$implementing) {
+            return;
+        }
         if (self::bridgesReady($context)) {
             return;
         }
 
-        $i8 = $context->getTypeFromString('int8');
-        $i1 = $context->getTypeFromString('int1');
+        self::$implementing = true;
+        try {
+            $i8 = $context->getTypeFromString('int8');
+            $i1 = $context->getTypeFromString('int1');
 
-        JitVmHelperLink::ensureBridge(
+            JitVmHelperLink::ensureBridge(
             $context,
             self::ABI_IS_ARRAY,
             'list_unpack_value_box_is_array_entry',
@@ -85,7 +92,20 @@ final class ListUnpackRuntime
             self::COMPILED_HELPERS,
             '#10266'
         );
-        $context->builder->clearInsertionPosition();
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+        } finally {
+            self::$implementing = false;
+        }
     }
 
     public static function callValueBoxIsArray(Context $context, Value $typeByte): Value
@@ -144,11 +164,11 @@ final class ListUnpackRuntime
     private static function bridgesReady(Context $context): bool
     {
         foreach ([self::ABI_IS_ARRAY, self::ABI_IS_STRING, self::ABI_IS_UNPACKABLE] as $abiName) {
-            $probe = $context->module->getNamedFunction($abiName);
-            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            try {
+                $context->lookupFunction($abiName);
+            } catch (\Throwable) {
                 return false;
             }
-            $context->registerFunction($abiName, $probe);
         }
 
         return true;

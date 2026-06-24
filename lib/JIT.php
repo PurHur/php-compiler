@@ -610,6 +610,7 @@ class JIT {
             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
         }
         $retval = $this->coerceReturnValue($return, $retval, $expected);
+        $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
         // Arm-tail ?: returns must not use merge-block dead operands — they free branch
         // locals (e.g. string params) before coerceReturnValue finishes (#8555).
         if ($this->isVoidLlvmFunction($func)) {
@@ -5944,6 +5945,7 @@ class JIT {
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'included_at_entry_cont');
 
         return $exit;
     }
@@ -5998,6 +6000,7 @@ class JIT {
         if (null !== $this->context->inlineIncludeExitBlock) {
             $exit = $this->context->inlineIncludeExitBlock;
         }
+        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'finally_at_entry_cont');
 
         return $exit;
     }
@@ -6030,12 +6033,16 @@ class JIT {
                 $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
             }
             $retval = $this->loadPendingReturnValue($valuePtr, $expected);
+            $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
             $builder->returnValue($retval);
         }
     }
 
     private function loadPendingReturnValue(PHPLLVM\Value $valuePtr, ?string $expectedReturn): PHPLLVM\Value
     {
+        if ('__value__' === $expectedReturn) {
+            return $this->context->builder->load($valuePtr);
+        }
         $read = match ($expectedReturn) {
             'string', '__string__*' => '__value__readString',
             'double' => '__value__readDouble',
@@ -6237,7 +6244,10 @@ class JIT {
             return $func->appendBasicBlock('entry');
         }
         if (!$allowRecompile && $this->context->scope->blockStorage->contains($block)) {
-            return $this->context->scope->blockStorage[$block];
+            $cached = $this->context->scope->blockStorage[$block];
+            if (null === $entryBlock || $cached === $entryBlock) {
+                return $cached;
+            }
         }
         if (null !== $block->func) {
             JIT\Progress::noteFunction($block->func->getScopedName());
@@ -6248,8 +6258,10 @@ class JIT {
             self::$blockNumber++;
             $origBasicBlock = $basicBlock = $func->appendBasicBlock('block_' . self::$blockNumber);
         }
-        $this->context->scope->blockStorage[$block] = $basicBlock;
-        if (!$this->context->scope->blockEntryStorage->contains($block)) {
+        if (!$this->context->scope->blockStorage->contains($block) || null === $entryBlock) {
+            $this->context->scope->blockStorage[$block] = $basicBlock;
+        }
+        if (!$this->context->scope->blockEntryStorage->contains($block) || null === $entryBlock) {
             $this->context->scope->blockEntryStorage[$block] = $basicBlock;
         }
         $builder = $this->context->builder;
@@ -7861,10 +7873,7 @@ class JIT {
                     $builder->positionAtEnd($nextBb);
                     break;
                 case OpCode::TYPE_JUMP:
-                    $branchBlock = $builder->getInsertBlock();
-                    if (null !== $branchBlock->getTerminator()) {
-                        break;
-                    }
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jump_cont');
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $skippedListUnpackAssign = $this->context->listUnpackSkipAssignPath;
@@ -8274,6 +8283,7 @@ class JIT {
                             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
                         }
                         $retval = $this->coerceReturnValue($return, $retval, $expected);
+                        $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
                         $this->context->builder->returnValue($retval);
                     }
     
@@ -9337,6 +9347,7 @@ class JIT {
             $expected = $this->context->functionReturnType[strtolower($this->context->activeFunction)] ?? null;
         }
         $retval = $this->coerceReturnValue($value, $this->context->helper->loadValue($value), $expected);
+        $retval = $this->alignRetvalToLlvmFnReturn($retval, $func);
         $builder->returnValue($retval);
     }
 
@@ -9473,6 +9484,43 @@ class JIT {
             return $this->loadNullValueStruct();
         }
         if (null === $expected || Variable::TYPE_VALUE !== $return->type) {
+            if ('bool' === $expected && Variable::TYPE_NATIVE_BOOL === $return->type) {
+                return $this->context->builder->truncOrBitCast(
+                    $retval,
+                    $this->context->getTypeFromString('int1')
+                );
+            }
+            if (
+                ('int64' === $expected || 'long long' === $expected)
+                && Variable::TYPE_NATIVE_LONG === $return->type
+            ) {
+                $i64 = $this->context->getTypeFromString('int64');
+                if ($retval->typeOf() !== $i64) {
+                    return $this->context->builder->zext($retval, $i64);
+                }
+
+                return $retval;
+            }
+            if ('int32' === $expected && Variable::TYPE_NATIVE_LONG === $return->type) {
+                return $this->context->builder->trunc(
+                    $retval,
+                    $this->context->getTypeFromString('int32')
+                );
+            }
+            if ('__value__' === $expected && Variable::TYPE_STRING === $return->type) {
+                $slot = JIT\JitValueBox::alloc($this->context);
+                $owned = $this->context->builder->call(
+                    $this->context->lookupFunction('__string__separate'),
+                    $retval
+                );
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeString'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $owned
+                );
+
+                return $this->context->builder->load($slot);
+            }
             if ('__string__*' === $expected && Variable::TYPE_NULL === $return->type) {
                 return $this->context->getTypeFromString('__string__*')->constNull();
             }
@@ -9480,6 +9528,11 @@ class JIT {
                 return $this->context->getTypeFromString('__hashtable__*')->constNull();
             }
             if ('__hashtable__*' === $expected && Variable::TYPE_HASHTABLE === $return->type) {
+                $htPtr = $this->context->getTypeFromString('__hashtable__*');
+                if ($retval->typeOf() !== $htPtr) {
+                    return $this->context->builder->bitcast($retval, $htPtr);
+                }
+
                 return $retval;
             }
             if ('__hashtable__*' === $expected && 0 !== ($return->type & Variable::IS_NATIVE_ARRAY)) {
@@ -9539,6 +9592,69 @@ class JIT {
                 $this->context->lookupFunction('__value__readHashtable'),
                 $valuePtr
             );
+        }
+
+        return $retval;
+    }
+
+    private function alignRetvalToLlvmFnReturn(PHPLLVM\Value $retval, PHPLLVM\Value $func): PHPLLVM\Value
+    {
+        $want = null;
+        $sig = JIT\BasicBlockHelper::llvmFunctionSignatureType($func);
+        if (null !== $sig) {
+            $want = $sig->getReturnType();
+        }
+        if (null === $want && null !== $this->context->activeFunction) {
+            $expected = $this->context->functionReturnType[$this->context->activeFunction] ?? null;
+            if (null !== $expected && 'void' !== $expected) {
+                $want = $this->context->getTypeFromString($expected);
+            }
+        }
+        if (null === $want) {
+            return $retval;
+        }
+        $have = $retval->typeOf();
+        if ($want === $have) {
+            return $retval;
+        }
+        $wantStr = $this->context->getStringFromType($want);
+        $haveStr = $this->context->getStringFromType($have);
+        if (('int1' === $wantStr || 'bool' === $wantStr) && ('int64' === $haveStr || 'long long' === $haveStr || 'int32' === $haveStr)) {
+            return $this->context->builder->truncOrBitCast($retval, $want);
+        }
+        if ('int8' === $haveStr && ('int32' === $wantStr || 'int64' === $wantStr || 'long long' === $wantStr)) {
+            return $this->context->builder->zext($retval, $want);
+        }
+        if ('int32' === $wantStr && ('int64' === $haveStr || 'long long' === $haveStr)) {
+            return $this->context->builder->trunc($retval, $want);
+        }
+        if (('int64' === $wantStr || 'long long' === $wantStr) && ('int32' === $haveStr || 'int1' === $haveStr)) {
+            return $this->context->builder->zext($retval, $want);
+        }
+        if ('__hashtable__*' === $wantStr && '__object__*' === $haveStr) {
+            return $this->context->builder->bitcast($retval, $want);
+        }
+        if ('__object__*' === $wantStr && '__hashtable__*' === $haveStr) {
+            return $this->context->builder->bitcast($retval, $want);
+        }
+        if ('__value__' === $wantStr && '__value__*' === $haveStr) {
+            return $this->context->builder->load($retval);
+        }
+        if ('__value__' === $wantStr && ('int64' === $haveStr || 'long long' === $haveStr)) {
+            $slot = JIT\JitValueBox::alloc($this->context);
+            $this->context->builder->call(
+                $this->context->lookupFunction('__value__writeLong'),
+                JIT\JitValueBox::pointer($this->context, $slot),
+                $retval
+            );
+
+            return $this->context->builder->load($slot);
+        }
+        if (\PHPLLVM\Type::KIND_INTEGER === $want->getKind() && \PHPLLVM\Type::KIND_INTEGER === $have->getKind()) {
+            return $this->context->builder->truncOrBitCast($retval, $want);
+        }
+        if (\PHPLLVM\Type::KIND_POINTER === $want->getKind() && \PHPLLVM\Type::KIND_POINTER === $have->getKind()) {
+            return $this->context->builder->bitcast($retval, $want);
         }
 
         return $retval;

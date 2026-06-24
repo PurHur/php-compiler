@@ -99,7 +99,7 @@ final class TryCatchHelper
         JitReturnPending::ensureLinked($context);
         JitThrow::registerDeclarations($context);
         JitThrow::ensureLinked($context);
-        $finallyBb = self::ensureFinallyLowering($jit, $func, $context, $handler, []);
+        $finallyBb = self::finallyBbFor($jit, $func, $context, $handler, [], false);
         JitReturnPending::setPending($context, $returnVar, $isVoid);
         $builder = $context->builder;
         $returnBlock = $builder->getInsertBlock();
@@ -139,21 +139,51 @@ final class TryCatchHelper
         $context->tryCatch->mergeHandlers[spl_object_id($mergeBlock)] = $handler;
 
         $builder = $context->builder;
-        $branchBlock = $context->scope->blockStorage[$handlerBlock] ?? $builder->getInsertBlock();
+        $branchBlock = null;
+        try {
+            $branchBlock = $builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        if (null === $branchBlock || null !== $branchBlock->getTerminator()) {
+            $cached = $context->scope->blockStorage[$handlerBlock] ?? null;
+            if (null !== $cached && null === $cached->getTerminator()) {
+                $branchBlock = $cached;
+            } elseif (null === $branchBlock || null !== $branchBlock->getTerminator()) {
+                $branchBlock = self::appendBlock($func, 'try_branch_'.self::blockSuffix($handler));
+            }
+        }
         if (null === $branchBlock) {
             throw new \LogicException('TYPE_TRY lowering requires an active LLVM basic block');
         }
+        $context->scope->blockStorage[$handlerBlock] = $branchBlock;
         $builder->positionAtEnd($branchBlock);
         $builder->call($context->lookupFunction('phpc_jit_clear_throw_pending'));
         $builder->call($context->lookupFunction('phpc_jit_clear_return_pending'));
-        $mergeBb = $context->scope->blockStorage[$mergeBlock] ?? null;
-        if (null === $mergeBb) {
-            $mergeBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
-        }
+        $mergeHeaderBb = $context->scope->blockStorage[$mergeBlock] ?? null;
         if (!$handler->mergeBodyCompiled) {
-            $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBb);
+            if (null === $mergeHeaderBb) {
+                $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            }
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
+            $mergeBodyBb = self::appendBlock($func, 'try_merge_body_'.self::blockSuffix($handler));
+            $handler->mergeBodyLlvmBb = $mergeBodyBb;
+            if (null === $mergeBodyBb->getTerminator()) {
+                $jit->compileIncludedAtEntry($func, $handler->mergeBlock, $mergeBodyBb);
+            }
+            $builder->positionAtEnd($mergeHeaderBb);
+            if (null === $mergeHeaderBb->getTerminator()) {
+                $builder->branch($mergeBodyBb);
+            }
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'try_merge_after_compile');
             $handler->mergeBodyCompiled = true;
+        } elseif (null === $mergeHeaderBb) {
+            $mergeHeaderBb = self::appendBlock($func, 'try_merge_'.self::blockSuffix($handler));
+            $context->scope->blockStorage[$mergeBlock] = $mergeHeaderBb;
+            $context->scope->blockEntryStorage[$mergeBlock] = $mergeHeaderBb;
         }
+        $mergeBb = $mergeHeaderBb;
+        $builder->positionAtEnd($branchBlock);
         if (null !== $handler->finallyOp) {
             self::ensureFinallyLowering($jit, $func, $context, $handler, $args);
         }
@@ -174,7 +204,9 @@ final class TryCatchHelper
         if (0 === $context->inlineIncludeDepth) {
             $context->freeDeadVariables($func, $branchBlock, $handlerBlock);
         }
-        $builder->branch($tryEntry);
+        if (null === $branchBlock->getTerminator()) {
+            $builder->branch($tryEntry);
+        }
     }
 
     /**
@@ -748,14 +780,19 @@ final class TryCatchHelper
     /**
      * @param list<Variable> $args
      */
-    private static function ensureFinallyLowering(
+    private static function finallyBbFor(
         \PHPCompiler\JIT $jit,
         Function_ $func,
         Context $context,
         TryCatchHandler $handler,
-        array $args
+        array $args,
+        bool $compileBody
     ): BasicBlock {
         if (null !== $handler->finallyBb) {
+            if ($compileBody && !$handler->finallyBodyCompiled) {
+                self::compileFinallyBody($jit, $func, $context, $handler, $args);
+            }
+
             return $handler->finallyBb;
         }
         if (null === $handler->finallyOp || null === $handler->finallyOp->block1) {
@@ -765,22 +802,56 @@ final class TryCatchHelper
         JitReturnPending::ensureLinked($context);
         $finallyCfg = $handler->finallyOp->block1;
         $finallyBb = $context->scope->blockStorage[$finallyCfg] ?? null;
+        if (null !== $finallyBb && null !== $handler->mergeBodyLlvmBb && $finallyBb === $handler->mergeBodyLlvmBb) {
+            $finallyBb = null;
+        }
         if (null === $finallyBb) {
             $finallyBb = self::appendBlock($func, 'try_finally_body_'.self::blockSuffix($handler));
             $context->scope->blockStorage[$finallyCfg] = $finallyBb;
         }
-        if (!$handler->finallyBodyCompiled) {
-            $handler->finallyBodyCompiled = true;
-            $jit->compileFinallyAtEntry($func, $finallyCfg, $finallyBb, ...$args);
-            $finallyTail = $context->builder->getInsertBlock();
-            if (null !== $finallyTail && null === $finallyTail->getTerminator()) {
-                $context->builder->positionAtEnd($finallyTail);
-                $context->builder->branch(self::finallyEpilogueBbFor($jit, $func, $context, $handler, $args));
-            }
-        }
         $handler->finallyBb = $finallyBb;
+        if ($compileBody && !$handler->finallyBodyCompiled) {
+            self::compileFinallyBody($jit, $func, $context, $handler, $args);
+        }
 
         return $finallyBb;
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function compileFinallyBody(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): void {
+        if ($handler->finallyBodyCompiled || null === $handler->finallyBb || null === $handler->finallyOp?->block1) {
+            return;
+        }
+        $handler->finallyBodyCompiled = true;
+        $jit->compileFinallyAtEntry($func, $handler->finallyOp->block1, $handler->finallyBb, ...$args);
+        $builder = $context->builder;
+        $builder->positionAtEnd($handler->finallyBb);
+        $finallyTail = $builder->getInsertBlock();
+        if (null !== $finallyTail && null === $finallyTail->getTerminator()) {
+            $builder->positionAtEnd($finallyTail);
+            $builder->branch(self::finallyEpilogueBbFor($jit, $func, $context, $handler, $args));
+        }
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function ensureFinallyLowering(
+        \PHPCompiler\JIT $jit,
+        Function_ $func,
+        Context $context,
+        TryCatchHandler $handler,
+        array $args
+    ): BasicBlock {
+        return self::finallyBbFor($jit, $func, $context, $handler, $args, true);
     }
 
     /**
@@ -890,6 +961,8 @@ final class TryCatchHandler
     public ?BasicBlock $dispatchBb = null;
 
     public ?BasicBlock $finallyBb = null;
+
+    public ?BasicBlock $mergeBodyLlvmBb = null;
 
     public ?BasicBlock $finallyEpilogueBb = null;
 

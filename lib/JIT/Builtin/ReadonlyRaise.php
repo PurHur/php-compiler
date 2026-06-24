@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -155,6 +156,7 @@ final class ReadonlyRaise
         }
 
         $i32 = $context->getTypeFromString('int32');
+        $i1 = $context->getTypeFromString('int1');
         $ft = $context->context->functionType($i32, false);
         $fn = null !== $probe
             ? $probe
@@ -162,8 +164,13 @@ final class ReadonlyRaise
 
         $entry = $fn->appendBasicBlock('readonly_has_pending_entry');
         $context->builder->positionAtEnd($entry);
-        $pending = $context->builder->call(self::helperFunction($context, self::HAS_PENDING_HELPER));
-        $context->builder->returnValue($context->builder->zext($pending, $i32));
+        $pendingRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::HAS_PENDING_HELPER),
+            []
+        );
+        $pendingI32 = JitNestedHelperCoerce::coerceHelperScalarResult($context, $pendingRaw, $i32);
+        $context->builder->returnValue($pendingI32);
         $context->registerFunction($abiName, $fn);
     }
 
@@ -178,6 +185,7 @@ final class ReadonlyRaise
         }
 
         $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
@@ -192,8 +200,13 @@ final class ReadonlyRaise
         $dest = $fn->getParam(0);
         $bufsize = $fn->getParam(1);
 
-        $has = $context->builder->call(self::helperFunction($context, self::HAS_PENDING_HELPER));
-        $noPending = $context->builder->icmp(Builder::INT_EQ, $has, $i8->constInt(0, false));
+        $hasRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::HAS_PENDING_HELPER),
+            []
+        );
+        $has = JitNestedHelperCoerce::coerceHelperScalarResult($context, $hasRaw, $i1);
+        $noPending = $context->builder->icmp(Builder::INT_EQ, $has, $i1->constInt(0, false));
         $skipBlock = $fn->appendBasicBlock('readonly_copy_skip');
         $copyBlock = $fn->appendBasicBlock('readonly_copy_do');
         $done = $fn->appendBasicBlock('readonly_copy_done');
@@ -204,7 +217,12 @@ final class ReadonlyRaise
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($copyBlock);
-        $msgStr = $context->builder->call(self::helperFunction($context, self::TAKE_MESSAGE_HELPER));
+        $msgRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::TAKE_MESSAGE_HELPER),
+            []
+        );
+        $msgStr = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $msgRaw);
         $strMap = $context->structFieldMap['__string__'];
         $msgLen = $context->builder->load(
             $context->builder->structGep($msgStr, $strMap['length'])

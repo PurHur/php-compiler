@@ -77,7 +77,7 @@ final class JitVmHelperLink
         string $issueTag
     ): void {
         $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::bridgeEntryComplete($probe)) {
             $context->registerFunction($abiName, $probe);
 
             return;
@@ -85,22 +85,52 @@ final class JitVmHelperLink
 
         self::ensureCompiled($context, $relativeHelperPath, $compiledHelpers, $issueTag);
 
+        $helperFn = self::lookupCompiled($context, $helperLogical, $issueTag);
         $ft = $context->context->functionType($returnType, false, ...$paramTypes);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock($entryBlockName);
+        $entry = self::bridgeEntryForEmit($fn, $entryBlockName);
         $context->builder->positionAtEnd($entry);
         $args = [];
         for ($i = 0, $n = $fn->countParams(); $i < $n; ++$i) {
-            $args[] = $fn->getParam($i);
+            $abiParam = $fn->getParam($i);
+            $helperTy = $helperFn->getParam($i)->typeOf();
+            $args[] = JitNestedHelperCoerce::coerceArgForHelper($context, $abiParam, $helperTy);
         }
-        $result = $context->builder->call(
-            self::lookupCompiled($context, $helperLogical, $issueTag),
-            ...$args
-        );
-        $context->builder->returnValue($result);
+        $result = $context->builder->call($helperFn, ...$args);
+        $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+        $context->builder->returnValue($ret);
         $context->registerFunction($abiName, $fn);
+    }
+
+    private static function bridgeEntryComplete(?LlvmFunction $probe): bool
+    {
+        if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            return false;
+        }
+        try {
+            $blocks = $probe->getBasicBlocks();
+            $entry = $blocks[0] ?? null;
+
+            return null !== $entry && null !== $entry->getTerminator();
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    private static function bridgeEntryForEmit(LlvmFunction $fn, string $entryBlockName): \PHPLLVM\BasicBlock
+    {
+        try {
+            $blocks = $fn->getBasicBlocks();
+            $entry = $blocks[0] ?? null;
+            if (null !== $entry && null === $entry->getTerminator()) {
+                return $entry;
+            }
+        } catch (\Throwable) {
+        }
+
+        return $fn->appendBasicBlock($entryBlockName);
     }
 }

@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -90,8 +91,14 @@ final class JitHelperAbiBridge
 
         $entry = $fn->appendBasicBlock('jhab_bool_i32_entry');
         $context->builder->positionAtEnd($entry);
-        $pending = $context->builder->call(self::helperFunction($context, $helperLogical, $issueTag));
-        $context->builder->returnValue($context->builder->zext($pending, $i32));
+        $pending = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical, $issueTag),
+            []
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $pending, $i32)
+        );
         $context->registerFunction($abiName, $fn);
     }
 

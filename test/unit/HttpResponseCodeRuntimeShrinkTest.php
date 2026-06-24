@@ -25,6 +25,18 @@ final class HttpResponseCodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('addGlobal($i32,', $source);
     }
 
+    /** Issue #11206: standalone C main wrapper must not re-enter implement() and clear the insert block. */
+    public function testEmitResetForStandaloneMainDoesNotRelink(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/HttpResponseRuntime.php');
+        $this->assertStringContainsString('function emitResetForStandaloneMain', $source);
+        $this->assertStringNotContainsString(
+            "emitResetForStandaloneMain(Context \$context): void\n    {\n        if (Builtin::LOAD_TYPE_STANDALONE !== \$context->loadType) {\n            return;\n        }\n        self::ensureLinked(\$context);",
+            $source
+        );
+        $this->assertStringContainsString('__phpc_http_response_status_reset', $source);
+    }
+
     public function testPendingHeadersUsesHttpResponseRuntimeNotGlobal(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersRuntime.php');

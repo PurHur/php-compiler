@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -51,7 +52,12 @@ final class StringHrtimeRuntime
 
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
-        $ht = $context->builder->call(self::helperFunction($context, self::PAIR_HELPER));
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::PAIR_HELPER),
+            []
+        );
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $sec = $context->builder->call(
             $context->lookupFunction('__hashtable__readLongAt'),
             $ht,
@@ -91,7 +97,12 @@ final class StringHrtimeRuntime
 
         $entry = $fn->appendBasicBlock('hrtime_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, $helperLogical));
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, $helperLogical),
+            []
+        );
+        $result = JitNestedHelperCoerce::coerceToHashtablePtr($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();

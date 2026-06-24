@@ -4942,7 +4942,14 @@ class Object_ extends Type {
             return;
         }
         if (Variable::TYPE_STRING === $propertyType) {
-            $stored = $this->context->helper->loadValue($value);
+            if (Variable::TYPE_VALUE === $value->type) {
+                $stored = $this->context->builder->call(
+                    $this->context->lookupFunction('__value__readString'),
+                    JitValueBox::valuePtrFromVariable($this->context, $value)
+                );
+            } else {
+                $stored = $this->context->helper->loadValue($value);
+            }
             $this->context->builder->store($stored, $global);
             if (Variable::TYPE_STRING === $value->type) {
                 $value->addref();
