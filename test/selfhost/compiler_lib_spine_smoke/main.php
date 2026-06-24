@@ -1386,6 +1386,7 @@ require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GmgetdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/LocaltimeJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/MetaTagsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/getdate.php';
 require_once __DIR__.'/../../../ext/standard/getenv_.php';
 require_once __DIR__.'/../../../ext/standard/gethostbyaddr.php';
