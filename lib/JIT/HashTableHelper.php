@@ -9,6 +9,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\string_trim;
+use PHPCompiler\JIT\Builtin\CallUnpackRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -2510,6 +2511,8 @@ final class HashTableHelper
      */
     public static function mergeCallArgEntries(Context $context, array $entries): Variable
     {
+        CallUnpackRuntime::ensureLinked($context);
+
         if (1 === \count($entries)) {
             $only = $entries[0];
             if (\is_array($only) && isset($only['unpack'])) {
