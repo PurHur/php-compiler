@@ -34,9 +34,6 @@ final class VmFsDirNative
         if (!$recursive) {
             return self::mkdirOne($path, $mode);
         }
-        if (VmStatPath::isDir($path)) {
-            return true;
-        }
         $path = rtrim($path, '/');
         if ('' === $path || \strlen($path) >= self::PATH_MAX) {
             return false;
