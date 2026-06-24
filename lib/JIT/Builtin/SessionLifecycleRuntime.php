@@ -14,15 +14,14 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM session lifecycle for JIT/AOT (issues #5332, #5750, #6968 phase 2).
+ * LLVM session lifecycle for JIT/AOT (issues #5332, #5750, #6968 phase 2, #9446).
  *
  * Replaces lib/AOT/runtime/phpc_session_lifecycle.c. php-src: ext/session/session.c
+ * `__phpc_session_generate_new_id` routes through SessionCreateIdJitHelper PHP (#9500).
  */
 final class SessionLifecycleRuntime
 {
     private const G_SG_SESSION = 'sg_SESSION';
-
-    private const HEX_TABLE = '0123456789abcdef';
 
     public static function ensureLinked(Context $context): void
     {
@@ -51,79 +50,32 @@ final class SessionLifecycleRuntime
             return;
         }
 
-        $entry = $fn->appendBasicBlock('sgen_entry');
+        SessionCreateIdRuntime::ensureRandomIdStringLinked($context);
+
+        $entry = $fn->appendBasicBlock('sgen_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $sixteen = $i64->constInt(16, false);
-        $thirtyTwo = $i64->constInt(32, false);
+        $i64 = $context->getTypeFromString('int64');
         $zeroI64 = $i64->constInt(0, false);
-        $oneI64 = $i64->constInt(1, false);
-        $zeroI32 = $i32->constInt(0, false);
 
-        $raw = $context->builder->call($context->lookupFunction('__compiler_random_bytes'), $sixteen);
-        $rawNull = $context->builder->icmp(Builder::INT_EQ, $raw, $strPtr->constNull());
+        $idStr = $context->builder->call($context->lookupFunction('phpc_session_random_id_string'));
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $idStr, $strPtr->constNull());
         $bbEmpty = BasicBlockHelper::append($context, 'sgen_empty');
-        $bbCheckLen = BasicBlockHelper::append($context, 'sgen_check_len');
-        $context->builder->branchIf($rawNull, $bbEmpty, $bbCheckLen);
-
-        $context->builder->positionAtEnd($bbCheckLen);
-        $strMap = $context->structFieldMap['__string__'];
-        $rawLen = $context->builder->load($context->builder->structGep($raw, $strMap['length']));
-        $tooShort = $context->builder->icmp(Builder::INT_SLT, $rawLen, $sixteen);
-        $bbEncode = BasicBlockHelper::append($context, 'sgen_encode');
-        $context->builder->branchIf($tooShort, $bbEmpty, $bbEncode);
+        $bbCopy = BasicBlockHelper::append($context, 'sgen_copy');
+        $bbDone = BasicBlockHelper::append($context, 'sgen_done');
+        $context->builder->branchIf($isNull, $bbEmpty, $bbCopy);
 
         $context->builder->positionAtEnd($bbEmpty);
         self::emitStoreSessionIdLen($context, $zeroI64);
         self::emitNulTerminateIdAt($context, $zeroI64);
-        $bbDone = BasicBlockHelper::append($context, 'sgen_done');
         $context->builder->branch($bbDone);
 
-        $context->builder->positionAtEnd($bbEncode);
-        $i8p = $context->getTypeFromString('int8*');
-        $hexBase = $context->builder->pointerCast(self::hexTableGlobal($context), $i8p);
-        $rawBytes = $context->builder->structGep($raw, $strMap['value']);
-        $iSlot = $context->builder->alloca($i64, 1, 'sgen_i');
-        $context->builder->store($zeroI64, $iSlot);
-        $loopHead = BasicBlockHelper::append($context, 'sgen_loop_head');
-        $context->builder->branch($loopHead);
-
-        $context->builder->positionAtEnd($loopHead);
-        $i = $context->builder->load($iSlot);
-        $loopDone = $context->builder->icmp(Builder::INT_SGE, $i, $thirtyTwo);
-        $loopBody = BasicBlockHelper::append($context, 'sgen_loop_body');
-        $context->builder->branchIf($loopDone, $bbDone, $loopBody);
-
-        $context->builder->positionAtEnd($loopBody);
-        $byteIdx = $context->builder->lshr($i, $oneI64);
-        $bytePtr = $context->builder->inBoundsGEP($rawBytes, $byteIdx);
-        $byte = $context->builder->load($bytePtr);
-        $isLow = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->and($i, $oneI64),
-            $zeroI64
-        );
-        $highNibble = $context->builder->lshr($byte, $i8->constInt(4, false));
-        $lowNibble = $context->builder->and($byte, $i8->constInt(0x0f, false));
-        $nibble = $context->builder->select($isLow, $lowNibble, $highNibble);
-        $hexPtr = $context->builder->inBoundsGEP(
-            $hexBase,
-            $context->builder->zext($nibble, $i64)
-        );
-        $hexChar = $context->builder->load($hexPtr);
-        $idPtr = self::idBufPtr($context);
-        $outPtr = $context->builder->inBoundsGEP($idPtr, $i);
-        $context->builder->store($hexChar, $outPtr);
-        $context->builder->store($context->builder->add($i, $oneI64), $iSlot);
-        $context->builder->branch($loopHead);
+        $context->builder->positionAtEnd($bbCopy);
+        self::emitCopyIdStringToGlobals($context, $idStr);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDone);
-        self::emitStoreSessionIdLen($context, $thirtyTwo);
-        self::emitNulTerminateIdAt($context, $thirtyTwo);
         $context->builder->returnVoid();
         $context->builder->clearInsertionPosition();
     }
@@ -417,6 +369,28 @@ final class SessionLifecycleRuntime
         $context->builder->positionAtEnd($bbAfter);
     }
 
+    private static function emitCopyIdStringToGlobals(Context $context, Value $idStr): void
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $zero = $i64->constInt(0, false);
+        $maxLen = $i64->constInt(VmSession::MAX_ID_LEN, false);
+
+        $newLen = $context->builder->load(
+            $context->builder->structGep($idStr, $strMap['length'])
+        );
+        $tooLong = $context->builder->icmp(Builder::INT_UGT, $newLen, $maxLen);
+        $storeLen = $context->builder->select($tooLong, $maxLen, $newLen);
+        $context->builder->store($storeLen, SessionStorageGlobals::$idLenGlobal);
+        $newBytes = $context->builder->structGep($idStr, $strMap['value']);
+        $bufPtr = self::idBufPtr($context);
+        $context->intrinsic->memcpy($bufPtr, $newBytes, $storeLen, false);
+        $nulPtr = $context->builder->inBoundsGEP($bufPtr, $storeLen);
+        $context->builder->store($i8->constInt(0, false), $nulPtr);
+    }
+
     private static function emitStoreSessionIdLen(Context $context, Value $len): void
     {
         $context->builder->store($len, SessionStorageGlobals::$idLenGlobal);
@@ -440,11 +414,6 @@ final class SessionLifecycleRuntime
             $i32->constInt(0, false),
             $i64->constInt(0, false)
         );
-    }
-
-    private static function hexTableGlobal(Context $context): Value
-    {
-        return $context->constantFromString(self::HEX_TABLE);
     }
 
     private static function sgSessionPtr(Context $context): Value
