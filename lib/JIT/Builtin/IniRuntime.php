@@ -103,6 +103,9 @@ final class IniRuntime
         $aaBb = $fn->appendBasicBlock('ig_aa');
         $aeBb = $fn->appendBasicBlock('ig_ae');
         $ipBb = $fn->appendBasicBlock('ig_ip');
+        $sotBb = $fn->appendBasicBlock('ig_sot');
+        $raaBb = $fn->appendBasicBlock('ig_raa');
+        $zegBb = $fn->appendBasicBlock('ig_zeg');
         $testEr = $fn->appendBasicBlock('ig_test_er');
         $testDe = $fn->appendBasicBlock('ig_test_de');
         $testMl = $fn->appendBasicBlock('ig_test_ml');
@@ -111,6 +114,9 @@ final class IniRuntime
         $testAa = $fn->appendBasicBlock('ig_test_aa');
         $testAe = $fn->appendBasicBlock('ig_test_ae');
         $testIp = $fn->appendBasicBlock('ig_test_ip');
+        $testSot = $fn->appendBasicBlock('ig_test_sot');
+        $testRaa = $fn->appendBasicBlock('ig_test_raa');
+        $testZeg = $fn->appendBasicBlock('ig_test_zeg');
 
         $context->builder->positionAtEnd($entry);
         self::ensureMemoryLimitBuffer($context, $fn);
@@ -131,7 +137,10 @@ final class IniRuntime
         self::branchIfKey($context, $testZa, $optCstr, 'zend.assertions', $zaBb, $testAa);
         self::branchIfKey($context, $testAa, $optCstr, 'assert.active', $aaBb, $testAe);
         self::branchIfKey($context, $testAe, $optCstr, 'assert.exception', $aeBb, $testIp);
-        self::branchIfKey($context, $testIp, $optCstr, 'include_path', $ipBb, $failBb);
+        self::branchIfKey($context, $testIp, $optCstr, 'include_path', $ipBb, $testSot);
+        self::branchIfKey($context, $testSot, $optCstr, 'short_open_tag', $sotBb, $testRaa);
+        self::branchIfKey($context, $testRaa, $optCstr, 'register_argc_argv', $raaBb, $testZeg);
+        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $failBb);
 
         $context->builder->positionAtEnd($erBb);
         SilenceRuntime::emitIniGetErrorReporting($context, $out);
@@ -176,6 +185,21 @@ final class IniRuntime
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
+        $context->builder->positionAtEnd($sotBb);
+        self::writeIniGetLiteral($context, $out, '');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($raaBb);
+        self::writeIniGetLiteral($context, $out, '1');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($zegBb);
+        self::writeIniGetLiteral($context, $out, '1');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
         $context->builder->positionAtEnd($failBb);
         self::writeValueBoolFalse($context, $out);
         self::freeCstr($context, $fn, $optCstr);
@@ -191,10 +215,16 @@ final class IniRuntime
         $deBb = $fn->appendBasicBlock('icg_de');
         $mlBb = $fn->appendBasicBlock('icg_ml');
         $spBb = $fn->appendBasicBlock('icg_sp');
+        $sotBb = $fn->appendBasicBlock('icg_sot');
+        $raaBb = $fn->appendBasicBlock('icg_raa');
+        $zegBb = $fn->appendBasicBlock('icg_zeg');
         $testEr = $fn->appendBasicBlock('icg_test_er');
         $testDe = $fn->appendBasicBlock('icg_test_de');
         $testMl = $fn->appendBasicBlock('icg_test_ml');
         $testSp = $fn->appendBasicBlock('icg_test_sp');
+        $testSot = $fn->appendBasicBlock('icg_test_sot');
+        $testRaa = $fn->appendBasicBlock('icg_test_raa');
+        $testZeg = $fn->appendBasicBlock('icg_test_zeg');
 
         $context->builder->positionAtEnd($entry);
         $option = $fn->getParam(0);
@@ -210,7 +240,10 @@ final class IniRuntime
         self::branchIfKey($context, $testEr, $optCstr, 'error_reporting', $erBb, $testDe);
         self::branchIfKey($context, $testDe, $optCstr, 'display_errors', $deBb, $testMl);
         self::branchIfKey($context, $testMl, $optCstr, 'memory_limit', $mlBb, $testSp);
-        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $failBb);
+        self::branchIfKey($context, $testSp, $optCstr, 'serialize_precision', $spBb, $testSot);
+        self::branchIfKey($context, $testSot, $optCstr, 'short_open_tag', $sotBb, $testRaa);
+        self::branchIfKey($context, $testRaa, $optCstr, 'register_argc_argv', $raaBb, $testZeg);
+        self::branchIfKey($context, $testZeg, $optCstr, 'zend.enable_gc', $zegBb, $failBb);
 
         $i8p = $context->getTypeFromString('int8*');
 
@@ -230,7 +263,7 @@ final class IniRuntime
         self::writeValueStringFromCstr(
             $context,
             $out,
-            $context->builder->pointerCast($context->constantFromString('1'), $i8p)
+            $context->builder->pointerCast($context->constantFromString(''), $i8p)
         );
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
@@ -250,6 +283,21 @@ final class IniRuntime
             $out,
             $context->builder->pointerCast($context->constantFromString('-1'), $i8p)
         );
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($sotBb);
+        self::writeIniGetLiteral($context, $out, '');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($raaBb);
+        self::writeIniGetLiteral($context, $out, '1');
+        self::freeCstr($context, $fn, $optCstr);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($zegBb);
+        self::writeIniGetLiteral($context, $out, '1');
         self::freeCstr($context, $fn, $optCstr);
         $context->builder->returnVoid();
 
@@ -583,6 +631,16 @@ final class IniRuntime
         );
     }
 
+    private static function writeIniGetLiteral(Context $context, Value $out, string $literal): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        self::writeValueStringFromCstr(
+            $context,
+            $out,
+            $context->builder->pointerCast($context->constantFromString($literal), $i8p)
+        );
+    }
+
     private static function writeValueBoolFalse(Context $context, Value $out): void
     {
         $context->builder->call(
@@ -630,7 +688,7 @@ final class IniRuntime
         $onePtr = $context->builder->pointerCast($context->constantFromString('1'), $i8p);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($zeroBb);
-        $zeroPtr = $context->builder->pointerCast($context->constantFromString('0'), $i8p);
+        $zeroPtr = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($doneBb);
         $phi = $context->builder->phi($i8p);
@@ -817,7 +875,7 @@ final class IniRuntime
 
         if (null === $context->module->getNamedGlobal(self::G_DISPLAY_ERRORS)) {
             $g = $context->module->addGlobal($i32, self::G_DISPLAY_ERRORS);
-            $g->setInitializer($i32->constInt(1, false));
+            $g->setInitializer($i32->constInt(0, false));
         }
         if (null === $context->module->getNamedGlobal(self::G_MEMORY_LIMIT)) {
             $g = $context->module->addGlobal($i8p, self::G_MEMORY_LIMIT);

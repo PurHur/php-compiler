@@ -14,6 +14,14 @@ final class VmIni
 {
     /** php-src INI_ALL — user/perdir/system readable. */
     private const INI_ACCESS_ALL = 7;
+
+    /** Read-only boolean directives with Zend CLI defaults (ext/standard/ini.c, #11356). */
+    private const READONLY_BOOL_DEFAULTS = [
+        'short_open_tag' => false,
+        'register_argc_argv' => true,
+        'zend.enable_gc' => true,
+    ];
+
     /** @var list<string> */
     public const SUPPORTED_KEYS = [
         'error_reporting',
@@ -23,10 +31,13 @@ final class VmIni
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'include_path',
+        'short_open_tag',
+        'register_argc_argv',
+        'zend.enable_gc',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
-    private const CFG_DISPLAY_ERRORS = '1';
+    private const CFG_DISPLAY_ERRORS = '';
 
     private const CFG_MEMORY_LIMIT = '128M';
 
@@ -66,6 +77,9 @@ final class VmIni
     /** @return string|false */
     public static function get(Context $ctx, string $option) {
         $key = strtolower($option);
+        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
+            return self::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
             return VmAssertState::iniGet($option);
         }
@@ -77,7 +91,7 @@ final class VmIni
             case 'error_reporting':
                 return (string) $ctx->errors->getErrorReporting();
             case 'display_errors':
-                return $ctx->errors->getDisplayErrors() ? '1' : '0';
+                return self::formatBoolIniGet($ctx->errors->getDisplayErrors());
             case 'memory_limit':
                 return self::$memoryLimit;
             case 'serialize_precision':
@@ -139,7 +153,7 @@ final class VmIni
     }
 
     private static function setDisplayErrors(Context $ctx, string $newValue) {
-        $old = $ctx->errors->getDisplayErrors() ? '1' : '0';
+        $old = self::formatBoolIniGet($ctx->errors->getDisplayErrors());
         $ctx->errors->setDisplayErrors(self::parseBoolIni($newValue));
 
         return $old;
@@ -211,6 +225,12 @@ final class VmIni
         $trimmed = strtolower(trim($value));
 
         return !('' === $trimmed || '0' === $trimmed || 'off' === $trimmed || 'false' === $trimmed);
+    }
+
+    /** php-src zend_ini.c — boolean ini_get() display as "" or "1" (#11356). */
+    public static function formatBoolIniGet(bool $on): string
+    {
+        return $on ? '1' : '';
     }
 
     /**
