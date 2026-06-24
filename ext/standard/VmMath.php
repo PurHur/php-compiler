@@ -710,7 +710,7 @@ final class VmMath
     /**
      * php-src: ext/standard/math.c — base_convert()
      *
-     * JIT/AOT lower via {@see MathBaseConvertJit} (no phpc_base_convert.c, #5197).
+     * JIT/AOT lower via {@see MathBaseConvertRuntime} → VmMath PHP (#9584).
      */
     public static function baseConvert(string $number, int $fromBase, int $toBase): string
     {
