@@ -259,4 +259,29 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
         self::assertSame(['array', 'flags'], BuiltinParamNames::forFunction('sort'));
     }
+
+    /** @covers issues #11111, #11112, #11113, #11114 */
+    public function testStreamFamilyNamedParameters(): void
+    {
+        $fread = BuiltinParamNames::forFunction('fread');
+        self::assertSame(['stream', 'length'], $fread);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fread, 'length', 'fread'));
+
+        foreach (['fwrite', 'fputs'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['stream', 'data', 'length'], $names, $fn);
+            self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'data', $fn));
+            self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'length', $fn));
+        }
+
+        $fputcsv = BuiltinParamNames::forFunction('fputcsv');
+        self::assertSame(['stream', 'fields', 'separator', 'enclosure', 'escape'], $fputcsv);
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'fields', 'fputcsv'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($fputcsv, 'separator', 'fputcsv'));
+
+        $ctx = BuiltinParamNames::forFunction('stream_context_create');
+        self::assertSame(['options', 'params'], $ctx);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ctx, 'options', 'stream_context_create'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($ctx, 'params', 'stream_context_create'));
+    }
 }

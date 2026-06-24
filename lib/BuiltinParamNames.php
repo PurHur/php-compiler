@@ -108,6 +108,15 @@ final class BuiltinParamNames
                 return ['stream', 'format'];
             case 'fprintf':
                 return ['stream', 'format'];
+            case 'fread':
+                return ['stream', 'length'];
+            case 'fwrite':
+            case 'fputs':
+                return ['stream', 'data', 'length'];
+            case 'fputcsv':
+                return ['stream', 'fields', 'separator', 'enclosure', 'escape'];
+            case 'stream_context_create':
+                return ['options', 'params'];
             case 'flock':
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
