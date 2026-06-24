@@ -13,11 +13,23 @@ namespace PHPCompiler\ext\standard;
  */
 final class IncludePathJitHelper
 {
-    private static string $stack = '.';
+    private static ?string $stack = null;
+
+    /** Seed from host SAPI ini on first access (issue #10461). */
+    private static function ensureStack(): string
+    {
+        if (null !== self::$stack) {
+            return self::$stack;
+        }
+        $ini = @ini_get('include_path');
+        self::$stack = (false !== $ini && '' !== $ini) ? $ini : '.';
+
+        return self::$stack;
+    }
 
     public static function get(): string
     {
-        $parts = \explode("\0", self::$stack);
+        $parts = \explode("\0", self::ensureStack());
 
         return $parts[\count($parts) - 1];
     }
@@ -26,7 +38,8 @@ final class IncludePathJitHelper
     public static function set(string $newPath): string
     {
         $old = self::get();
-        $parts = \explode("\0", self::$stack);
+        $stack = self::ensureStack();
+        $parts = \explode("\0", $stack);
         $parts[\count($parts) - 1] = $newPath;
         self::$stack = \implode("\0", $parts);
 
@@ -37,16 +50,17 @@ final class IncludePathJitHelper
     public static function push(string $newPath): string
     {
         $old = self::get();
-        self::$stack = self::$stack."\0".$newPath;
+        self::$stack = self::ensureStack()."\0".$newPath;
 
         return $old;
     }
 
     public static function restore(): void
     {
-        $pos = \strrpos(self::$stack, "\0");
+        $stack = self::ensureStack();
+        $pos = \strrpos($stack, "\0");
         if (false !== $pos) {
-            self::$stack = \substr(self::$stack, 0, $pos);
+            self::$stack = \substr($stack, 0, $pos);
         }
     }
 
