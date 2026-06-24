@@ -64,6 +64,7 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        self::registerExternals($context);
         $context->builder->call($context->lookupFunction('__phpc_ob_end_all'));
     }
 }
