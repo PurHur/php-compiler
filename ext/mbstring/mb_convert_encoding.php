@@ -49,19 +49,19 @@ final class mb_convert_encoding extends Internal
         $from = 2 === $argc
             ? 'UTF-8'
             : VmMbstring::coerceEncodingString($frame->calledArgs[2], 'mb_convert_encoding', 2);
-        if (null === CharsetEngine::parseEncodingSpec($from)) {
+        if (!VmMbstring::isHtmlEntitiesEncoding($from) && null === CharsetEngine::parseEncodingSpec($from)) {
             throw new \ValueError(sprintf(
                 'mb_convert_encoding(): Argument #3 ($from_encoding) is not a supported encoding, "%s" given',
                 $from
             ));
         }
-        if (null === CharsetEngine::parseEncodingSpec($to)) {
+        if (!VmMbstring::isHtmlEntitiesEncoding($to) && null === CharsetEngine::parseEncodingSpec($to)) {
             throw new \ValueError(sprintf(
                 'mb_convert_encoding(): Argument #2 ($to_encoding) is not a supported encoding, "%s" given',
                 $to
             ));
         }
-        $result = CharsetEngine::convert($from, $to, $source);
+        $result = VmMbstring::convertEncoding($source, $to, $from);
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {
                 $ret->bool(false);
@@ -83,7 +83,19 @@ final class mb_convert_encoding extends Internal
         $toLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
         $fromLit = 2 === $argc ? 'UTF-8' : JitStringBuiltinArg::compileTimeLiteral($args[2]);
         if (null !== $sourceLit && null !== $toLit && null !== $fromLit) {
-            $converted = CharsetEngine::convert($fromLit, $toLit, $sourceLit);
+            if (
+                !VmMbstring::isHtmlEntitiesEncoding($fromLit)
+                && null === CharsetEngine::parseEncodingSpec($fromLit)
+            ) {
+                return $context->getTypeFromString('bool')->constInt(0, false);
+            }
+            if (
+                !VmMbstring::isHtmlEntitiesEncoding($toLit)
+                && null === CharsetEngine::parseEncodingSpec($toLit)
+            ) {
+                return $context->getTypeFromString('bool')->constInt(0, false);
+            }
+            $converted = VmMbstring::convertEncoding($sourceLit, $toLit, $fromLit);
             if (false === $converted) {
                 return $context->getTypeFromString('bool')->constInt(0, false);
             }
