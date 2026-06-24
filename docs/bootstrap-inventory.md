@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 2970 |
-| Phase A inventory files (M2 ratio SSOT) | 2970 |
+| PHP files on vm.php path | 2971 |
+| Phase A inventory files (M2 ratio SSOT) | 2971 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8024 |
+| Source constructs flagged (warnings) | 8026 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -313,6 +313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ErrorLastJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLogJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorSilenceJitHelper.php` | 0 | 1 |
+| `ext/standard/ExceptionHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ExceptionJitHelper.php` | 0 | 1 |
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
 | `ext/standard/FunctionExistsJitHelper.php` | 0 | 1 |
@@ -2009,7 +2010,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/ErrorReporting.php` | 0 | 1 |
 | `lib/JIT/Builtin/EvalRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ExceptionHandlerOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExceptionThrowRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ExecutionLimitsRuntime.php` | 0 | 3 |
@@ -4955,6 +4956,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/ExceptionHandlerJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/standard/ExceptionJitHelper.php`
 
@@ -16179,8 +16185,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ExceptionHandlerJitRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
-- 1 closure(s)
+- new JIT (line 451)
+- 17 class method(s)
+- 2 closure(s)
 
 ### `lib/JIT/Builtin/ExceptionHandlerOutput.php`
 
