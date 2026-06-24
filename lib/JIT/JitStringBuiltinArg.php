@@ -29,6 +29,15 @@ final class JitStringBuiltinArg
     ): Value {
         JitNativeString::ensureInsertBlock($context);
         $arrayExpected = $arrayExpectedType ?? $expectedType;
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+                return self::unreachableStringPtr($context);
+            }
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
         if (Variable::TYPE_HASHTABLE === $arg->type) {
             self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
 
