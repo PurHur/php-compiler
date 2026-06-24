@@ -54,6 +54,71 @@ final class JitIntdiv
         return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, true);
     }
 
+    /**
+     * array_splice() length: explicit null means "to end" (hasLength=false), not zero (php-src array.c; #11209).
+     *
+     * @return array{0: Value, 1: Value} hasLength int1, length int64 (length ignored when hasLength is false)
+     */
+    public static function lowerSpliceLengthArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): array {
+        $i1 = $context->getTypeFromString('int1');
+        $i64 = $context->getTypeFromString('int64');
+        $false = $i1->constInt(0, false);
+        $true = $i1->constInt(1, false);
+        $zero = $i64->constInt(0, false);
+
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            return [$false, $zero];
+        }
+        if (JITVariable::TYPE_VALUE !== $arg->type) {
+            return [
+                $true,
+                self::lowerIntBuiltinArg($context, $arg, $function, $argIndex, $paramName),
+            ];
+        }
+
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+
+        $nullBlock = BasicBlockHelper::append($context, 'splice_len_null');
+        $nonNullBlock = BasicBlockHelper::append($context, 'splice_len_nonnull');
+        $mergeBlock = BasicBlockHelper::append($context, 'splice_len_merge');
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $nonNullBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($nonNullBlock);
+        $lengthVal = self::lowerIntBuiltinArg($context, $arg, $function, $argIndex, $paramName);
+        $nonNullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $hasLengthPhi = $context->builder->phi($i1, 'splice_len_has');
+        $hasLengthPhi->addIncoming($false, $nullBlock);
+        $hasLengthPhi->addIncoming($true, $nonNullEnd);
+
+        $lengthPhi = $context->builder->phi($i64, 'splice_len_val');
+        $lengthPhi->addIncoming($zero, $nullBlock);
+        $lengthPhi->addIncoming($lengthVal, $nonNullEnd);
+
+        return [$hasLengthPhi, $lengthPhi];
+    }
+
     private static function lowerIntOperand(
         Context $context,
         JITVariable $arg,

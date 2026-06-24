@@ -46,7 +46,7 @@ final class array_splice extends Internal
 
         $length = null;
         if ($argc >= 3) {
-            $length = VmMath::parseIntBuiltinArg(
+            $length = VmMath::parseNullableIntBuiltinArg(
                 $frame->calledArgs[2],
                 'array_splice',
                 3,
@@ -85,10 +85,18 @@ final class array_splice extends Internal
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
         $offset = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_splice', 2, 'offset');
-        $hasLength = $i1->constInt($argc >= 3 ? 1 : 0, false);
-        $length = $argc >= 3
-            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_splice', 3, 'length')
-            : $i64->constInt(0, false);
+        if ($argc >= 3) {
+            [$hasLength, $length] = JitIntdiv::lowerSpliceLengthArg(
+                $context,
+                $args[2],
+                'array_splice',
+                3,
+                'length'
+            );
+        } else {
+            $hasLength = $i1->constInt(0, false);
+            $length = $i64->constInt(0, false);
+        }
         $replacement = 4 === $argc ? $args[3] : null;
 
         return ArrayBuiltinHelper::buildSpliceArray(
