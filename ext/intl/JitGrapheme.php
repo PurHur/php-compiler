@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\intl;
 
 use PHPCompiler\ext\standard\JitStringSearch;
-use PHPCompiler\JIT\Builtin\StringUtf8Valid;
+use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
@@ -175,8 +175,8 @@ final class JitGrapheme
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $isEmptyNeedle = $context->builder->icmp(Builder::INT_EQ, $needleLen, $zero);
-        $hayValid = StringUtf8Valid::validFromPtr($context, $haystack);
-        $needleValid = StringUtf8Valid::validFromPtr($context, $needle);
+        $hayValid = StringUtf8Runtime::validFromPtr($context, $haystack);
+        $needleValid = StringUtf8Runtime::validFromPtr($context, $needle);
         $i64 = $context->getTypeFromString('int64');
         $zeroI64 = $i64->constInt(0, false);
         $bothValid = $context->builder->and(

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\standard\VmString;
-use PHPCompiler\JIT\Builtin\StringUtf8Strlen;
+use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -18,7 +18,7 @@ final class JitMbStrlen
 {
     public static function utf8LengthFromPtr(Context $context, Value $strPtr): Value
     {
-        StringUtf8Strlen::ensureLinked($context);
+        StringUtf8Runtime::ensureLinked($context);
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_utf8_strlen'),

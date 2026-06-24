@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StringUtf8Strlen;
+use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -26,7 +26,7 @@ final class StringUtf8StrlenStandaloneTest extends TestCase
     {
         $runtime = new Runtime(Runtime::MODE_AOT);
         $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringUtf8Strlen::ensureStandaloneBodies($ctx);
+        StringUtf8Runtime::ensureStandaloneBodies($ctx);
 
         $fn = $ctx->lookupFunction('__compiler_utf8_strlen');
         $this->assertNotNull($fn);

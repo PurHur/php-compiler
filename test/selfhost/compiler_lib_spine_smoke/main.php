@@ -2358,8 +2358,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrldecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Latin1.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Runtime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Strlen.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Valid.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarDumpJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExportJit.php';
