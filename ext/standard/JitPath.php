@@ -58,16 +58,30 @@ final class JitPath
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($scanBlock);
+        $schemeSepSlot = $context->builder->alloca($i64, 1, 'dirname_scheme_sep');
+        $context->builder->store($minusOne, $schemeSepSlot);
+        self::findSchemeSepIndex($context, $charPtr, $end, $schemeSepSlot, $id);
+        $schemeSep = $context->builder->load($schemeSepSlot);
+        $hasScheme = $context->builder->icmp(Builder::INT_SGE, $schemeSep, $zero);
+        $minSepSlot = $context->builder->alloca($i64, 1, 'dirname_min_sep');
+        $three = $i64->constInt(3, false);
+        $afterScheme = $context->builder->add($schemeSep, $three);
+        $context->builder->store(
+            $context->builder->select($hasScheme, $afterScheme, $zero),
+            $minSepSlot
+        );
+
         $lastSlot = $context->builder->alloca($i64, 1, 'dirname_last_sep');
         $context->builder->store($minusOne, $lastSlot);
         $idxSlot = $context->builder->alloca($i64, 1, 'dirname_idx');
         $context->builder->store($context->builder->sub($end, $one), $idxSlot);
-        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $id);
+        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $minSepSlot, $id);
 
         $last = $context->builder->load($lastSlot);
         $noSep = self::block($context, 'dirname_no_sep_'.$id);
         $atRoot = self::block($context, 'dirname_at_root_'.$id);
         $sliceBlock = self::block($context, 'dirname_slice_'.$id);
+        $wrapperRoot = self::block($context, 'dirname_wrapper_root_'.$id);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $last, $zero),
             $noSep,
@@ -75,7 +89,17 @@ final class JitPath
         );
 
         $context->builder->positionAtEnd($noSep);
+        $noSepDot = self::block($context, 'dirname_no_sep_dot_'.$id);
+        $context->builder->branchIf($hasScheme, $wrapperRoot, $noSepDot);
+
+        $context->builder->positionAtEnd($noSepDot);
         $dotResult = self::loadLiteral($context, '.');
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($wrapperRoot);
+        $schemeRootLen = $context->builder->add($schemeSep, $one);
+        $wrapperRootResult = string_trim::jitCopySlice($context, $str, $charPtr, $zero, $schemeRootLen, $id.'_wrapper');
+        $wrapperRootDoneBlock = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($atRoot);
@@ -94,7 +118,8 @@ final class JitPath
         $phi = $context->builder->phi($str->typeOf());
         $phi->addIncoming($emptyStr, $emptyInput);
         $phi->addIncoming($rootFromTrim, $trimmedEmpty);
-        $phi->addIncoming($dotResult, $noSep);
+        $phi->addIncoming($dotResult, $noSepDot);
+        $phi->addIncoming($wrapperRootResult, $wrapperRootDoneBlock);
         $phi->addIncoming($sliceResult, $sliceDoneBlock);
 
         return $phi;
@@ -181,7 +206,9 @@ final class JitPath
         $context->builder->store($minusOne, $lastSlot);
         $idxSlot = $context->builder->alloca($i64, 1, 'basename_idx');
         $context->builder->store($context->builder->sub($end, $one), $idxSlot);
-        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $id);
+        $minSepSlot = $context->builder->alloca($i64, 1, 'basename_min_sep');
+        $context->builder->store($zero, $minSepSlot);
+        self::scanBackwardForSeparator($context, $charPtr, $idxSlot, $lastSlot, $minSepSlot, $id);
 
         $last = $context->builder->load($lastSlot);
         $noSep = self::block($context, 'basename_no_sep_'.$id);
@@ -354,11 +381,50 @@ final class JitPath
         $context->builder->positionAtEnd($done);
     }
 
+    private static function findSchemeSepIndex(
+        Context $context,
+        Value $charPtr,
+        Value $end,
+        Value $schemeSepSlot,
+        string $id
+    ): void {
+        $i64 = JitStringIndex::i64($context);
+        $zero = JitStringIndex::zero($context);
+        $minusOne = $i64->constInt(-1, false);
+        $needle = self::loadLiteral($context, '://');
+        [, $needlePtr] = self::stringFields($context, $needle);
+        $match = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $charPtr,
+            $needlePtr
+        );
+        $nullPtr = $match->typeOf()->constNull();
+        $found = $context->builder->icmp(Builder::INT_NE, $match, $nullPtr);
+
+        $done = self::block($context, 'dirname_scheme_done_'.$id);
+        $miss = self::block($context, 'dirname_scheme_miss_'.$id);
+        $hit = self::block($context, 'dirname_scheme_hit_'.$id);
+        $context->builder->branchIf($found, $hit, $miss);
+
+        $context->builder->positionAtEnd($miss);
+        $context->builder->store($minusOne, $schemeSepSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($hit);
+        $offset = $context->builder->ptrToInt($match, $i64);
+        $base = $context->builder->ptrToInt($charPtr, $i64);
+        $context->builder->store($context->builder->sub($offset, $base), $schemeSepSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+    }
+
     private static function scanBackwardForSeparator(
         Context $context,
         Value $charPtr,
         Value $idxSlot,
         Value $lastSlot,
+        Value $minIdxSlot,
         string $id
     ): void {
         $i64 = JitStringIndex::i64($context);
@@ -374,7 +440,8 @@ final class JitPath
 
         $context->builder->positionAtEnd($head);
         $idx = $context->builder->load($idxSlot);
-        $stop = $context->builder->icmp(Builder::INT_SLT, $idx, $zero);
+        $minIdx = $context->builder->load($minIdxSlot);
+        $stop = $context->builder->icmp(Builder::INT_SLT, $idx, $minIdx);
         $context->builder->branchIf($stop, $done, $body);
 
         $context->builder->positionAtEnd($body);
