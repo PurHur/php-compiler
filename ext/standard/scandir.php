@@ -27,6 +27,7 @@ final class scandir extends Internal
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
         $path = self::vmDirectoryArg($frame->calledArgs[0]);
+        VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory');
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
         if (2 === $argc) {
             $sortingOrder = VmMath::parseIntBuiltinArg(
@@ -61,6 +62,12 @@ final class scandir extends Internal
         }
 
         $path = self::jitDirectoryArg($context, $args[0]);
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $path,
+            'scandir(): Argument #1 ($directory) cannot be empty'
+        );
         StringFsGlob::ensureLinked($context);
 
         return JitFsGlob::scandir($context, $path, $sort);

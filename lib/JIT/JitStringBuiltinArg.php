@@ -481,4 +481,37 @@ final class JitStringBuiltinArg
     {
         return JitStringArg::compileTimeLiteral($arg);
     }
+
+    /**
+     * Reject empty string operands after lowering (php-src dir.c / ini.c empty-path guards; #11031).
+     *
+     * @throws \ValueError when the compile-time operand is empty
+     */
+    public static function rejectEmpty(Context $context, Variable $arg, Value $loweredStr, string $errorMessage): void
+    {
+        if (null !== ($arg->compileTimeString ?? null)) {
+            if ('' === $arg->compileTimeString) {
+                throw new \ValueError($errorMessage);
+            }
+
+            return;
+        }
+
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $map = $context->structFieldMap['__string__'];
+        $len = $context->builder->load(
+            $context->builder->structGep($loweredStr, $map['length'])
+        );
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+        $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $failBlock = BasicBlockHelper::append($context, 'str_empty_fail');
+        $okBlock = BasicBlockHelper::append($context, 'str_empty_ok');
+        $context->builder->branchIf($empty, $failBlock, $okBlock);
+        $context->builder->positionAtEnd($failBlock);
+        TypeErrorRaise::emitValueError($context, $errorMessage);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($okBlock);
+    }
 }

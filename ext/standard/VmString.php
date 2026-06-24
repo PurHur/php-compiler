@@ -172,6 +172,27 @@ final class VmString
     }
 
     /**
+     * Reject empty string builtin operands (php-src Z_PARAM_STR non-empty path guards; #11031).
+     *
+     * @throws \ValueError when the coerced string is empty
+     */
+    public static function rejectEmptyBuiltinStringArg(
+        string $str,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if ('' === $str) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) cannot be empty',
+                $function,
+                $argIndex + 1,
+                $paramName
+            ));
+        }
+    }
+
+    /**
      * Coerce disk_*_space() directory operand; null means default path (php-src filestat.c, #4915).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
