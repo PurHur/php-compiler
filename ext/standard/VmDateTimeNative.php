@@ -238,7 +238,7 @@ final class VmDateTimeNative
                 }
             }
 
-            return self::parseResultFromComponents([
+            return self::finalizeParsedDateComponents([
                 'year' => (int) $matches[1],
                 'month' => (int) $matches[2],
                 'day' => (int) $matches[3],
@@ -246,12 +246,16 @@ final class VmDateTimeNative
                 'minute' => $hasTime ? (int) $matches[5] : false,
                 'second' => $hasTime ? (int) $matches[6] : false,
                 'fraction' => $fraction,
-            ]);
+            ], $tzName);
         }
 
-        $parsed = self::parseDateTime($date, $tzName);
+        try {
+            $parsed = self::parseDateTime($date, $tzName);
 
-        return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+        } catch (NativeDateMalformedStringException) {
+            return self::parseUnrecognizedDateString($date);
+        }
     }
 
     /**
@@ -744,6 +748,147 @@ final class VmDateTimeNative
         $components['day'] = $day;
 
         return ['components' => $components, 'warnings' => $warnings];
+    }
+
+    /**
+     * php-src ext/standard/parsedate.c — calendar overflow + invalid-day handling for date_parse() (#11225).
+     *
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false
+     * } $components
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function finalizeParsedDateComponents(array $components, string $tzName): array
+    {
+        $year = $components['year'];
+        $month = $components['month'];
+        $day = $components['day'];
+        if (!\is_int($year) || !\is_int($month) || !\is_int($day)) {
+            return self::parseResultFromComponents($components);
+        }
+        if ($month > 12) {
+            $components['month'] = 1;
+            $components['day'] = 1;
+            $result = self::parseResultFromComponents($components);
+            $result['error_count'] = 1;
+            $result['errors'] = [6 => 'Unexpected character'];
+            $result['is_localtime'] = true;
+
+            return $result;
+        }
+        if ($day > 31) {
+            $hour = false === $components['hour'] ? 0 : $components['hour'];
+            $minute = false === $components['minute'] ? 0 : $components['minute'];
+            $second = false === $components['second'] ? 0 : $components['second'];
+            $microsecond = 0;
+            if (false !== $components['fraction']) {
+                $microsecond = (int) \round($components['fraction'] * 1_000_000);
+            }
+            try {
+                $timestamp = self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+                $rolled = self::parseResultFromTimestamp($timestamp, $microsecond);
+                $result = self::parseResultFromComponents([
+                    'year' => $rolled['year'],
+                    'month' => $rolled['month'],
+                    'day' => $rolled['day'],
+                    'hour' => $components['hour'],
+                    'minute' => $components['minute'],
+                    'second' => $components['second'],
+                    'fraction' => $components['fraction'],
+                ]);
+                $result['error_count'] = 1;
+                $result['errors'] = [9 => 'Unexpected character'];
+                $result['is_localtime'] = true;
+
+                return $result;
+            } catch (NativeDateMalformedStringException) {
+                return self::parseResultFromComponents($components);
+            }
+        }
+        if (!self::isValidCalendarDate($year, $month, $day)) {
+            $result = self::parseResultFromComponents($components);
+            $result['warning_count'] = 1;
+            $result['warnings'] = [11 => 'The parsed date was invalid'];
+
+            return $result;
+        }
+
+        return self::parseResultFromComponents($components);
+    }
+
+    /**
+     * php-src timelib parse errors for strings that do not match structured patterns (#11225).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * }
+     */
+    private static function parseUnrecognizedDateString(string $date): array
+    {
+        $errors = [];
+        $warnings = [];
+        $len = \strlen($date);
+        if (preg_match('/^[A-Za-z]+/', $date, $firstWord)) {
+            try {
+                self::validateTimezoneId($firstWord[0]);
+            } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                $errors[0] = 'The timezone could not be found in the database';
+            }
+        }
+        for ($pos = 0; $pos < $len; ++$pos) {
+            if ('-' === $date[$pos] && !\preg_match('/^\d{4}-\d{2}-\d{2}/', $date)) {
+                $errors[$pos] = 'Unexpected character';
+            }
+        }
+        if (
+            \preg_match_all('/[A-Za-z]+/', $date) >= 2
+            && \substr_count($date, '-') >= 2
+        ) {
+            $errors[6] = 'Double timezone specification';
+            $warnings[4] = 'Double timezone specification';
+        }
+        if ([] === $errors) {
+            $errors[0] = 'The timezone could not be found in the database';
+        }
+        $result = self::failedParseResult($errors);
+        if ([] !== $warnings) {
+            $result['warning_count'] = \count($warnings);
+            $result['warnings'] = $warnings;
+        }
+        $result['is_localtime'] = true;
+
+        return $result;
     }
 
     private static function isValidCalendarDate(int $year, int $month, int $day): bool
