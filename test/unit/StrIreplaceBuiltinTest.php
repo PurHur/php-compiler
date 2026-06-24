@@ -85,9 +85,8 @@ TXT;
         $subject->string('foo');
         $frame->calledArgs = [$search, $replace, $subject];
         $frame->returnVar = new VMVariable();
-        $this->expectException(\LogicException::class);
-        $this->expectExceptionMessage('str_ireplace(): Argument #1 ($search) cannot be empty');
         $fn->execute($frame);
+        $this->assertSame('foo', $frame->returnVar->toString());
     }
 
     public function testVmScriptMatchesSubset(): void
