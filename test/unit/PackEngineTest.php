@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** PackEngine parity with Zend pack() (issue #5231). */
@@ -60,5 +61,13 @@ final class PackEngineTest extends TestCase
         $this->assertStringNotContainsString("\\pack('f'", $source);
         $this->assertStringNotContainsString("\\pack('d'", $source);
         $this->assertStringContainsString('Ieee754::encodeFloat32', $source);
+    }
+
+    /** Self-host spine include (#11177): compile-time fold must tolerate null CFG operands. */
+    public function testPackEngineSourceCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompileFile(__DIR__.'/../../ext/standard/PackEngine.php');
+        $this->assertNotNull($block);
     }
 }
