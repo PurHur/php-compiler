@@ -18,8 +18,10 @@ final class file_put_contents extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('file_put_contents() requires two or three arguments in this compiler build');
+        if ($argc < 2 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+            );
         }
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
@@ -27,12 +29,18 @@ final class file_put_contents extends Internal
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'file_put_contents');
         $flags = 0;
-        if (3 === $argc) {
+        if (isset($frame->calledArgs[2])) {
             $flagsVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
             }
             $flags = $flagsVar->toInt();
+        }
+        if (isset($frame->calledArgs[3])) {
+            $contextVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $contextVar->type) {
+                VmStreamContext::requireRepresentation($contextVar, 'file_put_contents', 4);
+            }
         }
         $data = self::coerceData($dataVar);
         $written = VmFs::filePutContents($path, $data, $flags);
@@ -48,11 +56,13 @@ final class file_put_contents extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('file_put_contents() requires two or three arguments in this compiler build');
+        if ($argc < 2 || $argc > 4) {
+            throw new \ArgumentCountError(
+                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+            );
         }
         $flags = 0;
-        if (3 === $argc) {
+        if ($argc >= 3) {
             if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
                 throw new \LogicException('file_put_contents() flags must be an integer in this compiler build');
             }
