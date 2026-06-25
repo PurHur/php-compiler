@@ -53,6 +53,22 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
+    public function testFileZeroByteReturnsEmptyArray(): void
+    {
+        if (!VmFsReadNative::available()) {
+            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+        }
+
+        $path = tempnam(sys_get_temp_dir(), 'phpc_file_empty_');
+        $this->assertNotFalse($path);
+        file_put_contents($path, '');
+
+        $this->assertSame([], VmFs::file($path));
+        $this->assertSame([], VmFs::file($path, \PHPCompiler\ext\standard\StdlibConstants::FILE_IGNORE_NEW_LINES));
+
+        @unlink($path);
+    }
+
     public function testReadNativeDeclaresLibcOpenReadClose(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsReadNative.php');
