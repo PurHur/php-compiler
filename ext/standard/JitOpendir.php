@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -16,6 +17,7 @@ final class JitOpendir
     /** @return Value (dir handle long, or boolean false on failure) */
     public static function invoke(Context $context, Value $pathStr): Value
     {
+        StringTriggerErrorJit::implement($context);
         $handle = $context->builder->call(
             $context->lookupFunction('__compiler_opendir'),
             $pathStr
@@ -32,6 +34,7 @@ final class JitOpendir
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        JitBuiltinWarning::emitPathOpenFailed($context, $pathStr, 'opendir');
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);

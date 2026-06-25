@@ -38,6 +38,9 @@ final class scandir extends Internal
             );
         }
         $result = VmDir::scandir($path, $sortingOrder);
+        if (false === $result) {
+            VmFilestatFailure::warnScandirFailed($frame, $path);
+        }
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($result): void {
             if (false === $result) {
                 $ret->bool(false);

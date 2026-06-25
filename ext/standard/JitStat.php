@@ -264,6 +264,7 @@ final class JitStat
     /** @return Value */
     private static function pathDiskSpaceBoxed(Context $context, Value $str, string $abiName): Value
     {
+        StringTriggerErrorJit::implement($context);
         StatPathRuntime::ensureLinked($context);
         $i64 = $context->getTypeFromString('int64');
         $bytes = $context->builder->call($context->lookupFunction($abiName), $str);
@@ -278,6 +279,8 @@ final class JitStat
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        $warnFn = StatPathRuntime::FN_DISK_FREE === $abiName ? 'disk_free_space' : 'disk_total_space';
+        self::emitStatWarning($context, $warnFn.'(): No such file or directory');
         $i1 = $context->getTypeFromString('int1');
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
         $context->builder->branch($doneBlock);

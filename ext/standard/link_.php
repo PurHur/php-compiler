@@ -31,6 +31,9 @@ final class link_ extends Internal
         $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'link', 0, 'target');
         $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'link', 1, 'link');
         $ok = VmFs::hardLink($target, $linkPath);
+        if (!$ok) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'link');
+        }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
