@@ -14,7 +14,7 @@ echo ($egid >= 0 ? 'egid-ok' : 'egid-bad'), "\n";
 echo count(posix_getgroups()) >= 0 ? 'groups-ok' : 'groups-fail', "\n";
 $uname = posix_uname();
 echo isset($uname['sysname']) && isset($uname['nodename']) && isset($uname['release'])
-    && isset($uname['version']) && isset($uname['machine'])
+    && isset($uname['version']) && isset($uname['machine']) && isset($uname['domainname'])
     ? 'uname-keys'
     : 'uname-fail', "\n";
 ?>

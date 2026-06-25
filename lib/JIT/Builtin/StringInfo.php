@@ -435,7 +435,7 @@ final class StringInfo
 
         $context->builder->positionAtEnd($loopHead);
         $i = $context->builder->load($iSlot);
-        $done = $context->builder->icmp(Builder::INT_SGE, $i, $i64->constInt(5, false));
+        $done = $context->builder->icmp(Builder::INT_SGE, $i, $i64->constInt(6, false));
         $context->builder->branchIf($done, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
@@ -465,7 +465,7 @@ final class StringInfo
     {
         $i64 = $context->getTypeFromString('int64');
         $key = self::literalString($context, 'sysname');
-        foreach ([1 => 'nodename', 2 => 'release', 3 => 'version', 4 => 'machine'] as $idx => $literal) {
+        foreach ([1 => 'nodename', 2 => 'release', 3 => 'version', 4 => 'machine', 5 => 'domainname'] as $idx => $literal) {
             $matches = $context->builder->icmp(Builder::INT_EQ, $index, $i64->constInt($idx, false));
             $key = $context->builder->select($matches, self::literalString($context, $literal), $key);
         }

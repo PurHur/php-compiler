@@ -11,7 +11,7 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmUnamePure
 {
-    /** @var array{sysname: string, nodename: string, release: string, version: string, machine: string}|null */
+    /** @var array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}|null */
     private static ?array $cached = null;
 
     public static function available(): bool
@@ -41,7 +41,7 @@ final class VmUnamePure
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     public static function utsname(): array
     {
@@ -55,7 +55,7 @@ final class VmUnamePure
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     private static function probeUtsname(): array
     {
@@ -73,7 +73,7 @@ final class VmUnamePure
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     private static function probeLinux(): array
     {
@@ -96,11 +96,12 @@ final class VmUnamePure
             'release' => $release ?? '',
             'version' => $version,
             'machine' => $machine,
+            'domainname' => self::readDomainname(),
         ];
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     private static function probeDarwin(): array
     {
@@ -118,11 +119,12 @@ final class VmUnamePure
             'release' => $release,
             'version' => '',
             'machine' => self::darwinMachine(),
+            'domainname' => self::readDomainname(),
         ];
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     private static function probeWindows(): array
     {
@@ -132,11 +134,12 @@ final class VmUnamePure
             'release' => '',
             'version' => '',
             'machine' => '',
+            'domainname' => '',
         ];
     }
 
     /**
-     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string}
+     * @return array{sysname: string, nodename: string, release: string, version: string, machine: string, domainname: string}
      */
     private static function probeGeneric(): array
     {
@@ -148,6 +151,7 @@ final class VmUnamePure
             'release' => '',
             'version' => '',
             'machine' => '',
+            'domainname' => self::readDomainname(),
         ];
     }
 
@@ -180,6 +184,21 @@ final class VmUnamePure
             if (false !== $host && '' !== $host) {
                 return $host;
             }
+        }
+
+        return '';
+    }
+
+    /** php-src ext/posix/posix.c — utsname.domainname; Linux default "(none)". */
+    private static function readDomainname(): string
+    {
+        if ('Linux' === \PHP_OS_FAMILY) {
+            $fromProc = self::readTrimmed('/proc/sys/kernel/domainname');
+            if (null !== $fromProc && '' !== $fromProc) {
+                return $fromProc;
+            }
+
+            return '(none)';
         }
 
         return '';
