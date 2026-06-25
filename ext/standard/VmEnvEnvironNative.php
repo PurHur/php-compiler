@@ -36,10 +36,7 @@ final class VmEnvEnvironNative
             return [];
         }
 
-        $raw = @\file_get_contents('/proc/self/environ');
-        if (false === $raw || '' === $raw) {
-            $raw = VmFsReadNative::read('/proc/self/environ');
-        }
+        $raw = VmFsReadNative::read('/proc/self/environ');
         if (false === $raw || '' === $raw) {
             return [];
         }
