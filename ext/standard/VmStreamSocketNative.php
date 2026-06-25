@@ -41,7 +41,7 @@ final class VmStreamSocketNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmStreamSocketPure::available();
     }
 
     /**
@@ -54,7 +54,7 @@ final class VmStreamSocketNative
         ?Variable $contextVar = null
     ): array {
         if (!self::available()) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
+            return [false, 0, 'stream_socket_client transport unavailable', null];
         }
 
         $parsed = self::parseRemoteSocket($remote);
@@ -75,13 +75,13 @@ final class VmStreamSocketNative
             $timeout = $contextTimeout;
         }
 
-        $sockType = 'udp' === $parsed['transport'] ? self::SOCK_DGRAM : self::SOCK_STREAM;
-        $port = (string) $parsed['port'];
-
         $ffi = self::ffi();
         if (null === $ffi) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
+            return VmStreamSocketPure::client($remote, $timeout, $flags, $contextVar);
         }
+
+        $sockType = 'udp' === $parsed['transport'] ? self::SOCK_DGRAM : self::SOCK_STREAM;
+        $port = (string) $parsed['port'];
 
         $hints = $ffi->new('struct addrinfo');
         $hints->ai_family = \str_contains($parsed['host'], ':') ? self::AF_INET6 : self::AF_INET;
