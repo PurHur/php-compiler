@@ -9960,12 +9960,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 320)
-- new HashTable (line 327)
-- new Variable (line 335)
-- new Variable (line 348)
+- new HashTable (line 328)
+- new HashTable (line 335)
+- new Variable (line 343)
 - new Variable (line 356)
-- 23 class method(s)
+- new Variable (line 364)
+- 24 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -13224,8 +13224,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/json_decode.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 36)
-- 7 class method(s)
+- new ArgumentCountError (line 38)
+- 8 class method(s)
 
 ### `ext/standard/json_encode.php`
 
