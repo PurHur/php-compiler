@@ -14,4 +14,18 @@ final class JitHtmlEntityDecode
     {
         return \PHPCompiler\JIT\Builtin\HtmlEntityDecodeJit::decode($context, $strPtr, $flags);
     }
+
+    public static function decodeWithEncoding(
+        Context $context,
+        Value $strPtr,
+        Value $flags,
+        Value $encodingPtr
+    ): Value {
+        return \PHPCompiler\JIT\Builtin\HtmlEntityDecodeJit::decodeWithEncoding(
+            $context,
+            $strPtr,
+            $flags,
+            $encodingPtr
+        );
+    }
 }
