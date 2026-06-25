@@ -12642,6 +12642,14 @@ restart:
                     if ($existing->declaringClassLc === $traitLc) {
                         continue 2;
                     }
+                    $classLc = strtolower($entry->name);
+                    if ($existing->declaringClassLc === $classLc) {
+                        throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                            $entry->name,
+                            $traitName,
+                            $property->name
+                        ));
+                    }
                     $prevTraitLc = $existing->declaringClassLc;
                     $prevTrait = isset($this->context->classes[$prevTraitLc])
                         ? $this->context->classes[$prevTraitLc]->name
@@ -13242,6 +13250,23 @@ restart:
                     $name = $frame->scope[$op->arg1];
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     $propLc = strtolower($name->toString());
+                    $classLc = strtolower($entry->name);
+                    foreach ($entry->properties as $existing) {
+                        if (strtolower($existing->name) !== $propLc) {
+                            continue;
+                        }
+                        $declaringLc = $existing->declaringClassLc;
+                        if ($declaringLc !== $classLc) {
+                            $traitName = isset($this->context->classes[$declaringLc])
+                                ? $this->context->classes[$declaringLc]->name
+                                : $declaringLc;
+                            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                $entry->name,
+                                $traitName,
+                                $name->toString()
+                            ));
+                        }
+                    }
                     $prop = new VM\ClassProperty(
                         $name->toString(),
                         $default,
@@ -13271,6 +13296,20 @@ restart:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
                     $pendingTraits = [];
                     $name = strtolower($frame->scope[$op->arg1]->toString());
+                    $classLc = strtolower($entry->name);
+                    if (isset($entry->staticProperties[$name])) {
+                        $declaringLc = $entry->staticPropertyDeclaringClassLc[$name] ?? $classLc;
+                        if ($declaringLc !== $classLc) {
+                            $traitName = isset($this->context->classes[$declaringLc])
+                                ? $this->context->classes[$declaringLc]->name
+                                : $declaringLc;
+                            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                                $entry->name,
+                                $traitName,
+                                $name
+                            ));
+                        }
+                    }
                     $storage = clone $frame->scope[$op->arg3];
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     if (null !== $default) {
