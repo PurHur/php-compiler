@@ -22,6 +22,11 @@ class JITTest extends BaseTest {
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsFpow()
+                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))
+                && !str_contains($name, 'php84_math_string_builtins_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZendThreadId()
                 && str_contains($name, 'zend_thread_id')
                 && !str_contains($name, 'zend_thread_id_phantom')) {
@@ -40,6 +45,14 @@ class JITTest extends BaseTest {
             if (!CompilerVersion::supportsFinalGlobalTypedConstants()
                 && str_contains($name, 'final_global_typed_constant')
                 && !str_contains($name, 'final_global_typed_constant_reject')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsClassHasFunctions()
+                && str_contains($name, 'class_has_')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStrPadded()
+                && str_contains($name, 'str_padded')) {
                 continue;
             }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).

@@ -58,6 +58,10 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsFpow()
+                && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsZendThreadId() && str_contains($name, 'zend_thread_id')) {
                 continue;
             }

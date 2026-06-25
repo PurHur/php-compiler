@@ -24,6 +24,16 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
     }
 
+    public function testStrIncrementNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+    }
+
+    public function testFpowNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsFpow());
+    }
+
     public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
     {
         $runtime = new Runtime();
