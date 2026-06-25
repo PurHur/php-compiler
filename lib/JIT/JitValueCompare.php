@@ -10,6 +10,7 @@ namespace PHPCompiler\JIT;
 
 require_once __DIR__.'/../OpCodeNames.php';
 
+use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\OpCode;
 use PHPCompiler\VM\Variable as VmVariable;
 use function PHPCompiler\opcode_type_name;
@@ -979,6 +980,8 @@ final class JitValueCompare
     /** True when a native handle id is registered in the stream/dir tables (#4699). */
     public static function nativeLongIsResource(Context $context, Value $handleLong): Value
     {
+        JitNativeString::ensureInsertBlock($context);
+        StreamLifecycle::ensureLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_is_resource'),

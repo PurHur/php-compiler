@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Type;
 use PHPLLVM\Value;
@@ -86,11 +87,58 @@ final class JitNestedHelperCoerce
 
     public static function isHelperResultNull(Context $context, Value $raw): Value
     {
+        JitNativeString::ensureInsertBlock($context);
+        $tyStr = $context->getStringFromType($raw->typeOf());
+        if ('__value__' === $tyStr) {
+            return self::isValueStructFalsey($context, $raw);
+        }
         if (self::isValueBox($context, $raw)) {
             return self::isNullPtr($context, $raw, $context->getTypeFromString('__value__*'));
         }
 
         return self::isNullPtr($context, $raw, $raw->typeOf());
+    }
+
+    /** Nested helpers may return {@see __value__} by value (HashTable|false, string|false, …). */
+    private static function isValueStructFalsey(Context $context, Value $struct): Value
+    {
+        $ptr = self::valueStructSlot($context, $struct);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($ptr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_NULL, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_BOOLEAN, false)
+        );
+        $valueField = $context->builder->structGep($ptr, $map['value']);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $i32->constInt(0, false),
+            $i64->constInt(0, false)
+        );
+        $boolVal = $context->builder->load($firstByte);
+        $isFalse = $context->builder->icmp(Builder::INT_EQ, $boolVal, $i8->constInt(0, false));
+
+        return $context->builder->or($isNull, $context->builder->and($isBool, $isFalse));
+    }
+
+    private static function valueStructSlot(Context $context, Value $struct): Value
+    {
+        $valueTy = $context->getTypeFromString('__value__');
+        $slot = BasicBlockHelper::entryAlloca($context, $valueTy);
+        $context->builder->store($struct, $slot);
+
+        return $slot;
     }
 
     public static function coerceArgForHelper(Context $context, Value $arg, Type $wantTy): Value
@@ -153,6 +201,7 @@ final class JitNestedHelperCoerce
      */
     public static function callHelper(Context $context, LlvmFunction $helper, array $args): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $coerced = [];
         for ($i = 0, $n = \count($args); $i < $n; ++$i) {
             $coerced[] = self::coerceArgForHelper($context, $args[$i], $helper->getParam($i)->typeOf());
@@ -174,6 +223,12 @@ final class JitNestedHelperCoerce
             return $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
                 $raw
+            );
+        }
+        if ('__value__' === $context->getStringFromType($have)) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                self::valueStructSlot($context, $raw)
             );
         }
 
@@ -213,6 +268,12 @@ final class JitNestedHelperCoerce
         $strPtr = $context->getTypeFromString('__string__*');
         if ($raw->typeOf() === $strPtr) {
             return $raw;
+        }
+        if ('__value__' === $context->getStringFromType($raw->typeOf())) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readString'),
+                self::valueStructSlot($context, $raw)
+            );
         }
         if (self::isValueBox($context, $raw)) {
             return $context->builder->call(

@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;
 
@@ -51,6 +53,10 @@ final class ListUnpackRuntime
             return;
         }
         if (self::bridgesReady($context)) {
+            return;
+        }
+
+        if (NestedJitCompileScope::isActive()) {
             return;
         }
 
@@ -99,7 +105,7 @@ final class ListUnpackRuntime
         } catch (\Throwable) {
         }
         if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
         } else {
             $context->builder->clearInsertionPosition();
         }

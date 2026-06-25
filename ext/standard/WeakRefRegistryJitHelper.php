@@ -86,12 +86,14 @@ final class WeakRefRegistryJitHelper
         }
         $stored = self::storeMapKey($key);
         for ($i = 0; $i < self::$mapCount; ++$i) {
-            if (self::$mapTargetPtr[$i] === $targetPtr
-                && self::$mapHtPtr[$i] === $htPtr
-                && self::$mapKey[$i] === $stored) {
-                self::clearMapEntry($i);
+            if (self::$mapTargetPtr[$i] === $targetPtr) {
+                if (self::$mapHtPtr[$i] === $htPtr) {
+                    if (self::$mapKey[$i] === $stored) {
+                        self::clearMapEntry($i);
 
-                return;
+                        return;
+                    }
+                }
             }
         }
     }

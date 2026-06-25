@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -69,7 +70,9 @@ final class GetBrowserRuntime
             self::helperFunction($context, self::BROWSCAP_CONFIGURED_HELPER),
             []
         );
-        $context->builder->returnValue($configured);
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $configured, $i32)
+        );
         $context->registerFunction(self::ABI_NAME, $fn);
     }
 
@@ -100,12 +103,14 @@ final class GetBrowserRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GetBrowserJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('GetBrowserJitHelper.php parseAndCompile failed (#11172)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GetBrowserJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GetBrowserJitHelper.php parseAndCompile failed (#11172)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {

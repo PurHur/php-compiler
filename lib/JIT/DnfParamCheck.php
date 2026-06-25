@@ -33,6 +33,9 @@ final class DnfParamCheck
         array $arms,
         string $kind = 'Argument'
     ): void {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
         if ([] === $arms) {
             return;
         }

@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamLifecycle;
 use PHPCompiler\JIT\Builtin\StreamBucket;
 use PHPCompiler\JIT\Builtin\StreamFilter as StreamFilterBuiltin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -16,6 +18,8 @@ final class JitIsResource
 {
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        JitNativeString::ensureInsertBlock($context);
+        StreamLifecycle::ensureLinked($context);
         StreamBucket::ensureLinked($context);
 
         $i32 = $context->getTypeFromString('int32');

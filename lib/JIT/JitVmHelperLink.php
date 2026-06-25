@@ -83,6 +83,8 @@ final class JitVmHelperLink
             return;
         }
 
+        $savedBlock = BasicBlockHelper::tryGetInsertBlock($context);
+
         self::ensureCompiled($context, $relativeHelperPath, $compiledHelpers, $issueTag);
 
         $helperFn = self::lookupCompiled($context, $helperLogical, $issueTag);
@@ -103,6 +105,12 @@ final class JitVmHelperLink
         $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
         $context->builder->returnValue($ret);
         $context->registerFunction($abiName, $fn);
+
+        if (null !== $savedBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function bridgeEntryComplete(?LlvmFunction $probe): bool

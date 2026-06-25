@@ -42,6 +42,8 @@ final class WeakRefRegistryRuntimeStandaloneTest extends TestCase
         $ctx->module->verify($ctx->module::VERIFY_ACTION_RETURN, $verifyMessage);
         $this->assertStringNotContainsString('wr_clear_bridge_entry', $verifyMessage);
         $this->assertStringNotContainsString('wr_clear_refs_inc', $verifyMessage);
+        $this->assertStringNotContainsString('ptrtoint i8* %0 to i64', strtolower($verifyMessage));
+        $this->assertStringNotContainsString('parentless instruction', strtolower($verifyMessage));
         $this->assertStringNotContainsString('weakrefregistryjithelper__reftargetptr(i32', \strtolower($verifyMessage));
     }
 

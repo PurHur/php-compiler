@@ -733,6 +733,9 @@ class Context {
         if ($loadType === Builtin::LOAD_TYPE_IMPORT) {
             return;
         }
+        if (Builtin::LOAD_TYPE_STANDALONE === $loadType) {
+            Builtin\StreamLifecycle::ensureLinked($this);
+        }
         foreach ($this->builtins as $builtin) {
             // this is a separate loop, since initialize may
             // depend on functions defined during implement()
@@ -774,6 +777,7 @@ class Context {
             Builtin\StringTriggerError::ensureStandaloneBodies($this);
             Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
             Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
+            Builtin\StreamLifecycle::ensureLinked($this);
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             Builtin\StringFormat::ensureStandaloneBodies($this);

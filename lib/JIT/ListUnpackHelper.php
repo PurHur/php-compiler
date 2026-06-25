@@ -8,6 +8,7 @@ use PHPCfg\Operand;
 use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\JIT\Builtin\ListUnpackRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\NestedJitCompileScope;
 
 /**
  * Runtime guard for `list()` / `[]` destructuring on non-array RHS (#4325, #4308, #10486);
@@ -115,6 +116,11 @@ final class ListUnpackHelper
         Variable $var,
         ?Operand $varOp = null
     ): \PHPLLVM\Value {
+        if (NestedJitCompileScope::isActive()) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(1, false);
+        }
         if (ArrayAccessHelper::containerImplementsArrayAccess($context, $var, $varOp)) {
             $i1 = $context->getTypeFromString('int1');
 
@@ -164,6 +170,11 @@ final class ListUnpackHelper
 
     public static function isArrayValue(Context $context, Variable $var): \PHPLLVM\Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            $i1 = $context->getTypeFromString('int1');
+
+            return $i1->constInt(0, false);
+        }
         if (Variable::TYPE_HASHTABLE === $var->type || ($var->type & Variable::IS_NATIVE_ARRAY)) {
             $i1 = $context->getTypeFromString('int1');
 

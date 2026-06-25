@@ -410,7 +410,6 @@ final class WeakRefRegistryRuntime
         $null = $i8p->constNull();
         $valuePtr = $context->getTypeFromString('__value__*');
         $writeNull = $context->lookupFunction('__value__writeNull');
-        $targetI64 = $context->builder->pointerCast($target, $i64);
 
         $loopCond = $fn->appendBasicBlock('wr_clear_refs_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_refs_body');
@@ -418,6 +417,7 @@ final class WeakRefRegistryRuntime
         $loopInc = $fn->appendBasicBlock('wr_clear_refs_inc');
 
         $context->builder->positionAtEnd($loopInit);
+        $targetI64 = $context->builder->pointerCast($target, $i64);
         $count = $context->builder->call(self::helperFunction($context, self::REF_COUNT));
         $countI32 = $context->builder->trunc($count, $i32);
         $idx = $context->builder->alloca($i32, 1, 'wr_clear_ref_i');
@@ -474,7 +474,6 @@ final class WeakRefRegistryRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $unsetKey = $context->lookupFunction('__hashtable__unsetStringKey');
         $strInit = $context->lookupFunction('__string__init');
-        $targetI64 = $context->builder->pointerCast($target, $i64);
 
         $loopCond = $fn->appendBasicBlock('wr_clear_maps_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_maps_body');
@@ -482,6 +481,7 @@ final class WeakRefRegistryRuntime
         $loopInc = $fn->appendBasicBlock('wr_clear_maps_inc');
 
         $context->builder->positionAtEnd($loopInit);
+        $targetI64 = $context->builder->pointerCast($target, $i64);
         $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
         $countI32 = $context->builder->trunc($count, $i32);
         $idx = $context->builder->alloca($i32, 1, 'wr_clear_map_i');

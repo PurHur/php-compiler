@@ -16,17 +16,25 @@ final class ResolveSidecarJitHelper
     /** Remap prelinked sidecar source paths to the live repo when the original path is missing. */
     public static function resolveArgv(string $path): string
     {
-        if ('' === $path || file_exists($path)) {
+        if ('' === $path) {
+            return $path;
+        }
+        if (file_exists($path)) {
             return $path;
         }
 
         $dockerRemap = self::resolveDockerBuildPrefix($path);
-        if ($dockerRemap !== $path && file_exists($dockerRemap)) {
-            return $dockerRemap;
+        if ($dockerRemap !== $path) {
+            if (file_exists($dockerRemap)) {
+                return $dockerRemap;
+            }
         }
 
         $repo = getenv('PHP_COMPILER_REPO_ROOT');
-        if (!is_string($repo) || '' === $repo) {
+        if (!is_string($repo)) {
+            return $path;
+        }
+        if ('' === $repo) {
             return $path;
         }
 
@@ -50,7 +58,10 @@ final class ResolveSidecarJitHelper
             return $path;
         }
         $repo = getenv('PHP_COMPILER_REPO_ROOT');
-        if (!is_string($repo) || '' === $repo) {
+        if (!is_string($repo)) {
+            return $path;
+        }
+        if ('' === $repo) {
             return $path;
         }
         $repoRoot = rtrim(str_replace('\\', '/', $repo), '/');

@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPCompiler\ext\standard\JitStringConcat;
 use PHPCompiler\ext\standard\VmJsonFlags;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
@@ -143,6 +144,7 @@ final class StringJsonEncode
 
     private static function emitListArrayJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $htMap = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $valuePtrTy = $context->getTypeFromString('__value__*');
@@ -237,6 +239,7 @@ final class StringJsonEncode
 
     private static function emitListAsObjectJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $htMap = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
         $valuePtrTy = $context->getTypeFromString('__value__*');
@@ -335,6 +338,7 @@ final class StringJsonEncode
 
     private static function emitAssocArrayJson(Context $context, LlvmFunction $fn, Value $ht, Value $flags): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $htMap = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
         $valMap = $context->structFieldMap['__value__'];
@@ -475,6 +479,7 @@ final class StringJsonEncode
 
     private static function emitScalarJson(Context $context, LlvmFunction $fn, Value $valPtr, Value $flags): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $valMap = $context->structFieldMap['__value__'];
         $strPtr = $context->getTypeFromString('__string__*');
         $i8 = $context->getTypeFromString('int8');
@@ -745,6 +750,7 @@ final class StringJsonEncode
      */
     private static function quoteEscapedString(Context $context, LlvmFunction $fn, Value $raw, Value $flags): Value
     {
+        JitNativeString::ensureInsertBlock($context);
         $strMap = $context->structFieldMap['__string__'];
         $strPtr = $context->getTypeFromString('__string__*');
         $len = $context->builder->load($context->builder->structGep($raw, $strMap['length']));

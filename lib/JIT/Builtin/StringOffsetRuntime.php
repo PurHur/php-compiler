@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\VM\StringOffsetJitHelper;
@@ -90,6 +91,7 @@ final class StringOffsetRuntime
     public static function normalizeOffset(Context $context, Value $index, Value $len): Value
     {
         self::ensureLinked($context);
+        JitNativeString::ensureInsertBlock($context);
         $fn = $context->lookupFunction(self::ABI_NORMALIZE);
         $i64 = $context->getTypeFromString('int64');
         $sizeT = $context->getTypeFromString('size_t');
