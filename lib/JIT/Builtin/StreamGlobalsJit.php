@@ -34,6 +34,11 @@ final class StreamGlobalsJit
     {
         self::ensureGlobals($context);
         self::ensureLibcStdio($context);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            StreamLibcHandleRuntime::ensureLinked($context);
+
+            return;
+        }
         self::implementResolveStream($context);
     }
 

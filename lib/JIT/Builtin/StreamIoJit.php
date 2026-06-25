@@ -363,6 +363,9 @@ final class StreamIoJit
         }
         $slot = $context->builder->gep($global, $zero, $handle);
         $context->builder->store($value, $context->builder->bitcast($slot, $i8p->pointerType(0)));
+        if (self::GLOBAL_HANDLES === $globalName && Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            StreamLibcHandleRuntime::emitRegisterHandle($context, $handle, $value);
+        }
     }
 
     private static function loadI32Slot(Context $context, string $globalName, Value $handle): Value
@@ -400,6 +403,9 @@ final class StreamIoJit
     private static function storeIsPopen(Context $context, Value $handle): void
     {
         self::storeI8Flag($context, self::GLOBAL_IS_POPEN, $handle);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            StreamLibcHandleRuntime::emitMarkPopen($context, $handle);
+        }
     }
 
     private static function storeI8Flag(Context $context, string $globalName, Value $handle): void
