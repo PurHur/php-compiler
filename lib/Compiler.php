@@ -13988,19 +13988,17 @@ class Compiler {
         }
         $args = $consumer->args;
         if (1 === count($args)) {
-            $arg = $args[0];
-
-            return $arg instanceof Operand\Temporary
-                || ($arg instanceof Operand\Variable && !$this->isNamedVariableOperand($arg));
+            return $this->callArgIsDeadInlineTemporary($args[0] ?? null);
         }
         // php-cfg `f(g(), literal)` — adjacent producer feeds arg0 (#10402, levenshtein(str_repeat(...), 'b')).
+        // php-cfg `f($named, g())` — producer feeds last arg (#11409, chown($path, getmyuid())).
         $firstArg = $args[0] ?? null;
-        if ($firstArg instanceof Operand\Temporary) {
+        if ($this->callArgIsDeadInlineTemporary($firstArg)) {
             return true;
         }
         $lastArg = $args[count($args) - 1];
 
-        return $lastArg instanceof Operand\Temporary;
+        return $this->callArgIsDeadInlineTemporary($lastArg);
     }
 
     private function isNamedVariableOperand(Operand $arg): bool
@@ -14676,7 +14674,12 @@ class Compiler {
         ) {
             return true;
         }
+        $feedsConsumerArg = false;
         foreach ($consumer->args as $consumerArg) {
+            if (!$this->inlineCallArgProducerFeedsCallArgOp($producer, $consumer, $consumerArg)) {
+                continue;
+            }
+            $feedsConsumerArg = true;
             if ($this->funcCallExprByRefArgMatchesOperand($producer, $consumerArg)) {
                 return false;
             }
@@ -14685,7 +14688,7 @@ class Compiler {
             }
         }
 
-        return true;
+        return $feedsConsumerArg;
     }
 
     /**

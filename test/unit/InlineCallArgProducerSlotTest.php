@@ -1721,4 +1721,42 @@ PHP;
         self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
         self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #11409 — chown($path, getmyuid()) wires nested int into trailing arg slot. */
+    public function testChownNamedPathNestedGetmyuidArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$path = '/nope/1';
+chown($path, getmyuid());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'chown_nested.php');
+
+        $getmyuidReturnSlot = null;
+        $chownSendSlots = [];
+        $pendingSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $getmyuidReturnSlot) {
+                $getmyuidReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if ([] !== $pendingSends) {
+                    $chownSendSlots = $pendingSends;
+                }
+                $pendingSends = [];
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $pendingSends[] = $op->arg1;
+            }
+        }
+        if ([] !== $pendingSends) {
+            $chownSendSlots = $pendingSends;
+        }
+
+        self::assertNotNull($getmyuidReturnSlot);
+        self::assertSame($getmyuidReturnSlot, $chownSendSlots[1] ?? null, 'chown sends='.json_encode($chownSendSlots));
+    }
 }
