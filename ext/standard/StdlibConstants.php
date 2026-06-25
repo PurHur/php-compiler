@@ -131,14 +131,14 @@ final class StdlibConstants
     public const PREG_BAD_UTF8_OFFSET_ERROR = 5;
     public const PREG_JIT_STACKLIMIT_ERROR = 6;
 
-    /** password_hash() algorithms (ext/standard/password.c). */
-    public const PASSWORD_BCRYPT = VmPassword::PASSWORD_BCRYPT;
+    /** password_hash() algorithms — user-visible string ids (ext/standard/password.c). */
+    public const PASSWORD_BCRYPT = '2y';
 
     public const PASSWORD_DEFAULT = VmPassword::PASSWORD_DEFAULT;
 
-    public const PASSWORD_ARGON2I = VmPassword::PASSWORD_ARGON2I;
+    public const PASSWORD_ARGON2I = 'argon2i';
 
-    public const PASSWORD_ARGON2ID = VmPassword::PASSWORD_ARGON2ID;
+    public const PASSWORD_ARGON2ID = 'argon2id';
 
     /** assert_options() selectors (ext/standard/assert.c). */
     public const ASSERT_ACTIVE = 1;
@@ -379,9 +379,6 @@ final class StdlibConstants
         'dns_a6' => self::DNS_A6,
         'dns_all' => self::DNS_ALL,
         'dns_any' => self::DNS_ANY,
-        'password_bcrypt' => self::PASSWORD_BCRYPT,
-        'password_argon2i' => self::PASSWORD_ARGON2I,
-        'password_argon2id' => self::PASSWORD_ARGON2ID,
         'assert_active' => self::ASSERT_ACTIVE,
         'assert_callback' => self::ASSERT_CALLBACK,
         'assert_bail' => self::ASSERT_BAIL,
