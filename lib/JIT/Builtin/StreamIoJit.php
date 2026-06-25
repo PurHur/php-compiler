@@ -529,6 +529,7 @@ final class StreamIoJit
             ['uri' => 'php://stdin', 'fd' => 0],
             ['uri' => 'php://stdout', 'fd' => 1],
             ['uri' => 'php://stderr', 'fd' => 2],
+            ['uri' => 'php://output', 'fd' => 1],
         ];
         $nextBb = $missBb;
         foreach (array_reverse($stdio) as $entryDef) {
