@@ -7,7 +7,7 @@ mkdir($dir);
 file_put_contents($dir . '/only_here.php', '<?php return "found";');
 $old = set_include_path($dir . PATH_SEPARATOR . get_include_path());
 $r = include 'only_here.php';
-restore_include_path();
+set_include_path($old);
 unlink($dir . '/only_here.php');
 rmdir($dir);
 echo 'include=', var_export($r, true), "\n";

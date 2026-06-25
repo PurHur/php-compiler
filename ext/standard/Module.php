@@ -668,7 +668,6 @@ class Module extends ModuleAbstract
             new getcwd_(),
             new get_include_path(),
             new set_include_path(),
-            new restore_include_path(),
             new stream_resolve_include_path(),
             new gethostname(),
             new net_get_interfaces(),

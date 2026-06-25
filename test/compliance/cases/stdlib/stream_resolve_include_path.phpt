@@ -8,7 +8,7 @@ file_put_contents($inc . '/only_here.php', 'marker');
 $old = set_include_path($inc);
 $resolved = stream_resolve_include_path('only_here.php');
 $missing = stream_resolve_include_path('not_present_' . getmypid() . '.php');
-restore_include_path();
+set_include_path($old);
 @unlink($inc . '/only_here.php');
 @rmdir($inc);
 echo function_exists('stream_resolve_include_path') ? "yes\n" : "no\n";
