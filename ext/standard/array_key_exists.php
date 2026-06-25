@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\HashTableHelper;
@@ -76,19 +77,25 @@ final class array_key_exists extends Internal
         ) {
             if (JITVariable::TYPE_VALUE === $array->type) {
                 JitArrayElem::requireArrayParam($context, $array, $fn, 2, 'array');
-            } else {
-                TypeErrorRaise::ensureLinked($context);
-                TypeErrorRaise::registerDeclarations($context);
-                TypeErrorRaise::emitRaise(
+
+                return self::jitKeyExistsOnHashTable(
                     $context,
-                    \sprintf(
-                        '%s(): Argument #2 ($array) must be of type array, %s given',
-                        $fn,
-                        self::jitArgTypeLabel($array)
-                    )
+                    ArrayBuiltinHelper::loadHashTable($context, $array),
+                    $key,
+                    $fn
                 );
-                $context->builder->call($context->lookupFunction('abort'));
             }
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::registerDeclarations($context);
+            TypeErrorRaise::emitRaise(
+                $context,
+                \sprintf(
+                    '%s(): Argument #2 ($array) must be of type array, %s given',
+                    $fn,
+                    self::jitArgTypeLabel($array)
+                )
+            );
+            $context->builder->call($context->lookupFunction('abort'));
 
             return $context->constantFromInteger(0, 'int1');
         }
