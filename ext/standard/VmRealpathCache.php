@@ -34,6 +34,18 @@ final class VmRealpathCache
 
     public static function record(string $path, string $resolved): void
     {
+        if ('' === $resolved) {
+            return;
+        }
+
+        if (str_starts_with($path, '/')) {
+            self::recordEntry($path, $resolved);
+        }
+        self::recordResolvedPrefixes($resolved);
+    }
+
+    private static function recordEntry(string $path, string $resolved, ?bool $isDir = null): void
+    {
         if ('' === $path || '' === $resolved) {
             return;
         }
@@ -44,12 +56,34 @@ final class VmRealpathCache
 
         $entry = [
             'key' => self::hashKey($path),
-            'is_dir' => VmStatPath::isDir($resolved),
+            'is_dir' => $isDir ?? VmStatPath::isDir($resolved),
             'realpath' => $resolved,
             'expires' => time() + self::DEFAULT_TTL,
         ];
         self::$entries[$path] = $entry;
         self::$sizeBytes += self::entryBytes($path, $resolved);
+    }
+
+    /** php-src realpath_cache_add — one entry per resolved path prefix walked (#11347). */
+    private static function recordResolvedPrefixes(string $resolved): void
+    {
+        if (!str_starts_with($resolved, '/')) {
+            return;
+        }
+
+        $isFile = VmStatPath::isFile($resolved);
+        $parts = explode('/', trim($resolved, '/'));
+        if ([] === $parts) {
+            return;
+        }
+
+        $built = '';
+        $lastIndex = \count($parts) - 1;
+        foreach ($parts as $index => $part) {
+            $built .= '/'.$part;
+            $isDir = $index < $lastIndex || !$isFile;
+            self::recordEntry($built, $built, $isDir);
+        }
     }
 
     public static function size(): int
