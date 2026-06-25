@@ -62,6 +62,7 @@ final class VmFsTempnamNative
         $cdef = <<<'CDEF'
 int mkstemp(char *template);
 int close(int fd);
+int unlink(const char *pathname);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
@@ -74,5 +75,58 @@ CDEF;
         }
 
         return null;
+    }
+
+    /**
+     * mkstemp(3) leaving the descriptor open — tmpfile() plainfile parity (#11397).
+     *
+     * @return array{0: int, 1: string}|false
+     */
+    public static function mkstempOpen(string $dir, string $prefix = 'php'): array|false
+    {
+        if (str_contains($dir, "\0") || str_contains($prefix, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $sep = ('/' === $dir[\strlen($dir) - 1] || '\\' === $dir[\strlen($dir) - 1]) ? '' : '/';
+        $template = $dir.$sep.$prefix.'XXXXXX';
+        if (\strlen($template) >= self::PATH_MAX) {
+            return false;
+        }
+        try {
+            $len = \strlen($template);
+            $buf = $ffi->new('char['.($len + 1).']', false);
+            for ($i = 0; $i < $len; ++$i) {
+                $buf[$i] = $template[$i];
+            }
+            $buf[$len] = "\0";
+            $fd = (int) $ffi->mkstemp(\FFI::addr($buf[0]));
+            if ($fd < 0) {
+                return false;
+            }
+
+            return [$fd, \FFI::string(\FFI::addr($buf[0]))];
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
+    public static function unlinkPath(string $path): bool
+    {
+        if ('' === $path || str_contains($path, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        try {
+            return 0 === (int) $ffi->unlink($path);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 }

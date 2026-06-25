@@ -5,23 +5,38 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * tmpfile() without libc FFI — anonymous php://temp stream (#9033, #1492).
+ * tmpfile() without host PHP — anonymous plainfile via mkstemp(3) (#9033, #11397).
  *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(tmpfile)
- * main/streams/php_stream_temp.c — anonymous temp stream lifecycle
+ * main/streams/php_stream_temp.c — unlinked temp path + STDIO fd
  */
 final class VmTmpfilePure
 {
     public static function available(): bool
     {
-        return true;
+        return VmPhpFdStream::available() || true;
     }
 
     /**
-     * @return int|false VM stream handle; buffer freed on fclose (Zend semantics)
+     * @return int|false VM stream handle; unlinked plainfile closed on fclose (Zend semantics)
      */
     public static function open(): int|false
     {
+        if (VmPhpFdStream::available()) {
+            $opened = VmFsTempnamNative::mkstempOpen(VmSysGetTempDirNative::resolve(), 'php');
+            if (false === $opened) {
+                return false;
+            }
+            [$fd, $path] = $opened;
+            VmFsTempnamNative::unlinkPath($path);
+            $handle = VmPhpFdStream::adopt($fd, $path, 'r+b');
+            if (false === $handle) {
+                return false;
+            }
+
+            return $handle;
+        }
+
         return VmPhpMemoryStream::open('php://temp', 'w+b');
     }
 }
