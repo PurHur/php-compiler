@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\SapiOutput;
 
 /**
  * ini_get/ini_set/ini_restore static storage for compiled JIT/AOT modules (#9249, php-in-PHP).
@@ -156,6 +157,9 @@ final class IniJitHelper
     public static function iniSet(string $option, string $newValue): ?string
     {
         $key = strtolower($option);
+        if (self::rejectSessionIniAfterHeadersSent($key)) {
+            return null;
+        }
         if (in_array($key, self::ASSERT_INI_KEYS, true)) {
             return self::assertIniSet($key, $newValue);
         }
@@ -378,5 +382,15 @@ final class IniJitHelper
         }
 
         return null;
+    }
+
+    /** php-src ext/session/session.c — session ini cannot change after headers sent (#11548). */
+    private static function rejectSessionIniAfterHeadersSent(string $key): bool
+    {
+        if (!SapiOutput::headersSent()) {
+            return false;
+        }
+
+        return in_array($key, ['session.save_path', 'session.gc_maxlifetime'], true);
     }
 }
