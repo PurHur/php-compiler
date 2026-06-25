@@ -14688,7 +14688,9 @@ class Compiler {
             }
         }
 
-        return $feedsConsumerArg;
+        // Producer may feed a dead temp via position matching when operand identity
+        // does not link result→arg (#11313, #11409); unrelated named locals are skipped above.
+        return true;
     }
 
     /**
