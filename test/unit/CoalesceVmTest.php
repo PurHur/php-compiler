@@ -253,6 +253,20 @@ echo "y=", var_export($a["k"] ?? null, true), "\n";
         );
     }
 
+    /** Issue #11801: ?? binds below additive/concat; deferred RHS must run on the null branch. */
+    public function testNullCoalesceOperatorPrecedence(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_null_coalesce_precedence.php'),
+            "ok null ?? 1 + 2\n"
+            . "ok unset coalesce add\n"
+            . "ok dim coalesce add\n"
+            . "ok null ?? concat\n"
+            . "ok nullsafe coalesce add\n"
+            . "ok chained coalesce add\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
