@@ -7,10 +7,10 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6633 #7414 */
+/** @covers issue #6633 #7414 #11473 */
 final class NeverParamTypeTest extends TestCase
 {
-    public function testStandaloneNeverParamCompiles(): void
+    public function testStandaloneNeverParamRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -18,24 +18,37 @@ final class NeverParamTypeTest extends TestCase
 function acceptsNever(never $value): void {}
 echo "ok\n";
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'never_param.php'));
-        $this->assertSame("ok\n", ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param.php');
     }
 
-    public function testNeverParamCallSiteTypeError(): void
+    public function testNeverParamOnAbstractMethodRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-function f(never $x) {
-    echo "hi";
+abstract class C {
+    abstract public function f(never $x): void;
 }
-f(1);
 PHP;
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('must be of type never');
-        $runtime->run($runtime->parseAndCompile($code, 'never_param_call.php'));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param_abstract.php');
+    }
+
+    public function testNeverParamOnInterfaceMethodRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public function f(never $x): void;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param_interface.php');
     }
 
     public function testNeverInUnionParamCompilesAndAcceptsInt(): void
