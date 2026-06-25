@@ -2282,7 +2282,12 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/PregEmptyPatternReplaceRuntime.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/PregExpandRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessIdentityJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpen.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenEmbedBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessOpenJit.php';
+require_once __DIR__.'/../../../ext/standard/ProcessSlotJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ProcessOpenJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProcessStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ProgressNoteRuntime.php';
