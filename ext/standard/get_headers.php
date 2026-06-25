@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * get_headers() — libc HTTP HEAD via VmHttpFetchNative, no host get_headers() (#3309).
+ * get_headers() — HTTP HEAD via VmHttpFetchPure / VmStreamSocketNative, no host get_headers() (#3309, #8939).
  *
  * php-src: ext/standard/head.c — PHP_FUNCTION(get_headers)
  */

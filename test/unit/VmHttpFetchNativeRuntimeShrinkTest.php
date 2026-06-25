@@ -6,10 +6,11 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmHttpFetchNative;
+use PHPCompiler\ext\standard\VmHttpFetchPure;
 use PHPCompiler\ext\standard\VmHttpLastResponseHeaders;
 use PHPUnit\Framework\TestCase;
 
-/** VmHttpFetchNative libc HTTP GET without host file_get_contents (#8552). */
+/** VmHttpFetchPure — HTTP GET via VmStreamSocketNative, no duplicate libc socket FFI (#8939). */
 final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
 {
     public function testVmFsFileGetContentsRoutesHttpThroughNativeFetch(): void
@@ -29,19 +30,29 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
         );
     }
 
-    public function testVmHttpFetchNativeDeclaresLibcSocketSendRecv(): void
+    public function testVmHttpFetchNativeDelegatesToPure(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchNative.php');
-        $this->assertStringContainsString('without host PHP', $source);
-        $this->assertStringContainsString('ssize_t send(int sockfd', $source);
-        $this->assertStringContainsString('ssize_t recv(int sockfd', $source);
-        $this->assertStringContainsString('VmHttpLastResponseHeaders::store', $source);
+        $nativeSource = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchNative.php');
+        $this->assertStringContainsString('VmHttpFetchPure::', $nativeSource);
+        $this->assertStringNotContainsString('FFI::cdef', $nativeSource);
+        $this->assertStringNotContainsString('ssize_t send(int sockfd', $nativeSource);
+    }
+
+    public function testVmHttpFetchPureUsesStreamSocketNativeNotLibcFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchPure.php');
+        $this->assertStringContainsString('VmStreamSocketNative::client', $source);
+        $this->assertStringContainsString('VmFs::fwrite', $source);
+        $this->assertStringContainsString('VmFs::streamGetContents', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('ssize_t send(int sockfd', $source);
+        $this->assertStringNotContainsString('without host PHP', $source);
     }
 
     public function testHttpsFetchPopulatesLastResponseHeadersWhenTlsAvailable(): void
     {
         if (!VmHttpFetchNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmHttpFetchNative');
+            $this->markTestSkipped('VmStreamSocketNative unavailable for VmHttpFetchPure');
         }
         if (!\PHPCompiler\ext\standard\VmHttpTlsNative::available()) {
             $this->markTestSkipped('libssl FFI required for https fetch');
@@ -64,7 +75,7 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
     public function testHttpsUrlReturnsFalseWhenTlsUnavailable(): void
     {
         if (!VmHttpFetchNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmHttpFetchNative');
+            $this->markTestSkipped('VmStreamSocketNative unavailable for VmHttpFetchPure');
         }
         if (\PHPCompiler\ext\standard\VmHttpTlsNative::available()) {
             $this->markTestSkipped('libssl available — use testHttpsFetchPopulatesLastResponseHeadersWhenTlsAvailable');
@@ -78,7 +89,7 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
     public function testHttpFetchPopulatesLastResponseHeaders(): void
     {
         if (!VmHttpFetchNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmHttpFetchNative');
+            $this->markTestSkipped('VmStreamSocketNative unavailable for VmHttpFetchPure');
         }
 
         VmHttpLastResponseHeaders::clear();
@@ -93,5 +104,31 @@ final class VmHttpFetchNativeRuntimeShrinkTest extends TestCase
         $this->assertStringStartsWith('HTTP/', (string) $headers[0]);
         $this->assertIsString($body);
         $this->assertNotSame('', $body);
+    }
+
+    public function testHttpFetchWorksWhenFfiDisabled(): void
+    {
+        if (!VmHttpFetchPure::available()) {
+            $this->markTestSkipped('VmStreamSocketNative unavailable');
+        }
+
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $this->assertTrue(VmHttpFetchPure::available());
+
+            $body = VmHttpFetchPure::fetch('http://example.com/');
+            if (false === $body) {
+                $this->markTestSkipped('network unavailable for http://example.com fetch with FFI disabled');
+            }
+            $this->assertIsString($body);
+            $this->assertNotSame('', $body);
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
     }
 }
