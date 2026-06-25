@@ -22,6 +22,10 @@ final class VmForwardStaticCall
                 "{$builtinName}() requires VM context in this compiler build"
             );
         }
+        $callable = $callable->resolveIndirect();
+        if (self::isPlainFunctionNameCallable($callable)) {
+            return VmCallable::invoke($frame->vmContext, $callable, ...$extraArgs);
+        }
         self::validateCallbackAtGlobalScope($frame, $callable, $builtinName);
         $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
@@ -50,6 +54,18 @@ final class VmForwardStaticCall
         }
 
         return $args;
+    }
+
+    /**
+     * php-src zif_forward_static_call_array — plain function name strings dispatch like call_user_func().
+     */
+    private static function isPlainFunctionNameCallable(Variable $callable): bool
+    {
+        if (Variable::TYPE_STRING !== $callable->type) {
+            return false;
+        }
+
+        return !str_contains($callable->toString(), '::');
     }
 
     /**
