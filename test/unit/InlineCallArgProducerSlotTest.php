@@ -1797,6 +1797,54 @@ PHP;
         self::assertSame("object\n", ob_get_clean());
     }
 
+    /** Issue #10094 — array_map(fn, [...], [...]) wires closure + both inline array slots. */
+    public function testArrayMapDualInlineArrayLiteralUsesAllSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_map(fn ($a, $b) => $a + $b, [1, 2], [3, 4]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_dual_inline.php');
+
+        $arraySlots = [];
+        $closureSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertNotNull($closureSlot);
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($closureSlot, $sendSlots[0]);
+        self::assertSame($arraySlots[0], $sendSlots[1]);
+        self::assertSame($arraySlots[1], $sendSlots[2]);
+    }
+
+    /** Issue #10094 — array_map with two inline array literals runtime parity. */
+    public function testArrayMapDualInlineArrayLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map(fn ($a, $b) => $a + $b, [1, 2], [3, 4]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_dual_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => 4,\n  1 => 6,\n)\n", ob_get_clean());
+    }
+
     /** Issue #11187 — rename($src, $dst) after file_put_contents must send path locals, not int returns. */
     public function testRenameAfterFilePutContentsUsesNamedPathSlots(): void
     {
