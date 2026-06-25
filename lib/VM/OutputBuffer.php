@@ -171,12 +171,6 @@ final class OutputBuffer
             }
             if ($idx > 0) {
                 self::$stack[$idx - 1]['content'] .= $content;
-                $parent = self::$stack[$idx - 1]['content'];
-                if ('' !== $parent) {
-                    SapiOutput::markStarted();
-                    echo $parent;
-                    self::$stack[$idx - 1]['content'] = '';
-                }
             } else {
                 SapiOutput::markStarted();
                 echo $content;

@@ -175,11 +175,6 @@ final class ObOutputJitHelper
         }
         if ($idx > 0) {
             self::$stack[$idx - 1]['content'] .= $content;
-            $parent = self::$stack[$idx - 1]['content'];
-            if ('' !== $parent) {
-                self::writeStdout($parent);
-                self::$stack[$idx - 1]['content'] = '';
-            }
         } else {
             self::writeStdout($content);
         }
