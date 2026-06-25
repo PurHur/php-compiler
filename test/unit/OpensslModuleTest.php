@@ -38,11 +38,13 @@ echo (int) defined('OPENSSL_RAW_DATA');
 echo OPENSSL_RAW_DATA;
 echo (int) defined('OPENSSL_ZERO_PADDING');
 echo OPENSSL_ZERO_PADDING;
+echo (int) defined('OPENSSL_ALGO_SHA256');
+echo OPENSSL_ALGO_SHA256;
 PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1111111111112', ob_get_clean());
+        self::assertSame('111111111111217', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void

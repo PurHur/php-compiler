@@ -19,10 +19,10 @@ class Module extends ModuleAbstract
     {
         parent::init($runtime);
         BuiltinClasses::register($runtime->vmContext);
-        foreach ([
+        foreach (array_merge([
             'OPENSSL_RAW_DATA' => OpensslConstants::OPENSSL_RAW_DATA,
             'OPENSSL_ZERO_PADDING' => OpensslConstants::OPENSSL_ZERO_PADDING,
-        ] as $name => $value) {
+        ], OpensslConstants::algorithmConstants()) as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
