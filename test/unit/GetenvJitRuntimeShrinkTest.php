@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** getenv/putenv JIT overlay routes through GetenvJitHelper PHP (#9092). */
+/** getenv/putenv JIT overlay routes through GetenvJitHelper PHP (#9092, #8992). */
 final class GetenvJitRuntimeShrinkTest extends TestCase
 {
     public function testGetenvJitHelperHasOverlayStorage(): void
@@ -22,14 +22,21 @@ final class GetenvJitRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('GetenvJitHelper', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringEnvLocal.php');
         $this->assertStringNotContainsString('__compiler_env_local_lookup', $source);
-        $this->assertLessThanOrEqual(230, \substr_count($source, "\n"), 'StringGetenv overlay via PHP helper + libc miss');
+        $this->assertStringNotContainsString("lookupFunction('getenv')", $source);
     }
 
-    public function testJitEnvPutenvUsesGetenvJitHelperOverlay(): void
+    public function testJitEnvPutenvUsesGetenvJitHelperOverlayOnly(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitEnv.php');
         $this->assertStringContainsString('GetenvJitHelper::putenv', $source);
-        $this->assertStringContainsString('Builtin::LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString("lookupFunction('putenv')", $source);
+    }
+
+    public function testGetenvJitHelperUsesEnvironNative(): void
+    {
+        $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/GetenvJitHelper.php');
+        $this->assertStringContainsString('VmEnvEnvironNative::enumerate()', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\\\FFI/', $source);
     }
 
     public function testVmEnvExportsAllEnvironmentMap(): void

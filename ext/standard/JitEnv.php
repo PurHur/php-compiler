@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092).
+ * JIT/AOT helpers for getenv() and putenv() via GetenvJitHelper PHP (#9092, #8992).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -58,53 +58,40 @@ final class JitEnv
         StringGetenv::ensurePutenvLinked($context);
         self::emitPutenvSyntaxGuard($context, $assignmentStr);
 
-        $overlayOk = null;
-        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
-            $overlayOk = $context->builder->call(
-                StringGetenv::helperFunction(
-                    $context,
-                    'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
-                ),
-                $assignmentStr
-            );
-        }
-
-        $map = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i64 = $context->getTypeFromString('int64');
-        $one = $i64->constInt(1, false);
-        $len = $context->builder->load(
-            $context->builder->structGep($assignmentStr, $map['length'])
-        );
-        $bytes = $context->builder->structGep($assignmentStr, $map['value']);
-        $bufLen = $context->builder->add($len, $one);
-        $mallocFn = self::lookupMalloc($context);
-        $buf = $context->builder->call($mallocFn, $bufLen);
-        $cStr = $context->builder->pointerCast($buf, $i8p);
-        $context->intrinsic->memcpy($cStr, $bytes, $len, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($cStr, $len)
-        );
-        $status = $context->builder->call(
-            $context->lookupFunction('putenv'),
-            $cStr
-        );
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            $i8 = $context->getTypeFromString('int8');
+            $i64 = $context->getTypeFromString('int64');
+            $i8p = $context->getTypeFromString('int8*');
+            $map = $context->structFieldMap['__string__'];
+            $one = $i64->constInt(1, false);
+            $len = $context->builder->load(
+                $context->builder->structGep($assignmentStr, $map['length'])
+            );
+            $bytes = $context->builder->structGep($assignmentStr, $map['value']);
+            $bufLen = $context->builder->add($len, $one);
+            $mallocFn = self::lookupMalloc($context);
+            $buf = $context->builder->call($mallocFn, $bufLen);
+            $cStr = $context->builder->pointerCast($buf, $i8p);
+            $context->intrinsic->memcpy($cStr, $bytes, $len, false);
+            $context->builder->store(
+                $i8->constInt(0, false),
+                $context->builder->inBoundsGEP($cStr, $len)
+            );
             $context->builder->call(
                 $context->lookupFunction('__compiler_env_register_putenv'),
                 $cStr
             );
-        }
-        $i32 = $context->getTypeFromString('int32');
-        $libcOk = $context->builder->icmp(Builder::INT_EQ, $status, $i32->constInt(0, false));
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return $libcOk;
+            return $context->builder->constInt(1, false, $context->getTypeFromString('int1'));
         }
 
-        return $context->builder->and($overlayOk, $libcOk);
+        return $context->builder->call(
+            StringGetenv::helperFunction(
+                $context,
+                'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv'
+            ),
+            $assignmentStr
+        );
     }
 
     private static function emitPutenvSyntaxGuard(Context $context, Value $assignmentStr): void

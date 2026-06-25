@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * Process environment helpers — putenv()/getenv() local table (php-src EG(env), issue #3710).
  *
- * VM syncs the process environment via {@see VmEnvPutenvNative} (libc FFI) — no host Zend delegation (#8086).
+ * Inherited variables come from {@see VmEnvEnvironNative}; no host Zend or libc FFI (#8086, #8992).
  *
  * php-src: ext/standard/basic_functions.c — zif_putenv, zif_getenv
  */
@@ -55,24 +55,13 @@ final class VmEnv
             self::$local[$name] = $value;
         }
 
-        return VmEnvPutenvNative::putenv($setting);
+        VmEnvPutenvNative::putenv($setting);
+
+        return true;
     }
 
     public static function getenv(string $name, bool $localOnly = false): string|false
     {
-        if ($localOnly) {
-            // php-src zif_getenv: local_only skips sapi_getenv, uses php_getenv (overlay + environ).
-            if (\array_key_exists($name, self::$local)) {
-                return self::$local[$name];
-            }
-            $environ = VmEnvEnvironNative::enumerate();
-            if (\array_key_exists($name, $environ)) {
-                return $environ[$name];
-            }
-
-            return false;
-        }
-
         if (\array_key_exists($name, self::$local)) {
             return self::$local[$name];
         }

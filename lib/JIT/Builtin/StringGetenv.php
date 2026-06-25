@@ -14,9 +14,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092).
+ * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092, #8992).
  *
- * PHP overlay via compiled helper; libc getenv on miss (thin trampoline).
+ * PHP overlay via compiled helper; no libc getenv on miss.
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -127,7 +127,6 @@ final class StringGetenv
         $valMap = $context->structFieldMap['__value__'];
         $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
         $zero = $i64->constInt(0, false);
 
         $overlayPtr = $context->builder->call(
@@ -145,32 +144,13 @@ final class StringGetenv
         );
 
         $overlayHit = $fn->appendBasicBlock('getenv_overlay_hit');
-        $libcBb = $fn->appendBasicBlock('getenv_libc');
+        $missing = $fn->appendBasicBlock('getenv_missing');
         $done = $fn->appendBasicBlock('getenv_done');
-        $context->builder->branchIf($isFalse, $libcBb, $overlayHit);
+        $context->builder->branchIf($isFalse, $missing, $overlayHit);
 
         $context->builder->positionAtEnd($overlayHit);
         JitValueBox::copyIntoPointer($context, $out, $overlayPtr);
         $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($libcBb);
-        $nameLen = $context->builder->load(
-            $context->builder->structGep($nameStr, $context->structFieldMap['__string__']['length'])
-        );
-        $nameBytes = $context->builder->structGep($nameStr, $context->structFieldMap['__string__']['value']);
-        $bufLen = $context->builder->add($nameLen, $i64->constInt(1, false));
-        $nameBuf = $context->builder->alloca($i8, $bufLen, 'getenv_name');
-        $nameCStr = $context->builder->pointerCast($nameBuf, $i8p);
-        $context->intrinsic->memcpy($nameCStr, $nameBytes, $nameLen, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($nameCStr, $nameLen)
-        );
-        $env = $context->builder->call($context->lookupFunction('getenv'), $nameCStr);
-        $envNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8p->constNull());
-        $missing = $fn->appendBasicBlock('getenv_missing');
-        $found = $fn->appendBasicBlock('getenv_found');
-        $context->builder->branchIf($envNull, $missing, $found);
 
         $context->builder->positionAtEnd($missing);
         $context->builder->store(
@@ -184,23 +164,6 @@ final class StringGetenv
             $zero
         );
         $context->builder->store($i8->constInt(0, false), $firstByte);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($found);
-        $len = $context->builder->call($context->lookupFunction('strlen'), $env);
-        $lenI64 = $len->typeOf() === $i64
-            ? $len
-            : $context->builder->zExt($len, $i64);
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $env
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $out,
-            $str
-        );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
