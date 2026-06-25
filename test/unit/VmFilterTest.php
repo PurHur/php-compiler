@@ -46,6 +46,37 @@ final class VmFilterTest extends TestCase
         $this->assertFalse($out->toBool());
     }
 
+    public function testValidateIntAllowHexFlag(): void
+    {
+        $v = new Variable();
+        $v->string('0x10');
+        $flags = new Variable();
+        $flags->int(VmFilter::FILTER_FLAG_ALLOW_HEX);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT, $flags);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(16, $out->toInt());
+    }
+
+    public function testValidateIntAllowOctalFlag(): void
+    {
+        $v = new Variable();
+        $v->string('010');
+        $flags = new Variable();
+        $flags->int(VmFilter::FILTER_FLAG_ALLOW_OCTAL);
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT, $flags);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(8, $out->toInt());
+    }
+
+    public function testValidateIntHexWithoutFlagReturnsFalse(): void
+    {
+        $v = new Variable();
+        $v->string('0x10');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_INT);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
     public function testValidateIntAcceptsPlainDecimal(): void
     {
         $v = new Variable();

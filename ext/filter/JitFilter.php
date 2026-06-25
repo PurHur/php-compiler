@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\filter;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
+use PHPCompiler\JIT\Builtin\StringFilterInt;
 use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -91,6 +92,26 @@ final class JitFilter
             $masked,
             $i64->constInt(0, false)
         );
+    }
+
+    public static function loadFilterFlags(Context $context, ?JITVariable $options): Value
+    {
+        if (null === $options || JITVariable::TYPE_NULL === $options->type) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+
+        return self::loadFilterId($context, $options);
+    }
+
+    private static function flagsNeedExtendedIntParse(Context $context, Value $flagsVal): bool
+    {
+        $lib = $context->llvm->lib;
+        if (null === $lib->LLVMIsAConstantInt($flagsVal->value)) {
+            return true;
+        }
+        $flags = (int) $lib->LLVMConstIntGetZExtValue($flagsVal->value);
+
+        return 0 !== ($flags & (VmFilter::FILTER_FLAG_ALLOW_HEX | VmFilter::FILTER_FLAG_ALLOW_OCTAL));
     }
 
     /** When flag is set, rewrite boxed false validation results to null. */
@@ -206,7 +227,7 @@ final class JitFilter
         return self::stringToFloatBox($context, $context->helper->loadValue($value));
     }
 
-    public static function validateInt(Context $context, JITVariable $value): Value
+    public static function validateInt(Context $context, JITVariable $value, ?Value $flags = null): Value
     {
         if (JITVariable::TYPE_VALUE === $value->type) {
             return self::boxValueValidateInt($context, $value);
@@ -215,6 +236,8 @@ final class JitFilter
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $falseVal = $context->constantFromBool(false);
+        $i64 = $context->getTypeFromString('int64');
+        $flagsVal = $flags ?? $i64->constInt(0, false);
 
         if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
             JitValueBox::writeLong($context, $slot, $context->helper->loadValue($value));
@@ -229,6 +252,10 @@ final class JitFilter
         }
 
         $str = $context->helper->loadValue($value);
+        if (self::flagsNeedExtendedIntParse($context, $flagsVal)) {
+            return self::validateIntStringWithFlags($context, $str, $flagsVal);
+        }
+
         $isValid = self::stringIsFullInteger($context, $str);
         $parsed = self::stringToInt64($context, $str);
 
@@ -237,6 +264,41 @@ final class JitFilter
         $failBlock = BasicBlockHelper::append($context, 'fvi_fail_'.$id);
         $mergeBlock = BasicBlockHelper::append($context, 'fvi_merge_'.$id);
         $context->builder->branchIf($isValid, $okBlock, $failBlock);
+
+        $context->builder->positionAtEnd($okBlock);
+        JitValueBox::writeLong($context, $slot, $parsed);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        JitValueBox::writeBool($context, $slot, $falseVal);
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+
+        return $ptr;
+    }
+
+    private static function validateIntStringWithFlags(Context $context, Value $str, Value $flagsVal): Value
+    {
+        StringFilterInt::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $falseVal = $context->constantFromBool(false);
+        $i64 = $context->getTypeFromString('int64');
+        $failSentinel = $i64->constInt(-1, true);
+
+        $parsed = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_validate_int_string'),
+            $str,
+            $flagsVal
+        );
+        $isOk = $context->builder->icmp(Builder::INT_NE, $parsed, $failSentinel);
+
+        $id = (string) (++self::$blockSerial);
+        $okBlock = BasicBlockHelper::append($context, 'fvi_flags_ok_'.$id);
+        $failBlock = BasicBlockHelper::append($context, 'fvi_flags_fail_'.$id);
+        $mergeBlock = BasicBlockHelper::append($context, 'fvi_flags_merge_'.$id);
+        $context->builder->branchIf($isOk, $okBlock, $failBlock);
 
         $context->builder->positionAtEnd($okBlock);
         JitValueBox::writeLong($context, $slot, $parsed);

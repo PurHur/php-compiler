@@ -356,6 +356,16 @@ class Context {
                 $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
 
                 return $var;
+            case 'filter_flag_allow_octal':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_FLAG_ALLOW_OCTAL);
+
+                return $var;
+            case 'filter_flag_allow_hex':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_FLAG_ALLOW_HEX);
+
+                return $var;
             case 'input_get':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
