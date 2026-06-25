@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc UDP socket exchange for DNS queries without host PHP stream wrappers (#8092, #4125).
+ * libc UDP socket exchange for DNS queries; falls back to {@see VmDnsUdpPure} when FFI unavailable (#8937).
  *
  * php-src: ext/standard/dns.c — UDP DNS transport
  */
@@ -32,7 +32,7 @@ final class VmDnsUdpNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmDnsUdpPure::available();
     }
 
     public static function exchange(string $nameserver, string $query): ?string
@@ -43,7 +43,7 @@ final class VmDnsUdpNative
 
         $ffi = self::ffi();
         if (null === $ffi) {
-            return null;
+            return VmDnsUdpPure::exchange($nameserver, $query);
         }
 
         $sock = (int) $ffi->socket(self::AF_INET, self::SOCK_DGRAM, 0);
