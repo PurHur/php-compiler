@@ -196,6 +196,24 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     $options['--debug-symbols'] = true;
 
                     break;
+                case '-d':
+                    if ($i >= $argc) {
+                        die("Option -d requires an argument\n");
+                    }
+                    $iniArg = (string) $argv[$i];
+                    ++$i;
+                    $eq = strpos($iniArg, '=');
+                    if (false === $eq) {
+                        die("Invalid -d argument: {$iniArg}\n");
+                    }
+                    $iniKey = substr($iniArg, 0, $eq);
+                    $iniValue = substr($iniArg, $eq + 1);
+                    if (!isset($options['-d']) || !is_array($options['-d'])) {
+                        $options['-d'] = [];
+                    }
+                    $options['-d'][$iniKey] = $iniValue;
+
+                    break;
                 case '-o':
                     if ($i >= $argc || substr((string) $argv[$i], 0, 1) === '-') {
                         $options['-o'] = true;

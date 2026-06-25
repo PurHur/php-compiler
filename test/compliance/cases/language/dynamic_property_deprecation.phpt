@@ -2,6 +2,8 @@
 Language: dynamic property deprecation on undeclared write (PHP 8.2+, issue #3253)
 --FILE--
 <?php
+ini_set('error_reporting', '32767');
+
 class C {
     public int $x = 1;
 }

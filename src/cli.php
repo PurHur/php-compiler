@@ -102,6 +102,23 @@ if (!function_exists('php_compiler_cli_is_virtual_code_filename')) {
     }
 }
 
+if (!function_exists('php_compiler_cli_apply_ini_overrides')) {
+    /**
+     * Apply Zend-style {@code -d name=value} overrides to the compiled VM context (#11558).
+     *
+     * @param array<string, string> $overrides
+     */
+    function php_compiler_cli_apply_ini_overrides(\PHPCompiler\VM\Context $ctx, array $overrides): void
+    {
+        foreach ($overrides as $key => $value) {
+            if (!is_string($key) || !is_string($value)) {
+                continue;
+            }
+            \PHPCompiler\ext\standard\VmIni::set($ctx, $key, $value);
+        }
+    }
+}
+
 if (!function_exists('php_compiler_cli_resolve_user_path')) {
     /**
      * Resolve a user-supplied relative path against the pre-chdir invocation cwd.
