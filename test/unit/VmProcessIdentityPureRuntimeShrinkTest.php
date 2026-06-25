@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmProcessIdentity;
 use PHPCompiler\ext\standard\VmProcessIdentityNative;
 use PHPCompiler\ext\standard\VmProcessIdentityPure;
@@ -34,6 +35,14 @@ final class VmProcessIdentityPureRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ProcessIdentityJit::getCurrentUser', $source);
         $this->assertStringNotContainsString("lookupFunction('getpwuid')", $source);
         $this->assertStringNotContainsString("lookupFunction('geteuid')", $source);
+    }
+
+    public function testGetCurrentUserEmptyForVirtualScriptPaths(): void
+    {
+        $this->assertSame('', VmProcessIdentity::getCurrentUserForScript(''));
+        $this->assertSame('', VmProcessIdentity::getCurrentUserForScript('-'));
+        $this->assertSame('', VmProcessIdentity::getCurrentUserForScript('Standard input code'));
+        $this->assertSame('', VmProcessIdentity::getCurrentUserForScript('Command line code'));
     }
 
     public function testGetmypidWorksWithFfiDisabledOnLinux(): void
@@ -76,9 +85,15 @@ final class VmProcessIdentityPureRuntimeShrinkTest extends TestCase
         $this->assertSame($uid, VmProcessIdentity::getmyuid());
         $this->assertSame($gid, VmProcessIdentity::getmygid());
 
-        $name = VmProcessIdentityPure::getpwuidName($euid);
-        if (null !== $name) {
-            $this->assertSame($name, VmProcessIdentity::getCurrentUser());
+        $ownerUid = VmFs::fileOwner(__FILE__);
+        if (false !== $ownerUid) {
+            $ownerName = VmProcessIdentityPure::getpwuidName($ownerUid);
+            if (null !== $ownerName) {
+                $this->assertSame(
+                    $ownerName,
+                    VmProcessIdentity::getCurrentUserForScript(__FILE__)
+                );
+            }
         }
     }
 }
