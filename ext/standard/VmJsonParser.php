@@ -60,11 +60,6 @@ final class VmJsonParser
      */
     private function parseValue(): mixed
     {
-        if ($this->depth > $this->maxDepth) {
-            VmJson::setLastError(1);
-
-            return null;
-        }
         $this->skipWs();
         if ($this->pos >= $this->len) {
             VmJson::setLastError(4);
@@ -76,6 +71,11 @@ final class VmJsonParser
             return $this->parseStringValue();
         }
         if ('{' === $c) {
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
+
+                return null;
+            }
             ++$this->depth;
             $result = $this->parseObjectValue();
             --$this->depth;
@@ -83,6 +83,11 @@ final class VmJsonParser
             return $result;
         }
         if ('[' === $c) {
+            if ($this->depth + 1 >= $this->maxDepth) {
+                VmJson::setLastError(1);
+
+                return null;
+            }
             ++$this->depth;
             $result = $this->parseArrayValue();
             --$this->depth;

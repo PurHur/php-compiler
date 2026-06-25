@@ -14,11 +14,11 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $exported VmJson::export shape
      */
-    public static function encodeExported(mixed $exported, int $flags = 0): string|false
+    public static function encodeExported(mixed $exported, int $flags = 0, int $maxDepth = 512): string|false
     {
         VmJson::setLastError(0);
         try {
-            return self::encodeValue($exported, $flags);
+            return self::encodeValue($exported, $flags, 0, $maxDepth);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
             if (VmJsonFlags::throwsOnError($flags)) {
@@ -74,7 +74,7 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $value
      */
-    private static function encodeValue(mixed $value, int $flags, int $depth = 0): string
+    private static function encodeValue(mixed $value, int $flags, int $depth, int $maxDepth): string
     {
         if (null === $value) {
             return 'null';
@@ -92,6 +92,10 @@ final class VmJsonFormat
             return self::encodeStringValue($value, $flags);
         }
         if ($value instanceof \stdClass) {
+            $nestedDepth = $depth + 1;
+            if ($nestedDepth > $maxDepth) {
+                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+            }
             $props = get_object_vars($value);
             if ([] === $props) {
                 return self::wrapObject('{}', $flags, $depth);
@@ -102,12 +106,16 @@ final class VmJsonFormat
                     throw new \LogicException('json_encode() only supports string keys in this compiler build');
                 }
                 $parts[] = '"'.self::escapeString($key, $flags).'"'.self::keyValueSeparator($flags)
-                    .self::encodePairValue($item, $flags, $depth);
+                    .self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
             }
 
             return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
         }
         if (\is_array($value)) {
+            $nestedDepth = $depth + 1;
+            if ($nestedDepth > $maxDepth) {
+                throw new VmJsonExportException(VmJson::ERROR_DEPTH);
+            }
             $encodeAsObject = !array_is_list($value) || self::forceObject($flags);
             if ([] === $value) {
                 $empty = $encodeAsObject ? '{}' : '[]';
@@ -117,7 +125,7 @@ final class VmJsonFormat
             if (!$encodeAsObject) {
                 $parts = [];
                 foreach ($value as $item) {
-                    $parts[] = self::encodePairValue($item, $flags, $depth);
+                    $parts[] = self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
                 }
 
                 return self::wrapContainer('['.self::joinParts($parts, $flags, $depth).']', $flags, $depth);
@@ -131,7 +139,7 @@ final class VmJsonFormat
                 }
                 $keyStr = \is_int($key) ? (string) $key : $key;
                 $parts[] = '"'.self::escapeString($keyStr, $flags).'"'.self::keyValueSeparator($flags)
-                    .self::encodePairValue($item, $flags, $depth);
+                    .self::encodePairValue($item, $flags, $nestedDepth, $maxDepth);
             }
 
             return self::wrapObject('{'.self::joinParts($parts, $flags, $depth).'}', $flags, $depth);
@@ -171,9 +179,9 @@ final class VmJsonFormat
     /**
      * @param array<mixed>|bool|float|int|null|string $value
      */
-    private static function encodePairValue(mixed $value, int $flags, int $depth): string
+    private static function encodePairValue(mixed $value, int $flags, int $depth, int $maxDepth): string
     {
-        return self::encodeValue($value, $flags, $depth + 1);
+        return self::encodeValue($value, $flags, $depth, $maxDepth);
     }
 
     private static function indent(int $depth): string
