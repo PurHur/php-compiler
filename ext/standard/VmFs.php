@@ -501,6 +501,17 @@ final class VmFs
 
             return VmString::byteSlice($body, $offset, $length);
         }
+        if (VmDataUri::isDataUri($path)) {
+            $data = VmDataUri::decode($path);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
         if ($useIncludePath) {
             $resolved = self::resolveIncludePath($path);
             if (false !== $resolved) {
