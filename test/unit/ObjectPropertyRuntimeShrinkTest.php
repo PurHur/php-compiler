@@ -44,6 +44,32 @@ final class ObjectPropertyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('exit_status_obj_enum_', $object);
     }
 
+    public function testObjectMonolithDelegatesDestructorLowering(): void
+    {
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('ObjectDestructorLlvm::implementInvokeDestructor', $object);
+        $this->assertStringNotContainsString('private function emitDestructDispatchForObject', $object);
+        $this->assertStringNotContainsString('private function emitDestructMagicCallForClass', $object);
+    }
+
+    public function testObjectMonolithDelegatesStaticPropertyInit(): void
+    {
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('ObjectStaticPropertyInitLlvm::scalarInitializer', $object);
+        $this->assertStringContainsString('ObjectStaticPropertyInitLlvm::initValueNull', $object);
+        $this->assertStringNotContainsString('private function initStaticValuePropertyNull', $object);
+        $this->assertStringNotContainsString('private function staticPropertyScalarInitializer', $object);
+    }
+
+    public function testObjectMonolithDelegatesInstancePropertyFetch(): void
+    {
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('ObjectInstancePropertyLlvm::propertyFetchOrdinary', $object);
+        $this->assertStringContainsString('ObjectInstancePropertyLlvm::boxFetchedPropertyIntoValue', $object);
+        $this->assertStringNotContainsString('private function propertyFetchOrdinary', $object);
+        $this->assertStringNotContainsString('private function boxFetchedPropertyIntoValue', $object);
+    }
+
     public function testEnumStringCastErrorMessageMatchesZend(): void
     {
         $msg = EnumCasePropertyJitHelper::enumStringCastErrorMessage('E');
