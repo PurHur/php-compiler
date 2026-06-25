@@ -1603,6 +1603,15 @@ class JIT {
                     $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
                 );
             }
+            if (str_ends_with($m3CompilerSetter, '\\compiler::getdebuglastphaseinputfile')
+                || str_ends_with($m3CompilerSetter, '\\compiler::getcompileabortdetail')
+            ) {
+                return $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $internalName,
+                    $logicalName,
+                    $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
+                );
+            }
             if ('phpcompiler\\compiler::compile' === $m3CompilerSetter
                 && $this->shouldUseM3InventoryEmitDriver()
                 && $this->shouldUseEmitHelperLinkStubs()
@@ -4048,6 +4057,17 @@ class JIT {
                 $stubBlock
             );
         }
+        foreach (['getdebuglastphaseinputfile', 'getcompileabortdetail'] as $methodLc) {
+            $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+            $lc = strtolower($logical);
+            if (!isset($this->context->functions[$lc])) {
+                $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+        }
         if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
             $compileLogical = 'PHPCompiler\\Compiler::compile';
             $compileLc = strtolower($compileLogical);
@@ -4194,6 +4214,41 @@ class JIT {
         $this->context->builder = $saved;
         $this->context->functions[$lcname] = $func;
         $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
+    /** Null string getter for Compiler spine — LLVM link only (#11809). */
+    private function emitM3EmitTuCompilerNullStringGetterStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($strPtr, false, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue($strPtr->constNull());
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = '__string__*';
         $this->context->functionProxies[$lcname] = new JIT\Call\Native(
             $func,
             $logicalName,
