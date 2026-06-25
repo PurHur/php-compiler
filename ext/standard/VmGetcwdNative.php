@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc getcwd for VM without host \getcwd() (issue #5044, #1492).
+ * libc getcwd for VM; falls back to {@see VmGetcwdPure} when FFI unavailable (#8955).
  *
  * php-src: ext/standard/dir.c — getcwd(2) / realpath fallback.
  * JIT/AOT: {@see JitGetcwd} via realpath(3) on ".".
@@ -36,13 +36,18 @@ final class VmGetcwdNative
         if ('Linux' === \PHP_OS_FAMILY) {
             $viaProc = self::resolveLinuxProcCwd();
             if (false === $viaProc) {
-                return false;
+                return VmGetcwdPure::resolve();
             }
 
             return self::validateCwd($viaProc);
         }
 
-        return false;
+        return VmGetcwdPure::resolve();
+    }
+
+    public static function available(): bool
+    {
+        return null !== self::ffi() || VmGetcwdPure::available() || 'Linux' === \PHP_OS_FAMILY;
     }
 
     /**
@@ -175,6 +180,9 @@ final class VmGetcwdNative
 
     private static function ffi(): ?\FFI
     {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
         if (self::$ffiUnavailable) {
             return null;
         }
@@ -206,5 +214,15 @@ CDEF;
         self::$ffiUnavailable = true;
 
         return null;
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $v = getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
+            return false;
+        }
+
+        return true;
     }
 }

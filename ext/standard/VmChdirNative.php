@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * chdir(2) for VM without host \chdir() (#8180, pairs #5044).
+ * chdir(2) for VM; falls back to {@see VmChdirPure} when FFI unavailable (#8955).
  *
- * Mirrors {@see JitChdir} — libc chdir only.
+ * Mirrors {@see JitChdir} — libc chdir with pure PHP bootstrap path.
  *
  * php-src: ext/standard/dir.c — PHP_FUNCTION(chdir)
  */
@@ -17,6 +17,11 @@ final class VmChdirNative
 
     private static bool $ffiUnavailable = false;
 
+    public static function available(): bool
+    {
+        return null !== self::ffi() || VmChdirPure::available();
+    }
+
     public static function chdir(string $path): bool
     {
         if (str_contains($path, "\0")) {
@@ -24,7 +29,7 @@ final class VmChdirNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmChdirPure::chdir($path);
         }
 
         try {
@@ -40,13 +45,16 @@ final class VmChdirNative
 
     private static function ffi(): ?\FFI
     {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
         if (self::$ffiUnavailable) {
             return null;
         }
         if (null !== self::$ffi) {
             return self::$ffi;
         }
-        if (!self::ffiEnabled() || !\extension_loaded('ffi')) {
+        if (!\extension_loaded('ffi')) {
             self::$ffiUnavailable = true;
 
             return null;
