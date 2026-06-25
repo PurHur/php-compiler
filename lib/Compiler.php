@@ -10621,6 +10621,13 @@ class Compiler {
         }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         if ($producer instanceof Op\Expr\Array_) {
+            $producerIdx = array_search($producer, $producers, true);
+            if (
+                false !== $producerIdx
+                && ($producers[$producerIdx + 1] ?? null) instanceof Op\Expr\New_
+            ) {
+                return null;
+            }
             if (0 === $argIndex && !$this->callIncludesNamedParameter($callOp)) {
                 $arrayProducers = array_values(array_filter(
                     $producers,
@@ -11406,7 +11413,7 @@ class Compiler {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
             }
-            $producerSlot = $block->slotForOperand($producer->result);
+            $producerSlot = $this->slotForInlineNewProducer($block, $producer);
         }
         if (null === $producerSlot && $producer instanceof Op\Expr\MagicScriptConst) {
             foreach ($this->compileExpr($producer, $block) as $op) {
@@ -12355,12 +12362,30 @@ class Compiler {
                     }
                 }
 
+                // iterator_to_array(new ArrayObject([...]), false) — ctor Array_ prelude + New_ + trailing arg (#11321).
+                if (
+                    $extra >= 1
+                    && ($producers[0] ?? null) instanceof Op\Expr\Array_
+                    && ($producers[1] ?? null) instanceof Op\Expr\New_
+                ) {
+                    $mappedIndex = $argIndex + 1;
+                    if ($mappedIndex >= 0 && $mappedIndex < $producerCount) {
+                        return $producers[$mappedIndex];
+                    }
+                }
+
                 return null;
             }
             // php-cfg emits inner-then-outer Array_ per inline arg (#4738, #10196, #10662).
             if ($this->producersAreNestedArrayLiteralChain($producers) && 0 === $producerCount % $argCount) {
                 $depth = intdiv($producerCount, $argCount);
                 $mappedIndex = $argIndex * $depth + ($depth - 1);
+            } elseif (
+                $extra >= 1
+                && ($producers[0] ?? null) instanceof Op\Expr\Array_
+                && ($producers[1] ?? null) instanceof Op\Expr\New_
+            ) {
+                $mappedIndex = $argIndex + 1;
             } elseif (1 === $argCount) {
                 $mappedIndex = $producerCount - 1;
             } else {
@@ -14520,7 +14545,26 @@ class Compiler {
             return $producers[$argIndex] instanceof Op\Expr\New_;
         }
 
-        return false;
+        $matched = $this->matchInlineCallArgProducer($producers, $cfgCallOp->args, $argIndex, $cfgCallOp, $block);
+
+        return $matched instanceof Op\Expr\New_;
+    }
+
+    /** Slot for hoisted inline `new` when php-cfg dead temps omit result→slot mapping (#11321). */
+    private function slotForInlineNewProducer(Block $block, Op\Expr\New_ $new): ?string
+    {
+        $slot = $block->slotForOperand($new->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_NEW === $op->type) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
     }
 
     /** True when $producer supplies the specific $callArg operand (#9456, #9904). */
@@ -17158,7 +17202,7 @@ class Compiler {
                                 $sends[] = $op;
                             }
                         }
-                        $valueSlot = $block->slotForOperand($newProducer->result);
+                        $valueSlot = $this->slotForInlineNewProducer($block, $newProducer);
                     }
                     if (null === $valueSlot) {
                         $valueSlot = $this->compileOperand($arg, $block, true);
@@ -17396,7 +17440,11 @@ class Compiler {
                             }
                         }
                         $matchedSlot = $this->slotForEmittedIssetOrEmptyProducer($block, $matched)
-                            ?? $block->slotForOperand($matched->result);
+                            ?? (
+                                $matched instanceof Op\Expr\New_
+                                    ? $this->slotForInlineNewProducer($block, $matched)
+                                    : $block->slotForOperand($matched->result)
+                            );
                         if (null !== $matchedSlot) {
                             $valueSlot = $matchedSlot;
                         }
