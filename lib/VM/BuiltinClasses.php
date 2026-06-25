@@ -280,12 +280,31 @@ final class BuiltinClasses
         $iterator = new ClassEntry('Iterator');
         $iterator->isInterface = true;
         $iterator->interfaces = ['traversable'];
+        self::registerBuiltinInterfaceMethods($iterator, ['current', 'key', 'next', 'rewind', 'valid']);
         $ctx->classes['iterator'] = $iterator;
 
         $iteratorAggregate = new ClassEntry('IteratorAggregate');
         $iteratorAggregate->isInterface = true;
         $iteratorAggregate->interfaces = ['traversable'];
+        self::registerBuiltinInterfaceMethods($iteratorAggregate, ['getIterator']);
         $ctx->classes['iteratoraggregate'] = $iteratorAggregate;
+    }
+
+    /**
+     * Zend interface method tables for get_class_methods() / method_exists() (#11786, zend_API.c).
+     *
+     * @param list<string> $methods
+     */
+    public static function registerBuiltinInterfaceMethods(ClassEntry $iface, array $methods): void
+    {
+        $declLc = strtolower($iface->name);
+        foreach ($methods as $name) {
+            $lc = strtolower($name);
+            $iface->abstractMethods[$lc] = true;
+            $iface->methodNames[$lc] = $name;
+            $iface->methodVisibility[$lc] = CfgFunc::FLAG_PUBLIC;
+            $iface->methodDeclaringClassLc[$lc] = $declLc;
+        }
     }
 
     /** Zend zend_interfaces.c — Countable interface (#3364). */
@@ -293,6 +312,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Countable');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['count']);
         $ctx->classes['countable'] = $entry;
     }
 
@@ -301,6 +321,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('ArrayAccess');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['offsetExists', 'offsetGet', 'offsetSet', 'offsetUnset']);
         $ctx->classes['arrayaccess'] = $entry;
     }
 
@@ -309,11 +330,13 @@ final class BuiltinClasses
     {
         $unitEnum = new ClassEntry('UnitEnum');
         $unitEnum->isInterface = true;
+        self::registerBuiltinInterfaceMethods($unitEnum, ['cases']);
         $ctx->classes['unitenum'] = $unitEnum;
 
         $backedEnum = new ClassEntry('BackedEnum');
         $backedEnum->isInterface = true;
         $backedEnum->interfaces = ['unitenum'];
+        self::registerBuiltinInterfaceMethods($backedEnum, ['tryFrom', 'from']);
         $ctx->classes['backedenum'] = $backedEnum;
     }
 
@@ -322,6 +345,7 @@ final class BuiltinClasses
     {
         $entry = new ClassEntry('Serializable');
         $entry->isInterface = true;
+        self::registerBuiltinInterfaceMethods($entry, ['serialize', 'unserialize']);
         $ctx->classes['serializable'] = $entry;
     }
 
