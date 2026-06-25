@@ -16,6 +16,10 @@ final class FsDirRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFsDirJit.php');
         $this->assertStringContainsString('FsDirRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('CopyRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('emitCopy', $source);
+        $this->assertStringNotContainsString("lookupFunction('fopen')", $source);
+        $this->assertStringNotContainsString("lookupFunction('fread')", $source);
         $this->assertStringNotContainsString('emitTouch', $source);
         $this->assertStringNotContainsString('emitMkdir', $source);
         $this->assertStringNotContainsString('emitTempnam', $source);
