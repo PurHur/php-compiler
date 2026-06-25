@@ -731,6 +731,7 @@ class Module extends ModuleAbstract
             new is_callable(),
             new call_user_func(),
             new call_user_func_array(),
+            new func_get_arg(),
             new func_get_args(),
             new func_num_args(),
             new method_exists_(),
