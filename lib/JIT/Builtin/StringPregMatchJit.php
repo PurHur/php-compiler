@@ -97,6 +97,7 @@ final class StringPregMatchJit
         self::$blockSuffix = 0;
         self::ensureGlobals($context);
         PregExpandRuntime::ensureLinked($context);
+        PregEmptyPatternReplaceRuntime::ensureLinked($context);
         self::ensureLibc($context);
         self::ensurePcre2($context);
         self::ensureRuntimeHelpers($context);
@@ -1512,13 +1513,78 @@ final class StringPregMatchJit
     {
         $entry = $fn->appendBasicBlock('cr_entry');
         $context->builder->positionAtEnd($entry);
+
+        $pattern = $fn->getParam(0);
+        $replacement = $fn->getParam(1);
+        $subject = $fn->getParam(2);
+        $limit = $fn->getParam(3);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+
+        $regexSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $regexLenSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $optsSlot = BasicBlockHelper::entryAlloca($context, $i32);
+        $pat = self::stringData($context, $pattern);
+        $patLen = $context->builder->truncOrBitCast(self::stringLen($context, $pattern), $sizeT);
+        $parsed = $context->builder->call(
+            $context->lookupFunction('__phpc_preg_parse_php_pattern'),
+            $pat,
+            $patLen,
+            $regexSlot,
+            $regexLenSlot,
+            $optsSlot
+        );
+        $parseFailBb = $fn->appendBasicBlock('cr_parse_fail');
+        $checkEmptyBb = $fn->appendBasicBlock('cr_check_empty');
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $parsed, $i32->constInt(0, false)),
+            $parseFailBb,
+            $checkEmptyBb
+        );
+
+        $context->builder->positionAtEnd($parseFailBb);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_INTERNAL_ERROR, false)
+        );
+        $context->builder->returnValue($nullStr);
+
+        $context->builder->positionAtEnd($checkEmptyBb);
+        $regexLen = $context->builder->load($regexLenSlot);
+        $isEmptyRegex = $context->builder->icmp(Builder::INT_EQ, $regexLen, $sizeT->constInt(0, false));
+        $emptyBb = $fn->appendBasicBlock('cr_empty_regex');
+        $normalBb = $fn->appendBasicBlock('cr_normal');
+        $context->builder->branchIf($isEmptyRegex, $emptyBb, $normalBb);
+
+        $context->builder->positionAtEnd($emptyBb);
+        $regex = $context->builder->load($regexSlot);
+        $context->builder->call($context->lookupFunction('free'), $regex);
+        $emptyResult = $context->builder->call(
+            $context->lookupFunction('phpc_preg_replace_empty_pattern'),
+            $pattern,
+            $replacement,
+            $subject,
+            $limit
+        );
+        $context->builder->call(
+            $context->lookupFunction('__phpc_preg_set_error'),
+            $i32->constInt(self::PHPC_PREG_NO_ERROR, false)
+        );
+        $context->builder->returnValue($emptyResult);
+
+        $context->builder->positionAtEnd($normalBb);
+        $regex = $context->builder->load($regexSlot);
+        $context->builder->call($context->lookupFunction('free'), $regex);
         $context->builder->returnValue(
             $context->builder->call(
                 $context->lookupFunction('__phpc_preg_replace_internal'),
-                $fn->getParam(0),
-                $fn->getParam(1),
-                $fn->getParam(2),
-                $fn->getParam(3)
+                $pattern,
+                $replacement,
+                $subject,
+                $limit
             )
         );
     }
