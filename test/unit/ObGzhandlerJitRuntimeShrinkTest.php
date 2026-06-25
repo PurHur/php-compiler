@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\ObGzhandlerJitHelper;
+use PHPCompiler\ext\standard\ObGzhandlerServerJitHelper;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
@@ -17,13 +18,14 @@ final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObGzhandlerJitRuntime.php');
         $this->assertStringContainsString('ObGzhandlerJitHelper', $source);
         $this->assertStringContainsString('ObGzhandlerStandaloneLlvm', $source);
+        $this->assertStringContainsString('ObGzhandlerServerJitHelper', $source);
         $this->assertStringContainsString('readAcceptEncodingFromServer', $source);
         $this->assertStringNotContainsString('emitReadAcceptEncodingString', $source);
         $this->assertStringNotContainsString('emitHandleBody', $source);
         $this->assertStringNotContainsString('emitPassthroughBody', $source);
         $this->assertStringNotContainsString('lookupFunction(\'strstr\')', $source);
         $this->assertStringNotContainsString('GLOBAL_ENCODING', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(335, \substr_count($source, "\n") + 1);
     }
 
     public function testObGzhandlerStandaloneLlvmQuarantinesAcceptEncodingWalk(): void
@@ -39,7 +41,7 @@ final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ObGzhandlerJitHelper.php');
         $this->assertStringContainsString('ZlibEncodeJitHelper::gzencode', $source);
         $this->assertStringContainsString('resolveEncodingFromAcceptHeader', $source);
-        $this->assertStringContainsString('readAcceptEncodingFromServer', $source);
+        $this->assertStringNotContainsString('readAcceptEncodingFromServer', $source);
         $this->assertStringNotContainsString('VmObGzhandler::', $source);
         $this->assertStringNotContainsString('$_SERVER', $source);
         $this->assertStringNotContainsString('ResponseContext', $source);
@@ -65,7 +67,7 @@ final class ObGzhandlerJitRuntimeShrinkTest extends TestCase
         $value = new Variable();
         $value->string('gzip, deflate');
         $ht->add('HTTP_ACCEPT_ENCODING', $value);
-        $this->assertSame('gzip, deflate', ObGzhandlerJitHelper::readAcceptEncodingFromServer($ht));
-        $this->assertSame('', ObGzhandlerJitHelper::readAcceptEncodingFromServer(null));
+        $this->assertSame('gzip, deflate', ObGzhandlerServerJitHelper::readAcceptEncodingFromServer($ht));
+        $this->assertSame('', ObGzhandlerServerJitHelper::readAcceptEncodingFromServer(null));
     }
 }

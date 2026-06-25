@@ -29,7 +29,9 @@ final class ObGzhandlerJitRuntime
 
     private const HELPER_PATH = '/ext/standard/ObGzhandlerJitHelper.php';
 
-    private const READ_ACCEPT_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::readAcceptEncodingFromServer';
+    private const SERVER_HELPER_PATH = '/ext/standard/ObGzhandlerServerJitHelper.php';
+
+    private const READ_ACCEPT_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerServerJitHelper::readAcceptEncodingFromServer';
 
     private const RESOLVE_ENCODING_HELPER = 'PHPCompiler\\ext\\standard\\ObGzhandlerJitHelper::resolveEncodingFromAcceptHeader';
 
@@ -39,10 +41,14 @@ final class ObGzhandlerJitRuntime
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::READ_ACCEPT_HELPER,
         self::RESOLVE_ENCODING_HELPER,
         self::HANDLE_HELPER,
         self::FLUSH_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const EMBED_COMPILED_HELPERS = [
+        self::READ_ACCEPT_HELPER,
     ];
 
     /** @var list<string> */
@@ -261,8 +267,12 @@ final class ObGzhandlerJitRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
+        $required = self::COMPILED_HELPERS;
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            $required = [...self::COMPILED_HELPERS, ...self::EMBED_COMPILED_HELPERS];
+        }
         $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
+        foreach ($required as $logical) {
             if (!isset($context->functions[\strtolower($logical)])) {
                 $missing = true;
                 break;
@@ -276,16 +286,28 @@ final class ObGzhandlerJitRuntime
         StringZlib::ensureLinked($context);
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ObGzhandlerJitHelper.php');
+        $repoRoot = \dirname(__DIR__, 3);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $repoRoot): void {
+            $corePath = $repoRoot.self::HELPER_PATH;
+            $block = $runtime->parseAndCompile((string) \file_get_contents($corePath), 'ObGzhandlerJitHelper.php');
             if (null === $block) {
                 throw new \LogicException('ObGzhandlerJitHelper.php parseAndCompile failed (#9798)');
             }
             $jit = new JIT($context);
             $jit->compile($block);
         });
-        foreach (self::COMPILED_HELPERS as $logical) {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            $serverPath = $repoRoot.self::SERVER_HELPER_PATH;
+            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $serverPath): void {
+                $block = $runtime->parseAndCompile((string) \file_get_contents($serverPath), 'ObGzhandlerServerJitHelper.php');
+                if (null === $block) {
+                    throw new \LogicException('ObGzhandlerServerJitHelper.php parseAndCompile failed (#9798)');
+                }
+                $jit = new JIT($context);
+                $jit->compile($block);
+            });
+        }
+        foreach ($required as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
                 throw new \LogicException($lc.' was not compiled for JIT (#9798)');

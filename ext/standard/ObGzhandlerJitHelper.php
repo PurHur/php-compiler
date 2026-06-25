@@ -4,9 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
-
 /**
  * Lowered into JIT/AOT modules for ob_gzhandler() handler dispatch (#9091, php-in-PHP).
  *
@@ -46,19 +43,6 @@ final class ObGzhandlerJitHelper
         $processed = self::handle($content, \PHP_OUTPUT_HANDLER_END, $encoding);
 
         return '' !== $processed ? $processed : $content;
-    }
-
-    public static function readAcceptEncodingFromServer(?HashTable $server): string
-    {
-        if (null === $server) {
-            return '';
-        }
-        $value = $server->find('HTTP_ACCEPT_ENCODING');
-        if (null === $value || Variable::TYPE_STRING !== $value->type) {
-            return '';
-        }
-
-        return $value->toString();
     }
 
     public static function resolveEncodingFromAcceptHeader(string $accept): int
