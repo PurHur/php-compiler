@@ -2675,6 +2675,17 @@ final class VmString
                 }
             }
 
+            $numericLen = self::htmlspecialcharsNumericEntityLen($string, $i, $len);
+            if ($numericLen > 0) {
+                $entity = substr($string, $i, $numericLen);
+                $decoded = self::decodeHtmlNumericEntity($entity);
+                if (null !== $decoded) {
+                    $out .= $decoded;
+                    $i += $numericLen;
+                    continue;
+                }
+            }
+
             $out .= '&';
             ++$i;
         }
