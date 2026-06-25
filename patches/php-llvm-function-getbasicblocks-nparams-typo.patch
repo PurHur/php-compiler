@@ -1,0 +1,11 @@
+--- vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Function_.php
++++ vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Function_.php
+@@ -110,7 +110,7 @@
+ 
+     public function getBasicBlocks(): array {
+         $nBlocks = $this->countBasicBlocks();
+-        $blocks = $this->llvm->lib->getFFI()->new('LLVMBasicBlockRef[' . $nParams . ']');
++        $blocks = $this->llvm->lib->getFFI()->new('LLVMBasicBlockRef[' . $nBlocks . ']');
+         $blockWrapper = new LLVMBasicBlockRef_ptr($blocks);
+         $this->llvm->lib->LLVMGetBasicBlocks($this->value, $blockWrapper);
+         $result = [];
