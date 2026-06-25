@@ -2984,14 +2984,14 @@ restart:
                         $op->arg2 !== $op->arg3
                         && $frame->block->assignTempSlotIsDead((int) $op->arg3)
                     ) {
-                        $arg3->null();
+                        $this->releaseVmDeadScopeSlot($frame, (int) $op->arg3);
                     }
                     if (
                         $op->arg1 !== $op->arg2
                         && $op->arg1 !== $op->arg3
                         && $frame->block->assignTempSlotIsDead((int) $op->arg1)
                     ) {
-                        $arg1->null();
+                        $this->releaseVmDeadScopeSlot($frame, (int) $op->arg1);
                     }
                     $strict = null !== $frame->parent
                         ? $frame->parent->block->strictTypes
@@ -5028,7 +5028,7 @@ restart:
                         $value = $snapshot;
                     }
                     if (null !== $op->arg3) {
-                        $frame->callArgEntries[] = ['u', $value];
+                        $frame->callArgEntries[] = ['u', $value, $needsRef ? null : $argSlot];
                         break;
                     }
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
@@ -5036,9 +5036,10 @@ restart:
                             'n',
                             $frame->block->constants[$op->arg2]->toString(),
                             $value,
+                            $needsRef ? null : $argSlot,
                         ];
                     } else {
-                        $frame->callArgEntries[] = ['p', $value];
+                        $frame->callArgEntries[] = ['p', $value, $needsRef ? null : $argSlot];
                     }
                     break;
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
@@ -5094,8 +5095,7 @@ restart:
                             $this->scopeSlot($frame, (int) $op->arg1)->object($state->wrapObject());
                         }
                         $frame->call = null;
-                        $frame->callArgs = [];
-                        $frame->callArgEntries = [];
+                        $this->clearOutgoingCallState($frame);
                         break;
                     }
                     try {
@@ -5281,8 +5281,7 @@ restart:
                             return self::FIBER_SUSPEND;
                         }
                         $frame->call = null;
-                        $frame->callArgs = [];
-                        $frame->callArgEntries = [];
+                        $this->clearOutgoingCallState($frame);
                         break;
                     }
                     $catchFrame = $this->guardFiberStackBeforeCall($frame);
@@ -6975,8 +6974,7 @@ restart:
         $caller = $this->context->pop();
         $this->releaseFrameObjectRefs($callee);
         if (null !== $caller) {
-            $caller->callArgs = [];
-            $caller->callArgEntries = [];
+            $this->clearOutgoingCallState($caller);
             $frame = $caller;
             goto restart;
         }
@@ -6990,8 +6988,7 @@ restart:
                 $this->releaseFrameObjectRefs($frame);
                 $caller = $this->context->pop();
                 if (null !== $caller) {
-                    $caller->callArgs = [];
-                    $caller->callArgEntries = [];
+                    $this->clearOutgoingCallState($caller);
                     $frame = $caller;
                     goto restart;
                 }
@@ -7916,8 +7913,7 @@ restart:
         } catch (VM\MagicMethodInvocationAborted) {
             $this->clearTryCatchUnwindState();
             $callerFrame->call = null;
-            $callerFrame->callArgs = [];
-            $callerFrame->callArgEntries = [];
+            $this->clearOutgoingCallState($callerFrame);
             $callerFrame->suppressNextEcho = true;
             ++$callerFrame->pos;
 
@@ -14142,8 +14138,7 @@ restart:
                     throw new \LogicException($e->getMessage(), 0, $e);
                 }
                 $frame->call = null;
-                $frame->callArgs = [];
-                $frame->callArgEntries = [];
+                $this->clearOutgoingCallState($frame);
                 $new->parent = $frame;
                 $new->vmContext = $this->context;
                 $new->ephemeral = true;
@@ -14731,6 +14726,36 @@ restart:
         }
         ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
         $frame->scope[$slot]->null();
+    }
+
+    /**
+     * Zend fcall end — drop by-value send snapshots and dead inline call-arg temps (#11602).
+     */
+    private function clearOutgoingCallState(Frame $frame): void
+    {
+        $this->releaseOutgoingCallArgTemps($frame);
+        $frame->callArgs = [];
+        $frame->callArgEntries = [];
+    }
+
+    private function releaseOutgoingCallArgTemps(Frame $frame): void
+    {
+        foreach ($frame->callArgEntries as $entry) {
+            if ('u' === $entry[0]) {
+                ObjectLifetime::releaseDirectObject($entry[1]);
+                $slot = $entry[2] ?? null;
+            } elseif ('n' === $entry[0]) {
+                ObjectLifetime::releaseDirectObject($entry[2]);
+                $slot = $entry[3] ?? null;
+            } else {
+                ObjectLifetime::releaseDirectObject($entry[1]);
+                $slot = $entry[2] ?? null;
+            }
+            if (!is_int($slot) || $frame->block->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            $this->releaseVmDeadScopeSlot($frame, $slot);
+        }
     }
 
 }
