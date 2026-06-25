@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3144 |
-| Phase A inventory files (M2 ratio SSOT) | 3144 |
+| PHP files on vm.php path | 3147 |
+| Phase A inventory files (M2 ratio SSOT) | 3147 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8414 |
+| Source constructs flagged (warnings) | 8421 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -300,6 +300,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/VmSplIterators.php` | 0 | 3 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/standard/AssertOptionsJitHelper.php` | 0 | 1 |
+| `ext/standard/AttributeRegistryArgsJitHelper.php` | 0 | 6 |
+| `ext/standard/AttributeRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 17 |
 | `ext/standard/BuiltinClasses.php` | 0 | 6 |
 | `ext/standard/BuiltinEnums.php` | 0 | 19 |
@@ -2072,7 +2074,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/AssertionErrorRaise.php` | 0 | 2 |
 | `lib/JIT/Builtin/AttributeNewInstanceRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/AttributeRegistry.php` | 0 | 1 |
-| `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 5 |
+| `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php` | 0 | 4 |
+| `lib/JIT/Builtin/AttributeRegistryLowering.php` | 0 | 1 |
 | `lib/JIT/Builtin/BackedEnumFromRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
@@ -3495,15 +3498,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/curl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 30)
-- new curl_init (line 39)
-- new curl_setopt (line 40)
-- new curl_exec (line 41)
-- new curl_close (line 42)
-- new curl_version (line 43)
-- new curl_escape (line 44)
-- new curl_unescape (line 45)
-- 2 class method(s)
+- new VM\Variable (line 36)
+- new curl_init (line 45)
+- new curl_setopt (line 46)
+- new curl_exec (line 47)
+- new curl_close (line 48)
+- new curl_version (line 49)
+- new curl_escape (line 50)
+- new curl_unescape (line 51)
+- 3 class method(s)
 
 ### `ext/curl/VmCurlEscape.php`
 
@@ -5029,6 +5032,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
+
+### `ext/standard/AttributeRegistryArgsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 54)
+- new HashTable (line 56)
+- new Variable (line 58)
+- new Variable (line 64)
+- new Variable (line 78)
+- 3 class method(s)
+
+### `ext/standard/AttributeRegistryJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/standard/BuiltinAttributes.php`
 
@@ -16698,14 +16716,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/AttributeRegistryLookupRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 312)
+- new JIT (line 343)
+- 14 class method(s)
+- 2 closure(s)
+
 ### `lib/JIT/Builtin/AttributeRegistryLowering.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 316)
-- new Variable (line 340)
-- new Variable (line 382)
-- 16 class method(s)
-- 1 closure(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/BackedEnumFromRuntime.php`
 
@@ -19279,73 +19301,73 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 418)
-- new Scope (line 480)
-- new Analyzer (line 501)
-- new Helper (line 502)
-- new Builtin\Refcount (line 504)
-- new Builtin\Output (line 506)
-- new Builtin\Type (line 507)
-- new Builtin\Internal (line 508)
-- new Builtin\VarArg (line 509)
-- new Builtin\ErrorHandler (line 510)
-- new Scope (line 530)
-- new Call\ExternalMethod (line 578)
-- new Builtin\IsNullFn (line 796)
-- new Builtin\IsNullFn (line 797)
-- new Call\SplObjectStorageMethod (line 798)
-- new Call\SplObjectStorageMethod (line 799)
-- new Call\SplObjectStorageMethod (line 800)
-- new Call\SplObjectStorageMethod (line 801)
-- new Call\SplObjectStorageMethod (line 802)
-- new Call\SplObjectStorageMethod (line 803)
-- new Call\WeakReferenceCreate (line 805)
-- new Call\WeakReferenceGet (line 806)
-- new Call\WeakMapMethod (line 807)
-- new Call\WeakMapMethod (line 808)
-- new Call\WeakMapMethod (line 809)
-- new Call\WeakMapMethod (line 810)
-- new Call\WeakMapMethod (line 811)
-- new Call\ReflectionClassConstruct (line 813)
-- new Call\ReflectionClassGetName (line 814)
-- new Call\ReflectionClassGetAttributes (line 815)
-- new Call\ReflectionClassGetMethod (line 816)
-- new Call\ReflectionClassGetReflectionConstant (line 817)
-- new Call\ReflectionClassNewLazyProxy (line 818)
-- new Call\ReflectionClassNewLazyGhost (line 819)
-- new Call\ReflectionClassCreateLazyGhost (line 820)
-- new Call\ReflectionClassCreateLazyProxy (line 821)
-- new Call\ReflectionPropertyConstruct (line 822)
-- new Call\ReflectionPropertyGetAttributes (line 823)
-- new Call\ReflectionConstantConstruct (line 824)
-- new Call\ReflectionConstantGetAttributes (line 825)
-- new Call\ReflectionMethodGetAttributes (line 826)
-- new Call\ReflectionAttributeGetName (line 827)
-- new Call\ReflectionAttributeNewInstance (line 828)
-- new Call\ReflectionEnumConstruct (line 829)
-- new Call\ReflectionEnumGetName (line 830)
-- new Call\ReflectionEnumHasCase (line 831)
-- new Call\ReflectionEnumGetCase (line 832)
-- new Call\ReflectionEnumIsBacked (line 833)
-- new Call\ReflectionEnumUnitCaseGetName (line 834)
-- new Call\ReflectionEnumUnitCaseGetName (line 835)
-- new Call\ExceptionGetMessage (line 836)
-- new Result (line 975)
-- new Result (line 996)
-- new Variable (line 1265)
-- new Variable (line 1585)
-- new Variable (line 1843)
-- new VMVariable (line 1990)
-- new VMVariable (line 1996)
-- new VMVariable (line 2002)
-- new VMVariable (line 2008)
-- new VMVariable (line 2015)
-- new VMVariable (line 2021)
-- new VMVariable (line 2027)
-- new VMVariable (line 2033)
-- new Variable (line 2058)
-- new Variable (line 2097)
-- 88 class method(s)
+- new Variable (line 435)
+- new Scope (line 497)
+- new Analyzer (line 518)
+- new Helper (line 519)
+- new Builtin\Refcount (line 521)
+- new Builtin\Output (line 523)
+- new Builtin\Type (line 524)
+- new Builtin\Internal (line 525)
+- new Builtin\VarArg (line 526)
+- new Builtin\ErrorHandler (line 527)
+- new Scope (line 547)
+- new Call\ExternalMethod (line 595)
+- new Builtin\IsNullFn (line 813)
+- new Builtin\IsNullFn (line 814)
+- new Call\SplObjectStorageMethod (line 815)
+- new Call\SplObjectStorageMethod (line 816)
+- new Call\SplObjectStorageMethod (line 817)
+- new Call\SplObjectStorageMethod (line 818)
+- new Call\SplObjectStorageMethod (line 819)
+- new Call\SplObjectStorageMethod (line 820)
+- new Call\WeakReferenceCreate (line 822)
+- new Call\WeakReferenceGet (line 823)
+- new Call\WeakMapMethod (line 824)
+- new Call\WeakMapMethod (line 825)
+- new Call\WeakMapMethod (line 826)
+- new Call\WeakMapMethod (line 827)
+- new Call\WeakMapMethod (line 828)
+- new Call\ReflectionClassConstruct (line 830)
+- new Call\ReflectionClassGetName (line 831)
+- new Call\ReflectionClassGetAttributes (line 832)
+- new Call\ReflectionClassGetMethod (line 833)
+- new Call\ReflectionClassGetReflectionConstant (line 834)
+- new Call\ReflectionClassNewLazyProxy (line 835)
+- new Call\ReflectionClassNewLazyGhost (line 836)
+- new Call\ReflectionClassCreateLazyGhost (line 837)
+- new Call\ReflectionClassCreateLazyProxy (line 838)
+- new Call\ReflectionPropertyConstruct (line 839)
+- new Call\ReflectionPropertyGetAttributes (line 840)
+- new Call\ReflectionConstantConstruct (line 841)
+- new Call\ReflectionConstantGetAttributes (line 842)
+- new Call\ReflectionMethodGetAttributes (line 843)
+- new Call\ReflectionAttributeGetName (line 844)
+- new Call\ReflectionAttributeNewInstance (line 845)
+- new Call\ReflectionEnumConstruct (line 846)
+- new Call\ReflectionEnumGetName (line 847)
+- new Call\ReflectionEnumHasCase (line 848)
+- new Call\ReflectionEnumGetCase (line 849)
+- new Call\ReflectionEnumIsBacked (line 850)
+- new Call\ReflectionEnumUnitCaseGetName (line 851)
+- new Call\ReflectionEnumUnitCaseGetName (line 852)
+- new Call\ExceptionGetMessage (line 853)
+- new Result (line 992)
+- new Result (line 1013)
+- new Variable (line 1285)
+- new Variable (line 1605)
+- new Variable (line 1863)
+- new VMVariable (line 2010)
+- new VMVariable (line 2016)
+- new VMVariable (line 2022)
+- new VMVariable (line 2028)
+- new VMVariable (line 2035)
+- new VMVariable (line 2041)
+- new VMVariable (line 2047)
+- new VMVariable (line 2053)
+- new Variable (line 2078)
+- new Variable (line 2117)
+- 89 class method(s)
 - 28 closure(s)
 
 ### `lib/JIT/DnfParamCheck.php`
