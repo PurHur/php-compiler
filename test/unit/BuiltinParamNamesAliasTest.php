@@ -112,6 +112,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'as_float', 'microtime'));
     }
 
+    /** @covers issue #11578 */
+    public function testMemoryGetUsageNamedRealUsageParamResolves(): void
+    {
+        foreach (['memory_get_usage', 'memory_get_peak_usage'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['real_usage'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'real_usage', $fn));
+        }
+    }
+
     /** @covers issue #10027 */
     public function testTrimCharactersNamedParamResolves(): void
     {
