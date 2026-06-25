@@ -549,8 +549,8 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
-    /** @covers issue #10592 — inline default initializer before property hook block */
-    public function testDefaultInitializerWithPropertyHooksParseErrors(): void
+    /** @covers issue #11594 — inline default initializer before property hook block (PHP 8.4) */
+    public function testDefaultInitializerWithPropertyHooksLowers(): void
     {
         $src = <<<'PHP'
 <?php
@@ -565,13 +565,15 @@ trait T {
     }
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(PropertyHooks::DEFAULT_INITIALIZER_HOOK_PARSE_ERROR);
-        (new PropertyHooks())->process($src);
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringContainsString("public string \$label = 'default';", $out);
+        self::assertStringContainsString("public string \$label = 'from-trait';", $out);
+        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
+        self::assertSame('__phpc_property_get_label', $registry['t']['label']['get'] ?? null);
     }
 
-    /** @covers issue #10592 — end-to-end via Runtime preprocess */
-    public function testDefaultInitializerWithPropertyHooksFailsRuntimePreprocess(): void
+    /** @covers issue #11594 — end-to-end via Runtime preprocess */
+    public function testDefaultInitializerWithPropertyHooksSurvivesRuntimePreprocess(): void
     {
         $src = <<<'PHP'
 <?php
@@ -584,9 +586,10 @@ $c = new C();
 echo $c->label;
 PHP;
         $runtime = new Runtime();
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(PropertyHooks::DEFAULT_INITIALIZER_HOOK_PARSE_ERROR);
-        $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
+        $block = $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('default', ob_get_clean());
     }
 
     /** @covers issue #9729 — promoted ctor defaults must not match property-hook `{` scanner */
