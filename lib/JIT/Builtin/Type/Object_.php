@@ -36,6 +36,7 @@ use PHPCompiler\JIT\MagicMethodDispatch;
 use PHPCompiler\JIT\PropertyHookDispatch;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\EnumCasePropertyJitHelper;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TraitCompositionConflictMessage;
 use PHPCompiler\VM\Variable as VMVariable;
@@ -55,10 +56,6 @@ class Object_ extends Type {
 
     /** @var array<int, ?string> */
     private array $enumBackedType = [];
-
-    private const ENUM_CASE_SLOT_NAME = 0;
-
-    private const ENUM_CASE_SLOT_VALUE = 1;
 
     /** @var array<int, string> class id => canonical name */
     private array $classIdToName = [];
@@ -969,11 +966,11 @@ class Object_ extends Type {
         );
         $this->context->builder->store(
             $this->context->builder->pointerCast($nameStr, $voidPtr),
-            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
+            $this->propertySlotPtr($obj, EnumCasePropertyJitHelper::SLOT_NAME)
         );
         if ($this->enumHasBacking($enumClassId)) {
             $this->propertyStore(
-                $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+                $this->propertySlotPtr($obj, EnumCasePropertyJitHelper::SLOT_VALUE),
                 $backingJit,
                 Variable::TYPE_VALUE
             );
@@ -1678,6 +1675,41 @@ class Object_ extends Type {
         $this->enumBackedType[$classId] = $backedType;
     }
 
+    public function jitContext(): Context
+    {
+        return $this->context;
+    }
+
+    /** @return array<int, string> */
+    public function classIdToNameEntries(): array
+    {
+        return $this->classIdToName;
+    }
+
+    public function isRegisteredEnumLc(string $lc): bool
+    {
+        return isset($this->enums[$lc]);
+    }
+
+    public function enumCaseBuiltinPropertySlotPtr(PHPLLVM\Value $obj, int $slotIndex): PHPLLVM\Value
+    {
+        return $this->propertySlotPtr($obj, $slotIndex);
+    }
+
+    /** @return array<int, string> */
+    public function knownEnumClassIdsToNames(): array
+    {
+        $enumEntries = [];
+        foreach ($this->classIdToName as $id => $name) {
+            $lc = strtolower(ltrim($name, '\\'));
+            if (isset($this->enums[$lc])) {
+                $enumEntries[(int) $id] = $name;
+            }
+        }
+
+        return $enumEntries;
+    }
+
     public function isEnumClassId(int $classId): bool
     {
         $lc = $this->classLcForId($classId);
@@ -1834,11 +1866,11 @@ class Object_ extends Type {
         );
         $this->context->builder->store(
             $this->context->builder->pointerCast($nameStr, $voidPtr),
-            $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_NAME)
+            $this->propertySlotPtr($obj, EnumCasePropertyJitHelper::SLOT_NAME)
         );
         if ($this->enumHasBacking($classId)) {
             $this->propertyStore(
-                $this->propertySlotPtr($obj, self::ENUM_CASE_SLOT_VALUE),
+                $this->propertySlotPtr($obj, EnumCasePropertyJitHelper::SLOT_VALUE),
                 $backingJit,
                 Variable::TYPE_VALUE
             );
@@ -3743,7 +3775,7 @@ class Object_ extends Type {
             $enumLc = $this->classNameForId($enumClassId);
             throw new \LogicException("Unknown enum case singleton: {$enumLc}::{$caseKey}");
         }
-        $globalName = 'php_compiler_enum_case_singleton_'.$enumClassId.'_'.$caseKey;
+        $globalName = EnumCasePropertyJitHelper::singletonGlobalName($enumClassId, $caseKey);
         if (!isset($this->classConstObjectGlobals[$globalName])) {
             $objPtrType = $this->context->getTypeFromString('__object__*');
             $global = $this->context->module->addGlobal($objPtrType, $globalName);
@@ -4245,11 +4277,6 @@ class Object_ extends Type {
         $sourceTraitLc = $this->traitMethodSource($this->lookup($declaringLc), $methodLc);
 
         return null !== $sourceTraitLc && $sourceTraitLc === $traitLc;
-    }
-
-    public function jitContext(): Context
-    {
-        return $this->context;
     }
 
     /**
@@ -5463,40 +5490,7 @@ class Object_ extends Type {
     /** get_object_vars() on enum case singletons (#4809). */
     public function fetchEnumCaseBuiltinProperty(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
     {
-        return $this->enumCasePropertyFetch($obj, $classId, $nameLc);
-    }
-
-    private function enumCasePropertyFetch(PHPLLVM\Value $obj, int $classId, string $nameLc): Variable
-    {
-        $slot = $this->propertySlotPtr(
-            $obj,
-            'name' === $nameLc ? self::ENUM_CASE_SLOT_NAME : self::ENUM_CASE_SLOT_VALUE
-        );
-        $loaded = $this->context->builder->load($slot);
-        if ('name' === $nameLc) {
-            return new Variable(
-                $this->context,
-                Variable::TYPE_STRING,
-                Variable::KIND_VALUE,
-                $this->context->builder->pointerCast(
-                    $loaded,
-                    $this->context->getTypeFromString('__string__*')
-                )
-            );
-        }
-        $storage = BasicBlockHelper::entryAlloca($this->context, $this->context->getTypeFromString('__value__'));
-        $valueMap = $this->context->structFieldMap['__value__'];
-        $this->context->builder->store(
-            $this->context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
-            $this->context->builder->structGep($storage, $valueMap['type'])
-        );
-        $this->context->builder->call(
-            $this->context->lookupFunction('__object__load_value_slot'),
-            $slot,
-            $storage
-        );
-
-        return new Variable($this->context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $storage);
+        return ObjectEnumCasePropertyLlvm::enumCasePropertyFetch($this, $obj, $classId, $nameLc);
     }
 
     /**
@@ -5504,24 +5498,7 @@ class Object_ extends Type {
      */
     public function emitEnumCaseValueEntryStringCastError(Context $context, PHPLLVM\Value $valueEntry): void
     {
-        $enumEntries = $this->knownEnumClassIdToName();
-        if ([] === $enumEntries) {
-            ErrorRaise::emitRaise($context, 'Object of class enum could not be converted to string');
-
-            return;
-        }
-
-        ErrorRaise::ensureLinked($context);
-        $enumMap = $context->structFieldMap['__enum_case__'] ?? null;
-        if (null === $enumMap || !isset($enumMap['class_id'])) {
-            ErrorRaise::emitRaise($context, 'Object of class enum could not be converted to string');
-
-            return;
-        }
-        $classId = $context->builder->load(
-            $context->builder->structGep($valueEntry, $enumMap['class_id'])
-        );
-        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $enumEntries, 'enum_val_str_cast');
+        ObjectEnumStringCastLlvm::emitEnumCaseValueEntryStringCastError($this, $context, $valueEntry);
     }
 
     /**
@@ -5529,28 +5506,7 @@ class Object_ extends Type {
      */
     public function emitObjectValueEntryStringCastError(Context $context, PHPLLVM\Value $valueEntry): void
     {
-        ErrorRaise::ensureLinked($context);
-        $objPtr = $context->builder->call(
-            $context->lookupFunction('__value__readObject'),
-            $valueEntry
-        );
-        $map = $context->structFieldMap['__object__'];
-        $classId = $context->builder->load(
-            $context->builder->structGep($objPtr, $map['class_id'])
-        );
-        $nonEnumClasses = [];
-        foreach ($this->classIdToName as $id => $name) {
-            $lc = strtolower(ltrim($name, '\\'));
-            if (!isset($this->enums[$lc])) {
-                $nonEnumClasses[(int) $id] = $name;
-            }
-        }
-        if ([] === $nonEnumClasses) {
-            ErrorRaise::emitRaise($context, 'Object of class stdClass could not be converted to string');
-
-            return;
-        }
-        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $nonEnumClasses, 'obj_val_str_cast');
+        ObjectEnumStringCastLlvm::emitObjectValueEntryStringCastError($this, $context, $valueEntry);
     }
 
     /**
@@ -5558,69 +5514,7 @@ class Object_ extends Type {
      */
     public function emitEnumObjectStringErrorIfMatches(Context $context, PHPLLVM\Value $objPtr): void
     {
-        $enumEntries = $this->knownEnumClassIdToName();
-        if ([] === $enumEntries) {
-            return;
-        }
-
-        ErrorRaise::ensureLinked($context);
-        $map = $context->structFieldMap['__object__'];
-        $classId = $context->builder->load(
-            $context->builder->structGep($objPtr, $map['class_id'])
-        );
-        $this->emitEnumClassIdStringCastErrorChain($context, $classId, $enumEntries, 'enum_str_cast');
-    }
-
-    /** @return array<int, string> */
-    private function knownEnumClassIdToName(): array
-    {
-        $enumEntries = [];
-        foreach ($this->classIdToName as $id => $name) {
-            $lc = strtolower(ltrim($name, '\\'));
-            if (isset($this->enums[$lc])) {
-                $enumEntries[(int) $id] = $name;
-            }
-        }
-
-        return $enumEntries;
-    }
-
-    /**
-     * @param array<int, string> $enumEntries
-     */
-    private function emitEnumClassIdStringCastErrorChain(
-        Context $context,
-        PHPLLVM\Value $classId,
-        array $enumEntries,
-        string $tag
-    ): void {
-        $i64 = $context->getTypeFromString('int64');
-        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
-        $ids = array_keys($enumEntries);
-        $lastIdx = count($ids) - 1;
-        foreach ($ids as $idx => $id) {
-            $matchBlock = BasicBlockHelper::append($context, $tag.'_match_'.$id);
-            $nextBlock = $idx === $lastIdx
-                ? $doneBlock
-                : BasicBlockHelper::append($context, $tag.'_next_'.$id);
-            $context->builder->branchIf(
-                $context->builder->icmp(
-                    PHPLLVM\Builder::INT_EQ,
-                    $classId,
-                    $i64->constInt($id, false)
-                ),
-                $matchBlock,
-                $nextBlock
-            );
-            $context->builder->positionAtEnd($matchBlock);
-            ErrorRaise::emitRaise(
-                $context,
-                'Object of class '.$enumEntries[$id].' could not be converted to string'
-            );
-            $context->builder->branch($doneBlock);
-            $context->builder->positionAtEnd($nextBlock);
-        }
-        $context->builder->positionAtEnd($doneBlock);
+        ObjectEnumStringCastLlvm::emitEnumObjectStringErrorIfMatches($this, $context, $objPtr);
     }
 
     /**
@@ -5755,7 +5649,7 @@ class Object_ extends Type {
 
     private function enumCaseBackingLong(Context $context, PHPLLVM\Value $objPtr, int $enumClassId): PHPLLVM\Value
     {
-        $slot = $this->propertySlotPtr($objPtr, self::ENUM_CASE_SLOT_VALUE);
+        $slot = $this->propertySlotPtr($objPtr, EnumCasePropertyJitHelper::SLOT_VALUE);
         $storage = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
         $valueMap = $context->structFieldMap['__value__'];
         $context->builder->store(
@@ -5778,11 +5672,11 @@ class Object_ extends Type {
     {
         $classId = $this->lookup('' !== $class ? $class : 'stdclass');
         $nameLc = strtolower($name);
-        if ($this->isEnumClassId($classId) && ('name' === $nameLc || 'value' === $nameLc)) {
-            return $this->enumCasePropertyFetch($obj, $classId, $nameLc);
+        if ($this->isEnumClassId($classId) && EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc)) {
+            return ObjectEnumCasePropertyLlvm::enumCasePropertyFetch($this, $obj, $classId, $nameLc);
         }
-        if (('name' === $nameLc || 'value' === $nameLc) && [] !== ($enumIds = $this->registeredEnumClassIds())) {
-            return $this->propertyFetchEnumCaseRuntimeDispatch($obj, $class, $name, $nameLc, $enumIds);
+        if (EnumCasePropertyJitHelper::isBuiltinPropertyName($nameLc) && [] !== ($enumIds = $this->registeredEnumClassIds())) {
+            return ObjectEnumCasePropertyLlvm::propertyFetchEnumCaseRuntimeDispatch($this, $obj, $nameLc, $enumIds);
         }
 
         return $this->propertyFetchOrdinary($obj, $class, $name, $classId);
@@ -5801,89 +5695,6 @@ class Object_ extends Type {
         }
 
         return $ids;
-    }
-
-    /**
-     * @param list<int> $enumIds
-     */
-    private function propertyFetchEnumCaseRuntimeDispatch(
-        PHPLLVM\Value $obj,
-        string $class,
-        string $name,
-        string $nameLc,
-        array $enumIds
-    ): Variable {
-        $map = $this->context->structFieldMap['__object__'];
-        $runtimeClassId = $this->context->builder->load(
-            $this->context->builder->structGep($obj, $map['class_id'])
-        );
-        $fn = BasicBlockHelper::parentFunction($this->context);
-        $entry = $this->context->builder->getInsertBlock();
-        $done = $fn->appendBasicBlock('enum_case_prop_fetch_done');
-        $exit = $fn->appendBasicBlock('enum_case_prop_fetch_exit');
-        $fallback = $fn->appendBasicBlock('enum_case_prop_fetch_fallback');
-        $isName = 'name' === $nameLc;
-        if ($isName) {
-            $destSlot = BasicBlockHelper::entryAlloca(
-                $this->context,
-                $this->context->getTypeFromString('__string__*')
-            );
-        } else {
-            $destSlot = JitValueBox::alloc($this->context);
-        }
-        $i64 = $this->context->getTypeFromString('int64');
-        $checkBlock = $entry;
-        $lastIdx = \count($enumIds) - 1;
-        foreach ($enumIds as $idx => $enumId) {
-            $this->context->builder->positionAtEnd($checkBlock);
-            $match = $this->context->builder->icmp(
-                PHPLLVM\Builder::INT_EQ,
-                $runtimeClassId,
-                $i64->constInt($enumId, false)
-            );
-            $caseBlock = $fn->appendBasicBlock('enum_case_prop_fetch_'.$enumId);
-            $nextBlock = $idx === $lastIdx
-                ? $fallback
-                : $fn->appendBasicBlock('enum_case_prop_fetch_try_'.($idx + 1));
-            $this->context->builder->branchIf($match, $caseBlock, $nextBlock);
-            $this->context->builder->positionAtEnd($caseBlock);
-            $fetched = $this->enumCasePropertyFetch($obj, $enumId, $nameLc);
-            if ($isName) {
-                $this->context->builder->store(
-                    $this->context->helper->loadValue($fetched),
-                    $destSlot
-                );
-            } else {
-                JitValueBox::copyFromPointer(
-                    $this->context,
-                    $destSlot,
-                    JitValueBox::valuePtrFromVariable($this->context, $fetched)
-                );
-            }
-            $this->context->builder->branch($done);
-            $checkBlock = $nextBlock;
-        }
-        $this->context->builder->positionAtEnd($fallback);
-        // Non-enum receivers on ->name/->value are undefined; enum cases always match a registered id.
-        $this->context->builder->call($this->context->lookupFunction('abort'));
-        $this->context->builder->positionAtEnd($done);
-        $this->context->builder->branch($exit);
-        $this->context->builder->positionAtEnd($exit);
-        if ($isName) {
-            return new Variable(
-                $this->context,
-                Variable::TYPE_STRING,
-                Variable::KIND_VALUE,
-                $this->context->builder->load($destSlot)
-            );
-        }
-
-        return new Variable(
-            $this->context,
-            Variable::TYPE_VALUE,
-            Variable::KIND_VARIABLE,
-            $destSlot
-        );
     }
 
     private function propertyFetchOrdinary(
