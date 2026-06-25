@@ -232,6 +232,19 @@ final class BuiltinParamNames
     }
 
     /**
+     * Parameter count for internal builtins (BuiltinParamNames first, then InternalArgInfo; #11453).
+     */
+    public static function paramCountForInternalFunction(string $name): ?int
+    {
+        $names = self::forFunction($name);
+        if (null !== $names) {
+            return \count($names);
+        }
+
+        return BuiltinInternalArgInfo::paramCountForFunction($name);
+    }
+
+    /**
      * Variadic parameter index for builtins that accept ...$args (issue #10637).
      */
     public static function variadicParamIndexForFunction(string $name): ?int
