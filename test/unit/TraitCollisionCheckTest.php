@@ -97,4 +97,36 @@ PHP;
         $runtime->run($block);
         $this->assertSame("1\n", ob_get_clean());
     }
+
+    public function testClassTraitPropertyConflictFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public $x = 1; }
+class C { use T; public $x = 2; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'C and T define the same property ($x) in the composition of C. '
+            .'However, the definition differs and is considered incompatible. Class was composed'
+        );
+        $runtime->parseAndCompile($code, 'trait_class_property_conflict.php');
+    }
+
+    public function testTraitPropertyMergeWithoutRedefinitionStillWorks(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+trait T { public $x = 1; }
+class C { use T; }
+echo (new C())->x, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'trait_property_merge.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }

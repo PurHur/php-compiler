@@ -3431,6 +3431,7 @@ class Object_ extends Type {
 
     public function defineProperty(int $classId, string $name, int $type): void
     {
+        $this->assertClassOwnInstancePropertyAllowed($classId, $name);
         if (!isset($this->propNameMap[$name])) {
             $this->propNameMap[$name] = count($this->propNameMap);
         }
@@ -3507,6 +3508,40 @@ class Object_ extends Type {
             return;
         }
         throw new \LogicException("Property {$name} not defined for class {$classId}");
+    }
+
+    public function assertClassOwnInstancePropertyAllowed(int $classId, string $name): void
+    {
+        $nameLc = strtolower($name);
+        foreach ($this->properties[$classId] ?? [] as $existing) {
+            if (strtolower($existing[1]) !== $nameLc) {
+                continue;
+            }
+            $declaringId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
+            if ($declaringId !== $classId) {
+                throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                    $this->classNameForId($classId),
+                    $this->classNameForId($declaringId),
+                    $name
+                ));
+            }
+        }
+    }
+
+    public function assertClassOwnStaticPropertyAllowed(int $classId, string $name): void
+    {
+        $key = strtolower($name);
+        if (!isset($this->staticPropertyGlobals[$classId][$key])) {
+            return;
+        }
+        $declaringId = $this->staticPropertyDeclaringClassId[$classId][$key] ?? $classId;
+        if ($declaringId !== $classId) {
+            throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                $this->classNameForId($classId),
+                $this->classNameForId($declaringId),
+                $name
+            ));
+        }
     }
 
     public function definePropertyDefault(int $classId, string $name, VMVariable $value): void
@@ -3986,6 +4021,13 @@ class Object_ extends Type {
             foreach ($this->properties[$classId] ?? [] as $existing) {
                 if (strtolower($existing[1]) === $nameLc) {
                     $prevTraitId = $this->instancePropertyDeclaringClassId[$classId][$nameLc] ?? $classId;
+                    if ($prevTraitId === $classId) {
+                        throw new \LogicException(TraitCompositionConflictMessage::incompatibleClassTraitProperty(
+                            $className,
+                            $traitName,
+                            $name
+                        ));
+                    }
                     throw new \LogicException(TraitCompositionConflictMessage::incompatibleProperty(
                         $this->classNameForId($prevTraitId),
                         $traitName,
@@ -4211,6 +4253,8 @@ class Object_ extends Type {
     ): void {
         $key = strtolower($name);
         if (isset($this->staticPropertyGlobals[$classId][$key])) {
+            $this->assertClassOwnStaticPropertyAllowed($classId, $name);
+
             return;
         }
         $typedWithoutDefault = $forceTypedWithoutDefault
