@@ -93,25 +93,24 @@ final class VmScope
             }
             $name = $keyVar->toString();
             if (null !== $caller->block) {
-                $written = false;
+                $slotHandled = false;
                 foreach ($caller->block->eachNamedScopeSlot() as [$slotName, $slot]) {
                     if ($slotName !== $name) {
                         continue;
                     }
+                    $slotHandled = true;
                     if (!isset($caller->scope[$slot])) {
                         $caller->scope[$slot] = new Variable();
                     }
                     if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($caller->scope[$slot])) {
-                        $written = true;
                         continue;
                     }
                     $caller->scope[$slot]->copyFrom($valueVar);
                     $caller->initializedSlots[$slot] = true;
                     self::markGlobalEverAssignedForSlot($caller, $slot, $builtinFrame);
-                    $written = true;
-                }
-                if ($written) {
                     ++$imported;
+                }
+                if ($slotHandled) {
                     continue;
                 }
             }
