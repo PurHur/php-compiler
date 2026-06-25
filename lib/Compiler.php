@@ -12118,6 +12118,9 @@ class Compiler {
                         || $prefixLast instanceof Op\Expr\BinaryOp\NotEqual
                         || $prefixLast instanceof Op\Expr\InstanceOf_
                         || $prefixLast instanceof Op\Expr\In_
+                        // var_export([...] + [...], true) — Plus prelude before trailing literal (#11511, #10490).
+                        || $prefixLast instanceof Op\Expr\BinaryOp\Plus
+                        || $prefixLast instanceof Op\Expr\BinaryOp\Concat
                     ) {
                         return $prefixLast;
                     }

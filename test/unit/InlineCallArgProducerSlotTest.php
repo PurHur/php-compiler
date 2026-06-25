@@ -803,6 +803,54 @@ PHP;
         );
     }
 
+    /** Issue #11511 — var_export(inline array union, true) wires Plus result slot, not dead array temps. */
+    public function testVarExportArrayUnionReturnTrueUsesPlusResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(['a' => 1] + ['b' => 2], true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_union_var_export_return.php');
+
+        $plusSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (OpCode::TYPE_PLUS === $op->type) {
+                $plusSlot = $op->arg1;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($plusSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($plusSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+    }
+
+    /** Issue #11511 — var_export(inline array union, true) runtime parity with Zend. */
+    public function testVarExportArrayUnionReturnTrueRuntime(): void
+    {
+        $code = file_get_contents(dirname(__DIR__).'/repro/issue_var_export_array_union_return.php');
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'issue_var_export_array_union_return.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("r='array (", $out);
+        self::assertStringContainsString('a', $out);
+        self::assertStringContainsString('b', $out);
+        self::assertStringNotContainsString('NULL', $out);
+    }
+
     /** Bootstrap helloworld — New_ then static MethodCall (null var) must not TypeError in producer filter. */
     public function testNewStaticMethodCallCompilesWithoutOperandNullTypeError(): void
     {
