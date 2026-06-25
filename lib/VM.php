@@ -13913,6 +13913,25 @@ restart:
         return $object;
     }
 
+    /** Evaluate declared default for ReflectionProperty::getDefaultValue() (#11239). */
+    public function evaluatePropertyDefaultForReflection(VM\ClassProperty $property): ?Variable
+    {
+        if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
+            $copy = new Variable();
+            $copy->copyFrom($property->default);
+
+            return $copy;
+        }
+        if ($property->hasRuntimeDefaultInit()) {
+            return $this->executePropertyDefaultInitBlock(
+                $property->defaultInitBlock,
+                $property->defaultInitResultSlot
+            );
+        }
+
+        return null;
+    }
+
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable
     {
         $initFrame = $initBlock->getFrame($this->context);
