@@ -810,7 +810,7 @@ class Module extends ModuleAbstract
             new get_cfg_var(),
             new php_ini_loaded_file(),
             new php_ini_scanned_files(),
-            new zend_thread_id(),
+            ...(CompilerVersion::supportsZendThreadId() ? [new zend_thread_id()] : []),
             new getmygrgid(),
             new getmyinode(),
             new getlastmod(),

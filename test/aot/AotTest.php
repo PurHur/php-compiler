@@ -58,6 +58,9 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsZendThreadId() && str_contains($name, 'zend_thread_id')) {
+                continue;
+            }
             // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             yield $name => $case;
