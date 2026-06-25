@@ -2971,10 +2971,7 @@ class Object_ extends Type {
             $this->setClassInterfaces($displayName, ['arrayaccess', 'countable']);
         }
         if ('streambucket' === $lcname) {
-            // ext/standard/streams.c — bucket resource handle + buffer string (#6323, #7089).
-            $this->defineProperty($id, 'bucket', Variable::TYPE_NATIVE_LONG);
-            $this->defineProperty($id, 'data', Variable::TYPE_STRING);
-            unset($this->externalOnlyClassIds[$id]);
+            // Removed: stream_bucket_new() returns stdClass (#10325).
         }
         if ('phpcompiler\\vm\\variable' === $lcname) {
             foreach ([

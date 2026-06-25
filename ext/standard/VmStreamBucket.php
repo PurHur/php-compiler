@@ -16,7 +16,7 @@ use PHPCompiler\VM\Variable;
  */
 final class VmStreamBucket
 {
-    public const CLASS_LC = 'streambucket';
+    private const STDCLASS_LC = 'stdclass';
 
     public const PROP_BUCKET = 'bucket';
 
@@ -100,21 +100,38 @@ final class VmStreamBucket
         $v = $v->resolveIndirect();
         if (EnumCaseSupport::isEnumCaseVariable($v)) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type StreamBucket, %s given',
+                '%s(): Argument #%d ($%s) must be of type object, %s given',
                 $functionName,
                 $argNum,
                 $paramName,
                 EnumCaseSupport::typeNameForVariable($v)
             ));
         }
-        if (Variable::TYPE_OBJECT !== $v->type
-            || self::CLASS_LC !== strtolower($v->object->class->name)) {
+        if (Variable::TYPE_OBJECT !== $v->type) {
             throw new \TypeError(\sprintf(
-                '%s(): Argument #%d ($%s) must be of type StreamBucket, %s given',
+                '%s(): Argument #%d ($%s) must be of type object, %s given',
                 $functionName,
                 $argNum,
                 $paramName,
                 VmStreamArg::debugTypeName($v)
+            ));
+        }
+        if (!$v->object->hasProperty(self::PROP_BUCKET)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be an object that has a "bucket" property',
+                $functionName,
+                $argNum,
+                $paramName
+            ));
+        }
+        try {
+            self::bucketIdFromObject($v->object);
+        } catch (\LogicException) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($%s) must be an object that has a "bucket" property',
+                $functionName,
+                $argNum,
+                $paramName
             ));
         }
 
@@ -147,19 +164,8 @@ final class VmStreamBucket
     public static function newBucketObject(Context $ctx, int $streamHandle, string $data): Variable
     {
         $bucketId = self::allocateBucket($data);
-        $class = $ctx->classes[self::CLASS_LC] ?? null;
-        if (null === $class) {
-            throw new \LogicException('StreamBucket is not registered in this compiler build');
-        }
-        $entry = new ObjectEntry($class);
-        $entry->constructed = true;
-        $obj = new Variable(Variable::TYPE_OBJECT);
-        $obj->object($entry);
 
-        self::bucketHandle($entry->getProperty(self::PROP_BUCKET), $bucketId);
-        $entry->getProperty(self::PROP_DATA)->string($data);
-
-        return $obj;
+        return self::materializeStdClassBucket($ctx, $bucketId, $data);
     }
 
     public static function bucketIdFromObject(ObjectEntry $entry): int
@@ -208,17 +214,23 @@ final class VmStreamBucket
             throw new \LogicException('Invalid stream bucket id '.$bucketId);
         }
         $data ??= self::$bucketData[$bucketId];
-        $class = $ctx->classes[self::CLASS_LC] ?? null;
+
+        return self::materializeStdClassBucket($ctx, $bucketId, $data);
+    }
+
+    private static function materializeStdClassBucket(Context $ctx, int $bucketId, string $data): Variable
+    {
+        $class = $ctx->classes[self::STDCLASS_LC] ?? null;
         if (null === $class) {
-            throw new \LogicException('StreamBucket is not registered in this compiler build');
+            throw new \LogicException('stdClass is not registered in this compiler build');
         }
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $obj = new Variable(Variable::TYPE_OBJECT);
         $obj->object($entry);
 
-        self::bucketHandle($entry->getProperty(self::PROP_BUCKET), $bucketId);
-        $entry->getProperty(self::PROP_DATA)->string($data);
+        self::bucketHandle($entry->allocateProperty(self::PROP_BUCKET), $bucketId);
+        $entry->allocateProperty(self::PROP_DATA)->string($data);
 
         return $obj;
     }

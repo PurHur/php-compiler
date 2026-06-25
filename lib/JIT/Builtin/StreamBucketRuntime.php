@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\JitStreamBucket;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
@@ -262,47 +263,7 @@ final class StreamBucketRuntime
 
         $bucketHandle = $fn->getParam(0);
         $dataStr = $fn->getParam(1);
-        $objectType = $context->type->object;
-        $classId = $objectType->lookup('StreamBucket');
-
-        $obj = $objectType->allocate($classId);
-        $objectType->markObjectConstructed($obj);
-
-        $bucketVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_NATIVE_LONG,
-            JITVariable::KIND_VALUE,
-            $bucketHandle
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'bucket'),
-            $bucketVar,
-            JITVariable::TYPE_NATIVE_LONG
-        );
-
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $dataStr
-        );
-        $dataVar = new JITVariable(
-            $context,
-            JITVariable::TYPE_STRING,
-            JITVariable::KIND_VALUE,
-            $owned
-        );
-        $objectType->propertyStore(
-            $objectType->propertySlotFor($obj, 'StreamBucket', 'data'),
-            $dataVar,
-            JITVariable::TYPE_STRING
-        );
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeObject'),
-            $ptr,
-            $obj
-        );
+        $ptr = JitStreamBucket::buildStdClassBucketValue($context, $bucketHandle, $dataStr);
         $context->builder->returnValue($ptr);
     }
 
