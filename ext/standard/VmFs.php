@@ -589,11 +589,7 @@ final class VmFs
             return false;
         }
         if ('' === $content) {
-            if (0 !== ($flags & StdlibConstants::FILE_SKIP_EMPTY_LINES)) {
-                return [];
-            }
-
-            return [''];
+            return [];
         }
 
         $lines = [];
