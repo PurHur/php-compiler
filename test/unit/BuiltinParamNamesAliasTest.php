@@ -122,6 +122,16 @@ final class BuiltinParamNamesAliasTest extends TestCase
         }
     }
 
+    /** @covers issue #11577 */
+    public function testUnpackNamedFormatStringParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('unpack');
+        self::assertSame(['format', 'string', 'offset'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'format', 'unpack'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'string', 'unpack'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'unpack'));
+    }
+
     /** @covers issue #10027 */
     public function testTrimCharactersNamedParamResolves(): void
     {
