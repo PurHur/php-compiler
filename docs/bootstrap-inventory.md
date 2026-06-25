@@ -5504,7 +5504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitChmod.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitChown.php`
 
@@ -10295,13 +10295,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmScope.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 102)
-- new HashTable (line 156)
-- new Variable (line 164)
-- new HashTable (line 286)
-- new Variable (line 298)
-- new HashTable (line 310)
-- new Variable (line 322)
+- new Variable (line 103)
+- new HashTable (line 155)
+- new Variable (line 163)
+- new HashTable (line 285)
+- new Variable (line 297)
+- new HashTable (line 309)
+- new Variable (line 321)
 - 18 class method(s)
 
 ### `ext/standard/VmSerialize.php`
