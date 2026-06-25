@@ -587,7 +587,9 @@ final class JitValueBox
     public static function valuePtrFromNativeVariable(Context $context, Variable $var): Value
     {
         $slot = self::alloc($context);
-        $native = $context->builder->load($var->value);
+        $native = Variable::KIND_VALUE === $var->kind
+            ? $var->value
+            : $context->builder->load($var->value);
         switch ($var->type) {
             case Variable::TYPE_NATIVE_LONG:
                 self::writeLong($context, $slot, $native);
