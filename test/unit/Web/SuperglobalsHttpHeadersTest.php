@@ -72,6 +72,9 @@ final class SuperglobalsHttpHeadersTest extends TestCase
 
     public function testGetallheadersBuiltinHashTableIsReadable(): void
     {
+        putenv('REQUEST_METHOD=GET');
+        $_ENV['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
         putenv('HTTP_X_TEST=1');
         putenv('HTTP_HOST=example.test');
         $_SERVER['HTTP_X_TEST'] = '1';
