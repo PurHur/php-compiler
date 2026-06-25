@@ -2458,8 +2458,12 @@ final class VmString
     /** html_entity_decode() — ENT_HTML5 named entities (php-src html.c); default ENT_COMPAT (#2472). */
     public static function html_entity_decode(
         string $string,
-        int $flags = ENT_COMPAT
+        int $flags = ENT_COMPAT,
+        string $encoding = 'UTF-8'
     ): string {
+        if (!self::isUtf8Encoding($encoding)) {
+            return \html_entity_decode($string, $flags, $encoding);
+        }
         if (0 !== ($flags & ENT_HTML5)) {
             return self::htmlEntityDecodeHtml5($string, $flags);
         }
