@@ -6,10 +6,12 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\CastSupport;
+use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ResourceSupport;
+use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -62,7 +64,105 @@ final class VmSettype
                 throw new \ValueError('settype(): Argument #2 ($type) must be a valid type');
         }
 
-        $slot->copyFrom($result);
+        self::assignSettypeResult($slot, $result, $frame);
+    }
+
+    /**
+     * Zend php_settype on typed property references coerces to the declared type (type.c).
+     */
+    private static function assignSettypeResult(Variable $slot, Variable $result, ?Frame $frame): void
+    {
+        $typeMeta = self::resolveTypedPropertyMetadata($slot, $frame);
+        if (null === $typeMeta) {
+            $slot->copyFrom($result);
+
+            return;
+        }
+        $probe = new Variable();
+        $probe->copyFrom($result);
+        self::bindPropertyTypeMetadata($probe, $typeMeta);
+        TypeCheck::coercePropertyWrite($probe, false);
+        if (null !== $typeMeta->dnfArms && null !== $frame?->vmContext) {
+            DnfCheck::assertMatches($probe, $typeMeta->dnfArms, $frame->vmContext, 'Property', $typeMeta);
+        }
+        $slot->copyFrom($probe);
+    }
+
+    private static function bindPropertyTypeMetadata(Variable $dest, Variable $typeMeta): void
+    {
+        $resolved = $dest->resolveIndirect();
+        $meta = $typeMeta->resolveIndirect();
+        $resolved->typeConstraint = $meta->typeConstraint;
+        $resolved->classConstraint = $meta->classConstraint;
+        $resolved->literalBoolType = $meta->literalBoolType;
+        $resolved->unionTypeConstraints = $meta->unionTypeConstraints;
+        $resolved->declaredTypeLabel = $meta->declaredTypeLabel;
+        $resolved->genericArrayTypeSpec = $meta->genericArrayTypeSpec;
+        $resolved->dnfArms = $meta->dnfArms;
+    }
+
+    private static function resolveTypedPropertyMetadata(Variable $slot, ?Frame $frame): ?Variable
+    {
+        $resolved = $slot->resolveIndirect();
+        if (self::variableHasDeclaredType($resolved)) {
+            return $resolved;
+        }
+        if (self::variableHasDeclaredType($slot)) {
+            return $slot;
+        }
+        $owner = $slot->objectPropertyOwner ?? $resolved->objectPropertyOwner;
+        $propName = $slot->objectPropertyName ?? $resolved->objectPropertyName;
+        if (null !== $owner && null !== $propName) {
+            $meta = self::instancePropertyTypeMeta($owner, $propName);
+            if (null !== $meta) {
+                return $meta;
+            }
+        }
+        $classLc = $slot->staticPropertyClassLc ?? $resolved->staticPropertyClassLc;
+        if (null !== $classLc && null !== $propName && null !== $frame?->vmContext) {
+            $meta = self::staticPropertyTypeMeta($frame->vmContext, $classLc, $propName);
+            if (null !== $meta) {
+                return $meta;
+            }
+        }
+
+        return null;
+    }
+
+    private static function variableHasDeclaredType(Variable $var): bool
+    {
+        return null !== $var->typeConstraint
+            || null !== $var->dnfArms
+            || null !== $var->unionTypeConstraints;
+    }
+
+    private static function instancePropertyTypeMeta(ObjectEntry $object, string $propName): ?Variable
+    {
+        $needle = strtolower($propName);
+        foreach ($object->class->properties as $property) {
+            if (strtolower($property->name) === $needle) {
+                return $property->prototype->resolveIndirect();
+            }
+        }
+
+        return null;
+    }
+
+    private static function staticPropertyTypeMeta(
+        \PHPCompiler\VM\Context $ctx,
+        string $classLc,
+        string $propName,
+    ): ?Variable {
+        $needle = strtolower($propName);
+        if (!isset($ctx->classes[$classLc])) {
+            return null;
+        }
+        $entry = $ctx->classes[$classLc];
+        if (!isset($entry->staticProperties[$needle])) {
+            return null;
+        }
+
+        return $entry->staticProperties[$needle]->resolveIndirect();
     }
 
     private static function toInteger(Variable $result, Variable $value, ?Frame $frame): void
