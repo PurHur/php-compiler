@@ -12,6 +12,9 @@ final class VmJsonFlags
     /** @see JSON_HEX_TAG */
     public const HEX_TAG = 1;
 
+    /** @see JSON_OBJECT_AS_ARRAY — json_decode() when $assoc is null (php_json.h, #11778) */
+    public const OBJECT_AS_ARRAY = 1;
+
     /** @see JSON_HEX_AMP */
     public const HEX_AMP = 2;
 
@@ -68,8 +71,9 @@ final class VmJsonFlags
         | self::NUMERIC_CHECK
         | self::PRESERVE_ZERO_FRACTION;
 
-    /** Flags honored by json_decode() in this compiler build (issue #3267). */
-    public const DECODE_SUPPORTED = self::INVALID_UTF8_IGNORE
+    /** Flags honored by json_decode() in this compiler build (issue #3267, #11778). */
+    public const DECODE_SUPPORTED = self::OBJECT_AS_ARRAY
+        | self::INVALID_UTF8_IGNORE
         | self::INVALID_UTF8_SUBSTITUTE
         | self::THROW_ON_ERROR;
 
@@ -81,6 +85,7 @@ final class VmJsonFlags
     {
         return [
             'JSON_HEX_TAG' => self::HEX_TAG,
+            'JSON_OBJECT_AS_ARRAY' => self::OBJECT_AS_ARRAY,
             'JSON_HEX_AMP' => self::HEX_AMP,
             'JSON_HEX_APOS' => self::HEX_APOS,
             'JSON_HEX_QUOT' => self::HEX_QUOT,
@@ -129,5 +134,11 @@ final class VmJsonFlags
     public static function partialOutputOnError(int $flags): bool
     {
         return 0 !== ($flags & self::PARTIAL_OUTPUT_ON_ERROR);
+    }
+
+    /** json_decode(): decode JSON objects as PHP arrays when $assoc is null (#11778). */
+    public static function objectAsArray(int $flags): bool
+    {
+        return 0 !== ($flags & self::OBJECT_AS_ARRAY);
     }
 }

@@ -47,10 +47,6 @@ final class json_decode extends Internal
             0,
             'json'
         );
-        $assoc = false;
-        if (isset($frame->calledArgs[1])) {
-            $assoc = self::resolveAssocVm($frame);
-        }
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
             $depth = VmMath::parseIntBuiltinArg(
@@ -72,6 +68,7 @@ final class json_decode extends Internal
                 'flags'
             );
         }
+        $assoc = self::resolveEffectiveAssocVm($frame, $flags);
         $decoded = VmJsonFormat::decode($json, $assoc, $depth, $flags);
         if (null === $frame->returnVar) {
             return;
@@ -93,9 +90,9 @@ final class json_decode extends Internal
             throw new \LogicException('json_decode() expects at most 4 arguments');
         }
 
-        $assoc = self::resolveAssocFlag($context, $args);
         $depth = self::resolveDepthJit($context, $args);
         $flags = self::resolveFlagsJit($context, $args);
+        $assoc = self::resolveAssocFlag($context, $args, $flags);
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
             $decoded = VmJsonFormat::decode($literal, $assoc, $depth, $flags);
@@ -118,10 +115,17 @@ final class json_decode extends Internal
     }
 
     /**
-     * @param list<JITVariable> $args
+     * php-src ext/json/php_json.c — $assoc null uses JSON_OBJECT_AS_ARRAY (#11778).
      */
-    private static function resolveAssocVm(Frame $frame): bool
+    private static function resolveEffectiveAssocVm(Frame $frame, int $flags): bool
     {
+        if (!isset($frame->calledArgs[1])) {
+            return false;
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_NULL === $arg->type) {
+            return VmJsonFlags::objectAsArray($flags);
+        }
         if (InternalStrictArg::isCallerStrict($frame)) {
             return InternalStrictArg::requireBool($frame, 1, 'json_decode', 'assoc')->toBool();
         }
@@ -134,10 +138,13 @@ final class json_decode extends Internal
         );
     }
 
-    private static function resolveAssocFlag(Context $context, array $args): bool
+    private static function resolveAssocFlag(Context $context, array $args, int $flags): bool
     {
         if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return false;
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || ($args[1]->isNullConstant ?? false)) {
+            return VmJsonFlags::objectAsArray($flags);
         }
         if ($context->callerStrictTypes) {
             JitInternalStrictArg::requireBool($context, $args[1], 'json_decode', 'assoc', 2);
