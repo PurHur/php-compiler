@@ -13155,10 +13155,15 @@ class Compiler {
             ) {
                 $next = $cfgChildren[$i + 1] ?? null;
                 if (
-                    $next instanceof Op\Expr\Array_
+                    (
+                        $next instanceof Op\Expr\Array_
+                        || $next instanceof Op\Expr\BinaryOp\BitwiseOr
+                        || $next instanceof Op\Expr\BinaryOp\BitwiseAnd
+                        || $next instanceof Op\Expr\BinaryOp\BitwiseXor
+                    )
                     && $this->cfgExprUsesOperand($next, $child->result)
                 ) {
-                    // Hoisted element inside sibling inline Array_ call arg (#10612, #11304).
+                    // Hoisted operand inside sibling inline Array_ / bitmask call arg (#10612, #11304, #11387).
                     continue;
                 }
                 if (

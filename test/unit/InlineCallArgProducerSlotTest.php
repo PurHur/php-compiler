@@ -1646,4 +1646,41 @@ PHP;
         self::assertStringContainsString("src_exists=false", $out);
         self::assertStringContainsString("dst='source'", $out);
     }
+
+    /** Issue #11387 — inline ENT_QUOTES | ENT_SUBSTITUTE must feed flags arg, not ENT_SUBSTITUTE alone. */
+    public function testHtmlspecialcharsInlineBitmaskFlagsArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$s = '<>&"';
+htmlspecialchars($s, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8', false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'htmlspecialchars_bitmask.php');
+
+        $bitwiseOrSlot = null;
+        $sendSlots = [];
+        $captureSends = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $captureSends = true;
+                $sendSlots = [];
+                continue;
+            }
+            if ($captureSends && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+                continue;
+            }
+            if ($captureSends && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+                break;
+            }
+        }
+
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
+    }
 }
