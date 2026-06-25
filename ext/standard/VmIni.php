@@ -36,6 +36,7 @@ final class VmIni
         'serialize_precision',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
+        'session.save_path',
         'include_path',
         'short_open_tag',
         'register_argc_argv',
@@ -52,6 +53,9 @@ final class VmIni
     private const CFG_SERIALIZE_PRECISION = '-1';
 
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
+
+    /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
+    private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
 
     public static function set(Context $ctx, string $option, string $newValue) {
         $key = strtolower($option);
@@ -75,6 +79,8 @@ final class VmIni
                 return self::setUnserializeCallbackFunc($newValue);
             case 'session.gc_maxlifetime':
                 return self::setSessionGcMaxLifetime($newValue);
+            case 'session.save_path':
+                return self::setSessionSavePath($newValue);
             case 'include_path':
                 return IncludePathJitHelper::push($newValue);
             default:
@@ -111,6 +117,8 @@ final class VmIni
                 return self::$unserializeCallbackFunc;
             case 'session.gc_maxlifetime':
                 return (string) self::$sessionGcMaxLifetime;
+            case 'session.save_path':
+                return self::$sessionSavePath;
             case 'include_path':
                 return IncludePathJitHelper::get();
             default:
@@ -133,6 +141,7 @@ final class VmIni
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
+            'session.save_path' => self::CFG_SESSION_SAVE_PATH,
             'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
             'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
             default => false,
@@ -152,6 +161,8 @@ final class VmIni
     private static string $unserializeCallbackFunc = '';
 
     private static int $sessionGcMaxLifetime = 1440;
+
+    private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
     public static function getSessionGcMaxLifetime(): int
     {
@@ -200,6 +211,13 @@ final class VmIni
         }
         $old = (string) self::$sessionGcMaxLifetime;
         self::$sessionGcMaxLifetime = $parsed;
+
+        return $old;
+    }
+
+    private static function setSessionSavePath(string $newValue) {
+        $old = self::$sessionSavePath;
+        self::$sessionSavePath = $newValue;
 
         return $old;
     }
@@ -274,6 +292,9 @@ final class VmIni
                 break;
             case 'session.gc_maxlifetime':
                 self::$sessionGcMaxLifetime = (int) self::CFG_SESSION_GC_MAXLIFETIME;
+                break;
+            case 'session.save_path':
+                self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
                 break;
         }
     }
