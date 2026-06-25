@@ -1,5 +1,5 @@
 --TEST--
-Language: standalone never parameter type — compile fatal (#11473, supersedes #6633)
+Language: standalone never parameter type — compile fatal (#11473, zend_compile.c)
 --FILE--
 <?php
 function acceptsNever(never $value): void {}
