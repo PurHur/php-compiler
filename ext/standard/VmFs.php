@@ -1349,7 +1349,7 @@ final class VmFs
                 return false;
             }
             if ('' === $byte) {
-                return VmPhpMemoryStream::eof($handle) ? '' : false;
+                return false;
             }
 
             return $byte;
@@ -1360,7 +1360,7 @@ final class VmFs
                 return false;
             }
             if ('' === $byte) {
-                return VmPhpInputOutputStream::eof($handle) ? '' : false;
+                return false;
             }
 
             return $byte;
@@ -1371,7 +1371,7 @@ final class VmFs
                 return false;
             }
             if ('' === $byte) {
-                return VmPhpFdStream::eof($handle) ? '' : false;
+                return false;
             }
 
             return $byte;
@@ -1382,10 +1382,6 @@ final class VmFs
         }
         $byte = @\fgetc($fp);
         if (false === $byte) {
-            if (\feof($fp)) {
-                return '';
-            }
-
             return false;
         }
 
