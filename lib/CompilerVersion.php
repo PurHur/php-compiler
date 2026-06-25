@@ -78,7 +78,7 @@ final class CompilerVersion
     /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
     public static function supportsStrIncrement(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /** PHP 8.3+ #[\Override] builtin attribute class (Zend/zend_attributes.c, issue #6303). */
@@ -120,19 +120,19 @@ final class CompilerVersion
     /** PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045). */
     public static function supportsFpow(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989). */
     public static function supportsClassHasFunctions(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** PHP 8.4+ zend_thread_id() (ext/standard/basic_functions.c, issue #6870, #11842). */

@@ -14,9 +14,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
-    public function testSupportsStrIncrementTrueOn83Target(): void
+    public function testSupportsStrIncrementFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+    }
+
+    public function testSupportsFpowFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
     public function testSupportsTypedTraitConstantsTrueOn83Target(): void
@@ -44,11 +49,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
     }
 
-    public function testVmRegistersStrIncrementOn83Target(): void
+    public function testVmDoesNotRegisterStrIncrementOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->functions['str_decrement']));
-        $this->assertTrue(isset($ctx->functions['str_increment']));
+        $this->assertFalse(isset($ctx->functions['str_decrement']));
+        $this->assertFalse(isset($ctx->functions['str_increment']));
     }
 }
