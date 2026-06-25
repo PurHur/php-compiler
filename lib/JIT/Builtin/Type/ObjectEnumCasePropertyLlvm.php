@@ -133,4 +133,28 @@ final class ObjectEnumCasePropertyLlvm
             $destSlot
         );
     }
+
+    public static function enumCaseBackingLong(Object_ $object, Context $context, Value $objPtr): Value
+    {
+        $slot = $object->enumCaseBuiltinPropertySlotPtr(
+            $objPtr,
+            EnumCasePropertyJitHelper::SLOT_VALUE
+        );
+        $storage = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $valueMap = $context->structFieldMap['__value__'];
+        $context->builder->store(
+            $context->getTypeFromString('int8')->constInt(Variable::TYPE_NULL, false),
+            $context->builder->structGep($storage, $valueMap['type'])
+        );
+        $context->builder->call(
+            $context->lookupFunction('__object__load_value_slot'),
+            $slot,
+            $storage
+        );
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readLong'),
+            $storage
+        );
+    }
 }

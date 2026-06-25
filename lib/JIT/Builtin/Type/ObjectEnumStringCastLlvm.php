@@ -100,10 +100,12 @@ final class ObjectEnumStringCastLlvm
         Context $context,
         Value $classId,
         array $enumEntries,
-        string $tag
+        string $tag,
+        ?PHPLLVM\BasicBlock $noMatchBlock = null,
+        bool $abortAfterMatch = false
     ): void {
         $i64 = $context->getTypeFromString('int64');
-        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $doneBlock = $noMatchBlock ?? BasicBlockHelper::append($context, $tag.'_done');
         $ids = array_keys($enumEntries);
         $lastIdx = count($ids) - 1;
         foreach ($ids as $idx => $id) {
@@ -125,9 +127,15 @@ final class ObjectEnumStringCastLlvm
                 $context,
                 EnumCasePropertyJitHelper::enumStringCastErrorMessage($enumEntries[$id])
             );
-            $context->builder->branch($doneBlock);
+            if ($abortAfterMatch) {
+                $context->builder->call($context->lookupFunction('abort'));
+            } else {
+                $context->builder->branch($doneBlock);
+            }
             $context->builder->positionAtEnd($nextBlock);
         }
-        $context->builder->positionAtEnd($doneBlock);
+        if (!$abortAfterMatch) {
+            $context->builder->positionAtEnd($doneBlock);
+        }
     }
 }

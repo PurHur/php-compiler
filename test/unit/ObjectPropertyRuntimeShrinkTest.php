@@ -35,6 +35,15 @@ final class ObjectPropertyRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('private function knownEnumClassIdToName', $object);
     }
 
+    public function testObjectMonolithDelegatesExitStatusLowering(): void
+    {
+        $object = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('ObjectExitStatusLlvm::emitExitStatusObjectGuard', $object);
+        $this->assertStringContainsString('ObjectExitStatusLlvm::emitExitStatusFromEnumCaseObject', $object);
+        $this->assertStringNotContainsString('private function enumCaseBackingLong', $object);
+        $this->assertStringNotContainsString('exit_status_obj_enum_', $object);
+    }
+
     public function testEnumStringCastErrorMessageMatchesZend(): void
     {
         $msg = EnumCasePropertyJitHelper::enumStringCastErrorMessage('E');
