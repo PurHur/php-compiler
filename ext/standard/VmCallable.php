@@ -289,7 +289,8 @@ final class VmCallable
                 return true;
             }
 
-            return $ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method);
+            return $ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method)
+                || self::hasInstanceMagicCall($ctx, $target->toObject()->class);
         }
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
@@ -301,7 +302,8 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::classMethExists($ctx, $class, $method);
+            return VmReflection::classMethExists($ctx, $class, $method)
+                || self::hasStaticMagicCall($ctx, $class);
         }
 
         return false;
@@ -449,5 +451,55 @@ final class VmCallable
     private static function isValidMethodName(string $name): bool
     {
         return (bool) preg_match('/^[a-zA-Z_\x80-\xff][a-zA-Z0-9_\x80-\xff]*$/', $name);
+    }
+
+    /**
+     * php-src zend_is_callable — __call makes missing instance methods invokable.
+     */
+    private static function hasInstanceMagicCall(Context $ctx, \PHPCompiler\VM\ClassEntry $class): bool
+    {
+        $lcClass = strtolower($class->name);
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__call'])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
+    }
+
+    /**
+     * php-src zend_is_callable — __callStatic makes missing static methods invokable.
+     */
+    private static function hasStaticMagicCall(Context $ctx, string $className): bool
+    {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__callstatic'])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
     }
 }
