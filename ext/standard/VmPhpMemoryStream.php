@@ -150,6 +150,9 @@ final class VmPhpMemoryStream
         if (null === $state) {
             return false;
         }
+        if ($state->position > \strlen($state->buffer)) {
+            return false;
+        }
 
         return $state->position;
     }

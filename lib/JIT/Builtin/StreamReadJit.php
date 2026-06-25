@@ -163,6 +163,8 @@ final class StreamReadJit
             ['memcpy', $i8p, [$i8p, $i8p, $sizeT]],
             ['realloc', $i8p, [$i8p, $sizeT]],
             ['fseek', $i32, [$i8p, $i64, $i32]],
+            ['strcmp', $i32, [$i8p, $i8p]],
+            ['strncmp', $i32, [$i8p, $i8p, $sizeT]],
             ['__string__init', $strPtr, [$i64, $i8p]],
             ['__string__strlen', $i64, [$strPtr]],
             ['__compiler_stream_filter_apply_read', $strPtr, [$i64, $strPtr]],
@@ -393,12 +395,18 @@ final class StreamReadJit
 
         $handle = $fn->getParam(0);
         $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
         $minusOne = $i64->constInt(-1, true);
         $zero = $i64->constInt(0, false);
+        $zero32 = $i32->constInt(0, false);
+        $seekEnd = $i32->constInt(\SEEK_END, false);
+        $seekSet = $i32->constInt(\SEEK_SET, false);
+        $nullPtr = $i8p->constNull();
 
         $fp = $context->builder->call($context->lookupFunction('__phpc_resolve_stream'), $handle);
-        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $i8p->constNull());
+        $fpNull = $context->builder->icmp(Builder::INT_EQ, $fp, $nullPtr);
         $failBb = $fn->appendBasicBlock('ftell_fail');
         $workBb = $fn->appendBasicBlock('ftell_work');
         $context->builder->branchIf($fpNull, $failBb, $workBb);
@@ -408,7 +416,45 @@ final class StreamReadJit
         $bad = $context->builder->icmp(Builder::INT_SLT, $pos, $zero);
         $okBb = $fn->appendBasicBlock('ftell_ok');
         $context->builder->branchIf($bad, $failBb, $okBb);
+
         $context->builder->positionAtEnd($okBb);
+        $pathGlobal = $context->module->getNamedGlobal(StreamGlobalsJit::GLOBAL_PATHS);
+        $pathSlot = $context->builder->gep($pathGlobal, $zero, $handle);
+        $pathPtr = $context->builder->load($context->builder->bitcast($pathSlot, $i8p->pointerType(0)));
+        $pathNull = $context->builder->icmp(Builder::INT_EQ, $pathPtr, $nullPtr);
+        $plainBb = $fn->appendBasicBlock('ftell_plain');
+        $memCheckBb = $fn->appendBasicBlock('ftell_mem_check');
+        $context->builder->branchIf($pathNull, $plainBb, $memCheckBb);
+
+        $context->builder->positionAtEnd($memCheckBb);
+        $isMemory = $context->builder->call(
+            $context->lookupFunction('strcmp'),
+            $pathPtr,
+            $context->pointerFromStringConstant('php://memory')
+        );
+        $memoryMatch = $context->builder->icmp(Builder::INT_EQ, $isMemory, $zero32);
+        $memBoundsBb = $fn->appendBasicBlock('ftell_mem_bounds');
+        $tempCheckBb = $fn->appendBasicBlock('ftell_temp_check');
+        $context->builder->branchIf($memoryMatch, $memBoundsBb, $tempCheckBb);
+
+        $context->builder->positionAtEnd($tempCheckBb);
+        $isTemp = $context->builder->call(
+            $context->lookupFunction('strncmp'),
+            $pathPtr,
+            $context->pointerFromStringConstant('php://temp'),
+            $sizeT->constInt(10, false)
+        );
+        $tempMatch = $context->builder->icmp(Builder::INT_EQ, $isTemp, $zero32);
+        $context->builder->branchIf($tempMatch, $memBoundsBb, $plainBb);
+
+        $context->builder->positionAtEnd($memBoundsBb);
+        $context->builder->call($context->lookupFunction('fseek'), $fp, $zero, $seekEnd);
+        $endPos = $context->builder->call($context->lookupFunction('ftell'), $fp);
+        $context->builder->call($context->lookupFunction('fseek'), $fp, $pos, $seekSet);
+        $pastEnd = $context->builder->icmp(Builder::INT_SGT, $pos, $endPos);
+        $context->builder->branchIf($pastEnd, $failBb, $plainBb);
+
+        $context->builder->positionAtEnd($plainBb);
         $context->builder->returnValue($pos);
 
         $context->builder->positionAtEnd($failBb);
