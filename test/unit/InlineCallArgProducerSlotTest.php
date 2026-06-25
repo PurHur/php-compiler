@@ -110,6 +110,53 @@ PHP;
         self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #11153 — array_all([], fn) must wire inline [] to arg 0, not swap with closure. */
+    public function testArrayAllInlineEmptyArrayUsesArrayAndClosureSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_all([], fn ($v) => (bool) $v);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_all_empty_inline.php');
+
+        $arraySlot = null;
+        $closureSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($closureSlot);
+        self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #11153 — vacuous array_all on inline [] matches Zend. */
+    public function testArrayAllInlineEmptyArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo array_all([], fn ($v) => (bool) $v) ? 'all' : 'notall', "\n";
+echo array_any([], fn ($v) => (bool) $v) ? 'any' : 'notany', "\n";
+echo array_find([], fn ($v) => (bool) $v) === null ? 'null' : 'bad', "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_find_family_empty_inline.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("all\nnotany\nnull\n", ob_get_clean());
+    }
+
     /** Issue #9463 — sibling closure __invoke FuncCall producers map to distinct var_dump arg slots. */
     public function testVarDumpReceivesDistinctClosureCallProducerSlots(): void
     {
