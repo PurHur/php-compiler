@@ -3113,6 +3113,7 @@ require_once __DIR__.'/../../../lib/VM/VmFiberValue.php';
 require_once __DIR__.'/../../../lib/VM/VmFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/VmFunctionStatic.php';
 require_once __DIR__.'/../../../lib/VM/VmIsset.php';
+require_once __DIR__.'/../../../lib/VM/VmIteratorForeach.php';
 require_once __DIR__.'/../../../lib/VM/VmIteratorProtocol.php';
 require_once __DIR__.'/../../../lib/VM/VmLazyObject.php';
 require_once __DIR__.'/../../../lib/VM/VmObjectPropertyForeach.php';

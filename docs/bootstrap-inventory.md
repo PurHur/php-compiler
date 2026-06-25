@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3147 |
-| Phase A inventory files (M2 ratio SSOT) | 3147 |
+| PHP files on vm.php path | 3148 |
+| Phase A inventory files (M2 ratio SSOT) | 3148 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8421 |
+| Source constructs flagged (warnings) | 8422 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2543,7 +2543,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/IntersectionParamCheck.php` | 0 | 2 |
 | `lib/JIT/IssetHelper.php` | 0 | 1 |
 | `lib/JIT/IssetHelperLlvm.php` | 0 | 4 |
-| `lib/JIT/IteratorHelper.php` | 0 | 15 |
+| `lib/JIT/IteratorHelper.php` | 0 | 1 |
 | `lib/JIT/IteratorProtocolHelper.php` | 0 | 1 |
 | `lib/JIT/JitArrayColumnArg.php` | 0 | 2 |
 | `lib/JIT/JitArrayUserSetOps.php` | 0 | 6 |
@@ -3044,6 +3044,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
+| `lib/VM/VmIteratorForeach.php` | 0 | 15 |
 | `lib/VM/VmIteratorProtocol.php` | 0 | 9 |
 | `lib/VM/VmLazyObject.php` | 0 | 1 |
 | `lib/VM/VmObjectPropertyForeach.php` | 0 | 3 |
@@ -19626,21 +19627,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IteratorHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 56)
-- new Variable (line 81)
-- new Variable (line 98)
-- new Variable (line 116)
-- new Variable (line 141)
-- new Variable (line 404)
-- new Variable (line 441)
-- new Variable (line 465)
-- new Variable (line 502)
-- new Variable (line 531)
-- new Variable (line 548)
-- new Variable (line 557)
-- new Variable (line 591)
-- new Variable (line 632)
-- 25 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/IteratorProtocolHelper.php`
 
@@ -23507,6 +23494,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/VM/VmIteratorForeach.php`
+
+**Warnings** (review for bootstrap subset):
+- new JitVariable (line 75)
+- new JitVariable (line 100)
+- new JitVariable (line 117)
+- new JitVariable (line 135)
+- new JitVariable (line 160)
+- new JitVariable (line 423)
+- new JitVariable (line 460)
+- new JitVariable (line 484)
+- new JitVariable (line 521)
+- new JitVariable (line 550)
+- new JitVariable (line 567)
+- new JitVariable (line 576)
+- new JitVariable (line 610)
+- new JitVariable (line 651)
+- 25 class method(s)
 
 ### `lib/VM/VmIteratorProtocol.php`
 
