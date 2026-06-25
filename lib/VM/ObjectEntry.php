@@ -456,8 +456,35 @@ class ObjectEntry {
         if (!isset($names[$index])) {
             return null;
         }
+        $name = $names[$index];
         $result = new Variable();
-        $result->copyFrom($this->properties[$names[$index]]->resolveIndirect());
+        foreach ($this->class->properties as $property) {
+            if ($property->name !== $name) {
+                continue;
+            }
+            if (!$this->hasProperty($name)) {
+                $result->copyFrom($property->getVariable());
+
+                return $result;
+            }
+            $resolved = $this->getProperty($name)->resolveIndirect();
+            if (
+                Variable::TYPE_NULL === $resolved->type
+                || $resolved->isUndefined()
+                || TypedPropertyCheck::isUninitialized($resolved)
+            ) {
+                $result->copyFrom($property->getVariable());
+
+                return $result;
+            }
+            $result->copyFrom($resolved);
+
+            return $result;
+        }
+        if (!isset($this->properties[$name])) {
+            return null;
+        }
+        $result->copyFrom($this->properties[$name]->resolveIndirect());
 
         return $result;
     }
