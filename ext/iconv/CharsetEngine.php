@@ -69,7 +69,11 @@ final class CharsetEngine
         $flags = $fromFlags | $toFlags;
 
         if ($fromCanon === $toCanon) {
-            return $input;
+            if (0 === $flags) {
+                return $input;
+            }
+
+            return self::applySameEncodingFlags($fromCanon, $input, $flags);
         }
 
         $utf8 = match ($fromCanon) {
@@ -92,6 +96,31 @@ final class CharsetEngine
             'UTF-16BE' => self::utf8ToUtf16be($utf8, $flags),
             default => false,
         };
+    }
+
+    /**
+     * Same canonical encoding with //IGNORE or //TRANSLIT suffix (php-src iconv.c).
+     */
+    private static function applySameEncodingFlags(string $canon, string $input, int $flags): string|false
+    {
+        if ('UTF-8' === $canon) {
+            return self::normalizeUtf8($input, $flags);
+        }
+
+        return $input;
+    }
+
+    private static function normalizeUtf8(string $input, int $flags): string|false
+    {
+        if (0 === ($flags & (self::FLAG_IGNORE | self::FLAG_TRANSLIT))) {
+            return null === self::utf8Codepoints($input, 0) ? false : $input;
+        }
+        $codepoints = self::utf8Codepoints($input, $flags);
+        if (null === $codepoints) {
+            return false;
+        }
+
+        return self::codepointsToUtf8($codepoints);
     }
 
     public static function latin1ToUtf8(string $input): string
