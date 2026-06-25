@@ -23,7 +23,7 @@ final class ReflectionFunctionGetNumberOfParameters extends VmClassMethod
         $receiver = ReflectionSupport::requireReflectionFunction($frame, $frame->calledArgs[0]);
         $funcName = ReflectionSupport::functionNameFromReflection($receiver);
         if (ReflectionSupport::isReflectionInternalFunction($receiver)) {
-            $count = \count(BuiltinParamNames::forFunction($funcName) ?? []);
+            $count = BuiltinParamNames::paramCountForInternalFunction($funcName) ?? 0;
         } else {
             $func = ReflectionSupport::resolveFunctionFromReflection($ctx, $receiver);
             $count = \count($func->block->paramNames);
