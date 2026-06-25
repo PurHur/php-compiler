@@ -43,7 +43,7 @@ final class VmStreamSelectGuard
         }
     }
 
-    /** @param list<array{0: int, 1: resource}> ...$pairLists */
+    /** @param list<StreamSelectPair> ...$pairLists */
     public static function ensureSelectableStreamArrays(array ...$pairLists): void
     {
         $total = 0;
