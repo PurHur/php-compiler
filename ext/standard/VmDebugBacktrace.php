@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\OpCode;
 use PHPCfg\Func;
 use PHPCompiler\VM\SensitiveParamSupport;
 use PHPCompiler\VM\Variable;
@@ -32,7 +33,7 @@ final class VmDebugBacktrace
 
         $framesAdded = 0;
         foreach (self::collectFrames($frame) as $f) {
-            if ($f->hasHandler()) {
+            if ($f->hasHandler() || self::isMainScriptFrame($f)) {
                 continue;
             }
             $entry = self::frameEntry($f, $includeArgs, $provideObject, false);
@@ -61,7 +62,7 @@ final class VmDebugBacktrace
         $index = 0;
         $printed = 0;
         foreach (self::collectFrames($frame) as $f) {
-            if ($f->hasHandler()) {
+            if ($f->hasHandler() || self::isMainScriptFrame($f)) {
                 continue;
             }
             $line = self::formatFlatFrame($index, $f, $includeArgs);
@@ -114,12 +115,27 @@ final class VmDebugBacktrace
      */
     private static function isTopLevelBacktraceCall(Frame $frame): bool
     {
+        if (self::isUserCodeFrame($frame->parent)) {
+            return false;
+        }
+        if (null !== $frame->vmContext) {
+            foreach ($frame->vmContext->runStackFrames() as $stackFrame) {
+                if (self::isUserCodeFrame($stackFrame)) {
+                    return false;
+                }
+            }
+        }
         $caller = self::callerFrame($frame);
         if (null === $caller) {
             return true;
         }
 
         return null !== $caller->block && $caller->block->isMainScript();
+    }
+
+    private static function isUserCodeFrame(?Frame $frame): bool
+    {
+        return null !== $frame && !$frame->hasHandler() && !self::isMainScriptFrame($frame);
     }
 
     private static function callerFrame(Frame $frame): ?Frame
@@ -137,19 +153,29 @@ final class VmDebugBacktrace
     private static function collectFrames(Frame $frame): array
     {
         $walk = [];
-        if ($frame->hasHandler() && null !== $frame->parent) {
-            $walk[] = $frame->parent;
-        }
         if (null !== $frame->vmContext) {
-            foreach ($frame->vmContext->runStackFrames() as $stackFrame) {
-                $walk[] = $stackFrame;
+            $walk = $frame->vmContext->runStackFrames();
+        }
+        if ($frame->hasHandler() && null !== $frame->parent) {
+            if ([] === $walk || $walk[0] !== $frame->parent) {
+                array_unshift($walk, $frame->parent);
             }
         }
-        if ([] === $walk) {
-            $walk = self::parentChainFrames($frame);
+        if ([] !== $walk) {
+            return $walk;
         }
 
-        return $walk;
+        return self::parentChainFrames($frame);
+    }
+
+    /** Zend omits file-level `{main}` from debug_backtrace() (zend_fetch_debug_backtrace, #11528). */
+    private static function isMainScriptFrame(Frame $frame): bool
+    {
+        if (null !== $frame->block && $frame->block->isMainScript()) {
+            return true;
+        }
+
+        return '{main}' === self::frameFunctionName($frame);
     }
 
     /**
@@ -316,8 +342,37 @@ final class VmDebugBacktrace
 
     private static function frameLine(Frame $frame): int
     {
-        // Opcode positions are not mapped to source lines in the VM yet (#1378).
-        unset($frame);
+        if ($frame->callSiteLine > 0) {
+            return $frame->callSiteLine;
+        }
+        if (null === $frame->block) {
+            return 0;
+        }
+        $block = $frame->block;
+        $pos = $frame->pos;
+        if ($pos >= $block->nOpCodes) {
+            $pos = max(0, $block->nOpCodes - 1);
+        }
+        for ($i = $pos; $i >= 0; --$i) {
+            $op = $block->opCodes[$i] ?? null;
+            if (null === $op) {
+                continue;
+            }
+            if (
+                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
+            ) {
+                $line = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+                    ? (int) ($op->arg2 ?? 0)
+                    : (int) ($op->arg1 ?? 0);
+                if ($line > 0) {
+                    return $line;
+                }
+            }
+            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
+                return $op->sourceLocation->startLine;
+            }
+        }
 
         return 0;
     }

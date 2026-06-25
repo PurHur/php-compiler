@@ -6,7 +6,6 @@ function callee() {
     $t = debug_backtrace();
     echo $t[0]['function'], "\n";
     echo $t[1]['function'], "\n";
-    echo $t[2]['function'], "\n";
     echo isset($t[0]['file']) && '' !== $t[0]['file'] ? 'file' : 'nofile', "\n";
     echo $t[0]['line'], "\n";
 }
@@ -17,6 +16,5 @@ caller();
 --EXPECT--
 callee
 caller
-{main}
 file
 0
