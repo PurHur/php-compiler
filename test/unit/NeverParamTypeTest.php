@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6633 #7414 */
+/** @covers issue #6633 #7414 #11473 */
 final class NeverParamTypeTest extends TestCase
 {
     public function testStandaloneNeverParamRejectedAtCompileTime(): void
@@ -23,19 +23,32 @@ PHP;
         $runtime->parseAndCompile($code, 'never_param.php');
     }
 
-    public function testNeverParamDeclarationRejectedBeforeCallSite(): void
+    public function testNeverParamOnAbstractMethodRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-function f(never $x) {
-    echo "hi";
+abstract class C {
+    abstract public function f(never $x): void;
 }
-f(1);
 PHP;
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('never cannot be used as a parameter type');
-        $runtime->parseAndCompile($code, 'never_param_call.php');
+        $runtime->parseAndCompile($code, 'never_param_abstract.php');
+    }
+
+    public function testNeverParamOnInterfaceMethodRejectedAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {
+    public function f(never $x): void;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param_interface.php');
     }
 
     public function testNeverInUnionParamCompilesAndAcceptsInt(): void

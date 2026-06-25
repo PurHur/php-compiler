@@ -1,5 +1,7 @@
 <?php
-// Repro for #11473 — Zend fatals; VM must not print "compiled".
+
+/** Issue #11473 — standalone never parameter must fatal at compile (Zend/zend_compile.c). */
+
 function acceptsNever(never $value): void {}
 
 echo "compiled\n";

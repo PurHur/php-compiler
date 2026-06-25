@@ -6,3 +6,5 @@ function acceptsNever(never $value): void {}
 echo "ok\n";
 --EXPECT_EXIT--
 255
+--EXPECTF--
+parseAndCompile failure: target=%s: never cannot be used as a parameter type
