@@ -640,7 +640,7 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties: same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467, #11617).
+     * Hooked properties: real backing (same-name or separate) probes storage; virtual get-only invokes get (#11262, #11617).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -935,7 +935,7 @@ class VM {
     }
 
     /**
-     * isset($obj->hooked) — same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467).
+     * isset($obj->hooked) — real backing probes storage; virtual get-only invokes get (#11262, #11617).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -952,6 +952,9 @@ class VM {
         }
         if ($this->hookedPropertyHasRealSameNameBacking($object, $propName)) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
+        }
+        if ($this->hookedPropertyDistinctBackingUnsetForIssetEmpty($object, $propName)) {
+            return false;
         }
         if (null === $frame) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
@@ -1183,6 +1186,24 @@ class VM {
     }
 
     /**
+     * Separate backing cleared by unset/null — isset/empty probe storage only, never get hook (#11617).
+     */
+    private function hookedPropertyDistinctBackingUnsetForIssetEmpty(ObjectEntry $object, string $propName): bool
+    {
+        if (!$this->hookedPropertyUsesDistinctBacking($object, $propName)) {
+            return false;
+        }
+        $backing = $this->hookedPropertyBackingValue($object, $propName);
+        if (false === $backing) {
+            return false;
+        }
+
+        return $backing->isUndefined()
+            || VM\TypedPropertyCheck::isUninitialized($backing)
+            || Variable::TYPE_NULL === $backing->type;
+    }
+
+    /**
      * isset/empty/?? backing probe — never invokes get hook (#6472, #8901, #8917, #8918).
      *
      * @return Variable|false false when the property is not hooked
@@ -1335,6 +1356,11 @@ class VM {
 
             return true;
         }
+        if ($this->hookedPropertyDistinctBackingUnsetForIssetEmpty($object, $propName)) {
+            $dst->bool(true);
+
+            return true;
+        }
         $hookValue = $this->fetchPropertyWithHooks($object, $propName, $frame);
         if (null === $hookValue) {
             $backing = $this->hookedPropertyBackingValue($object, $propName);
@@ -1431,13 +1457,9 @@ class VM {
         }
     }
 
-    /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191). */
+    /** Clear registry-recorded get/set backing field after hooked-property unset (#6471, #5191, #11617). */
     private function resetHookedPropertyBackingField(ObjectEntry $object, string $propName): void
     {
-        $meta = $this->classPropertyMeta($object, $propName);
-        if (null === $meta || null === $meta->setHookMethodLc) {
-            return;
-        }
         $lcClass = strtolower($object->class->name);
         $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
             ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
