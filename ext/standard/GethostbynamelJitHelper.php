@@ -21,7 +21,10 @@ final class GethostbynamelJitHelper
     public static function ipAt(string $hostname, int $index): string
     {
         $ips = VmDns::resolveHostnameIpv4List($hostname);
+        if (!isset($ips[$index])) {
+            return '';
+        }
 
-        return $ips[$index] ?? '';
+        return $ips[$index];
     }
 }

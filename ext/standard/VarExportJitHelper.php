@@ -26,7 +26,7 @@ final class VarExportJitHelper
             throw new \LogicException('var_export() JIT helper requires active VM (#9189)');
         }
         $frames = $ctx->runStackFrames();
-        $frame = $frames[0] ?? null;
+        $frame = isset($frames[0]) ? $frames[0] : null;
         if (null === $frame) {
             throw new \LogicException('var_export() JIT helper requires an active frame (#9189)');
         }

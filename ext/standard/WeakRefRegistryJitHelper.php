@@ -86,12 +86,14 @@ final class WeakRefRegistryJitHelper
         }
         $stored = self::storeMapKey($key);
         for ($i = 0; $i < self::$mapCount; ++$i) {
-            if (self::$mapTargetPtr[$i] === $targetPtr
-                && self::$mapHtPtr[$i] === $htPtr
-                && self::$mapKey[$i] === $stored) {
-                self::clearMapEntry($i);
+            if (self::$mapTargetPtr[$i] === $targetPtr) {
+                if (self::$mapHtPtr[$i] === $htPtr) {
+                    if (self::$mapKey[$i] === $stored) {
+                        self::clearMapEntry($i);
 
-                return;
+                        return;
+                    }
+                }
             }
         }
     }
@@ -107,17 +109,10 @@ final class WeakRefRegistryJitHelper
 
     public static function mapKeyToObjectPtr(string $key): int
     {
-        $len = \strlen($key);
-        if ($len < 3) {
+        if (!str_starts_with($key, 'o:')) {
             return 0;
         }
-        if ('o' !== $key[0]) {
-            return 0;
-        }
-        if (':' !== $key[1]) {
-            return 0;
-        }
-        $suffix = \substr($key, 2);
+        $suffix = substr($key, 2);
         if ('' === $suffix) {
             return 0;
         }

@@ -87,10 +87,64 @@ final class JitNestedHelperCoerce
     public static function isHelperResultNull(Context $context, Value $raw): Value
     {
         if (self::isValueBox($context, $raw)) {
-            return self::isNullPtr($context, $raw, $context->getTypeFromString('__value__*'));
+            return self::isValueBoxNullOrFalse($context, self::valueBoxPtrFromHelperResult($context, $raw));
         }
 
         return self::isNullPtr($context, $raw, $raw->typeOf());
+    }
+
+    /** Materialize nested-helper {@see __value__} struct returns to a stack slot pointer. */
+    public static function valueBoxPtrFromHelperResult(Context $context, Value $raw): Value
+    {
+        $have = $raw->typeOf();
+        $haveStr = $context->getStringFromType($have);
+        $valuePtrTy = $context->getTypeFromString('__value__*');
+        if ('__value__*' === $haveStr) {
+            return $raw;
+        }
+        if ('__value__' === $haveStr) {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'nested_helper_vbox_materialize');
+            $slot = BasicBlockHelper::entryAlloca($context, $have);
+            $context->builder->store($raw, $slot);
+
+            return $context->builder->pointerCast($slot, $valuePtrTy);
+        }
+
+        throw new \LogicException('valueBoxPtrFromHelperResult: unsupported type '.$haveStr);
+    }
+
+  private static function isValueBoxNullOrFalse(Context $context, Value $valuePtr): Value
+    {
+        $map = $context->structFieldMap['__value__'];
+        $i8 = $context->getTypeFromString('int8');
+        $i1 = $context->getTypeFromString('int1');
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NULL, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
+        );
+        $valueField = $context->builder->structGep($valuePtr, $map['value']);
+        $boolBytePtr = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $context->getTypeFromString('int64')->constInt(0, false)
+        );
+        $boolByte = $context->builder->load($boolBytePtr);
+        $boolFalse = $context->builder->icmp(
+            Builder::INT_EQ,
+            $boolByte,
+            $i8->constInt(0, false)
+        );
+
+        return $context->builder->or($isNull, $context->builder->and($isBool, $boolFalse));
     }
 
     public static function coerceArgForHelper(Context $context, Value $arg, Type $wantTy): Value
@@ -169,11 +223,17 @@ final class JitNestedHelperCoerce
         if ($have === $htPtr) {
             return $raw;
         }
-        $valuePtr = $context->getTypeFromString('__value__*');
-        if ($have === $valuePtr) {
+        $haveStr = $context->getStringFromType($have);
+        if ('__value__*' === $haveStr) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readHashtable'),
                 $raw
+            );
+        }
+        if ('__value__' === $haveStr) {
+            return $context->builder->call(
+                $context->lookupFunction('__value__readHashtable'),
+                self::valueBoxPtrFromHelperResult($context, $raw)
             );
         }
 
@@ -217,7 +277,7 @@ final class JitNestedHelperCoerce
         if (self::isValueBox($context, $raw)) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readString'),
-                $raw
+                self::valueBoxPtrFromHelperResult($context, $raw)
             );
         }
 

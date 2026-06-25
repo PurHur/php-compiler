@@ -23,8 +23,14 @@ final class StatCacheJitHelper
         if (false === $raw) {
             return -1;
         }
+        if (isset($raw['mode'])) {
+            return (int) $raw['mode'];
+        }
+        if (isset($raw[2])) {
+            return (int) $raw[2];
+        }
 
-        return (int) ($raw['mode'] ?? $raw[2] ?? -1);
+        return -1;
     }
 
     public static function clearAll(): void

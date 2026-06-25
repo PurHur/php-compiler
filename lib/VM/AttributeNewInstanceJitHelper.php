@@ -31,7 +31,11 @@ final class AttributeNewInstanceJitHelper
                 continue;
             }
             if (0 === strcasecmp($needle, $candidate)) {
-                return (int) ($ids[$i] ?? -1);
+                if (!isset($ids[$i])) {
+                    return -1;
+                }
+
+                return (int) $ids[$i];
             }
         }
 

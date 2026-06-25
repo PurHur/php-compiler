@@ -78,7 +78,11 @@ final class AssertOptionsJitHelper
 
     public static function getCallbackString(): string
     {
-        return self::$callback ?? '';
+        if (null === self::$callback) {
+            return '';
+        }
+
+        return self::$callback;
     }
 
     public static function setCallbackString(string $value): string

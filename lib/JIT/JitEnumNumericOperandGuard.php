@@ -21,6 +21,9 @@ final class JitEnumNumericOperandGuard
         Variable $left,
         Variable $right
     ): void {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
         if (!self::isGuardedArithmeticOp($opCode)) {
             return;
         }
@@ -29,11 +32,17 @@ final class JitEnumNumericOperandGuard
 
     public static function guardPow(Context $context, Variable $base, Variable $exp): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
         self::guardOperands($context, OpCode::TYPE_POW, $base, $exp);
     }
 
     public static function guardModulo(Context $context, Variable $left, Variable $right): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
         self::guardOperands($context, OpCode::TYPE_MODULO, $left, $right);
     }
 

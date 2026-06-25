@@ -29,8 +29,12 @@ final class InfoJitHelper
         if (!ModuleRegistry::extensionLoaded($extension)) {
             return '';
         }
+        $version = ModuleRegistry::getExtensionVersion($extension);
+        if (null === $version) {
+            return self::VERSION_STRING;
+        }
 
-        return ModuleRegistry::getExtensionVersion($extension) ?? self::VERSION_STRING;
+        return $version;
     }
 
     public static function php_sapi_name(): string
