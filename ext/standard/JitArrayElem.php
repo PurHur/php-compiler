@@ -231,19 +231,10 @@ final class JitArrayElem
         }
         if (JITVariable::TYPE_VALUE === $array->type) {
             $loaded = JitValueBox::valuePtrFromVariable($context, $array);
-            $typeField = $context->structFieldMap['__value__']['type'];
-            $typeByte = $context->builder->load(
-                $context->builder->structGep($loaded, $typeField)
-            );
-            $i8 = $context->getTypeFromString('int8');
-            $isHt = $context->builder->icmp(
-                Builder::INT_EQ,
-                $typeByte,
-                $i8->constInt(Variable::TYPE_ARRAY, false)
-            );
+            $isArray = self::valueBoxIsArray($context, $loaded);
             $okBlock = BasicBlockHelper::append($context, 'array_elem_req_ok');
             $errBlock = BasicBlockHelper::append($context, 'array_elem_req_err');
-            $context->builder->branchIf($isHt, $okBlock, $errBlock);
+            $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
             self::emitErrorAndAbort(
                 $context,
@@ -278,15 +269,38 @@ final class JitArrayElem
         int $argNum
     ): void {
         $loaded = JitValueBox::valuePtrFromVariable($context, $array);
+        $isArray = self::valueBoxIsArray($context, $loaded);
+        $okBlock = BasicBlockHelper::append($context, 'array_argnum_req_ok');
+        $errBlock = BasicBlockHelper::append($context, 'array_argnum_req_err');
+        $context->builder->branchIf($isArray, $okBlock, $errBlock);
+        $context->builder->positionAtEnd($errBlock);
+        $typeField = $context->structFieldMap['__value__']['type'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($loaded, $typeField)
+        );
+        self::emitBoxedNonArrayTypeErrorArgNum($context, $fn, $argNum, $typeByte);
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    /**
+     * True when a boxed __value__* holds a hashtable array (VM tag 6 or JIT TYPE_HASHTABLE).
+     */
+    private static function valueBoxIsArray(Context $context, Value $loaded): Value
+    {
         $typeField = $context->structFieldMap['__value__']['type'];
         $typeByte = $context->builder->load(
             $context->builder->structGep($loaded, $typeField)
         );
         $i8 = $context->getTypeFromString('int8');
-        $isArrayType = $context->builder->icmp(
+        $isVmArray = $context->builder->icmp(
             Builder::INT_EQ,
             $typeByte,
             $i8->constInt(Variable::TYPE_ARRAY, false)
+        );
+        $isJitHt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_HASHTABLE, false)
         );
         $ht = $context->builder->call(
             $context->lookupFunction('__value__readHashtable'),
@@ -297,13 +311,11 @@ final class JitArrayElem
             $ht,
             $ht->typeOf()->constNull()
         );
-        $isArray = $context->builder->or($isArrayType, $hasHt);
-        $okBlock = BasicBlockHelper::append($context, 'array_argnum_req_ok');
-        $errBlock = BasicBlockHelper::append($context, 'array_argnum_req_err');
-        $context->builder->branchIf($isArray, $okBlock, $errBlock);
-        $context->builder->positionAtEnd($errBlock);
-        self::emitBoxedNonArrayTypeErrorArgNum($context, $fn, $argNum, $typeByte);
-        $context->builder->positionAtEnd($okBlock);
+
+        return $context->builder->or(
+            $isVmArray,
+            $context->builder->or($isJitHt, $hasHt)
+        );
     }
 
     private static function emitBoxedNonArrayTypeErrorArgNum(
