@@ -35,7 +35,7 @@ final class get_html_translation_table extends Internal
             return;
         }
         $table = HTML_SPECIALCHARS;
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         if ($argc >= 1) {
             $tableVar = $frame->calledArgs[0]->resolveIndirect();
