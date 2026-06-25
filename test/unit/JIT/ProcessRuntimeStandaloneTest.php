@@ -20,9 +20,10 @@ final class ProcessRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_process.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('__compiler_shell_exec', $runtime);
-        $this->assertStringContainsString('__compiler_escapeshellarg', $runtime);
-        $this->assertStringContainsString('__compiler_escapeshellcmd', $runtime);
-        $this->assertStringContainsString('__compiler_phpc_run_command', $runtime);
+        $this->assertStringContainsString('ProcessStandaloneLlvm::implement', $runtime);
+        $this->assertStringNotContainsString('emitShellExec', $runtime);
+        $standalone = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
+        $this->assertStringContainsString('emitShellExec', $standalone);
     }
 
     /**
