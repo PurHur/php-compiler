@@ -31,6 +31,9 @@ final class VmJson
     /** JSON_ERROR_RECURSION — circular array/object reference (Zend ext/json/php_json.c). */
     public const ERROR_RECURSION = 6;
 
+    /** JSON_ERROR_DEPTH — maximum stack depth exceeded (Zend ext/json/php_json.c). */
+    public const ERROR_DEPTH = 1;
+
     /** Last JSON_ERROR_* from VM json_* (Zend ext/json/php_json.c). */
     private static int $lastError = 0;
 
@@ -208,9 +211,15 @@ final class VmJson
         );
     }
 
-    public static function export(Variable $v, ?Context $ctx = null, ?VM $vm = null, ?Frame $frame = null): mixed
-    {
-        return self::exportValue($v, $ctx, $vm, $frame, new \SplObjectStorage());
+    public static function export(
+        Variable $v,
+        ?Context $ctx = null,
+        ?VM $vm = null,
+        ?Frame $frame = null,
+        int $maxDepth = 512,
+        int $depth = 0
+    ): mixed {
+        return self::exportValue($v, $ctx, $vm, $frame, new \SplObjectStorage(), $maxDepth, $depth);
     }
 
     private static function exportValue(
@@ -218,7 +227,9 @@ final class VmJson
         ?Context $ctx,
         ?VM $vm,
         ?Frame $frame,
-        \SplObjectStorage $visited
+        \SplObjectStorage $visited,
+        int $maxDepth,
+        int $depth
     ): mixed {
         $v = $v->resolveIndirect();
         if (is_resource_::isResource($v)) {
@@ -236,6 +247,10 @@ final class VmJson
             case Variable::TYPE_STRING:
                 return $v->toString();
             case Variable::TYPE_ARRAY:
+                $arrayDepth = $depth + 1;
+                if ($arrayDepth > $maxDepth) {
+                    throw new VmJsonExportException(self::ERROR_DEPTH);
+                }
                 $ht = $v->toArray();
                 if ($visited->contains($ht)) {
                     throw new VmJsonExportException(self::ERROR_RECURSION);
@@ -246,9 +261,25 @@ final class VmJson
                     foreach ($ht->iterateKeyed(true) as [$key, $value]) {
                         $k = $key->resolveIndirect();
                         if (Variable::TYPE_STRING === $k->type) {
-                            $out[$k->toString()] = self::exportValue($value, $ctx, $vm, $frame, $visited);
+                            $out[$k->toString()] = self::exportValue(
+                                $value,
+                                $ctx,
+                                $vm,
+                                $frame,
+                                $visited,
+                                $maxDepth,
+                                $arrayDepth
+                            );
                         } elseif (Variable::TYPE_INTEGER === $k->type) {
-                            $out[$k->toInt()] = self::exportValue($value, $ctx, $vm, $frame, $visited);
+                            $out[$k->toInt()] = self::exportValue(
+                                $value,
+                                $ctx,
+                                $vm,
+                                $frame,
+                                $visited,
+                                $maxDepth,
+                                $arrayDepth
+                            );
                         } else {
                             throw new \LogicException(
                                 'json_encode() only supports string or integer keys in this compiler build'
@@ -261,8 +292,12 @@ final class VmJson
                     $visited->detach($ht);
                 }
             case Variable::TYPE_ENUM_CASE:
-                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm, $frame, $visited);
+                return self::exportEnumCase($v->toEnumCase(), $ctx, $vm, $frame, $visited, $maxDepth, $depth);
             case Variable::TYPE_OBJECT:
+                $objectDepth = $depth + 1;
+                if ($objectDepth > $maxDepth) {
+                    throw new VmJsonExportException(self::ERROR_DEPTH);
+                }
                 if (null === $ctx || null === $vm) {
                     throw new \LogicException(
                         'json_encode() value type not supported in this compiler build'
@@ -291,11 +326,21 @@ final class VmJson
                             $ctx,
                             $vm,
                             $frame,
-                            $visited
+                            $visited,
+                            $maxDepth,
+                            $objectDepth
                         );
                     }
                     if (!InterfaceCheck::entryImplements($object->class, 'jsonserializable', $ctx)) {
-                        return self::exportObjectPublicProperties($object, $ctx, $vm, $frame, $visited);
+                        return self::exportObjectPublicProperties(
+                            $object,
+                            $ctx,
+                            $vm,
+                            $frame,
+                            $visited,
+                            $maxDepth,
+                            $objectDepth
+                        );
                     }
                     if (!$vm->hasInstanceMethod($object->class, 'jsonserialize')) {
                         throw new \Error(
@@ -304,7 +349,15 @@ final class VmJson
                     }
                     $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
 
-                    return self::exportValue($serialized, $ctx, $vm, $frame, $visited);
+                    return self::exportValue(
+                        $serialized,
+                        $ctx,
+                        $vm,
+                        $frame,
+                        $visited,
+                        $maxDepth,
+                        $objectDepth
+                    );
                 } finally {
                     $visited->detach($object);
                 }
@@ -323,12 +376,22 @@ final class VmJson
         Context $ctx,
         VM $vm,
         ?Frame $frame,
-        \SplObjectStorage $visited
+        \SplObjectStorage $visited,
+        int $maxDepth,
+        int $depth
     ): \stdClass {
         $out = new \stdClass();
         if (null !== $frame) {
             foreach ($vm->collectPublicPropertiesForSerialize($object, $frame) as $name => $prop) {
-                $out->$name = self::exportValue($prop, $ctx, $vm, $frame, $visited);
+                $out->$name = self::exportValue(
+                    $prop,
+                    $ctx,
+                    $vm,
+                    $frame,
+                    $visited,
+                    $maxDepth,
+                    $depth
+                );
             }
 
             return $out;
@@ -358,7 +421,15 @@ final class VmJson
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $name = $meta->name;
-                $out->$name = self::exportValue($copy, $ctx, $vm, $frame, $visited);
+                $out->$name = self::exportValue(
+                    $copy,
+                    $ctx,
+                    $vm,
+                    $frame,
+                    $visited,
+                    $maxDepth,
+                    $depth
+                );
             }
         }
         foreach ($object->getRawProperties() as $name => $prop) {
@@ -371,7 +442,15 @@ final class VmJson
             }
             $copy = new Variable();
             $copy->copyFrom($prop);
-            $out->$name = self::exportValue($copy, $ctx, $vm, $frame, $visited);
+            $out->$name = self::exportValue(
+                $copy,
+                $ctx,
+                $vm,
+                $frame,
+                $visited,
+                $maxDepth,
+                $depth
+            );
         }
 
         return $out;
@@ -385,7 +464,9 @@ final class VmJson
         ?Context $ctx,
         ?VM $vm,
         ?Frame $frame,
-        \SplObjectStorage $visited
+        \SplObjectStorage $visited,
+        int $maxDepth,
+        int $depth
     ): mixed {
         if (null !== $ctx && null !== $vm
             && InterfaceCheck::entryImplements($case->enumClass, 'jsonserializable', $ctx)) {
@@ -399,7 +480,15 @@ final class VmJson
             }
             $serialized = $vm->invokeInstanceMethod($object, 'jsonSerialize')->resolveIndirect();
 
-            return self::exportValue($serialized, $ctx, $vm, $frame, $visited);
+            return self::exportValue(
+                $serialized,
+                $ctx,
+                $vm,
+                $frame,
+                $visited,
+                $maxDepth,
+                $depth
+            );
         }
 
         if (null === $case->enumClass->backedType) {
