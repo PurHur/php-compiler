@@ -18,11 +18,11 @@ final class VmArrayPointer
             return;
         }
         if (null === $key) {
-            $frame->returnVar->null();
+            self::writeReturnSlot($frame, null, false);
 
             return;
         }
-        $frame->returnVar->copyFrom($key);
+        self::writeReturnSlot($frame, $key, false);
     }
 
     public static function returnValue(Frame $frame, ?Variable $value): void
@@ -35,7 +35,60 @@ final class VmArrayPointer
 
             return;
         }
-        $frame->returnVar->copyFrom($value);
+        self::writeReturnSlot($frame, $value, true);
+    }
+
+    /**
+     * FUNCCALL result slots may alias object property storage (#1885, #11787); stage through INDIRECT
+     * so key()/next() returns do not clobber typed instance properties on the operand object.
+     */
+    private static function writeReturnSlot(Frame $frame, ?Variable $value, bool $valueMode): void
+    {
+        $dest = $frame->returnVar;
+        if (null === $dest) {
+            return;
+        }
+        if ($valueMode && null === $value) {
+            $dest->bool(false);
+
+            return;
+        }
+        if (!$valueMode && null === $value) {
+            $dest->null();
+
+            return;
+        }
+        if (!self::returnVarAliasesPointerObjectProperty($frame, $dest)) {
+            $dest->copyFrom($value);
+
+            return;
+        }
+        $staging = new Variable();
+        $staging->copyFrom($value);
+        if (Variable::TYPE_INDIRECT === $dest->type) {
+            $dest->resolveIndirect()->copyFrom($staging);
+
+            return;
+        }
+        $dest->indirect($staging);
+    }
+
+  private static function returnVarAliasesPointerObjectProperty(Frame $frame, Variable $dest): bool
+    {
+        if (!isset($frame->calledArgs[0])) {
+            return false;
+        }
+        $operand = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $operand->type) {
+            return false;
+        }
+        $object = $operand->toObject();
+        $target = $dest->resolveIndirect();
+        if (null === $target->objectPropertyOwner || null === $target->objectPropertyName) {
+            return false;
+        }
+
+        return $target->objectPropertyOwner === $object;
     }
 
     /**
