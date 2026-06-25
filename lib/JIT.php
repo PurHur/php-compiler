@@ -135,7 +135,7 @@ class JIT {
             $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         }
         $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
-        if (null !== $emitHelperStubBlock && $this->shouldStubInventoryEmitHelperBundledBodies()) {
+        if (null !== $emitHelperStubBlock && ($this->shouldStubInventoryEmitHelperBundledBodies() || $this->shouldRealLowerInventoryArgvParseSpine())) {
             foreach (['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser'] as $methodLc) {
                 $logical = 'PHPCompiler\\Runtime::'.$methodLc;
                 $lc = strtolower($logical);
@@ -990,6 +990,15 @@ class JIT {
         return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
     }
 
+    /**
+     * Inventory argv driver real-lowers Runtime::parse but not the full preprocess rewriter chain
+     * (SealedClassPreprocessor, PropertyHooks, …) — identity LLVM stubs suffice for gen-0 refresh (#11809).
+     */
+    private function shouldStubInventoryArgvPreprocessSpineMethods(): bool
+    {
+        return $this->shouldRealLowerInventoryArgvParseSpine();
+    }
+
     /** Inventory emit TU is compile_driver.php — do not host-compile it again as a link sidecar (#2843). */
     private function shouldSkipM3InventoryEmitDriverSelfSidecar(string $path): bool
     {
@@ -1223,9 +1232,21 @@ class JIT {
         }
         if (str_ends_with($lower, '\\runtime::preparesourceforparser')
             || str_ends_with($lower, '\\runtime::preprocesssourceforparse')
-            || str_ends_with($lower, '\\runtime::rewritesourcebeforeparser')
-            || str_ends_with($lower, '\\runtime::parse')) {
+            || str_ends_with($lower, '\\runtime::rewritesourcebeforeparser')) {
+            if ($this->shouldStubInventoryArgvPreprocessSpineMethods()) {
+                return false;
+            }
+
             return !$this->shouldStubInventoryEmitParseCompileSpine();
+        }
+        if (str_ends_with($lower, '\\runtime::parse')) {
+            return !$this->shouldStubInventoryEmitParseCompileSpine();
+        }
+        if (str_ends_with($lower, '\\runtime::detectfilestricttypes')
+            || str_ends_with($lower, '\\runtime::resetparsernameresolverstate')
+            || str_ends_with($lower, '\\runtime::recordlastparsefailure')
+            || str_ends_with($lower, '\\runtime::formatparseandcompilenulldetail')) {
+            return $this->shouldRealLowerInventoryArgvParseSpine();
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
             return true;
@@ -1502,6 +1523,18 @@ class JIT {
 
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
             }
+            if ($this->shouldStubInventoryArgvPreprocessSpineMethods()
+                && (
+                    str_ends_with($m3Spine, '\\runtime::preprocesssourceforparse')
+                    || str_ends_with($m3Spine, '\\runtime::rewritesourcebeforeparser')
+                )
+            ) {
+                return $this->compileSkippedCompilerSplitCfgStub(
+                    $internalName,
+                    $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock ?? $block,
+                    $logicalName ?? $internalName
+                );
+            }
             if (str_ends_with($m3Spine, '\\runtime::compileemitsmoke')) {
                 if ($this->shouldUseM3EmitTuRuntimeMethodStub('compileemitsmoke')) {
                     return $this->emitM3EmitTuRuntimeCompileEmitSmokeNative($internalName, $logicalName, $block);
@@ -1549,6 +1582,22 @@ class JIT {
                 || str_ends_with($m3CompilerSetter, '\\compiler::setbarerethrowlines')
             ) {
                 return $this->emitM3EmitTuCompilerArrayPropertySetterVoidStub(
+                    $internalName,
+                    $logicalName,
+                    $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
+                );
+            }
+            if (str_ends_with($m3CompilerSetter, '\\compiler::setcompileabortdetailifempty')
+                || str_ends_with($m3CompilerSetter, '\\compiler::setdebuglastphaseinputfile')
+            ) {
+                return $this->emitM3EmitTuCompilerStringSetterVoidStub(
+                    $internalName,
+                    $logicalName,
+                    $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
+                );
+            }
+            if (str_ends_with($m3CompilerSetter, '\\compiler::resetcompileabortdetail')) {
+                return $this->emitM3EmitTuCompilerVoidStub(
                     $internalName,
                     $logicalName,
                     $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
@@ -3824,7 +3873,11 @@ class JIT {
         $this->context->scope->className = 'phpcompiler\\runtime';
         $forceRealParseSpine = $this->shouldRealLowerInventoryArgvParseSpine();
         if ($forceRealParseSpine) {
-            foreach (['preprocesssourceforparse', 'rewritesourcebeforeparser', 'preparesourceforparser', 'parse', 'compileemitsmoke'] as $spineLc) {
+            // Inventory argv Zend rebuild keeps preprocess CFG stubs; only parse/emit spine is real (#11809).
+            $forceRealUnset = $this->shouldUseM3InventoryEmitDriver()
+                ? ['parse', 'compileemitsmoke']
+                : ['preprocesssourceforparse', 'rewritesourcebeforeparser', 'preparesourceforparser', 'parse', 'compileemitsmoke'];
+            foreach ($forceRealUnset as $spineLc) {
                 $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
                 unset(
                     $this->context->functions[$spineLcKey],
@@ -3834,13 +3887,16 @@ class JIT {
             }
         }
         if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
-            foreach ([
-                'preprocesssourceforparse',
-                'rewritesourcebeforeparser',
-                'preparesourceforparser',
-                'parse',
-                'compileemitsmoke',
-            ] as $spineLc) {
+            $spineCompileList = $this->shouldUseM3InventoryEmitDriver()
+                ? ['parse', 'compileemitsmoke']
+                : [
+                    'preprocesssourceforparse',
+                    'rewritesourcebeforeparser',
+                    'preparesourceforparser',
+                    'parse',
+                    'compileemitsmoke',
+                ];
+            foreach ($spineCompileList as $spineLc) {
                 $spineLcKey = strtolower('PHPCompiler\\Runtime::'.$spineLc);
                 if (isset($this->context->functions[$spineLcKey])) {
                     continue;
@@ -3908,9 +3964,13 @@ class JIT {
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $this->ensureM3EmitTuRuntimeParseSpineDeps();
-        $emitHelperStubMethods = $this->shouldStubInventoryEmitParseCompileSpine()
-            ? ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke']
-            : [];
+        $emitHelperStubMethods = [];
+        if ($this->shouldStubInventoryEmitParseCompileSpine()) {
+            $emitHelperStubMethods = ['parse', 'preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
+        } elseif ($this->shouldRealLowerInventoryArgvParseSpine()) {
+            // Inventory argv: real-lower parse only; preprocess helpers stay CFG stubs (#11809).
+            $emitHelperStubMethods = ['preparesourceforparser', 'preprocesssourceforparse', 'rewritesourcebeforeparser', 'compileemitsmoke'];
+        }
         $inventoryEmitHelper = $this->shouldStubM3InventoryEmitJitSpineMethods();
         foreach ([
             '__construct',
@@ -3967,6 +4027,26 @@ class JIT {
                     $stubBlock
                 );
             }
+        }
+        foreach (['setcompileabortdetailifempty', 'setdebuglastphaseinputfile'] as $methodLc) {
+            $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+            $lc = strtolower($logical);
+            if (!isset($this->context->functions[$lc])) {
+                $this->emitM3EmitTuCompilerStringSetterVoidStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+        }
+        $resetLogical = 'PHPCompiler\\Compiler::resetcompileabortdetail';
+        $resetLc = strtolower($resetLogical);
+        if (!isset($this->context->functions[$resetLc])) {
+            $this->emitM3EmitTuCompilerVoidStub(
+                $this->llvmInternalName($resetLogical),
+                $resetLogical,
+                $stubBlock
+            );
         }
         if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
             $compileLogical = 'PHPCompiler\\Compiler::compile';
@@ -4053,22 +4133,137 @@ class JIT {
         return $func;
     }
 
+    /** No-op string setter for Compiler spine — LLVM link only (#11809). */
+    private function emitM3EmitTuCompilerStringSetterVoidStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($voidTy, false, $objectPtr, $strPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr, $strPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
+    /** No-op void Compiler spine method — LLVM link only (#11809). */
+    private function emitM3EmitTuCompilerVoidStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($voidTy, false, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
     /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
     private function ensureM3EmitTuRuntimeParseSpineDeps(): void
     {
         if (!$this->shouldRealLowerInventoryArgvParseSpine()) {
             return;
         }
-        foreach (['detectfilestricttypes', 'resetparsernameresolverstate'] as $methodLc) {
+        $this->ensureM3EmitTuRuntimeInventoryArgvParsePreprocessStubs();
+        $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if (null === $stubBlock) {
+            return;
+        }
+        foreach ([
+            'detectfilestricttypes',
+            'resetparsernameresolverstate',
+            'formatparseandcompilenulldetail',
+            'recordlastparsefailure',
+            'formatphpparsererrorcontext',
+            'emitparsecompilefailurestderr',
+        ] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
             if (isset($this->context->functions[$lc])) {
                 continue;
             }
-            $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile($methodLc, $logical, $lc);
-            if (!isset($this->context->functions[$lc])) {
-                $this->compileM3EmitTuRuntimeMethodFromDeclareClassBlocks([$methodLc]);
+            $this->compileSkippedCompilerSplitCfgStub(
+                $this->llvmInternalName($logical),
+                $stubBlock,
+                $logical
+            );
+        }
+    }
+
+    /**
+     * Inventory argv parse spine: stub preprocess/rewrite (heavy rewriter deps) and real-lower prepare wrapper (#11809).
+     */
+    private function ensureM3EmitTuRuntimeInventoryArgvParsePreprocessStubs(): void
+    {
+        if (!$this->shouldStubInventoryArgvPreprocessSpineMethods()) {
+            return;
+        }
+        $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if (null === $stubBlock) {
+            return;
+        }
+        foreach (['preprocesssourceforparse', 'rewritesourcebeforeparser'] as $methodLc) {
+            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $lc = strtolower($logical);
+            if (isset($this->context->functions[$lc])) {
+                continue;
             }
+            $this->compileSkippedCompilerSplitCfgStub(
+                $this->llvmInternalName($logical),
+                $stubBlock,
+                $logical
+            );
+        }
+        $prepareLogical = 'PHPCompiler\\Runtime::preparesourceforparser';
+        $prepareLc = strtolower($prepareLogical);
+        if (!isset($this->context->functions[$prepareLc])) {
+            $this->compileM3EmitTuRuntimeMethodFromRuntimePhpFile('preparesourceforparser', $prepareLogical, $prepareLc);
         }
     }
 
@@ -5573,7 +5768,15 @@ class JIT {
         if ($this->shouldUseM3InventoryEmitDriver()) {
             // Never scan O(modules×funcs) on inventory argv links (#2967). parse/compileEmitSmoke from
             // Runtime.php; ctor/init* use native M3 via compileBlock / ensureM3EmitTuRuntimeInitSpineSymbols.
-            if (in_array($methodLc, ['parse', 'preparesourceforparser', 'compileemitsmoke', 'peeklastparsefailure', 'noteparsecompilenullforscript'], true)) {
+            if (in_array($methodLc, [
+                'parse',
+                'preparesourceforparser',
+                'preprocesssourceforparse',
+                'rewritesourcebeforeparser',
+                'compileemitsmoke',
+                'peeklastparsefailure',
+                'noteparsecompilenullforscript',
+            ], true)) {
                 if ($this->shouldRealLowerInventoryArgvParseSpine()) {
                     unset(
                         $this->context->functions[$lc],
