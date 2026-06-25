@@ -35,11 +35,7 @@ final class hash_hkdf extends Internal
         }
         $length = 0;
         if ($argc >= 3) {
-            $lengthArg = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \TypeError('hash_hkdf(): Argument #3 ($length) must be of type int');
-            }
-            $length = $lengthArg->toInt();
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'hash_hkdf', 3, 'length');
             if ($length < 0) {
                 throw new \ValueError('hash_hkdf(): Argument #3 ($length) must be greater than or equal to 0');
             }
