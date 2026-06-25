@@ -9742,7 +9742,114 @@ class Compiler {
             }
         }
 
-        return $this->compileOperand($arg, $block, true);
+        return $this->compileOperand($empty->result, $block, true);
+    }
+
+    /**
+     * php-cfg dead call-arg temps for hoisted isset()/empty() — map to producer result slot (#11498).
+     */
+    private function resolveHoistedIssetOrEmptyCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): ?int {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        $producer = $this->findHoistedIssetOrEmptyProducerForCallArg($block, $cfgCallOp, $argIndex);
+        if (null === $producer) {
+            return null;
+        }
+        if ($producer instanceof Op\Expr\Isset_ && !$this->issetExprLoweringEmitted($block, $producer)) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        if ($producer instanceof Op\Expr\Empty_ && !$this->emptyExprLoweringEmitted($block, $producer)) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+
+        return $this->slotForEmittedIssetOrEmptyProducer($block, $producer)
+            ?? $this->compileOperand($producer->result, $block, true);
+    }
+
+    /**
+     * @return Op\Expr\Isset_|Op\Expr\Empty_|null
+     */
+    private function findHoistedIssetOrEmptyProducerForCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): ?Op\Expr {
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $callArgs = property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args) ? $cfgCallOp->args : [];
+        if (\count($producers) === \count($callArgs) && isset($producers[$argIndex])) {
+            $candidate = $producers[$argIndex];
+            if ($candidate instanceof Op\Expr\Isset_ || $candidate instanceof Op\Expr\Empty_) {
+                return $candidate;
+            }
+        }
+        $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex, $cfgCallOp);
+        if ($matched instanceof Op\Expr\Isset_ || $matched instanceof Op\Expr\Empty_) {
+            return $matched;
+        }
+        $hoisted = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                array_unshift($hoisted, $child);
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            break;
+        }
+        $producer = $hoisted[$argIndex] ?? null;
+
+        return ($producer instanceof Op\Expr\Isset_ || $producer instanceof Op\Expr\Empty_) ? $producer : null;
+    }
+
+    /**
+     * Recover lowered isset()/empty() result slots when php-cfg dead arg temps omit dataflow (#11498).
+     */
+    private function slotForEmittedIssetOrEmptyProducer(Block $block, Op\Expr $producer): ?int
+    {
+        $slot = $block->slotForOperand($producer->result);
+        if (null !== $slot) {
+            return $slot;
+        }
+        if ($producer instanceof Op\Expr\Isset_) {
+            for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+                $op = $block->opCodes[$i];
+                if (OpCode::TYPE_ISSET === $op->type) {
+                    return $op->arg1;
+                }
+            }
+        }
+        if ($producer instanceof Op\Expr\Empty_) {
+            for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+                $op = $block->opCodes[$i];
+                if (OpCode::TYPE_EMPTY === $op->type || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type) {
+                    return $op->arg1;
+                }
+            }
+        }
+
+        return null;
     }
 
     private function emptyExprLoweringEmitted(Block $block, Op\Expr\Empty_ $empty): bool
@@ -16772,7 +16879,18 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp);
+                $valueSlot = null;
+                if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
+                if (null === $valueSlot) {
+                    $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp);
+                }
                 if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
                 } elseif (null === $valueSlot) {
@@ -17039,7 +17157,8 @@ class Compiler {
                                 $sends[] = $op;
                             }
                         }
-                        $matchedSlot = $block->slotForOperand($matched->result);
+                        $matchedSlot = $this->slotForEmittedIssetOrEmptyProducer($block, $matched)
+                            ?? $block->slotForOperand($matched->result);
                         if (null !== $matchedSlot) {
                             $valueSlot = $matchedSlot;
                         }
@@ -17187,6 +17306,17 @@ class Compiler {
                     if (null !== $arraySlot) {
                         $valueSlot = $arraySlot;
                     }
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $recoveredIssetEmpty = $this->resolveHoistedIssetOrEmptyCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $recoveredIssetEmpty) {
+                    $valueSlot = $recoveredIssetEmpty;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
