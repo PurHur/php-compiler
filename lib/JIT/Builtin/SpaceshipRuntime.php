@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -28,6 +29,10 @@ final class SpaceshipRuntime
 
     private const KIND_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::kindSpaceship';
 
+    private const OBJECT_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::objectSpaceship';
+
+    private const HASHTABLE_HELPER = 'PHPCompiler\\VM\\CompareJitHelper::hashtableSpaceship';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::LONG_HELPER,
@@ -35,6 +40,8 @@ final class SpaceshipRuntime
         self::STRING_HELPER,
         self::NUMBER_STRING_HELPER,
         self::KIND_HELPER,
+        self::OBJECT_HELPER,
+        self::HASHTABLE_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -112,12 +119,14 @@ final class SpaceshipRuntime
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CompareJitHelper.php');
-        if (null === $block) {
-            throw new \LogicException('CompareJitHelper.php parseAndCompile failed (#9381)');
-        }
-        $jit = new JIT($context);
-        $jit->compile($block);
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'CompareJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('CompareJitHelper.php parseAndCompile failed (#9381)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
         foreach (self::COMPILED_HELPERS as $logical) {
             $lc = \strtolower($logical);
             if (!isset($context->functions[$lc])) {
