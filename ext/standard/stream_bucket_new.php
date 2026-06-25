@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** stream_bucket_new() — create StreamBucket for filter brigades (#6053, #7089). */
+/** stream_bucket_new() — create stdClass bucket for filter brigades (#6053, #7089, #10325). */
 final class stream_bucket_new extends Internal
 {
     public function __construct()
