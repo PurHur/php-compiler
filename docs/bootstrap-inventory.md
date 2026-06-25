@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3097 |
-| Phase A inventory files (M2 ratio SSOT) | 3097 |
+| PHP files on vm.php path | 3099 |
+| Phase A inventory files (M2 ratio SSOT) | 3099 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8328 |
+| Source constructs flagged (warnings) | 8330 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2534,7 +2534,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/JitVmHelperLink.php` | 0 | 2 |
 | `lib/JIT/LateStaticBindingHelper.php` | 0 | 1 |
 | `lib/JIT/LazyBuiltins.php` | 0 | 1 |
-| `lib/JIT/LazyObjectHelper.php` | 0 | 3 |
+| `lib/JIT/LazyObjectHelper.php` | 0 | 1 |
+| `lib/JIT/LazyObjectHelperLlvm.php` | 0 | 3 |
 | `lib/JIT/LibcExtern.php` | 0 | 1 |
 | `lib/JIT/ListUnpackHelper.php` | 0 | 1 |
 | `lib/JIT/M3EmitTuTrivialEchoAot.php` | 0 | 2 |
@@ -2997,6 +2998,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
+| `lib/VM/VmLazyObject.php` | 0 | 1 |
 | `lib/VM/VmUnset.php` | 0 | 1 |
 | `lib/VM/VmVarFetch.php` | 0 | 1 |
 | `lib/VM/VmVarFetchJitHelper.php` | 0 | 1 |
@@ -19536,9 +19538,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/LazyObjectHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 133)
-- new Variable (line 139)
-- 4 class method(s)
+- 3 class method(s)
+
+### `lib/JIT/LazyObjectHelperLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 125)
+- new Variable (line 131)
+- 3 class method(s)
 
 ### `lib/JIT/LibcExtern.php`
 
@@ -23189,6 +23196,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `lib/VM/VmLazyObject.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/VM/VmUnset.php`
 
