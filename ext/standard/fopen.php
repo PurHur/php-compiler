@@ -30,7 +30,7 @@ final class fopen extends Internal
         $mode = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'fopen', 1, 'mode');
 
         $useIncludePath = false;
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $useIncludePath = VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[2],
                 'fopen',
@@ -39,7 +39,7 @@ final class fopen extends Internal
             );
         }
 
-        if ($argc >= 4) {
+        if (isset($frame->calledArgs[3])) {
             $contextVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL !== $contextVar->type) {
                 VmStreamContext::requireRepresentation($contextVar, 'fopen', 4);

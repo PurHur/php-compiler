@@ -175,6 +175,8 @@ final class BuiltinParamNames
                 return ['pattern', 'replacement', 'subject', 'limit', 'count'];
             case 'file_get_contents':
                 return ['filename', 'use_include_path', 'context', 'offset', 'length'];
+            case 'file_put_contents':
+                return ['filename', 'data', 'flags', 'context'];
             case 'fopen':
                 return ['filename', 'mode', 'use_include_path', 'context'];
             case 'fgets':
