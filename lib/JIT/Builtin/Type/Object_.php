@@ -4344,7 +4344,9 @@ class Object_ extends Type {
         }
         if (Variable::TYPE_HASHTABLE === $jitType) {
             if (null === $default || VMVariable::TYPE_ARRAY === $default->type) {
-                $this->initStaticHashtablePropertyEmpty($global);
+                if (!$this->deferStaticHashtableInitInAot($classId)) {
+                    $this->initStaticHashtablePropertyEmpty($global);
+                }
             } else {
                 throw new \LogicException(
                     'Static array property default must be an empty array literal for '.$this->classNameForId($classId).'::'.$name
@@ -4436,6 +4438,20 @@ class Object_ extends Type {
         if (null !== $restore) {
             BasicBlockHelper::restoreInsertBlock($this->context, $restore);
         }
+    }
+
+    /**
+     * WeakRef registry slot tables allocate on first write — eager __init__ hashtable alloc
+     * runs before runtime tables are ready and segfaults HelloWorld AOT (#11437).
+     */
+    private function deferStaticHashtableInitInAot(int $classId): bool
+    {
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE !== $this->context->loadType) {
+            return false;
+        }
+        $classLc = strtolower(ltrim($this->classNameForId($classId), '\\'));
+
+        return 'phpcompiler\\ext\\standard\\weakrefregistryjithelper' === $classLc;
     }
 
     /** Box an empty compile-time array default into a union/DNF static {@see __value__} property (#8708, #8719, DomRegistry::$states #6140). */

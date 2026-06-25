@@ -77,16 +77,7 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        try {
-            $fn = $context->lookupFunction('__phpc_ob_end_all');
-            if ($fn->countBasicBlocks() > 0) {
-                $context->builder->call($fn);
-
-                return;
-            }
-        } catch (\Throwable) {
-        }
-        self::registerExternals($context);
+        ObOutputRuntime::ensureLinked($context);
         $context->builder->call($context->lookupFunction('__phpc_ob_end_all'));
     }
 }
