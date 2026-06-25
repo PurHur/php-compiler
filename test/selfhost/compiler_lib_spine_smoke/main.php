@@ -2184,6 +2184,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/InetLibcBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/InetRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniGet.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/IniIntrospectionRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniParseQuantityRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/IniSet.php';
