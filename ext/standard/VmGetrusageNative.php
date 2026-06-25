@@ -32,7 +32,7 @@ final class VmGetrusageNative
     }
 
     /**
-     * @return array<int|string, int>|false
+     * @return array<string, int>|false
      */
     public static function getrusage(int $who = 0): array|false
     {
@@ -55,11 +55,11 @@ final class VmGetrusageNative
     }
 
     /**
-     * @return array<int|string, int>
+     * @return array<string, int>
      */
     private static function toPhpArray(\FFI\CData $ru): array
     {
-        $fields = [
+        return [
             'ru_utime.tv_sec' => (int) $ru->ru_utime->tv_sec,
             'ru_utime.tv_usec' => (int) $ru->ru_utime->tv_usec,
             'ru_stime.tv_sec' => (int) $ru->ru_stime->tv_sec,
@@ -78,15 +78,6 @@ final class VmGetrusageNative
             'ru_nvcsw' => (int) $ru->ru_nvcsw,
             'ru_nivcsw' => (int) $ru->ru_nivcsw,
         ];
-        $out = [];
-        $i = 0;
-        foreach ($fields as $key => $value) {
-            $out[$key] = $value;
-            $out[$i] = $value;
-            ++$i;
-        }
-
-        return $out;
     }
 
     private static function ffi(): ?\FFI

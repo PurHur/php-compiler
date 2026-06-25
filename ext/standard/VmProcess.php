@@ -31,13 +31,12 @@ final class VmProcess
 
         $ht = new HashTable();
         foreach ($raw as $key => $value) {
+            if (\is_int($key)) {
+                continue;
+            }
             $slot = new Variable();
             $slot->int((int) $value);
-            if (\is_int($key)) {
-                $ht->addIndex($key, $slot);
-            } else {
-                $ht->add((string) $key, $slot);
-            }
+            $ht->add((string) $key, $slot);
         }
 
         return $ht;

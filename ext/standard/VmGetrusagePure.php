@@ -15,7 +15,7 @@ namespace PHPCompiler\ext\standard;
 final class VmGetrusagePure
 {
     /**
-     * @return array<int|string, int>|false
+     * @return array<string, int>|false
      */
     public static function getrusage(int $who = 0): array|false
     {
@@ -63,16 +63,13 @@ final class VmGetrusagePure
     }
 
     /**
-     * @return array<int|string, int>
+     * @return array<string, int>
      */
     private static function toPhpArray(array $named): array
     {
         $out = [];
-        $i = 0;
         foreach ($named as $key => $value) {
             $out[(string) $key] = (int) $value;
-            $out[$i] = (int) $value;
-            ++$i;
         }
 
         return $out;
