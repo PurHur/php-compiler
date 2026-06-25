@@ -297,7 +297,7 @@ final class VmSprintf
                 return self::formatSignedDecimal(self::argToInt($var, $frame), $showSign);
             case 'f':
             case 'F':
-                return self::formatFixed(self::argToFloat($var, $frame), $floatPrec);
+                return self::formatFixed(self::argToFloat($var, $frame), $floatPrec, $showSign);
             case 'b':
                 return self::formatRadix(self::argToInt($var, $frame), 2, false);
             case 'x':
@@ -311,13 +311,13 @@ final class VmSprintf
             case 'c':
                 return self::intToChar(self::argToInt($var, $frame));
             case 'e':
-                return self::formatScientific(self::argToFloat($var, $frame), false, $floatPrec);
+                return self::formatScientific(self::argToFloat($var, $frame), false, $floatPrec, $showSign);
             case 'E':
-                return self::formatScientific(self::argToFloat($var, $frame), true, $floatPrec);
+                return self::formatScientific(self::argToFloat($var, $frame), true, $floatPrec, $showSign);
             case 'g':
-                return self::formatGeneral(self::argToFloat($var, $frame), false, $floatPrec);
+                return self::formatGeneral(self::argToFloat($var, $frame), false, $floatPrec, $showSign);
             case 'G':
-                return self::formatGeneral(self::argToFloat($var, $frame), true, $floatPrec);
+                return self::formatGeneral(self::argToFloat($var, $frame), true, $floatPrec, $showSign);
             case 'a':
                 return self::formatHexFloat(self::argToFloat($var, $frame), false, $precision, $showSign);
             case 'A':
@@ -510,27 +510,34 @@ final class VmSprintf
         return \chr($value & 0xFF);
     }
 
-    /** php-src sprintf.c — %f (default precision 6; issue #10151, #10796). */
-    private static function formatFixed(float $value, int $precision = 6): string
-    {
-        return VmFloatDtoa::formatSprintfF($value, $precision);
-    }
-
-    /** php-src sprintf.c — %e / %E (default precision 6). */
-    private static function formatScientific(float $value, bool $upper, int $precision = 6): string
+    /** php-src sprintf.c — %f (default precision 6; issue #10151, #10796, #11779). */
+    private static function formatFixed(float $value, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
             return 'NAN';
         }
         if (\is_infinite($value)) {
-            return $value > 0 ? 'INF' : '-INF';
+            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
         }
-        $sign = $value < 0 ? '-' : '';
+
+        return self::applyFloatSignPrefix($value, VmFloatDtoa::formatSprintfF($value, $precision), $showSign);
+    }
+
+    /** php-src sprintf.c — %e / %E (default precision 6). */
+    private static function formatScientific(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
+    {
+        if (\is_nan($value)) {
+            return 'NAN';
+        }
+        if (\is_infinite($value)) {
+            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+        }
+        $sign = $value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign);
         $abs = \abs($value);
         if (0.0 === $abs) {
             $zeros = \str_repeat('0', $precision);
 
-            return '0.'.$zeros.($upper ? 'E' : 'e').'+0';
+            return $sign.'0.'.$zeros.($upper ? 'E' : 'e').'+0';
         }
         $exp = (int) \floor(\log10($abs));
         $mantissa = $abs / (10 ** $exp);
@@ -542,27 +549,53 @@ final class VmSprintf
     }
 
     /** php-src sprintf.c — %g / %G (default precision 6). */
-    private static function formatGeneral(float $value, bool $upper, int $precision = 6): string
+    private static function formatGeneral(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
             return 'NAN';
         }
         if (\is_infinite($value)) {
-            return $value > 0 ? 'INF' : '-INF';
+            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
         }
         $abs = \abs($value);
         if (0.0 === $abs) {
-            return '0';
+            return self::positiveFloatSignPrefix($value, $showSign).'0';
         }
         if ($abs < 1e-4 || $abs >= 1e6) {
-            return self::trimGeneralScientific(self::formatScientific($value, $upper, $precision));
+            return self::trimGeneralScientific(self::formatScientific($value, $upper, $precision, $showSign));
         }
         $formatted = VmNumberFormat::format($value, $precision, '.', '');
         if (str_contains($formatted, '.')) {
             $formatted = \rtrim(\rtrim($formatted, '0'), '.');
         }
 
-        return $formatted;
+        return self::applyFloatSignPrefix($value, $formatted, $showSign);
+    }
+
+    /** php-src ext/standard/sprintf.c — SIGN flag on float conversions (#11779). */
+    private static function positiveFloatSignPrefix(float $value, ?string $showSign): string
+    {
+        if ($value < 0.0) {
+            return '';
+        }
+        if ('+' === $showSign) {
+            return '+';
+        }
+        if (' ' === $showSign) {
+            return ' ';
+        }
+
+        return '';
+    }
+
+    private static function applyFloatSignPrefix(float $value, string $formatted, ?string $showSign): string
+    {
+        if ($value < 0.0 || str_starts_with($formatted, '-') || str_starts_with($formatted, '+')) {
+            return $formatted;
+        }
+        $prefix = self::positiveFloatSignPrefix($value, $showSign);
+
+        return '' === $prefix ? $formatted : $prefix.$formatted;
     }
 
     private static function trimGeneralScientific(string $scientific): string
