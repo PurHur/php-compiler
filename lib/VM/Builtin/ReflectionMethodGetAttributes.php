@@ -27,13 +27,10 @@ final class ReflectionMethodGetAttributes extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
         }
-        $filter = null;
-        if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionMethod::getAttributes() name', 1);
-        }
+        [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionMethod::getAttributes()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
-                AttributeRegistry::methodAttributes($frame, $entry, strtolower($method), $filter)
+                AttributeRegistry::methodAttributes($frame, $entry, strtolower($method), $filter, $flags)
             );
         }
     }

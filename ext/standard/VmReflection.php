@@ -1645,6 +1645,15 @@ final class VmReflection
 
     public const REFLECTION_IS_PRIVATE = 1024;
 
+    /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
+    public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void
+    {
+        $const = new Variable();
+        $const->int(ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF);
+        $entry->constants['is_instanceof'] = $const;
+        $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
+    }
+
     /** Register ReflectionProperty::IS_* class constants (#5060). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
     {
@@ -2193,11 +2202,11 @@ final class VmReflection
         if (null === $entry) {
             return false;
         }
-        if ([] !== ReflectionSupport::filterEntriesByName($entry->attributeEntries, $attributeName)) {
+        if ([] !== ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $attributeName)) {
             return true;
         }
 
-        return [] !== ReflectionSupport::filterByName($entry->attributeNames, $attributeName);
+        return [] !== ReflectionSupport::filterByName($ctx, $entry->attributeNames, $attributeName);
     }
 
     /**

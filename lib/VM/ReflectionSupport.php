@@ -17,6 +17,7 @@ use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -37,6 +38,9 @@ final class ReflectionSupport
     public const REFLECTION_CLASS_CONSTANT = 'reflectionclassconstant';
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
+
+    /** php-src REFLECTION_ATTRIBUTE_IS_INSTANCEOF — getAttributes() filter flag (#11471). */
+    public const REFLECTION_ATTRIBUTE_IS_INSTANCEOF = 2;
 
     public const REFLECTION_ENUM = 'reflectionenum';
 
@@ -891,23 +895,50 @@ final class ReflectionSupport
     }
 
     /**
+     * Parse Reflection*::getAttributes(?string $name, int $flags) optional args (#11471).
+     *
+     * @return array{0: ?string, 1: int}
+     */
+    public static function getAttributesFilterArgs(Frame $frame, string $methodLabel): array
+    {
+        $filter = null;
+        $flags = 0;
+        if (isset($frame->calledArgs[1])) {
+            $arg1 = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg1->type) {
+                $filter = VmReflection::stringArg($arg1, $methodLabel.' name', 1);
+            }
+        }
+        if (isset($frame->calledArgs[2])) {
+            $arg2 = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $arg2->type) {
+                throw new \TypeError(
+                    $methodLabel.': Argument #2 ($flags) must be of type int, '
+                    .EnumCaseSupport::typeNameForVariable($arg2).' given'
+                );
+            }
+            $flags = $arg2->toInt();
+        }
+
+        return [$filter, $flags];
+    }
+
+    /**
      * @param list<AttributeEntry> $all
      *
      * @return list<AttributeEntry>
      */
-    public static function filterEntriesByName(array $all, ?string $filter): array
+    public static function filterEntriesByName(Context $ctx, array $all, ?string $filter, int $flags = 0): array
     {
         if (null === $filter || '' === $filter) {
             return $all;
         }
-        $want = strtolower(ltrim($filter, '\\'));
         $out = [];
         foreach ($all as $entry) {
             if (!$entry instanceof AttributeEntry) {
                 continue;
             }
-            $cand = strtolower(ltrim($entry->name, '\\'));
-            if ($cand === $want || str_ends_with($cand, '\\'.$want)) {
+            if (self::attributeClassMatchesFilter($ctx, $entry->name, $filter, $flags)) {
                 $out[] = $entry;
             }
         }
@@ -920,21 +951,37 @@ final class ReflectionSupport
      *
      * @return list<string>
      */
-    public static function filterByName(array $all, ?string $filter): array
+    public static function filterByName(Context $ctx, array $all, ?string $filter, int $flags = 0): array
     {
         if (null === $filter || '' === $filter) {
             return $all;
         }
-        $want = strtolower(ltrim($filter, '\\'));
         $out = [];
         foreach ($all as $name) {
-            $cand = strtolower(ltrim($name, '\\'));
-            if ($cand === $want || str_ends_with($cand, '\\'.$want)) {
+            if (self::attributeClassMatchesFilter($ctx, $name, $filter, $flags)) {
                 $out[] = $name;
             }
         }
 
         return $out;
+    }
+
+    /** php-src reflection_get_attributes_impl name / IS_INSTANCEOF filter (#11471). */
+    public static function attributeClassMatchesFilter(
+        Context $ctx,
+        string $attributeClass,
+        string $filter,
+        int $flags
+    ): bool {
+        if (($flags & self::REFLECTION_ATTRIBUTE_IS_INSTANCEOF) !== 0) {
+            $entry = VmReflection::resolveClassEntry($ctx, $attributeClass);
+
+            return null !== $entry && VmReflection::isInstanceOf($ctx, $entry, $filter);
+        }
+        $want = strtolower(ltrim($filter, '\\'));
+        $cand = strtolower(ltrim($attributeClass, '\\'));
+
+        return $cand === $want || str_ends_with($cand, '\\'.$want);
     }
 
     public static function requireReflectionType(Frame $frame, Variable $receiver): ObjectEntry
