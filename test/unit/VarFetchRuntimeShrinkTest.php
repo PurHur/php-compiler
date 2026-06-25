@@ -17,6 +17,9 @@ final class VarFetchRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('isSuperglobalName', $source);
         $this->assertStringNotContainsString('operandBindingRank', $source);
         $this->assertFileExists(__DIR__.'/../../lib/VM/VmVarFetchJitHelper.php');
+        $this->assertStringNotContainsString('SuperglobalNames::ALL', $source);
+        $this->assertStringNotContainsString("lookupFunction('strcmp')", $source);
+        $this->assertLessThan(210, \substr_count($source, "\n") + 1);
     }
 
     public function testVarFetchRuntimeLazyLinkedFromHelper(): void
