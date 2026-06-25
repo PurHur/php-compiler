@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3113 |
-| Phase A inventory files (M2 ratio SSOT) | 3113 |
+| PHP files on vm.php path | 3115 |
+| Phase A inventory files (M2 ratio SSOT) | 3115 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8363 |
+| Source constructs flagged (warnings) | 8366 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -117,6 +117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/Module.php` | 0 | 3 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
+| `ext/gettext/GettextJitHelper.php` | 0 | 1 |
 | `ext/gettext/JitGettext.php` | 0 | 9 |
 | `ext/gettext/Module.php` | 0 | 9 |
 | `ext/gettext/VmGettext.php` | 0 | 1 |
@@ -2291,7 +2292,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetrusage.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringGettextJit.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringGettextRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringGettextStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 3 |
@@ -3675,6 +3677,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 38)
 - 2 class method(s)
+
+### `ext/gettext/GettextJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/gettext/JitGettext.php`
 
@@ -17950,11 +17957,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `lib/JIT/Builtin/StringGettextJit.php`
+### `lib/JIT/Builtin/StringGettextRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- new JIT (line 430)
+- 12 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringGettextStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/StringGettimeofday.php`
 

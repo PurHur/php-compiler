@@ -16,12 +16,13 @@ final class GettextJitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('not implemented for JIT', $source);
     }
 
-    public function testStringGettextJitDeclaresRuntimeHelpers(): void
+    public function testStringGettextRuntimeDeclaresAbiHelpers(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextJit.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextRuntime.php');
         $this->assertStringContainsString('__compiler_gettext', $source);
         $this->assertStringContainsString('__compiler_bindtextdomain', $source);
         $this->assertStringContainsString('__compiler_dngettext', $source);
+        $this->assertStringContainsString('GettextJitHelper', $source);
     }
 
     public function testJitGettextPhpSourceParses(): void
