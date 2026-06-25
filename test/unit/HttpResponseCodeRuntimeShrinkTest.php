@@ -39,7 +39,7 @@ final class HttpResponseCodeRuntimeShrinkTest extends TestCase
 
     public function testPendingHeadersUsesHttpResponseRuntimeNotGlobal(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersRuntime.php');
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
         $this->assertStringContainsString('HttpResponseRuntime::loadStatusRaw', $source);
         $this->assertStringNotContainsString('HttpResponseCode::$global', $source);
     }
