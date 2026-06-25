@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652, #8889).
  *
- * Mirrors JIT {@see \PHPCompiler\JIT\Builtin\ProcessOpenJit} and {@see VmProcessExecCaptureNative}.
+ * Mirrors JIT {@see \PHPCompiler\JIT\Builtin\ProcessOpenStandaloneLlvm} and {@see VmProcessExecCaptureNative}.
  * php-src: ext/standard/proc_open.c
  */
 final class VmProcessProcOpenNative
@@ -30,6 +30,12 @@ final class VmProcessProcOpenNative
     public static function available(): bool
     {
         return null !== self::ffi();
+    }
+
+    /** @internal {@see ProcessSlotJitHelper} embed slot table (#9408) */
+    public static function sharedFfi(): ?\FFI
+    {
+        return self::ffi();
     }
 
     public static function isValidHandle(int $handle): bool

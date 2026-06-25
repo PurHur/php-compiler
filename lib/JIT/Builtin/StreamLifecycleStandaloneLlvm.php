@@ -205,7 +205,7 @@ final class StreamLifecycleStandaloneLlvm
         $context->builder->returnValue($oneI32);
 
         $context->builder->positionAtEnd($processCheckBb);
-        $processBase = $i64->constInt(ProcessOpenJit::PROCESS_HANDLE_BASE, false);
+        $processBase = $i64->constInt(ProcessOpenStandaloneLlvm::PROCESS_HANDLE_BASE, false);
         $isProcessRange = $context->builder->icmp(Builder::INT_SGE, $handle, $processBase);
         $stdioBb = $fn->appendBasicBlock('is_res_stdio');
         $processProbeBb = $fn->appendBasicBlock('is_res_process_probe');
