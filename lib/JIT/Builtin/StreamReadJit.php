@@ -443,13 +443,7 @@ final class StreamReadJit
 
         $context->builder->positionAtEnd($eofBb);
         $atEof = $context->builder->icmp(Builder::INT_NE, $context->builder->call($context->lookupFunction('feof'), $fp), $i32->constInt(0, false));
-        $emptyBb = $fn->appendBasicBlock('fgetc_empty');
-        $context->builder->branchIf($atEof, $emptyBb, $failBb);
-
-        $context->builder->positionAtEnd($emptyBb);
-        $context->builder->returnValue(
-            $context->builder->call($context->lookupFunction('__string__init'), $i64->constInt(0, false), $context->pointerFromStringConstant(''))
-        );
+        $context->builder->branchIf($atEof, $failBb, $failBb);
 
         $context->builder->positionAtEnd($okBb);
         $buf = $context->builder->alloca($i8, 2, 'fgetc_buf');
