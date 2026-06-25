@@ -15,6 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT `@` silence + error_reporting via ErrorSilenceJitHelper PHP (#9197).
  *
+ * Standalone LLVM quarantine: {@see SilenceStandaloneLlvm}
  * Replaces LLVM globals phpc_ini_silence_* and phpc_ini_error_reporting for silence paths.
  * php-src: Zend/zend_execute.c — ZEND_SILENCE
  */
@@ -76,7 +77,7 @@ final class SilenceRuntime
 
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             $restoreBlock = self::captureInsertBlock($context);
-            self::implementStandaloneThinAbi($context);
+            SilenceStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
             self::restoreInsertBlock($context, $restoreBlock);
 
@@ -206,84 +207,6 @@ final class SilenceRuntime
         $context->registerFunction($abiName, $fn);
     }
 
-    /** Standalone AOT: thin LLVM ABI without compiled ErrorSilenceJitHelper PHP (#9197, #2930). */
-    private static function implementStandaloneThinAbi(Context $context): void
-    {
-        $voidTy = $context->getTypeFromString('void');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $savedBuilder = $context->builder;
-        self::ensureValueWriters($context);
-
-        foreach (['__compiler_begin_silence', '__compiler_end_silence'] as $abiName) {
-            $fn = self::standaloneAbiFunction(
-                $context,
-                $abiName,
-                $context->context->functionType($voidTy, false)
-            );
-            if ($fn->countBasicBlocks() > 0) {
-                $context->registerFunction($abiName, $fn);
-                continue;
-            }
-            $entry = $fn->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-            $context->registerFunction($abiName, $fn);
-        }
-
-        $isel = self::standaloneAbiFunction(
-            $context,
-            '__compiler_phpc_error_level_enabled',
-            $context->context->functionType($i32, false, $i32)
-        );
-        if (0 === $isel->countBasicBlocks()) {
-            $entry = $isel->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($i32->constInt(1, false));
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__compiler_phpc_error_level_enabled', $isel);
-
-        $ier = self::standaloneAbiFunction(
-            $context,
-            '__compiler_error_reporting',
-            $context->context->functionType($voidTy, false, $i32, $i64, $valPtr)
-        );
-        if (0 === $ier->countBasicBlocks()) {
-            $entry = $ier->appendBasicBlock('entry');
-            $context->builder = $context->context->builderCreate();
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeLong'),
-                $ier->getParam(2),
-                $i64->constInt(0, false)
-            );
-            $context->builder->returnVoid();
-            $context->builder->clearInsertionPosition();
-        }
-        $context->registerFunction('__compiler_error_reporting', $ier);
-
-        $context->builder = $savedBuilder;
-    }
-
-    private static function standaloneAbiFunction(Context $context, string $abiName, $ft): LlvmFunction
-    {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null === $probe) {
-            $context->module->addFunction($abiName, $ft);
-            $probe = $context->module->getNamedFunction($abiName);
-        }
-        if (null === $probe) {
-            throw new \LogicException($abiName.' missing after standalone ABI declare (#9197)');
-        }
-
-        return $probe;
-    }
-
     private static function implementVoidBridge(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);
@@ -367,7 +290,8 @@ final class SilenceRuntime
         }
     }
 
-    private static function ensureValueWriters(Context $context): void
+    /** Standalone AOT + embed ini emit paths need value writers declared (#9197). */
+    public static function ensureValueWriters(Context $context): void
     {
         $strPtr = $context->getTypeFromString('__string__*');
         $valPtr = $context->getTypeFromString('__value__*');
