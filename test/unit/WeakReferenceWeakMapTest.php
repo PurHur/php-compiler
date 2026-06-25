@@ -214,6 +214,21 @@ PHP;
         $this->assertSame('err', ob_get_clean());
     }
 
+    public function testWeakReferenceGetNullAfterInlineNew(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$ref = WeakReference::create(new stdClass());
+echo $ref->get() === null ? '1' : '0';
+echo "\n";
+echo get_debug_type($ref->get());
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_inline_new.php'));
+        $this->assertSame("1\nnull", ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterGcCollect(): void
     {
         $runtime = new Runtime();
