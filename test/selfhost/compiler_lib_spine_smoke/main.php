@@ -409,6 +409,7 @@ require_once __DIR__.'/../../../ext/standard/InetJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/InfoJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IniParseQuantityJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IniJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/IniIntrospectionJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitAddcslashes.php';
 require_once __DIR__.'/../../../ext/standard/JitAddslashes.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayChunk.php';
