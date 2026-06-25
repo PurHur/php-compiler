@@ -86,6 +86,13 @@ final class VmFsReadPure
             $toRead = $fileSize - $offset;
         }
         if (0 === $toRead) {
+            // /proc pseudo-files report size 0 but stream content (e.g. /proc/self/environ, #11744).
+            if (0 === $offset) {
+                $content = self::readStreaming($fp, $length);
+                @\fclose($fp);
+
+                return $content;
+            }
             @\fclose($fp);
 
             return '';

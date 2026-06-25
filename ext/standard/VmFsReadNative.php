@@ -97,6 +97,14 @@ final class VmFsReadNative
                 $toRead = $fileSize - $offset;
             }
             if (0 === $toRead) {
+                // /proc and other pseudo-files report size 0 via lseek/filesize but have content (#11744).
+                if (0 === $offset) {
+                    $ffi->lseek($fd, 0, self::SEEK_SET);
+                    $content = self::readStreaming($ffi, $fd, $length);
+                    $ffi->close($fd);
+
+                    return $content;
+                }
                 $ffi->close($fd);
 
                 return '';
