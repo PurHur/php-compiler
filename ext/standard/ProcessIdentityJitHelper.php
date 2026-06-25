@@ -27,8 +27,8 @@ final class ProcessIdentityJitHelper
         return VmProcessIdentity::getmygid();
     }
 
-    public static function resolveGetCurrentUser(): string
+    public static function resolveGetCurrentUser(string $scriptPath = ''): string
     {
-        return VmProcessIdentity::getCurrentUser();
+        return VmProcessIdentity::getCurrentUserForScript($scriptPath);
     }
 }

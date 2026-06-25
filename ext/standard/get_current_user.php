@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** get_current_user() — login name via getpwuid(geteuid()) (basic_functions.c, #6119). */
+/** get_current_user() — script file owner; '' for stdin (basic_functions.c, #6119, #11755). */
 final class get_current_user extends Internal
 {
     public function __construct()
@@ -29,7 +29,9 @@ final class get_current_user extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->string(VmProcessIdentity::getCurrentUser());
+        $frame->returnVar->string(
+            VmProcessIdentity::getCurrentUserForScript(VmProcessIdentity::executedFilename($frame))
+        );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
