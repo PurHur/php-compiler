@@ -1032,6 +1032,9 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             return VmPhpMemoryStream::flush($handle);
         }
+        if (VmPhpInputOutputStream::isValidHandle($handle)) {
+            return VmPhpInputOutputStream::flush($handle);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;

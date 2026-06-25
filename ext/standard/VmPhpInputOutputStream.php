@@ -168,6 +168,14 @@ final class VmPhpInputOutputStream
         return $previous;
     }
 
+    /**
+     * fflush() — php://output has no userspace buffer; parity true (#11432, ext/standard/streams.c).
+     */
+    public static function flush(int $handle): bool
+    {
+        return isset(self::$streams[$handle]);
+    }
+
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1): string|false
     {
         $state = self::$streams[$handle] ?? null;
