@@ -185,6 +185,9 @@ patch_already_applied() {
       grep -q 'LLVMTokenTypeKind' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null \
         && ! grep -q 'LLVMTokenTypeKin' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null
       ;;
+    php-llvm-function-getbasicblocks-nparams-typo.patch)
+      grep -q "LLVMBasicBlockRef\[' . \$nBlocks . '\]" "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Value/Function_.php" 2>/dev/null
+      ;;
     php-cfg-mixed-reserved.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php" ]] \
         && [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php" ]]
@@ -5743,6 +5746,7 @@ apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-populate.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
 apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
 apply_patch "$PATCH_DIR/php-llvm-token-type-kind-typo.patch"
+apply_patch "$PATCH_DIR/php-llvm-function-getbasicblocks-nparams-typo.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
 repair_php_llvm_token_type_kind_typo_in_prelinked
 
