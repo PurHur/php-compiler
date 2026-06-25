@@ -9,9 +9,17 @@ use PHPCompiler\Runtime;
 
 /**
  * sockets extension module entry (php-src ext/sockets/sockets.c; issue #6544).
+ *
+ * Register under {@see standard} so extension_loaded('sockets') stays false until
+ * socket_create() and core socket API land (#3399, #11820).
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
