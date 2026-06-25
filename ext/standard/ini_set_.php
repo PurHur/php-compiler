@@ -9,6 +9,8 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\SapiOutput;
 use PHPLLVM\Value;
 
 /** ini_set() and ini_alter() alias (php-src PHP_FALIAS, issue #6085). */
@@ -30,6 +32,13 @@ final class ini_set_ extends Internal
         }
         $option = VmString::coerceStringBuiltinArg($frame->calledArgs[0], $fn, 0, 'option');
         $value = VmIniValue::coerceValueArg($frame->calledArgs[1], $fn);
+        if (self::rejectSessionIniAfterHeadersSent($frame, $option)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         $result = VmIni::set($frame->vmContext, $option, $value);
         if (null === $frame->returnVar) {
             return;
@@ -51,5 +60,31 @@ final class ini_set_ extends Internal
         $valueStr = JitIniValueArg::lower($context, $args[1], $fn);
 
         return JitIni::set($context, $optionStr, $valueStr);
+    }
+
+    /**
+     * php-src ext/session/session.c — session ini cannot change after headers sent (#11548).
+     */
+    private static function rejectSessionIniAfterHeadersSent(Frame $frame, string $option): bool
+    {
+        if (!SapiOutput::headersSent()) {
+            return false;
+        }
+        $key = strtolower($option);
+        if (!in_array($key, ['session.save_path', 'session.gc_maxlifetime'], true)) {
+            return false;
+        }
+        if (null === $frame->vmContext) {
+            return true;
+        }
+        $frame->vmContext->errors->triggerError(
+            'Session ini settings cannot be changed after headers have already been sent',
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+
+        return true;
     }
 }
