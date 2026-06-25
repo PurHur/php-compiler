@@ -59,6 +59,9 @@ class VM {
     /** Frame executing the current opcode (property hook ref read/write, #6426). */
     private ?Frame $executingFrame = null;
 
+    /** Active builtin handler while {@see executeInternalHandler} bridges a throw (#11677). */
+    private ?Frame $builtinHandlerFrameForTrace = null;
+
     /** @internal Active VM during runFrames (#3429 typed property errors). */
     public static function running(): ?self
     {
@@ -7857,6 +7860,7 @@ restart:
             }
         }
         try {
+            $this->builtinHandlerFrameForTrace = $handlerFrame;
             $handlerFrame->handler->execute($handlerFrame);
 
             return null;
@@ -7920,6 +7924,8 @@ restart:
             return null;
         } catch (\Exception $e) {
             return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
+        } finally {
+            $this->builtinHandlerFrameForTrace = null;
         }
     }
 
@@ -7934,17 +7940,36 @@ restart:
         return null;
     }
 
-    /** Bridge native Exception from builtins (e.g. Generator::rewind after run, #5195). */
-    private function dispatchVmEngineException(string $message, Frame $frame): ?Frame
+    /** Attach builtin throw trace then dispatch to user catch / fatal (#11677). */
+    private function dispatchBuiltinThrowable(Frame $callerFrame, Variable $thrown): ?Frame
     {
-        $thrown = $this->makeEngineError($message, 'Exception');
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+        if (null !== $this->builtinHandlerFrameForTrace) {
+            VM\ExceptionTrace::captureOnBuiltinThrow(
+                $this->context,
+                $callerFrame,
+                $this->builtinHandlerFrameForTrace,
+                $thrown
+            );
+        }
+        $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
         if (null !== $catchFrame) {
+            if ($this->stashPropertyHookSetExternalCatch($callerFrame, $catchFrame)) {
+                return null;
+            }
+
             return $catchFrame;
         }
         $this->raiseUncaughtException($thrown);
 
         return null;
+    }
+
+    /** Bridge native Exception from builtins (e.g. Generator::rewind after run, #5195). */
+    private function dispatchVmEngineException(string $message, Frame $frame): ?Frame
+    {
+        $thrown = $this->makeEngineError($message, 'Exception');
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge native LogicException from stdlib builtins into user catch handlers (#4866). */
@@ -7957,13 +7982,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -7978,17 +7998,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                return null;
-            }
 
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** ASSIGN to ArrayAccess lvalue — dispatch deferred offsetSet TypeError (#8949). */
@@ -8014,13 +8025,8 @@ restart:
     private function dispatchVmArgumentCountError(\ArgumentCountError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeArgumentCountError($this->context, $error->getMessage());
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8029,13 +8035,8 @@ restart:
     private function dispatchVmDivisionByZeroError(\DivisionByZeroError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeDivisionByZeroError($this->context, $error->getMessage());
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8044,13 +8045,8 @@ restart:
     private function dispatchVmArithmeticError(\ArithmeticError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeArithmeticError($this->context, $error->getMessage());
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8065,13 +8061,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge native AssertionError from assert() into user catch handlers (#3316). */
@@ -8084,13 +8075,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8135,17 +8121,8 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
-                return null;
-            }
 
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
-
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     private function dispatchVmCompileError(\CompileError $error, Frame $frame): ?Frame
@@ -8157,13 +8134,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     private function dispatchVmParseError(\ParseError $error, Frame $frame): ?Frame
@@ -8176,13 +8148,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge native ReflectionException from reflection builtins into user catch handlers (#7344). */
@@ -8195,13 +8162,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge native JsonException from ext/json builtins into user catch handlers (#3281). */
@@ -8215,13 +8177,8 @@ restart:
             $line,
             $error->getCode()
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge native DateInvalidTimeZoneException from date builtins into user catch handlers (#7279). */
@@ -8237,13 +8194,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge malformed DateTime strings from date builtins into user catch handlers (#7113). */
@@ -8259,13 +8211,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge DateRangeError from date builtins into user catch handlers (#7276). */
@@ -8278,13 +8225,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /** Bridge DateObjectError from date builtins into user catch handlers (#7276). */
@@ -8297,13 +8239,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8312,13 +8249,8 @@ restart:
     private function dispatchVmFiberError(VM\NativeFiberError $error, Frame $frame): ?Frame
     {
         $thrown = VM\BuiltinExceptionSupport::materializeFiberError($this->context, $error->getMessage());
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     /**
@@ -8393,13 +8325,8 @@ restart:
             $file,
             $line
         );
-        $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
-        if (null !== $catchFrame) {
-            return $catchFrame;
-        }
-        $this->raiseUncaughtException($thrown);
 
-        return null;
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
     }
 
     private function findCatchFrameForThrow(Frame $frame, Variable $thrown): ?Frame

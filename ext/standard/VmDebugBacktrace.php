@@ -192,6 +192,33 @@ final class VmDebugBacktrace
         return $frames;
     }
 
+    /**
+     * Synthetic trace row for an internal builtin throw (Zend zend_exceptions.c, #11677).
+     */
+    public static function builtinInvokeFrameEntry(Frame $callerFrame, string $builtinName): Variable
+    {
+        $entry = new Variable();
+        $entry->newArray();
+        $ht = $entry->toArray();
+
+        $file = self::frameFile($callerFrame);
+        if ('' !== $file) {
+            $fileVar = new Variable(Variable::TYPE_STRING);
+            $fileVar->string($file);
+            $ht->add('file', $fileVar);
+
+            $lineVar = new Variable(Variable::TYPE_INTEGER);
+            $lineVar->int(self::frameLine($callerFrame));
+            $ht->add('line', $lineVar);
+        }
+
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($builtinName);
+        $ht->add('function', $fnVar);
+
+        return $entry;
+    }
+
     private static function frameEntry(
         Frame $frame,
         bool $includeArgs,
