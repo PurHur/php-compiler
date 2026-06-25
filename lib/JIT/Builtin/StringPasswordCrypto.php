@@ -7,9 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for password_hash / password_verify / password_get_info runtime (#6906).
+ * JIT LLVM bodies for password_hash / password_verify / crypt runtime (#6906, #9908).
  *
- * Replaces lib/AOT/runtime/password_crypto.c via StringPasswordCryptoJit (libcrypt thin ABI).
+ * Replaces lib/AOT/runtime/password_crypto.c via PasswordCryptoRuntime PHP helpers.
  */
 final class StringPasswordCrypto
 {
@@ -18,9 +18,14 @@ final class StringPasswordCrypto
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        PasswordCryptoRuntime::ensureStandaloneBodies($context);
+    }
+
     public static function implement(Context $context): void
     {
-        StringPasswordCryptoJit::implement($context);
+        PasswordCryptoRuntime::implement($context);
     }
 
     /** MCJIT resolves libcrypt symbols from the host process (#172). */

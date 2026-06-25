@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6906: password LLVM helpers replace password_crypto.c.
+ * Issue #6906 / #9908: password LLVM helpers replace password_crypto.c via PasswordJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -18,12 +18,12 @@ final class StringPasswordCryptoRuntimeStandaloneTest extends TestCase
     public function testRuntimeShrinkRemovesPasswordCryptoC(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/password_crypto.c');
-        $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoJit.php');
-        $this->assertStringContainsString('__compiler_password_hash', $jit);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoJit.php');
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('password_crypto.c', $linker);
         $wrapper = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php');
-        $this->assertStringContainsString('StringPasswordCryptoJit', $wrapper);
+        $this->assertStringContainsString('PasswordCryptoRuntime', $wrapper);
     }
 
     /**
