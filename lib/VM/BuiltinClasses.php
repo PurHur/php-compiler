@@ -415,6 +415,7 @@ final class BuiltinClasses
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $attr = new ClassEntry('ReflectionAttribute');
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionAttributeClassConstants($attr);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto);
