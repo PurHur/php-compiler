@@ -139,6 +139,8 @@ final class BuiltinParamNames
                 return ['min', 'max'];
             case 'hex2bin':
                 return ['data', 'strict'];
+            case 'unpack':
+                return ['format', 'string', 'offset'];
             case 'hash':
                 return ['algo', 'data', 'binary'];
             case 'hash_hmac':
