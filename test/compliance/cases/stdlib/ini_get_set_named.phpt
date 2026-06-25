@@ -7,6 +7,6 @@ ini_set(option: 'display_errors', value: '0');
 $mid = ini_get(option: 'display_errors');
 ini_set(option: 'display_errors', value: $before);
 $after = ini_get(option: 'display_errors');
-echo ($mid === '' && $after === $before) ? "ok\n" : "fail\n";
+echo ($mid === '0' && $after === $before) ? "ok\n" : "fail\n";
 --EXPECT--
 ok

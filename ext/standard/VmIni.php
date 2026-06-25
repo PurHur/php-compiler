@@ -109,7 +109,7 @@ final class VmIni
             case 'error_reporting':
                 return (string) $ctx->errors->getErrorReporting();
             case 'display_errors':
-                return self::formatBoolIniGet($ctx->errors->getDisplayErrors());
+                return self::displayErrorsIniString($ctx);
             case 'memory_limit':
                 return self::$memoryLimit;
             case 'serialize_precision':
@@ -162,6 +162,9 @@ final class VmIni
         return (string) self::$serializePrecision;
     }
 
+    /** Raw ini_set() value for display_errors; null uses php.ini default formatting (#11835). */
+    private static ?string $displayErrorsLocalValue = null;
+
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
 
     private static int $serializePrecision = -1;
@@ -185,10 +188,20 @@ final class VmIni
     }
 
     private static function setDisplayErrors(Context $ctx, string $newValue) {
-        $old = self::formatBoolIniGet($ctx->errors->getDisplayErrors());
+        $old = self::displayErrorsIniString($ctx);
+        self::$displayErrorsLocalValue = $newValue;
         $ctx->errors->setDisplayErrors(self::parseBoolIni($newValue));
 
         return $old;
+    }
+
+    private static function displayErrorsIniString(Context $ctx): string
+    {
+        if (null !== self::$displayErrorsLocalValue) {
+            return self::$displayErrorsLocalValue;
+        }
+
+        return self::formatBoolIniGet($ctx->errors->getDisplayErrors());
     }
 
     private static function setMemoryLimit(string $newValue) {
@@ -294,6 +307,7 @@ final class VmIni
                 $ctx->errors->setErrorReporting(self::parseErrorReporting(self::defaultErrorReportingString()));
                 break;
             case 'display_errors':
+                self::$displayErrorsLocalValue = null;
                 $ctx->errors->setDisplayErrors(self::parseBoolIni(self::CFG_DISPLAY_ERRORS));
                 break;
             case 'memory_limit':
