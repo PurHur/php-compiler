@@ -26,6 +26,17 @@ final class ProgressNoteRuntimeStandaloneTest extends TestCase
         $this->assertGreaterThan(0, $fn->countBasicBlocks());
     }
 
+    /** Issue #11437: standalone main uses buffer-only remember ABI (no ProgressJitHelper broadcast). */
+    public function testEnsureLinkedDefinesProgressRememberForStandalone(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
+        ProgressNoteRuntime::ensureLinked($ctx);
+
+        $remember = $ctx->lookupFunction('__phpc_progress_remember');
+        $this->assertGreaterThan(0, $remember->countBasicBlocks());
+    }
+
     public function testEnsureLinkedDefinesProgressBufferGlobals(): void
     {
         $runtime = new Runtime(Runtime::MODE_AOT);

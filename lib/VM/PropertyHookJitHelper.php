@@ -25,14 +25,23 @@ final class PropertyHookJitHelper
     ): ?string {
         $lcClass = strtolower(ltrim($declaringClass, '\\'));
         $propLc = strtolower($propertyName);
-        $meta = $registry[$lcClass][$propertyName]
-            ?? $registry[$lcClass][$propLc]
-            ?? null;
+        $meta = null;
+        if (isset($registry[$lcClass][$propertyName])) {
+            $meta = $registry[$lcClass][$propertyName];
+        } elseif (isset($registry[$lcClass][$propLc])) {
+            $meta = $registry[$lcClass][$propLc];
+        }
         if (!is_array($meta) || (!isset($meta['get']) && !isset($meta['set']))) {
             return null;
         }
+        if (isset($meta['setBacking'])) {
+            return $meta['setBacking'];
+        }
+        if (isset($meta['getBacking'])) {
+            return $meta['getBacking'];
+        }
 
-        return $meta['setBacking'] ?? $meta['getBacking'] ?? $propertyName;
+        return $propertyName;
     }
 
     public static function isRawHookWrite(
@@ -44,7 +53,9 @@ final class PropertyHookJitHelper
             && $context->jitPropertyHookRawProperty === $propertyName) {
             return true;
         }
-        $block = $context->jitCurrentBlock ?? $block;
+        if (null !== $context->jitCurrentBlock) {
+            $block = $context->jitCurrentBlock;
+        }
         if (null === $block || null === $block->func) {
             return false;
         }
@@ -69,7 +80,10 @@ final class PropertyHookJitHelper
             return true;
         }
         if (null !== $block->func->class) {
-            $classVal = $block->func->class->value ?? null;
+            $classVal = null;
+            if (isset($block->func->class->value)) {
+                $classVal = $block->func->class->value;
+            }
             if (is_string($classVal) && '' !== $classVal) {
                 $qualifiedSet = strtolower($classVal.'::'.$wantSet);
                 if ($funcName === $qualifiedSet || strtolower($block->func->name) === $qualifiedSet) {

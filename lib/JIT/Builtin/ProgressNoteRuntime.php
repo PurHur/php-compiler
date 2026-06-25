@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -70,8 +71,11 @@ final class ProgressNoteRuntime
         if ('' === $message) {
             return;
         }
+        $abi = Builtin::LOAD_TYPE_STANDALONE === $context->loadType
+            ? '__phpc_progress_remember'
+            : '__phpc_progress_note';
         try {
-            $fn = $context->lookupFunction('__phpc_progress_note');
+            $fn = $context->lookupFunction($abi);
         } catch (\Throwable) {
             return;
         }
@@ -101,6 +105,7 @@ final class ProgressNoteRuntime
         self::ensureValueStringHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementNoteBridge($context);
+        self::implementRememberBridge($context);
         self::implementStaticBridges($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
@@ -167,6 +172,43 @@ final class ProgressNoteRuntime
         self::emitRememberToBuffer($context, $fn, $msg);
         $msgStr = self::cstrToString($context, $msg);
         $context->builder->call(self::helperFunction($context, self::BROADCAST_HELPER), $msgStr);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /** SIGSEGV buffer only — no ProgressJitHelper broadcast (#11437 standalone main). */
+    private static function implementRememberBridge(Context $context): void
+    {
+        $abiName = '__phpc_progress_remember';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i8p = $context->getTypeFromString('int8*');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('pn_remember_entry');
+        $done = $fn->appendBasicBlock('pn_remember_done');
+        $body = $fn->appendBasicBlock('pn_remember_body');
+        $context->builder->positionAtEnd($entry);
+
+        $msg = $fn->getParam(0);
+        $nullPtr = $i8p->constNull();
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $msg, $nullPtr);
+        $context->builder->branchIf($isNull, $done, $body);
+
+        $context->builder->positionAtEnd($body);
+        self::emitRememberToBuffer($context, $fn, $msg);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -421,5 +463,9 @@ final class ProgressNoteRuntime
             throw new \LogicException('__phpc_progress_note missing after ProgressNoteRuntime bridge (#9521)');
         }
         $context->registerFunction('__phpc_progress_note', $fn);
+        $remember = $context->module->getNamedFunction('__phpc_progress_remember');
+        if (null !== $remember) {
+            $context->registerFunction('__phpc_progress_remember', $remember);
+        }
     }
 }

@@ -27,7 +27,7 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         WeakRefRegistryJitHelper::resetForTest();
         $target = 0x1000;
         $slot = 0x2000;
-        WeakRefRegistryJitHelper::registerRef($target, $slot);
+        WeakRefRegistryJitHelper::appendRefEntry($target, $slot);
         $this->assertSame(1, WeakRefRegistryJitHelper::refCount());
         $this->assertSame($target, WeakRefRegistryJitHelper::refTargetPtr(0));
         $this->assertSame($slot, WeakRefRegistryJitHelper::refSlotPtr(0));
@@ -36,13 +36,13 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         $this->assertSame('o:1000', $key);
         $this->assertSame($target, WeakRefRegistryJitHelper::mapKeyToObjectPtr($key));
 
-        WeakRefRegistryJitHelper::registerMap($target, 0x3000, $key);
+        WeakRefRegistryJitHelper::appendMapEntry($target, 0x3000, $key);
         $this->assertSame(1, WeakRefRegistryJitHelper::mapCount());
         $this->assertSame($target, WeakRefRegistryJitHelper::mapTargetPtr(0));
         $this->assertSame(0x3000, WeakRefRegistryJitHelper::mapHtPtr(0));
         $this->assertSame($key, WeakRefRegistryJitHelper::mapKey(0));
 
-        WeakRefRegistryJitHelper::unregisterMap($target, 0x3000, $key);
+        WeakRefRegistryJitHelper::clearMapEntry(0);
         $this->assertSame(0, WeakRefRegistryJitHelper::mapTargetPtr(0));
         $this->assertSame(0, WeakRefRegistryJitHelper::mapHtPtr(0));
         $this->assertSame('', WeakRefRegistryJitHelper::mapKey(0));

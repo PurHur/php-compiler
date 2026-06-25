@@ -979,6 +979,9 @@ final class JitValueCompare
     /** True when a native handle id is registered in the stream/dir tables (#4699). */
     public static function nativeLongIsResource(Context $context, Value $handleLong): Value
     {
+        if (NestedJitCompileScope::isActive()) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
         $i32 = $context->getTypeFromString('int32');
         $ret = $context->builder->call(
             $context->lookupFunction('__compiler_is_resource'),

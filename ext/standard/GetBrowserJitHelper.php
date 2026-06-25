@@ -19,7 +19,16 @@ final class GetBrowserJitHelper
     public static function browscapConfigured(): int
     {
         $path = @ini_get('browscap');
+        if (!is_string($path)) {
+            return 0;
+        }
+        if ('' === $path) {
+            return 0;
+        }
+        if (!is_readable($path)) {
+            return 0;
+        }
 
-        return is_string($path) && '' !== $path && is_readable($path) ? 1 : 0;
+        return 1;
     }
 }

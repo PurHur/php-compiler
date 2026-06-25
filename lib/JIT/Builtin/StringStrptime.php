@@ -119,6 +119,7 @@ final class StringStrptime
         );
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

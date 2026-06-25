@@ -10,6 +10,9 @@ namespace PHPCompiler\ext\standard;
  * Slot-table ABI mirrors legacy WeakRefRegistryRuntime LLVM globals. VM SSOT remains
  * {@see \PHPCompiler\VM\WeakRefRegistry} for interpreted code.
  * php-src: Zend/zend_weakrefs.c
+ *
+ * Guards and scan loops live in {@see \PHPCompiler\JIT\Builtin\WeakRefRegistryRuntime} LLVM
+ * bridges — this file only exposes append/accessors safe for nested JIT (#11437).
  */
 final class WeakRefRegistryJitHelper
 {
@@ -49,75 +52,36 @@ final class WeakRefRegistryJitHelper
         self::$mapKey = [];
     }
 
-    public static function registerRef(int $targetPtr, int $slotPtr): void
+    /** @internal LLVM bridge checks non-zero pointers and capacity */
+    public static function appendRefEntry(int $targetPtr, int $slotPtr): void
     {
-        if (0 === $targetPtr || 0 === $slotPtr) {
-            return;
-        }
-        if (self::$refCount >= self::MAX_REFS) {
-            return;
-        }
         $idx = self::$refCount;
         self::$refTargetPtr[$idx] = $targetPtr;
         self::$refSlotPtr[$idx] = $slotPtr;
-        ++self::$refCount;
+        self::$refCount = self::$refCount + 1;
     }
 
-    public static function registerMap(int $targetPtr, int $htPtr, string $key): void
+    /** @internal LLVM bridge checks non-zero pointers, non-empty key, and capacity */
+    public static function appendMapEntry(int $targetPtr, int $htPtr, string $key): void
     {
-        if (0 === $targetPtr || 0 === $htPtr || '' === $key) {
-            return;
-        }
-        if (self::$mapCount >= self::MAX_MAPS) {
-            return;
-        }
-        $stored = self::storeMapKey($key);
         $idx = self::$mapCount;
         self::$mapTargetPtr[$idx] = $targetPtr;
         self::$mapHtPtr[$idx] = $htPtr;
-        self::$mapKey[$idx] = $stored;
-        ++self::$mapCount;
-    }
-
-    public static function unregisterMap(int $targetPtr, int $htPtr, string $key): void
-    {
-        if (0 === $targetPtr || 0 === $htPtr || '' === $key) {
-            return;
-        }
-        $stored = self::storeMapKey($key);
-        for ($i = 0; $i < self::$mapCount; ++$i) {
-            if (self::$mapTargetPtr[$i] === $targetPtr
-                && self::$mapHtPtr[$i] === $htPtr
-                && self::$mapKey[$i] === $stored) {
-                self::clearMapEntry($i);
-
-                return;
-            }
-        }
+        self::$mapKey[$idx] = self::storeMapKey($key);
+        self::$mapCount = self::$mapCount + 1;
     }
 
     public static function formatObjectKey(int $objPtr): string
     {
-        if (0 === $objPtr) {
-            return '';
-        }
-
         return \sprintf('o:%x', $objPtr);
     }
 
     public static function mapKeyToObjectPtr(string $key): int
     {
-        $len = \strlen($key);
-        if ($len < 3) {
+        if (!str_starts_with($key, 'o:')) {
             return 0;
         }
-        if ('o' !== $key[0]) {
-            return 0;
-        }
-        if (':' !== $key[1]) {
-            return 0;
-        }
-        $suffix = \substr($key, 2);
+        $suffix = substr($key, 2);
         if ('' === $suffix) {
             return 0;
         }
@@ -132,7 +96,10 @@ final class WeakRefRegistryJitHelper
 
     public static function refTargetPtr(int $index): int
     {
-        if ($index < 0 || $index >= self::$refCount) {
+        if ($index < 0) {
+            return 0;
+        }
+        if ($index >= self::$refCount) {
             return 0;
         }
         if (!isset(self::$refTargetPtr[$index])) {
@@ -144,7 +111,10 @@ final class WeakRefRegistryJitHelper
 
     public static function refSlotPtr(int $index): int
     {
-        if ($index < 0 || $index >= self::$refCount) {
+        if ($index < 0) {
+            return 0;
+        }
+        if ($index >= self::$refCount) {
             return 0;
         }
         if (!isset(self::$refSlotPtr[$index])) {
@@ -156,7 +126,10 @@ final class WeakRefRegistryJitHelper
 
     public static function clearRefEntry(int $index): void
     {
-        if ($index < 0 || $index >= self::$refCount) {
+        if ($index < 0) {
+            return;
+        }
+        if ($index >= self::$refCount) {
             return;
         }
         self::$refTargetPtr[$index] = 0;
@@ -170,7 +143,10 @@ final class WeakRefRegistryJitHelper
 
     public static function mapTargetPtr(int $index): int
     {
-        if ($index < 0 || $index >= self::$mapCount) {
+        if ($index < 0) {
+            return 0;
+        }
+        if ($index >= self::$mapCount) {
             return 0;
         }
         if (!isset(self::$mapTargetPtr[$index])) {
@@ -182,7 +158,10 @@ final class WeakRefRegistryJitHelper
 
     public static function mapHtPtr(int $index): int
     {
-        if ($index < 0 || $index >= self::$mapCount) {
+        if ($index < 0) {
+            return 0;
+        }
+        if ($index >= self::$mapCount) {
             return 0;
         }
         if (!isset(self::$mapHtPtr[$index])) {
@@ -194,7 +173,10 @@ final class WeakRefRegistryJitHelper
 
     public static function mapKey(int $index): string
     {
-        if ($index < 0 || $index >= self::$mapCount) {
+        if ($index < 0) {
+            return '';
+        }
+        if ($index >= self::$mapCount) {
             return '';
         }
         if (!isset(self::$mapKey[$index])) {
@@ -206,7 +188,10 @@ final class WeakRefRegistryJitHelper
 
     public static function clearMapEntry(int $index): void
     {
-        if ($index < 0 || $index >= self::$mapCount) {
+        if ($index < 0) {
+            return;
+        }
+        if ($index >= self::$mapCount) {
             return;
         }
         self::$mapTargetPtr[$index] = 0;

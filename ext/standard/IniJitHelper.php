@@ -77,6 +77,31 @@ final class IniJitHelper
         return self::$serializePrecision;
     }
 
+    private static function parseSerializePrecisionIni(string $newValue): int
+    {
+        $trimmed = trim($newValue);
+        if ('' === $trimmed) {
+            return -1;
+        }
+
+        return intval($trimmed);
+    }
+
+    private static function parseSessionGcMaxlifetimeIni(string $newValue): int
+    {
+        return intval(trim($newValue));
+    }
+
+    private static function serializePrecisionAsIniString(): string
+    {
+        return \sprintf('%d', self::$serializePrecision);
+    }
+
+    private static function sessionGcMaxlifetimeAsIniString(): string
+    {
+        return \sprintf('%d', self::$sessionGcMaxlifetime);
+    }
+
     /** @return string|null null when ini_get() is false */
     public static function iniGet(string $option): ?string
     {
@@ -94,16 +119,29 @@ final class IniJitHelper
             return null;
         }
 
-        return match ($key) {
-            'error_reporting' => ErrorSilenceJitHelper::iniGetErrorReporting(),
-            'display_errors' => VmIni::formatBoolIniGet(self::$displayErrors),
-            'memory_limit' => self::$memoryLimit,
-            'serialize_precision' => (string) self::$serializePrecision,
-            'unserialize_callback_func' => self::$unserializeCallbackFunc,
-            'session.gc_maxlifetime' => (string) self::$sessionGcMaxlifetime,
-            'include_path' => IncludePathJitHelper::get(),
-            default => null,
-        };
+        if ('error_reporting' === $key) {
+            return ErrorSilenceJitHelper::iniGetErrorReporting();
+        }
+        if ('display_errors' === $key) {
+            return VmIni::formatBoolIniGet(self::$displayErrors);
+        }
+        if ('memory_limit' === $key) {
+            return self::$memoryLimit;
+        }
+        if ('serialize_precision' === $key) {
+            return self::serializePrecisionAsIniString();
+        }
+        if ('unserialize_callback_func' === $key) {
+            return self::$unserializeCallbackFunc;
+        }
+        if ('session.gc_maxlifetime' === $key) {
+            return self::sessionGcMaxlifetimeAsIniString();
+        }
+        if ('include_path' === $key) {
+            return IncludePathJitHelper::get();
+        }
+
+        return null;
     }
 
     /** @return string|null null when ini_set() is false */
@@ -117,16 +155,29 @@ final class IniJitHelper
             return null;
         }
 
-        return match ($key) {
-            'error_reporting' => self::setErrorReporting($newValue),
-            'display_errors' => self::setDisplayErrors($newValue),
-            'memory_limit' => self::setMemoryLimit($newValue),
-            'serialize_precision' => self::setSerializePrecision($newValue),
-            'unserialize_callback_func' => self::setUnserializeCallbackFunc($newValue),
-            'session.gc_maxlifetime' => self::setSessionGcMaxlifetime($newValue),
-            'include_path' => IncludePathJitHelper::push($newValue),
-            default => null,
-        };
+        if ('error_reporting' === $key) {
+            return self::setErrorReporting($newValue);
+        }
+        if ('display_errors' === $key) {
+            return self::setDisplayErrors($newValue);
+        }
+        if ('memory_limit' === $key) {
+            return self::setMemoryLimit($newValue);
+        }
+        if ('serialize_precision' === $key) {
+            return self::setSerializePrecision($newValue);
+        }
+        if ('unserialize_callback_func' === $key) {
+            return self::setUnserializeCallbackFunc($newValue);
+        }
+        if ('session.gc_maxlifetime' === $key) {
+            return self::setSessionGcMaxlifetime($newValue);
+        }
+        if ('include_path' === $key) {
+            return IncludePathJitHelper::push($newValue);
+        }
+
+        return null;
     }
 
     /** @return string|null null when get_cfg_var() is false */
@@ -137,19 +188,35 @@ final class IniJitHelper
             return null;
         }
 
-        return match ($key) {
-            'error_reporting' => (string) ErrorReporter::DEFAULT_STARTUP_REPORTING,
-            'display_errors' => self::CFG_DISPLAY_ERRORS,
-            'memory_limit' => self::CFG_MEMORY_LIMIT,
-            'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
-            'unserialize_callback_func' => '',
-            'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
-            'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
-            'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
-            default => isset(self::READONLY_BOOL_DEFAULTS[$key])
-                ? VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key])
-                : null,
-        };
+        if ('error_reporting' === $key) {
+            return \sprintf('%d', ErrorReporter::DEFAULT_STARTUP_REPORTING);
+        }
+        if ('display_errors' === $key) {
+            return self::CFG_DISPLAY_ERRORS;
+        }
+        if ('memory_limit' === $key) {
+            return self::CFG_MEMORY_LIMIT;
+        }
+        if ('serialize_precision' === $key) {
+            return self::CFG_SERIALIZE_PRECISION;
+        }
+        if ('unserialize_callback_func' === $key) {
+            return '';
+        }
+        if ('session.gc_maxlifetime' === $key) {
+            return self::CFG_SESSION_GC_MAXLIFETIME;
+        }
+        if ('max_execution_time' === $key) {
+            return self::READONLY_STRING_DEFAULTS['max_execution_time'];
+        }
+        if ('default_charset' === $key) {
+            return self::READONLY_STRING_DEFAULTS['default_charset'];
+        }
+        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
+            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
+
+        return null;
     }
 
     public static function iniRestore(string $option): void
@@ -170,13 +237,13 @@ final class IniJitHelper
                 self::$memoryLimit = self::CFG_MEMORY_LIMIT;
                 break;
             case 'serialize_precision':
-                self::$serializePrecision = VmIni::parseSerializePrecision(self::CFG_SERIALIZE_PRECISION);
+                self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
                 break;
             case 'unserialize_callback_func':
                 self::$unserializeCallbackFunc = '';
                 break;
             case 'session.gc_maxlifetime':
-                self::$sessionGcMaxlifetime = (int) self::CFG_SESSION_GC_MAXLIFETIME;
+                self::$sessionGcMaxlifetime = 1440;
                 break;
         }
     }
@@ -207,8 +274,8 @@ final class IniJitHelper
 
     private static function setSerializePrecision(string $newValue): string
     {
-        $old = (string) self::$serializePrecision;
-        self::$serializePrecision = VmIni::parseSerializePrecision($newValue);
+        $old = self::serializePrecisionAsIniString();
+        self::$serializePrecision = self::parseSerializePrecisionIni($newValue);
 
         return $old;
     }
@@ -224,11 +291,11 @@ final class IniJitHelper
     /** @return string|null null when ini_set rejected the value */
     private static function setSessionGcMaxlifetime(string $newValue): ?string
     {
-        $parsed = (int) trim($newValue);
+        $parsed = self::parseSessionGcMaxlifetimeIni($newValue);
         if ($parsed <= 0) {
             return null;
         }
-        $old = (string) self::$sessionGcMaxlifetime;
+        $old = self::sessionGcMaxlifetimeAsIniString();
         self::$sessionGcMaxlifetime = $parsed;
 
         return $old;
@@ -237,26 +304,53 @@ final class IniJitHelper
     /** @return string|null */
     private static function assertIniGet(string $key): ?string
     {
-        return match ($key) {
-            'zend.assertions' => AssertOptionsJitHelper::iniGetZendAssertions(),
-            'assert.active' => AssertOptionsJitHelper::iniGetActive(),
-            'assert.bail' => AssertOptionsJitHelper::getBailInt() ? '1' : '0',
-            'assert.callback' => AssertOptionsJitHelper::getCallbackString(),
-            'assert.exception' => AssertOptionsJitHelper::iniGetException(),
-            default => null,
-        };
+        if ('zend.assertions' === $key) {
+            return AssertOptionsJitHelper::iniGetZendAssertions();
+        }
+        if ('assert.active' === $key) {
+            return AssertOptionsJitHelper::iniGetActive();
+        }
+        if ('assert.bail' === $key) {
+            if (AssertOptionsJitHelper::getBailInt()) {
+                return '1';
+            }
+
+            return '0';
+        }
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::getCallbackString();
+        }
+        if ('assert.exception' === $key) {
+            return AssertOptionsJitHelper::iniGetException();
+        }
+
+        return null;
     }
 
     /** @return string|null */
     private static function assertIniSet(string $key, string $newValue): ?string
     {
-        return match ($key) {
-            'zend.assertions' => AssertOptionsJitHelper::iniSetZendAssertionsFromString($newValue),
-            'assert.active' => AssertOptionsJitHelper::iniSetActiveFromString($newValue),
-            'assert.bail' => (string) AssertOptionsJitHelper::setBailBool(VmIni::parseBoolIni($newValue)),
-            'assert.callback' => AssertOptionsJitHelper::setCallbackString($newValue),
-            'assert.exception' => AssertOptionsJitHelper::iniSetExceptionFromString($newValue),
-            default => null,
-        };
+        if ('zend.assertions' === $key) {
+            return AssertOptionsJitHelper::iniSetZendAssertionsFromString($newValue);
+        }
+        if ('assert.active' === $key) {
+            return AssertOptionsJitHelper::iniSetActiveFromString($newValue);
+        }
+        if ('assert.bail' === $key) {
+            $old = AssertOptionsJitHelper::setBailBool(VmIni::parseBoolIni($newValue));
+            if ($old) {
+                return '1';
+            }
+
+            return '0';
+        }
+        if ('assert.callback' === $key) {
+            return AssertOptionsJitHelper::setCallbackString($newValue);
+        }
+        if ('assert.exception' === $key) {
+            return AssertOptionsJitHelper::iniSetExceptionFromString($newValue);
+        }
+
+        return null;
     }
 }

@@ -103,6 +103,7 @@ final class JitVmHelperLink
         $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
         $context->builder->returnValue($ret);
         $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function bridgeEntryComplete(?LlvmFunction $probe): bool

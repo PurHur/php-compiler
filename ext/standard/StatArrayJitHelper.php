@@ -39,7 +39,13 @@ final class StatArrayJitHelper
         $ht = new HashTable();
         $values = [];
         foreach ($keys as $i => $key) {
-            $values[$i] = (int) ($stat[$key] ?? $stat[$i] ?? 0);
+            if (isset($stat[$key])) {
+                $values[$i] = (int) $stat[$key];
+            } elseif (isset($stat[$i])) {
+                $values[$i] = (int) $stat[$i];
+            } else {
+                $values[$i] = 0;
+            }
         }
         foreach ($values as $val) {
             $ht->append(self::intVariable($val));

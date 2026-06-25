@@ -52,6 +52,19 @@ final class ObOutput
         ];
 
         foreach ($decls as $name => [$ret, $vararg, $params]) {
+            try {
+                $linked = $context->lookupFunction($name);
+                if ($linked->countBasicBlocks() > 0) {
+                    continue;
+                }
+            } catch (\Throwable) {
+            }
+            $existing = $context->module->getNamedFunction($name);
+            if (null !== $existing) {
+                $context->registerFunction($name, $existing);
+
+                continue;
+            }
             $ft = $context->context->functionType($ret, $vararg, ...$params);
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
@@ -64,7 +77,7 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        self::registerExternals($context);
+        ObOutputRuntime::ensureLinked($context);
         $context->builder->call($context->lookupFunction('__phpc_ob_end_all'));
     }
 }

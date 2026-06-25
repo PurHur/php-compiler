@@ -55,6 +55,11 @@ final class ListUnpackRuntime
         }
 
         self::$implementing = true;
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         try {
             $i8 = $context->getTypeFromString('int8');
             $i1 = $context->getTypeFromString('int1');
@@ -92,18 +97,12 @@ final class ListUnpackRuntime
             self::COMPILED_HELPERS,
             '#10266'
         );
-
-        $savedBlock = null;
-        try {
-            $savedBlock = $context->builder->getInsertBlock();
-        } catch (\Throwable) {
-        }
-        if (null !== $savedBlock) {
-            $context->builder->positionAtEnd($savedBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
-        }
         } finally {
+            if (null !== $savedBlock) {
+                $context->builder->positionAtEnd($savedBlock);
+            } else {
+                $context->builder->clearInsertionPosition();
+            }
             self::$implementing = false;
         }
     }

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\WeakRefRegistryJitHelper;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -27,11 +29,9 @@ final class WeakRefRegistryRuntime
 
     private const RESET = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::reset';
 
-    private const REGISTER_REF = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::registerRef';
+    private const REGISTER_REF = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::appendRefEntry';
 
-    private const REGISTER_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::registerMap';
-
-    private const UNREGISTER_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::unregisterMap';
+    private const REGISTER_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::appendMapEntry';
 
     private const FORMAT_KEY = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::formatObjectKey';
 
@@ -60,7 +60,6 @@ final class WeakRefRegistryRuntime
         self::RESET,
         self::REGISTER_REF,
         self::REGISTER_MAP,
-        self::UNREGISTER_MAP,
         self::FORMAT_KEY,
         self::MAP_KEY_TO_OBJECT,
         self::REF_COUNT,
@@ -141,26 +140,49 @@ final class WeakRefRegistryRuntime
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('wr_reg_ref_bridge_entry');
+        $doneBb = $fn->appendBasicBlock('wr_reg_ref_bridge_done');
+        $checkSlotBb = $fn->appendBasicBlock('wr_reg_ref_bridge_check_slot');
+        $checkMaxBb = $fn->appendBasicBlock('wr_reg_ref_bridge_check_max');
+        $workBb = $fn->appendBasicBlock('wr_reg_ref_bridge_work');
         $context->builder->positionAtEnd($entry);
+
         $target = $context->builder->pointerCast($fn->getParam(0), $i64);
         $slot = $context->builder->pointerCast($fn->getParam(1), $i64);
+        $zero = $i64->constInt(0, false);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
+            $doneBb,
+            $checkSlotBb
+        );
+
+        $context->builder->positionAtEnd($checkSlotBb);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $slot, $zero),
+            $doneBb,
+            $checkMaxBb
+        );
+
+        $context->builder->positionAtEnd($checkMaxBb);
+        $count = $context->builder->call(self::helperFunction($context, self::REF_COUNT));
+        $maxRefs = $i64->constInt(WeakRefRegistryJitHelper::MAX_REFS, false);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SGE, $count, $maxRefs),
+            $doneBb,
+            $workBb
+        );
+
+        $context->builder->positionAtEnd($workBb);
         $context->builder->call(self::helperFunction($context, self::REGISTER_REF), $target, $slot);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
 
     private static function implementRegisterMapBridge(Context $context): void
     {
-        self::implementMapMutationBridge($context, 'phpc_weakref_register_map', self::REGISTER_MAP);
-    }
-
-    private static function implementUnregisterMapBridge(Context $context): void
-    {
-        self::implementMapMutationBridge($context, 'phpc_weakref_unregister_map', self::UNREGISTER_MAP);
-    }
-
-    private static function implementMapMutationBridge(Context $context, string $abiName, string $helperLogical): void
-    {
+        $abiName = 'phpc_weakref_register_map';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -172,16 +194,112 @@ final class WeakRefRegistryRuntime
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
+        $sizeT = $context->getTypeFromString('size_t');
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
-        $entry = $fn->appendBasicBlock('wr_map_mut_bridge_entry');
+        $entry = $fn->appendBasicBlock('wr_reg_map_bridge_entry');
+        $doneBb = $fn->appendBasicBlock('wr_reg_map_bridge_done');
+        $checkHtBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_ht');
+        $checkKeyBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_key');
+        $checkMaxBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_max');
+        $workBb = $fn->appendBasicBlock('wr_reg_map_bridge_work');
         $context->builder->positionAtEnd($entry);
 
         $target = $context->builder->pointerCast($fn->getParam(0), $i64);
         $ht = $context->builder->pointerCast($fn->getParam(1), $i64);
         $keyCstr = $fn->getParam(2);
+        $zero = $i64->constInt(0, false);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
+            $doneBb,
+            $checkHtBb
+        );
+
+        $context->builder->positionAtEnd($checkHtBb);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ht, $zero),
+            $doneBb,
+            $checkKeyBb
+        );
+
+        $context->builder->positionAtEnd($checkKeyBb);
+        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
+            $doneBb,
+            $checkMaxBb
+        );
+
+        $context->builder->positionAtEnd($checkMaxBb);
+        $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
+        $maxMaps = $i64->constInt(WeakRefRegistryJitHelper::MAX_MAPS, false);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SGE, $count, $maxMaps),
+            $doneBb,
+            $workBb
+        );
+
+        $context->builder->positionAtEnd($workBb);
         $keyStr = self::cstrToString($context, $keyCstr);
-        $context->builder->call(self::helperFunction($context, $helperLogical), $target, $ht, $keyStr);
+        $context->builder->call(self::helperFunction($context, self::REGISTER_MAP), $target, $ht, $keyStr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementUnregisterMapBridge(Context $context): void
+    {
+        $abiName = 'phpc_weakref_unregister_map';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $voidTy = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $i64 = $context->getTypeFromString('int64');
+        $sizeT = $context->getTypeFromString('size_t');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $i8p, $i8p);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('wr_unmap_bridge_entry');
+        $doneBb = $fn->appendBasicBlock('wr_unmap_bridge_done');
+        $checkHtBb = $fn->appendBasicBlock('wr_unmap_bridge_check_ht');
+        $checkKeyBb = $fn->appendBasicBlock('wr_unmap_bridge_check_key');
+        $loopPrep = $fn->appendBasicBlock('wr_unmap_bridge_prep');
+        $context->builder->positionAtEnd($entry);
+
+        $target = $context->builder->pointerCast($fn->getParam(0), $i64);
+        $ht = $context->builder->pointerCast($fn->getParam(1), $i64);
+        $keyCstr = $fn->getParam(2);
+        $zero = $i64->constInt(0, false);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
+            $doneBb,
+            $checkHtBb
+        );
+
+        $context->builder->positionAtEnd($checkHtBb);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $ht, $zero),
+            $doneBb,
+            $checkKeyBb
+        );
+
+        $context->builder->positionAtEnd($checkKeyBb);
+        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
+            $doneBb,
+            $loopPrep
+        );
+
+        self::emitUnregisterMapLoop($context, $fn, $target, $ht, $keyCstr, $loopPrep, $doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -210,14 +328,17 @@ final class WeakRefRegistryRuntime
         $buf = $fn->getParam(1);
         $bufLen = $fn->getParam(2);
         $null = $i8p->constNull();
-        $bad = $context->builder->or(
+        $zero = $i64->constInt(0, false);
+        $objPtr = $context->builder->pointerCast($fn->getParam(0), $i64);
+        $badBuf = $context->builder->or(
             $context->builder->icmp(Builder::INT_EQ, $buf, $null),
             $context->builder->icmp(Builder::INT_EQ, $bufLen, $sizeT->constInt(0, false))
         );
+        $badObj = $context->builder->icmp(Builder::INT_EQ, $objPtr, $zero);
+        $bad = $context->builder->or($badBuf, $badObj);
         $context->builder->branchIf($bad, $doneBb, $workBb);
 
         $context->builder->positionAtEnd($workBb);
-        $objPtr = $context->builder->pointerCast($fn->getParam(0), $i64);
         $formatted = $context->builder->call(self::helperFunction($context, self::FORMAT_KEY), $objPtr);
         $context->builder->call(
             $context->lookupFunction('snprintf'),
@@ -410,7 +531,6 @@ final class WeakRefRegistryRuntime
         $null = $i8p->constNull();
         $valuePtr = $context->getTypeFromString('__value__*');
         $writeNull = $context->lookupFunction('__value__writeNull');
-        $targetI64 = $context->builder->pointerCast($target, $i64);
 
         $loopCond = $fn->appendBasicBlock('wr_clear_refs_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_refs_body');
@@ -418,6 +538,7 @@ final class WeakRefRegistryRuntime
         $loopInc = $fn->appendBasicBlock('wr_clear_refs_inc');
 
         $context->builder->positionAtEnd($loopInit);
+        $targetI64 = $context->builder->pointerCast($target, $i64);
         $count = $context->builder->call(self::helperFunction($context, self::REF_COUNT));
         $countI32 = $context->builder->trunc($count, $i32);
         $idx = $context->builder->alloca($i32, 1, 'wr_clear_ref_i');
@@ -474,7 +595,6 @@ final class WeakRefRegistryRuntime
         $strPtr = $context->getTypeFromString('__string__*');
         $unsetKey = $context->lookupFunction('__hashtable__unsetStringKey');
         $strInit = $context->lookupFunction('__string__init');
-        $targetI64 = $context->builder->pointerCast($target, $i64);
 
         $loopCond = $fn->appendBasicBlock('wr_clear_maps_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_maps_body');
@@ -482,6 +602,7 @@ final class WeakRefRegistryRuntime
         $loopInc = $fn->appendBasicBlock('wr_clear_maps_inc');
 
         $context->builder->positionAtEnd($loopInit);
+        $targetI64 = $context->builder->pointerCast($target, $i64);
         $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
         $countI32 = $context->builder->trunc($count, $i32);
         $idx = $context->builder->alloca($i32, 1, 'wr_clear_map_i');
@@ -517,6 +638,70 @@ final class WeakRefRegistryRuntime
         );
         $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i64Idx);
         $context->builder->branch($loopInc);
+
+        $context->builder->positionAtEnd($loopInc);
+        $context->builder->store(
+            $context->builder->add($context->builder->load($idx), $i32->constInt(1, false)),
+            $idx
+        );
+        $context->builder->branch($loopCond);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitUnregisterMapLoop(
+        Context $context,
+        Value $fn,
+        Value $targetI64,
+        Value $htI64,
+        Value $keyCstr,
+        $loopPrep,
+        $doneBb,
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        $loopCond = $fn->appendBasicBlock('wr_unmap_cond');
+        $loopBody = $fn->appendBasicBlock('wr_unmap_body');
+        $checkHtBb = $fn->appendBasicBlock('wr_unmap_check_ht');
+        $checkKeyBb = $fn->appendBasicBlock('wr_unmap_check_key');
+        $clearBb = $fn->appendBasicBlock('wr_unmap_do');
+        $loopInc = $fn->appendBasicBlock('wr_unmap_inc');
+
+        $context->builder->positionAtEnd($loopPrep);
+        $keyStr = self::cstrToString($context, $keyCstr);
+        $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
+        $countI32 = $context->builder->trunc($count, $i32);
+        $idx = $context->builder->alloca($i32, 1, 'wr_unmap_i');
+        $context->builder->store($i32->constInt(0, false), $idx);
+        $context->builder->branch($loopCond);
+
+        $context->builder->positionAtEnd($loopCond);
+        $i = $context->builder->load($idx);
+        $context->builder->branchIf(
+            $context->builder->icmp(Builder::INT_SLT, $i, $countI32),
+            $loopBody,
+            $doneBb
+        );
+
+        $context->builder->positionAtEnd($loopBody);
+        $i64Idx = $context->builder->sext($i, $i64);
+        $storedTarget = $context->builder->call(self::helperFunction($context, self::MAP_TARGET), $i64Idx);
+        $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
+        $context->builder->branchIf($targetMatch, $checkHtBb, $loopInc);
+
+        $context->builder->positionAtEnd($checkHtBb);
+        $storedHt = $context->builder->call(self::helperFunction($context, self::MAP_HT), $i64Idx);
+        $htMatch = $context->builder->icmp(Builder::INT_EQ, $storedHt, $htI64);
+        $context->builder->branchIf($htMatch, $checkKeyBb, $loopInc);
+
+        $context->builder->positionAtEnd($checkKeyBb);
+        $storedKey = $context->builder->call(self::helperFunction($context, self::MAP_KEY), $i64Idx);
+        $keyMatch = JitStringCompare::identical($context, $storedKey, $keyStr);
+        $context->builder->branchIf($keyMatch, $clearBb, $loopInc);
+
+        $context->builder->positionAtEnd($clearBb);
+        $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i64Idx);
+        $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($loopInc);
         $context->builder->store(
@@ -624,6 +809,11 @@ final class WeakRefRegistryRuntime
             $context,
             '__string__init',
             $context->context->functionType($strPtr, false, $i64, $i8p)
+        );
+        self::ensureExternal(
+            $context,
+            'memcmp',
+            $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
         );
     }
 

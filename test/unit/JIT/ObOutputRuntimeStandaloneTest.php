@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\ObOutput;
 use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -36,5 +37,14 @@ final class ObOutputRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+
+        // Issue #11437: repeated registerExternals must keep implemented bodies linkable.
+        $obEndAll = $ctx->lookupFunction('__phpc_ob_end_all');
+        $this->assertGreaterThan(0, $obEndAll->countBasicBlocks());
+        ObOutput::registerExternals($ctx);
+        ObOutput::registerExternals($ctx);
+        $after = $ctx->lookupFunction('__phpc_ob_end_all');
+        $this->assertGreaterThan(0, $after->countBasicBlocks());
+        $this->assertSame($obEndAll, $after);
     }
 }
