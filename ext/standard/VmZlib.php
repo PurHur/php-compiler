@@ -10,7 +10,7 @@ use PHPCompiler\VM\ErrorReporter;
 /**
  * VM zlib builtins via libz FFI (ext/zlib/zlib.c parity, issue #3194, #6476, #6356).
  *
- * JIT/AOT use {@see \PHPCompiler\JIT\Builtin\StringZlibJit}; VM uses {@see VmZlibNative} only.
+ * JIT/AOT use {@see \PHPCompiler\JIT\Builtin\ZlibRuntime} → {@see ZlibJitHelper}; VM uses {@see VmZlibNative}.
  */
 final class VmZlib
 {

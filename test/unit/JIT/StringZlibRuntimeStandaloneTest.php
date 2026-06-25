@@ -26,8 +26,10 @@ final class StringZlibRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('zlib_compress.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringZlib.php');
-        $this->assertStringContainsString('StringZlibJit', $runtime);
+        $this->assertStringContainsString('ZlibRuntime', $runtime);
         $this->assertStringNotContainsString('zlib_compress.c', $runtime);
+        $zlibRuntime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php');
+        $this->assertStringContainsString('StringZlibJit', $zlibRuntime);
     }
 
 }
