@@ -1082,9 +1082,14 @@ final class VmReflection
         return null !== $prop->default || $prop->hasRuntimeDefaultInit();
     }
 
-    private static function staticPropertyHasDefaultValue(Variable $storage): bool
+    public static function staticPropertyHasDefaultValue(Variable $storage): bool
     {
         return !$storage->resolveIndirect()->isUndefined();
+    }
+
+    public static function propertyDefaultValueIsAvailable(ClassProperty $prop): bool
+    {
+        return null !== $prop->default && !$prop->hasRuntimeDefaultInit();
     }
 
     /**
