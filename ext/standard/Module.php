@@ -494,7 +494,7 @@ class Module extends ModuleAbstract
             new output_reset_rewrite_vars(),
             new json_encode(),
             new json_decode(),
-            new json_validate(),
+            ...(CompilerVersion::supportsJsonValidate() ? [new json_validate()] : []),
             new serialize(),
             new unserialize(),
             new json_last_error_(),
