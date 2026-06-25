@@ -202,6 +202,9 @@ final class BuiltinParamNames
                 return ['iterator', 'preserve_keys'];
             case 'hrtime':
                 return ['as_number'];
+            case 'memory_get_usage':
+            case 'memory_get_peak_usage':
+                return ['real_usage'];
             case 'microtime':
                 return ['as_float'];
             case 'trim':
