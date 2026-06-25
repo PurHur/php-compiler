@@ -459,6 +459,25 @@ final class VmPregNative
         int $limit,
         ?int &$count = null
     ): string|false {
+        $emptyParsed = PregEmptyPatternReplace::parseEmptyPattern($pattern);
+        if (null !== $emptyParsed) {
+            [, $opts] = $emptyParsed;
+            self::$lastError = 0;
+            $replacements = 0;
+            $result = PregEmptyPatternReplace::replace(
+                $replacement,
+                $subject,
+                $limit,
+                $opts,
+                $replacements
+            );
+            if (null !== $count) {
+                $count = $replacements;
+            }
+
+            return $result;
+        }
+
         $compiled = self::compile($pattern);
         if (null === $compiled) {
             return false;
