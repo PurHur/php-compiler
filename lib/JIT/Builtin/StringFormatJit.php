@@ -201,7 +201,7 @@ final class StringFormatJit
             ),
             '__phpc_fmt_append_spec_f_prec' => $context->module->addFunction(
                 $name,
-                $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i32)
+                $context->context->functionType($void, false, $i8p, $sizeTp, $sizeT, $valuePtr, $i32, $i8)
             ),
             '__phpc_fmt_append_spec_snprintf' => $context->module->addFunction(
                 $name,
@@ -1112,14 +1112,21 @@ final class StringFormatJit
         $cap = $fn->getParam(2);
         $valuePtr = $fn->getParam(3);
         $prec = $fn->getParam(4);
+        $signFlag = $fn->getParam(5);
 
         $appendFloatPrec = $context->lookupFunction('__phpc_fmt_append_float_prec');
+        $appendStr = $context->lookupFunction('__phpc_fmt_append_str');
+        $snprintfFn = $context->lookupFunction('snprintf');
+        $strlenFn = $context->lookupFunction('strlen');
+        $sizeT = $context->getTypeFromString('size_t');
         $readLong = $context->lookupFunction('__value__readLong');
         $readDouble = $context->lookupFunction('__value__readDouble');
         $readString = $context->lookupFunction('__value__readString');
         $strtodFn = $context->lookupFunction('strtod');
         $nullPtr = $i8pp->constNull();
         $kind = self::valueTypeKind($context, $valuePtr);
+        $floatValSlot = BasicBlockHelper::entryAlloca($context, $dbl);
+        $zeroDbl = $dbl->constReal(0.0);
 
         $fDefault = $fn->appendBasicBlock('spec_fp_default');
         $fDouble = $fn->appendBasicBlock('spec_fp_double');
@@ -1135,36 +1142,18 @@ final class StringFormatJit
         $fSwitch->addCase($i32->constInt(self::PHPC_TYPE_STRING, false), $fString);
 
         $context->builder->positionAtEnd($fDouble);
-        $context->builder->call(
-            $appendFloatPrec,
-            $buf,
-            $posPtr,
-            $cap,
-            $context->builder->call($readDouble, $valuePtr),
-            $prec
-        );
+        $context->builder->store($context->builder->call($readDouble, $valuePtr), $floatValSlot);
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fLong);
-        $context->builder->call(
-            $appendFloatPrec,
-            $buf,
-            $posPtr,
-            $cap,
+        $context->builder->store(
             $context->builder->sitofp($context->builder->call($readLong, $valuePtr), $dbl),
-            $prec
+            $floatValSlot
         );
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fNull);
-        $context->builder->call(
-            $appendFloatPrec,
-            $buf,
-            $posPtr,
-            $cap,
-            $dbl->constReal(0.0),
-            $prec
-        );
+        $context->builder->store($zeroDbl, $floatValSlot);
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fString);
@@ -1174,13 +1163,48 @@ final class StringFormatJit
             self::stringData($context, $fStr),
             $nullPtr
         );
-        $context->builder->call($appendFloatPrec, $buf, $posPtr, $cap, $parsedF, $prec);
+        $context->builder->store($parsedF, $floatValSlot);
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fDefault);
+        $context->builder->store($zeroDbl, $floatValSlot);
         $context->builder->branch($fDone);
 
         $context->builder->positionAtEnd($fDone);
+        $hasSign = $context->builder->icmp(Builder::INT_NE, $signFlag, $i8->constInt(0, false));
+        $signedBb = $fn->appendBasicBlock('spec_fp_signed');
+        $plainBb = $fn->appendBasicBlock('spec_fp_plain');
+        $finishBb = $fn->appendBasicBlock('spec_fp_finish');
+        $context->builder->branchIf($hasSign, $signedBb, $plainBb);
+
+        $context->builder->positionAtEnd($plainBb);
+        $context->builder->call(
+            $appendFloatPrec,
+            $buf,
+            $posPtr,
+            $cap,
+            $context->builder->load($floatValSlot),
+            $prec
+        );
+        $context->builder->branch($finishBb);
+
+        $context->builder->positionAtEnd($signedBb);
+        $tmpCap = $sizeT->constInt(64, false);
+        $tmpSlot = $context->builder->alloca($i8->arrayType(64), 1, 'spec_fp_signed_tmp');
+        $tmp = $context->builder->pointerCast($tmpSlot, $i8p);
+        $context->builder->call(
+            $snprintfFn,
+            $tmp,
+            $tmpCap,
+            self::literalCstr($context, '%+.*f'),
+            $prec,
+            $context->builder->load($floatValSlot)
+        );
+        $outLen = $context->builder->call($strlenFn, $tmp);
+        $context->builder->call($appendStr, $buf, $posPtr, $cap, $tmp, $outLen);
+        $context->builder->branch($finishBb);
+
+        $context->builder->positionAtEnd($finishBb);
         $context->builder->returnVoid();
     }
 
@@ -2466,7 +2490,15 @@ final class StringFormatJit
 
         $context->builder->positionAtEnd($precEmit);
         $argValPrec = $context->builder->inBoundsGEP($argv, $context->builder->zExt($resolvedIdx, $i64));
-        $context->builder->call($appendSpecFloatPrec, $out, $posSlot, $outCap, $argValPrec, $precVal);
+        $context->builder->call(
+            $appendSpecFloatPrec,
+            $out,
+            $posSlot,
+            $outCap,
+            $argValPrec,
+            $precVal,
+            $context->builder->load($signFlagSlot)
+        );
         $context->builder->branch($afterArg);
 
         $context->builder->positionAtEnd($skipArg);
