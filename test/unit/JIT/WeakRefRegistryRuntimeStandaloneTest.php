@@ -46,6 +46,7 @@ final class WeakRefRegistryRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_weakref.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php');
+        $this->assertStringContainsString('WeakRefRegistryJitHelper', $runtime);
         $this->assertStringContainsString('Replaces lib/AOT/runtime/phpc_weakref.c', $runtime);
     }
 }
