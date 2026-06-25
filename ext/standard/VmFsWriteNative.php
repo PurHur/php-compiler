@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc open(2)/write(2)/flock(2) for VM file writes without host PHP @file_put_contents() (#8487, pairs StringFilePutContents).
+ * libc open(2)/write(2)/flock(2) for VM file writes; falls back to {@see VmFsWritePure} when FFI unavailable (#8950).
  *
  * php-src: ext/standard/file.c — php_file_put_contents
  * JIT/AOT: __compiler_file_put_contents LLVM lowering (unchanged).
@@ -32,7 +32,7 @@ final class VmFsWriteNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFsWritePure::available();
     }
 
     public static function write(string $path, string $data, int $flags = 0): int|false
@@ -42,7 +42,7 @@ final class VmFsWriteNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsWritePure::write($path, $data, $flags);
         }
 
         $openFlags = 0 !== ($flags & self::FILE_APPEND)

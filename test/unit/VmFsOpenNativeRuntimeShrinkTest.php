@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsOpenNative;
+use PHPCompiler\ext\standard\VmFsOpenPure;
 use PHPUnit\Framework\TestCase;
 
 /** VmFsOpenNative libc open without host @fopen delegation (#5214, #8517). */
@@ -42,14 +43,22 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
     public function testFopenReturnsFalseWhenOpenNativeUnavailable(): void
     {
         if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('ext/ffi required to test VmFsOpenNative availability gate');
+            $this->markTestSkipped('ext/ffi required to test VmFsOpenNative FFI gate');
+        }
+        if (!VmFsOpenPure::available()) {
+            $this->markTestSkipped('host fopen required for VmFsOpenPure fallback');
         }
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
             $path = tempnam(sys_get_temp_dir(), 'phpc_fopen_gate_');
             $this->assertNotFalse($path);
-            $this->assertFalse(VmFs::fopen($path, 'rb'));
+            $this->assertTrue(VmFsOpenNative::available());
+            $handle = VmFs::fopen($path, 'rb');
+            $this->assertNotFalse($handle);
+            if (false !== $handle) {
+                VmFs::fclose($handle);
+            }
             @unlink($path);
         } finally {
             if (false === $prev) {
@@ -71,7 +80,7 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
     public function testOpenNativeDeclaresLibcOpenDupClose(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsOpenNative.php');
-        $this->assertStringContainsString('without host PHP @fopen', $source);
+        $this->assertStringContainsString('VmFsOpenPure', $source);
         $this->assertStringContainsString('int open(const char *pathname', $source);
         $this->assertStringContainsString('int dup(int oldfd)', $source);
         $this->assertStringContainsString('int close(int fd)', $source);

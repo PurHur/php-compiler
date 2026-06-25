@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc open(2)/dup(2) for VM fopen() on regular paths without host PHP @fopen (#5214, pairs VmFsReadNative).
+ * libc open(2)/dup(2) for VM fopen(); falls back to {@see VmFsOpenPure} when FFI unavailable (#8950).
  *
  * php-src: ext/standard/streams.c — _php_stream_fopen
  * JIT/AOT: {@see \PHPCompiler\JIT\Builtin\StreamIoJit} / __compiler_fopen (unchanged)
@@ -32,7 +32,7 @@ final class VmFsOpenNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFsOpenPure::available();
     }
 
     /**
@@ -50,7 +50,7 @@ final class VmFsOpenNative
         [$flags, $createMode] = $parsed;
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsOpenPure::open($path, $mode);
         }
 
         try {

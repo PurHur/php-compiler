@@ -26,7 +26,7 @@ final class VmFsWriteNativeRuntimeShrinkTest extends TestCase
     public function testWriteNativeDeclaresLibcOpenWriteFlockClose(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsWriteNative.php');
-        $this->assertStringContainsString('without host PHP @file_put_contents', $source);
+        $this->assertStringContainsString('VmFsWritePure', $source);
         $this->assertStringContainsString('int open(const char *pathname', $source);
         $this->assertStringContainsString('ssize_t write(int fd', $source);
         $this->assertStringContainsString('int flock(int fd', $source);
