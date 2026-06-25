@@ -30,17 +30,10 @@ final class hash_pbkdf2 extends Internal
         $algo = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hash_pbkdf2', 0, 'algo');
         $password = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'hash_pbkdf2', 1, 'password');
         $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[2], 'hash_pbkdf2', 2, 'salt');
-        $iterations = $frame->calledArgs[3]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $iterations->type) {
-            throw new \LogicException('hash_pbkdf2() iterations must be an integer in this compiler build');
-        }
+        $iterations = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'hash_pbkdf2', 4, 'iterations');
         $length = 0;
         if ($argc >= 5) {
-            $lengthArg = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $lengthArg->type) {
-                throw new \LogicException('hash_pbkdf2() length must be an integer in this compiler build');
-            }
-            $length = $lengthArg->toInt();
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 4, 'hash_pbkdf2', 5, 'length');
         }
         $raw = false;
         if (6 === $argc) {
@@ -63,7 +56,7 @@ final class hash_pbkdf2 extends Internal
             $algo,
             $password,
             $salt,
-            $iterations->toInt(),
+            $iterations,
             $length,
             $raw
         ));
