@@ -11506,7 +11506,17 @@ restart:
 
     protected function frameUsesClosureStaticStorage(Frame $frame): bool
     {
-        return null !== $frame->closureCall;
+        if (null === $frame->closureCall) {
+            return false;
+        }
+        $func = $frame->block->func ?? null;
+        if (null === $func) {
+            return false;
+        }
+
+        // Per-closure statics only inside closure bodies; nested user-function calls from
+        // a closure must not inherit the caller's ClosureState (#11451, Zend/zend_execute.c).
+        return (($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
     }
 
     protected function ensureFunctionStaticForFrame(Frame $frame, string $storageKey): Variable
