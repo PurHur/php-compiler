@@ -43,6 +43,7 @@ final class VmIni
         'zend.enable_gc',
         'max_execution_time',
         'default_charset',
+        'cfg_file_path',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -144,8 +145,15 @@ final class VmIni
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
             'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
             'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
+            'cfg_file_path' => self::cfgFilePath(),
             default => false,
         };
+    }
+
+    /** php-src cfg_file_path — path of loaded php.ini (ext/standard/info.c, #10179). */
+    private static function cfgFilePath(): string|false
+    {
+        return VmIniIntrospection::loadedFile();
     }
 
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
