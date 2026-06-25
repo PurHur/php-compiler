@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -59,6 +60,9 @@ final class JitFdiv
         string $function = self::FUNCTION,
         string $expectedType = 'float'
     ): Value {
+        if ($context->callerStrictTypes && 'float' === $expectedType) {
+            JitInternalStrictArg::requireFloat($context, $arg, $function, $paramName, $argIndex);
+        }
         if (JITVariable::TYPE_NULL === $arg->type) {
             return $double->constReal(0.0);
         }

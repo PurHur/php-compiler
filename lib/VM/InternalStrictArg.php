@@ -37,6 +37,20 @@ final class InternalStrictArg
         return $arg;
     }
 
+    /** float builtin args: int widens; string rejected under caller strict_types (#11497, zend_verify_arg_type). */
+    public static function requireFloat(Frame $frame, int $argIndex, string $function, string $paramName): Variable
+    {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (!self::callerStrict($frame)) {
+            return $arg;
+        }
+        if (Variable::TYPE_INTEGER === $arg->type || Variable::TYPE_FLOAT === $arg->type) {
+            return $arg;
+        }
+
+        throw new \TypeError(self::message($function, $argIndex, $paramName, 'float', $arg));
+    }
+
     public static function requireString(Frame $frame, int $argIndex, string $function, string $paramName): Variable
     {
         $arg = $frame->calledArgs[$argIndex]->resolveIndirect();

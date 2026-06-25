@@ -434,6 +434,32 @@ final class VmMath
     }
 
     /**
+     * float builtin args with strict_types TypeError on string (#11497, ext/standard/math.c).
+     */
+    public static function parseStrictFloatBuiltinArgForFrame(
+        Frame $frame,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): float {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            $arg = InternalStrictArg::requireFloat($frame, 0, $function, $paramName);
+            if (Variable::TYPE_INTEGER === $arg->type) {
+                return (float) $arg->toInt();
+            }
+
+            return $arg->toFloat();
+        }
+
+        return self::parseDoubleBuiltinArg(
+            $frame->calledArgs[0],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
+    }
+
+    /**
      * Z_PARAM_NUMBER rejects enum cases (php-src ext/standard/math.c; #5613).
      *
      * @throws \TypeError

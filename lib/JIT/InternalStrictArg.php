@@ -39,6 +39,31 @@ final class InternalStrictArg
         );
     }
 
+    /** float builtin args: int widens; string rejected under caller strict_types (#11497). */
+    public static function requireFloat(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return;
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            self::enforceFloatValueBox($context, $arg, $function, $paramName, $argNumber);
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'float', $arg)
+        );
+    }
+
     /**
      * Reject null for internal string parameters when caller uses strict_types (#4365, #11322).
      */
@@ -332,6 +357,49 @@ final class InternalStrictArg
                 $argNumber,
                 $paramName,
                 $expectedLabel,
+                'mixed'
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function enforceFloatValueBox(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_strict_float_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_strict_float_fail');
+        $isInt = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_INTEGER, false)
+        );
+        $isFloat = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(VmVariable::TYPE_FLOAT, false)
+        );
+        $isOk = $context->builder->or($isInt, $isFloat);
+        $context->builder->branchIf($isOk, $okBlock, $failBlock);
+        $context->builder->positionAtEnd($failBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type float, %s given',
+                $function,
+                $argNumber,
+                $paramName,
                 'mixed'
             )
         );
