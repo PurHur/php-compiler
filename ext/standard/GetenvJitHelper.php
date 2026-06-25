@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, php-in-PHP).
+ * Lowered into JIT/AOT modules for getenv()/putenv() overlay (#9092, #8992 php-in-PHP).
  *
- * Process environ on miss stays in {@see \PHPCompiler\JIT\Builtin\StringGetenv} libc trampoline.
+ * Overlay mutations and inherited environ lookup — no libc getenv/putenv in VM/JIT overlay path.
  * php-src: ext/standard/basic_functions.c — zif_getenv, zif_putenv
  */
 final class GetenvJitHelper
@@ -33,17 +33,29 @@ final class GetenvJitHelper
         if (null === $name) {
             return false;
         }
-        if (!\array_key_exists($name, self::$local)) {
+        if (\array_key_exists($name, self::$local)) {
+            return self::$local[$name];
+        }
+
+        $environ = VmEnvEnvironNative::enumerate();
+        if (!\array_key_exists($name, $environ)) {
             return false;
         }
 
-        return self::$local[$name];
+        return $environ[$name];
     }
 
     /** @return array<string, string> */
     public static function getAllEnvironmentMap(): array
     {
-        return self::$local;
+        $all = VmEnvEnvironNative::enumerate();
+        foreach (self::$local as $name => $value) {
+            if ('' !== $name) {
+                $all[$name] = $value;
+            }
+        }
+
+        return $all;
     }
 
     public static function putenv(?string $assignment): bool

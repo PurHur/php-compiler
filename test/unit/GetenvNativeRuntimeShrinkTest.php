@@ -35,6 +35,14 @@ final class GetenvNativeRuntimeShrinkTest extends TestCase
         );
     }
 
+    public function testVmEnvEnvironNativeHasNoFfi(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmEnvEnvironNative.php');
+        $this->assertDoesNotMatchRegularExpression('/\\\\FFI/', $source);
+        $this->assertStringNotContainsString('libc.so', $source);
+        $this->assertStringContainsString('/proc/self/environ', $source);
+    }
+
     public function testBootstrapReproAndCompliancePresent(): void
     {
         $this->assertFileExists($this->repoRoot.'/test/repro-maintainer/bootstrap_getenv_all_native.php');
