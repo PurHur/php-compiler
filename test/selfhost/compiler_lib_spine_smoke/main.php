@@ -2875,6 +2875,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetAsymmetricVisibility.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetAttributes.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDeclaringClass.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetDocComment.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetHooks.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetMangledName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetName.php';

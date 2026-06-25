@@ -1369,6 +1369,21 @@ final class ReflectionSupport
         return $entry->methodSourceLocations[$methodLc] ?? null;
     }
 
+    public static function propertySourceLocation(Context $ctx, ClassEntry $entry, string $property): ?SourceLocation
+    {
+        $lc = strtolower($property);
+        $current = $entry;
+        while (true) {
+            if (isset($current->propertySourceLocations[$lc])) {
+                return $current->propertySourceLocations[$lc];
+            }
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                return null;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+    }
+
     public static function returnDocComment(?Variable $returnVar, ?string $docComment): void
     {
         if (null === $returnVar) {

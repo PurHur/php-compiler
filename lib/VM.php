@@ -12715,6 +12715,9 @@ restart:
             if (isset($trait->propDeprecated[$propLc])) {
                 $entry->propDeprecated[$propLc] = $trait->propDeprecated[$propLc];
             }
+            if (isset($trait->propertySourceLocations[$propLc])) {
+                $entry->propertySourceLocations[$propLc] = $trait->propertySourceLocations[$propLc];
+            }
         }
     }
 
@@ -13311,6 +13314,9 @@ restart:
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$propLc] = $op->deprecatedMetadata;
                     }
+                    if (null !== $op->sourceLocation) {
+                        $entry->propertySourceLocations[$propLc] = $op->sourceLocation;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -13333,6 +13339,9 @@ restart:
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$name] = $op->deprecatedMetadata;
+                    }
+                    if (null !== $op->sourceLocation) {
+                        $entry->propertySourceLocations[$name] = $op->sourceLocation;
                     }
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:

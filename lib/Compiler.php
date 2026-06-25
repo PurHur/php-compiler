@@ -4517,6 +4517,7 @@ class Compiler {
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
                     $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+                    $this->assignSourceMetadata($declare, $child);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:

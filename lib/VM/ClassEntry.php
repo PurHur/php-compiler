@@ -134,6 +134,8 @@ class ClassEntry {
     public ?\PHPCompiler\Compiler\SourceLocation $sourceLocation = null;
     /** @var array<string, \PHPCompiler\Compiler\SourceLocation> method lc => source metadata (#7358) */
     public array $methodSourceLocations = [];
+    /** @var array<string, \PHPCompiler\Compiler\SourceLocation> property lc => source metadata (#11464) */
+    public array $propertySourceLocations = [];
 
     public function __construct(string $name) {
         $this->name = $name;
