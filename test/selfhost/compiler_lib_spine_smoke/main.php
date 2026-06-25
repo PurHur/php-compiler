@@ -904,6 +904,7 @@ require_once __DIR__.'/../../../ext/standard/StatFieldsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StatPathJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StdlibConstants.php';
 require_once __DIR__.'/../../../ext/standard/StreamBucketJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/WeakRefRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamContextJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamFilterJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamNotificationJitHelper.php';
