@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3108 |
-| Phase A inventory files (M2 ratio SSOT) | 3108 |
+| PHP files on vm.php path | 3110 |
+| Phase A inventory files (M2 ratio SSOT) | 3110 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8353 |
+| Source constructs flagged (warnings) | 8355 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -968,12 +968,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsAccessNative.php` | 0 | 1 |
 | `ext/standard/VmFsAccessPure.php` | 0 | 1 |
 | `ext/standard/VmFsDirNative.php` | 0 | 1 |
+| `ext/standard/VmFsDirPure.php` | 0 | 1 |
 | `ext/standard/VmFsDiskNative.php` | 0 | 1 |
 | `ext/standard/VmFsDiskPure.php` | 0 | 1 |
 | `ext/standard/VmFsGlob.php` | 0 | 1 |
 | `ext/standard/VmFsOpenNative.php` | 0 | 1 |
 | `ext/standard/VmFsPathNative.php` | 0 | 1 |
 | `ext/standard/VmFsReadNative.php` | 0 | 1 |
+| `ext/standard/VmFsReadPure.php` | 0 | 1 |
 | `ext/standard/VmFsStdio.php` | 0 | 1 |
 | `ext/standard/VmFsStdioNative.php` | 0 | 1 |
 | `ext/standard/VmFsTempnam.php` | 0 | 1 |
@@ -9491,6 +9493,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
 
+### `ext/standard/VmFsDirPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
 ### `ext/standard/VmFsDiskNative.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9520,6 +9527,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/VmFsReadPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/VmFsStdio.php`
 
