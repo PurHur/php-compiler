@@ -76,10 +76,18 @@ if (!function_exists('php_compiler_cli_note_invocation_cwd')) {
 }
 
 if (!function_exists('php_compiler_cli_standard_input_code_filename')) {
-    /** Virtual filename for {@code php -r} snippets (Zend sapi/cli, issue #4374). */
+    /** Virtual filename for stdin bundles (Zend sapi/cli, issue #4374). */
     function php_compiler_cli_standard_input_code_filename(): string
     {
         return 'Standard input code';
+    }
+}
+
+if (!function_exists('php_compiler_cli_command_line_code_filename')) {
+    /** Virtual filename for {@code php -r} snippets (Zend sapi/cli, issue #11533). */
+    function php_compiler_cli_command_line_code_filename(): string
+    {
+        return 'Command line code';
     }
 }
 
