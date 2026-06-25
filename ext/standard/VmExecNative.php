@@ -29,14 +29,14 @@ final class VmExecNative
 
         $handle = $opened['handle'];
         $lines = [];
-        while (!VmPhpFdStream::eof($handle)) {
-            $line = VmPhpFdStream::fgets($handle);
+        while (!VmFs::feof($handle)) {
+            $line = VmFs::fgets($handle);
             if (false === $line) {
                 break;
             }
             $lines[] = \rtrim($line, "\r\n");
         }
-        VmPhpFdStream::close($handle);
+        VmFs::fclose($handle);
 
         $status = VmPopenNative::pclose($opened['file']);
         if (-1 === $status) {

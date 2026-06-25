@@ -27,14 +27,14 @@ final class VmShellExecNative
 
         $handle = $opened['handle'];
         $output = '';
-        while (!VmPhpFdStream::eof($handle)) {
-            $chunk = VmPhpFdStream::read($handle, self::READ_CHUNK);
+        while (!VmFs::feof($handle)) {
+            $chunk = VmFs::fread($handle, self::READ_CHUNK);
             if (false === $chunk || '' === $chunk) {
                 break;
             }
             $output .= $chunk;
         }
-        VmPhpFdStream::close($handle);
+        VmFs::fclose($handle);
 
         $status = VmPopenNative::pclose($opened['file']);
         if (-1 === $status) {
