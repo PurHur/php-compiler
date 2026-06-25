@@ -10,7 +10,7 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #6633 #7414 */
 final class NeverParamTypeTest extends TestCase
 {
-    public function testStandaloneNeverParamCompiles(): void
+    public function testStandaloneNeverParamRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -18,12 +18,12 @@ final class NeverParamTypeTest extends TestCase
 function acceptsNever(never $value): void {}
 echo "ok\n";
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'never_param.php'));
-        $this->assertSame("ok\n", ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param.php');
     }
 
-    public function testNeverParamCallSiteTypeError(): void
+    public function testNeverParamDeclarationRejectedBeforeCallSite(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -33,9 +33,9 @@ function f(never $x) {
 }
 f(1);
 PHP;
-        $this->expectException(\TypeError::class);
-        $this->expectExceptionMessage('must be of type never');
-        $runtime->run($runtime->parseAndCompile($code, 'never_param_call.php'));
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never cannot be used as a parameter type');
+        $runtime->parseAndCompile($code, 'never_param_call.php');
     }
 
     public function testNeverInUnionParamCompilesAndAcceptsInt(): void

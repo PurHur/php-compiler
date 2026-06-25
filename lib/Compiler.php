@@ -4260,9 +4260,7 @@ class Compiler {
         $declared = $param->declaredType;
         $this->assertFunctionSignatureNeverType($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
-            $block->paramNeverSlots[$slot] = true;
-
-            return;
+            $this->throwCompileError('never cannot be used as a parameter type');
         }
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
