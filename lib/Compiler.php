@@ -11189,7 +11189,8 @@ class Compiler {
                 if (null !== $name) {
                     $lookup = strtolower($name);
                     $isHoistedScalar = \in_array($lookup, ['true', 'false', 'null'], true)
-                        || isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup]);
+                        || isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                        || null !== \PHPCompiler\VM\Context::errorReportingConstant($name);
                     if ($isHoistedScalar) {
                         $callArg = $callOp->args[$argIndex] ?? null;
                         $callArgs = $callOp->args;
@@ -11220,11 +11221,14 @@ class Compiler {
                                 return (string) $block->registerConstant($arg, $vm);
                             }
                         }
-                        // Hoisted SORT_* / PHP_* int constants (incl. zero-valued SORT_REGULAR) (#9462, #9548).
+                        // Hoisted SORT_* / PHP_* / E_USER_* int constants (incl. zero-valued SORT_REGULAR) (#9462, #9548, #11526).
                         if (
                             null !== $callArg
                             && $isLastArg
-                            && isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                            && (
+                                isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])
+                                || null !== \PHPCompiler\VM\Context::errorReportingConstant($name)
+                            )
                         ) {
                             $slot = $block->slotForOperand($prev->result);
                             if (null !== $slot) {
