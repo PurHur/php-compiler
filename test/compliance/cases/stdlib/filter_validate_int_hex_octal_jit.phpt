@@ -1,0 +1,10 @@
+--TEST--
+stdlib filter_var() FILTER_VALIDATE_INT ALLOW_HEX/ALLOW_OCTAL JIT (issue #11757)
+--JIT--
+--FILE--
+<?php
+echo filter_var('0x10', FILTER_VALIDATE_INT, FILTER_FLAG_ALLOW_HEX), "\n";
+echo filter_var('010', FILTER_VALIDATE_INT, FILTER_FLAG_ALLOW_OCTAL), "\n";
+--EXPECT--
+16
+8

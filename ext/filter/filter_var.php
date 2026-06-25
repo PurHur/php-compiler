@@ -126,7 +126,8 @@ final class filter_var extends Internal
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
 
         $context->builder->positionAtEnd($intBlock);
-        $intResult = JitFilter::validateInt($context, $value);
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        $intResult = JitFilter::validateInt($context, $value, $flags);
         if (null !== $optionsArg && JITVariable::TYPE_NULL !== $optionsArg->type) {
             $intResult = JitFilter::applyNullOnFailure($context, $intResult, $nullOnFailure);
         }

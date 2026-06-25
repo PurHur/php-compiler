@@ -28,6 +28,10 @@ final class VmFilter
     public const FILTER_VALIDATE_EMAIL = 274;
     /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
     public const FILTER_NULL_ON_FAILURE = 134217728;
+    /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_OCTAL */
+    public const FILTER_FLAG_ALLOW_OCTAL = 8;
+    /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_HEX */
+    public const FILTER_FLAG_ALLOW_HEX = 16;
     /** php-src ext/filter/php_filter.h */
     public const INPUT_POST = 0;
 
@@ -61,7 +65,7 @@ final class VmFilter
         $parsed = self::parseFilterArgs($options);
         $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value, $nullOnFailure);
+            return self::validateInt($value, $nullOnFailure, $parsed['flags']);
         }
         if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
             return self::validateBoolean($value, $nullOnFailure);
@@ -383,7 +387,7 @@ final class VmFilter
         return is_finite($f) ? $f : null;
     }
 
-    private static function validateInt(Variable $value, bool $nullOnFailure = false): Variable
+    private static function validateInt(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
@@ -398,13 +402,37 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if ('' === $s || !self::isIntegerString($s)) {
+        if ('' === $s) {
+            return self::failureResult($nullOnFailure);
+        }
+        $parsed = self::parseIntFilterString($s, $flags);
+        if (null === $parsed) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
-        $out->int((int) $s);
+        $out->int($parsed);
 
         return $out;
+    }
+
+    /**
+     * FILTER_VALIDATE_INT string parsing (php-src ext/filter/logical_filters.c).
+     */
+    public static function parseIntFilterString(string $s, int $flags = 0): ?int
+    {
+        $allowHex = 0 !== ($flags & self::FILTER_FLAG_ALLOW_HEX);
+        $allowOctal = 0 !== ($flags & self::FILTER_FLAG_ALLOW_OCTAL);
+        if ($allowHex && self::isHexIntegerString($s)) {
+            return self::parseHexIntegerString($s);
+        }
+        if ($allowOctal && self::isOctalIntegerString($s)) {
+            return self::parseOctalIntegerString($s);
+        }
+        if (!self::isIntegerString($s)) {
+            return null;
+        }
+
+        return (int) $s;
     }
 
     private static function validateEmail(Variable $value, bool $nullOnFailure = false): Variable
@@ -571,6 +599,42 @@ final class VmFilter
         }
 
         return true;
+    }
+
+    public static function isHexIntegerString(string $s): bool
+    {
+        return (bool) preg_match('/^[+-]?0[xX][0-9a-fA-F]+$/', $s);
+    }
+
+    public static function isOctalIntegerString(string $s): bool
+    {
+        if (!preg_match('/^[+-]?0[0-7]*$/', $s)) {
+            return false;
+        }
+        $body = ltrim($s, '+-');
+        if (str_starts_with($body, '0x') || str_starts_with($body, '0X')) {
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function parseHexIntegerString(string $s): int
+    {
+        $neg = str_starts_with($s, '-');
+        $body = ltrim($s, '+-');
+        $val = (int) hexdec(substr($body, 2));
+
+        return $neg ? -$val : $val;
+    }
+
+    public static function parseOctalIntegerString(string $s): int
+    {
+        $neg = str_starts_with($s, '-');
+        $body = ltrim($s, '+-');
+        $val = (int) octdec($body);
+
+        return $neg ? -$val : $val;
     }
 
     /**
