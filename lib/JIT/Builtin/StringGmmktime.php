@@ -4,29 +4,33 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_gmmktime — UTC mktime via libc timegm (#7001).
+ * JIT/AOT link for __compiler_gmmktime via GmmktimeJitHelper PHP (#9132).
  *
- * Mirrors ext/standard/VmDate::gmmktime(). php-src: ext/date/php_date.c PHP_FUNCTION(gmmktime).
+ * Replaces libc struct tm / timegm LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
+ * php-src: ext/date/php_date.c — PHP_FUNCTION(gmmktime)
  */
 final class StringGmmktime
 {
-    private const TM_SEC = 0;
+    private const HELPER_PATH = '/ext/standard/GmmktimeJitHelper.php';
 
-    private const TM_MIN = 4;
+    private const GMMKTIME_HELPER = 'PHPCompiler\\ext\\standard\\GmmktimeJitHelper::gmmktimeArgv';
 
-    private const TM_HOUR = 8;
+    private const LAST_TIMESTAMP = 'PHPCompiler\\ext\\standard\\GmmktimeJitHelper::lastTimestamp';
 
-    private const TM_MDAY = 12;
-
-    private const TM_MON = 16;
-
-    private const TM_YEAR = 20;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::GMMKTIME_HELPER,
+        self::LAST_TIMESTAMP,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -42,207 +46,150 @@ final class StringGmmktime
             return;
         }
 
-        self::ensureHelpers($context);
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
 
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $voidTy = $context->getTypeFromString('void');
-        $valuePtr = $context->getTypeFromString('__value__*');
-
-        $ft = $context->context->functionType(
-            $voidTy,
-            false,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $i64,
-            $i1,
-            $valuePtr
-        );
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction('__compiler_gmmktime', $ft);
-        self::implementGmmktime($context, $fn);
-
+        self::ensureJitHelperCompiled($context);
+        self::implementGmmktimeBridge($context);
         self::registerLinkedRuntime($context);
-    }
 
-    private static function implementGmmktime(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('gmt_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $hour = $fn->getParam(0);
-        $minute = $fn->getParam(1);
-        $second = $fn->getParam(2);
-        $month = $fn->getParam(3);
-        $day = $fn->getParam(4);
-        $year = $fn->getParam(5);
-        $useCurrentUtc = $fn->getParam(6);
-        $out = $fn->getParam(7);
-
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i64p = $context->getTypeFromString('int64*');
-        $i32p = $context->getTypeFromString('int32*');
-        $one = $i64->constInt(1, false);
-        $yearBase = $i32->constInt(1900, false);
-        $minusOne = $i64->constInt(-1, true);
-
-        $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $nullRetBb = $fn->appendBasicBlock('gmt_null_out');
-        $resolveBb = $fn->appendBasicBlock('gmt_resolve');
-        $context->builder->branchIf($nullOut, $nullRetBb, $resolveBb);
-
-        $context->builder->positionAtEnd($nullRetBb);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($resolveBb);
-        $currentBb = $fn->appendBasicBlock('gmt_current');
-        $passedBb = $fn->appendBasicBlock('gmt_passed');
-        $mergeBb = $fn->appendBasicBlock('gmt_merge');
-        $context->builder->branchIf($useCurrentUtc, $currentBb, $passedBb);
-
-        $context->builder->positionAtEnd($currentBb);
-        $now = $context->builder->call($context->lookupFunction('time'), $i8p->constNull());
-        $tsSlot = $context->builder->alloca($i64, 1, 'gmt_now');
-        $context->builder->store($now, $tsSlot);
-        $tsPtr = $context->builder->pointerCast($tsSlot, $i64p);
-        $tmPtr = $context->builder->call($context->lookupFunction('gmtime'), $tsPtr);
-        $tmNull = $context->builder->icmp(Builder::INT_EQ, $tmPtr, $i8p->constNull());
-        $tmFailBb = $fn->appendBasicBlock('gmt_tm_fail');
-        $tmOkBb = $fn->appendBasicBlock('gmt_tm_ok');
-        $context->builder->branchIf($tmNull, $tmFailBb, $tmOkBb);
-
-        $context->builder->positionAtEnd($tmFailBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($tmOkBb);
-        $curMin = $context->builder->zExt(self::loadTmField($context, $tmPtr, self::TM_MIN), $i64);
-        $curSec = $context->builder->zExt(self::loadTmField($context, $tmPtr, self::TM_SEC), $i64);
-        $curMon = $context->builder->addNoSignedWrap(
-            $context->builder->zExt(self::loadTmField($context, $tmPtr, self::TM_MON), $i64),
-            $one
-        );
-        $curDay = $context->builder->zExt(self::loadTmField($context, $tmPtr, self::TM_MDAY), $i64);
-        $curYear = $context->builder->add(
-            $context->builder->zExt(self::loadTmField($context, $tmPtr, self::TM_YEAR), $i64),
-            $context->builder->zExt($yearBase, $i64)
-        );
-        $context->builder->branch($mergeBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($passedBb);
-        $context->builder->branch($mergeBb);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($mergeBb);
-        $phiMin = $context->builder->phi($i64, 'gmt_min');
-        $phiSec = $context->builder->phi($i64, 'gmt_sec');
-        $phiMon = $context->builder->phi($i64, 'gmt_mon');
-        $phiDay = $context->builder->phi($i64, 'gmt_day');
-        $phiYear = $context->builder->phi($i64, 'gmt_year');
-        $phiMin->addIncoming($curMin, $tmOkBb);
-        $phiMin->addIncoming($minute, $passedBb);
-        $phiSec->addIncoming($curSec, $tmOkBb);
-        $phiSec->addIncoming($second, $passedBb);
-        $phiMon->addIncoming($curMon, $tmOkBb);
-        $phiMon->addIncoming($month, $passedBb);
-        $phiDay->addIncoming($curDay, $tmOkBb);
-        $phiDay->addIncoming($day, $passedBb);
-        $phiYear->addIncoming($curYear, $tmOkBb);
-        $phiYear->addIncoming($year, $passedBb);
-
-        $tmBuf = $context->builder->alloca($i32, 9, 'gmt_tm');
-        self::storeTmField($context, $tmBuf, self::TM_SEC, $context->builder->trunc($phiSec, $i32));
-        self::storeTmField($context, $tmBuf, self::TM_MIN, $context->builder->trunc($phiMin, $i32));
-        self::storeTmField($context, $tmBuf, self::TM_HOUR, $context->builder->trunc($hour, $i32));
-        self::storeTmField($context, $tmBuf, self::TM_MDAY, $context->builder->trunc($phiDay, $i32));
-        $monZero = $context->builder->subNoSignedWrap($phiMon, $one);
-        self::storeTmField($context, $tmBuf, self::TM_MON, $context->builder->trunc($monZero, $i32));
-        $yearSince1900 = $context->builder->sub($phiYear, $context->builder->zExt($yearBase, $i64));
-        self::storeTmField($context, $tmBuf, self::TM_YEAR, $context->builder->trunc($yearSince1900, $i32));
-        self::storeTmField($context, $tmBuf, 36, $i32->constInt(0, false));
-
-        $tmPtrOut = $context->builder->pointerCast($tmBuf, $i8p);
-        $result = $context->builder->call($context->lookupFunction('timegm'), $tmPtrOut);
-        $failed = $context->builder->icmp(Builder::INT_EQ, $result, $minusOne);
-        $failBb = $fn->appendBasicBlock('gmt_fail');
-        $okBb = $fn->appendBasicBlock('gmt_ok');
-        $context->builder->branchIf($failed, $failBb, $okBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($okBb);
-        $context->builder->call($context->lookupFunction('__value__writeLong'), $out, $result);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function loadTmField(Context $context, Value $tmPtr, int $offset): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i32p = $context->getTypeFromString('int32*');
-        $tmFields = $context->builder->pointerCast($tmPtr, $i32p);
-
-        return $context->builder->load(
-            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
-        );
-    }
-
-    private static function storeTmField(Context $context, Value $tmBuf, int $offset, Value $valueI32): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i32p = $context->getTypeFromString('int32*');
-        $tmFields = $context->builder->pointerCast($tmBuf, $i32p);
-        $context->builder->store(
-            $valueI32,
-            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
-        );
-    }
-
-    private static function ensureHelpers(Context $context): void
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i64p = $context->getTypeFromString('int64*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-
-        foreach ([
-            ['time', $i64, [$i8p]],
-            ['gmtime', $i8p, [$i64p]],
-            ['timegm', $i64, [$i8p]],
-            ['__value__writeLong', $voidTy, [$valuePtr, $i64]],
-            ['__value__writeBool', $voidTy, [$valuePtr, $i32]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal(
-                $context,
-                $name,
-                $context->context->functionType($ret, false, ...$params)
-            );
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
         }
     }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
+    private static function implementGmmktimeBridge(Context $context): void
     {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $abiName = '__compiler_gmmktime';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
+        $i32 = $context->getTypeFromString('int32');
+        $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+
+        $ft = $context->context->functionType($voidTy, false, $i64, $i64, $i64, $i64, $i64, $i64, $i1, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('gmt_bridge_entry');
+        $nullOutBb = $fn->appendBasicBlock('gmt_null_out');
+        $bodyBb = $fn->appendBasicBlock('gmt_body');
+        $context->builder->positionAtEnd($entry);
+
+        $out = $fn->getParam(7);
+        $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
+        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
+
+        $context->builder->positionAtEnd($nullOutBb);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($bodyBb);
+        $tag = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::GMMKTIME_HELPER),
+            [
+                $fn->getParam(0),
+                $fn->getParam(1),
+                $fn->getParam(2),
+                $fn->getParam(3),
+                $fn->getParam(4),
+                $fn->getParam(5),
+                $fn->getParam(6),
+            ]
+        );
+        $tagI32 = $context->builder->trunc(
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $tag, $i32),
+            $i32
+        );
+        $isFalse = $context->builder->icmp(
+            Builder::INT_EQ,
+            $tagI32,
+            $i32->constInt(\PHPCompiler\ext\standard\GmmktimeJitHelper::TAG_FALSE, false)
+        );
+        $falseBb = BasicBlockHelper::append($context, 'gmt_false');
+        $okBb = BasicBlockHelper::append($context, 'gmt_ok');
+        $doneBb = BasicBlockHelper::append($context, 'gmt_done');
+        $context->builder->branchIf($isFalse, $falseBb, $okBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $out,
+            $i32->constInt(0, false)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($okBb);
+        $timestamp = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::LAST_TIMESTAMP),
+            []
+        );
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $out,
+            JitNestedHelperCoerce::coerceHelperScalarResult($context, $timestamp, $i64)
+        );
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GmmktimeJitHelper compile (#9132)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GmmktimeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GmmktimeJitHelper.php parseAndCompile failed (#9132)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9132)');
+            }
         }
     }
 
@@ -250,7 +197,7 @@ final class StringGmmktime
     {
         $fn = $context->module->getNamedFunction('__compiler_gmmktime');
         if (null === $fn) {
-            throw new \LogicException('__compiler_gmmktime missing after StringGmmktime LLVM implement');
+            throw new \LogicException('__compiler_gmmktime missing after StringGmmktime bridge (#9132)');
         }
         $context->registerFunction('__compiler_gmmktime', $fn);
     }

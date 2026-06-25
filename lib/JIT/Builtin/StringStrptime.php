@@ -4,33 +4,29 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM __compiler_strptime — libc strptime + hashtable breakdown (#3694).
+ * JIT/AOT link for __compiler_strptime via StrptimeJitHelper PHP (#9132).
  *
+ * Replaces libc strptime / struct tm LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/datetime.c — PHP_FUNCTION(strptime)
  */
 final class StringStrptime
 {
-    private const TM_SEC = 0;
+    private const HELPER_PATH = '/ext/standard/StrptimeJitHelper.php';
 
-    private const TM_MIN = 4;
+    private const STRPTIME_HELPER = 'PHPCompiler\\ext\\standard\\StrptimeJitHelper::strptimeArgv';
 
-    private const TM_HOUR = 8;
-
-    private const TM_MDAY = 12;
-
-    private const TM_MON = 16;
-
-    private const TM_YEAR = 20;
-
-    private const TM_WDAY = 24;
-
-    private const TM_YDAY = 28;
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::STRPTIME_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -46,201 +42,125 @@ final class StringStrptime
             return;
         }
 
-        self::ensureHashtableHelpers($context);
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementStrptimeBridge($context);
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementStrptimeBridge(Context $context): void
+    {
+        $abiName = '__compiler_strptime';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
 
         $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i32 = $context->getTypeFromString('int32');
+
         $ft = $context->context->functionType($voidTy, false, $strPtr, $strPtr, $valuePtr);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_strptime', $ft);
-        self::implementStrptime($context, $fn);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
+            : $context->module->addFunction($abiName, $ft);
 
-    private static function implementStrptime(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('sp_entry');
+        $entry = $fn->appendBasicBlock('sp_bridge_entry');
+        $nullOutBb = $fn->appendBasicBlock('sp_null_out');
+        $bodyBb = $fn->appendBasicBlock('sp_body');
         $context->builder->positionAtEnd($entry);
 
-        $dateStr = $fn->getParam(0);
-        $formatStr = $fn->getParam(1);
         $out = $fn->getParam(2);
-
-        $strMap = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $charPtr = $context->getTypeFromString('char*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $sizeT = $context->getTypeFromString('size_t');
-
         $nullOut = $context->builder->icmp(Builder::INT_EQ, $out, $valuePtr->constNull());
-        $nullRetBb = $fn->appendBasicBlock('sp_null_out');
-        $parseBb = $fn->appendBasicBlock('sp_parse');
-        $context->builder->branchIf($nullOut, $nullRetBb, $parseBb);
+        $context->builder->branchIf($nullOut, $nullOutBb, $bodyBb);
 
-        $context->builder->positionAtEnd($nullRetBb);
+        $context->builder->positionAtEnd($nullOutBb);
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($parseBb);
-        $dateChars = $context->builder->structGep($dateStr, $strMap['value']);
-        $datePtr = $context->builder->pointerCast($dateChars, $charPtr);
-        $fmtChars = $context->builder->structGep($formatStr, $strMap['value']);
-        $fmtPtr = $context->builder->pointerCast($fmtChars, $charPtr);
-
-        $tmBuf = $context->builder->alloca($i8, 36, 'sp_tm');
-        $tmPtr = $context->builder->pointerCast($tmBuf, $i8p);
-        $context->builder->call(
-            $context->lookupFunction('memset'),
-            $tmPtr,
-            $i32->constInt(0, false),
-            $sizeT->constInt(36, false)
+        $context->builder->positionAtEnd($bodyBb);
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::STRPTIME_HELPER),
+            [$fn->getParam(0), $fn->getParam(1)]
         );
+        $htNull = JitNestedHelperCoerce::isHelperResultNull($context, $htRaw);
+        $falseBb = $fn->appendBasicBlock('sp_false');
+        $storeBb = $fn->appendBasicBlock('sp_store');
+        $context->builder->branchIf($htNull, $falseBb, $storeBb);
 
-        $rest = $context->builder->call(
-            $context->lookupFunction('strptime'),
-            $datePtr,
-            $fmtPtr,
-            $tmPtr
-        );
-        $parseFail = $context->builder->icmp(Builder::INT_EQ, $rest, $charPtr->constNull());
-        $failBb = $fn->appendBasicBlock('sp_fail');
-        $okBb = $fn->appendBasicBlock('sp_ok');
-        $context->builder->branchIf($parseFail, $failBb, $okBb);
-
-        $context->builder->positionAtEnd($failBb);
+        $context->builder->positionAtEnd($falseBb);
         $context->builder->call(
             $context->lookupFunction('__value__writeBool'),
             $out,
             $i32->constInt(0, false)
         );
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
 
-        $context->builder->positionAtEnd($okBb);
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $htNull = $context->builder->icmp(Builder::INT_EQ, $ht, $htPtr->constNull());
-        $allocFailBb = $fn->appendBasicBlock('sp_alloc_fail');
-        $fillBb = $fn->appendBasicBlock('sp_fill');
-        $context->builder->branchIf($htNull, $allocFailBb, $fillBb);
-
-        $context->builder->positionAtEnd($allocFailBb);
+        $context->builder->positionAtEnd($storeBb);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
         $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
+            $context->lookupFunction('__value__writeHashtable'),
             $out,
-            $i32->constInt(0, false)
+            $ht
         );
         $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
+    }
 
-        $context->builder->positionAtEnd($fillBb);
-        $setLong = $context->lookupFunction('__hashtable__setStringKeyLong');
-        $setString = $context->lookupFunction('__hashtable__setStringKeyString');
-        foreach ([
-            'tm_sec' => self::TM_SEC,
-            'tm_min' => self::TM_MIN,
-            'tm_hour' => self::TM_HOUR,
-            'tm_mday' => self::TM_MDAY,
-            'tm_mon' => self::TM_MON,
-            'tm_year' => self::TM_YEAR,
-            'tm_wday' => self::TM_WDAY,
-            'tm_yday' => self::TM_YDAY,
-        ] as $key => $offset) {
-            $field = self::loadTmField($context, $tmPtr, $offset);
-            $context->builder->call(
-                $setLong,
-                $ht,
-                self::literalString($context, $key),
-                $context->builder->zExt($field, $i64)
-            );
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StrptimeJitHelper compile (#9132)');
         }
 
-        $restI8 = $context->builder->pointerCast($rest, $i8p);
-        $unparsedLen = $context->builder->call($context->lookupFunction('strlen'), $restI8);
-        $unparsedStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->builder->zExt($unparsedLen, $i64),
-            $restI8
-        );
-        $context->builder->call(
-            $setString,
-            $ht,
-            self::literalString($context, 'unparsed'),
-            $unparsedStr
-        );
-        $context->builder->call($context->lookupFunction('__value__writeHashtable'), $out, $ht);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
+        return $fn;
     }
 
-    private static function loadTmField(Context $context, Value $tmPtr, int $offset): Value
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $i32 = $context->getTypeFromString('int32');
-        $i32p = $context->getTypeFromString('int32*');
-        $tmFields = $context->builder->pointerCast($tmPtr, $i32p);
-
-        return $context->builder->load(
-            $context->builder->gep($tmFields, $i32->constInt((int) ($offset / 4), false))
-        );
-    }
-
-    private static function literalString(Context $context, string $text): Value
-    {
-        $i64 = $context->getTypeFromString('int64');
-        $i8p = $context->getTypeFromString('int8*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $i8p);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
-    }
-
-    private static function ensureHashtableHelpers(Context $context): void
-    {
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $voidTy = $context->getTypeFromString('void');
-        $charPtr = $context->getTypeFromString('char*');
-
-        foreach ([
-            ['__hashtable__alloc', $htPtr, []],
-            ['__hashtable__setStringKeyLong', $voidTy, [$htPtr, $strPtr, $i64]],
-            ['__hashtable__setStringKeyString', $voidTy, [$htPtr, $strPtr, $strPtr]],
-            ['__value__writeHashtable', $voidTy, [$valuePtr, $htPtr]],
-            ['__value__writeBool', $voidTy, [$valuePtr, $i32]],
-            ['__string__init', $strPtr, [$i64, $i8p]],
-            ['memset', $i8p, [$i8p, $i32, $sizeT]],
-            ['strptime', $charPtr, [$charPtr, $charPtr, $i8p]],
-            ['strlen', $sizeT, [$i8p]],
-        ] as [$name, $ret, $params]) {
-            self::ensureExternal(
-                $context,
-                $name,
-                $context->context->functionType($ret, false, ...$params)
-            );
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
         }
-    }
+        if (!$missing) {
+            return;
+        }
 
-    private static function ensureExternal(Context $context, string $name, $ft): void
-    {
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StrptimeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StrptimeJitHelper.php parseAndCompile failed (#9132)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9132)');
+            }
         }
     }
 
@@ -248,7 +168,7 @@ final class StringStrptime
     {
         $fn = $context->module->getNamedFunction('__compiler_strptime');
         if (null === $fn) {
-            throw new \LogicException('__compiler_strptime missing after StringStrptime LLVM implement');
+            throw new \LogicException('__compiler_strptime missing after StringStrptime bridge (#9132)');
         }
         $context->registerFunction('__compiler_strptime', $fn);
     }

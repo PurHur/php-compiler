@@ -4,81 +4,141 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_strftime — gmtime/localtime + libc strftime (#3692).
+ * JIT/AOT link for __compiler_strftime via StrftimeJitHelper PHP (#9132).
  *
+ * Replaces gmtime/localtime/strftime libc LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/datetime.c — PHP_FUNCTION(strftime), PHP_FUNCTION(gmstrftime)
  */
 final class StringStrftime
 {
-    private const OUT_BYTES = 256;
+    private const HELPER_PATH = '/ext/standard/StrftimeJitHelper.php';
+
+    private const STRFTIME_HELPER = 'PHPCompiler\\ext\\standard\\StrftimeJitHelper::strftimeArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::STRFTIME_HELPER,
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
 
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__compiler_strftime');
-        $entry = $fn->appendBasicBlock('strftime_entry');
-        $context->builder->positionAtEnd($entry);
+        $probe = $context->module->getNamedFunction('__compiler_strftime');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
-        $format = $fn->getParam(0);
-        $timestamp = $fn->getParam(1);
-        $gmt = $fn->getParam(2);
-        $strMap = $context->structFieldMap['__string__'];
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementStrftimeBridge($context);
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementStrftimeBridge(Context $context): void
+    {
+        $abiName = '__compiler_strftime';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
         $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $charPtr = $context->getTypeFromString('char*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i64p = $context->getTypeFromString('int64*');
 
-        $fmtChars = $context->builder->structGep($format, $strMap['value']);
-        $fmtPtr = $context->builder->pointerCast($fmtChars, $charPtr);
+        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $i8);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
-        $tsSlot = $context->builder->alloca($i64, 1, 'strftime_ts');
-        $context->builder->store($timestamp, $tsSlot);
-        $tsPtr = $context->builder->pointerCast($tsSlot, $i64p);
-
-        $isGmt = $context->builder->icmp(Builder::INT_NE, $gmt, $i8->constInt(0, false));
-        $localBb = $fn->appendBasicBlock('strftime_local');
-        $utcBb = $fn->appendBasicBlock('strftime_utc');
-        $mergeBb = $fn->appendBasicBlock('strftime_tm_merge');
-        $afterTmBb = $fn->appendBasicBlock('strftime_after_tm');
-        $context->builder->branchIf($isGmt, $utcBb, $localBb);
-
-        $context->builder->positionAtEnd($localBb);
-        $localTm = $context->builder->call($context->lookupFunction('localtime'), $tsPtr);
-        $context->builder->branch($mergeBb);
-
-        $context->builder->positionAtEnd($utcBb);
-        $utcTm = $context->builder->call($context->lookupFunction('gmtime'), $tsPtr);
-        $context->builder->branch($mergeBb);
-
-        $context->builder->positionAtEnd($mergeBb);
-        $tmPtr = $context->builder->phi($i8p);
-        $tmPtr->addIncoming($localTm, $localBb);
-        $tmPtr->addIncoming($utcTm, $utcBb);
-        $context->builder->branch($afterTmBb);
-
-        $context->builder->positionAtEnd($afterTmBb);
-        $outBuf = $context->builder->alloca($i8, self::OUT_BYTES, 'strftime_buf');
-        $outPtr = $context->builder->pointerCast($outBuf, $i8p);
-        $written = $context->builder->call(
-            $context->lookupFunction('strftime'),
-            $outPtr,
-            $sizeT->constInt(self::OUT_BYTES, false),
-            $fmtPtr,
-            $tmPtr
+        $entry = $fn->appendBasicBlock('strftime_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::STRFTIME_HELPER),
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2)]
         );
-        $writtenI64 = $context->builder->zExt($written, $i64);
-        $result = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $writtenI64,
-            $outPtr
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $result, $strPtr)
         );
-        $context->builder->returnValue($result);
-        $context->builder->clearInsertionPosition();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after StrftimeJitHelper compile (#9132)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'StrftimeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('StrftimeJitHelper.php parseAndCompile failed (#9132)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9132)');
+            }
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        $fn = $context->module->getNamedFunction('__compiler_strftime');
+        if (null === $fn) {
+            throw new \LogicException('__compiler_strftime missing after StringStrftime bridge (#9132)');
+        }
+        $context->registerFunction('__compiler_strftime', $fn);
     }
 }
