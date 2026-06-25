@@ -47,9 +47,9 @@ final class stream_socket_client extends Internal
         $errstr = '';
         $timeout = 60.0;
         $flags = \STREAM_CLIENT_CONNECT;
-        $contextVar = $argc >= 6 ? $frame->calledArgs[5] : null;
+        $contextVar = null;
 
-        if ($argc >= 4) {
+        if (isset($frame->calledArgs[3])) {
             $timeoutVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_NULL === $timeoutVar->type) {
                 $timeout = 60.0;
@@ -64,7 +64,7 @@ final class stream_socket_client extends Internal
             }
         }
 
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $flagsVar = $frame->calledArgs[4]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsVar->type) {
                 throw new \LogicException(
@@ -74,15 +74,15 @@ final class stream_socket_client extends Internal
             $flags = $flagsVar->toInt();
         }
 
-        if ($argc >= 6) {
+        if (isset($frame->calledArgs[5])) {
             $ctxVar = $frame->calledArgs[5]->resolveIndirect();
             if (Variable::TYPE_NULL !== $ctxVar->type && !VmStreamContext::isRepresentation($ctxVar)) {
                 throw new \LogicException(
                     'stream_socket_client() context must be a stream context resource in this compiler build'
                 );
             }
-            if (Variable::TYPE_NULL === $ctxVar->type) {
-                $contextVar = null;
+            if (Variable::TYPE_NULL !== $ctxVar->type) {
+                $contextVar = $frame->calledArgs[5];
             }
         }
 
@@ -93,12 +93,12 @@ final class stream_socket_client extends Internal
             $contextVar
         );
 
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $errnoOut = new Variable(Variable::TYPE_INTEGER);
             $errnoOut->int($errno);
             $frame->calledArgs[1]->copyFrom($errnoOut);
         }
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $errstrOut = new Variable(Variable::TYPE_STRING);
             $errstrOut->string($errstr);
             $frame->calledArgs[2]->copyFrom($errstrOut);
