@@ -22,6 +22,7 @@ final class IniJitHelper
         'serialize_precision',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
+        'session.save_path',
         'include_path',
         'short_open_tag',
         'register_argc_argv',
@@ -62,6 +63,8 @@ final class IniJitHelper
 
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
 
+    private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
+
     private static bool $displayErrors = false;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
@@ -71,6 +74,8 @@ final class IniJitHelper
     private static string $unserializeCallbackFunc = '';
 
     private static int $sessionGcMaxlifetime = 1440;
+
+    private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
     public static function getSerializePrecisionInt(): int
     {
@@ -137,6 +142,9 @@ final class IniJitHelper
         if ('session.gc_maxlifetime' === $key) {
             return self::sessionGcMaxlifetimeAsIniString();
         }
+        if ('session.save_path' === $key) {
+            return self::$sessionSavePath;
+        }
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
         }
@@ -173,6 +181,9 @@ final class IniJitHelper
         if ('session.gc_maxlifetime' === $key) {
             return self::setSessionGcMaxlifetime($newValue);
         }
+        if ('session.save_path' === $key) {
+            return self::setSessionSavePath($newValue);
+        }
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
         }
@@ -205,6 +216,9 @@ final class IniJitHelper
         }
         if ('session.gc_maxlifetime' === $key) {
             return self::CFG_SESSION_GC_MAXLIFETIME;
+        }
+        if ('session.save_path' === $key) {
+            return self::CFG_SESSION_SAVE_PATH;
         }
         if ('max_execution_time' === $key) {
             return self::READONLY_STRING_DEFAULTS['max_execution_time'];
@@ -244,6 +258,9 @@ final class IniJitHelper
                 break;
             case 'session.gc_maxlifetime':
                 self::$sessionGcMaxlifetime = 1440;
+                break;
+            case 'session.save_path':
+                self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
                 break;
         }
     }
@@ -297,6 +314,15 @@ final class IniJitHelper
         }
         $old = self::sessionGcMaxlifetimeAsIniString();
         self::$sessionGcMaxlifetime = $parsed;
+
+        return $old;
+    }
+
+    /** @return string|null null when ini_set rejected the value */
+    private static function setSessionSavePath(string $newValue): ?string
+    {
+        $old = self::$sessionSavePath;
+        self::$sessionSavePath = $newValue;
 
         return $old;
     }
