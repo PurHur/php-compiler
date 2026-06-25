@@ -27,8 +27,8 @@ final class atan extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('atan() requires exactly one argument');
         }
-        $num = VmMath::parseDoubleBuiltinArg(
-            $frame->calledArgs[0]->resolveIndirect(),
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame(
+            $frame,
             'atan',
             1,
             'num'
