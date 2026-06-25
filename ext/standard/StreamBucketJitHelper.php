@@ -108,7 +108,10 @@ final class StreamBucketJitHelper
         if (!isset(self::$brigadeActive[$slot]) || !self::$brigadeActive[$slot]) {
             return 0;
         }
-        $count = self::$brigadeCount[$slot] ?? 0;
+        $count = 0;
+        if (isset(self::$brigadeCount[$slot])) {
+            $count = self::$brigadeCount[$slot];
+        }
         if ($count >= self::MAX_QUEUE) {
             return 0;
         }
@@ -127,7 +130,10 @@ final class StreamBucketJitHelper
         if (!isset(self::$brigadeActive[$slot]) || !self::$brigadeActive[$slot]) {
             return -1;
         }
-        $count = self::$brigadeCount[$slot] ?? 0;
+        $count = 0;
+        if (isset(self::$brigadeCount[$slot])) {
+            $count = self::$brigadeCount[$slot];
+        }
         if (0 === $count) {
             return -1;
         }
