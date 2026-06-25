@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3170 |
-| Phase A inventory files (M2 ratio SSOT) | 3170 |
+| PHP files on vm.php path | 3172 |
+| Phase A inventory files (M2 ratio SSOT) | 3172 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8456 |
+| Source constructs flagged (warnings) | 8458 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -944,6 +944,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmConnection.php` | 0 | 2 |
 | `ext/standard/VmConstants.php` | 0 | 14 |
 | `ext/standard/VmConvertCyrString.php` | 0 | 1 |
+| `ext/standard/VmCopyFailure.php` | 0 | 1 |
 | `ext/standard/VmCrc32.php` | 0 | 1 |
 | `ext/standard/VmCrc32c.php` | 0 | 1 |
 | `ext/standard/VmCsv.php` | 0 | 1 |
@@ -1007,6 +1008,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmGetcwdNative.php` | 0 | 1 |
 | `ext/standard/VmGetcwdPure.php` | 0 | 1 |
 | `ext/standard/VmGetopt.php` | 0 | 2 |
+| `ext/standard/VmGetrusageArg.php` | 0 | 1 |
 | `ext/standard/VmGetrusageNative.php` | 0 | 1 |
 | `ext/standard/VmGetrusagePure.php` | 0 | 1 |
 | `ext/standard/VmGzStream.php` | 0 | 1 |
@@ -6402,7 +6404,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitGetrusageArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitGettimeofday.php`
 
@@ -9343,6 +9345,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/VmCopyFailure.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/VmCrc32.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9760,6 +9767,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 16)
 - 2 class method(s)
+
+### `ext/standard/VmGetrusageArg.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmGetrusageNative.php`
 
