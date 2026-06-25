@@ -1603,6 +1603,15 @@ class JIT {
                     $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
                 );
             }
+            if (str_ends_with($m3CompilerSetter, '\\compiler::getdebuglastphaseinputfile')
+                || str_ends_with($m3CompilerSetter, '\\compiler::getcompileabortdetail')
+            ) {
+                return $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $internalName,
+                    $logicalName,
+                    $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock
+                );
+            }
             if ('phpcompiler\\compiler::compile' === $m3CompilerSetter
                 && $this->shouldUseM3InventoryEmitDriver()
                 && $this->shouldUseEmitHelperLinkStubs()
@@ -4048,6 +4057,17 @@ class JIT {
                 $stubBlock
             );
         }
+        foreach (['getdebuglastphaseinputfile', 'getcompileabortdetail'] as $methodLc) {
+            $logical = 'PHPCompiler\\Compiler::'.$methodLc;
+            $lc = strtolower($logical);
+            if (!isset($this->context->functions[$lc])) {
+                $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+        }
         if ($this->shouldStubM3InventoryEmitJitSpineMethods()) {
             $compileLogical = 'PHPCompiler\\Compiler::compile';
             $compileLc = strtolower($compileLogical);
@@ -4204,6 +4224,41 @@ class JIT {
         return $func;
     }
 
+    /** Null string getter for Compiler spine — LLVM link only (#11809). */
+    private function emitM3EmitTuCompilerNullStringGetterStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($strPtr, false, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue($strPtr->constNull());
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = '__string__*';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
     /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
     private function ensureM3EmitTuRuntimeParseSpineDeps(): void
     {
@@ -4219,6 +4274,7 @@ class JIT {
             'detectfilestricttypes',
             'resetparsernameresolverstate',
             'formatparseandcompilenulldetail',
+            'emitparseandcompilenulldiagnostic',
             'recordlastparsefailure',
             'formatphpparsererrorcontext',
             'emitparsecompilefailurestderr',
@@ -4267,6 +4323,40 @@ class JIT {
         }
     }
 
+    /** Inventory argv: AssignOp::optimize is link-only on compileEmitSmoke spine (#11809). */
+    private function ensureM3EmitTuInventoryArgvVmOptimizerStub(): void
+    {
+        if (!$this->shouldUseM3InventoryEmitDriver() || !$this->shouldUseM3CompileDriverRealLowering()) {
+            return;
+        }
+        $logical = 'PHPCompiler\\VM\\Optimizer::optimize';
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return;
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $this->llvmInternalName($logical),
+            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lc] = $func;
+        $this->context->functionReturnType[$lc] = 'void';
+        $this->context->functionProxies[$lc] = new JIT\Call\Native(
+            $func,
+            $logical,
+            [$objectPtr, $objectPtr],
+            []
+        );
+    }
+
     /** Ensure parse + Compiler::compileEmitSmoke exist before emit-bridge LLVM (#2666). */
     private function ensureM3EmitTuEmitBridgeSpineSymbols(): void
     {
@@ -4278,6 +4368,7 @@ class JIT {
         }
         $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
         $this->ensureM3EmitTuRuntimeParseSpineDeps();
+        $this->ensureM3EmitTuInventoryArgvVmOptimizerStub();
         $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if ($this->shouldStubInventoryEmitParseCompileSpine() && null !== $stubBlock) {
             $parseLc = strtolower('PHPCompiler\\Runtime::parse');
@@ -10003,6 +10094,27 @@ class JIT {
         return false;
     }
 
+    /** PHPCfg operand names for inventory argv Runtime spine (#11809). */
+    private function resolveInstanceMethodReceiverClass(Operand $receiverOp): ?string
+    {
+        $userType = $receiverOp->type?->userType;
+        if (is_string($userType) && '' !== ltrim($userType, '\\')) {
+            return ltrim($userType, '\\');
+        }
+        $operandName = strtolower(JIT\OperandName::resolve($receiverOp) ?? '');
+        if ('script' === $operandName) {
+            return 'PHPCfg\\Script';
+        }
+        if (in_array($operandName, ['main', 'func'], true)) {
+            return 'PHPCfg\\Func';
+        }
+        if (in_array($operandName, ['cfg', 'block'], true)) {
+            return 'PHPCfg\\Block';
+        }
+
+        return null;
+    }
+
     private function resolvePropertyDeclaringClass(Operand $obj, Block $block, ?string $propName): string
     {
         $declaringClass = $obj->type->userType ?? null;
@@ -13604,10 +13716,13 @@ class JIT {
             }
         }
 
+        $externalReceiverClass = $this->resolveInstanceMethodReceiverClass($receiverOp);
         $userType = $receiverOp->type?->userType;
         $className = (is_string($userType) && '' !== ltrim($userType, '\\'))
             ? $userType
-            : ($this->context->scope->className !== '' ? $this->context->scope->className : 'object');
+            : (null !== $externalReceiverClass
+                ? $externalReceiverClass
+                : ($this->context->scope->className !== '' ? $this->context->scope->className : 'object'));
         $declaringClassLc = strtolower(ltrim($className, '\\'));
         $methodLc = strtolower($methodName);
 
@@ -13664,6 +13779,17 @@ class JIT {
             }
             if ($this->isBundledJitExternalClassPrefix($declaringClassLc)) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+                $this->context->scope->args = [$receiverVar];
+
+                return;
+            }
+            if (
+                'getfile' === $methodLc
+                && str_starts_with($declaringClassLc, 'phpcompiler\\')
+                && $this->shouldUseM3InventoryEmitDriver()
+            ) {
+                // $script->main->getFile() temps lose PHPCfg userType on inventory argv spine (#11809).
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy('phpcfg\\func::getfile');
                 $this->context->scope->args = [$receiverVar];
 
                 return;
