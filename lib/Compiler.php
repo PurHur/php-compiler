@@ -13551,7 +13551,21 @@ class Compiler {
         // Trailing hoisted literal preludes only (e.g. var_export(g(), true), in_array('x', g(), true);
         // statement-level calls before multiple hoisted ConstFetch args must not match (#11312, #11373).
         if ($literalPreludeCount !== $argCount - 1 - $targetArgIndex) {
-            return false;
+            // var_export(in_array(..., true), true) — nested producer feeds arg0, not arg1 (#11399).
+            if (
+                0 !== $targetArgIndex
+                && $literalPreludeCount > 0
+                && null === $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren)
+                && $this->callArgIsDeadInlineTemporary($consumer->args[0] ?? null)
+                && $literalPreludeCount === $argCount - 1
+            ) {
+                $targetArgIndex = 0;
+                if ($literalPreludeCount !== $argCount - 1 - $targetArgIndex) {
+                    return false;
+                }
+            } else {
+                return false;
+            }
         }
 
         return true;
