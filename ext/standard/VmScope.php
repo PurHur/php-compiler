@@ -173,7 +173,17 @@ final class VmScope
     {
         $value = self::callerVariable($caller, $name);
         if (null !== $value) {
-            return $value;
+            $resolved = $value->resolveIndirect();
+            if (!$resolved->isUndefined()) {
+                return $value;
+            }
+        }
+        if (null !== $frame->vmContext) {
+            $key = new Variable(Variable::TYPE_STRING);
+            $key->string($name);
+            if ($frame->vmContext->globalsTableOffsetIsSet($key)) {
+                return $frame->vmContext->ensureGlobal($name);
+            }
         }
         if (!Superglobals::isSuperglobalName($name) || null === $frame->vmContext) {
             return null;
