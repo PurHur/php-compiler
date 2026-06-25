@@ -247,8 +247,15 @@ final class VmIni
     public static function parseErrorReporting(string $value): int
     {
         $trimmed = trim($value);
+        if ('' === $trimmed) {
+            return 0;
+        }
+        $constant = Context::errorReportingConstant($trimmed);
+        if (null !== $constant) {
+            return $constant;
+        }
 
-        return '' === $trimmed ? 0 : (int) $trimmed;
+        return (int) $trimmed;
     }
 
     public static function parseBoolIni(string $value): bool

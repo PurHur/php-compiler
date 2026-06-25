@@ -15,6 +15,10 @@ use PHPCompiler\Web\Superglobals;
 function run(string $filename, string $code, array $options): void
 {
     $runtime = new Runtime();
+    $iniOverrides = $options['-d'] ?? null;
+    if (is_array($iniOverrides)) {
+        php_compiler_cli_apply_ini_overrides($runtime->vmContext, $iniOverrides);
+    }
     $queryString = $options['-q'] ?? null;
     $postBody = $options['-p'] ?? null;
     $scriptFilename = null;
