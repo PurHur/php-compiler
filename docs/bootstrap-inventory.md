@@ -3905,7 +3905,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/CharsetEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 19 class method(s)
 
 ### `ext/iconv/IconvJitHelper.php`
 
@@ -9579,10 +9579,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 123)
 - new Error (line 147)
 - new Error (line 154)
-- new Variable (line 168)
-- new Variable (line 215)
-- new Variable (line 217)
-- new Error (line 283)
+- new Variable (line 180)
+- new Variable (line 227)
+- new Variable (line 229)
+- new Error (line 295)
 - 11 class method(s)
 
 ### `ext/standard/VmFs.php`
