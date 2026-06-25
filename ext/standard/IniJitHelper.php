@@ -69,6 +69,9 @@ final class IniJitHelper
 
     private static bool $displayErrors = false;
 
+    /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
+    private static ?string $displayErrorsLocalValue = null;
+
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
 
     private static int $serializePrecision = -1;
@@ -130,7 +133,7 @@ final class IniJitHelper
             return ErrorSilenceJitHelper::iniGetErrorReporting();
         }
         if ('display_errors' === $key) {
-            return VmIni::formatBoolIniGet(self::$displayErrors);
+            return self::displayErrorsIniString();
         }
         if ('memory_limit' === $key) {
             return self::$memoryLimit;
@@ -255,6 +258,7 @@ final class IniJitHelper
                 ErrorSilenceJitHelper::iniRestoreErrorReporting();
                 break;
             case 'display_errors':
+                self::$displayErrorsLocalValue = null;
                 self::$displayErrors = VmIni::parseBoolIni(self::CFG_DISPLAY_ERRORS);
                 break;
             case 'memory_limit':
@@ -285,10 +289,20 @@ final class IniJitHelper
 
     private static function setDisplayErrors(string $newValue): string
     {
-        $old = VmIni::formatBoolIniGet(self::$displayErrors);
+        $old = self::displayErrorsIniString();
+        self::$displayErrorsLocalValue = $newValue;
         self::$displayErrors = VmIni::parseBoolIni($newValue);
 
         return $old;
+    }
+
+    private static function displayErrorsIniString(): string
+    {
+        if (null !== self::$displayErrorsLocalValue) {
+            return self::$displayErrorsLocalValue;
+        }
+
+        return VmIni::formatBoolIniGet(self::$displayErrors);
     }
 
     private static function setMemoryLimit(string $newValue): string
