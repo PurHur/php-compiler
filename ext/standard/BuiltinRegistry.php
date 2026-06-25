@@ -66,4 +66,11 @@ final class BuiltinRegistry
 
         return self::$byName[$lc] ?? null;
     }
+
+    /** @internal PHPUnit isolation when SAPI/env gating changes (#11780). */
+    public static function resetForTest(): void
+    {
+        self::$sortedNames = null;
+        self::$byName = null;
+    }
 }
