@@ -5530,6 +5530,11 @@ class Object_ extends Type {
         return $this->classes['memoryusage'] ?? null;
     }
 
+    public function clockInterfaceEnumClassId(): ?int
+    {
+        return $this->classes['clockinterface'] ?? null;
+    }
+
     public function phpInputFilterEnumClassId(): ?int
     {
         return $this->classes['phpinputfilter'] ?? null;

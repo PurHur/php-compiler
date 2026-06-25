@@ -33,6 +33,7 @@ final class BuiltinEnums
         self::registerParseUrl($ctx);
         self::registerRequestMethod($ctx);
         self::registerInfoView($ctx);
+        self::registerClockInterface($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -424,6 +425,32 @@ final class BuiltinEnums
         EnumSupport::ensureBuiltinEnumInterfaces($entry);
 
         $lc = 'infoview';
+        $ctx->classes[$lc] = $entry;
+        $ctx->enums[$lc] = true;
+    }
+
+    /**
+     * PHP 8.3 ClockInterface: int-backed enum for clock_gettime() (#11624).
+     *
+     * php-src: ext/standard/basic_functions.stub.php — enum ClockInterface: int
+     */
+    private static function registerClockInterface(Context $ctx): void
+    {
+        if (isset($ctx->classes['clockinterface'])) {
+            return;
+        }
+
+        $entry = new ClassEntry('ClockInterface');
+        $entry->isEnum = true;
+        $entry->backedType = 'int';
+
+        self::registerBackedEnumCase($entry, 'Realtime', VmHrtimeNative::CLOCK_REALTIME);
+        self::registerBackedEnumCase($entry, 'Monotonic', VmHrtimeNative::CLOCK_MONOTONIC);
+
+        EnumSupport::ensureBuiltinCasesMethod($entry);
+        EnumSupport::ensureBuiltinEnumInterfaces($entry);
+
+        $lc = 'clockinterface';
         $ctx->classes[$lc] = $entry;
         $ctx->enums[$lc] = true;
     }
