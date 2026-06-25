@@ -13,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for password_hash() / password_verify() — libcrypt via StringPasswordCryptoJit (#6906). */
+/** LLVM helpers for password_hash() / password_verify() — PasswordJitHelper PHP via PasswordCryptoRuntime (#6906, #9908). */
 final class JitPassword
 {
     private static int $blockSerial = 0;
