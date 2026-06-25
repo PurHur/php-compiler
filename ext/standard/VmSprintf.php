@@ -401,26 +401,28 @@ final class VmSprintf
 
     private static function intToDecimal(int $value): string
     {
+        if ($value < 0) {
+            throw new \LogicException('intToDecimal() expects a non-negative value');
+        }
         if (0 === $value) {
             return '0';
         }
-        $negative = $value < 0;
-        if ($negative) {
-            $value = -$value;
-        }
-        $digits = '';
-        while ($value > 0) {
-            $digits = \chr(48 + ($value % 10)).$digits;
-            $value = (int) ($value / 10);
+        $dec = '0';
+        foreach (str_split(dechex($value)) as $hexDigit) {
+            $dec = self::decimalMulAdd($dec, 16, (int) \hexdec($hexDigit));
         }
 
-        return $negative ? '-'.$digits : $digits;
+        return $dec;
     }
 
     /** php-src sprintf.c — SIGN flag for %d. */
     private static function formatSignedDecimal(int $value, ?string $showSign): string
     {
         if ($value < 0) {
+            if (PHP_INT_MIN === $value) {
+                return '-'.self::intToUnsignedDecimal(PHP_INT_MIN);
+            }
+
             return '-'.self::intToDecimal(-$value);
         }
         $digits = self::intToDecimal($value);
