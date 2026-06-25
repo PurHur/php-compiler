@@ -12044,6 +12044,27 @@ class Compiler {
             }
         }
         if (null === $closureProducer) {
+            $callIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $cfgCallOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null !== $callIndex) {
+                for ($i = $callIndex - 1; $i >= 0; --$i) {
+                    $prev = $block->orig->children[$i];
+                    if ($prev instanceof Op\Expr\ArrowFunction || $prev instanceof Op\Expr\Closure) {
+                        $closureProducer = $prev;
+                        break;
+                    }
+                    if (!$this->isInlineExprCallArgProducer($prev)) {
+                        break;
+                    }
+                }
+            }
+        }
+        if (null === $closureProducer) {
             return null;
         }
         $matched = $this->matchSingleClosureInlineProducer($closureProducer, $callArgs, $argIndex);
@@ -12639,6 +12660,15 @@ class Compiler {
             if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
                 $nonEmbeddedArgIndices[] = $i;
             }
+        }
+        // array_map(fn, [...], [...]) — php-cfg omits ArrowFunction from hoisted producers (#10094).
+        if (
+            'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
+            && $this->producersAreNestedArrayLiteralChain($producers)
+            && $argIndex >= 1
+            && $argIndex - 1 < \count($producers)
+        ) {
+            return $producers[$argIndex - 1];
         }
         // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
         if (
