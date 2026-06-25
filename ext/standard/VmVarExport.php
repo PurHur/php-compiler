@@ -47,8 +47,8 @@ final class VmVarExport
         bool &$warned
     ): string {
         $v = $v->resolveIndirect();
-        // php-src var.c: closed/invalid resources export as NULL (#5148, #4920).
-        if (ResourceSupport::isVmResource($v) && !is_resource_::isResource($v)) {
+        // php-src var.c: live and closed resources export as NULL (#5148, #11421).
+        if (ResourceSupport::isVmResource($v)) {
             return 'NULL';
         }
         // php-src var.c: stream contexts are resources but var_export prints NULL (#10704).
