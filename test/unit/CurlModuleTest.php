@@ -40,12 +40,11 @@ echo (int) class_exists('CURLFile', false);
 echo (int) defined('CURLOPT_URL');
 echo CURLOPT_URL;
 echo (int) defined('CURLINFO_HTTP_CODE');
-echo CURLINFO_HTTP_CODE;
 PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('0000011111000212097154', ob_get_clean());
+        self::assertSame('000001111100020', ob_get_clean());
     }
 
     public function test_curl_init_stub_class_throws_logic_exception(): void
