@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3096 |
-| Phase A inventory files (M2 ratio SSOT) | 3096 |
+| PHP files on vm.php path | 3097 |
+| Phase A inventory files (M2 ratio SSOT) | 3097 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8323 |
+| Source constructs flagged (warnings) | 8328 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1336,7 +1336,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/feof_.php` | 0 | 1 |
 | `ext/standard/fflush_.php` | 0 | 1 |
 | `ext/standard/fgetc.php` | 0 | 1 |
-| `ext/standard/fgetcsv.php` | 0 | 1 |
+| `ext/standard/fgetcsv.php` | 0 | 2 |
 | `ext/standard/fgets.php` | 0 | 1 |
 | `ext/standard/file_.php` | 0 | 3 |
 | `ext/standard/file_exists.php` | 0 | 1 |
@@ -1363,7 +1363,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/fpassthru.php` | 0 | 1 |
 | `ext/standard/fpow.php` | 0 | 1 |
 | `ext/standard/fprintf_.php` | 0 | 4 |
-| `ext/standard/fputcsv.php` | 0 | 4 |
+| `ext/standard/fputcsv.php` | 0 | 5 |
 | `ext/standard/fread.php` | 0 | 1 |
 | `ext/standard/frexp.php` | 0 | 1 |
 | `ext/standard/fscanf.php` | 0 | 2 |
@@ -1530,7 +1530,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/iterator_count.php` | 0 | 1 |
 | `ext/standard/iterator_to_array.php` | 0 | 1 |
 | `ext/standard/json_decode.php` | 0 | 2 |
-| `ext/standard/json_encode.php` | 0 | 3 |
+| `ext/standard/json_encode.php` | 0 | 4 |
 | `ext/standard/json_last_error_.php` | 0 | 1 |
 | `ext/standard/json_last_error_msg_.php` | 0 | 1 |
 | `ext/standard/json_validate.php` | 0 | 1 |
@@ -1739,7 +1739,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/str_contains.php` | 0 | 2 |
 | `ext/standard/str_decrement.php` | 0 | 1 |
 | `ext/standard/str_ends_with.php` | 0 | 2 |
-| `ext/standard/str_getcsv.php` | 0 | 1 |
+| `ext/standard/str_getcsv.php` | 0 | 2 |
 | `ext/standard/str_increment.php` | 0 | 1 |
 | `ext/standard/str_ireplace.php` | 0 | 4 |
 | `ext/standard/str_pad.php` | 0 | 2 |
@@ -2151,6 +2151,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObGzhandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 2 |
@@ -8567,7 +8568,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ObGzhandlerJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/ObStatusJitHelper.php`
 
@@ -11854,6 +11855,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/fgetcsv.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 33)
 - 5 class method(s)
 
 ### `ext/standard/fgets.php`
@@ -11996,8 +11998,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/fputcsv.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 60)
-- new Error (line 69)
+- new ArgumentCountError (line 38)
+- new Error (line 68)
+- new Error (line 77)
 - 4 class method(s)
 - 1 closure(s)
 
@@ -12927,9 +12930,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/json_encode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JsonException (line 47)
-- new JsonException (line 78)
-- 5 class method(s)
+- new ArgumentCountError (line 35)
+- new JsonException (line 53)
+- new JsonException (line 84)
+- 6 class method(s)
 
 ### `ext/standard/json_last_error_.php`
 
@@ -14089,6 +14093,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_getcsv.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 36)
 - 2 class method(s)
 
 ### `ext/standard/str_increment.php`
@@ -15445,7 +15450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 277)
+- new ArgumentCountError (line 279)
 - 7 class method(s)
 
 ### `lib/Cfg/OpSubBlockAccess.php`
@@ -17128,9 +17133,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObGzhandlerJitRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 396)
-- 18 class method(s)
+- new JIT (line 285)
+- 17 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 17 class method(s)
 
 ### `lib/JIT/Builtin/ObOutput.php`
 
