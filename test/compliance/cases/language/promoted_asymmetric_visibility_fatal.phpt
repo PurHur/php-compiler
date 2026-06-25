@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted asymmetric visibility public private(set) rejected at compile (#10237, PHP 8.4 zend_compile.c)
+Language: promoted public private(set) compiles (#11546, PHP 8.4 zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -8,7 +8,6 @@ class C {
     ) {
     }
 }
---EXPECT_EXIT--
-255
---EXPECTF--
-parseAndCompile failure: target=%s: Multiple access type modifiers are not allowed
+echo (new C('alice'))->name, "\n";
+--EXPECT--
+alice
