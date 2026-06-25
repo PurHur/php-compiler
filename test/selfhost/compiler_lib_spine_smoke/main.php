@@ -154,6 +154,7 @@ require_once __DIR__.'/../../../ext/hash/hash_init.php';
 require_once __DIR__.'/../../../ext/hash/hash_update.php';
 require_once __DIR__.'/../../../ext/hash/hash_update_stream.php';
 require_once __DIR__.'/../../../ext/iconv/CharsetEngine.php';
+require_once __DIR__.'/../../../ext/iconv/IconvJitHelper.php';
 require_once __DIR__.'/../../../ext/iconv/JitIconv.php';
 require_once __DIR__.'/../../../ext/iconv/Module.php';
 require_once __DIR__.'/../../../ext/iconv/VmIconv.php';
