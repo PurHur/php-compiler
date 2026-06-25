@@ -16,9 +16,6 @@ final class PropertyHooks
     /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
-    /** php-src: Zend/zend_compile.c — property default initializer + hook block (#10592). */
-    public const DEFAULT_INITIALIZER_HOOK_PARSE_ERROR = 'syntax error, unexpected token "=>"';
-
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -709,7 +706,6 @@ final class PropertyHooks
                 $propDeclHead = preg_replace('/\babstract\s+/', '', $propDeclHead) ?? $propDeclHead;
             }
             $isStatic = (bool) preg_match('/\bstatic\b/', $declPrefix.$propDeclHead);
-            $this->rejectDefaultInitializerWithPropertyHooks($propDeclHead);
             $isPromotedCtorParam = $this->isPromotedConstructorParam(
                 $body,
                 $declStart,
@@ -1075,17 +1071,7 @@ final class PropertyHooks
     }
 
     /**
-     * php-src: Zend/zend_compile.c — `$prop = <expr> { get => … }` is a parse error (#10592).
-     */
-    private function rejectDefaultInitializerWithPropertyHooks(string $propDeclHead): void
-    {
-        if ($this->propertyDeclHeadHasInlineInitializer($propDeclHead)) {
-            throw new \CompileError(self::DEFAULT_INITIALIZER_HOOK_PARSE_ERROR);
-        }
-    }
-
-    /**
-     * True when the hooked property decl already carries `= <expr>` before the hook block (#9945).
+     * True when the hooked property decl already carries `= <expr>` before the hook block (#9945, #11594).
      */
     private function propertyDeclHeadHasInlineInitializer(string $propDeclHead): bool
     {

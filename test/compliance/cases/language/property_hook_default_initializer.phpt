@@ -1,5 +1,5 @@
 --TEST--
-Language: property hook with default initializer — parse error (#10592, Zend/zend_compile.c)
+Language: property hook with default initializer (#11594, Zend/zend_compile.c PHP 8.4)
 --FILE--
 <?php
 class C {
@@ -7,11 +7,7 @@ class C {
         get => $this->label;
     }
 }
-trait T {
-    public string $label = 'from-trait' {
-        get => $this->label;
-    }
-}
-echo "compiled\n";
---EXPECT_EXIT--
-255
+$c = new C();
+echo $c->label, "\n";
+--EXPECT--
+default
