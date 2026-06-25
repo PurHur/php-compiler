@@ -17,6 +17,7 @@ use PHPCompiler\JIT\OperandName;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\Web\Superglobals;
 use PHPCompiler\OpCode;
+use PHPCompiler\ext\standard\IncludeJitHelper;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPCompiler\Web\DeployRoot;
 
@@ -46,10 +47,10 @@ final class IncludeHelper
         }
         if (null === $path) {
             $pathOperand = $callerBlock->getOperand($op->arg1);
-            $path = self::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
+            $path = IncludeJitHelper::resolveLiteralPath($callerBlock, $op->arg1, $pathOperand, $context);
         }
         if (null === $path || '' === $path) {
-            if (self::shouldStubM3SidecarHostNonLiteralInclude($callerBlock)) {
+            if (IncludeJitHelper::shouldStubM3SidecarHostNonLiteralInclude($callerBlock)) {
                 self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
 
                 return;
@@ -66,7 +67,7 @@ final class IncludeHelper
                 .' operand='.$operandDesc
             );
         }
-        if (self::shouldSkipSelfHostSpineCliInclude($path)) {
+        if (IncludeJitHelper::shouldSkipSelfHostSpineCliInclude($path)) {
             self::emitSkippedSelfHostSpineCliInclude($jit, $callerBlock, $resultOperand);
 
             return;
@@ -967,89 +968,6 @@ final class IncludeHelper
         }
     }
 
-    private static function resolveLiteralPath(
-        Block $block,
-        int $pathSlot,
-        Operand $pathOperand,
-        Context $context
-    ): ?string {
-        if ($pathOperand instanceof Operand\Literal && is_string($pathOperand->value)) {
-            return $pathOperand->value;
-        }
-        if (isset($block->constants[$pathSlot])) {
-            $constant = $block->constants[$pathSlot];
-            if ($constant instanceof VmVariable && VmVariable::TYPE_STRING === $constant->type) {
-                return $constant->toString();
-            }
-        }
-        if ($context->hasVariableOp($pathOperand)) {
-            return $context->getVariableFromOp($pathOperand)->compileTimeString;
-        }
-
-        return null;
-    }
-
-    /**
-     * Skip argv/cli driver includes when bundling bin/vm.php in compiler_lib_spine_smoke (#2134).
-     * cli_spine_shim.php (src/cli.php) and src/cli_driver.php provide skip-entry helpers at runtime; this
-     * avoids compiling vendor/autoload Expr_Closure during self-host AOT link.
-     */
-    /** Stub dynamic requires while host-compiling M3 emit sidecars or full lib-spine AOT (#2699, #8559). */
-    private static function shouldStubM3SidecarHostNonLiteralInclude(Block $callerBlock): bool
-    {
-        $caller = str_replace('\\', '/', $callerBlock->scriptPath());
-        $isSpineSmokeEntry = str_ends_with($caller, '/test/selfhost/compiler_lib_spine_smoke/main.php');
-        $isSpineSmokeTree = str_contains($caller, '/test/selfhost/compiler_lib_spine_smoke/');
-
-        $sidecarHost = getenv('PHP_COMPILER_M3_SIDECAR_HOST');
-        if ('1' === $sidecarHost || 'true' === strtolower((string) $sidecarHost)) {
-            return str_ends_with($caller, '/bin/vm.php')
-                || str_ends_with($caller, '/src/cli_driver.php')
-                || $isSpineSmokeEntry;
-        }
-
-        $libSpineBundle = getenv('PHP_COMPILER_LIB_SPINE_BUNDLE');
-        if ('1' === $libSpineBundle || 'true' === strtolower((string) $libSpineBundle)) {
-            return true;
-        }
-
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        if ('1' === $selfhost || 'true' === strtolower((string) $selfhost)) {
-            return $isSpineSmokeEntry
-                || $isSpineSmokeTree
-                || str_ends_with($caller, '/bin/vm.php')
-                || str_ends_with($caller, '/src/cli_driver.php')
-                || str_ends_with($caller, '/src/cli.php');
-        }
-
-        return false;
-    }
-
-    private static function shouldSkipSelfHostSpineCliInclude(string $path): bool
-    {
-        // This helper exists primarily to keep argv-driver and vendor autoload out of
-        // spine smoke bundles. Historically it was gated on SELFHOST_AOT, but bootstrap
-        // probes also bundle CLI entrypoints under other flags (issue #1492, #1467).
-        $selfhost = getenv('PHP_COMPILER_SELFHOST_AOT');
-        $cliSpine = getenv('PHP_COMPILER_CLI_SPINE_BUNDLE');
-        $vmSpine = getenv('PHP_COMPILER_VM_SPINE_SMOKE');
-        if (
-            ('1' !== $selfhost && 'true' !== strtolower((string) $selfhost))
-            && ('1' !== $cliSpine && 'true' !== strtolower((string) $cliSpine))
-            && ('1' !== $vmSpine && 'true' !== strtolower((string) $vmSpine))
-        ) {
-            return false;
-        }
-        $normalized = str_replace('\\', '/', $path);
-
-        return $normalized === 'src/cli.php'
-            || $normalized === 'src/cli_driver.php'
-            || $normalized === 'vendor/autoload.php'
-            || str_ends_with($normalized, '/src/cli.php')
-            || str_ends_with($normalized, '/src/cli_driver.php')
-            || str_ends_with($normalized, '/vendor/autoload.php');
-    }
-
     private static function emitSkippedSelfHostSpineCliInclude(
         JIT $jit,
         Block $callerBlock,
@@ -1064,7 +982,7 @@ final class IncludeHelper
                 $jit->context,
                 Variable::TYPE_NATIVE_LONG,
                 Variable::KIND_VALUE,
-                $jit->context->constantFromInteger(1)
+                $jit->context->constantFromInteger(IncludeJitHelper::skippedSelfHostIncludeReturnInt())
             ),
             true
         );
