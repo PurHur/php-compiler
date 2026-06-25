@@ -885,6 +885,7 @@ require_once __DIR__.'/../../../ext/standard/NetworkServicesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObGzhandlerJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObGzhandlerServerJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObStatusJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ObOutputJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/OutputRewriteVarsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PackEngine.php';
 require_once __DIR__.'/../../../ext/standard/PackJitHelper.php';
