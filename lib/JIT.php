@@ -13953,13 +13953,28 @@ class JIT {
         if ($this->jitCallArgsHaveNamed($argEntries)) {
             [$paramNames, $variadicIndex] = $this->jitCalleeParamMetadata($toCall);
             if ([] !== $paramNames) {
-                return JIT\NamedArgs::resolveOutgoing(
-                    $argEntries,
-                    $argOperands,
+                $prefixLen = $this->jitNamedCallArgPrefixLength($toCall, $argEntries);
+                $prefix = \array_slice($argEntries, 0, $prefixLen);
+                $prefixOperands = \array_slice($argOperands, 0, $prefixLen);
+                $userEntries = \array_slice($argEntries, $prefixLen);
+                $userOperands = \array_slice($argOperands, $prefixLen);
+                [$userArgs, $userOps] = JIT\NamedArgs::resolveOutgoing(
+                    $userEntries,
+                    $userOperands,
                     $paramNames,
                     $variadicIndex,
                     $this->jitInternalBuiltinFunctionName($toCall)
                 );
+                $callArgs = $prefix;
+                foreach ($userArgs as $idx => $value) {
+                    $callArgs[$prefixLen + (int) $idx] = $value;
+                }
+                $callOperands = $prefixOperands;
+                foreach ($userOps as $idx => $operand) {
+                    $callOperands[$prefixLen + (int) $idx] = $operand;
+                }
+
+                return [$callArgs, $callOperands];
             }
         }
 
@@ -14038,6 +14053,23 @@ class JIT {
         }
 
         return null;
+    }
+
+    /**
+     * Leading $this / NEW result args must not participate in named-arg index resolution (#11844).
+     *
+     * @param list<Variable|array<string, mixed>> $argEntries
+     */
+    private function jitNamedCallArgPrefixLength(JIT\Call $toCall, array $argEntries): int
+    {
+        if ([] === $argEntries || \is_array($argEntries[0])) {
+            return 0;
+        }
+        if (!$toCall instanceof JIT\Call\Native || [] === $toCall->argTypes) {
+            return 0;
+        }
+
+        return '__object__*' === $this->context->getStringFromType($toCall->argTypes[0]) ? 1 : 0;
     }
 
     /**
