@@ -10,7 +10,7 @@ use PHPCompiler\ext\standard\VmSession;
  * File-backed session blob I/O (php-src ext/session/mod_files.c; issue #6968).
  *
  * VM source of truth for storage paths and id sanitization; JIT/AOT lowering in
- * {@see \PHPCompiler\JIT\Builtin\SessionStorageRuntime}.
+ * {@see \PHPCompiler\ext\standard\SessionStorageJitHelper} via {@see \PHPCompiler\JIT\Builtin\SessionStorageRuntime}.
  */
 final class SessionFileStorage
 {
