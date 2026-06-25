@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * Lowered into JIT/AOT modules for spaceship (<=>) on runtime values (#9381, php-in-PHP).
+ * Lowered into JIT/AOT modules for spaceship (<=>) on runtime values (#9381, #9476, php-in-PHP).
  *
  * php-src: Zend/zend_operators.c — compare_function, zend_compare_arrays, zend_compare_objects
  * SSOT: {@see Variable::spaceshipCompare()}, {@see ObjectEntry::compareSpaceship()}, {@see HashTable::compareSpaceship()}
@@ -52,6 +52,18 @@ final class CompareJitHelper
     public static function kindSpaceship(int $leftKind, int $rightKind): int
     {
         return self::longSpaceship($leftKind, $rightKind);
+    }
+
+    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
+    public static function objectSpaceship(ObjectEntry $left, ObjectEntry $right): int
+    {
+        return $left->compareSpaceship($right);
+    }
+
+    /** @return int -1, 0, or 1 (LLVM i64 ABI) */
+    public static function hashtableSpaceship(HashTable $left, HashTable $right): int
+    {
+        return $left->compareSpaceship($right);
     }
 
     /** @param int|float $left */

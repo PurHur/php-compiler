@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\BasicBlock;
@@ -16,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * LLVM spaceship (<=>) dispatch for boxed values, objects, and hashtables (#5185, #9381).
  *
  * Scalar compare semantics route through compiled {@see \PHPCompiler\VM\CompareJitHelper};
- * object/hashtable walks remain LLVM until ObjectEntry/HashTable JIT calls land.
+ * object/hashtable walks route through CompareJitHelper on JIT embed (#9476); standalone keeps LLVM.
  */
 final class SpaceshipCompareJit
 {
@@ -85,8 +86,13 @@ final class SpaceshipCompareJit
             ]
         );
 
-        self::emitHashtableCompareSpaceship($context, $htFn);
-        self::emitObjectCompareSpaceship($context, $objectFn);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::emitHashtableCompareSpaceship($context, $htFn);
+            self::emitObjectCompareSpaceship($context, $objectFn);
+        } else {
+            self::emitHashtableCompareSpaceshipBridge($context, $htFn);
+            self::emitObjectCompareSpaceshipBridge($context, $objectFn);
+        }
         self::emitValueSpaceship($context, $valueFn);
 
         self::registerFunctions($context);
@@ -533,6 +539,93 @@ final class SpaceshipCompareJit
         $one = $i64->constInt(1, true);
 
         return $context->builder->select($isEnum, $one, self::longSpaceship($context, self::i64FromI32($context, self::TYPE_OBJECT), self::i64FromI32($context, self::TYPE_STRING)));
+    }
+
+    private static function emitObjectCompareSpaceshipBridge(Context $context, LlvmFunction $fn): void
+    {
+        SpaceshipRuntime::ensureCompareJitHelperCompiled($context);
+
+        $entry = $fn->appendBasicBlock('ss_obj_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $left = $fn->getParam(0);
+        $right = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $zero64 = $i64->constInt(0, false);
+        $objPtr = $context->getTypeFromString('__object__*');
+        $nullObj = $objPtr->constNull();
+
+        $samePtr = $context->builder->icmp(Builder::INT_EQ, $left, $right);
+        $sameRet = $fn->appendBasicBlock('ss_obj_bridge_same');
+        $notSame = $fn->appendBasicBlock('ss_obj_bridge_not_same');
+        $context->builder->branchIf($samePtr, $sameRet, $notSame);
+
+        $context->builder->positionAtEnd($sameRet);
+        $context->builder->returnValue($zero64);
+
+        $context->builder->positionAtEnd($notSame);
+        $leftNull = $context->builder->icmp(Builder::INT_EQ, $left, $nullObj);
+        $rightNull = $context->builder->icmp(Builder::INT_EQ, $right, $nullObj);
+        $eitherNull = $context->builder->or($leftNull, $rightNull);
+        $nullCmp = $fn->appendBasicBlock('ss_obj_bridge_null_cmp');
+        $callHelper = $fn->appendBasicBlock('ss_obj_bridge_call');
+        $context->builder->branchIf($eitherNull, $nullCmp, $callHelper);
+
+        $context->builder->positionAtEnd($nullCmp);
+        $leftKind = $context->builder->select(
+            $leftNull,
+            $i64->constInt(self::TYPE_NULL, false),
+            $i64->constInt(self::TYPE_OBJECT, false)
+        );
+        $rightKind = $context->builder->select(
+            $rightNull,
+            $i64->constInt(self::TYPE_NULL, false),
+            $i64->constInt(self::TYPE_OBJECT, false)
+        );
+        $context->builder->returnValue(self::kindSpaceship($context, $leftKind, $rightKind));
+
+        $context->builder->positionAtEnd($callHelper);
+        $helperFn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::objectSpaceship'
+        );
+        $result = $context->builder->call($helperFn, $left, $right);
+        $context->builder->returnValue($context->builder->sext($result, $i64));
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitHashtableCompareSpaceshipBridge(Context $context, LlvmFunction $fn): void
+    {
+        SpaceshipRuntime::ensureCompareJitHelperCompiled($context);
+
+        $entry = $fn->appendBasicBlock('ss_ht_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $left = $fn->getParam(0);
+        $right = $fn->getParam(1);
+        $i64 = $context->getTypeFromString('int64');
+        $zero64 = $i64->constInt(0, false);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullHt = $htPtr->constNull();
+
+        $leftNull = $context->builder->icmp(Builder::INT_EQ, $left, $nullHt);
+        $rightNull = $context->builder->icmp(Builder::INT_EQ, $right, $nullHt);
+        $eitherNull = $context->builder->or($leftNull, $rightNull);
+        $nullRet = $fn->appendBasicBlock('ss_ht_bridge_null_ret');
+        $callHelper = $fn->appendBasicBlock('ss_ht_bridge_call');
+        $context->builder->branchIf($eitherNull, $nullRet, $callHelper);
+
+        $context->builder->positionAtEnd($nullRet);
+        $context->builder->returnValue($zero64);
+
+        $context->builder->positionAtEnd($callHelper);
+        $helperFn = SpaceshipRuntime::compareHelper(
+            $context,
+            'PHPCompiler\\VM\\CompareJitHelper::hashtableSpaceship'
+        );
+        $result = $context->builder->call($helperFn, $left, $right);
+        $context->builder->returnValue($context->builder->sext($result, $i64));
+        $context->builder->clearInsertionPosition();
     }
 
     private static function emitObjectCompareSpaceship(Context $context, LlvmFunction $fn): void
