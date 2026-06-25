@@ -16,6 +16,9 @@ final class touch_ extends Internal
 {
     private const FUNCTION = 'touch';
 
+    /** JIT/AOT omit sentinel — see {@see FsDirJitHelper::TOUCH_TIME_OMIT} (#11587). */
+    private const TOUCH_TIME_OMIT = FsDirJitHelper::TOUCH_TIME_OMIT;
+
     public function __construct()
     {
         parent::__construct(self::FUNCTION);
@@ -53,14 +56,14 @@ final class touch_ extends Internal
         }
         $path = JitFilestatArg::lowerFilename($context, $args[0], self::FUNCTION);
         $i64 = $context->getTypeFromString('int64');
-        $sentinel = $i64->constInt(-1, true);
-        $mtime = $sentinel;
+        $omit = $i64->constInt(self::TOUCH_TIME_OMIT, true);
+        $mtime = $omit;
         if ($argc >= 2) {
-            $mtime = JitTouch::lowerNullableLong($context, $args[1], 2, 'mtime', $sentinel);
+            $mtime = JitTouch::lowerNullableLong($context, $args[1], 2, 'mtime', $omit);
         }
-        $atime = $sentinel;
+        $atime = $omit;
         if (3 === $argc) {
-            $atime = JitTouch::lowerNullableLong($context, $args[2], 3, 'atime', $sentinel);
+            $atime = JitTouch::lowerNullableLong($context, $args[2], 3, 'atime', $omit);
         }
 
         return JitTouch::invoke($context, $path, $mtime, $atime);

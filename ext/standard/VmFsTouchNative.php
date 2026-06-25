@@ -44,15 +44,14 @@ final class VmFsTouchNative
                 }
             }
 
-            $mtimeSentinel = $mtime ?? -1;
-            $atimeSentinel = $atime ?? -1;
-            if ($mtimeSentinel < 0 && $atimeSentinel < 0) {
+            // php-src filestat.c — omitted mtime/atime → current time; explicit negatives pass through.
+            if (null === $mtime && null === $atime) {
                 return 0 === (int) $ffi->utime($path, null);
             }
 
             $now = (int) $ffi->time(null);
-            $mtimeEff = $mtimeSentinel < 0 ? $now : $mtimeSentinel;
-            $atimeEff = $atimeSentinel < 0 ? $mtimeEff : $atimeSentinel;
+            $mtimeEff = $mtime ?? $now;
+            $atimeEff = $atime ?? $mtimeEff;
             $times = $ffi->new('long[2]');
             $times[0] = $atimeEff;
             $times[1] = $mtimeEff;
