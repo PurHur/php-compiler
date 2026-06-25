@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3186 |
-| Phase A inventory files (M2 ratio SSOT) | 3186 |
+| PHP files on vm.php path | 3199 |
+| Phase A inventory files (M2 ratio SSOT) | 3199 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8472 |
+| Source constructs flagged (warnings) | 8501 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -865,6 +865,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PregReplacementExpand.php` | 0 | 1 |
 | `ext/standard/PrintRJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessIdentityJitHelper.php` | 0 | 1 |
+| `ext/standard/ProcessJitHelper.php` | 0 | 10 |
+| `ext/standard/ProcessOpenJitHelper.php` | 0 | 3 |
+| `ext/standard/ProcessSlotJitHelper.php` | 0 | 1 |
 | `ext/standard/ProgressJitHelper.php` | 0 | 1 |
 | `ext/standard/QuotPrintJitHelper.php` | 0 | 1 |
 | `ext/standard/RandomBytesJitHelper.php` | 0 | 1 |
@@ -924,7 +927,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayFilterCallback.php` | 0 | 3 |
-| `ext/standard/VmArrayPointer.php` | 0 | 1 |
+| `ext/standard/VmArrayPointer.php` | 0 | 2 |
 | `ext/standard/VmArraySort.php` | 0 | 2 |
 | `ext/standard/VmArraySortCallback.php` | 0 | 3 |
 | `ext/standard/VmArrayUserSetOps.php` | 0 | 15 |
@@ -1024,6 +1027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmHashNative.php` | 0 | 2 |
 | `ext/standard/VmHashNonCrypto.php` | 0 | 1 |
 | `ext/standard/VmHashXxh.php` | 0 | 1 |
+| `ext/standard/VmHead.php` | 0 | 1 |
 | `ext/standard/VmHebrev.php` | 0 | 1 |
 | `ext/standard/VmHighlight.php` | 0 | 1 |
 | `ext/standard/VmHost.php` | 0 | 1 |
@@ -1147,6 +1151,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamSocketFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairNative.php` | 0 | 1 |
+| `ext/standard/VmStreamSocketPure.php` | 0 | 1 |
 | `ext/standard/VmStreamSupports.php` | 0 | 1 |
 | `ext/standard/VmStreamSync.php` | 0 | 1 |
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
@@ -2226,8 +2231,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PregExpandRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessIdentityJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpen.php` | 0 | 1 |
+| `lib/JIT/Builtin/ProcessOpenEmbedBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php` | 0 | 1 |
+| `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ProcessStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/ReadonlyRaise.php` | 0 | 4 |
 | `lib/JIT/Builtin/Refcount.php` | 0 | 1 |
@@ -2558,7 +2567,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/FiberHelperLlvm.php` | 0 | 7 |
 | `lib/JIT/FromCallableHelper.php` | 0 | 1 |
 | `lib/JIT/FunctionStaticHelper.php` | 0 | 1 |
-| `lib/JIT/GeneratorHelper.php` | 0 | 17 |
+| `lib/JIT/GeneratorHelper.php` | 0 | 10 |
 | `lib/JIT/GlobalsTableInit.php` | 0 | 1 |
 | `lib/JIT/HashTableHelper.php` | 0 | 29 |
 | `lib/JIT/Helper.php` | 0 | 8 |
@@ -2998,7 +3007,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/FiberSupport.php` | 0 | 4 |
 | `lib/VM/FiberTrace.php` | 0 | 4 |
 | `lib/VM/ForeachIterator.php` | 0 | 1 |
+| `lib/VM/GeneratorIteratorJitHelper.php` | 0 | 4 |
+| `lib/VM/GeneratorJitHelper.php` | 0 | 1 |
 | `lib/VM/GeneratorState.php` | 0 | 18 |
+| `lib/VM/GeneratorYieldFromJitHelper.php` | 0 | 2 |
 | `lib/VM/HashTable.php` | 0 | 91 |
 | `lib/VM/HeaderCallbackQueue.php` | 0 | 1 |
 | `lib/VM/InOperator.php` | 0 | 1 |
@@ -3073,6 +3085,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmFloatCompare.php` | 0 | 1 |
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
+| `lib/VM/VmGenerator.php` | 0 | 4 |
 | `lib/VM/VmInclude.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
 | `lib/VM/VmIteratorForeach.php` | 0 | 15 |
@@ -5147,7 +5160,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Module (line 35)
 - new Module (line 57)
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/CheckdateJitHelper.php`
 
@@ -6943,7 +6956,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPasswordBcryptCost.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitPasswordGetInfo.php`
 
@@ -8279,426 +8292,426 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new header_remove (line 464)
 - new header_list (line 465)
 - new headers_list (line 466)
-- new getallheaders_ (line 467)
 - new getallheaders_ (line 468)
-- new http_get_last_response_headers (line 469)
-- new get_last_response_headers (line 470)
-- new http_clear_last_response_headers (line 471)
-- new get_headers (line 472)
-- new ob_start (line 473)
-- new ob_gzhandler (line 474)
-- new ob_get_clean (line 475)
-- new ob_get_contents (line 476)
-- new ob_get_flush (line 477)
-- new ob_end_clean (line 478)
-- new ob_get_length (line 479)
-- new ob_end_flush (line 480)
-- new flush_ (line 481)
-- new ob_get_level (line 482)
-- new ob_get_status (line 483)
-- new ob_implicit_flush (line 484)
-- new ob_flush (line 485)
-- new ob_clean (line 486)
-- new ob_list_handlers (line 487)
-- new http_response_code (line 488)
-- new output_add_rewrite_var (line 489)
-- new output_reset_rewrite_vars (line 490)
-- new json_encode (line 491)
-- new json_decode (line 492)
-- new json_validate (line 493)
-- new serialize (line 494)
-- new unserialize (line 495)
-- new json_last_error_ (line 496)
-- new json_last_error_msg_ (line 497)
-- new web_int (line 498)
-- new web_string (line 499)
-- new web_bool (line 500)
-- new urlencode (line 501)
-- new rawurlencode (line 502)
-- new http_build_query (line 503)
-- new parse_str (line 504)
-- new urldecode (line 505)
-- new rawurldecode (line 506)
-- new parse_url (line 507)
-- new dirname (line 508)
-- new basename (line 509)
-- new realpath (line 510)
-- new realpath_cache_get (line 511)
-- new realpath_cache_size (line 512)
-- new pathinfo (line 513)
-- new file_get_contents (line 514)
-- new readfile (line 515)
-- new mime_content_type (line 516)
-- new file_ (line 517)
-- new readline (line 518)
-- new readline_info (line 519)
-- new readline_add_history (line 520)
-- new readline_clear_history (line 521)
-- new readline_list_history (line 522)
-- new readline_read_history (line 523)
-- new readline_write_history (line 524)
-- new readline_completion_function (line 525)
-- new readline_callback_handler_install (line 526)
-- new readline_callback_read_char (line 527)
-- new readline_callback_handler_remove (line 528)
-- new readline_on_new_line (line 529)
-- new readline_redisplay (line 530)
-- new file_put_contents (line 531)
-- new file_exists (line 532)
-- new filesize (line 533)
-- new filemtime (line 534)
-- new disk_free_space (line 535)
-- new disk_total_space (line 536)
-- new diskfreespace (line 537)
-- new disktotalspace (line 538)
-- new dl (line 539)
-- new fileatime (line 540)
-- new filectime (line 541)
-- new fileinode (line 542)
-- new fileowner (line 543)
-- new filegroup (line 544)
-- new clearstatcache_ (line 545)
-- new stat_ (line 546)
-- new lstat_ (line 547)
-- new fstat_ (line 548)
-- new fileperms (line 549)
-- new is_file (line 550)
-- new is_dir (line 551)
-- new is_readable (line 552)
-- new is_writable (line 553)
-- new is_executable (line 554)
-- new is_link (line 555)
-- new readlink (line 556)
-- new linkinfo (line 557)
-- new link_ (line 558)
-- new symlink_ (line 559)
-- new unlink (line 560)
-- new mkdir_ (line 561)
-- new rmdir_ (line 562)
-- new chmod_ (line 563)
-- new chown_ (line 564)
-- new lchown_ (line 565)
-- new chgrp_ (line 566)
-- new lchgrp_ (line 567)
-- new umask_ (line 568)
-- new rename_ (line 569)
-- new move_uploaded_file (line 570)
-- new is_uploaded_file (line 571)
-- new copy_ (line 572)
-- new move_uploaded_file (line 573)
-- new touch_ (line 574)
-- new filetype (line 575)
-- new stream_context_create (line 576)
-- new stream_context_get_default (line 577)
-- new stream_context_set_default (line 578)
-- new stream_context_get_options (line 579)
-- new stream_context_set_options (line 580)
-- new stream_context_set_params (line 581)
-- new stream_notification_callback (line 582)
-- new stream_socket_client (line 583)
-- new stream_socket_server (line 584)
-- new stream_socket_pair (line 585)
-- new fsockopen (line 586)
-- new pfsockopen (line 587)
-- new stream_set_chunk_size_ (line 588)
-- new stream_set_timeout_ (line 589)
-- new stream_set_write_buffer_ (line 590)
-- new stream_set_read_buffer_ (line 591)
-- new set_file_buffer (line 592)
-- new stream_supports (line 593)
-- new stream_supports_lock (line 594)
-- new stream_is_local (line 595)
-- new stream_isatty (line 596)
-- new stream_get_meta_data (line 597)
-- new stream_set_blocking (line 598)
-- new fopen (line 599)
-- new fread (line 600)
-- new stream_get_contents (line 601)
-- new stream_copy_to_stream (line 602)
-- new stream_copy_to_string (line 603)
-- new stream_get_filters (line 604)
-- new stream_filter_register (line 605)
-- new stream_filter_append (line 606)
-- new stream_filter_prepend (line 607)
-- new stream_filter_remove (line 608)
-- new stream_get_wrappers (line 609)
-- new stream_get_transports (line 610)
-- new stream_wrapper_register (line 611)
-- new stream_register_wrapper (line 612)
-- new stream_wrapper_unregister (line 613)
-- new stream_wrapper_restore (line 614)
-- new stream_bucket_new (line 615)
-- new stream_bucket_make_writeable (line 616)
-- new stream_bucket_append (line 617)
-- new stream_bucket_prepend (line 618)
-- new fgetc (line 619)
-- new fgets (line 620)
-- new stream_get_line (line 621)
-- new fgetcsv (line 622)
-- new fputcsv (line 623)
-- new str_getcsv (line 624)
-- new ftell_ (line 625)
-- new ftok (line 626)
-- new fseek (line 627)
-- new rewind_ (line 628)
-- new feof_ (line 629)
-- new fflush_ (line 630)
-- new fsync_ (line 631)
-- new fdatasync_ (line 632)
-- new ftruncate_ (line 633)
-- new fpassthru (line 634)
-- new fwrite (line 635)
-- new fwrite (line 636)
-- new fclose (line 637)
-- new flock (line 638)
-- new forward_static_call (line 639)
-- new forward_static_call_array (line 640)
-- new getenv_ (line 641)
-- new putenv_ (line 642)
-- new exec (line 643)
-- new passthru (line 644)
-- new system (line 645)
-- new shell_exec (line 646)
-- new popen (line 647)
-- new pclose (line 648)
-- new proc_open (line 649)
-- new proc_close (line 650)
-- new proc_get_status (line 651)
-- new proc_terminate (line 652)
-- new stream_select (line 653)
-- new escapeshellarg (line 654)
-- new escapeshellcmd (line 655)
-- new phpc_run_command (line 656)
-- new sys_get_temp_dir (line 657)
-- new sys_getloadavg (line 658)
-- new openlog (line 659)
-- new syslog (line 660)
-- new closelog (line 661)
-- new tempnam (line 662)
-- new tmpfile (line 663)
-- new getcwd_ (line 664)
-- new get_include_path (line 665)
-- new set_include_path (line 666)
-- new restore_include_path (line 667)
-- new stream_resolve_include_path (line 668)
-- new gethostname (line 669)
-- new net_get_interfaces (line 670)
-- new gethostbynamel (line 671)
-- new gethostbyname (line 672)
-- new gethostbyaddr (line 673)
-- new checkdnsrr (line 674)
-- new checkdnsrr (line 675)
-- new dns_get_mx (line 676)
-- new dns_get_record (line 677)
-- new getmxrr (line 678)
-- new long2ip (line 679)
-- new ip2long (line 680)
-- new inet_ntop (line 681)
-- new inet_pton (line 682)
-- new getprotobyname (line 683)
-- new getprotobynumber (line 684)
-- new getservbyname (line 685)
-- new getservbyport (line 686)
-- new chdir_ (line 687)
-- new chroot_ (line 688)
-- new putenv_ (line 689)
-- new ini_set_ (line 690)
-- new ini_set_ (line 691)
-- new ini_get_ (line 692)
-- new ini_get_all (line 693)
-- new ini_restore (line 694)
-- new ini_parse_quantity (line 695)
-- new parse_ini_string (line 696)
-- new parse_ini_file (line 697)
-- new error_reporting (line 698)
-- new error_log (line 699)
-- new define_ (line 700)
-- new defined_ (line 701)
-- new constant_ (line 702)
-- new class_constants_ (line 703)
-- new get_defined_constants_ (line 704)
-- new get_defined_vars_ (line 705)
-- new get_declared_variables_ (line 706)
-- new get_declared_interfaces_ (line 707)
-- new get_declared_classes_ (line 708)
-- new get_declared_traits_ (line 709)
-- new get_declared_attributes_ (line 710)
-- new get_declared_functions_ (line 711)
-- new get_defined_functions_ (line 712)
-- new get_included_files_ (line 713)
-- new get_included_files_ (line 714)
-- new debug_backtrace (line 715)
-- new debug_print_backtrace (line 716)
-- new get_debug_backtrace (line 717)
-- new class_exists_ (line 718)
-- new class_alias (line 719)
-- new create_lazy_ghost (line 720)
-- new create_lazy_proxy (line 721)
-- new enum_exists_ (line 722)
-- new unitenum_exists_ (line 723)
-- new interface_exists_ (line 724)
-- new trait_exists_ (line 725)
-- new class_uses_ (line 726)
-- new class_uses_recursive (line 727)
-- new class_implements_ (line 728)
-- new class_parents_ (line 729)
-- new function_exists (line 730)
-- new is_callable (line 731)
-- new call_user_func (line 732)
-- new call_user_func_array (line 733)
-- new func_get_arg (line 734)
-- new func_get_args (line 735)
-- new func_num_args (line 736)
-- new method_exists_ (line 737)
-- new class_meth_exists_ (line 738)
-- new class_has_method_ (line 740)
-- new class_has_property_ (line 741)
-- new class_has_constant_ (line 742)
-- new property_exists_ (line 744)
-- new attribute_exists_ (line 745)
-- new get_object_vars_ (line 746)
-- new get_mangled_object_vars_ (line 747)
-- new get_object_id (line 748)
-- new spl_object_id (line 749)
-- new spl_object_hash (line 750)
-- new get_class_ (line 751)
-- new get_called_class_ (line 752)
-- new get_class_vars_ (line 753)
-- new get_class_methods_ (line 754)
-- new get_parent_class_ (line 755)
-- new is_a_ (line 756)
-- new is_subclass_of_ (line 757)
-- new assert_ (line 758)
-- new assert_options (line 759)
-- new trigger_error_ (line 760)
-- new user_error (line 761)
-- new compiler_language_warning_ (line 762)
-- new set_error_handler_ (line 763)
-- new restore_error_handler_ (line 764)
-- new set_exception_handler (line 765)
-- new restore_exception_handler (line 766)
-- new error_get_last (line 767)
-- new error_clear_last (line 768)
-- new exif_tagname (line 769)
-- new eval_ (line 770)
-- new phpc_deploy_path (line 771)
-- new compiler_is_superglobal_name (line 772)
-- new phpc_match_unhandled_operand_is_object (line 773)
-- new phpc_clone_with_begin (line 774)
-- new phpc_clone_with_end (line 775)
-- new phpc_clone_with_reinit (line 776)
-- new extract_ (line 777)
-- new compact_ (line 778)
-- new scandir (line 779)
-- new opendir (line 780)
-- new readdir (line 781)
-- new closedir (line 782)
-- new rewinddir (line 783)
-- new glob_ (line 784)
-- new gzcompress (line 785)
-- new gzdecode (line 786)
-- new gzdeflate (line 787)
-- new gzencode (line 788)
-- new gzinflate (line 789)
-- new gzuncompress (line 790)
-- new gzopen (line 791)
-- new gzwrite (line 792)
-- new gzread (line 793)
-- new gzgets (line 794)
-- new gzclose (line 795)
-- new readgzfile (line 796)
-- new gzfile (line 797)
-- new gzpassthru (line 798)
-- new zlib_encode (line 799)
-- new zlib_decode (line 800)
-- new fnmatch (line 801)
-- new time (line 802)
-- new getmypid (line 803)
-- new getmyuid (line 804)
-- new getmygid (line 805)
-- new get_current_user (line 806)
-- new get_cfg_var (line 807)
-- new php_ini_loaded_file (line 808)
-- new php_ini_scanned_files (line 809)
-- new zend_thread_id (line 810)
-- new getmygrgid (line 811)
-- new getmyinode (line 812)
-- new getlastmod (line 813)
-- new getrusage (line 814)
-- new cli_get_process_title (line 815)
-- new cli_set_process_title (line 816)
-- new proc_nice (line 817)
-- new memory_get_peak_usage (line 818)
-- new memory_get_usage (line 819)
-- new memory_reset_peak_usage (line 820)
-- new microtime (line 821)
-- new gettimeofday (line 822)
-- new hrtime (line 823)
-- new clock_gettime (line 824)
-- new phpversion (line 825)
-- new php_sapi_name (line 826)
-- new getopt (line 827)
-- new php_uname (line 828)
-- new phpinfo (line 829)
-- new phpcredits (line 830)
-- new zend_version (line 831)
-- new version_compare (line 832)
-- new extension_loaded (line 833)
-- new get_loaded_extensions (line 834)
-- new get_extension_funcs (line 835)
-- new date (line 836)
-- new timezone_version_get (line 837)
-- new timezone_identifiers_list (line 838)
-- new timezone_open (line 839)
-- new timezone_name_get (line 840)
-- new timezone_offset_get (line 841)
-- new timezone_location_get (line 842)
-- new timezone_transitions_get (line 843)
-- new gmdate (line 844)
-- new strftime (line 845)
-- new gmstrftime (line 846)
-- new strptime (line 847)
-- new getdate (line 848)
-- new gmgetdate (line 849)
-- new gmmktime (line 850)
-- new mktime (line 851)
-- new strtotime (line 852)
-- new checkdate (line 853)
-- new date_default_timezone_get (line 854)
-- new date_default_timezone_set (line 855)
-- new localtime (line 856)
-- new localeconv (line 857)
-- new idate (line 858)
-- new date_sun_info (line 859)
-- new date_interval_format (line 860)
-- new date_interval_create_from_date_string (line 861)
-- new date_create (line 862)
-- new date_create_immutable (line 863)
-- new date_create_from_format (line 864)
-- new date_create_immutable_from_format (line 865)
-- new date_parse (line 866)
-- new date_parse_from_format (line 867)
-- new date_add (line 868)
-- new date_sub (line 869)
-- new date_modify (line 870)
-- new date_diff (line 871)
-- new date_sunrise (line 872)
-- new date_sunset (line 873)
-- new sleep (line 874)
-- new set_time_limit (line 875)
-- new setlocale (line 876)
-- new nl_langinfo (line 877)
-- new ignore_user_abort (line 878)
-- new connection_aborted (line 879)
-- new spl_autoload (line 880)
-- new spl_autoload_extensions (line 881)
-- new spl_autoload_functions (line 882)
-- new spl_autoload_register (line 883)
-- new spl_autoload_unregister (line 884)
-- new spl_autoload_call (line 885)
-- new time_nanosleep (line 886)
-- new time_sleep_until (line 887)
-- new usleep (line 888)
+- new getallheaders_ (line 469)
+- new http_get_last_response_headers (line 471)
+- new get_last_response_headers (line 472)
+- new http_clear_last_response_headers (line 473)
+- new get_headers (line 474)
+- new ob_start (line 475)
+- new ob_gzhandler (line 476)
+- new ob_get_clean (line 477)
+- new ob_get_contents (line 478)
+- new ob_get_flush (line 479)
+- new ob_end_clean (line 480)
+- new ob_get_length (line 481)
+- new ob_end_flush (line 482)
+- new flush_ (line 483)
+- new ob_get_level (line 484)
+- new ob_get_status (line 485)
+- new ob_implicit_flush (line 486)
+- new ob_flush (line 487)
+- new ob_clean (line 488)
+- new ob_list_handlers (line 489)
+- new http_response_code (line 490)
+- new output_add_rewrite_var (line 491)
+- new output_reset_rewrite_vars (line 492)
+- new json_encode (line 493)
+- new json_decode (line 494)
+- new json_validate (line 495)
+- new serialize (line 496)
+- new unserialize (line 497)
+- new json_last_error_ (line 498)
+- new json_last_error_msg_ (line 499)
+- new web_int (line 500)
+- new web_string (line 501)
+- new web_bool (line 502)
+- new urlencode (line 503)
+- new rawurlencode (line 504)
+- new http_build_query (line 505)
+- new parse_str (line 506)
+- new urldecode (line 507)
+- new rawurldecode (line 508)
+- new parse_url (line 509)
+- new dirname (line 510)
+- new basename (line 511)
+- new realpath (line 512)
+- new realpath_cache_get (line 513)
+- new realpath_cache_size (line 514)
+- new pathinfo (line 515)
+- new file_get_contents (line 516)
+- new readfile (line 517)
+- new mime_content_type (line 518)
+- new file_ (line 519)
+- new readline (line 520)
+- new readline_info (line 521)
+- new readline_add_history (line 522)
+- new readline_clear_history (line 523)
+- new readline_list_history (line 524)
+- new readline_read_history (line 525)
+- new readline_write_history (line 526)
+- new readline_completion_function (line 527)
+- new readline_callback_handler_install (line 528)
+- new readline_callback_read_char (line 529)
+- new readline_callback_handler_remove (line 530)
+- new readline_on_new_line (line 531)
+- new readline_redisplay (line 532)
+- new file_put_contents (line 533)
+- new file_exists (line 534)
+- new filesize (line 535)
+- new filemtime (line 536)
+- new disk_free_space (line 537)
+- new disk_total_space (line 538)
+- new diskfreespace (line 539)
+- new disktotalspace (line 540)
+- new dl (line 541)
+- new fileatime (line 542)
+- new filectime (line 543)
+- new fileinode (line 544)
+- new fileowner (line 545)
+- new filegroup (line 546)
+- new clearstatcache_ (line 547)
+- new stat_ (line 548)
+- new lstat_ (line 549)
+- new fstat_ (line 550)
+- new fileperms (line 551)
+- new is_file (line 552)
+- new is_dir (line 553)
+- new is_readable (line 554)
+- new is_writable (line 555)
+- new is_executable (line 556)
+- new is_link (line 557)
+- new readlink (line 558)
+- new linkinfo (line 559)
+- new link_ (line 560)
+- new symlink_ (line 561)
+- new unlink (line 562)
+- new mkdir_ (line 563)
+- new rmdir_ (line 564)
+- new chmod_ (line 565)
+- new chown_ (line 566)
+- new lchown_ (line 567)
+- new chgrp_ (line 568)
+- new lchgrp_ (line 569)
+- new umask_ (line 570)
+- new rename_ (line 571)
+- new move_uploaded_file (line 572)
+- new is_uploaded_file (line 573)
+- new copy_ (line 574)
+- new move_uploaded_file (line 575)
+- new touch_ (line 576)
+- new filetype (line 577)
+- new stream_context_create (line 578)
+- new stream_context_get_default (line 579)
+- new stream_context_set_default (line 580)
+- new stream_context_get_options (line 581)
+- new stream_context_set_options (line 582)
+- new stream_context_set_params (line 583)
+- new stream_notification_callback (line 584)
+- new stream_socket_client (line 585)
+- new stream_socket_server (line 586)
+- new stream_socket_pair (line 587)
+- new fsockopen (line 588)
+- new pfsockopen (line 589)
+- new stream_set_chunk_size_ (line 590)
+- new stream_set_timeout_ (line 591)
+- new stream_set_write_buffer_ (line 592)
+- new stream_set_read_buffer_ (line 593)
+- new set_file_buffer (line 594)
+- new stream_supports (line 595)
+- new stream_supports_lock (line 596)
+- new stream_is_local (line 597)
+- new stream_isatty (line 598)
+- new stream_get_meta_data (line 599)
+- new stream_set_blocking (line 600)
+- new fopen (line 601)
+- new fread (line 602)
+- new stream_get_contents (line 603)
+- new stream_copy_to_stream (line 604)
+- new stream_copy_to_string (line 605)
+- new stream_get_filters (line 606)
+- new stream_filter_register (line 607)
+- new stream_filter_append (line 608)
+- new stream_filter_prepend (line 609)
+- new stream_filter_remove (line 610)
+- new stream_get_wrappers (line 611)
+- new stream_get_transports (line 612)
+- new stream_wrapper_register (line 613)
+- new stream_register_wrapper (line 614)
+- new stream_wrapper_unregister (line 615)
+- new stream_wrapper_restore (line 616)
+- new stream_bucket_new (line 617)
+- new stream_bucket_make_writeable (line 618)
+- new stream_bucket_append (line 619)
+- new stream_bucket_prepend (line 620)
+- new fgetc (line 621)
+- new fgets (line 622)
+- new stream_get_line (line 623)
+- new fgetcsv (line 624)
+- new fputcsv (line 625)
+- new str_getcsv (line 626)
+- new ftell_ (line 627)
+- new ftok (line 628)
+- new fseek (line 629)
+- new rewind_ (line 630)
+- new feof_ (line 631)
+- new fflush_ (line 632)
+- new fsync_ (line 633)
+- new fdatasync_ (line 634)
+- new ftruncate_ (line 635)
+- new fpassthru (line 636)
+- new fwrite (line 637)
+- new fwrite (line 638)
+- new fclose (line 639)
+- new flock (line 640)
+- new forward_static_call (line 641)
+- new forward_static_call_array (line 642)
+- new getenv_ (line 643)
+- new putenv_ (line 644)
+- new exec (line 645)
+- new passthru (line 646)
+- new system (line 647)
+- new shell_exec (line 648)
+- new popen (line 649)
+- new pclose (line 650)
+- new proc_open (line 651)
+- new proc_close (line 652)
+- new proc_get_status (line 653)
+- new proc_terminate (line 654)
+- new stream_select (line 655)
+- new escapeshellarg (line 656)
+- new escapeshellcmd (line 657)
+- new phpc_run_command (line 658)
+- new sys_get_temp_dir (line 659)
+- new sys_getloadavg (line 660)
+- new openlog (line 661)
+- new syslog (line 662)
+- new closelog (line 663)
+- new tempnam (line 664)
+- new tmpfile (line 665)
+- new getcwd_ (line 666)
+- new get_include_path (line 667)
+- new set_include_path (line 668)
+- new restore_include_path (line 669)
+- new stream_resolve_include_path (line 670)
+- new gethostname (line 671)
+- new net_get_interfaces (line 672)
+- new gethostbynamel (line 673)
+- new gethostbyname (line 674)
+- new gethostbyaddr (line 675)
+- new checkdnsrr (line 676)
+- new checkdnsrr (line 677)
+- new dns_get_mx (line 678)
+- new dns_get_record (line 679)
+- new getmxrr (line 680)
+- new long2ip (line 681)
+- new ip2long (line 682)
+- new inet_ntop (line 683)
+- new inet_pton (line 684)
+- new getprotobyname (line 685)
+- new getprotobynumber (line 686)
+- new getservbyname (line 687)
+- new getservbyport (line 688)
+- new chdir_ (line 689)
+- new chroot_ (line 690)
+- new putenv_ (line 691)
+- new ini_set_ (line 692)
+- new ini_set_ (line 693)
+- new ini_get_ (line 694)
+- new ini_get_all (line 695)
+- new ini_restore (line 696)
+- new ini_parse_quantity (line 697)
+- new parse_ini_string (line 698)
+- new parse_ini_file (line 699)
+- new error_reporting (line 700)
+- new error_log (line 701)
+- new define_ (line 702)
+- new defined_ (line 703)
+- new constant_ (line 704)
+- new class_constants_ (line 705)
+- new get_defined_constants_ (line 706)
+- new get_defined_vars_ (line 707)
+- new get_declared_variables_ (line 708)
+- new get_declared_interfaces_ (line 709)
+- new get_declared_classes_ (line 710)
+- new get_declared_traits_ (line 711)
+- new get_declared_attributes_ (line 712)
+- new get_declared_functions_ (line 713)
+- new get_defined_functions_ (line 714)
+- new get_included_files_ (line 715)
+- new get_included_files_ (line 716)
+- new debug_backtrace (line 717)
+- new debug_print_backtrace (line 718)
+- new get_debug_backtrace (line 719)
+- new class_exists_ (line 720)
+- new class_alias (line 721)
+- new create_lazy_ghost (line 722)
+- new create_lazy_proxy (line 723)
+- new enum_exists_ (line 724)
+- new unitenum_exists_ (line 725)
+- new interface_exists_ (line 726)
+- new trait_exists_ (line 727)
+- new class_uses_ (line 728)
+- new class_uses_recursive (line 729)
+- new class_implements_ (line 730)
+- new class_parents_ (line 731)
+- new function_exists (line 732)
+- new is_callable (line 733)
+- new call_user_func (line 734)
+- new call_user_func_array (line 735)
+- new func_get_arg (line 736)
+- new func_get_args (line 737)
+- new func_num_args (line 738)
+- new method_exists_ (line 739)
+- new class_meth_exists_ (line 740)
+- new class_has_method_ (line 742)
+- new class_has_property_ (line 743)
+- new class_has_constant_ (line 744)
+- new property_exists_ (line 746)
+- new attribute_exists_ (line 747)
+- new get_object_vars_ (line 748)
+- new get_mangled_object_vars_ (line 749)
+- new get_object_id (line 750)
+- new spl_object_id (line 751)
+- new spl_object_hash (line 752)
+- new get_class_ (line 753)
+- new get_called_class_ (line 754)
+- new get_class_vars_ (line 755)
+- new get_class_methods_ (line 756)
+- new get_parent_class_ (line 757)
+- new is_a_ (line 758)
+- new is_subclass_of_ (line 759)
+- new assert_ (line 760)
+- new assert_options (line 761)
+- new trigger_error_ (line 762)
+- new user_error (line 763)
+- new compiler_language_warning_ (line 764)
+- new set_error_handler_ (line 765)
+- new restore_error_handler_ (line 766)
+- new set_exception_handler (line 767)
+- new restore_exception_handler (line 768)
+- new error_get_last (line 769)
+- new error_clear_last (line 770)
+- new exif_tagname (line 771)
+- new eval_ (line 772)
+- new phpc_deploy_path (line 773)
+- new compiler_is_superglobal_name (line 774)
+- new phpc_match_unhandled_operand_is_object (line 775)
+- new phpc_clone_with_begin (line 776)
+- new phpc_clone_with_end (line 777)
+- new phpc_clone_with_reinit (line 778)
+- new extract_ (line 779)
+- new compact_ (line 780)
+- new scandir (line 781)
+- new opendir (line 782)
+- new readdir (line 783)
+- new closedir (line 784)
+- new rewinddir (line 785)
+- new glob_ (line 786)
+- new gzcompress (line 787)
+- new gzdecode (line 788)
+- new gzdeflate (line 789)
+- new gzencode (line 790)
+- new gzinflate (line 791)
+- new gzuncompress (line 792)
+- new gzopen (line 793)
+- new gzwrite (line 794)
+- new gzread (line 795)
+- new gzgets (line 796)
+- new gzclose (line 797)
+- new readgzfile (line 798)
+- new gzfile (line 799)
+- new gzpassthru (line 800)
+- new zlib_encode (line 801)
+- new zlib_decode (line 802)
+- new fnmatch (line 803)
+- new time (line 804)
+- new getmypid (line 805)
+- new getmyuid (line 806)
+- new getmygid (line 807)
+- new get_current_user (line 808)
+- new get_cfg_var (line 809)
+- new php_ini_loaded_file (line 810)
+- new php_ini_scanned_files (line 811)
+- new zend_thread_id (line 812)
+- new getmygrgid (line 813)
+- new getmyinode (line 814)
+- new getlastmod (line 815)
+- new getrusage (line 816)
+- new cli_get_process_title (line 817)
+- new cli_set_process_title (line 818)
+- new proc_nice (line 819)
+- new memory_get_peak_usage (line 820)
+- new memory_get_usage (line 821)
+- new memory_reset_peak_usage (line 822)
+- new microtime (line 823)
+- new gettimeofday (line 824)
+- new hrtime (line 825)
+- new clock_gettime (line 826)
+- new phpversion (line 827)
+- new php_sapi_name (line 828)
+- new getopt (line 829)
+- new php_uname (line 830)
+- new phpinfo (line 831)
+- new phpcredits (line 832)
+- new zend_version (line 833)
+- new version_compare (line 834)
+- new extension_loaded (line 835)
+- new get_loaded_extensions (line 836)
+- new get_extension_funcs (line 837)
+- new date (line 838)
+- new timezone_version_get (line 839)
+- new timezone_identifiers_list (line 840)
+- new timezone_open (line 841)
+- new timezone_name_get (line 842)
+- new timezone_offset_get (line 843)
+- new timezone_location_get (line 844)
+- new timezone_transitions_get (line 845)
+- new gmdate (line 846)
+- new strftime (line 847)
+- new gmstrftime (line 848)
+- new strptime (line 849)
+- new getdate (line 850)
+- new gmgetdate (line 851)
+- new gmmktime (line 852)
+- new mktime (line 853)
+- new strtotime (line 854)
+- new checkdate (line 855)
+- new date_default_timezone_get (line 856)
+- new date_default_timezone_set (line 857)
+- new localtime (line 858)
+- new localeconv (line 859)
+- new idate (line 860)
+- new date_sun_info (line 861)
+- new date_interval_format (line 862)
+- new date_interval_create_from_date_string (line 863)
+- new date_create (line 864)
+- new date_create_immutable (line 865)
+- new date_create_from_format (line 866)
+- new date_create_immutable_from_format (line 867)
+- new date_parse (line 868)
+- new date_parse_from_format (line 869)
+- new date_add (line 870)
+- new date_sub (line 871)
+- new date_modify (line 872)
+- new date_diff (line 873)
+- new date_sunrise (line 874)
+- new date_sunset (line 875)
+- new sleep (line 876)
+- new set_time_limit (line 877)
+- new setlocale (line 878)
+- new nl_langinfo (line 879)
+- new ignore_user_abort (line 880)
+- new connection_aborted (line 881)
+- new spl_autoload (line 882)
+- new spl_autoload_extensions (line 883)
+- new spl_autoload_functions (line 884)
+- new spl_autoload_register (line 885)
+- new spl_autoload_unregister (line 886)
+- new spl_autoload_call (line 887)
+- new time_nanosleep (line 888)
+- new time_sleep_until (line 889)
+- new usleep (line 890)
 - 5 class method(s)
 - 1 closure(s)
 
@@ -8840,6 +8853,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/ProcessJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 76)
+- new Variable (line 77)
+- new Variable (line 80)
+- new Variable (line 83)
+- new HashTable (line 113)
+- new Variable (line 114)
+- new Variable (line 117)
+- new HashTable (line 126)
+- new Variable (line 134)
+- 6 class method(s)
+
+### `ext/standard/ProcessOpenJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 66)
+- new Variable (line 68)
+- 7 class method(s)
+
+### `ext/standard/ProcessSlotJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `ext/standard/ProgressJitHelper.php`
 
@@ -9198,7 +9237,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArrayPointer.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- new Variable (line 66)
+- 9 class method(s)
 
 ### `ext/standard/VmArraySort.php`
 
@@ -9867,6 +9907,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `ext/standard/VmHead.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/VmHebrev.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10044,7 +10089,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmJsonFlags.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmJsonFormat.php`
 
@@ -10394,7 +10439,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessProcOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 19 class method(s)
+- 20 class method(s)
 
 ### `ext/standard/VmRandom.php`
 
@@ -10696,7 +10741,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 221)
 - new Error (line 336)
-- 24 class method(s)
+- 26 class method(s)
 
 ### `ext/standard/VmSscanf.php`
 
@@ -10818,6 +10863,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/VmStreamSocketPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/VmStreamSupports.php`
 
@@ -12865,7 +12915,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hash_hkdf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 105)
+- new JITVariable (line 101)
 - 3 class method(s)
 
 ### `ext/standard/hash_hmac.php`
@@ -17657,12 +17707,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/ProcessOpenEmbedBridge.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 216)
+- 8 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/ProcessOpenJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 41 class method(s)
+- 2 class method(s)
+
+### `lib/JIT/Builtin/ProcessOpenRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 43 class method(s)
 
 ### `lib/JIT/Builtin/ProcessRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 259)
+- 9 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/ProcessStandaloneLlvm.php`
 
 **Warnings** (review for bootstrap subset):
 - 34 class method(s)
@@ -19680,23 +19754,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/GeneratorHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\GeneratorSend (line 41)
-- new Call\GeneratorThrow (line 42)
-- new Call\GeneratorGetReturn (line 43)
-- new Call\GeneratorNext (line 44)
-- new Call\GeneratorCurrent (line 45)
-- new Call\GeneratorRewind (line 46)
-- new Call\GeneratorValid (line 47)
-- new Call\GeneratorKey (line 48)
-- new Native (line 556)
-- new Variable (line 943)
-- new Variable (line 1123)
-- new Variable (line 1126)
-- new Variable (line 1136)
-- new Variable (line 1205)
-- new Variable (line 1220)
-- new Variable (line 1231)
-- 51 class method(s)
+- new Call\GeneratorSend (line 36)
+- new Call\GeneratorThrow (line 37)
+- new Call\GeneratorGetReturn (line 38)
+- new Call\GeneratorNext (line 39)
+- new Call\GeneratorCurrent (line 40)
+- new Call\GeneratorRewind (line 41)
+- new Call\GeneratorValid (line 42)
+- new Call\GeneratorKey (line 43)
+- new Native (line 285)
+- 26 class method(s)
 
 ### `lib/JIT/GlobalsTableInit.php`
 
@@ -23041,6 +23108,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/VM/GeneratorIteratorJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 133)
+- new Variable (line 148)
+- new Variable (line 159)
+- 14 class method(s)
+
+### `lib/VM/GeneratorJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
+
 ### `lib/VM/GeneratorState.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23062,6 +23142,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 120)
 - new Exception (line 130)
 - 4 class method(s)
+
+### `lib/VM/GeneratorYieldFromJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 311)
+- 9 class method(s)
 
 ### `lib/VM/HashTable.php`
 
@@ -23291,7 +23377,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 286)
 - new self (line 298)
 - new Variable (line 326)
-- new Variable (line 459)
+- new Variable (line 460)
 - 23 class method(s)
 
 ### `lib/VM/ObjectHandleSupport.php`
@@ -23681,6 +23767,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `lib/VM/VmGenerator.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 173)
+- new Variable (line 176)
+- new Variable (line 186)
+- 7 class method(s)
 
 ### `lib/VM/VmInclude.php`
 

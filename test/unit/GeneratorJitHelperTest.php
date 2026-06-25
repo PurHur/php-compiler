@@ -8,10 +8,13 @@ use PHPCompiler\Block;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\GeneratorIteratorJitHelper;
 use PHPCompiler\VM\GeneratorJitHelper;
+use PHPCompiler\VM\GeneratorYieldFromJitHelper;
+use PHPCompiler\VM\VmGenerator;
 use PHPUnit\Framework\TestCase;
 
-/** Generator compile-time CFG analysis lives in VM PHP SSOT (#10105). */
+/** Generator compile-time CFG + LLVM shrink lives in VM PHP SSOT (#10105). */
 final class GeneratorJitHelperTest extends TestCase
 {
     public function testGeneratorHelperDelegatesCompileTimeAnalysisToVmHelper(): void
@@ -20,6 +23,22 @@ final class GeneratorJitHelperTest extends TestCase
         $this->assertStringContainsString('GeneratorJitHelper', $source);
         $this->assertStringContainsString('GeneratorJitHelper::collectResumePoints', $source);
         $this->assertStringNotContainsString('walkBlockForResumePoints', $source);
+        $this->assertStringContainsString('VmGenerator::ensureJitTypes', $source);
+        $this->assertStringContainsString('GeneratorYieldFromJitHelper::emitYieldFromPoint', $source);
+        $this->assertStringContainsString('GeneratorIteratorJitHelper::emitYieldPoint', $source);
+        $this->assertLessThan(500, substr_count($source, "\n"), 'GeneratorHelper should stay a thin delegate');
+    }
+
+    public function testVmGeneratorSharesPropertyConstants(): void
+    {
+        $this->assertSame(GeneratorHelper::TARGET_PROPERTY, VmGenerator::TARGET_PROPERTY);
+        $this->assertSame(GeneratorHelper::STATE_PROPERTY, VmGenerator::STATE_PROPERTY);
+    }
+
+    public function testYieldFromJitHelperClassExists(): void
+    {
+        $this->assertTrue(class_exists(GeneratorYieldFromJitHelper::class));
+        $this->assertTrue(class_exists(GeneratorIteratorJitHelper::class));
     }
 
     public function testPrefixSegmentSafeForYieldFromInitViaPublicApi(): void
