@@ -2127,6 +2127,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/CopyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ConvertCyrString.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CtypeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DateIntervalFormatRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DateMutationRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DefaultTimezoneRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/DefineRuntime.php';
