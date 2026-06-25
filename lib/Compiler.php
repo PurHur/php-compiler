@@ -12150,14 +12150,16 @@ class Compiler {
             $closureIdx = null;
             $arrayIdx = null;
             foreach ($producers as $pi => $producer) {
-                if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+                if ($producer instanceof Op\Expr\ArrowFunction
+                    || $producer instanceof Op\Expr\Closure
+                    || $producer instanceof Op\Expr\FirstClassCallable) {
                     $closureIdx = $pi;
                 } elseif ($producer instanceof Op\Expr\Array_) {
                     $arrayIdx = $pi;
                 }
             }
-            // Closure + inline Array_ — match by dead-temp operand wiring first (#10827, array_all/any/find);
-            // array_map(callback, array) fallback when links are opaque (#10651).
+            // Closure/FCC + inline Array_ — match by dead-temp operand wiring first (#10827, array_all/any/find);
+            // array_map(callback, array) fallback when links are opaque (#10651, #11450).
             if (null !== $closureIdx && null !== $arrayIdx && 2 === $producerCount && 2 === $argCount) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 if (null !== $callArg) {
@@ -12471,7 +12473,9 @@ class Compiler {
             }
             $closureProducerIndex = null;
             foreach ($producers as $pi => $producer) {
-                if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
+                if ($producer instanceof Op\Expr\ArrowFunction
+                    || $producer instanceof Op\Expr\Closure
+                    || $producer instanceof Op\Expr\FirstClassCallable) {
                     $closureProducerIndex = $pi;
                     break;
                 }
@@ -13140,13 +13144,22 @@ class Compiler {
                 break;
             }
             if (
-                ($child instanceof Op\Expr\ArrowFunction || $child instanceof Op\Expr\Closure)
-                && $callOp instanceof Op\Expr\FuncCall
-                && property_exists($callOp, 'name')
-                && ($callOp->name === $child->result
-                    || $this->operandsReferToSameVariable($callOp->name, $child->result))
+                ($child instanceof Op\Expr\ArrowFunction
+                    || $child instanceof Op\Expr\Closure
+                    || $child instanceof Op\Expr\FirstClassCallable)
+                && ($callOp instanceof Op\Expr\FuncCall || $callOp instanceof Op\Expr\NsFuncCall)
             ) {
-                continue;
+                $calleeOperand = $callOp instanceof Op\Expr\NsFuncCall
+                    ? ($callOp->nsName ?? null)
+                    : ($callOp->name ?? null);
+                if (
+                    null !== $calleeOperand
+                    && null !== $child->result
+                    && ($calleeOperand === $child->result
+                        || $this->operandsReferToSameVariable($calleeOperand, $child->result))
+                ) {
+                    continue;
+                }
             }
             if (
                 $child instanceof Op\Expr\ConstFetch
@@ -13272,8 +13285,10 @@ class Compiler {
                 }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
-                // array_map(fn(...), [...]) / preg_replace_callback($pat, fn(...), $arr) — Closure before Array_ (#10651, #10652).
-                if ($prev instanceof Op\Expr\Closure || $prev instanceof Op\Expr\ArrowFunction) {
+                // array_map(fn(...), [...]) / preg_replace_callback($pat, fn(...), $arr) — Closure/FCC before Array_ (#10651, #10652, #11450).
+                if ($prev instanceof Op\Expr\Closure
+                    || $prev instanceof Op\Expr\ArrowFunction
+                    || $prev instanceof Op\Expr\FirstClassCallable) {
                     array_unshift($producers, $prev);
                     break;
                 }
