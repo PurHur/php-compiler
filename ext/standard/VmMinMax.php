@@ -82,10 +82,8 @@ final class VmMinMax
         }
 
         $best = $values[0];
-        self::assertNumericScalar($best, $name);
         foreach (\array_slice($values, 1) as $candidate) {
-            self::assertNumericScalar($candidate, $name);
-            // zend_hash_minmax + php_data_compare (zend_compare) ordering (#10776).
+            // zend_hash_minmax + php_data_compare (zend_compare) ordering (#10776, #11668).
             $cmp = Variable::spaceshipCompare($best, $candidate);
             if ($pickMin ? $cmp > 0 : $cmp < 0) {
                 $best = $candidate;
@@ -195,18 +193,6 @@ final class VmMinMax
         $s = $value->toString();
 
         return '' !== $s && \is_numeric($s);
-    }
-
-    private static function assertNumericScalar(Variable $value, string $name): void
-    {
-        if (self::isNumericScalar($value)) {
-            return;
-        }
-
-        throw new \TypeError(
-            $name.'(): Argument #1 ($value) must be of type array, '
-            .self::valueTypeName($value).' given'
-        );
     }
 
     private static function numericGreaterThan(Variable $a, Variable $b): bool
