@@ -337,12 +337,14 @@ final class WeakRefRegistryRuntime
             $doneBb,
             $refsInit
         );
+        $context->builder->clearInsertionPosition();
 
         self::emitClearRefLoop($context, $fn, $target, $refsInit, $mapsInit);
         self::emitClearMapLoop($context, $fn, $target, $mapsInit, $doneBb);
 
         $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
         $context->registerFunction($abiName, $fn);
     }
 
@@ -412,6 +414,7 @@ final class WeakRefRegistryRuntime
 
         $loopCond = $fn->appendBasicBlock('wr_clear_refs_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_refs_body');
+        $clearBb = $fn->appendBasicBlock('wr_clear_refs_do');
         $loopInc = $fn->appendBasicBlock('wr_clear_refs_inc');
 
         $context->builder->positionAtEnd($loopInit);
@@ -436,7 +439,6 @@ final class WeakRefRegistryRuntime
         $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
         $slotNonNull = $context->builder->icmp(Builder::INT_NE, $storedSlot, $i64->constInt(0, false));
         $doClear = $context->builder->and($targetMatch, $slotNonNull);
-        $clearBb = $fn->appendBasicBlock('wr_clear_refs_do');
         $context->builder->branchIf($doClear, $clearBb, $loopInc);
 
         $context->builder->positionAtEnd($clearBb);
@@ -454,6 +456,7 @@ final class WeakRefRegistryRuntime
             $idx
         );
         $context->builder->branch($loopCond);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function emitClearMapLoop(
@@ -475,6 +478,7 @@ final class WeakRefRegistryRuntime
 
         $loopCond = $fn->appendBasicBlock('wr_clear_maps_cond');
         $loopBody = $fn->appendBasicBlock('wr_clear_maps_body');
+        $clearBb = $fn->appendBasicBlock('wr_clear_maps_do');
         $loopInc = $fn->appendBasicBlock('wr_clear_maps_inc');
 
         $context->builder->positionAtEnd($loopInit);
@@ -500,7 +504,6 @@ final class WeakRefRegistryRuntime
         $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
         $htNonNull = $context->builder->icmp(Builder::INT_NE, $storedHt, $i64->constInt(0, false));
         $doClear = $context->builder->and($targetMatch, $htNonNull);
-        $clearBb = $fn->appendBasicBlock('wr_clear_maps_do');
         $context->builder->branchIf($doClear, $clearBb, $loopInc);
 
         $context->builder->positionAtEnd($clearBb);
@@ -521,6 +524,7 @@ final class WeakRefRegistryRuntime
             $idx
         );
         $context->builder->branch($loopCond);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function cstrToString(Context $context, Value $keyCstr): Value

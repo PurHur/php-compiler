@@ -37,6 +37,12 @@ final class WeakRefRegistryRuntimeStandaloneTest extends TestCase
             $this->assertNotNull($fn);
             $this->assertGreaterThan(0, $fn->countBasicBlocks());
         }
+
+        $verifyMessage = '';
+        $ctx->module->verify($ctx->module::VERIFY_ACTION_RETURN, $verifyMessage);
+        $this->assertStringNotContainsString('wr_clear_bridge_entry', $verifyMessage);
+        $this->assertStringNotContainsString('wr_clear_refs_inc', $verifyMessage);
+        $this->assertStringNotContainsString('weakrefregistryjithelper__reftargetptr(i32', \strtolower($verifyMessage));
     }
 
     public function testPhpcWeakrefCDeletedAndGcNotifyInPhpRuntime(): void

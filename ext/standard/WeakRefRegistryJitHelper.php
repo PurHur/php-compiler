@@ -111,7 +111,10 @@ final class WeakRefRegistryJitHelper
         if ($len < 3) {
             return 0;
         }
-        if ('o' !== $key[0] || ':' !== $key[1]) {
+        if ('o' !== $key[0]) {
+            return 0;
+        }
+        if (':' !== $key[1]) {
             return 0;
         }
         $suffix = \substr($key, 2);
