@@ -12,9 +12,15 @@ use PHPCompiler\VM;
  * curl extension module entry (php-src ext/curl/interface.c; issue #6999).
  *
  * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
+ * Register under {@see standard} so extension_loaded('curl') stays false until #3325 (#11627).
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
