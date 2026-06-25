@@ -20,6 +20,7 @@ final class StringableSupport
     {
         $entry = new ClassEntry(self::INTERFACE_NAME);
         $entry->isInterface = true;
+        BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['__toString']);
         $ctx->classes[self::INTERFACE_LC] = $entry;
     }
 
