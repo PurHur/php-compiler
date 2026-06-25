@@ -640,7 +640,7 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties: uninitialized backing is false without get hook; initialized invokes get (#11262).
+     * Hooked properties: same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
@@ -935,7 +935,7 @@ class VM {
     }
 
     /**
-     * isset($obj->hooked) — uninitialized backing is false without get hook; initialized invokes get (#11262, #10392).
+     * isset($obj->hooked) — same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467).
      *
      * @return bool|null null when the property is not hook-backed
      */
@@ -949,6 +949,9 @@ class VM {
         }
         if ($this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)) {
             return false;
+        }
+        if ($this->hookedPropertyHasRealSameNameBacking($object, $propName)) {
+            return $this->issetHookedPropertyWithoutGetHook($object, $propName);
         }
         if (null === $frame) {
             return $this->issetHookedPropertyWithoutGetHook($object, $propName);
@@ -1143,6 +1146,26 @@ class VM {
     }
 
     /**
+     * Hooked property with detached backing sharing the hook name — isset/empty probe storage only (#10392, #11467).
+     */
+    private function hookedPropertyHasRealSameNameBacking(ObjectEntry $object, string $propName): bool
+    {
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+        if (!is_array($propMeta) || !empty($propMeta['virtual'])) {
+            return false;
+        }
+        $backingName = $propMeta['setBacking'] ?? $propMeta['getBacking'] ?? null;
+        if (null === $backingName) {
+            return false;
+        }
+
+        return strcasecmp($backingName, $propName) === 0;
+    }
+
+    /**
      * isset/empty on hooked properties with real backing storage — skip get hook when typed slot is uninitialized (#11262).
      */
     private function hookedPropertyIssetProbesUninitializedBackingOnly(ObjectEntry $object, string $propName): bool
@@ -1300,6 +1323,15 @@ class VM {
         }
         if ($this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)) {
             $dst->bool(true);
+
+            return true;
+        }
+        if ($this->hookedPropertyHasRealSameNameBacking($object, $propName)) {
+            $backing = $this->hookedPropertyBackingValue($object, $propName);
+            if (false === $backing) {
+                return false;
+            }
+            $dst->bool(!ext\standard\boolval::isTruthy($backing));
 
             return true;
         }
@@ -12683,6 +12715,9 @@ restart:
             if (isset($trait->propDeprecated[$propLc])) {
                 $entry->propDeprecated[$propLc] = $trait->propDeprecated[$propLc];
             }
+            if (isset($trait->propertySourceLocations[$propLc])) {
+                $entry->propertySourceLocations[$propLc] = $trait->propertySourceLocations[$propLc];
+            }
         }
     }
 
@@ -13279,6 +13314,9 @@ restart:
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$propLc] = $op->deprecatedMetadata;
                     }
+                    if (null !== $op->sourceLocation) {
+                        $entry->propertySourceLocations[$propLc] = $op->sourceLocation;
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_STATIC_PROPERTY:
                     $this->flushPendingTraitUses($entry, $pendingTraits, $ownMethods);
@@ -13301,6 +13339,9 @@ restart:
                     $entry->staticPropertyDeclaringClassLc[$name] = strtolower($entry->name);
                     if (null !== $op->deprecatedMetadata) {
                         $entry->propDeprecated[$name] = $op->deprecatedMetadata;
+                    }
+                    if (null !== $op->sourceLocation) {
+                        $entry->propertySourceLocations[$name] = $op->sourceLocation;
                     }
                     break;
                 case OpCode::TYPE_DECLARE_METHOD:
@@ -13911,6 +13952,25 @@ restart:
         $object->constructed = true;
 
         return $object;
+    }
+
+    /** Evaluate declared default for ReflectionProperty::getDefaultValue() (#11239). */
+    public function evaluatePropertyDefaultForReflection(VM\ClassProperty $property): ?Variable
+    {
+        if (null !== $property->default && !$property->hasRuntimeDefaultInit()) {
+            $copy = new Variable();
+            $copy->copyFrom($property->default);
+
+            return $copy;
+        }
+        if ($property->hasRuntimeDefaultInit()) {
+            return $this->executePropertyDefaultInitBlock(
+                $property->defaultInitBlock,
+                $property->defaultInitResultSlot
+            );
+        }
+
+        return null;
     }
 
     private function executePropertyDefaultInitBlock(Block $initBlock, int $resultSlot): Variable

@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * VM password_hash()/password_verify()/crypt() via libcrypt(3) FFI (#4794, #6906).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\StringPasswordCryptoJit} — no host \\password_* delegation.
+ * Mirrors {@see \PHPCompiler\ext\standard\PasswordJitHelper} — no host \\password_* delegation.
  *
  * php-src: ext/standard/password.c, crypt.c
  */

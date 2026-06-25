@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\GetClassRuntime;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\VM\LazyGhostTraitSupport;
@@ -321,16 +322,11 @@ final class ReflectionBuiltinHelper
 
     private static function classNameFromId(Context $context, Value $classId): Value
     {
-        $names = self::objectBuiltin($context)->allClassNamesById();
-        $strPtr = $context->getTypeFromString('__string__*');
-        $result = $context->builder->load($context->constantStringFromString(''));
-        foreach ($names as $id => $name) {
-            $expected = $context->constantFromInteger($id, 'int64');
-            $isId = $context->builder->icmp(Builder::INT_EQ, $classId, $expected);
-            $candidate = $context->builder->load($context->constantStringFromString($name));
-            $result = $context->builder->select($isId, $candidate, $result);
-        }
+        GetClassRuntime::ensureLinked($context);
 
-        return $result;
+        return $context->builder->call(
+            $context->lookupFunction('__phpc_class_name_from_id'),
+            $classId
+        );
     }
 }

@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * json_encode() — native VmJson/VmJsonFormat (VM + JIT/AOT via __compiler_json_encode_value, #6852).
+ * json_encode() — native VmJson/VmJsonFormat (VM + JIT/AOT via JsonEncodeJitHelper, #9267).
  *
  * php-src ref: ext/json/json.c — encode flags (#3281).
  */

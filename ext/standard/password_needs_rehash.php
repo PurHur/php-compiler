@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** password_needs_rehash() — VM via VmPassword; JIT/AOT via StringPasswordCryptoJit (issue #3279, #6503, #6906). */
+/** password_needs_rehash() — VM via VmPassword; JIT/AOT via PasswordJitHelper PHP (issue #3279, #6503, #9908). */
 final class password_needs_rehash extends Internal
 {
     public function __construct()

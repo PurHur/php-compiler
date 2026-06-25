@@ -301,7 +301,7 @@ final class VmReflection
             foreach ($ctx->runtime->modules as $module) {
                 foreach ($module->getFunctions() as $func) {
                     if ($func === $registered) {
-                        return self::reflectionExtensionName($module->getExtensionName());
+                        return self::reflectionExtensionName($module->getExtensionName(), $lc);
                     }
                 }
             }
@@ -315,12 +315,16 @@ final class VmReflection
             }
         }
 
-        return self::reflectionExtensionName($extension);
+        return self::reflectionExtensionName($extension, $lc);
     }
 
-    /** php-src maps Zend core builtins to extension name Core (#6678). */
-    private static function reflectionExtensionName(string $moduleExtension): string
+    /** php-src maps Zend core builtins to extension name Core (#6678, #11461). */
+    private static function reflectionExtensionName(string $moduleExtension, ?string $functionName = null): string
     {
+        if (null !== $functionName && CoreExtensionFunctions::isCoreFunction($functionName)) {
+            return 'Core';
+        }
+
         return match ($moduleExtension) {
             'types' => 'Core',
             default => $moduleExtension,
@@ -1073,6 +1077,90 @@ final class VmReflection
         }
     }
 
+    public static function propertyHasDefaultValue(ClassProperty $prop): bool
+    {
+        return null !== $prop->default || $prop->hasRuntimeDefaultInit();
+    }
+
+    public static function staticPropertyHasDefaultValue(Variable $storage): bool
+    {
+        return !$storage->resolveIndirect()->isUndefined();
+    }
+
+    public static function propertyDefaultValueIsAvailable(ClassProperty $prop): bool
+    {
+        return null !== $prop->default && !$prop->hasRuntimeDefaultInit();
+    }
+
+    public static function copyPropertyDefaultValue(Variable $dest, ClassProperty $prop, Context $ctx): bool
+    {
+        $value = $ctx->runtime->vm()->evaluatePropertyDefaultForReflection($prop);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
+    public static function copyStaticPropertyDefaultValue(Variable $dest, Variable $storage): bool
+    {
+        if (!self::staticPropertyHasDefaultValue($storage)) {
+            return false;
+        }
+        $resolved = $storage->resolveIndirect();
+        $dest->copyFrom($resolved);
+
+        return true;
+    }
+
+    /**
+     * ReflectionClass::getDefaultProperties() — declared defaults along inheritance chain (#11441).
+     *
+     * php-src: ext/reflection/php_reflection.c — reflection_class_get_default_properties()
+     */
+    public static function getDefaultPropertiesArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $chain = [];
+        $current = $entry;
+        while (true) {
+            $chain[] = $current;
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+        foreach ($chain as $classEntry) {
+            foreach ($classEntry->properties as $prop) {
+                if (!self::propertyHasDefaultValue($prop)) {
+                    continue;
+                }
+                $copy = new Variable();
+                self::copyClassVarDefault($copy, $prop);
+                $ht->add($prop->name, $copy);
+            }
+            foreach ($classEntry->staticProperties as $propLc => $storage) {
+                if (!self::staticPropertyHasDefaultValue($storage)) {
+                    continue;
+                }
+                $displayName = $storage->objectPropertyName ?? $propLc;
+                $copy = new Variable();
+                $resolved = $storage->resolveIndirect();
+                if ($resolved->isUndefined()) {
+                    $copy->null();
+                } else {
+                    $copy->copyFrom($resolved);
+                }
+                $ht->add($displayName, $copy);
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * Public static properties declared on $entry (php-src add_class_vars, #7397).
      *
@@ -1556,6 +1644,15 @@ final class VmReflection
     public const REFLECTION_IS_PROTECTED = 512;
 
     public const REFLECTION_IS_PRIVATE = 1024;
+
+    /** Register ReflectionAttribute::IS_INSTANCEOF (#11471, ext/reflection/php_reflection.c). */
+    public static function registerReflectionAttributeClassConstants(ClassEntry $entry): void
+    {
+        $const = new Variable();
+        $const->int(ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF);
+        $entry->constants['is_instanceof'] = $const;
+        $entry->constNames['is_instanceof'] = 'IS_INSTANCEOF';
+    }
 
     /** Register ReflectionProperty::IS_* class constants (#5060). */
     public static function registerReflectionPropertyClassConstants(ClassEntry $entry): void
@@ -2105,11 +2202,11 @@ final class VmReflection
         if (null === $entry) {
             return false;
         }
-        if ([] !== ReflectionSupport::filterEntriesByName($entry->attributeEntries, $attributeName)) {
+        if ([] !== ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $attributeName)) {
             return true;
         }
 
-        return [] !== ReflectionSupport::filterByName($entry->attributeNames, $attributeName);
+        return [] !== ReflectionSupport::filterByName($ctx, $entry->attributeNames, $attributeName);
     }
 
     /**

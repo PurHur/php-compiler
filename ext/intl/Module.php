@@ -10,9 +10,17 @@ use PHPCompiler\VM;
 
 /**
  * intl extension module entry (php-src ext/intl/php_intl.c; issue #5774).
+ *
+ * Grapheme builtins are partial PHP implementations without ICU. Register under
+ * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);

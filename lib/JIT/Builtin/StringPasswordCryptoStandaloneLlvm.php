@@ -12,11 +12,12 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM password_hash/verify/crypt/get_info helpers (mirrors lib/AOT/runtime/password_crypto.c, #6906).
+ * LLVM password_hash/verify/crypt/get_info helpers for AOT standalone only (#6906, #9908).
  *
- * php-src: ext/standard/password.c — libcrypt(3) for bcrypt only (thin ABI).
+ * JIT embed uses {@see PasswordJitHelper} PHP; this TU quarantines libcrypt LLVM until
+ * nested standalone can compile VmPassword helpers. php-src: ext/standard/password.c
  */
-final class StringPasswordCryptoJit
+final class StringPasswordCryptoStandaloneLlvm
 {
     private const BCRYPT_ITOA64 = './ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 

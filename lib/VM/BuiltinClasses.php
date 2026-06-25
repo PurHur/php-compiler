@@ -69,6 +69,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstants;
+use PHPCompiler\VM\Builtin\ReflectionClassGetDefaultProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
@@ -190,7 +191,11 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDeclaringClass;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetDefaultValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
+use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetMangledName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetName;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasHook;
@@ -411,6 +416,7 @@ final class BuiltinClasses
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $attr = new ClassEntry('ReflectionAttribute');
+        \PHPCompiler\ext\standard\VmReflection::registerReflectionAttributeClassConstants($attr);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_NAME, null, $strProto);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_ARGS, null, $arrayProto);
         $attr->properties[] = new ClassProperty(ReflectionSupport::PROP_ATTR_IS_REPEATED, null, $boolProto);
@@ -548,6 +554,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getreflectionconstants'] = $pub;
         $rc->methods['getconstants'] = new ReflectionClassGetConstants();
         $rc->methodVisibility['getconstants'] = $pub;
+        $rc->methods['getdefaultproperties'] = new ReflectionClassGetDefaultProperties();
+        $rc->methodVisibility['getdefaultproperties'] = $pub;
         $rc->methods['gettraitaliases'] = new ReflectionClassGetTraitAliases();
         $rc->methodVisibility['gettraitaliases'] = $pub;
         $rc->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
@@ -623,6 +631,10 @@ final class BuiltinClasses
         $rp->methodVisibility['getname'] = $pub;
         $rp->methods['getdeclaringclass'] = new ReflectionPropertyGetDeclaringClass();
         $rp->methodVisibility['getdeclaringclass'] = $pub;
+        $rp->methods['getdefaultvalue'] = new ReflectionPropertyGetDefaultValue();
+        $rp->methodVisibility['getdefaultvalue'] = $pub;
+        $rp->methods['getdoccomment'] = new ReflectionPropertyGetDocComment();
+        $rp->methodVisibility['getdoccomment'] = $pub;
         $rp->methods['getvalue'] = new ReflectionPropertyGetValue();
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['setvalue'] = new ReflectionPropertySetValue();
@@ -661,6 +673,8 @@ final class BuiltinClasses
                 'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
+                'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
+                'isdefaultvalueavailable' => new ReflectionPropertyIsDefaultValueAvailable(),
             ] as $name => $method
         ) {
             $rp->methods[$name] = $method;

@@ -3585,6 +3585,9 @@ class Compiler {
     protected function compileClassMethodDeclaration(Op\Stmt\ClassMethod $child, Block $result): void
     {
         $this->registerMethodDeclaration($child->func->name);
+        foreach ($child->func->params as $param) {
+            $this->assertParamDeclaredType($param->declaredType);
+        }
         if ('__construct' === $child->func->name) {
             foreach ($child->func->params as $param) {
                 if ($this->isPromotedParam($param)) {
@@ -4255,15 +4258,18 @@ class Compiler {
         return null;
     }
 
+    protected function assertParamDeclaredType(?Op\Type $declared): void
+    {
+        $this->assertFunctionSignatureNeverType($declared);
+        if ($this->cfgTypeIsStandaloneNever($declared)) {
+            $this->throwCompileError('never cannot be used as a parameter type');
+        }
+    }
+
     protected function applyParamDeclaredType(Op\Expr\Param $param, Block $block, int $slot, bool $variadicElement = false): void
     {
         $declared = $param->declaredType;
-        $this->assertFunctionSignatureNeverType($declared);
-        if ($this->cfgTypeIsStandaloneNever($declared)) {
-            $block->paramNeverSlots[$slot] = true;
-
-            return;
-        }
+        $this->assertParamDeclaredType($declared);
         if (null !== $declared) {
             $block->paramDeclaredTypes[$slot] = $declared;
         }
@@ -4519,6 +4525,7 @@ class Compiler {
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
                     $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
+                    $this->assignSourceMetadata($declare, $child);
                     $result->addOpCode($declare);
                     break;
                 case Op\Stmt\ClassMethod::class:
