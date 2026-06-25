@@ -566,10 +566,11 @@ final class JitValueBox
             $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
             $context->builder->structGep($ptr, $map['type'])
         );
-        $boolTy = $context->getStringFromType($bool->typeOf());
-        $boolByte = ('int1' === $boolTy || 'bool' === $boolTy)
-            ? $context->builder->zExt($bool, $i8)
-            : $context->builder->truncOrBitCast($bool, $i8);
+        $i1 = $context->getTypeFromString('int1');
+        $boolByte = $context->builder->zExt(
+            $context->builder->truncOrBitCast($bool, $i1),
+            $i8
+        );
         $valueField = $context->builder->structGep($ptr, $map['value']);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

@@ -259,7 +259,7 @@ final class AttributeRegistryLookupRuntime
         $isNull = $context->builder->icmp(Builder::INT_EQ, $strPtr, $nullStr);
         $empty = $context->builder->pointerCast($context->constantFromString(''), $i8p);
         $map = $context->structFieldMap['__string__'];
-        $chars = $context->builder->load($context->builder->structGep($strPtr, $map['value']));
+        $chars = $context->builder->structGep($strPtr, $map['value']);
         $cstr = $context->builder->pointerCast($chars, $i8p);
 
         return $context->builder->select($isNull, $empty, $cstr);

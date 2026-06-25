@@ -202,7 +202,8 @@ final class json_decode extends Internal
             return null;
         }
         $lib = $context->llvm->lib;
-        if (JITVariable::TYPE_NATIVE_BOOL === $var->type && $var->value->isAConstantInt()) {
+        if (JITVariable::TYPE_NATIVE_BOOL === $var->type
+            && null !== $lib->LLVMIsAConstantInt($var->value->value)) {
             return 0 !== (int) $lib->LLVMConstIntGetZExtValue($var->value->value);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $var->type
