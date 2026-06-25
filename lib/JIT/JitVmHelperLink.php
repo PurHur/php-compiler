@@ -100,8 +100,12 @@ final class JitVmHelperLink
             $args[] = JitNestedHelperCoerce::coerceArgForHelper($context, $abiParam, $helperTy);
         }
         $result = $context->builder->call($helperFn, ...$args);
-        $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
-        $context->builder->returnValue($ret);
+        if ('void' === $context->getStringFromType($returnType)) {
+            $context->builder->returnVoid();
+        } else {
+            $ret = JitNestedHelperCoerce::coerceBridgeResult($context, $result, $returnType);
+            $context->builder->returnValue($ret);
+        }
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
