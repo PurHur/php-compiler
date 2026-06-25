@@ -301,7 +301,7 @@ final class VmReflection
             foreach ($ctx->runtime->modules as $module) {
                 foreach ($module->getFunctions() as $func) {
                     if ($func === $registered) {
-                        return self::reflectionExtensionName($module->getExtensionName());
+                        return self::reflectionExtensionName($module->getExtensionName(), $lc);
                     }
                 }
             }
@@ -315,12 +315,16 @@ final class VmReflection
             }
         }
 
-        return self::reflectionExtensionName($extension);
+        return self::reflectionExtensionName($extension, $lc);
     }
 
-    /** php-src maps Zend core builtins to extension name Core (#6678). */
-    private static function reflectionExtensionName(string $moduleExtension): string
+    /** php-src maps Zend core builtins to extension name Core (#6678, #11461). */
+    private static function reflectionExtensionName(string $moduleExtension, ?string $functionName = null): string
     {
+        if (null !== $functionName && CoreExtensionFunctions::isCoreFunction($functionName)) {
+            return 'Core';
+        }
+
         return match ($moduleExtension) {
             'types' => 'Core',
             default => $moduleExtension,

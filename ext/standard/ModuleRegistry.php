@@ -65,6 +65,7 @@ final class ModuleRegistry
 
     public static function registerModule(Module $module): void
     {
+        self::register('core');
         $moduleVersion = $module->getExtensionVersion();
         $additionalVersions = $module->getAdditionalExtensionVersions();
         self::register($module->getExtensionName(), $moduleVersion);
@@ -83,6 +84,9 @@ final class ModuleRegistry
             $fnName = strtolower($func->getName());
             $logical = self::logicalExtensionForFunction($fnName, $primary, $additional);
             self::registerModuleFunction($logical, $fnName);
+            if (CoreExtensionFunctions::isCoreFunction($fnName)) {
+                self::registerModuleFunction('core', $fnName);
+            }
         }
     }
 
