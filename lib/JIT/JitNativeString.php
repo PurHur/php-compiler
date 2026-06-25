@@ -80,7 +80,7 @@ final class JitNativeString
                     $context,
                     Variable::TYPE_STRING,
                     Variable::KIND_VALUE,
-                    self::format($context, $value, '%lld')
+                    JitResourceIdString::formatNativeLong($context, $value)
                 );
             case Variable::TYPE_NATIVE_DOUBLE:
                 return new Variable(

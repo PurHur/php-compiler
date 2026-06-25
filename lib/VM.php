@@ -329,6 +329,9 @@ class VM {
             return $var->toString($this, $frame);
         }
         $object = $var->toObject();
+        if (VM\ResourceSupport::isResourceObject($object)) {
+            return $var->toString($this, $frame);
+        }
         if (EnumCaseSupport::isEnumCase($object)) {
             throw new \Error("Object of class {$object->class->name} could not be converted to string");
         }
@@ -1451,6 +1454,12 @@ class VM {
     /** (string) cast on objects — invoke __toString (Zend zend_operators.c, issue #3421). */
     public function castObjectToString(ObjectEntry $object): string
     {
+        if (VM\ResourceSupport::isResourceObject($object)) {
+            $var = new Variable();
+            $var->object($object);
+
+            return $var->toString($this);
+        }
         if (EnumCaseSupport::isEnumCase($object)) {
             throw new \Error(
                 'Object of class '.$object->class->name.' could not be converted to string'
@@ -1492,6 +1501,9 @@ class VM {
             return $var->toString($this, $frame);
         }
         $object = $var->toObject();
+        if (VM\ResourceSupport::isResourceObject($object)) {
+            return $var->toString($this, $frame);
+        }
         if (EnumCaseSupport::isEnumCase($object)) {
             throw new \Error(VM\ValueEchoSupport::objectToStringErrorMessage($object->class->name));
         }

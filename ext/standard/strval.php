@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitResourceIdString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
@@ -65,7 +66,10 @@ final class strval extends Internal
             case JITVariable::TYPE_NATIVE_BOOL:
                 return $this->boolToString($context, $context->helper->loadValue($args[0]));
             case JITVariable::TYPE_NATIVE_LONG:
-                return $this->formatToString($context, $context->helper->loadValue($args[0]), '%lld');
+                return JitResourceIdString::formatNativeLong(
+                    $context,
+                    $context->helper->loadValue($args[0])
+                );
             case JITVariable::TYPE_NATIVE_DOUBLE:
                 return $this->formatToString($context, $context->helper->loadValue($args[0]), '%.14g');
             case JITVariable::TYPE_VALUE:
@@ -116,10 +120,9 @@ final class strval extends Internal
         );
 
         $context->builder->positionAtEnd($longBlock);
-        $longStr = $this->formatToString(
+        $longStr = JitResourceIdString::formatNativeLong(
             $context,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
-            '%lld'
+            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
         );
         $longEndBlock = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
