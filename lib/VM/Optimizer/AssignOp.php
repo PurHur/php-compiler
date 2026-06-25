@@ -47,10 +47,11 @@ class AssignOp extends Optimizer
                 $binaryOpResult = $block->getOperand($prior->arg1);
                 if (count($binaryOpResult->usages) === 1) {
                     // We can safely replace it with an assign op
+                    $binaryDest = $prior->arg1;
                     $prior->arg1 = $op->arg2;
                     $assignResult = $block->getOperand($op->arg1);
-                    if (empty($assignResult->usages)) {
-                        // remove assign as it's dead
+                    if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
+                        // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
                         $toRemove[] = $key;
                     } else {
                         // We still need the assign, since we're using the result

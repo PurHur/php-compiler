@@ -8135,7 +8135,7 @@ class Compiler {
         if ($exprOp instanceof Op\Expr\BinaryOp\Coalesce) {
             $afterCoalesce = $this->compileCoalesce($exprOp, $targetBlock);
 
-            return [$this->compileOperand($rhs, $afterCoalesce, true), $afterCoalesce];
+            return [$this->compileCoalesceRhsResultSlot($exprOp, $afterCoalesce), $afterCoalesce];
         }
         if (null !== $exprOp) {
             if ($exprOp instanceof Op\Expr\Throw_) {
@@ -8146,32 +8146,45 @@ class Compiler {
                 return [null, $targetBlock];
             }
             $afterExpr = $this->compileDeferredCoalesceBranchExpr($exprOp, $targetBlock);
-            if ($afterExpr !== $targetBlock) {
-                return [$this->compileOperand($rhs, $afterExpr, true), $afterExpr];
-            }
+
+            return [$afterExpr[1], $afterExpr[0]];
         }
 
         return [$this->compileOperand($rhs, $targetBlock, true), $targetBlock];
     }
 
     /**
+     * Stmt-deferred ?? RHS ops are lowered with compileOperand(..., isRead: false); read the same slot (#11801).
+     */
+    private function compileCoalesceRhsResultSlot(Op\Expr $exprOp, Block $block): ?int
+    {
+        return $this->compileOperand($exprOp->result, $block, false);
+    }
+
+    /**
      * Lower stmt-deferred expr ops on a ?? branch (#3462, #5263).
      *
-     * @return Block block where the expr result slot is valid (may differ after ?-> lowering)
+     * @return array{0: Block, 1: ?int} block and result slot for the deferred expr
      */
-    private function compileDeferredCoalesceBranchExpr(Op\Expr $exprOp, Block $targetBlock): Block
+    private function compileDeferredCoalesceBranchExpr(Op\Expr $exprOp, Block $targetBlock): array
     {
         if ($exprOp instanceof Op\Expr\NullsafePropertyFetch) {
-            return $this->compileNullsafePropertyFetch($exprOp, $targetBlock);
+            $after = $this->compileNullsafePropertyFetch($exprOp, $targetBlock);
+
+            return [$after, $this->compileCoalesceRhsResultSlot($exprOp, $after)];
         }
         if ($exprOp instanceof Op\Expr\NullsafeMethodCall) {
-            return $this->compileNullsafeMethodCall($exprOp, $targetBlock);
+            $after = $this->compileNullsafeMethodCall($exprOp, $targetBlock);
+
+            return [$after, $this->compileCoalesceRhsResultSlot($exprOp, $after)];
         }
+        // Pre-bind the producer slot so compileExpr cannot collide with the outer ?? result (#11801).
+        $resultSlot = $this->compileCoalesceRhsResultSlot($exprOp, $targetBlock);
         foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
             $targetBlock->addOpCode($op);
         }
 
-        return $targetBlock;
+        return [$targetBlock, $resultSlot];
     }
 
     /**
@@ -8508,7 +8521,7 @@ class Compiler {
         ) {
             $this->compileStaticPropertyFetchWrite($staticPropFetch, $rightEmitBlock);
         }
-        if (null !== $rightSlot) {
+        if (null !== $rightSlot && $rightSlot !== $resultSlot) {
             $rightEmitBlock->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
                 $resultSlot,
@@ -10795,13 +10808,15 @@ class Compiler {
         if ($callArg instanceof Operand\Literal || $this->isEmbeddedCallLiteralArg($callArg)) {
             return true;
         }
+        // php-cfg clones stmt-level ?? call-arg temps from inner ConstFetch/null operands (#11801).
+        $cfgClone = $callArg instanceof Operand\Temporary;
         $vm = $this->vmVariableFromCfgLiteralOperand($callArg);
         if (null !== $vm && \in_array($vm->type, [
             Variable::TYPE_BOOLEAN,
             Variable::TYPE_INTEGER,
             Variable::TYPE_NULL,
         ], true)) {
-            return true;
+            return !$cfgClone;
         }
         $root = $this->unwrapOperandChain($callArg);
         if ($root instanceof Op\Expr\ConstFetch) {
@@ -10809,9 +10824,9 @@ class Compiler {
             if (null !== $name) {
                 $lookup = strtolower($name);
                 if (\in_array($lookup, ['true', 'false', 'null'], true)) {
-                    return true;
+                    return !$cfgClone;
                 }
-                if (isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
+                if (!$cfgClone && isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lookup])) {
                     return true;
                 }
             }
@@ -12522,6 +12537,24 @@ class Compiler {
                     && !$this->callArgsAreDistinctInlineTemporaries($callArgs)
                 ) {
                     return null;
+                }
+            }
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                null !== $callArg
+                && !$this->isEmbeddedCallLiteralArg($callArg)
+            ) {
+                foreach ($producers as $producer) {
+                    if (!$producer instanceof Op\Expr\BinaryOp\Coalesce) {
+                        continue;
+                    }
+                    if (
+                        $callArg instanceof Operand\Temporary
+                        || $producer->result === $callArg
+                        || $this->operandsReferToSameVariable($producer->result, $callArg)
+                    ) {
+                        return $producer;
+                    }
                 }
             }
 
@@ -16843,6 +16876,9 @@ class Compiler {
         ?Op $cfgCallOp = null
     ): ?int
     {
+        if (null !== $this->findCoalesceStmtForCallArg($arg, $block)) {
+            return null;
+        }
         if (null !== $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp)) {
             return null;
         }
@@ -17172,13 +17208,16 @@ class Compiler {
                 }
                 if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
-                } elseif (null === $valueSlot) {
+                } else                if (null === $valueSlot) {
                     $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
                         $arg,
                         $block,
                         $cfgCallOp,
                         (int) $argIndex
                     );
+                }
+                if (null === $valueSlot && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->compileCallArgCoalesceSlot($arg, $block, $cfgCallOp, (int) $argIndex);
                 }
                 if (
                     null === $valueSlot
