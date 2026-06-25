@@ -32,6 +32,38 @@ final class DnfParenIntersectionTypeTest extends TestCase
         $this->assertSame($source, $rewritten);
     }
 
+    /** Issue #11745: union RHS intersection arms must keep parens — php-parser rejects unwrapped `A|B&C`. */
+    public function testRewriterKeepsParenthesizedIntersectionAfterUnion(): void
+    {
+        $source = '<?php function f(A|(B&C) $o): void {}';
+        $rewritten = DnfParenTypeRewriter::rewrite($source);
+        $this->assertSame($source, $rewritten);
+    }
+
+    public function testUnionRhsIntersectionParamCompileAndRun(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+interface PhpcDnfA {}
+interface PhpcDnfB {}
+interface PhpcDnfC {}
+class PhpcDnfBC implements PhpcDnfB, PhpcDnfC {}
+
+function phpc_dnf_probe(PhpcDnfA|(PhpcDnfB&PhpcDnfC) $arg): string {
+    return $arg::class;
+}
+
+var_export(phpc_dnf_probe(new PhpcDnfBC()));
+echo "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'dnf_union_rhs_intersection.php'));
+        $this->assertSame("'PhpcDnfBC'\n", ob_get_clean());
+    }
+
     /** Issue #9968: union-only parenthesized leaves are a Zend parse error — do not unwrap. */
     public function testRewriterDoesNotUnwrapParenthesizedUnionOnlyParamType(): void
     {

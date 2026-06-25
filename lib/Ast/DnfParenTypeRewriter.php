@@ -11,8 +11,9 @@ namespace PHPCompiler\Ast;
  * parenthesized intersection-only leaves unless followed by `|` or `&`.
  * Parenthesized union-only leaves such as `(A|B) $param` are a Zend parse error (#9968) —
  * do not unwrap them into `A|B`.
- * `(I1&I2)|null` and `(A|B)&C` must keep their parens — only unwrap bare intersection-only
- * leaves when the closing `)` is not part of a larger DNF type.
+ * `(I1&I2)|null`, `A|(B&C)`, and `(A|B)&C` must keep their parens — only unwrap bare
+ * intersection-only leaves when the closing `)` is not part of a larger DNF type.
+ * php-parser accepts `A|(B&C)` but not the unwrapped `A|B&C` (#11745).
  *
  * php-src: Zend/zend_compile.c — zend_compile_type / DNF normalization.
  */
@@ -68,6 +69,13 @@ final class DnfParenTypeRewriter
                 continue;
             }
 
+            // Union RHS intersection arms: `A|(B&C)` must keep parens — unwrapping breaks php-parser (#11745).
+            if (self::isPrecededByTypeUnionOperator($tokens, $i)) {
+                $out .= self::tokenText($tok);
+                ++$i;
+                continue;
+            }
+
             // catch (A|B) requires parens for php-parser; unwrap breaks non-capturing union (#9766).
             if (self::isCatchTypeParenContext($tokens, $i)) {
                 $out .= self::tokenText($tok);
@@ -82,6 +90,23 @@ final class DnfParenTypeRewriter
         }
 
         return $out;
+    }
+
+    /**
+     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function isPrecededByTypeUnionOperator(array $tokens, int $open): bool
+    {
+        for ($i = $open - 1; $i >= 0; --$i) {
+            $tok = $tokens[$i];
+            if (\is_array($tok) && self::isIgnorable($tok[0])) {
+                continue;
+            }
+
+            return '|' === self::tokenText($tok);
+        }
+
+        return false;
     }
 
     /**
