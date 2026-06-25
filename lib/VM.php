@@ -5484,6 +5484,7 @@ restart:
                     }
                     $ifaceEntry = new VM\ClassEntry($name);
                     $ifaceEntry->isInterface = true;
+                    \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($ifaceEntry);
                     $ifaceEntry->interfaces = $op->classImplements;
                     if ($op->isSealed) {
                         $ifaceEntry->sealed = true;
@@ -5506,6 +5507,7 @@ restart:
                     }
                     $traitEntry = new ClassEntry($name);
                     $traitEntry->isTrait = true;
+                    \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($traitEntry);
                     $traitEntry->attributeNames = $op->attributeNames;
                     $traitEntry->attributeEntries = $op->attributeEntries;
                     self::defineClass($traitEntry, $op->block1, $frame);
@@ -5545,6 +5547,7 @@ restart:
                     }
                     $classEntry = new ClassEntry($name);
                     $classEntry->isEnum = true;
+                    \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($classEntry);
                     if (null !== $op->arg2 && isset($frame->block->constants[$op->arg2])) {
                         $classEntry->backedType = $frame->block->constants[$op->arg2]->toString();
                     }
@@ -5569,6 +5572,7 @@ restart:
                         throw new \LogicException("Duplicate class definition for $name");
                     }
                     $classEntry = new ClassEntry($name);
+                    \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($classEntry);
                     $classEntry->interfaces = $op->classImplements;
                     $parentPending = false;
                     if (null !== $op->arg2) {

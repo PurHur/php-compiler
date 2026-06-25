@@ -157,7 +157,8 @@ final class VmReflection
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
-            if ($entry->isInterface || $entry->isTrait || isset($ctx->classAliases[$lc])) {
+            self::markCompilerBootstrapClassInternal($entry);
+            if ($entry->isInterface || $entry->isTrait || $entry->isInternal || isset($ctx->classAliases[$lc])) {
                 continue;
             }
             $value = new Variable();
@@ -166,6 +167,16 @@ final class VmReflection
         }
 
         return $result;
+    }
+
+    /**
+     * Compiler bootstrap types (PHPCompiler\\*) are CE_INTERNAL for user reflection (#11688).
+     */
+    public static function markCompilerBootstrapClassInternal(ClassEntry $entry): void
+    {
+        if (!$entry->isInternal && str_starts_with($entry->name, 'PHPCompiler\\')) {
+            $entry->isInternal = true;
+        }
     }
 
     /**

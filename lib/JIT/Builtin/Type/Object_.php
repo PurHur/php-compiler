@@ -2017,7 +2017,11 @@ class Object_ extends Type {
                     break;
                 }
             }
-            $names[] = $resolved ?? $classLc;
+            $display = $resolved ?? $classLc;
+            if (str_starts_with($display, 'PHPCompiler\\')) {
+                continue;
+            }
+            $names[] = $display;
         }
 
         return $names;
