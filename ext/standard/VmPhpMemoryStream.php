@@ -33,7 +33,10 @@ final class VmPhpMemoryStream
         }
 
         $id = VmFs::allocateStreamHandleId();
-        self::$streams[$id] = new PhpMemoryStreamState($uri, $flags);
+        $state = new PhpMemoryStreamState($uri, $flags);
+        // php-src php_stream_memory: buffer reads work after rewind even for write-only modes (#11636).
+        $state->canRead = true;
+        self::$streams[$id] = $state;
 
         return $id;
     }
