@@ -23,4 +23,4 @@ unset($h->x);
 echo 'RW isset=', var_export(isset($h->x), true), ' value=', $h->x, "\n";
 --EXPECT--
 RO: Error: Cannot unset hooked property RO::$x
-RW isset=NULL value=u
+RW isset=false value=u

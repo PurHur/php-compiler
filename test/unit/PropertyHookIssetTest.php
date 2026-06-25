@@ -92,4 +92,24 @@ PHP;
         $rt->run($block);
         self::assertSame("get runs for isset\nbool(true)\n", ob_get_clean());
     }
+
+    public function testVmIssetOnSeparateBackingAfterUnsetReturnsFalseWithoutGetHook(): void
+    {
+        $code = <<<'PHP'
+<?php
+class RW {
+    private ?string $v = 'a';
+    public string $x { get => $this->v ?? 'u'; set => $this->v = $value; }
+}
+$h = new RW();
+unset($h->x);
+var_dump(isset($h->x));
+echo $h->x, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("bool(false)\nu\n", ob_get_clean());
+    }
 }
