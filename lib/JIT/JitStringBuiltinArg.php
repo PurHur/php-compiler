@@ -63,6 +63,159 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Lower Z_PARAM_STR operands with __toString coercion when caller is not strict (#11398, ext/standard/string.c).
+     */
+    public static function lowerCoercible(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        JitNativeString::ensureInsertBlock($context);
+        $arrayExpected = $arrayExpectedType ?? $expectedType;
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+                return self::unreachableStringPtr($context);
+            }
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        if (Variable::TYPE_HASHTABLE === $arg->type) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
+
+            return self::unreachableStringPtr($context);
+        }
+        if (0 !== ($arg->type & Variable::IS_NATIVE_ARRAY)) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpected);
+
+            return self::unreachableStringPtr($context);
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            if ($context->callerStrictTypes) {
+                self::emitRejectTypeError($context, $arg, $function, $argIndex, $paramName, $expectedType);
+
+                return self::unreachableStringPtr($context);
+            }
+            $native = JitNativeString::coerce($context, $arg);
+
+            return $context->helper->loadValue($native);
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            return self::lowerCoercibleBoxed(
+                $context,
+                $arg,
+                $function,
+                $argIndex,
+                $paramName,
+                $expectedType,
+                $arrayExpected
+            );
+        }
+
+        return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
+    }
+
+    private static function lowerCoercibleBoxed(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType,
+        string $arrayExpectedType
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
+        $arrayTy = $i8->constInt(Variable::TYPE_HASHTABLE & 0x7f, false);
+        $objectTy = $i8->constInt(Variable::TYPE_OBJECT & 0x7f, false);
+        $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
+
+        $okBlock = BasicBlockHelper::append($context, 'str_coercible_ok');
+        $arrayBlock = BasicBlockHelper::append($context, 'str_coercible_array');
+        $rejectBlock = BasicBlockHelper::append($context, 'str_coercible_reject');
+        $coerceBlock = BasicBlockHelper::append($context, 'str_coercible_coerce');
+
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeKind, $arrayTy);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeKind, $objectTy);
+        $isEnumCase = $context->builder->icmp(Builder::INT_EQ, $typeKind, $enumCaseTy);
+        $context->builder->branchIf($isArray, $arrayBlock, $okBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'array', $arrayExpectedType);
+
+        $context->builder->positionAtEnd($okBlock);
+        $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
+        $context->builder->branchIf($isObjOrEnum, $rejectBlock, $coerceBlock);
+
+        $enumRejectBlock = BasicBlockHelper::append($context, 'str_coercible_enum_reject');
+        $objectRejectBlock = BasicBlockHelper::append($context, 'str_coercible_object_reject');
+        $context->builder->positionAtEnd($rejectBlock);
+        $context->builder->branchIf($isEnumCase, $enumRejectBlock, $objectRejectBlock);
+        $context->builder->positionAtEnd($enumRejectBlock);
+        self::emitRuntimeBoxedEnumCaseReject(
+            $context,
+            $valuePtr,
+            $function,
+            $argIndex,
+            $paramName,
+            $expectedType
+        );
+        $context->builder->positionAtEnd($objectRejectBlock);
+        if ($context->callerStrictTypes) {
+            self::emitRuntimeBoxedObjectReject(
+                $context,
+                $valuePtr,
+                $function,
+                $argIndex,
+                $paramName,
+                $expectedType
+            );
+        } else {
+            $objVar = new Variable(
+                $context,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VALUE,
+                $valuePtr
+            );
+            $native = JitNativeString::coerce($context, $objVar);
+
+            return $context->helper->loadValue($native);
+        }
+
+        $context->builder->positionAtEnd($coerceBlock);
+        if ($context->callerStrictTypes) {
+            $isString = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeKind,
+                $i8->constInt(VmVariable::TYPE_STRING, false)
+            );
+            $strictOkBlock = BasicBlockHelper::append($context, 'str_coercible_strict_ok');
+            $strictErrBlock = BasicBlockHelper::append($context, 'str_coercible_strict_err');
+            $context->builder->branchIf($isString, $strictOkBlock, $strictErrBlock);
+            $context->builder->positionAtEnd($strictErrBlock);
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'mixed', $expectedType);
+            $context->builder->positionAtEnd($strictOkBlock);
+        }
+
+        return $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+    }
+
+    /**
      * Emit a Z_PARAM_STR TypeError for a runtime object operand (#10166, ext/standard/string.c).
      */
     public static function emitObjectTypeErrorReject(
