@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
-use PHPCompiler\JIT\BoundMethodCallableHelper;
+use PHPCompiler\VM\VmBoundMethodCallable;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\ClosureWithBinding;
 use PHPCompiler\JIT\Context;
@@ -34,19 +34,19 @@ final class VmFromCallable
             }
         }
 
-        $methodLc = BoundMethodCallableHelper::resolveMethodLcFromCalleeSlot($block, $callableSlot);
+        $methodLc = VmBoundMethodCallable::resolveMethodLcFromCalleeSlot($block, $callableSlot);
         if (null !== $methodLc) {
-            $receiverOp = BoundMethodCallableHelper::resolveBoundMethodReceiverOperand($block, $callableSlot);
+            $receiverOp = VmBoundMethodCallable::resolveBoundMethodReceiverOperand($block, $callableSlot);
             if (null !== $receiverOp) {
-                $classHint = BoundMethodCallableHelper::resolveBoundMethodReceiverClassName($block, $callableSlot);
+                $classHint = VmBoundMethodCallable::resolveBoundMethodReceiverClassName($block, $callableSlot);
 
                 return self::fromBoundMethodCallable($context, $block, $receiverOp, $methodLc, $classHint);
             }
         }
 
-        $receiverOp = BoundMethodCallableHelper::resolveInvokableObjectReceiverOperand($block, $callableSlot);
+        $receiverOp = VmBoundMethodCallable::resolveInvokableObjectReceiverOperand($block, $callableSlot);
         if (null !== $receiverOp) {
-            $classHint = BoundMethodCallableHelper::resolveInvokableObjectClassName($block, $callableSlot);
+            $classHint = VmBoundMethodCallable::resolveInvokableObjectClassName($block, $callableSlot);
 
             return self::fromBoundMethodCallable($context, $block, $receiverOp, '__invoke', $classHint);
         }
