@@ -33,7 +33,7 @@ final class JitVmHelperLink
         }
 
         $runtime = $context->runtime;
-        $path = \dirname(__DIR__).$relativeHelperPath;
+        $path = self::resolveHelperPath($relativeHelperPath);
         $basename = \basename($path);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $basename, $compileLabel): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), $basename);
@@ -108,6 +108,19 @@ final class JitVmHelperLink
         }
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
+    }
+
+    /**
+     * Resolve helper source path: ext/* and lib/* live at repo root; /VM/* under lib/.
+     */
+    private static function resolveHelperPath(string $relativeHelperPath): string
+    {
+        if (\str_starts_with($relativeHelperPath, '/ext/')
+            || \str_starts_with($relativeHelperPath, '/lib/')) {
+            return \dirname(__DIR__, 2).$relativeHelperPath;
+        }
+
+        return \dirname(__DIR__).$relativeHelperPath;
     }
 
     private static function bridgeEntryComplete(?LlvmFunction $probe): bool
