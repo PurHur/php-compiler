@@ -41,6 +41,11 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/BuiltinParamNames.php',
         'lib/VM/NamedArgs.php',
         'lib/VM/Builtin/VmClassMethod.php',
+        'ext/standard/StreamLibcHandleJitHelper.php',
+        'ext/standard/StreamLifecycleJitHelper.php',
+        'lib/JIT/Builtin/StreamLibcHandleRuntime.php',
+        'lib/JIT/Builtin/StreamLifecycleRuntime.php',
+        'lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php',
         'lib/VM/WeakRefSupport.php',
         'lib/VM/InterfaceCheck.php',
         'lib/VM/ClassReadonly.php',
@@ -434,12 +439,47 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(3096, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234)');
+        $this->assertSame(3122, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
                 $contents,
                 "missing {$unit}"
+            );
+        }
+    }
+
+    public function testCompilerLibSpineSmokeVmClassMethodBeforeExtenders(): void
+    {
+        $entry = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        $lines = file($entry, FILE_IGNORE_NEW_LINES) ?: [];
+        $vmClassMethodLine = null;
+        $firstExtenderLine = null;
+        foreach ($lines as $i => $line) {
+            if (!preg_match("#require_once __DIR__\\.'/\\.\\./\\.\\./\\.\\./([^']+)';#", $line, $m)) {
+                continue;
+            }
+            $rel = $m[1];
+            if ('lib/VM/Builtin/VmClassMethod.php' === $rel) {
+                $vmClassMethodLine = $i + 1;
+                break;
+            }
+            $abs = self::$root.'/'.$rel;
+            if (!is_file($abs)) {
+                continue;
+            }
+            $src = (string) file_get_contents($abs);
+            if (str_contains($src, 'extends VmClassMethod')) {
+                $firstExtenderLine = $i + 1;
+                break;
+            }
+        }
+        $this->assertNotNull($vmClassMethodLine, 'VmClassMethod.php must be in spine');
+        if (null !== $firstExtenderLine) {
+            $this->assertLessThan(
+                $firstExtenderLine,
+                $vmClassMethodLine,
+                'VmClassMethod must load before first extends VmClassMethod unit'
             );
         }
     }

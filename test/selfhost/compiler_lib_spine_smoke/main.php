@@ -14,6 +14,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 }
 
 require_once __DIR__.'/../../../bin/vm.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathFunction.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathJitHelper.php';
@@ -2943,7 +2944,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueConstruct.
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueDebugInfo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ThrowableGetMessage.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapCount.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetExists.php';
@@ -3131,6 +3131,11 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
+require_once __DIR__.'/../../../ext/standard/StreamLibcHandleJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/StreamLifecycleJitHelper.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLibcHandleRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
