@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3115 |
-| Phase A inventory files (M2 ratio SSOT) | 3115 |
+| PHP files on vm.php path | 3117 |
+| Phase A inventory files (M2 ratio SSOT) | 3117 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8366 |
+| Source constructs flagged (warnings) | 8370 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -55,6 +55,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/bcscale.php` | 0 | 1 |
 | `ext/bcmath/bcsqrt.php` | 0 | 1 |
 | `ext/bcmath/bcsub.php` | 0 | 1 |
+| `ext/bz2/Bz2JitHelper.php` | 0 | 1 |
 | `ext/bz2/JitBz2.php` | 0 | 1 |
 | `ext/bz2/Module.php` | 0 | 3 |
 | `ext/bz2/VmBz2Native.php` | 0 | 1 |
@@ -2064,6 +2065,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/BackedEnumFromRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/Bcmath.php` | 0 | 1 |
 | `lib/JIT/Builtin/BcmathJit.php` | 0 | 3 |
+| `lib/JIT/Builtin/Bz2Runtime.php` | 0 | 3 |
+| `lib/JIT/Builtin/Bz2StandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallArgv.php` | 0 | 1 |
 | `lib/JIT/Builtin/CallUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/CastArrayRuntime.php` | 0 | 1 |
@@ -2263,7 +2266,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringBz2Jit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringConvertUuJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 2 |
@@ -3247,6 +3249,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/bz2/Bz2JitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/bz2/JitBz2.php`
 
@@ -16629,6 +16636,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 11 class method(s)
 - 5 closure(s)
 
+### `lib/JIT/Builtin/Bz2Runtime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 168)
+- 6 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/Bz2StandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/JIT/Builtin/CallArgv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17796,12 +17815,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringBz2.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `lib/JIT/Builtin/StringBz2Jit.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringConvertUu.php`
 
