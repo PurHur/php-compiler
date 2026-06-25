@@ -259,14 +259,47 @@ final class ScopeBuiltinHelper
 
     private static function addCompactByName(Context $context, Value $result, string $name): void
     {
-        $source = self::findCompactVariableByName($context, $name);
-        if (null === $source) {
-            self::emitCompactUndefinedVariableWarning($context, $name);
+        $local = self::findVariableByName($context, $name);
+        if (null !== $local) {
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            self::storeVariableAtStringKey($context, $result, $keyStr, $local);
 
             return;
         }
+        if (Superglobals::isSuperglobalName($name)) {
+            $source = SuperglobalInit::load($context, $name);
+            $keyStr = $context->builder->load($context->constantStringFromString($name));
+            self::storeVariableAtStringKey($context, $result, $keyStr, $source);
+
+            return;
+        }
+        self::addCompactFromScriptGlobal($context, $result, $name);
+    }
+
+    /** $GLOBALS-only symbols — runtime isset before import (#11743, php-src zif_compact). */
+    private static function addCompactFromScriptGlobal(Context $context, Value $result, string $name): void
+    {
+        $global = GlobalsTableInit::ensureGlobal($context, $name);
+        $keyVar = new Variable($context, Variable::TYPE_STRING);
+        $keyVar->compileTimeString = $name;
+        $isSet = GlobalsTableInit::offsetIsSet($context, $keyVar);
+
+        $tag = 'cg'.(string) ++self::$blockSeq;
+        $okBlock = BasicBlockHelper::append($context, 'compact_global_ok_'.$tag);
+        $missBlock = BasicBlockHelper::append($context, 'compact_global_miss_'.$tag);
+        $doneBlock = BasicBlockHelper::append($context, 'compact_global_done_'.$tag);
+        $context->builder->branchIf($isSet, $okBlock, $missBlock);
+
+        $context->builder->positionAtEnd($okBlock);
         $keyStr = $context->builder->load($context->constantStringFromString($name));
-        self::storeVariableAtStringKey($context, $result, $keyStr, $source);
+        self::storeVariableAtStringKey($context, $result, $keyStr, $global);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missBlock);
+        self::emitCompactUndefinedVariableWarning($context, $name);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
     }
 
     private static function applyRuntimeCompactArgument(Context $context, Value $result, Variable $arg, int $argNum): void
