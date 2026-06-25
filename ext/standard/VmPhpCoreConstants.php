@@ -17,6 +17,12 @@ final class VmPhpCoreConstants
      *
      * @var list<string>
      */
+    /** Core path constants (main/main.c REGISTER_MAIN_STRINGL_CONSTANT). */
+    private const PATH_CONSTANT_NAMES = [
+        'DIRECTORY_SEPARATOR',
+        'PATH_SEPARATOR',
+    ];
+
     private const CORE_NAMES = [
         'PHP_VERSION',
         'PHP_MAJOR_VERSION',
@@ -69,6 +75,10 @@ final class VmPhpCoreConstants
 
     public static function fetch(string $name): ?Variable
     {
+        $path = self::pathConstantValue($name);
+        if (null !== $path) {
+            return self::fromPhpValue($path);
+        }
         $canonical = self::canonicalName($name);
         if (null === $canonical || !\defined($canonical)) {
             return null;
@@ -80,6 +90,10 @@ final class VmPhpCoreConstants
     /** Case-exact fetch for defined()/constant() (#10635, basic_functions.c). */
     public static function fetchExact(string $name): ?Variable
     {
+        $path = self::pathConstantValue($name);
+        if (null !== $path) {
+            return self::fromPhpValue($path);
+        }
         if (!\in_array($name, self::CORE_NAMES, true) || !\defined($name)) {
             return null;
         }
@@ -93,6 +107,12 @@ final class VmPhpCoreConstants
     public static function definedCoreEntries(): array
     {
         $entries = [];
+        foreach (self::PATH_CONSTANT_NAMES as $canonical) {
+            $var = self::fromPhpValue(self::pathConstantValue($canonical));
+            if (null !== $var) {
+                $entries[$canonical] = $var;
+            }
+        }
         foreach (self::CORE_NAMES as $canonical) {
             if (!\defined($canonical)) {
                 continue;
@@ -104,6 +124,40 @@ final class VmPhpCoreConstants
         }
 
         return $entries;
+    }
+
+    private static function pathConstantValue(string $name): ?string
+    {
+        $canonical = match (strtoupper($name)) {
+            'DIRECTORY_SEPARATOR' => 'DIRECTORY_SEPARATOR',
+            'PATH_SEPARATOR' => 'PATH_SEPARATOR',
+            default => null,
+        };
+        if (null === $canonical) {
+            return null;
+        }
+        if (\defined($canonical)) {
+            /** @var string $value */
+            $value = \constant($canonical);
+
+            return $value;
+        }
+
+        return 'DIRECTORY_SEPARATOR' === $canonical
+            ? (self::isWindowsPlatform() ? '\\' : '/')
+            : (self::isWindowsPlatform() ? ';' : ':');
+    }
+
+    private static function isWindowsPlatform(): bool
+    {
+        if (\defined('PHP_OS_FAMILY')) {
+            return 'Windows' === \PHP_OS_FAMILY;
+        }
+        if (\defined('PHP_OS')) {
+            return str_starts_with(\PHP_OS, 'WIN');
+        }
+
+        return false;
     }
 
     private static function canonicalName(string $name): ?string
