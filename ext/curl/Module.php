@@ -32,8 +32,6 @@ class Module extends ModuleAbstract
             'CURLOPT_RETURNTRANSFER' => CurlConstants::CURLOPT_RETURNTRANSFER,
             'CURLOPT_POST' => CurlConstants::CURLOPT_POST,
             'CURLOPT_HTTPHEADER' => CurlConstants::CURLOPT_HTTPHEADER,
-            'CURLINFO_HTTP_CODE' => CurlConstants::CURLINFO_HTTP_CODE,
-            'CURLINFO_EFFECTIVE_URL' => CurlConstants::CURLINFO_EFFECTIVE_URL,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
