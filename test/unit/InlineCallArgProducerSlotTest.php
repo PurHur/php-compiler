@@ -1419,6 +1419,44 @@ PHP;
         self::assertSame('true', $out);
     }
 
+    /** Issue #11400 — print_r(in_array(..., true), true) wires nested FuncCall + dual ConstFetch true slots. */
+    public function testPrintRNestedBuiltinDualTrueLiteralUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo print_r(in_array('x', ['x'], true), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'print_r_dual_true_literal_nested.php');
+
+        $inArrayReturnSlot = null;
+        $printRSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $printRSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inArrayReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $printRSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($inArrayReturnSlot);
+        self::assertCount(2, $printRSends);
+        self::assertSame($inArrayReturnSlot, $printRSends[0], 'arg sends='.json_encode($printRSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('1', $out);
+    }
+
     /** Issue #10673 — substr(sprintf(...), -N) wires nested FuncCall + UnaryMinus producer slots. */
     public function testSubstrNestedSprintfUsesFuncCallProducerSlot(): void
     {

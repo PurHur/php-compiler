@@ -14636,7 +14636,7 @@ class Compiler {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
             foreach ($producers as $producer) {
                 if ($producer->result === $result || $this->operandsReferToSameVariable($producer->result, $result)) {
-                    if ($this->inlineCallArgProducerPassesByRefGuards($producer, $child)) {
+                    if ($this->inlineCallArgProducerPassesByRefGuards($producer, $child, $block->orig->children)) {
                         return true;
                     }
                 }
@@ -14656,7 +14656,7 @@ class Compiler {
                 ) {
                     continue;
                 }
-                if ($this->inlineCallArgProducerPassesByRefGuards($matched, $child)) {
+                if ($this->inlineCallArgProducerPassesByRefGuards($matched, $child, $block->orig->children)) {
                     return true;
                 }
             }
@@ -14665,7 +14665,10 @@ class Compiler {
         return false;
     }
 
-    private function inlineCallArgProducerPassesByRefGuards(Op\Expr $producer, Op $consumer): bool
+    /**
+     * @param list<Op>|null $cfgChildren
+     */
+    private function inlineCallArgProducerPassesByRefGuards(Op\Expr $producer, Op $consumer, ?array $cfgChildren = null): bool
     {
         if (
             !($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
@@ -14685,6 +14688,27 @@ class Compiler {
             }
             if (!$this->namedCallArgMayUseFuncCallProducerResult($producer, $consumerArg)) {
                 return false;
+            }
+        }
+        if (!$feedsConsumerArg && null !== $cfgChildren) {
+            $producerIndex = array_search($producer, $cfgChildren, true);
+            $consumerIndex = array_search($consumer, $cfgChildren, true);
+            if (is_int($producerIndex) && is_int($consumerIndex)) {
+                $feedsConsumerArg = $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+                    || $this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)
+                    || $this->isSiblingMultiArgFuncCallProducer(
+                        $producer,
+                        $consumer,
+                        $producerIndex,
+                        $consumerIndex,
+                        $cfgChildren
+                    );
             }
         }
 
