@@ -2314,7 +2314,7 @@ final class VmString
      */
     public static function getHtmlTranslationTable(
         int $table = HTML_SPECIALCHARS,
-        int $flags = ENT_COMPAT,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
         string $encoding = 'UTF-8'
     ): \PHPCompiler\VM\HashTable {
         if ('UTF-8' !== $encoding) {
@@ -2326,7 +2326,7 @@ final class VmString
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
 
-        if (HTML_SPECIALCHARS === $table) {
+        if (!$table) {
             $entries = [
                 '&' => '&amp;',
                 '<' => '&lt;',

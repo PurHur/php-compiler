@@ -17,7 +17,7 @@ final class JitGetHtmlTranslationTable
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         $table = self::compileTimeInt($context, $args[0] ?? null, HTML_SPECIALCHARS, 'table');
-        $flags = self::compileTimeInt($context, $args[1] ?? null, ENT_COMPAT, 'flags');
+        $flags = self::compileTimeInt($context, $args[1] ?? null, ENT_QUOTES | ENT_SUBSTITUTE, 'flags');
         $encoding = 'UTF-8';
         if (isset($args[2])) {
             $literal = JitStringArg::compileTimeLiteral($args[2]);
