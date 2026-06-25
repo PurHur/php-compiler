@@ -9,7 +9,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
-/** Minimal ini_set() subset (issue #1374): error_reporting, display_errors, memory_limit, serialize_precision. */
+/** Minimal ini_set() subset (issue #1374): error_reporting, display_errors, memory_limit, precision, serialize_precision. */
 final class VmIni
 {
     /** php-src INI_ALL — user/perdir/system readable. */
@@ -33,6 +33,7 @@ final class VmIni
         'error_reporting',
         'display_errors',
         'memory_limit',
+        'precision',
         'serialize_precision',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
@@ -50,6 +51,9 @@ final class VmIni
     private const CFG_DISPLAY_ERRORS = '';
 
     private const CFG_MEMORY_LIMIT = '-1';
+
+    /** php-src PG(precision) default 14 (ext/standard/ini.c, issue #11841). */
+    private const CFG_PRECISION = '14';
 
     private const CFG_SERIALIZE_PRECISION = '-1';
 
@@ -74,6 +78,8 @@ final class VmIni
                 return self::setDisplayErrors($ctx, $newValue);
             case 'memory_limit':
                 return self::setMemoryLimit($newValue);
+            case 'precision':
+                return self::setPrecision($newValue);
             case 'serialize_precision':
                 return self::setSerializePrecision($newValue);
             case 'unserialize_callback_func':
@@ -112,6 +118,8 @@ final class VmIni
                 return self::displayErrorsIniString($ctx);
             case 'memory_limit':
                 return self::$memoryLimit;
+            case 'precision':
+                return (string) self::$precision;
             case 'serialize_precision':
                 return (string) self::$serializePrecision;
             case 'unserialize_callback_func':
@@ -139,6 +147,7 @@ final class VmIni
             'error_reporting' => self::defaultErrorReportingString(),
             'display_errors' => self::CFG_DISPLAY_ERRORS,
             'memory_limit' => self::CFG_MEMORY_LIMIT,
+            'precision' => self::CFG_PRECISION,
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
@@ -156,6 +165,12 @@ final class VmIni
         return VmIniIntrospection::loadedFile();
     }
 
+    /** php-src PG(precision) — float display/significant digits (ext/standard/ini.c, #11841). */
+    public static function getPrecision(): int
+    {
+        return self::$precision;
+    }
+
     /** php-src PG(serialize_precision) default -1 (zend_dtoa mode 0; issue #7100). */
     public static function getSerializePrecision(): string
     {
@@ -166,6 +181,8 @@ final class VmIni
     private static ?string $displayErrorsLocalValue = null;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
+
+    private static int $precision = 14;
 
     private static int $serializePrecision = -1;
 
@@ -211,6 +228,13 @@ final class VmIni
         return $old;
     }
 
+    private static function setPrecision(string $newValue) {
+        $old = (string) self::$precision;
+        self::$precision = self::parsePrecision($newValue);
+
+        return $old;
+    }
+
     private static function setSerializePrecision(string $newValue) {
         $old = (string) self::$serializePrecision;
         self::$serializePrecision = self::parseSerializePrecision($newValue);
@@ -246,6 +270,11 @@ final class VmIni
     public static function getUnserializeCallbackFunc(): string
     {
         return self::$unserializeCallbackFunc;
+    }
+
+    public static function parsePrecision(string $value): int
+    {
+        return (int) trim($value);
     }
 
     public static function parseSerializePrecision(string $value): int
@@ -312,6 +341,9 @@ final class VmIni
                 break;
             case 'memory_limit':
                 self::$memoryLimit = self::CFG_MEMORY_LIMIT;
+                break;
+            case 'precision':
+                self::$precision = self::parsePrecision(self::CFG_PRECISION);
                 break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecision(self::CFG_SERIALIZE_PRECISION);
