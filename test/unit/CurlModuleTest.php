@@ -19,8 +19,11 @@ final class CurlModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['curl_init', 'curl_setopt', 'curl_exec', 'curl_close', 'curl_version'] as $fn) {
+        foreach (['curl_escape', 'curl_unescape'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+        }
+        foreach (['curl_init', 'curl_setopt', 'curl_exec', 'curl_close', 'curl_version'] as $fn) {
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         self::assertTrue(VmReflection::classExists($ctx, 'CURLFile'));
 
@@ -31,6 +34,8 @@ echo (int) function_exists('curl_setopt');
 echo (int) function_exists('curl_exec');
 echo (int) function_exists('curl_close');
 echo (int) function_exists('curl_version');
+echo (int) function_exists('curl_escape');
+echo (int) function_exists('curl_unescape');
 echo (int) class_exists('CURLFile', false);
 echo (int) defined('CURLOPT_URL');
 echo CURLOPT_URL;
@@ -40,10 +45,10 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11111111000212097154', ob_get_clean());
+        self::assertSame('0000011111000212097154', ob_get_clean());
     }
 
-    public function test_curl_init_stub_throws_logic_exception(): void
+    public function test_curl_init_stub_class_throws_logic_exception(): void
     {
         $runtime = new Runtime();
         $fn = new \PHPCompiler\ext\curl\curl_init();
