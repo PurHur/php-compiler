@@ -10608,7 +10608,7 @@ class Compiler {
                 }
             }
         }
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         if ($producer instanceof Op\Expr\Array_) {
             if (0 === $argIndex && !$this->callIncludesNamedParameter($callOp)) {
                 $arrayProducers = array_values(array_filter(
@@ -11141,7 +11141,7 @@ class Compiler {
                     );
                 }
                 if (!$matched instanceof Op\Expr) {
-                    $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                    $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
                 }
                 if ($matched instanceof Op\Expr) {
                     if (null === $block->slotForOperand($matched->result)) {
@@ -11156,7 +11156,7 @@ class Compiler {
                 }
             }
             if (1 === $funcCallProducerCount && 0 === $arrayProducerCount) {
-                $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
                 if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall) {
                     $producerIndex = null;
                     foreach ($block->orig->children as $i => $child) {
@@ -11180,6 +11180,20 @@ class Compiler {
                         if (null !== $slot) {
                             return (string) $slot;
                         }
+                    }
+                }
+            }
+            if ($this->callIncludesNamedParameter($callOp) && [] !== $producers) {
+                $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+                if ($matched instanceof Op\Expr) {
+                    if (null === $block->slotForOperand($matched->result)) {
+                        foreach ($this->compileExpr($matched, $block) as $op) {
+                            $block->addOpCode($op);
+                        }
+                    }
+                    $slot = $block->slotForOperand($matched->result);
+                    if (null !== $slot) {
+                        return (string) $slot;
                     }
                 }
             }
@@ -11291,7 +11305,7 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         if (null === $producer) {
             $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $callOp, $argIndex);
             if (null !== $adjacentSlot) {
@@ -11922,7 +11936,7 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         if ($producer instanceof Op\Expr\FirstClassCallable) {
             return $this->slotForInlineFirstClassCallableProducer($producer, $block);
         }
@@ -11966,7 +11980,7 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
             return $this->slotForInlineClosureProducer($producer, $block);
         }
@@ -12092,7 +12106,8 @@ class Compiler {
         array $producers,
         array $callArgs,
         int $argIndex,
-        ?Op $cfgCallOp = null
+        ?Op $cfgCallOp = null,
+        ?Block $block = null
     ): ?Op\Expr
     {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
@@ -12107,11 +12122,34 @@ class Compiler {
             if (null === $callArg) {
                 return null;
             }
+            if (
+                $this->callArgIsDeadInlineTemporary($callArg)
+                && null !== $cfgCallOp
+                && null !== $block
+                && null !== $block->orig
+            ) {
+                $byIndex = $this->inlineHoistedProducerForCallArgIndex(
+                    $cfgCallOp,
+                    $argIndex,
+                    $producers,
+                    $block->orig->children
+                );
+                if ($byIndex instanceof Op\Expr) {
+                    return $byIndex;
+                }
+            }
             foreach ($producers as $producer) {
                 if (
                     null !== $producer->result
                     && $this->operandsReferToSameVariable($producer->result, $callArg)
                 ) {
+                    if (
+                        $producer instanceof Op\Expr\Array_
+                        && !$this->callArgOperandExpectsArrayProducer($callArg)
+                    ) {
+                        continue;
+                    }
+
                     return $producer;
                 }
             }
@@ -14234,6 +14272,44 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists inline Expr_Array / ConstFetch siblings before FuncCall — map arg index to producer (#11591).
+     *
+     * @param list<Op>        $cfgChildren
+     * @param list<Op\Expr>   $producers
+     */
+    private function inlineHoistedProducerForCallArgIndex(
+        Op $callOp,
+        int $argIndex,
+        array $producers,
+        array $cfgChildren
+    ): ?Op\Expr {
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $producerCount = \count($producers);
+        if ($producerCount < 1 || $argIndex >= $producerCount) {
+            return null;
+        }
+        $cfgProducerIndex = $callIndex - $producerCount + $argIndex;
+        if ($cfgProducerIndex < 0 || $cfgProducerIndex >= $callIndex) {
+            return null;
+        }
+        $candidate = $cfgChildren[$cfgProducerIndex] ?? null;
+        if (!$candidate instanceof Op\Expr || !\in_array($candidate, $producers, true)) {
+            return null;
+        }
+
+        return $candidate;
+    }
+
+    /**
      * Single hoisted ArrowFunction/Closure with extra named call args (#9154, array_any/find family).
      *
      * php-cfg may emit `array_any($arr, fn ($v) => …)` as one closure producer plus a named
@@ -16034,7 +16110,7 @@ class Compiler {
                         return true;
                     }
                 }
-                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
                 if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
                     return true;
                 }
@@ -16686,7 +16762,7 @@ class Compiler {
                 property_exists($callOp, 'args')
                 && is_array($callOp->args)
             ) {
-                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
             }
             if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
@@ -16866,7 +16942,7 @@ class Compiler {
         if (!$fetch instanceof Op\Expr\ClassConstFetch) {
             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
             if (property_exists($callOp, 'args') && is_array($callOp->args)) {
-                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp);
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
                 if ($producer instanceof Op\Expr\ClassConstFetch) {
                     $fetch = $producer;
                 }
@@ -16972,7 +17048,8 @@ class Compiler {
                         $producers,
                         $cfgCallOp->args ?? [],
                         (int) $argIndex,
-                        $cfgCallOp
+                        $cfgCallOp,
+                        $block
                     );
                     if ($newProducer instanceof Op\Expr\New_) {
                         if (null === $block->slotForOperand($newProducer->result)) {
@@ -17112,7 +17189,8 @@ class Compiler {
                                 $producers,
                                 $cfgCallOp->args ?? [],
                                 (int) $argIndex,
-                                $cfgCallOp
+                                $cfgCallOp,
+                                $block
                             );
                             if ($matched instanceof Op\Expr) {
                                 $matchedSlot = $block->slotForOperand($matched->result);
@@ -17207,7 +17285,8 @@ class Compiler {
                         $producers,
                         $cfgCallOp->args ?? [],
                         (int) $argIndex,
-                        $cfgCallOp
+                        $cfgCallOp,
+                        $block
                     );
                     if ($matched instanceof Op\Expr) {
                         if (null === $block->slotForOperand($matched->result)) {
