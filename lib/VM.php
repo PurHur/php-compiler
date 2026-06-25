@@ -11215,8 +11215,35 @@ restart:
             return $userArgs;
         }
 
-        $args = array_merge($frame->callArgs, $userArgs);
+        $args = $this->mergeOutgoingCallArgs($frame->callArgs, $userArgs);
         $this->separateInternalByRefArgsForWrite($frame->call, $args);
+
+        return $args;
+    }
+
+    /**
+     * Merge implicit call prefix ($this on new/method calls) with user args without
+     * renumbering named-parameter indices (issue #11844, Zend/zend_execute.c).
+     *
+     * @param list<Variable>        $prefix
+     * @param array<int, Variable>  $userArgs
+     *
+     * @return array<int, Variable>
+     */
+    private function mergeOutgoingCallArgs(array $prefix, array $userArgs): array
+    {
+        if ([] === $prefix) {
+            return $userArgs;
+        }
+        if ([] === $userArgs) {
+            return $prefix;
+        }
+
+        $args = $prefix;
+        $offset = \count($prefix);
+        foreach ($userArgs as $idx => $value) {
+            $args[$offset + (int) $idx] = $value;
+        }
 
         return $args;
     }
