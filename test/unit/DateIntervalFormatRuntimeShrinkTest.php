@@ -14,8 +14,14 @@ final class DateIntervalFormatRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatRuntime.php');
         $this->assertStringContainsString('formatFromScalars', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertStringContainsString('implementStandaloneLlvm', $source);
+        $this->assertStringContainsString('DateIntervalFormatStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('emitFormatCode', $source);
+        $this->assertStringNotContainsString('implementFormat(', $source);
+        $this->assertLessThan(200, \substr_count($source, "\n") + 1);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php');
+        $this->assertStringContainsString('implementFormat', $llvm);
+        $this->assertStringContainsString('emitFormatCode', $llvm);
     }
 
     public function testDateIntervalFormatJitHelperDelegatesToVmDateInterval(): void
