@@ -1871,6 +1871,8 @@ require_once __DIR__.'/../../../ext/standard/stream_isatty.php';
 require_once __DIR__.'/../../../ext/standard/stream_notification_callback.php';
 require_once __DIR__.'/../../../ext/standard/stream_register_wrapper.php';
 require_once __DIR__.'/../../../ext/standard/stream_resolve_include_path.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamSelectPure.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamSelect.php';
 require_once __DIR__.'/../../../ext/standard/stream_select.php';
 require_once __DIR__.'/../../../ext/standard/stream_set_blocking.php';
 require_once __DIR__.'/../../../ext/standard/stream_set_chunk_size_.php';
