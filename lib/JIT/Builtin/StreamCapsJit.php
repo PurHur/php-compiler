@@ -326,8 +326,17 @@ final class StreamCapsJit
             $featureI32,
             $i32->constInt(VmStreamSupports::STREAM_META_SEEKABLE, false)
         );
+        $tellBb = $fn->appendBasicBlock('caps_supports_tell');
+        $isTell = $context->builder->icmp(
+            Builder::INT_EQ,
+            $featureI32,
+            $i32->constInt(VmStreamSupports::STREAM_SUPPORT_TELL, false)
+        );
         $metaRangeBb = $fn->appendBasicBlock('caps_supports_meta_range');
-        $context->builder->branchIf($isFilter, $filterBb, $metaRangeBb);
+        $context->builder->branchIf($isFilter, $filterBb, $tellCheckBb = $fn->appendBasicBlock('caps_supports_tell_check'));
+
+        $context->builder->positionAtEnd($tellCheckBb);
+        $context->builder->branchIf($isTell, $tellBb, $metaRangeBb);
 
         $context->builder->positionAtEnd($metaRangeBb);
         $isMeta = $context->builder->and(
@@ -346,6 +355,7 @@ final class StreamCapsJit
 
         self::emitSupportsLock($context, $fn, $fp, $path, $failBb, $lockBb);
         self::emitSupportsFilter($context, $fn, $path, $failBb, $filterBb);
+        self::emitSupportsTell($context, $fn, $path, $failBb, $tellBb);
         self::emitSupportsMetadata($context, $fn, $path, $failBb, $metaBb);
 
         $context->builder->positionAtEnd($defaultBb);
@@ -428,6 +438,32 @@ final class StreamCapsJit
             )
         );
         $context->builder->returnValue($context->builder->select($nonSeekable, $zero, $one));
+    }
+
+    private static function emitSupportsTell(
+        Context $context,
+        LlvmFunction $fn,
+        Value $path,
+        BasicBlock $failBb,
+        BasicBlock $tellBb
+    ): void {
+        $context->builder->positionAtEnd($tellBb);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $zero = $i32->constInt(0, false);
+        $one = $i32->constInt(1, false);
+        $nullPtr = $i8p->constNull();
+
+        $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $nullPtr);
+        $checkBb = $fn->appendBasicBlock('caps_supports_tell_check_uri');
+        $context->builder->branchIf($pathNull, $failBb, $checkBb);
+
+        $context->builder->positionAtEnd($checkBb);
+        $isInput = self::hasPrefix($context, $path, 'php://input');
+        $isOutput = self::hasPrefix($context, $path, 'php://output');
+        $isStdin = self::uriEquals($context, $path, 'php://stdin');
+        $nonTellable = $context->builder->or($isInput, $context->builder->or($isOutput, $isStdin));
+        $context->builder->returnValue($context->builder->select($nonTellable, $zero, $one));
     }
 
     private static function uriEquals(Context $context, Value $path, string $uri): Value

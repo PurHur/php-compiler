@@ -1270,6 +1270,8 @@ final class VmFs
             case VmStreamSupports::STREAM_META_SEEKABLE:
             case VmStreamSupports::STREAM_FILTER:
                 return self::streamSupportsSeekable($handle);
+            case VmStreamSupports::STREAM_SUPPORT_TELL:
+                return self::streamSupportsTell($handle);
             case VmStreamSupports::STREAM_META_TOUCH:
             case VmStreamSupports::STREAM_META_OWNER_NAME:
             case VmStreamSupports::STREAM_META_OWNER:
@@ -1290,6 +1292,11 @@ final class VmFs
     private static function streamSupportsSeekable(int $handle): bool
     {
         return VmStreamMeta::supportsSeekable(self::handleUri($handle));
+    }
+
+    private static function streamSupportsTell(int $handle): bool
+    {
+        return VmStreamMeta::supportsTell(self::handleUri($handle));
     }
 
     private static function streamSupportsMetadata(int $handle): bool
