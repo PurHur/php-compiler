@@ -15,7 +15,9 @@ final class VmHrtimeNative
 {
     public const NS_PER_SEC = 1_000_000_000;
 
-    private const CLOCK_MONOTONIC = 1;
+    public const CLOCK_REALTIME = 0;
+
+    public const CLOCK_MONOTONIC = 1;
 
     private static ?\FFI $ffi = null;
 
@@ -26,22 +28,30 @@ final class VmHrtimeNative
      */
     public static function readMonotonic(): array
     {
-        $ffiPair = self::readMonotonicFfi();
+        return self::readClock(self::CLOCK_MONOTONIC) ?? [0, 0];
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null seconds and nanoseconds
+     */
+    public static function readClock(int $clockId): ?array
+    {
+        $ffiPair = self::readClockFfi($clockId);
         if (null !== $ffiPair) {
             return $ffiPair;
         }
 
-        if ('Linux' === \PHP_OS_FAMILY) {
+        if (self::CLOCK_MONOTONIC === $clockId && 'Linux' === \PHP_OS_FAMILY) {
             return self::readMonotonicLinux();
         }
 
-        return [0, 0];
+        return null;
     }
 
     /**
      * @return array{0: int, 1: int}|null
      */
-    private static function readMonotonicFfi(): ?array
+    private static function readClockFfi(int $clockId): ?array
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -49,11 +59,19 @@ final class VmHrtimeNative
         }
 
         $ts = $ffi->new('struct timespec');
-        if (0 !== (int) $ffi->clock_gettime(self::CLOCK_MONOTONIC, \FFI::addr($ts))) {
+        if (0 !== (int) $ffi->clock_gettime($clockId, \FFI::addr($ts))) {
             return null;
         }
 
         return [(int) $ts->tv_sec, (int) $ts->tv_nsec];
+    }
+
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private static function readMonotonicFfi(): ?array
+    {
+        return self::readClockFfi(self::CLOCK_MONOTONIC);
     }
 
     /**
@@ -123,6 +141,7 @@ struct timespec {
     time_t tv_sec;
     long tv_nsec;
 };
+#define CLOCK_REALTIME 0
 #define CLOCK_MONOTONIC 1
 int clock_gettime(clockid_t clk_id, struct timespec *tp);
 CDEF;

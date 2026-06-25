@@ -41,6 +41,7 @@ final class SelfHostBuiltinPolicy
         'microtime' => 'numeric',
         'gettimeofday' => 'numeric',
         'hrtime' => 'numeric',
+        'clock_gettime' => 'array',
         'getdate' => 'numeric',
         'gmgetdate' => 'numeric',
         'gmmktime' => 'numeric',
