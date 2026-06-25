@@ -21,6 +21,11 @@ final class VmStreamSupports
     public const STREAM_META_SEEKABLE = 8;
     public const STREAM_FILTER = 8;
 
+    /** PHP 8.3+ stream_supports() capability probes (issue #11702). */
+    public const STREAM_SUPPORT_LOCK = self::STREAM_LOCK;
+    public const STREAM_SUPPORT_SEEK = self::STREAM_META_SEEKABLE;
+    public const STREAM_SUPPORT_TELL = 9;
+
     /** @return array<string, int> */
     public static function constants(): array
     {
@@ -34,6 +39,9 @@ final class VmStreamSupports
             'STREAM_LOCK' => self::STREAM_LOCK,
             'STREAM_META_SEEKABLE' => self::STREAM_META_SEEKABLE,
             'STREAM_FILTER' => self::STREAM_FILTER,
+            'STREAM_SUPPORT_LOCK' => self::STREAM_SUPPORT_LOCK,
+            'STREAM_SUPPORT_SEEK' => self::STREAM_SUPPORT_SEEK,
+            'STREAM_SUPPORT_TELL' => self::STREAM_SUPPORT_TELL,
         ];
     }
 }

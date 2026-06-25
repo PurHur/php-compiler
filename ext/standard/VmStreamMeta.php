@@ -94,6 +94,19 @@ final class VmStreamMeta
         return true;
     }
 
+    /** stream_supports(..., STREAM_SUPPORT_TELL) — php-src php_stream_tell (issue #11702). */
+    public static function supportsTell(string $uri): bool
+    {
+        $lower = \strtolower($uri);
+        if (\str_starts_with($lower, 'php://input')
+            || \str_starts_with($lower, 'php://output')
+            || 'php://stdin' === $lower) {
+            return false;
+        }
+
+        return true;
+    }
+
     public static function supportsMetadata(string $uri): bool
     {
         if (\str_starts_with($uri, 'php://')) {
