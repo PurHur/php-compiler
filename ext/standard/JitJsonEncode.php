@@ -14,7 +14,7 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
- * JIT json_encode() lowering via VmJsonFormat LLVM helpers (#6852).
+ * JIT json_encode() lowering via JsonEncodeJitHelper PHP (#6852, #9267).
  */
 final class JitJsonEncode
 {
