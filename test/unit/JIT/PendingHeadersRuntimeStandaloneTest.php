@@ -21,8 +21,10 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_pending_headers.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php');
-        $this->assertStringContainsString('appendSetcookieExpires', $runtime);
-        $this->assertStringContainsString('gmtime', $runtime);
+        $this->assertStringContainsString('PendingHeadersStandaloneLlvm', $runtime);
+        $standalone = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
+        $this->assertStringContainsString('appendSetcookieExpires', $standalone);
+        $this->assertStringContainsString('gmtime', $standalone);
     }
 
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void
