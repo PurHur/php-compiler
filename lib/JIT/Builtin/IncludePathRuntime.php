@@ -15,6 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245).
  *
+ * Standalone LLVM quarantine: {@see IncludePathStandaloneLlvm}
  * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
@@ -76,7 +77,7 @@ final class IncludePathRuntime
         $savedBlock = self::captureInsertBlock($context);
 
         if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::implementStandaloneBodies($context);
+            IncludePathStandaloneLlvm::implement($context);
         } else {
             self::ensureStackHelperCompiled($context);
             self::implementInitNoop($context);
@@ -90,110 +91,7 @@ final class IncludePathRuntime
         self::restoreInsertBlock($context, $savedBlock);
     }
 
-    private static function implementStandaloneBodies(Context $context): void
-    {
-        self::implementInitNoop($context);
-        self::implementStandaloneGetBridge($context);
-        self::implementStandaloneSetBridge($context);
-        self::implementStandaloneRestoreBridge($context);
-        self::implementResolveStandaloneStub($context);
-    }
-
-    private static function implementStandaloneGetBridge(Context $context): void
-    {
-        $abiName = '__compiler_get_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_get_standalone');
-        $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $dot = $context->constantFromString('.');
-        $str = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(1, false),
-            $context->builder->pointerCast($dot, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $fn->getParam(0),
-            $str
-        );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementStandaloneSetBridge(Context $context): void
-    {
-        $abiName = '__compiler_set_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valPtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false, $strPtr, $valPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_set_standalone');
-        $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $dot = $context->constantFromString('.');
-        $oldStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(1, false),
-            $context->builder->pointerCast($dot, $context->getTypeFromString('char*'))
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $fn->getParam(1),
-            $oldStr
-        );
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementStandaloneRestoreBridge(Context $context): void
-    {
-        $abiName = '__compiler_restore_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_restore_standalone');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementInitNoop(Context $context): void
+    public static function implementInitNoop(Context $context): void
     {
         $abiName = '__compiler_include_path_init';
         $probe = $context->module->getNamedFunction($abiName);
@@ -332,28 +230,6 @@ final class IncludePathRuntime
         );
         $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementResolveStandaloneStub(Context $context): void
-    {
-        $abiName = '__compiler_stream_resolve_include_path';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('include_path_resolve_standalone');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($strPtr->constNull());
         $context->registerFunction($abiName, $fn);
     }
 
