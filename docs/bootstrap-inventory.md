@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3160 |
-| Phase A inventory files (M2 ratio SSOT) | 3160 |
+| PHP files on vm.php path | 3166 |
+| Phase A inventory files (M2 ratio SSOT) | 3166 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8443 |
+| Source constructs flagged (warnings) | 8452 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -841,6 +841,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/NetworkServicesJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerServerJitHelper.php` | 0 | 1 |
+| `ext/standard/ObOutputJitHelper.php` | 0 | 1 |
 | `ext/standard/ObStatusJitHelper.php` | 0 | 3 |
 | `ext/standard/OutputRewriteVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/PackEngine.php` | 0 | 1 |
@@ -2187,7 +2188,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
+| `lib/JIT/Builtin/ObOutputJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ObOutputStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObStorageGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -2428,10 +2431,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Type/HashTable.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/MaskedArray.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/NativeArray.php` | 0 | 1 |
+| `lib/JIT/Builtin/Type/ObjectDestructorLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/Type/ObjectEnumCasePropertyLlvm.php` | 0 | 5 |
 | `lib/JIT/Builtin/Type/ObjectEnumStringCastLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php` | 0 | 1 |
-| `lib/JIT/Builtin/Type/Object_.php` | 0 | 36 |
+| `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php` | 0 | 4 |
+| `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php` | 0 | 2 |
+| `lib/JIT/Builtin/Type/Object_.php` | 0 | 32 |
 | `lib/JIT/Builtin/Type/String_.php` | 0 | 1 |
 | `lib/JIT/Builtin/Type/Value.php` | 0 | 4 |
 | `lib/JIT/Builtin/TypeErrorRaise.php` | 0 | 2 |
@@ -8691,6 +8697,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/ObOutputJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 22 class method(s)
 
 ### `ext/standard/ObStatusJitHelper.php`
 
@@ -17416,7 +17427,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/ObOutputJitBridge.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 555)
+- 23 class method(s)
+- 10 closure(s)
+
 ### `lib/JIT/Builtin/ObOutputRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/ObOutputStandaloneLlvm.php`
 
 **Warnings** (review for bootstrap subset):
 - 53 class method(s)
@@ -18802,6 +18825,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/Type/ObjectDestructorLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 134)
+- 3 class method(s)
+
 ### `lib/JIT/Builtin/Type/ObjectEnumCasePropertyLlvm.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18821,45 +18850,55 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `lib/JIT/Builtin/Type/ObjectInstancePropertyLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 58)
+- new Variable (line 79)
+- new Variable (line 100)
+- 2 class method(s)
+
+### `lib/JIT/Builtin/Type/ObjectStaticPropertyInitLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/Type/Object_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 401)
-- new Variable (line 1007)
-- new Variable (line 1046)
-- new Variable (line 1083)
-- new Variable (line 1885)
-- new Variable (line 2288)
-- new Variable (line 2350)
-- new Variable (line 2374)
-- new Variable (line 2386)
-- new Variable (line 2399)
-- new Variable (line 2558)
-- new VMVariable (line 3194)
-- new VMVariable (line 3211)
-- new VMVariable (line 3229)
-- new Variable (line 4771)
-- new Variable (line 4784)
-- new Variable (line 4876)
-- new Variable (line 5143)
-- new Variable (line 5169)
-- new Variable (line 5177)
-- new Variable (line 5200)
-- new Variable (line 5226)
-- new Variable (line 5234)
-- new Variable (line 5305)
-- new Literal (line 5322)
-- new Literal (line 5327)
-- new Literal (line 5332)
-- new Variable (line 5343)
-- new Variable (line 5376)
-- new Variable (line 5399)
-- new Variable (line 5648)
-- new Variable (line 5669)
-- new Variable (line 5690)
-- new Variable (line 5852)
-- 255 class method(s)
-- 9 closure(s)
+- new Variable (line 880)
+- new Variable (line 919)
+- new Variable (line 956)
+- new Variable (line 1781)
+- new Variable (line 2184)
+- new Variable (line 2246)
+- new Variable (line 2270)
+- new Variable (line 2282)
+- new Variable (line 2295)
+- new Variable (line 2454)
+- new VMVariable (line 3090)
+- new VMVariable (line 3107)
+- new VMVariable (line 3125)
+- new Variable (line 4465)
+- new Variable (line 4478)
+- new Variable (line 4570)
+- new Variable (line 4837)
+- new Variable (line 4863)
+- new Variable (line 4871)
+- new Variable (line 4894)
+- new Variable (line 4920)
+- new Variable (line 4928)
+- new Variable (line 4999)
+- new Literal (line 5016)
+- new Literal (line 5021)
+- new Literal (line 5026)
+- new Variable (line 5037)
+- new Variable (line 5070)
+- new Variable (line 5093)
+- new Variable (line 5452)
+- 246 class method(s)
+- 8 closure(s)
 
 ### `lib/JIT/Builtin/Type/String_.php`
 
