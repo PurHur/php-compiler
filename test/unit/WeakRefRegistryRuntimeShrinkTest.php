@@ -18,6 +18,7 @@ final class WeakRefRegistryRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ensureGlobals', $source);
         $this->assertStringNotContainsString('refEntryPtr', $source);
         $this->assertStringNotContainsString('mapEntryPtr', $source);
+        $this->assertStringContainsString('sext($i, $i64)', $source);
     }
 
     public function testWeakRefRegistryJitHelperRegistryRoundtrip(): void

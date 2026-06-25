@@ -71,7 +71,7 @@ final class WeakRefRegistryJitHelper
         if (self::$mapCount >= self::MAX_MAPS) {
             return;
         }
-        $stored = self::truncateMapKey($key);
+        $stored = self::storeMapKey($key);
         $idx = self::$mapCount;
         self::$mapTargetPtr[$idx] = $targetPtr;
         self::$mapHtPtr[$idx] = $htPtr;
@@ -84,20 +84,15 @@ final class WeakRefRegistryJitHelper
         if (0 === $targetPtr || 0 === $htPtr || '' === $key) {
             return;
         }
-        $stored = self::truncateMapKey($key);
+        $stored = self::storeMapKey($key);
         for ($i = 0; $i < self::$mapCount; ++$i) {
-            if (self::$mapTargetPtr[$i] !== $targetPtr) {
-                continue;
-            }
-            if (self::$mapHtPtr[$i] !== $htPtr) {
-                continue;
-            }
-            if (self::$mapKey[$i] !== $stored) {
-                continue;
-            }
-            self::clearMapEntry($i);
+            if (self::$mapTargetPtr[$i] === $targetPtr
+                && self::$mapHtPtr[$i] === $htPtr
+                && self::$mapKey[$i] === $stored) {
+                self::clearMapEntry($i);
 
-            return;
+                return;
+            }
         }
     }
 
@@ -112,7 +107,8 @@ final class WeakRefRegistryJitHelper
 
     public static function mapKeyToObjectPtr(string $key): int
     {
-        if (\strlen($key) < 3) {
+        $len = \strlen($key);
+        if ($len < 3) {
             return 0;
         }
         if ('o' !== $key[0] || ':' !== $key[1]) {
@@ -122,9 +118,8 @@ final class WeakRefRegistryJitHelper
         if ('' === $suffix) {
             return 0;
         }
-        $parsed = \hexdec($suffix);
 
-        return (int) $parsed;
+        return (int) \hexdec($suffix);
     }
 
     public static function refCount(): int
@@ -134,12 +129,26 @@ final class WeakRefRegistryJitHelper
 
     public static function refTargetPtr(int $index): int
     {
-        return self::$refTargetPtr[$index] ?? 0;
+        if ($index < 0 || $index >= self::$refCount) {
+            return 0;
+        }
+        if (!isset(self::$refTargetPtr[$index])) {
+            return 0;
+        }
+
+        return self::$refTargetPtr[$index];
     }
 
     public static function refSlotPtr(int $index): int
     {
-        return self::$refSlotPtr[$index] ?? 0;
+        if ($index < 0 || $index >= self::$refCount) {
+            return 0;
+        }
+        if (!isset(self::$refSlotPtr[$index])) {
+            return 0;
+        }
+
+        return self::$refSlotPtr[$index];
     }
 
     public static function clearRefEntry(int $index): void
@@ -158,17 +167,38 @@ final class WeakRefRegistryJitHelper
 
     public static function mapTargetPtr(int $index): int
     {
-        return self::$mapTargetPtr[$index] ?? 0;
+        if ($index < 0 || $index >= self::$mapCount) {
+            return 0;
+        }
+        if (!isset(self::$mapTargetPtr[$index])) {
+            return 0;
+        }
+
+        return self::$mapTargetPtr[$index];
     }
 
     public static function mapHtPtr(int $index): int
     {
-        return self::$mapHtPtr[$index] ?? 0;
+        if ($index < 0 || $index >= self::$mapCount) {
+            return 0;
+        }
+        if (!isset(self::$mapHtPtr[$index])) {
+            return 0;
+        }
+
+        return self::$mapHtPtr[$index];
     }
 
     public static function mapKey(int $index): string
     {
-        return self::$mapKey[$index] ?? '';
+        if ($index < 0 || $index >= self::$mapCount) {
+            return '';
+        }
+        if (!isset(self::$mapKey[$index])) {
+            return '';
+        }
+
+        return self::$mapKey[$index];
     }
 
     public static function clearMapEntry(int $index): void
@@ -181,12 +211,8 @@ final class WeakRefRegistryJitHelper
         self::$mapKey[$index] = '';
     }
 
-    private static function truncateMapKey(string $key): string
+    private static function storeMapKey(string $key): string
     {
-        if (\strlen($key) >= self::MAP_KEY_BYTES) {
-            return \substr($key, 0, self::MAP_KEY_BYTES - 1);
-        }
-
         return $key;
     }
 

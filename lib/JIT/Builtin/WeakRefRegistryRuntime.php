@@ -430,8 +430,9 @@ final class WeakRefRegistryRuntime
         );
 
         $context->builder->positionAtEnd($loopBody);
-        $storedTarget = $context->builder->call(self::helperFunction($context, self::REF_TARGET), $i);
-        $storedSlot = $context->builder->call(self::helperFunction($context, self::REF_SLOT), $i);
+        $i64Idx = $context->builder->sext($i, $i64);
+        $storedTarget = $context->builder->call(self::helperFunction($context, self::REF_TARGET), $i64Idx);
+        $storedSlot = $context->builder->call(self::helperFunction($context, self::REF_SLOT), $i64Idx);
         $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
         $slotNonNull = $context->builder->icmp(Builder::INT_NE, $storedSlot, $i64->constInt(0, false));
         $doClear = $context->builder->and($targetMatch, $slotNonNull);
@@ -444,7 +445,7 @@ final class WeakRefRegistryRuntime
             $valuePtr
         );
         $context->builder->call($writeNull, $slotAsValue);
-        $context->builder->call(self::helperFunction($context, self::CLEAR_REF), $i);
+        $context->builder->call(self::helperFunction($context, self::CLEAR_REF), $i64Idx);
         $context->builder->branch($loopInc);
 
         $context->builder->positionAtEnd($loopInc);
@@ -492,9 +493,10 @@ final class WeakRefRegistryRuntime
         );
 
         $context->builder->positionAtEnd($loopBody);
-        $storedTarget = $context->builder->call(self::helperFunction($context, self::MAP_TARGET), $i);
-        $storedHt = $context->builder->call(self::helperFunction($context, self::MAP_HT), $i);
-        $keyStr = $context->builder->call(self::helperFunction($context, self::MAP_KEY), $i);
+        $i64Idx = $context->builder->sext($i, $i64);
+        $storedTarget = $context->builder->call(self::helperFunction($context, self::MAP_TARGET), $i64Idx);
+        $storedHt = $context->builder->call(self::helperFunction($context, self::MAP_HT), $i64Idx);
+        $keyStr = $context->builder->call(self::helperFunction($context, self::MAP_KEY), $i64Idx);
         $targetMatch = $context->builder->icmp(Builder::INT_EQ, $storedTarget, $targetI64);
         $htNonNull = $context->builder->icmp(Builder::INT_NE, $storedHt, $i64->constInt(0, false));
         $doClear = $context->builder->and($targetMatch, $htNonNull);
@@ -510,7 +512,7 @@ final class WeakRefRegistryRuntime
             ),
             $keyStr
         );
-        $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i);
+        $context->builder->call(self::helperFunction($context, self::CLEAR_MAP), $i64Idx);
         $context->builder->branch($loopInc);
 
         $context->builder->positionAtEnd($loopInc);
