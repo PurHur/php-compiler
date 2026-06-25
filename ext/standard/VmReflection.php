@@ -1077,6 +1077,63 @@ final class VmReflection
         }
     }
 
+    public static function propertyHasDefaultValue(ClassProperty $prop): bool
+    {
+        return null !== $prop->default || $prop->hasRuntimeDefaultInit();
+    }
+
+    private static function staticPropertyHasDefaultValue(Variable $storage): bool
+    {
+        return !$storage->resolveIndirect()->isUndefined();
+    }
+
+    /**
+     * ReflectionClass::getDefaultProperties() — declared defaults along inheritance chain (#11441).
+     *
+     * php-src: ext/reflection/php_reflection.c — reflection_class_get_default_properties()
+     */
+    public static function getDefaultPropertiesArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        $chain = [];
+        $current = $entry;
+        while (true) {
+            $chain[] = $current;
+            if (null === $current->parentLc || !isset($ctx->classes[$current->parentLc])) {
+                break;
+            }
+            $current = $ctx->classes[$current->parentLc];
+        }
+        foreach ($chain as $classEntry) {
+            foreach ($classEntry->properties as $prop) {
+                if (!self::propertyHasDefaultValue($prop)) {
+                    continue;
+                }
+                $copy = new Variable();
+                self::copyClassVarDefault($copy, $prop);
+                $ht->add($prop->name, $copy);
+            }
+            foreach ($classEntry->staticProperties as $propLc => $storage) {
+                if (!self::staticPropertyHasDefaultValue($storage)) {
+                    continue;
+                }
+                $displayName = $storage->objectPropertyName ?? $propLc;
+                $copy = new Variable();
+                $resolved = $storage->resolveIndirect();
+                if ($resolved->isUndefined()) {
+                    $copy->null();
+                } else {
+                    $copy->copyFrom($resolved);
+                }
+                $ht->add($displayName, $copy);
+            }
+        }
+
+        return $result;
+    }
+
     /**
      * Public static properties declared on $entry (php-src add_class_vars, #7397).
      *

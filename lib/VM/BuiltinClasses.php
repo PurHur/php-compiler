@@ -69,6 +69,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassConstruct;
 use PHPCompiler\VM\Builtin\ReflectionClassGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetConstants;
+use PHPCompiler\VM\Builtin\ReflectionClassGetDefaultProperties;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitAliases;
 use PHPCompiler\VM\Builtin\ReflectionClassGetTraitNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializer;
@@ -548,6 +549,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getreflectionconstants'] = $pub;
         $rc->methods['getconstants'] = new ReflectionClassGetConstants();
         $rc->methodVisibility['getconstants'] = $pub;
+        $rc->methods['getdefaultproperties'] = new ReflectionClassGetDefaultProperties();
+        $rc->methodVisibility['getdefaultproperties'] = $pub;
         $rc->methods['gettraitaliases'] = new ReflectionClassGetTraitAliases();
         $rc->methodVisibility['gettraitaliases'] = $pub;
         $rc->methods['gettraitnames'] = new ReflectionClassGetTraitNames();
