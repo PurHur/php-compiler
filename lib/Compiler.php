@@ -14272,7 +14272,32 @@ class Compiler {
     }
 
     /**
-     * php-cfg hoists inline Expr_Array / ConstFetch siblings before FuncCall — map arg index to producer (#11591).
+     * Hoisted producer ordinal among dead inline call-arg temps (skip embedded literals, #10321).
+     *
+     * @param list<Operand> $callArgs
+     */
+    private function inlineHoistedProducerSlotIndexForCallArg(array $callArgs, int $argIndex): ?int
+    {
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $slot = 0;
+        for ($i = 0; $i < $argIndex; ++$i) {
+            $arg = $callArgs[$i] ?? null;
+            if (null === $arg || $this->isEmbeddedCallLiteralArg($arg)) {
+                continue;
+            }
+            if ($this->callArgIsDeadInlineTemporary($arg)) {
+                ++$slot;
+            }
+        }
+
+        return $slot;
+    }
+
+    /**
+     * php-cfg hoists inline Expr_Array / ConstFetch siblings before FuncCall — map arg index to producer (#11591, #10321).
      *
      * @param list<Op>        $cfgChildren
      * @param list<Op\Expr>   $producers
@@ -14283,6 +14308,13 @@ class Compiler {
         array $producers,
         array $cfgChildren
     ): ?Op\Expr {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg($callOp->args, $argIndex);
+        if (null === $producerSlotIndex) {
+            return null;
+        }
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
             if ($child === $callOp) {
@@ -14294,10 +14326,10 @@ class Compiler {
             return null;
         }
         $producerCount = \count($producers);
-        if ($producerCount < 1 || $argIndex >= $producerCount) {
+        if ($producerCount < 1 || $producerSlotIndex >= $producerCount) {
             return null;
         }
-        $cfgProducerIndex = $callIndex - $producerCount + $argIndex;
+        $cfgProducerIndex = $callIndex - $producerCount + $producerSlotIndex;
         if ($cfgProducerIndex < 0 || $cfgProducerIndex >= $callIndex) {
             return null;
         }
