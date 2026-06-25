@@ -133,6 +133,8 @@ class Module extends ModuleAbstract
             'STREAM_SOCK_STREAM' => StdlibConstants::STREAM_SOCK_STREAM,
             'STREAM_SOCK_DGRAM' => StdlibConstants::STREAM_SOCK_DGRAM,
             'STREAM_IPPROTO_IP' => StdlibConstants::STREAM_IPPROTO_IP,
+            'STREAM_CAST_AS_STREAM' => StdlibConstants::STREAM_CAST_AS_STREAM,
+            'STREAM_CAST_FOR_SELECT' => StdlibConstants::STREAM_CAST_FOR_SELECT,
         ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);

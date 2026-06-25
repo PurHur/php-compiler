@@ -170,6 +170,11 @@ final class StdlibConstants
 
     public const STREAM_IPPROTO_IP = 0;
 
+    /** stream_cast() cast modes (ext/standard/streams.c PHP_MINIT). */
+    public const STREAM_CAST_AS_STREAM = 0;
+
+    public const STREAM_CAST_FOR_SELECT = 3;
+
     /** syslog priorities (syslog.h; ext/standard/basic_functions.c). */
     public const LOG_EMERG = 0;
     public const LOG_ALERT = 1;
@@ -289,6 +294,8 @@ final class StdlibConstants
         'stream_sock_stream' => self::STREAM_SOCK_STREAM,
         'stream_sock_dgram' => self::STREAM_SOCK_DGRAM,
         'stream_iproto_ip' => self::STREAM_IPPROTO_IP,
+        'stream_cast_as_stream' => self::STREAM_CAST_AS_STREAM,
+        'stream_cast_for_select' => self::STREAM_CAST_FOR_SELECT,
         'sunfuncs_ret_string' => VmDate::SUNFUNCS_RET_STRING,
         'sunfuncs_ret_double' => VmDate::SUNFUNCS_RET_DOUBLE,
         'sunfuncs_ret_timestamp' => VmDate::SUNFUNCS_RET_TIMESTAMP,
