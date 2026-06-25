@@ -83,6 +83,8 @@ final class BuiltinByRefParams
             case 'passthru':
             case 'system':
                 return [1];
+            case 'proc_open':
+                return [2];
         }
 
         return [];

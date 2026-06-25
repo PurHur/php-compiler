@@ -79,4 +79,10 @@ final class BuiltinByRefParamsTest extends TestCase
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('dns_get_mx'));
         $this->assertSame([1, 2], BuiltinByRefParams::forFunction('GETMXRR'));
     }
+
+    public function testProcOpenPipesByRef(): void
+    {
+        $this->assertSame([2], BuiltinByRefParams::forFunction('proc_open'));
+        $this->assertSame([2], BuiltinByRefParams::forFunction('PROC_OPEN'));
+    }
 }
