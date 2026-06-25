@@ -68,9 +68,7 @@ final class stream_select extends Internal
             + \count($writePairs ?? [])
             + \count($exceptPairs ?? []);
         if (0 === $totalPairs) {
-            $frame->returnVar->int(0);
-
-            return;
+            throw new \ValueError('No stream arrays were passed');
         }
 
         VmStreamSelectGuard::ensureSelectableStreamArrays($readPairs, $writePairs ?? [], $exceptPairs ?? []);
