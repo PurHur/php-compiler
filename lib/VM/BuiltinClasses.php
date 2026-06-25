@@ -191,6 +191,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyConstruct;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAsymmetricVisibility;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetDeclaringClass;
+use PHPCompiler\VM\Builtin\ReflectionPropertyGetDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetHooks;
 use PHPCompiler\VM\Builtin\ReflectionPropertyHasDefaultValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsDefaultValueAvailable;
@@ -628,6 +629,8 @@ final class BuiltinClasses
         $rp->methodVisibility['getname'] = $pub;
         $rp->methods['getdeclaringclass'] = new ReflectionPropertyGetDeclaringClass();
         $rp->methodVisibility['getdeclaringclass'] = $pub;
+        $rp->methods['getdefaultvalue'] = new ReflectionPropertyGetDefaultValue();
+        $rp->methodVisibility['getdefaultvalue'] = $pub;
         $rp->methods['getvalue'] = new ReflectionPropertyGetValue();
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['setvalue'] = new ReflectionPropertySetValue();

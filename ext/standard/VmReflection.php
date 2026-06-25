@@ -1092,6 +1092,28 @@ final class VmReflection
         return null !== $prop->default && !$prop->hasRuntimeDefaultInit();
     }
 
+    public static function copyPropertyDefaultValue(Variable $dest, ClassProperty $prop, Context $ctx): bool
+    {
+        $value = $ctx->runtime->vm()->evaluatePropertyDefaultForReflection($prop);
+        if (null === $value) {
+            return false;
+        }
+        $dest->copyFrom($value);
+
+        return true;
+    }
+
+    public static function copyStaticPropertyDefaultValue(Variable $dest, Variable $storage): bool
+    {
+        if (!self::staticPropertyHasDefaultValue($storage)) {
+            return false;
+        }
+        $resolved = $storage->resolveIndirect();
+        $dest->copyFrom($resolved);
+
+        return true;
+    }
+
     /**
      * ReflectionClass::getDefaultProperties() — declared defaults along inheritance chain (#11441).
      *
