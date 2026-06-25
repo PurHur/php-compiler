@@ -1,5 +1,5 @@
 --TEST--
-Language: isset() on uninitialized get+set property hook returns false without get hook (#11262, zend_object_handlers.c)
+Language: isset()/empty() on uninitialized get+set property hook — no get hook (#11262, #11617, zend_object_api.c)
 --FILE--
 <?php
 class C {
@@ -11,5 +11,8 @@ class C {
 }
 $c = new C();
 var_export(isset($c->x));
+echo "\n";
+var_export(empty($c->x));
 --EXPECT--
 false
+true

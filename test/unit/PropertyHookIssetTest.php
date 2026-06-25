@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** isset() on property hooks — same-name backing probes storage; separate backing invokes get (#11262, #10680, #11467). */
+/** isset()/empty() on property hooks — same-name backing probes storage; separate backing invokes get (#11262, #10680, #11467, #11617). */
 final class PropertyHookIssetTest extends TestCase
 {
     public function testVmIssetOnUninitializedHookedBackingReturnsFalseWithoutGetHook(): void
@@ -29,6 +29,27 @@ PHP;
         ob_start();
         $rt->run($block);
         self::assertSame("bool(false)\n", ob_get_clean());
+    }
+
+    public function testVmEmptyOnUninitializedHookedBackingReturnsTrueWithoutGetHook(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x {
+        get { echo "GET\n"; return $this->x; }
+        set => $this->x = $value;
+    }
+    private int $x;
+}
+$c = new C();
+var_dump(empty($c->x));
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        self::assertSame("bool(true)\n", ob_get_clean());
     }
 
     public function testVmIssetOnVirtualGetHookInvokesGet(): void
