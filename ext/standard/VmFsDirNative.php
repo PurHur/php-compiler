@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * mkdir/rmdir/chmod/chown/chgrp via libc FFI — no host PHP builtin delegation.
+ * mkdir/rmdir/chmod/chown/chgrp via libc FFI; falls back to {@see VmFsDirPure} when unavailable (#8991).
  *
  * Mirrors {@see \PHPCompiler\JIT\Builtin\StringFsDirJit} (__compiler_mkdir/chown/chgrp)
  * and {@see JitRmdir}/{@see JitChmod} (php-src ext/standard/filestat.c).
@@ -22,7 +22,7 @@ final class VmFsDirNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFsDirPure::available();
     }
 
     public static function mkdir(string $path, int $mode, bool $recursive): bool
@@ -65,7 +65,7 @@ final class VmFsDirNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsDirPure::rmdir($path);
         }
 
         return 0 === (int) $ffi->rmdir($path);
@@ -78,7 +78,7 @@ final class VmFsDirNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsDirPure::chmod($path, $permissions);
         }
 
         return 0 === (int) $ffi->chmod($path, $permissions & 07777);
@@ -108,7 +108,7 @@ final class VmFsDirNative
     {
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsDirPure::mkdir($path, $mode, false);
         }
 
         return 0 === (int) $ffi->mkdir($path, $mode);
@@ -121,7 +121,7 @@ final class VmFsDirNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsDirPure::chownAt($path, $uid, $gid, $linkOnly);
         }
         if ($linkOnly) {
             return 0 === (int) $ffi->fchownat(
