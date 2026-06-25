@@ -32,6 +32,13 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsStreamSupports()
+                && (str_contains($name, 'stream_supports.phpt')
+                    || str_contains($name, 'stream_support_constants')
+                    || str_contains($name, 'stream_meta_seekable'))
+                && !str_contains($name, 'stream_supports_phantom')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {

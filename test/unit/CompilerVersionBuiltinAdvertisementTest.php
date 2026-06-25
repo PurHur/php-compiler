@@ -34,9 +34,20 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testStreamSupportsNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStreamSupports());
+    }
+
     public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
+    }
+
+    public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
     }
 }

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * stream_supports() feature codes — php-src main/php_streams.h (STREAM_META_*)
  * plus compiler feature probes (STREAM_LOCK, STREAM_FILTER).
@@ -29,7 +31,7 @@ final class VmStreamSupports
     /** @return array<string, int> */
     public static function constants(): array
     {
-        return [
+        $constants = [
             'STREAM_META_TOUCH' => self::STREAM_META_TOUCH,
             'STREAM_META_OWNER_NAME' => self::STREAM_META_OWNER_NAME,
             'STREAM_META_OWNER' => self::STREAM_META_OWNER,
@@ -39,9 +41,13 @@ final class VmStreamSupports
             'STREAM_LOCK' => self::STREAM_LOCK,
             'STREAM_META_SEEKABLE' => self::STREAM_META_SEEKABLE,
             'STREAM_FILTER' => self::STREAM_FILTER,
-            'STREAM_SUPPORT_LOCK' => self::STREAM_SUPPORT_LOCK,
-            'STREAM_SUPPORT_SEEK' => self::STREAM_SUPPORT_SEEK,
-            'STREAM_SUPPORT_TELL' => self::STREAM_SUPPORT_TELL,
         ];
+        if (CompilerVersion::supportsStreamSupports()) {
+            $constants['STREAM_SUPPORT_LOCK'] = self::STREAM_SUPPORT_LOCK;
+            $constants['STREAM_SUPPORT_SEEK'] = self::STREAM_SUPPORT_SEEK;
+            $constants['STREAM_SUPPORT_TELL'] = self::STREAM_SUPPORT_TELL;
+        }
+
+        return $constants;
     }
 }
