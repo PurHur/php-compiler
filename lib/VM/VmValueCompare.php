@@ -18,7 +18,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\SpaceshipRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitFloatCompare;
 use PHPCompiler\JIT\JitStringCompare;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -708,7 +707,7 @@ final class VmValueCompare
             $valuePtr
         );
 
-        return JitFloatCompare::relationalCompare(
+        return VmFloatCompare::relationalCompare(
             $context,
             $opcodeType,
             $leftDouble,
@@ -731,7 +730,7 @@ final class VmValueCompare
             $valuePtr
         );
 
-        return JitFloatCompare::relationalCompare(
+        return VmFloatCompare::relationalCompare(
             $context,
             $opcodeType,
             $nativeDouble,

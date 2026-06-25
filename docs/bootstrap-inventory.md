@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3150 |
-| Phase A inventory files (M2 ratio SSOT) | 3150 |
+| PHP files on vm.php path | 3153 |
+| Phase A inventory files (M2 ratio SSOT) | 3153 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8426 |
+| Source constructs flagged (warnings) | 8429 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -3041,6 +3041,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmClosure.php` | 0 | 7 |
 | `lib/VM/VmEmpty.php` | 0 | 1 |
 | `lib/VM/VmFiberValue.php` | 0 | 1 |
+| `lib/VM/VmFloatCompare.php` | 0 | 1 |
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
@@ -3048,6 +3049,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmIteratorProtocol.php` | 0 | 9 |
 | `lib/VM/VmLazyObject.php` | 0 | 1 |
 | `lib/VM/VmObjectPropertyForeach.php` | 0 | 3 |
+| `lib/VM/VmPowNumericOperandGuard.php` | 0 | 1 |
+| `lib/VM/VmResourceIdString.php` | 0 | 1 |
 | `lib/VM/VmStringCompare.php` | 0 | 1 |
 | `lib/VM/VmUnset.php` | 0 | 1 |
 | `lib/VM/VmValueCompare.php` | 0 | 1 |
@@ -19677,7 +19680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitFloatCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/JitHttpResponseCodeArg.php`
 
@@ -19733,7 +19736,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitPowNumericOperandGuard.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/JitReferencableCheck.php`
 
@@ -19748,7 +19751,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitResourceIdString.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 1 class method(s)
 
 ### `lib/JIT/JitRoundModeArg.php`
 
@@ -23480,6 +23483,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/VM/VmFloatCompare.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `lib/VM/VmFromCallable.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23542,6 +23550,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JitVariable (line 101)
 - new JitVariable (line 113)
 - 13 class method(s)
+
+### `lib/VM/VmPowNumericOperandGuard.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
+
+### `lib/VM/VmResourceIdString.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `lib/VM/VmStringCompare.php`
 
