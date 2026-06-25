@@ -2261,6 +2261,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/SessionStorageRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionUnset.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SessionWriteClose.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SilenceRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/SilenceStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SpaceshipCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SpaceshipRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SplAutoloadOutput.php';

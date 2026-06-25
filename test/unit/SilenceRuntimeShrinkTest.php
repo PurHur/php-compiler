@@ -20,6 +20,14 @@ final class SilenceRuntimeShrinkTest extends TestCase
 
         $silenceSource = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SilenceRuntime.php');
         $this->assertStringContainsString('ErrorSilenceJitHelper', $silenceSource);
+        $this->assertStringContainsString('SilenceStandaloneLlvm', $silenceSource);
+        $this->assertStringNotContainsString('implementStandaloneThinAbi', $silenceSource);
+        $this->assertStringNotContainsString('standaloneAbiFunction', $silenceSource);
+        $this->assertLessThan(380, \substr_count($silenceSource, "\n") + 1);
+
+        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SilenceStandaloneLlvm.php');
+        $this->assertStringContainsString('__compiler_begin_silence', $llvm);
+        $this->assertStringContainsString('__compiler_error_reporting', $llvm);
     }
 
     public function testErrorSilenceHelperUsesSilenceRuntime(): void
