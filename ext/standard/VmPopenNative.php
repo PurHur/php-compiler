@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc popen(3)/pclose(3) for VM without host PHP \popen()/\pclose() (#8250, #6211).
+ * libc popen(3)/pclose(3) for VM; falls back to {@see VmPopenPure} when FFI unavailable (#8951).
  *
  * php-src: ext/standard/exec.c — PHP_FUNCTION(popen), PHP_FUNCTION(pclose)
  * JIT/AOT: {@see JitPopen} / __compiler_popen via StreamIoJit.
@@ -18,17 +18,21 @@ final class VmPopenNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmPopenPure::available();
     }
 
     /**
-     * @return array{handle: int, file: \FFI\CData}|false
+     * @return array{handle: int, file: int|\FFI\CData}|false
      */
     public static function open(string $command, string $mode): array|false
     {
+        if (str_contains($command, "\0")) {
+            return false;
+        }
+
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmPopenPure::open($command, $mode);
         }
 
         try {
@@ -67,15 +71,19 @@ final class VmPopenNative
         }
     }
 
-    public static function pclose(\FFI\CData $libcFp): int
+    public static function pclose(int|\FFI\CData $token): int
     {
+        if (\is_int($token)) {
+            return VmPopenPure::pclose($token);
+        }
+
         $ffi = self::ffi();
         if (null === $ffi) {
             return -1;
         }
 
         try {
-            $result = (int) $ffi->pclose($libcFp);
+            $result = (int) $ffi->pclose($token);
 
             return -1 === $result ? -1 : $result;
         } catch (\Throwable) {

@@ -677,8 +677,8 @@ final class VmFs
     }
 
     /**
-     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244).
-     * VmPopenNative (libc FFI) only — no host \\popen() fallback.
+     * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244, #8951).
+     * VmPopenNative with {@see VmPopenPure} fallback when libc FFI unavailable.
      *
      * @return int|false stream handle id
      */
@@ -704,12 +704,16 @@ final class VmFs
      */
     public static function pclose(int $handle): int
     {
-        if (!VmPhpFdStream::isValidHandle($handle)) {
+        if (!isset(self::$popenHandles[$handle])) {
             return -1;
         }
         $nativeFile = self::$popenNativeFiles[$handle] ?? null;
         unset(self::$popenHandles[$handle], self::$popenNativeFiles[$handle]);
-        VmPhpFdStream::close($handle);
+        if (VmPhpFdStream::isValidHandle($handle)) {
+            VmPhpFdStream::close($handle);
+        } else {
+            self::fclose($handle);
+        }
         if (null !== $nativeFile) {
             return VmPopenNative::pclose($nativeFile);
         }
