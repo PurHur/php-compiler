@@ -161,6 +161,18 @@ final class VmForwardStaticCall
     public static function parseExplicitClassFromCallable(Variable $callable, string $builtinName): ?string
     {
         $callable = $callable->resolveIndirect();
+        if (Variable::TYPE_STRING === $callable->type) {
+            $name = $callable->toString();
+            if (!str_contains($name, '::')) {
+                return null;
+            }
+            [$class, $method] = explode('::', $name, 2);
+            if ('' === $class || '' === $method) {
+                return null;
+            }
+
+            return $class;
+        }
         if (Variable::TYPE_ARRAY !== $callable->type) {
             return null;
         }
