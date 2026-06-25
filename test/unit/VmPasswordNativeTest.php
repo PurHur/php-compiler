@@ -59,4 +59,15 @@ final class VmPasswordNativeTest extends TestCase
         $this->assertNotSame('*0', $hash);
         $this->assertStringStartsWith('$2y$', $hash);
     }
+
+    public function testCryptSha256Salt(): void
+    {
+        if (!VmPasswordNative::available()) {
+            $this->markTestSkipped('libcrypt FFI unavailable');
+        }
+        $hash = VmPassword::crypt('pass', '$5$rounds=1000$usesomesillystringf');
+        $this->assertNotSame('*0', $hash);
+        $this->assertStringStartsWith('$5$', $hash);
+        $this->assertGreaterThanOrEqual(60, \strlen($hash));
+    }
 }
