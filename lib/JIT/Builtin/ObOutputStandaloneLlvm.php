@@ -385,7 +385,6 @@ final class ObOutputStandaloneLlvm
             $parentIdx = $context->builder->sub($idx, $i32->constInt(1, false));
             self::mergeRowIntoRow($context, $fn, $parentIdx, $idx);
             self::clearBufferAt($context, $idx);
-            self::emitStdoutFromRow($context, $fn, $parentIdx);
             $context->builder->branch($doneBb);
             $context->builder->positionAtEnd($directBb);
             self::emitStdoutFromRow($context, $fn, $idx);
