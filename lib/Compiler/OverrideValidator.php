@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Block as CfgBlock;
 use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
@@ -27,6 +28,10 @@ final class OverrideValidator
      */
     public static function validateScript(Script $script): void
     {
+        if (!CompilerVersion::supportsOverrideAttribute()) {
+            return;
+        }
+
         $registry = self::buildRegistry($script);
         foreach ($script->main->cfg->children as $child) {
             if ($child instanceof Op\Stmt\Interface_) {
