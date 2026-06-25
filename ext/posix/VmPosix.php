@@ -117,6 +117,7 @@ final class VmPosix
             'release' => \FFI::string($buf->release),
             'version' => \FFI::string($buf->version),
             'machine' => \FFI::string($buf->machine),
+            'domainname' => \FFI::string($buf->domainname),
         ];
     }
 

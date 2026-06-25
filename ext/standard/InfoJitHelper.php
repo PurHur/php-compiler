@@ -114,6 +114,7 @@ final class InfoJitHelper
             2 => $uts['release'],
             3 => $uts['version'],
             4 => $uts['machine'],
+            5 => $uts['domainname'],
             default => '',
         };
     }
