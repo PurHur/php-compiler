@@ -182,7 +182,7 @@ class Module extends ModuleAbstract
             new ldexp(),
             new frexp(),
             new fdiv(),
-            ...(CompilerVersion::supportsFpow() ? [new fpow()] : []),
+            ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax()] : []),
             new intval(),
             new floatval(),
             new doubleval(),
