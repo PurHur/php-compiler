@@ -4028,7 +4028,7 @@ class JIT {
                 );
             }
         }
-        foreach (['setcompileabortdetailifempty', 'setdebuglastphaseinputfile'] as $methodLc) {
+        foreach (['setcompileabortdetailifempty'] as $methodLc) {
             $logical = 'PHPCompiler\\Compiler::'.$methodLc;
             $lc = strtolower($logical);
             if (!isset($this->context->functions[$lc])) {
@@ -4038,6 +4038,14 @@ class JIT {
                     $stubBlock
                 );
             }
+        }
+        $getDebugLogical = 'PHPCompiler\\Compiler::getdebuglastphaseinputfile';
+        $getDebugLc = strtolower($getDebugLogical);
+        if (!isset($this->context->functions[$getDebugLc])) {
+            $this->emitM3EmitTuCompilerStringNullStubNative(
+                $this->llvmInternalName($getDebugLogical),
+                $getDebugLogical
+            );
         }
         $resetLogical = 'PHPCompiler\\Compiler::resetcompileabortdetail';
         $resetLc = strtolower($resetLogical);
@@ -4165,6 +4173,33 @@ class JIT {
             [$objectPtr, $strPtr],
             null !== $block ? $this->collectParamDefaults($block) : []
         );
+
+        return $func;
+    }
+
+    /** Null __string__* return for Compiler spine getter — inventory emit link only (#11809). */
+    private function emitM3EmitTuCompilerStringNullStubNative(string $internalName, string $logical): PHPLLVM\Value
+    {
+        $lc = strtolower($logical);
+        if (isset($this->context->functions[$lc])) {
+            return $this->context->functions[$lc];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $strPtr = $this->context->getTypeFromString('__string__*');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($strPtr, false, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnValue($strPtr->constNull());
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lc] = $func;
+        $this->context->functionReturnType[$lc] = '__string__*';
+        $this->context->functionProxies[$lc] = new JIT\Call\Native($func, $logical, [$objectPtr], []);
 
         return $func;
     }
