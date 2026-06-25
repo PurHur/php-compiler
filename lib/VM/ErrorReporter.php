@@ -450,20 +450,7 @@ final class ErrorReporter
                 $walk = $walk->parent;
             }
         }
-        if (null !== $file && $this->isVirtualScriptFilename($file)) {
-            $file = null;
-            $line = 0;
-        }
-
         return [$file, $line];
-    }
-
-    private function isVirtualScriptFilename(string $file): bool
-    {
-        return '' === $file
-            || '-' === $file
-            || 'Standard input code' === $file
-            || 'Command line code' === $file;
     }
 
     private function activeHandlerCopy(): ?Variable
