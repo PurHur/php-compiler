@@ -2197,6 +2197,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MimeContentTypeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NativeDlopen.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandler.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandlerJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputRuntime.php';
