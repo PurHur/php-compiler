@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM helpers for bzcompress()/bzdecompress() — libbz2 via StringBz2Jit (#3402). */
+/** LLVM helpers for bzcompress()/bzdecompress() — Bz2Runtime PHP bridge (#3402, #8868). */
 final class JitBz2
 {
     private static int $blockSerial = 0;
