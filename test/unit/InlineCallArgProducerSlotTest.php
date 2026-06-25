@@ -1981,4 +1981,39 @@ PHP;
         self::assertNotNull($getmyuidReturnSlot);
         self::assertSame($getmyuidReturnSlot, $chownSendSlots[1] ?? null, 'chown sends='.json_encode($chownSendSlots));
     }
+
+    /** Issue #11321 — iterator_to_array(new ArrayObject([...]), false) uses New_ slot, not ctor Array_. */
+    public function testIteratorToArrayInlineNewWithFalsePreserveKeysUsesNewSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$packed = iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'iterator_to_array_preserve_false.php');
+
+        $newSlot = null;
+        $sendSlots = [];
+        $capture = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $capture = true;
+                $sendSlots = [];
+                continue;
+            }
+            if ($capture && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+                continue;
+            }
+            if ($capture && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertNotNull($newSlot);
+        self::assertSame($newSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
 }
