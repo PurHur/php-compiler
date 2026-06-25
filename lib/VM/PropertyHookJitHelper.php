@@ -25,14 +25,23 @@ final class PropertyHookJitHelper
     ): ?string {
         $lcClass = strtolower(ltrim($declaringClass, '\\'));
         $propLc = strtolower($propertyName);
-        $meta = $registry[$lcClass][$propertyName]
-            ?? $registry[$lcClass][$propLc]
-            ?? null;
+        $meta = null;
+        if (isset($registry[$lcClass][$propertyName])) {
+            $meta = $registry[$lcClass][$propertyName];
+        } elseif (isset($registry[$lcClass][$propLc])) {
+            $meta = $registry[$lcClass][$propLc];
+        }
         if (!is_array($meta) || (!isset($meta['get']) && !isset($meta['set']))) {
             return null;
         }
+        if (isset($meta['setBacking'])) {
+            return $meta['setBacking'];
+        }
+        if (isset($meta['getBacking'])) {
+            return $meta['getBacking'];
+        }
 
-        return $meta['setBacking'] ?? $meta['getBacking'] ?? $propertyName;
+        return $propertyName;
     }
 
     public static function isRawHookWrite(

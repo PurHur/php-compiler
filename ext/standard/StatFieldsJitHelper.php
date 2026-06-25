@@ -44,8 +44,11 @@ final class StatFieldsJitHelper
         if (false === $raw) {
             return -1;
         }
+        if (isset($raw[$key])) {
+            return (int) $raw[$key];
+        }
 
-        return (int) ($raw[$key] ?? -1);
+        return -1;
     }
 
     private static function fieldKey(int $fieldId): ?string

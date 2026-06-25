@@ -61,6 +61,9 @@ final class StreamBucketJitHelper
         if (!isset(self::$bucketActive[$slot]) || !self::$bucketActive[$slot]) {
             return '';
         }
+        if (!isset(self::$bucketData[$slot])) {
+            return '';
+        }
 
         return self::$bucketData[$slot];
     }
@@ -71,8 +74,11 @@ final class StreamBucketJitHelper
         if ($slot < 0 || $slot >= self::MAX_BUCKETS) {
             return 0;
         }
+        if (!isset(self::$bucketActive[$slot]) || !self::$bucketActive[$slot]) {
+            return 0;
+        }
 
-        return (isset(self::$bucketActive[$slot]) && self::$bucketActive[$slot]) ? 1 : 0;
+        return 1;
     }
 
     public static function isBrigadeResource(int $handle): int
@@ -81,8 +87,11 @@ final class StreamBucketJitHelper
         if ($slot < 0 || $slot >= self::MAX_BRIGADES) {
             return 0;
         }
+        if (!isset(self::$brigadeActive[$slot]) || !self::$brigadeActive[$slot]) {
+            return 0;
+        }
 
-        return (isset(self::$brigadeActive[$slot]) && self::$brigadeActive[$slot]) ? 1 : 0;
+        return 1;
     }
 
     public static function brigadeAlloc(): int
@@ -108,7 +117,10 @@ final class StreamBucketJitHelper
         if (!isset(self::$brigadeActive[$slot]) || !self::$brigadeActive[$slot]) {
             return 0;
         }
-        $count = self::$brigadeCount[$slot] ?? 0;
+        $count = 0;
+        if (isset(self::$brigadeCount[$slot])) {
+            $count = self::$brigadeCount[$slot];
+        }
         if ($count >= self::MAX_QUEUE) {
             return 0;
         }
@@ -127,7 +139,10 @@ final class StreamBucketJitHelper
         if (!isset(self::$brigadeActive[$slot]) || !self::$brigadeActive[$slot]) {
             return -1;
         }
-        $count = self::$brigadeCount[$slot] ?? 0;
+        $count = 0;
+        if (isset(self::$brigadeCount[$slot])) {
+            $count = self::$brigadeCount[$slot];
+        }
         if (0 === $count) {
             return -1;
         }

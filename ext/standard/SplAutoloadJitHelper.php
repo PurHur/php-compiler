@@ -60,12 +60,20 @@ final class SplAutoloadJitHelper
 
     public static function fnOpaqueAt(int $index): int
     {
-        return self::$fnStack[$index] ?? 0;
+        if (!isset(self::$fnStack[$index])) {
+            return 0;
+        }
+
+        return self::$fnStack[$index];
     }
 
     public static function metaOpaqueAt(int $index): int
     {
-        return self::$metaStack[$index] ?? 0;
+        if (!isset(self::$metaStack[$index])) {
+            return 0;
+        }
+
+        return self::$metaStack[$index];
     }
 
     /** @internal test reset */
