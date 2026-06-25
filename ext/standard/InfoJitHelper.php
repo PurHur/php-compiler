@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, php-in-PHP).
  *
@@ -14,28 +16,24 @@ final class InfoJitHelper
 {
     private static string $extensionFuncsExtension = '';
 
-    private const VERSION_STRING = '8.4.0-dev';
-
-    private const SAPI_STRING = 'cli';
-
     public static function phpversion(?string $extension): string
     {
         if (null === $extension || '' === $extension) {
-            return self::VERSION_STRING;
+            return CompilerVersion::VERSION;
         }
         if (VmInfo::isEngineExtensionName($extension) || VmInfo::isBundledExtensionName($extension)) {
-            return self::VERSION_STRING;
+            return CompilerVersion::VERSION;
         }
         if (!ModuleRegistry::extensionLoaded($extension)) {
             return '';
         }
 
-        return ModuleRegistry::getExtensionVersion($extension) ?? self::VERSION_STRING;
+        return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
     }
 
     public static function php_sapi_name(): string
     {
-        return self::SAPI_STRING;
+        return CompilerVersion::SAPI;
     }
 
     public static function zend_version(): string

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\VmInfo;
 use PHPCompiler\ext\standard\VmPhpCoreConstants;
 use PHPUnit\Framework\TestCase;
 
@@ -37,7 +39,15 @@ final class VmPhpCoreConstantsTest extends TestCase
     {
         $var = VmPhpCoreConstants::fetch('PHP_VERSION');
         $this->assertNotNull($var);
-        $this->assertSame(PHP_VERSION, $var->toString());
+        $this->assertSame(CompilerVersion::VERSION, $var->toString());
+        $this->assertSame(VmInfo::phpversion(), $var->toString());
+    }
+
+    public function testPhpVersionIdMatchesCompilerVersion(): void
+    {
+        $var = VmPhpCoreConstants::fetch('PHP_VERSION_ID');
+        $this->assertNotNull($var);
+        $this->assertSame(CompilerVersion::VERSION_ID, $var->toInt());
     }
 
     public function testFetchExactRejectsLowercasePhpVersion(): void
