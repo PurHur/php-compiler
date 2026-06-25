@@ -162,6 +162,27 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         }', $context);
     }
 
+    /** #11642: entry path must come from aotSourceFilename when jitAotEntryScriptPath unset. */
+    public function testBootstrapNonSpineSelfhostEntryUsesAotSourceFilename(): void
+    {
+        $runtime = new Runtime(Runtime::MODE_AOT);
+        $ctx = new JIT\Context($runtime, JIT\Builtin::LOAD_TYPE_STANDALONE);
+        $minimal = self::$root.'/test/selfhost/compiler_minimal/main.php';
+        $ctx->setAotSourceFilename($minimal);
+        $this->assertTrue($ctx->isBootstrapNonSpineSelfhostEntry());
+        $this->assertFalse($ctx->isCompilerLibSpineSmokeEntry());
+
+        $spine = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
+        $ctx->setAotSourceFilename($spine);
+        $this->assertFalse($ctx->isBootstrapNonSpineSelfhostEntry());
+        $this->assertTrue($ctx->isCompilerLibSpineSmokeEntry());
+
+        $example = self::$root.'/examples/000-HelloWorld/example.php';
+        $ctx->setAotSourceFilename($example);
+        $this->assertFalse($ctx->isBootstrapNonSpineSelfhostEntry());
+        $this->assertFalse($ctx->isCompilerLibSpineSmokeEntry());
+    }
+
     public function testHelloWorldCompileBinScriptExists(): void
     {
         $script = self::$root.'/script/bootstrap-selfhost-helloworld-compile-bin.sh';

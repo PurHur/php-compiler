@@ -328,9 +328,23 @@ class Context {
         }
     }
 
+    /** Outer {main} TU path for bootstrap/AOT entry classification (#11005, #11642). */
+    private function resolveJitAotEntryScriptPath(): string
+    {
+        if ('' !== $this->jitAotEntryScriptPath) {
+            return str_replace('\\', '/', $this->jitAotEntryScriptPath);
+        }
+        $fromAot = $this->aotSourceFilename;
+        if (is_string($fromAot) && '' !== $fromAot) {
+            return str_replace('\\', '/', $fromAot);
+        }
+
+        return '';
+    }
+
     public function isCompilerLibSpineSmokeEntry(): bool
     {
-        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+        $entry = $this->resolveJitAotEntryScriptPath();
 
         return str_ends_with($entry, '/test/selfhost/compiler_lib_spine_smoke/main.php');
     }
@@ -341,7 +355,10 @@ class Context {
      */
     public function isBootstrapNonSpineSelfhostEntry(): bool
     {
-        $entry = str_replace('\\', '/', $this->jitAotEntryScriptPath);
+        $entry = $this->resolveJitAotEntryScriptPath();
+        if ('' === $entry) {
+            return false;
+        }
 
         return str_contains($entry, '/test/selfhost/') && !$this->isCompilerLibSpineSmokeEntry();
     }
@@ -1217,6 +1234,9 @@ class Context {
     public function setAotSourceFilename(?string $filename): void
     {
         $this->aotSourceFilename = $filename;
+        if (null !== $filename && '' !== $filename) {
+            $this->jitAotEntryScriptPath = str_replace('\\', '/', $filename);
+        }
     }
 
     public function setDebug(bool $value): void {
