@@ -10885,8 +10885,13 @@ class Compiler {
                         && (
                             $prev->result === $matchedCallArg
                             || $this->operandsReferToSameVariable($prev->result, $matchedCallArg)
+                            || $this->operandsReferToSameVariable($prev->left, $matchedCallArg)
                         )
                     ) {
+                        return $prev;
+                    }
+                    // php-cfg may lower later call-arg producers (e.g. var_export(..., true)) between ?? and FuncCall (#11601).
+                    if ($this->onlyInlineCallArgProducersBetweenIndices($block->orig->children, $j, $i)) {
                         return $prev;
                     }
                     break;
@@ -13300,6 +13305,24 @@ class Compiler {
             || $op instanceof Op\Expr\MethodCall
             || $op instanceof Op\Expr\StaticCall
             || $op instanceof Op\Expr\New_;
+    }
+
+    /**
+     * @param list<Op> $children
+     */
+    private function onlyInlineCallArgProducersBetweenIndices(array $children, int $fromIndex, int $toIndex): bool
+    {
+        if ($fromIndex >= $toIndex - 1) {
+            return false;
+        }
+        for ($k = $fromIndex + 1; $k < $toIndex; ++$k) {
+            $stmt = $children[$k];
+            if (!$stmt instanceof Op\Expr || !$this->isInlineExprCallArgProducer($stmt)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function isInlineExprCallArgProducer(Op $op): bool

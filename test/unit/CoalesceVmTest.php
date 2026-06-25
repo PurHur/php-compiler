@@ -225,6 +225,34 @@ echo "\n";
         );
     }
 
+    /** Issue #11601: stmt ?? before var_export(..., true) after prior call must wire coalesce slot (WeakMap repro). */
+    public function testCoalesceFuncCallArgAfterPriorVarExport(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+declare(strict_types=1);
+$wm = new WeakMap();
+$obj = new stdClass();
+$wm[$obj] = "val";
+echo "direct=", var_export($wm[$obj], true), "\n";
+echo "nullco=", var_export($wm[$obj] ?? null, true), "\n";
+',
+            "direct='val'\nnullco='val'\n"
+        );
+    }
+
+    public function testArrayDimCoalesceFuncCallArgWithTrueSecondArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+$a = ["k" => "val"];
+echo "x=", var_export($a["k"], true), "\n";
+echo "y=", var_export($a["k"] ?? null, true), "\n";
+',
+            "x='val'\ny='val'\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
