@@ -159,10 +159,14 @@ final class VmPasswordNative
     {
         $cost = self::BCRYPT_DEFAULT_COST;
         if (isset($options['cost'])) {
-            if (!\is_int($options['cost'])) {
+            $costVal = $options['cost'];
+            if (\is_int($costVal)) {
+                $cost = $costVal;
+            } elseif (\is_string($costVal) && '' !== $costVal && is_numeric($costVal)) {
+                $cost = (int) $costVal;
+            } else {
                 return null;
             }
-            $cost = $options['cost'];
         }
         if ($cost < self::BCRYPT_MIN_COST || $cost > self::BCRYPT_MAX_COST) {
             return null;
