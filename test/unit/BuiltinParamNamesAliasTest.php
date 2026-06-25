@@ -358,5 +358,23 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($copy, 'to', 'stream_copy_to_stream'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($copy, 'length', 'stream_copy_to_stream'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($copy, 'offset', 'stream_copy_to_stream'));
+
+        $ssc = BuiltinParamNames::forFunction('stream_socket_client');
+        self::assertSame(
+            ['address', 'error_code', 'error_message', 'timeout', 'flags', 'context'],
+            $ssc
+        );
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($ssc, 'address', 'stream_socket_client'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($ssc, 'timeout', 'stream_socket_client'));
+    }
+
+    /** @covers issue #11576 */
+    public function testStreamSocketClientNamedTimeoutParamResolves(): void
+    {
+        $names = BuiltinParamNames::forFunction('stream_socket_client');
+        self::assertNotNull($names);
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'timeout', 'stream_socket_client'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'stream_socket_client'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'error_message', 'stream_socket_client'));
     }
 }

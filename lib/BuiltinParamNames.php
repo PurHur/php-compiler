@@ -125,6 +125,8 @@ final class BuiltinParamNames
                 return ['options', 'params'];
             case 'stream_copy_to_stream':
                 return ['from', 'to', 'length', 'offset'];
+            case 'stream_socket_client':
+                return ['address', 'error_code', 'error_message', 'timeout', 'flags', 'context'];
             case 'flock':
                 return ['stream', 'operation', 'wouldblock'];
             case 'get_resources':
