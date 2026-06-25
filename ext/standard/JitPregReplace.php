@@ -7,10 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringPregMatch;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -50,6 +52,30 @@ final class JitPregReplace
     private static function unlimitedLimit(Context $context): Value
     {
         return $context->getTypeFromString('int64')->constInt(-1, false);
+    }
+
+    public static function returnNullEmptyPattern(Context $context, string $function): Value
+    {
+        StringPregMatch::ensureLinked($context);
+        StringTriggerErrorJit::implement($context);
+        $message = $function.'(): Empty regular expression';
+        $i8p = $context->getTypeFromString('int8*');
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $sizeT->constInt(\strlen($message), false),
+            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $context->builder->pointerCast($context->constantFromString(''), $i8p),
+            $i32->constInt(0, false)
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
+
+        return $ptr;
     }
 
     private static function replaceString(

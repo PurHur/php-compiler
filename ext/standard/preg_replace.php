@@ -7,10 +7,13 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -37,7 +40,25 @@ final class preg_replace extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        $patternRaw = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_NULL === $patternRaw->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    'preg_replace(): Argument #1 ($pattern) must be of type array|string, null given'
+                );
+            }
+            VmPregFailure::warnEmptyRegularExpression($frame, 'preg_replace');
+            $frame->returnVar->null();
+
+            return;
+        }
         $patternVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        if (Variable::TYPE_STRING === $patternVar->type && '' === $patternVar->toString()) {
+            VmPregFailure::warnEmptyRegularExpression($frame, 'preg_replace');
+            $frame->returnVar->null();
+
+            return;
+        }
         $replacementVar = VmPreg::requireStringOrArrayArg($frame->calledArgs[1], 'preg_replace', 1, 'replacement');
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
@@ -132,7 +153,25 @@ final class preg_replace extends Internal
             );
         }
 
-        $pattern = JitStringArg::lower($context, $args[0], 'preg_replace() pattern');
+        JitInternalStrictArg::rejectNullStringOrArray(
+            $context,
+            $args[0],
+            'preg_replace',
+            'pattern',
+            1
+        );
+        if (($args[0]->isNullConstant ?? false) || '' === JitStringBuiltinArg::compileTimeLiteral($args[0])) {
+            return JitPregReplace::returnNullEmptyPattern($context, 'preg_replace');
+        }
+
+        $pattern = JitStringBuiltinArg::lower(
+            $context,
+            $args[0],
+            'preg_replace',
+            0,
+            'pattern',
+            'array|string'
+        );
         $replacement = JitStringArg::lower($context, $args[1], 'preg_replace() replacement');
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_replace', 2, 'subject');
         if (JITVariable::TYPE_STRING === $args[2]->type) {

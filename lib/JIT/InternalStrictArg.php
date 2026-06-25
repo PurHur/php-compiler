@@ -182,6 +182,67 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    /**
+     * Reject null for array|string internal parameters when caller uses strict_types (#11015).
+     */
+    public static function rejectNullStringOrArray(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::raiseTypeErrorAndAbort(
+                $context,
+                \sprintf(
+                    '%s(): Argument #%d ($%s) must be of type array|string, null given',
+                    $function,
+                    $argNumber,
+                    $paramName
+                )
+            );
+
+            return;
+        }
+        if (Variable::TYPE_VALUE !== $arg->type) {
+            return;
+        }
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $okBlock = BasicBlockHelper::append($context, 'internal_reject_null_strarr_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_reject_null_strarr_fail');
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_NULL, false)
+            ),
+            $failBlock,
+            $okBlock
+        );
+        $context->builder->positionAtEnd($failBlock);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            \sprintf(
+                '%s(): Argument #%d ($%s) must be of type array|string, null given',
+                $function,
+                $argNumber,
+                $paramName
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
     public static function requireBool(
         Context $context,
         Variable $arg,
