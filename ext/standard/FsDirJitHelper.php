@@ -12,15 +12,23 @@ namespace PHPCompiler\ext\standard;
  */
 final class FsDirJitHelper
 {
+    /** JIT/AOT omit sentinel — distinct from explicit -1 mtime/atime (#11587). */
+    public const TOUCH_TIME_OMIT = PHP_INT_MIN;
+
     private static bool $tempnamPendingNotice = false;
 
     public static function touch(string $path, int $mtime, int $atime): bool
     {
         return VmFsTouchNative::touch(
             $path,
-            $mtime < 0 ? null : $mtime,
-            $atime < 0 ? null : $atime
+            self::decodeTouchTime($mtime),
+            self::decodeTouchTime($atime)
         );
+    }
+
+    private static function decodeTouchTime(int $value): ?int
+    {
+        return self::TOUCH_TIME_OMIT === $value ? null : $value;
     }
 
     public static function mkdir(string $path, int $mode, bool $recursive): bool
