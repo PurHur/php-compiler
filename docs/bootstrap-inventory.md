@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3166 |
-| Phase A inventory files (M2 ratio SSOT) | 3166 |
+| PHP files on vm.php path | 3170 |
+| Phase A inventory files (M2 ratio SSOT) | 3170 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8452 |
+| Source constructs flagged (warnings) | 8456 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -368,6 +368,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HttpStatusEnumData.php` | 0 | 1 |
 | `ext/standard/IdateJitHelper.php` | 0 | 1 |
 | `ext/standard/Ieee754.php` | 0 | 1 |
+| `ext/standard/IncludeBindingJitHelper.php` | 0 | 2 |
+| `ext/standard/IncludeJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludePathJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludePathResolveJitHelper.php` | 0 | 1 |
 | `ext/standard/InetJitHelper.php` | 0 | 1 |
@@ -2545,7 +2547,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/HashTableHelper.php` | 0 | 29 |
 | `lib/JIT/Helper.php` | 0 | 8 |
 | `lib/JIT/InOperatorHelper.php` | 0 | 2 |
-| `lib/JIT/IncludeHelper.php` | 0 | 8 |
+| `lib/JIT/IncludeBindingEmitHelper.php` | 0 | 3 |
+| `lib/JIT/IncludeHelper.php` | 0 | 5 |
 | `lib/JIT/InstanceOfHelper.php` | 0 | 6 |
 | `lib/JIT/InstancePropertyVisibilityJitGuard.php` | 0 | 2 |
 | `lib/JIT/InternalStrictArg.php` | 0 | 1 |
@@ -3054,6 +3057,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/VmFloatCompare.php` | 0 | 1 |
 | `lib/VM/VmFromCallable.php` | 0 | 5 |
 | `lib/VM/VmFunctionStatic.php` | 0 | 1 |
+| `lib/VM/VmInclude.php` | 0 | 1 |
 | `lib/VM/VmIsset.php` | 0 | 1 |
 | `lib/VM/VmIteratorForeach.php` | 0 | 15 |
 | `lib/VM/VmIteratorProtocol.php` | 0 | 9 |
@@ -5441,6 +5445,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
+
+### `ext/standard/IncludeBindingJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Literal (line 334)
+- 14 class method(s)
+
+### `ext/standard/IncludeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/IncludePathJitHelper.php`
 
@@ -19646,17 +19661,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 33)
 - 6 class method(s)
 
+### `lib/JIT/IncludeBindingEmitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 90)
+- new Variable (line 117)
+- 5 class method(s)
+
 ### `lib/JIT/IncludeHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Temporary (line 143)
-- new Variable (line 150)
-- new Variable (line 194)
-- new Variable (line 417)
-- new Variable (line 444)
-- new Literal (line 778)
-- new Variable (line 1063)
-- 29 class method(s)
+- new Temporary (line 141)
+- new Variable (line 148)
+- new Variable (line 192)
+- new Variable (line 327)
+- 7 class method(s)
 
 ### `lib/JIT/InstanceOfHelper.php`
 
@@ -23566,6 +23585,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `lib/VM/VmInclude.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/VM/VmIsset.php`
 
