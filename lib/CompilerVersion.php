@@ -140,4 +140,10 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinSince('8.4.0');
     }
+
+    /** PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826). */
+    public static function supportsJsonValidate(): bool
+    {
+        return self::advertisesBuiltinSince('8.3.0');
+    }
 }
