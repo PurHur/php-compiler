@@ -30,6 +30,7 @@ final class IniJitHelper
         'zend.enable_gc',
         'max_execution_time',
         'default_charset',
+        'cfg_file_path',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -229,6 +230,11 @@ final class IniJitHelper
         }
         if ('default_charset' === $key) {
             return self::READONLY_STRING_DEFAULTS['default_charset'];
+        }
+        if ('cfg_file_path' === $key) {
+            $path = VmIniIntrospection::loadedFile();
+
+            return false === $path ? null : $path;
         }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
