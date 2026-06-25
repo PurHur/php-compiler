@@ -28,6 +28,12 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/LateStaticBindingRuntime.php',
         'lib/VM/InOperatorJitHelper.php',
         'lib/VM/InstanceOfJitHelper.php',
+        'ext/standard/func_get_arg.php',
+        'lib/JIT/Builtin/Type/ObjectExitStatusLlvm.php',
+        'lib/VM/VmArrayAccess.php',
+        'lib/VM/VmBoundMethodCallable.php',
+        'lib/VM/VmIteratorProtocol.php',
+        'lib/VM/VmObjectPropertyForeach.php',
         'lib/VM/VmVarFetch.php',
         'lib/VM/VmVarFetchJitHelper.php',
         'lib/VM/VmFromCallable.php',
@@ -439,7 +445,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(3122, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11593)');
+        $this->assertSame(3132, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
