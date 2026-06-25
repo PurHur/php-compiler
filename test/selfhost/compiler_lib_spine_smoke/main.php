@@ -3003,6 +3003,7 @@ require_once __DIR__.'/../../../lib/VM/ClosureState.php';
 require_once __DIR__.'/../../../lib/VM/ClosureSupport.php';
 require_once __DIR__.'/../../../lib/VM/CoalesceJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/CompareJitHelper.php';
+require_once __DIR__.'/../../../lib/VM/VmValueCompare.php';
 require_once __DIR__.'/../../../lib/VM/VmStringCompare.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';
 require_once __DIR__.'/../../../lib/VM/CycleCollector.php';

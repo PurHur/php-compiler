@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\JitValueCompare;
+use PHPCompiler\VM\VmValueCompare;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCompiler\OpCode;
 use function PHPCompiler\opcode_type_name;
@@ -34,7 +34,7 @@ final class VmStringCompare
             case OpCode::TYPE_IDENTICAL:
                 return self::identical($context, $leftStr, $rightStr);
             case OpCode::TYPE_EQUAL:
-                return JitValueCompare::looseEqualStringToString($context, $leftStr, $rightStr);
+                return VmValueCompare::looseEqualStringToString($context, $leftStr, $rightStr);
             case OpCode::TYPE_NOT_IDENTICAL:
             case OpCode::TYPE_NOT_EQUAL:
                 $same = self::identical($context, $leftStr, $rightStr);
