@@ -35,48 +35,28 @@ final class array_walk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_walk() first argument must be an array in this compiler build');
+        $subject = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
+            throw new \TypeError(
+                'array_walk(): Argument #1 ($array) must be of type array|object, '
+                .self::valueTypeName($subject).' given'
+            );
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
-        $src = $array->toArray();
-        if (VmClosureCall::isClosure($callback)) {
-            if (null === $frame->vmContext) {
-                throw new \LogicException('array_walk() requires VM context in this compiler build');
-            }
-            $closure = VmClosureCall::resolve($callback);
-            $ok = self::walkClosure($frame->vmContext, $src, $closure, $userdata);
+        if (Variable::TYPE_ARRAY === $subject->type) {
+            $array = $subject;
+            $src = $array->toArray();
+            $ok = self::walkArraySubject($frame, $array, $src, $callback, $userdata);
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool($ok);
             }
 
             return;
         }
-        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
-        }
-        $fn = VmInternalCall::resolveStringCallback($callback->toString());
-        $out = new HashTable();
-        foreach ($src->iterateKeyed(true) as [$key, $value]) {
-            $result = VmInternalCall::invoke($fn, $value);
-            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
-                if (null !== $frame->returnVar) {
-                    $frame->returnVar->bool(false);
-                }
-
-                return;
-            }
-            if (Variable::TYPE_NULL !== $result->type) {
-                array_map::appendKeyedCopy($out, $key, $result);
-            } else {
-                array_map::appendKeyedCopy($out, $key, $value);
-            }
-        }
-        $array->array($out);
+        $ok = self::walkObjectSubject($frame, $subject->toObject(), $callback, $userdata);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->bool($ok);
         }
     }
 
@@ -105,41 +85,106 @@ final class array_walk extends Internal
         return ArrayBuiltinHelper::walkInPlace($context, $args[0], $args[1]);
     }
 
-    private static function walkClosure(
-        \PHPCompiler\VM\Context $context,
-        HashTable $table,
-        \PHPCompiler\VM\ClosureState $closure,
+    private static function walkArraySubject(
+        Frame $frame,
+        Variable $array,
+        HashTable $src,
+        Variable $callback,
         ?Variable $userdata
     ): bool {
-        foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            if (null !== $userdata) {
-                $userdataCopy = new Variable();
-                $userdataCopy->copyFrom($userdata);
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
-            } else {
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_walk() requires VM context in this compiler build');
             }
+
+            return VmArrayWalk::walkArrayFlatClosure(
+                $frame->vmContext,
+                $src,
+                VmClosureCall::resolve($callback),
+                $userdata
+            );
+        }
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
+        }
+        $fn = VmInternalCall::resolveStringCallback($callback->toString());
+        $out = new HashTable();
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $result = VmInternalCall::invoke($fn, $value);
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
             if (Variable::TYPE_NULL !== $result->type) {
-                self::replaceAtKey($table, $key, $result);
+                array_map::appendKeyedCopy($out, $key, $result);
+            } else {
+                array_map::appendKeyedCopy($out, $key, $value);
+            }
+        }
+        $array->array($out);
+
+        return true;
+    }
+
+    private static function walkObjectSubject(
+        Frame $frame,
+        \PHPCompiler\VM\ObjectEntry $object,
+        Variable $callback,
+        ?Variable $userdata
+    ): bool {
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_walk() requires VM context in this compiler build');
+            }
+
+            return VmArrayWalk::walkObjectFlatClosure(
+                $frame->vmContext,
+                $object,
+                $frame,
+                VmClosureCall::resolve($callback),
+                $userdata
+            );
+        }
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
+        }
+        $fn = VmInternalCall::resolveStringCallback($callback->toString());
+        $vm = $frame->vmContext->runtime->vm();
+        $iterator = new \PHPCompiler\VM\ObjectPropertyIterator($object, $vm, $frame);
+        $iterator->reset();
+        while ($iterator->valid()) {
+            $propName = $iterator->currentKey()->toString();
+            $value = $iterator->currentValue(true);
+            $result = VmInternalCall::invoke($fn, $value);
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+            if (Variable::TYPE_NULL !== $result->type) {
+                $object->getProperty($propName)->copyFrom($result);
             }
         }
 
         return true;
     }
 
-    private static function replaceAtKey(HashTable $table, Variable $key, Variable $value): void
+    private static function valueTypeName(Variable $value): string
     {
-        $copy = new Variable();
-        $copy->copyFrom($value);
-        if (Variable::TYPE_INTEGER === $key->type) {
-            $table->updateIndex($key->toInt(), $copy);
-        } else {
-            $table->update($key->toString(), $copy);
+        switch ($value->type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            default:
+                return 'mixed';
         }
     }
 }

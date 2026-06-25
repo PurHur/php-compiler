@@ -10,7 +10,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -37,36 +36,22 @@ final class array_walk_recursive extends Internal
                 'array_walk_recursive() requires two or three arguments in this compiler build'
             );
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \TypeError(
-                'array_walk_recursive(): Argument #1 ($array) must be of type array, '
-                .self::valueTypeName($array).' given'
-            );
-        }
-        $array->separateArrayForWrite();
+        $subject = $frame->calledArgs[0]->resolveIndirect();
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
-        $table = $array->toArray();
-        if (VmClosureCall::isClosure($callback)) {
-            if (null === $frame->vmContext) {
-                throw new \LogicException(
-                    'array_walk_recursive() requires VM context in this compiler build'
-                );
-            }
-            $closure = VmClosureCall::resolve($callback);
-            $ok = self::walkClosure($frame->vmContext, $table, $closure, $userdata);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->bool($ok);
-            }
-
-            return;
+        if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
+            throw new \TypeError(
+                'array_walk_recursive(): Argument #1 ($array) must be of type array, '
+                .self::valueTypeName($subject).' given'
+            );
         }
-        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
-            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
+        if (Variable::TYPE_ARRAY === $subject->type) {
+            $subject->separateArrayForWrite();
+            $table = $subject->toArray();
+            $ok = $this->walkSubjectArray($frame, $table, $callback, $userdata);
+        } else {
+            $ok = $this->walkSubjectObject($frame, $subject->toObject(), $callback, $userdata);
         }
-        $fn = VmInternalCall::resolveStringCallback($callback->toString());
-        $ok = self::walkString($table, $fn);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }
@@ -98,71 +83,66 @@ final class array_walk_recursive extends Internal
         return ArrayBuiltinHelper::walkRecursiveInPlace($context, $args[0], $args[1]);
     }
 
-    private static function walkString(HashTable $table, Internal $fn): bool
-    {
-        foreach ($table->iterateKeyed(true) as [$key, $value]) {
-            if (Variable::TYPE_ARRAY === $value->type) {
-                $value->separateArrayForWrite();
-                if (!self::walkString($value->toArray(), $fn)) {
-                    return false;
-                }
-                continue;
-            }
-            $result = VmInternalCall::invoke($fn, $value);
-            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
-                return false;
-            }
-            if (Variable::TYPE_NULL !== $result->type) {
-                self::replaceAtKey($table, $key, $result);
-            }
-        }
-
-        return true;
-    }
-
-    private static function walkClosure(
-        \PHPCompiler\VM\Context $context,
-        HashTable $table,
-        \PHPCompiler\VM\ClosureState $closure,
+    private function walkSubjectArray(
+        Frame $frame,
+        \PHPCompiler\VM\HashTable $table,
+        Variable $callback,
         ?Variable $userdata
     ): bool {
-        foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            if (Variable::TYPE_ARRAY === $value->type) {
-                $value->separateArrayForWrite();
-                if (!self::walkClosure($context, $value->toArray(), $closure, $userdata)) {
-                    return false;
-                }
-                continue;
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
             }
-            $keyCopy = new Variable();
-            $keyCopy->copyFrom($key);
-            if (null !== $userdata) {
-                $userdataCopy = new Variable();
-                $userdataCopy->copyFrom($userdata);
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy, $userdataCopy);
-            } else {
-                $result = VmClosureCall::invokeDirect($context, $closure, $value, $keyCopy);
-            }
-            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
-                return false;
-            }
-            if (Variable::TYPE_NULL !== $result->type) {
-                self::replaceAtKey($table, $key, $result);
-            }
+
+            return VmArrayWalk::walkArrayRecursiveClosure(
+                $frame->vmContext,
+                $table,
+                VmClosureCall::resolve($callback),
+                $userdata
+            );
+        }
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
 
-        return true;
+        return VmArrayWalk::walkArrayRecursiveString(
+            $table,
+            VmInternalCall::resolveStringCallback($callback->toString())
+        );
     }
 
-    private static function replaceAtKey(HashTable $table, Variable $key, Variable $value): void
-    {
-        $copy = new Variable();
-        $copy->copyFrom($value);
-        if (Variable::TYPE_INTEGER === $key->type) {
-            $table->updateIndex($key->toInt(), $copy);
-        } else {
-            $table->update($key->toString(), $copy);
+    private function walkSubjectObject(
+        Frame $frame,
+        \PHPCompiler\VM\ObjectEntry $object,
+        Variable $callback,
+        ?Variable $userdata
+    ): bool {
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
+            }
+
+            return VmArrayWalk::walkObjectRecursiveClosure(
+                $frame->vmContext,
+                $object,
+                $frame,
+                VmClosureCall::resolve($callback),
+                $userdata
+            );
         }
+        if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
+        }
+
+        return VmArrayWalk::walkObjectRecursiveString(
+            $object,
+            $frame,
+            VmInternalCall::resolveStringCallback($callback->toString())
+        );
     }
 
     private static function valueTypeName(Variable $value): string
