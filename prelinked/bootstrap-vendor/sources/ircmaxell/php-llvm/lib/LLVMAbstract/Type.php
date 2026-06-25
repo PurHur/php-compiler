@@ -76,7 +76,7 @@ class Type implements CoreType {
                 return self::KIND_METADATA;
             case lib::LLVMX86_MMXTypeKind:
                 return self::KIND_MMX;
-            case lib::LLVMTokenTypeKin:
+            case lib::LLVMTokenTypeKind:
                 return self::KIND_TOKEN;
         }
         throw new \LogicException("Unknown kind returned from LLVM: " . ($this->kind));

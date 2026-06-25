@@ -181,6 +181,10 @@ patch_already_applied() {
     php-llvm-vector-get-address-space.patch)
       grep -q 'function getAddressSpace' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type/Vector.php" 2>/dev/null
       ;;
+    php-llvm-token-type-kind-typo.patch)
+      grep -q 'LLVMTokenTypeKind' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null \
+        && ! grep -q 'LLVMTokenTypeKin' "$ROOT/vendor/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php" 2>/dev/null
+      ;;
     php-cfg-mixed-reserved.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed_.php" ]] \
         && [[ ! -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Mixed.php" ]]
@@ -5331,6 +5335,17 @@ patch_marker_present() {
   grep -qF "$marker" "$ROOT/$old_path" 2>/dev/null
 }
 
+repair_php_llvm_token_type_kind_typo_in_prelinked() {
+  local target="$ROOT/prelinked/bootstrap-vendor/sources/ircmaxell/php-llvm/lib/LLVMAbstract/Type.php"
+  if [[ ! -f "$target" ]]; then
+    return 0
+  fi
+  if grep -q 'LLVMTokenTypeKin' "$target" 2>/dev/null; then
+    sed -i 's/lib::LLVMTokenTypeKin:/lib::LLVMTokenTypeKind:/' "$target"
+    echo "Repaired php-llvm LLVMTokenTypeKin typo in prelinked bootstrap-vendor (#11396)"
+  fi
+}
+
 # Apply a patch file with git/patch(1) only — no overlay dispatch (avoids recursion).
 apply_patch_file_direct() {
   local patch="$1"
@@ -5727,7 +5742,9 @@ apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-typed-prop.patch"
 apply_patch "$PATCH_DIR/php-llvm-pass-manager-builder-populate.patch"
 apply_patch "$PATCH_DIR/php-llvm-memory-buffer-bitcode.patch"
 apply_patch "$PATCH_DIR/php-llvm-vector-get-address-space.patch"
+apply_patch "$PATCH_DIR/php-llvm-token-type-kind-typo.patch"
 apply_patch "$PATCH_DIR/php-llvm-x86-posix-fallback.patch"
+repair_php_llvm_token_type_kind_typo_in_prelinked
 
 # php-cfg before php-types: php-types-mixed-reserved.patch references Op\Type\Mixed_.
 if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
