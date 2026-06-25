@@ -1007,6 +1007,7 @@ require_once __DIR__.'/../../../ext/standard/VmDirPure.php';
 require_once __DIR__.'/../../../ext/standard/VmDns.php';
 require_once __DIR__.'/../../../ext/standard/VmDnsMx.php';
 require_once __DIR__.'/../../../ext/standard/VmDnsUdpNative.php';
+require_once __DIR__.'/../../../ext/standard/VmDnsUdpPure.php';
 require_once __DIR__.'/../../../ext/standard/VmEnv.php';
 require_once __DIR__.'/../../../ext/standard/VmEnvEnvironNative.php';
 require_once __DIR__.'/../../../ext/standard/VmEnvPutenvNative.php';

@@ -24,6 +24,7 @@ final class VmDnsGetMxRuntimeShrinkTest extends TestCase
     {
         $this->assertFileExists(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
+        $this->assertStringContainsString('VmDnsUdpPure::', $source);
         $this->assertStringContainsString('$ffi->socket', $source);
         $this->assertStringContainsString('$ffi->send', $source);
         $this->assertStringContainsString('$ffi->recv', $source);
