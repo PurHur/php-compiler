@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -26,17 +27,22 @@ final class json_encode extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
+        if (!isset($frame->calledArgs[0])) {
             throw new \LogicException('json_encode() requires at least one argument');
+        }
+        foreach (\array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 2) {
+                throw new \ArgumentCountError(\sprintf(
+                    'json_encode() expects at most 3 arguments, %d given',
+                    $idx + 1
+                ));
+            }
         }
         if (null === $frame->returnVar) {
             return;
         }
-        if ($argc > 2) {
-            throw new \LogicException('json_encode() accepts at most two arguments');
-        }
-        $flags = self::resolveFlagsVm($frame, $argc);
+        $flags = self::resolveFlagsVm($frame);
+        self::resolveDepthVm($frame);
         $ctx = $frame->vmContext;
         $vm = null !== $ctx ? $ctx->runtime->vm : null;
         try {
@@ -64,8 +70,8 @@ final class json_encode extends Internal
         if (\count($args) < 1) {
             throw new \LogicException('json_encode() requires at least one argument');
         }
-        if (\count($args) > 2) {
-            throw new \LogicException('json_encode() accepts at most two arguments');
+        if (\count($args) > 3) {
+            throw new \LogicException('json_encode() accepts at most three arguments');
         }
 
         $flagsVal = self::lowerFlagsJitValue($context, $args);
@@ -89,9 +95,9 @@ final class json_encode extends Internal
         return JitJsonEncode::encode($context, $args[0], $flagsVal);
     }
 
-    private static function resolveFlagsVm(Frame $frame, int $argc): int
+    private static function resolveFlagsVm(Frame $frame): int
     {
-        if ($argc < 2) {
+        if (!isset($frame->calledArgs[1])) {
             return 0;
         }
         $flagsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -104,12 +110,30 @@ final class json_encode extends Internal
         return $flagsVar->toInt();
     }
 
+    private static function resolveDepthVm(Frame $frame): int
+    {
+        if (!isset($frame->calledArgs[2])) {
+            return 512;
+        }
+        $depth = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[2]->resolveIndirect(),
+            'json_encode',
+            3,
+            'depth'
+        );
+        if ($depth < 1) {
+            throw new \ValueError('json_encode(): Argument #3 ($depth) must be greater than 0');
+        }
+
+        return $depth;
+    }
+
     /**
      * @param list<JITVariable> $args
      */
     private static function lowerFlagsJitValue(Context $context, array $args): Value
     {
-        if (\count($args) < 2) {
+        if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
@@ -121,7 +145,7 @@ final class json_encode extends Internal
      */
     private static function tryCompileTimeFlags(Context $context, array $args): ?int
     {
-        if (\count($args) < 2) {
+        if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return 0;
         }
         $flagsArg = $args[1];
