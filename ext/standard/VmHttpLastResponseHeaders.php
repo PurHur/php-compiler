@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Last HTTP stream-wrapper response headers (php-src ext/standard/basic_functions.c, issue #7236).
  *
- * Populated when {@see VmFs::fileGetContents()} completes an http fetch via {@see VmHttpFetchNative}.
+ * Populated when {@see VmFs::fileGetContents()} completes an http fetch via {@see VmHttpFetchPure}.
  */
 final class VmHttpLastResponseHeaders
 {

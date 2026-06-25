@@ -18,8 +18,11 @@ final class VmGetHeadersRuntimeShrinkTest extends TestCase
 
     public function testVmHttpFetchNativeExposesFetchHeaders(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchNative.php');
-        $this->assertStringContainsString('fetchHeaders(string $url)', $source);
-        $this->assertStringContainsString("request(\$url, 'HEAD')", $source);
+        $nativeSource = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchNative.php');
+        $this->assertStringContainsString('fetchHeaders(string $url', $nativeSource);
+        $this->assertStringContainsString('VmHttpFetchPure::fetchHeaders', $nativeSource);
+
+        $pureSource = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHttpFetchPure.php');
+        $this->assertStringContainsString("httpOptionMethod(\$httpOptions, 'HEAD')", $pureSource);
     }
 }
