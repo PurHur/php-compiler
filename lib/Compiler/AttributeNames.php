@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Op;
 
 /**
@@ -77,6 +78,10 @@ final class AttributeNames
      */
     public static function assertOverrideMethodTargetOnly(array $names, string $target): void
     {
+        if (!CompilerVersion::supportsOverrideAttribute()) {
+            return;
+        }
+
         if (!self::hasOverride($names)) {
             return;
         }
