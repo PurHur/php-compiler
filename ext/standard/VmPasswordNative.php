@@ -196,6 +196,9 @@ final class VmPasswordNative
             if ($len >= 3 && '1' === $salt[1] && '$' === $salt[2]) {
                 return true;
             }
+            if ($len >= 3 && ('5' === $salt[1] || '6' === $salt[1]) && '$' === $salt[2]) {
+                return true;
+            }
 
             return false;
         }
