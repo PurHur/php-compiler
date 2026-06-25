@@ -99,4 +99,20 @@ final class AttributeNamesDuplicateTest extends TestCase
         AttributeNames::assertCompileTimeConstTargetOnly(['CompileTime'], 'class constant');
         $this->addToAssertionCount(1);
     }
+
+    public function testRejectsSensitiveParameterOnFunction(): void
+    {
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Attribute "SensitiveParameter" cannot target function (allowed targets: parameter)'
+        );
+
+        AttributeNames::assertSensitiveParameterParamTargetOnly(['\\SensitiveParameter'], 'function');
+    }
+
+    public function testAllowsSensitiveParameterOnParameter(): void
+    {
+        AttributeNames::assertSensitiveParameterParamTargetOnly(['\\SensitiveParameter'], 'parameter');
+        $this->addToAssertionCount(1);
+    }
 }

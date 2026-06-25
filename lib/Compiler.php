@@ -709,6 +709,7 @@ class Compiler {
             AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($names, 'parameter');
             AttributeNames::assertOverrideMethodTargetOnly($names, 'parameter');
             AttributeNames::assertCompileTimeConstTargetOnly($names, 'parameter');
+            AttributeNames::assertSensitiveParameterParamTargetOnly($names, 'parameter');
             AttributeNames::validateDuplicates($entries, $this->attributeClassRegistry);
         }
     }
@@ -3462,6 +3463,7 @@ class Compiler {
         $this->assignAttributeMetadata($return, $iface);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
@@ -3489,6 +3491,7 @@ class Compiler {
         $this->assignAttributeMetadata($return, $trait);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $traitLc = strtolower(ltrim($name, '\\'));
         $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
@@ -3523,6 +3526,7 @@ class Compiler {
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($enum);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
         $enumName = $this->staticNameFromOperand($enum->name);
         if (null !== $enumName) {
             AttributeNames::assertAllowDynamicPropertiesNotOnEnum($return->attributeNames, $enumName);
@@ -3662,6 +3666,7 @@ class Compiler {
         $this->assignSourceMetadata($declare, $child);
         AttributeNames::assertAllowDynamicPropertiesClassTargetOnly($declare->attributeNames, 'method');
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'method');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'method');
         $declare->parameterMetadata = $this->parameterMetadataFromParams($child->func->params);
         $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $result->addOpCode($declare);
@@ -3752,6 +3757,7 @@ class Compiler {
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($class);
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
         $this->applySealedMetadataFromOp($class, $return);
         $return->classIsAbstract = VM\ClassAbstract::fromClassFlags($class->flags);
         if ($return->classIsAbstract) {
@@ -4557,6 +4563,7 @@ class Compiler {
                     );
                     AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
                     AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
+                    AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property');
                     $declare->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
                     $this->assignSourceMetadata($declare, $child);
                     $result->addOpCode($declare);
@@ -4680,6 +4687,7 @@ class Compiler {
         $constOp->deprecatedMetadata = DeprecatedMetadata::fromOp($child);
         $this->assignAttributeMetadata($constOp, $child);
         AttributeNames::assertCompileTimeConstTargetOnly($constOp->attributeNames, 'class constant');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($constOp->attributeNames, 'class constant');
         $result->addOpCode($constOp);
         if (null !== $this->compilingClassLc && isset($result->constants[$valueSlot])) {
             $constName = $this->staticNameFromOperand($child->name);
@@ -5223,6 +5231,7 @@ class Compiler {
         AttributeTargetValidator::assertPromotedParameterTargets($declare->attributeEntries, $this->attributeClassRegistry);
         AttributeNames::assertOverrideMethodTargetOnly($declare->attributeNames, 'property');
         AttributeNames::assertCompileTimeConstTargetOnly($declare->attributeNames, 'property');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($declare->attributeNames, 'property');
         $result->addOpCode($declare);
     }
 
@@ -6668,6 +6677,7 @@ class Compiler {
         $this->assignAttributeMetadata($return, $function);
         $this->assignSourceMetadata($return, $function);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'function');
         return $return;
     }
 
@@ -7834,6 +7844,7 @@ class Compiler {
         $this->assignAttributeMetadata($op, $expr);
         $this->assignSourceMetadata($op, $expr);
         AttributeNames::assertCompileTimeConstTargetOnly($op->attributeNames, 'function');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($op->attributeNames, 'function');
         if ($expr instanceof Op\Expr\Closure) {
             foreach ($expr->useVars as $useVar) {
                 if (!$useVar instanceof Operand\BoundVariable) {
@@ -15905,6 +15916,7 @@ class Compiler {
         $opcode->globalConstStartLine = max(0, $const->getLine());
         $this->assignAttributeMetadata($opcode, $const);
         AttributeNames::assertCompileTimeConstTargetOnly($opcode->attributeNames, 'constant');
+        AttributeNames::assertSensitiveParameterParamTargetOnly($opcode->attributeNames, 'constant');
 
         return $opcode;
     }

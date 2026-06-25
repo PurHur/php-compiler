@@ -150,12 +150,34 @@ final class AttributeNames
     public static function isSensitiveParameter(array $names): bool
     {
         foreach ($names as $name) {
-            if ('SensitiveParameter' === $name || str_ends_with($name, '\\SensitiveParameter')) {
+            $base = ltrim($name, '\\');
+            if ('SensitiveParameter' === $base || str_ends_with($base, '\\SensitiveParameter')) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Zend compile-time target guard (zend_attributes.c, issue #11638).
+     * `#[\SensitiveParameter]` is only valid on parameters.
+     *
+     * @param list<string> $names
+     */
+    public static function assertSensitiveParameterParamTargetOnly(array $names, string $target): void
+    {
+        if (!self::isSensitiveParameter($names)) {
+            return;
+        }
+
+        if ('parameter' === $target) {
+            return;
+        }
+
+        throw new \CompileError(
+            'Attribute "'.self::messageName('SensitiveParameter').'" cannot target '.$target.' (allowed targets: parameter)'
+        );
     }
 
     /** PHP 8.4+ #[\NoDiscard] on functions/methods (issue #5078, Zend zend_attributes.c). */
