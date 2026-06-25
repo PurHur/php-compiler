@@ -847,10 +847,20 @@ restart:
             }
         }
         if (Variable::TYPE_VALUE === $leftType && Variable::TYPE_VALUE === $rightType) {
-            if (OpCode::TYPE_PLUS === $opcode->type) {
+            if (
+                OpCode::TYPE_PLUS === $opcode->type
+                || OpCode::TYPE_MINUS === $opcode->type
+                || OpCode::TYPE_MUL === $opcode->type
+            ) {
                 $leftLong = JitLongArg::lower($this->context, $left, 'binary op left operand');
                 $rightLong = JitLongArg::lower($this->context, $right, 'binary op right operand');
-                $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
+                if (OpCode::TYPE_PLUS === $opcode->type) {
+                    $result = $this->context->builder->addNoSignedWrap($leftLong, $rightLong);
+                } elseif (OpCode::TYPE_MINUS === $opcode->type) {
+                    $result = $this->context->builder->subNoSignedWrap($leftLong, $rightLong);
+                } else {
+                    $result = $this->context->builder->mulNoSignedWrap($leftLong, $rightLong);
+                }
                 goto return_long;
             }
             if (OpCode::TYPE_DIV === $opcode->type || OpCode::TYPE_MODULO === $opcode->type) {

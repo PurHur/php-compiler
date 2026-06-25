@@ -44,6 +44,33 @@ PHP;
         $this->assertStringNotContainsString('Source type: 196', $stderr);
     }
 
+    /** Issue #11392: value×value TYPE_MUL/TYPE_MINUS must not abort JIT lowering (bin/compile.php spine). */
+    public function testValueBoxMulMinusDoesNotAbortJitOnTypeMul(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $source = <<<'PHP'
+<?php
+function pick(int $n): int|string
+{
+    return $n;
+}
+$a = pick(6);
+$b = pick(7);
+$c = pick(20);
+echo ($a * $b), "\n";
+echo ($c - $a), "\n";
+PHP;
+        $output = $this->compileSourceAllowFailure($source, 'value box mul minus');
+        $this->assertStringNotContainsString(
+            'TYPE_MUL for type pair 134 and 134',
+            $output
+        );
+        $this->assertStringNotContainsString(
+            "can't handle binary operation yet: TYPE_MUL for type pair",
+            $output
+        );
+    }
+
     /** Self-host lint of production driver must not fail on FFI::cdef (#2633; full AOT link still LLVM 9 flaky). */
     public function testBinCompilePhpSelfHostLintDoesNotHitFfiCdef(): void
     {
