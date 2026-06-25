@@ -543,7 +543,7 @@ class Context {
     /**
      * Register an alternate name for a user-defined class (ext/standard class_alias, #3095).
      *
-     * php-src: zend_register_class_alias_ex — user classes/interfaces/traits/enums; no alias chains.
+     * php-src: zend_register_class_alias_ex — resolves alias-of-alias to canonical class (#11639).
      */
     public function registerClassAlias(string $original, string $alias, bool $autoload = true): bool
     {
@@ -563,8 +563,8 @@ class Context {
             return false;
         }
 
-        if (isset($this->classAliases[$originalLc])) {
-            return false;
+        while (isset($this->classAliases[$originalLc])) {
+            $originalLc = $this->classAliases[$originalLc];
         }
 
         $entry = $this->classes[$originalLc];
