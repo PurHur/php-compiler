@@ -21,6 +21,10 @@ final class GetrusageJITTest extends BaseTest
             __DIR__.'/cases/stdlib/getrusage_type_jit.phpt',
             'getrusage_type_jit.phpt'
         );
+        yield 'getrusage_bool_type_jit.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/getrusage_bool_type_jit.phpt',
+            'getrusage_bool_type_jit.phpt'
+        );
     }
 
     public function setUp(): void
