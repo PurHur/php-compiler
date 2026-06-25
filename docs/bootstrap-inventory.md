@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3117 |
-| Phase A inventory files (M2 ratio SSOT) | 3117 |
+| PHP files on vm.php path | 3122 |
+| Phase A inventory files (M2 ratio SSOT) | 3122 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8370 |
+| Source constructs flagged (warnings) | 8379 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -879,6 +879,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamCapsJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamContextJitHelper.php` | 0 | 9 |
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamLibcHandleJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamLifecycleJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamNotificationJitHelper.php` | 0 | 5 |
 | `ext/standard/StreamPathJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamSyncJitHelper.php` | 0 | 1 |
@@ -2249,8 +2251,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamGlobalsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamIoJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamLibcHandleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamLifecycle.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamLifecycleRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamMeta.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamMetaJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamNotificationRuntime.php` | 0 | 3 |
@@ -8857,6 +8862,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/StreamLibcHandleJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
+
+### `ext/standard/StreamLifecycleJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `ext/standard/StreamNotificationJitHelper.php`
 
@@ -15524,7 +15539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 281)
+- new ArgumentCountError (line 288)
 - 7 class method(s)
 
 ### `lib/Cfg/OpSubBlockAccess.php`
@@ -17726,12 +17741,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 35 class method(s)
 
+### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 225)
+- 8 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StreamLifecycle.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `lib/JIT/Builtin/StreamLifecycleJit.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `lib/JIT/Builtin/StreamLifecycleRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 201)
+- 7 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php`
 
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)

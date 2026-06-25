@@ -47,6 +47,30 @@ foreach ($lines as $line) {
 }
 
 $marker = '// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).';
+$earlyBootstrap = [
+    'lib/VM/Builtin/VmClassMethod.php',
+];
+$earlySet = array_flip($earlyBootstrap);
+$earlyRequires = [];
+$lateRequires = [];
+foreach ($requires as $req) {
+    if (!preg_match("#require_once __DIR__\\.'/\\.\\./\\.\\./\\.\\./([^']+)';#", $req, $m)) {
+        $lateRequires[] = $req;
+        continue;
+    }
+    if (isset($earlySet[$m[1]])) {
+        $earlyRequires[] = $req;
+        continue;
+    }
+    $lateRequires[] = $req;
+}
+foreach ($earlyBootstrap as $rel) {
+    $line = "require_once __DIR__.'/../../../{$rel}';";
+    if (!in_array($line, $earlyRequires, true)) {
+        $earlyRequires[] = $line;
+    }
+}
+$requires = array_merge($earlyRequires, $lateRequires);
 $out = implode("\n", $header)."\n\n".implode("\n", $requires)."\n".$marker."\n".implode("\n", $footer)."\n";
 file_put_contents($main, $out);
 fwrite(STDOUT, 'bootstrap-spine-repair-main: '.count($requires)." unique requires\n");
