@@ -7,10 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -47,11 +49,7 @@ final class json_decode extends Internal
         );
         $assoc = false;
         if (isset($frame->calledArgs[1])) {
-            $assocVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $assocVar->type) {
-                throw new \TypeError('json_decode(): Argument #2 ($assoc) must be of type bool');
-            }
-            $assoc = $assocVar->toBool();
+            $assoc = self::resolveAssocVm($frame);
         }
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
@@ -122,14 +120,35 @@ final class json_decode extends Internal
     /**
      * @param list<JITVariable> $args
      */
+    private static function resolveAssocVm(Frame $frame): bool
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireBool($frame, 1, 'json_decode', 'assoc')->toBool();
+        }
+
+        return VmMath::parseBoolBuiltinArg(
+            $frame->calledArgs[1],
+            'json_decode',
+            2,
+            'assoc'
+        );
+    }
+
     private static function resolveAssocFlag(Context $context, array $args): bool
     {
         if (!isset($args[1]) || NamedOptionalCallArgs::isOmittedOptional($args[1])) {
             return false;
         }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireBool($context, $args[1], 'json_decode', 'assoc', 2);
+        }
         $assoc = self::compileTimeBool($context, $args[1]);
         if (null !== $assoc) {
             return $assoc;
+        }
+        $int = self::compileTimeInt($context, $args[1]);
+        if (null !== $int) {
+            return 0 !== $int;
         }
 
         throw new \LogicException('json_decode() assoc flag must be a compile-time boolean in this compiler build');
