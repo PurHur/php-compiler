@@ -17,6 +17,11 @@ class VMTest extends BaseTest {
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsZendThreadId()
+                && str_contains($name, 'zend_thread_id')
+                && !str_contains($name, 'zend_thread_id_phantom')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {

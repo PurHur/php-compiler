@@ -54,6 +54,27 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * Version profile for builtin advertisement / function_exists parity (#11842).
+     *
+     * Until stable 8.4.0, match Docker CI Zend 8.2 reference (php-env.sh) so forward-compat
+     * builtins are not phantom-registered on the reference profile.
+     */
+    public static function builtinAdvertisementVersion(): string
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return '8.2.0';
+        }
+
+        return self::VERSION;
+    }
+
+    /** Whether a builtin introduced in $since should appear in function_exists() for the active profile. */
+    public static function advertisesBuiltinSince(string $since): bool
+    {
+        return version_compare(self::builtinAdvertisementVersion(), $since, '>=');
+    }
+
     /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
     public static function supportsStrIncrement(): bool
     {
@@ -112,5 +133,11 @@ final class CompilerVersion
     public static function supportsClassHasFunctions(): bool
     {
         return version_compare(self::VERSION, '8.4', '>=');
+    }
+
+    /** PHP 8.4+ zend_thread_id() (ext/standard/basic_functions.c, issue #6870, #11842). */
+    public static function supportsZendThreadId(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
     }
 }
