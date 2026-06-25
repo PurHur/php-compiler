@@ -29,6 +29,14 @@ final class VmFsTempnam
     public static function invoke(string $directory, string $prefix, Frame $frame): string|false
     {
         $pfx = self::normalizePrefix($prefix);
+        if ('' === $directory) {
+            $fallback = VmSysGetTempDirNative::resolve();
+            if ('' === $fallback) {
+                return false;
+            }
+
+            return self::tryCreate($fallback, $pfx);
+        }
         $path = self::tryCreate($directory, $pfx);
         if (false !== $path) {
             return $path;
