@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmDebugBacktrace;
+use PHPCompiler\Func\Internal;
 
 /**
  * Populate user exception `trace` property on throw (issue #3351; Zend zend_exceptions.c).
@@ -44,6 +45,46 @@ final class ExceptionTrace
             return;
         }
         $traceProp->duplicateFrom(self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame)));
+    }
+
+    /**
+     * Builtin throw trace — Zend includes internal function name at user call site (#11677).
+     */
+    public static function captureOnBuiltinThrow(
+        Context $ctx,
+        Frame $callerFrame,
+        Frame $handlerFrame,
+        Variable $thrown,
+    ): void {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return;
+        }
+        $object = $thrown->toObject();
+        $object->manualConstructTrace = null;
+        if (!self::classHasInstanceProperty($object->class, ExceptionSupport::PROP_TRACE, $ctx)) {
+            return;
+        }
+        $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
+        $existing = $traceProp->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
+            return;
+        }
+        $builtinName = '';
+        if ($handlerFrame->hasHandler() && $handlerFrame->handler instanceof Internal) {
+            $builtinName = $handlerFrame->handler->getName();
+        }
+        $trace = new Variable();
+        $trace->newArray();
+        $ht = $trace->toArray();
+        if ('' !== $builtinName) {
+            $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
+        }
+        $userTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($callerFrame));
+        foreach ($userTrace->toArray()->iterate(true) as $frameVar) {
+            $ht->append($frameVar);
+        }
+        $traceProp->duplicateFrom($trace);
     }
 
     public static function resolveTraceVariable(ObjectEntry $object): Variable
