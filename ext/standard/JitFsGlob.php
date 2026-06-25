@@ -8,6 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Builtin\FsGlobVecRuntime;
 use PHPCompiler\JIT\Builtin\StringFsGlobVecJit;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -39,6 +40,7 @@ final class JitFsGlob
 
     public static function scandir(Context $context, Value $pathStr, Value $sortI32): Value
     {
+        StringTriggerErrorJit::implement($context);
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             StringFsGlobVecJit::implement($context);
 
@@ -75,6 +77,7 @@ final class JitFsGlob
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
+        self::emitScandirFailureWarnings($context, $argStr, $id);
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
@@ -111,6 +114,7 @@ final class JitFsGlob
         $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
         $context->builder->branchIf($failed, $failBlock, $buildBlock);
         $context->builder->positionAtEnd($failBlock);
+        self::emitScandirFailureWarnings($context, $argStr, $id);
         $falseSlot = JitValueBox::alloc($context);
         $falsePtr = JitValueBox::pointer($context, $falseSlot);
         JitValueBox::writeBool($context, $falseSlot, $context->getTypeFromString('int1')->constInt(0, false));
@@ -166,5 +170,14 @@ final class JitFsGlob
         BasicBlockHelper::branchToFreshContinue($context, $tag.'_continue');
 
         return $ht;
+    }
+
+    private static function emitScandirFailureWarnings(Context $context, Value $pathStr, string $id): void
+    {
+        if ('scandir' !== $id) {
+            return;
+        }
+        JitBuiltinWarning::emitPathOpenFailed($context, $pathStr, 'scandir');
+        JitBuiltinWarning::emit($context, 'scandir(): (errno 2): No such file or directory');
     }
 }

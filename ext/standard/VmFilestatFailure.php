@@ -63,6 +63,31 @@ final class VmFilestatFailure
         self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): No such file or directory', $function));
     }
 
+    public static function warnOpendirFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            \sprintf('opendir(%s): Failed to open directory: No such file or directory', $path)
+        );
+    }
+
+    public static function warnScandirFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            \sprintf('scandir(%s): Failed to open directory: No such file or directory', $path)
+        );
+        self::triggerWarningWithHandlerFirst($frame, 'scandir(): (errno 2): No such file or directory');
+    }
+
+    public static function warnRmdirMissing(Frame $frame, string $path): void
+    {
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            \sprintf('rmdir(%s): No such file or directory', $path)
+        );
+    }
+
     private static function triggerWarningWithHandlerFirst(Frame $frame, string $message): void
     {
         if (null === $frame->vmContext) {

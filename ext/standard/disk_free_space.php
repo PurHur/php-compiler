@@ -33,6 +33,7 @@ final class disk_free_space extends Internal
             return;
         }
         if (false === $result) {
+            VmFilestatFailure::warnNoSuchFile($frame, 'disk_free_space');
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->float($result);

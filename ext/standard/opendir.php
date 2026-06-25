@@ -25,6 +25,7 @@ final class opendir extends Internal
         }
         $handle = VmDir::opendir($path);
         if (false === $handle) {
+            VmFilestatFailure::warnOpendirFailed($frame, $path);
             $frame->returnVar->bool(false);
 
             return;
