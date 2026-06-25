@@ -65,7 +65,10 @@ final class exit_ extends Internal
             return;
         }
         $v = $arg->resolveIndirect();
-        if (Variable::TYPE_STRING === $v->type || Variable::TYPE_INTEGER === $v->type) {
+        if (Variable::TYPE_STRING === $v->type
+            || Variable::TYPE_INTEGER === $v->type
+            || Variable::TYPE_BOOLEAN === $v->type
+            || Variable::TYPE_FLOAT === $v->type) {
             return;
         }
         // Zend rejects enum cases at object-to-string conversion (Error), not ZPP (#7214).
@@ -107,7 +110,12 @@ final class exit_ extends Internal
 
     private static function jitRequireStringOrIntStatus(Context $context, JITVariable $arg, string $function): void
     {
-        if (\in_array($arg->type, [JITVariable::TYPE_STRING, JITVariable::TYPE_NATIVE_LONG], true)) {
+        if (\in_array($arg->type, [
+            JITVariable::TYPE_STRING,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::TYPE_NATIVE_BOOL,
+        ], true)) {
             return;
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {

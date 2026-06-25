@@ -1277,6 +1277,39 @@ class Compiler {
         return null;
     }
 
+    /** exit($a && $b) ? … — dead call-arg temp must use && phi / parent cast slot (#11592). */
+    private function resolveExitLogicalShortCircuitCallArgSlot(Block $block): ?string
+    {
+        $phi = $this->logicalShortCircuitPhiMergeSlot($block);
+        if (null !== $phi) {
+            return (string) $phi;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->parents as $parentCfg) {
+            if (!$this->seen->contains($parentCfg)) {
+                continue;
+            }
+            $parentBlock = $this->seen[$parentCfg];
+            for ($i = $parentBlock->nOpCodes - 1; $i >= 0; --$i) {
+                $op = $parentBlock->opCodes[$i];
+                if (OpCode::TYPE_JUMP === $op->type) {
+                    continue;
+                }
+                if (OpCode::TYPE_CAST_BOOL === $op->type) {
+                    return (string) $op->arg1;
+                }
+                if (OpCode::TYPE_ASSIGN === $op->type) {
+                    return (string) $op->arg2;
+                }
+                break;
+            }
+        }
+
+        return null;
+    }
+
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
     {
         foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
@@ -11264,6 +11297,24 @@ class Compiler {
             if (null !== $classConstSlot) {
                 return $classConstSlot;
             }
+            $logicalPhi = $this->logicalShortCircuitPhiMergeSlot($block);
+            if (
+                null !== $logicalPhi
+                && null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex] ?? null)
+                && \in_array(strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''), ['exit', 'die'], true)
+            ) {
+                return (string) $logicalPhi;
+            }
+            $exitPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
+            if (
+                null !== $exitPhi
+                && null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex] ?? null)
+                && \in_array(strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? ''), ['exit', 'die'], true)
+            ) {
+                return $exitPhi;
+            }
 
             return $this->slotForMatchResultDeadCallArg($arg, $block, $cfgCallOp);
         }
@@ -17320,6 +17371,16 @@ class Compiler {
                 );
                 if (null !== $recoveredIssetEmpty) {
                     $valueSlot = $recoveredIssetEmpty;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && \in_array(strtolower($calleeName ?? ''), ['exit', 'die'], true)
+            ) {
+                $logicalPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
+                if (null !== $logicalPhi) {
+                    $valueSlot = $logicalPhi;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
