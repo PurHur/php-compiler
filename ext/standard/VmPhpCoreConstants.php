@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -79,6 +80,10 @@ final class VmPhpCoreConstants
         if (null !== $path) {
             return self::fromPhpValue($path);
         }
+        $compiler = self::compilerVersionConstantLoose($name);
+        if (null !== $compiler) {
+            return self::fromPhpValue($compiler);
+        }
         $canonical = self::canonicalName($name);
         if (null === $canonical || !\defined($canonical)) {
             return null;
@@ -93,6 +98,10 @@ final class VmPhpCoreConstants
         $path = self::pathConstantValue($name);
         if (null !== $path) {
             return self::fromPhpValue($path);
+        }
+        $compiler = self::compilerVersionConstantExact($name);
+        if (null !== $compiler) {
+            return self::fromPhpValue($compiler);
         }
         if (!\in_array($name, self::CORE_NAMES, true) || !\defined($name)) {
             return null;
@@ -114,10 +123,14 @@ final class VmPhpCoreConstants
             }
         }
         foreach (self::CORE_NAMES as $canonical) {
-            if (!\defined($canonical)) {
+            $value = self::compilerVersionConstantExact($canonical);
+            if (null === $value && \defined($canonical)) {
+                $value = \constant($canonical);
+            }
+            if (null === $value) {
                 continue;
             }
-            $var = self::fromPhpValue(\constant($canonical));
+            $var = self::fromPhpValue($value);
             if (null !== $var) {
                 $entries[$canonical] = $var;
             }
@@ -188,6 +201,30 @@ final class VmPhpCoreConstants
         }
 
         return null;
+    }
+
+    /** Runtime version constants — SSOT {@see CompilerVersion} / phpversion() (#11470). */
+    private static function compilerVersionConstantLoose(string $name): mixed
+    {
+        $canonical = self::canonicalName($name);
+        if (null === $canonical) {
+            return null;
+        }
+
+        return self::compilerVersionConstantExact($canonical);
+    }
+
+    private static function compilerVersionConstantExact(string $canonical): mixed
+    {
+        return match ($canonical) {
+            'PHP_VERSION' => CompilerVersion::VERSION,
+            'PHP_MAJOR_VERSION' => CompilerVersion::MAJOR_VERSION,
+            'PHP_MINOR_VERSION' => CompilerVersion::MINOR_VERSION,
+            'PHP_RELEASE_VERSION' => CompilerVersion::RELEASE_VERSION,
+            'PHP_EXTRA_VERSION' => CompilerVersion::EXTRA_VERSION,
+            'PHP_VERSION_ID' => CompilerVersion::VERSION_ID,
+            default => null,
+        };
     }
 
     private static function fromPhpValue(mixed $value): ?Variable

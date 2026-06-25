@@ -10,6 +10,16 @@ final class CompilerVersion
     /** Language/runtime version reported by phpversion() (php-src PHP_VERSION shape). */
     public const VERSION = '8.4.0-dev';
 
+    public const MAJOR_VERSION = 8;
+
+    public const MINOR_VERSION = 4;
+
+    public const RELEASE_VERSION = 0;
+
+    public const EXTRA_VERSION = '-dev';
+
+    public const VERSION_ID = 80400;
+
     /** SAPI name for CLI entrypoints (bin/vm.php, AOT binaries). */
     public const SAPI = 'cli';
 
