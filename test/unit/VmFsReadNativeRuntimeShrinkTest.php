@@ -56,7 +56,7 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
     public function testReadNativeDeclaresLibcOpenReadClose(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsReadNative.php');
-        $this->assertStringContainsString('without host PHP', $source);
+        $this->assertStringContainsString('VmFsReadPure', $source);
         $this->assertStringContainsString('int open(const char *pathname', $source);
         $this->assertStringContainsString('ssize_t read(int fd', $source);
         $this->assertStringContainsString('int close(int fd)', $source);

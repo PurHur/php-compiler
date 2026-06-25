@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * libc open(2)/read(2) for VM file reads without host PHP \\file_get_contents() (#1492, pairs StringFileGetContents).
+ * libc open(2)/read(2) for VM file reads; falls back to {@see VmFsReadPure} when FFI unavailable (#8920).
  *
  * php-src: ext/standard/file.c — php_stream_copy_to_mem
  * JIT/AOT: __compiler_file_get_contents LLVM lowering (unchanged).
@@ -26,7 +26,7 @@ final class VmFsReadNative
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return null !== self::ffi() || VmFsReadPure::available();
     }
 
     public static function read(string $path): string|false
@@ -46,7 +46,7 @@ final class VmFsReadNative
         }
         $ffi = self::ffi();
         if (null === $ffi) {
-            return false;
+            return VmFsReadPure::readSlice($path, $offset, $length);
         }
 
         try {
@@ -173,10 +173,13 @@ final class VmFsReadNative
 
     private static function ffi(): ?\FFI
     {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
         if (null !== self::$ffi) {
             return self::$ffi;
         }
-        if (self::$ffiUnavailable || !self::ffiEnabled() || !\extension_loaded('ffi')) {
+        if (self::$ffiUnavailable || !\extension_loaded('ffi')) {
             self::$ffiUnavailable = true;
 
             return null;
