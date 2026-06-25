@@ -14941,6 +14941,10 @@ class Compiler {
     private function inlineClosureArrayPairCallbackArgIndex(?string $funcName): int
     {
         if (in_array($funcName, [
+            'array_all',
+            'array_any',
+            'array_find',
+            'array_find_key',
             'array_reduce',
             'array_walk',
             'array_walk_recursive',
