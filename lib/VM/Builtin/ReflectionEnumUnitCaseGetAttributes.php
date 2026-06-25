@@ -27,13 +27,10 @@ final class ReflectionEnumUnitCaseGetAttributes extends VmClassMethod
         if (null === $entry || !$entry->isEnum) {
             throw new \LogicException('ReflectionEnumUnitCase refers to unknown enum in this compiler build');
         }
-        $filter = null;
-        if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionEnumUnitCase::getAttributes() name', 1);
-        }
+        [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionEnumUnitCase::getAttributes()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
-                AttributeRegistry::enumCaseAttributes($frame, $entry, strtolower($caseName), $filter)
+                AttributeRegistry::enumCaseAttributes($frame, $entry, strtolower($caseName), $filter, $flags)
             );
         }
     }

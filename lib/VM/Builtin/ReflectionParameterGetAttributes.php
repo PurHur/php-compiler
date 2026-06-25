@@ -20,12 +20,13 @@ final class ReflectionParameterGetAttributes extends VmClassMethod
     {
         $receiver = ReflectionSupport::requireReflectionParameter($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
-        $all = ReflectionSupport::parameterAttributeEntries($ctx, $receiver);
-        $filter = null;
-        if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionParameter::getAttributes() name', 1);
-        }
-        $entries = ReflectionSupport::filterEntriesByName($all, $filter);
+        [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionParameter::getAttributes()');
+        $entries = ReflectionSupport::filterEntriesByName(
+            $ctx,
+            ReflectionSupport::parameterAttributeEntries($ctx, $receiver),
+            $filter,
+            $flags
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(ReflectionSupport::attributesArrayFromEntries($frame, $entries));
         }

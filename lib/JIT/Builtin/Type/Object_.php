@@ -2874,6 +2874,11 @@ class Object_ extends Type {
                 'mode_aot' => \PHPCompiler\Runtime::MODE_AOT,
             ]);
         }
+        if ('reflectionattribute' === $lcname) {
+            $this->seedExternalClassConstants($id, [
+                'is_instanceof' => \PHPCompiler\VM\ReflectionSupport::REFLECTION_ATTRIBUTE_IS_INSTANCEOF,
+            ]);
+        }
     }
 
     private function seedExternalClassConstants(int $id, array $constants): void

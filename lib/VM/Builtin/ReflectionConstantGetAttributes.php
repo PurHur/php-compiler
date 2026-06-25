@@ -27,13 +27,10 @@ final class ReflectionConstantGetAttributes extends VmClassMethod
         if (null === $entry) {
             throw new \LogicException('ReflectionConstant refers to unknown class in this compiler build');
         }
-        $filter = null;
-        if (isset($frame->calledArgs[1])) {
-            $filter = VmReflection::stringArg($frame->calledArgs[1], 'ReflectionConstant::getAttributes() name', 1);
-        }
+        [$filter, $flags] = ReflectionSupport::getAttributesFilterArgs($frame, 'ReflectionConstant::getAttributes()');
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(
-                AttributeRegistry::constantAttributes($frame, $entry, strtolower($constant), $filter)
+                AttributeRegistry::constantAttributes($frame, $entry, strtolower($constant), $filter, $flags)
             );
         }
     }

@@ -15,16 +15,20 @@ use PHPCompiler\VM\Variable;
  */
 final class AttributeRegistry
 {
-    public static function classAttributes(Frame $frame, ClassEntry $entry, ?string $filter): Variable
+    public static function classAttributes(Frame $frame, ClassEntry $entry, ?string $filter, int $flags = 0): Variable
     {
-        $entries = ReflectionSupport::filterEntriesByName($entry->attributeEntries, $filter);
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
+        $entries = ReflectionSupport::filterEntriesByName($ctx, $entry->attributeEntries, $filter, $flags);
         if ([] !== $entries) {
             return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
         }
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($entry->attributeNames, $filter)
+            ReflectionSupport::filterByName($ctx, $entry->attributeNames, $filter, $flags)
         );
     }
 
@@ -32,10 +36,15 @@ final class AttributeRegistry
         Frame $frame,
         ClassEntry $entry,
         string $methodLc,
-        ?string $filter
+        ?string $filter,
+        int $flags = 0
     ): Variable {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
         $allEntries = $entry->methodAttributeEntries[$methodLc] ?? [];
-        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
+        $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
             return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
         }
@@ -44,7 +53,7 @@ final class AttributeRegistry
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($all, $filter)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
         );
     }
 
@@ -52,10 +61,15 @@ final class AttributeRegistry
         Frame $frame,
         ClassEntry $entry,
         string $propLc,
-        ?string $filter
+        ?string $filter,
+        int $flags = 0
     ): Variable {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
         $allEntries = $entry->propertyAttributeEntries[$propLc] ?? [];
-        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
+        $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
             return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
         }
@@ -64,7 +78,7 @@ final class AttributeRegistry
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($all, $filter)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
         );
     }
 
@@ -72,10 +86,15 @@ final class AttributeRegistry
         Frame $frame,
         ClassEntry $entry,
         string $constLc,
-        ?string $filter
+        ?string $filter,
+        int $flags = 0
     ): Variable {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
         $allEntries = $entry->constAttributeEntries[$constLc] ?? [];
-        $entries = ReflectionSupport::filterEntriesByName($allEntries, $filter);
+        $entries = ReflectionSupport::filterEntriesByName($ctx, $allEntries, $filter, $flags);
         if ([] !== $entries) {
             return ReflectionSupport::attributesArrayFromEntries($frame, $entries);
         }
@@ -84,7 +103,7 @@ final class AttributeRegistry
 
         return ReflectionSupport::attributesArray(
             $frame,
-            ReflectionSupport::filterByName($all, $filter)
+            ReflectionSupport::filterByName($ctx, $all, $filter, $flags)
         );
     }
 
@@ -92,13 +111,18 @@ final class AttributeRegistry
         Frame $frame,
         ClassEntry $entry,
         string $caseLc,
-        ?string $filter
+        ?string $filter,
+        int $flags = 0
     ): Variable {
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('AttributeRegistry requires active VM context');
+        }
         $entries = $entry->enumCaseAttributeEntries[$caseLc] ?? [];
 
         return ReflectionSupport::attributesArrayFromEntries(
             $frame,
-            ReflectionSupport::filterEntriesByName($entries, $filter)
+            ReflectionSupport::filterEntriesByName($ctx, $entries, $filter, $flags)
         );
     }
 }
