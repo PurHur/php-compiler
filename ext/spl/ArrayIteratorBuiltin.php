@@ -103,19 +103,19 @@ final class ArrayIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('ArrayIterator::__construct() expects at least 1 argument');
-        }
         $object = SplIteratorSupport::receiver(
             $frame,
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::__construct()'
         );
-        $table = SplIteratorSupport::requireArrayArg(
-            $frame->calledArgs[1],
-            'ArrayIterator::__construct',
-            1
-        );
+        $table = new HashTable();
+        if (isset($frame->calledArgs[1])) {
+            $table = SplIteratorSupport::requireArrayArg(
+                $frame->calledArgs[1],
+                'ArrayIterator::__construct',
+                1
+            );
+        }
         ArrayIteratorBuiltin::init($object, $table);
     }
 }
