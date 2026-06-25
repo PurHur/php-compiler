@@ -103,6 +103,17 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         VmFs::fclose($handle);
     }
 
+    public function testFtellPastEofOnEmptyMemoryStreamReturnsFalse(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        $this->assertSame(0, VmFs::fseek($handle, 99));
+        $this->assertFalse(VmFs::ftell($handle));
+        $this->assertSame(0, VmFs::fseek($handle, 0));
+        $this->assertSame(0, VmFs::ftell($handle));
+        VmFs::fclose($handle);
+    }
+
     public function testFgetcAtEofOnEmptyMemoryStreamReturnsFalse(): void
     {
         $handle = VmFs::fopen('php://memory', 'r+');
