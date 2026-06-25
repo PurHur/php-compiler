@@ -593,6 +593,7 @@ require_once __DIR__.'/../../../ext/standard/JitHashHmacAlgos.php';
 require_once __DIR__.'/../../../ext/standard/JitHeader.php';
 require_once __DIR__.'/../../../ext/standard/JitHeaderRegisterCallback.php';
 require_once __DIR__.'/../../../ext/standard/JitHeadersSent.php';
+require_once __DIR__.'/../../../ext/standard/JitBuiltinWarning.php';
 require_once __DIR__.'/../../../ext/standard/JitHebrev.php';
 require_once __DIR__.'/../../../ext/standard/JitHex2bin.php';
 require_once __DIR__.'/../../../ext/standard/JitHighlight.php';
