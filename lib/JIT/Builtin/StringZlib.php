@@ -7,22 +7,23 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM bodies for gzcompress/gzuncompress/gzdeflate/gzinflate/gzencode/gzdecode (#3194, #6791).
+ * JIT LLVM bodies for gzcompress/gzuncompress/gzdeflate/gzinflate/gzencode/gzdecode (#3194, #6791, #9879).
  *
- * PHP lowering via {@see StringZlibJit}; links libz at AOT link time (-lz).
+ * PHP lowering via {@see ZlibRuntime} → {@see \PHPCompiler\ext\standard\ZlibJitHelper}.
+ * Standalone AOT keeps {@see StringZlibJit} until nested helper link is reliable.
  */
 final class StringZlib
 {
     public static function ensureLinked(Context $context): void
     {
         self::preloadLibz();
-        StringZlibJit::implement($context);
+        ZlibRuntime::ensureLinked($context);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::preloadLibz();
-        StringZlibJit::implement($context);
+        ZlibRuntime::implement($context);
     }
 
     /** MCJIT resolves libz symbols from the host process (issue #3194). */
