@@ -13,6 +13,7 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -29,9 +30,16 @@ final class fputcsv extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('fputcsv() requires two to five arguments in this compiler build');
+        if (!isset($frame->calledArgs[0], $frame->calledArgs[1])) {
+            throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
+        }
+        foreach (\array_keys($frame->calledArgs) as $idx) {
+            if ($idx < 0 || $idx > 4) {
+                throw new \ArgumentCountError(\sprintf(
+                    'fputcsv() expects at most 5 arguments, %d given',
+                    $idx + 1
+                ));
+            }
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
         $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -42,13 +50,13 @@ final class fputcsv extends Internal
         $separator = ',';
         $enclosure = '"';
         $escape = '\\';
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $separator = VmReflection::stringArg($frame->calledArgs[2], 'fputcsv() separator', 2);
         }
-        if ($argc >= 4) {
+        if (isset($frame->calledArgs[3])) {
             $enclosure = VmReflection::stringArg($frame->calledArgs[3], 'fputcsv() enclosure', 3);
         }
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
         VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
@@ -94,15 +102,17 @@ final class fputcsv extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 2 || $argc > 5) {
-            throw new \LogicException('fputcsv() requires two to five arguments in this compiler build');
+        if (\count($args) < 2) {
+            throw new \LogicException('fputcsv() requires at least stream and fields arguments in this compiler build');
         }
-        $compileTimeFailure = $this->emitCompileTimeCsvValidationFailure($context, $argc, ...$args);
+        if (\count($args) > 5) {
+            throw new \LogicException('fputcsv() expects at most 5 arguments');
+        }
+        $compileTimeFailure = $this->emitCompileTimeCsvValidationFailure($context, ...$args);
         if (null !== $compileTimeFailure) {
             return $compileTimeFailure;
         }
-        JitCsvArg::validateFputcsvCall($context, $argc, ...$args);
+        JitCsvArg::validateFputcsvCall($context, ...$args);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $handle = $context->builder->truncOrBitCast(
@@ -113,13 +123,13 @@ final class fputcsv extends Internal
         $separator = $strPtr->constNull();
         $enclosure = $strPtr->constNull();
         $escape = $strPtr->constNull();
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             $separator = JitStringArg::lower($context, $args[2], 'fputcsv() separator');
         }
-        if ($argc >= 4) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             $enclosure = JitStringArg::lower($context, $args[3], 'fputcsv() enclosure');
         }
-        if ($argc >= 5) {
+        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $escape = JitStringArg::lower($context, $args[4], 'fputcsv() escape');
         }
 
@@ -144,15 +154,15 @@ final class fputcsv extends Internal
         throw new \LogicException('fputcsv() fields must be an array in this compiler build');
     }
 
-    private function emitCompileTimeCsvValidationFailure(Context $context, int $argc, JITVariable ...$args): ?Value
+    private function emitCompileTimeCsvValidationFailure(Context $context, JITVariable ...$args): ?Value
     {
         $checks = [
-            [3, 'separator', false, 2],
-            [4, 'enclosure', false, 3],
-            [5, 'escape', true, 4],
+            [2, 'separator', false, 3],
+            [3, 'enclosure', false, 4],
+            [4, 'escape', true, 5],
         ];
-        foreach ($checks as [$argNum, $paramName, $allowEmpty, $argIndex]) {
-            if ($argc < $argNum) {
+        foreach ($checks as [$argIndex, $paramName, $allowEmpty, $argNum]) {
+            if (!isset($args[$argIndex]) || NamedOptionalCallArgs::isOmittedOptional($args[$argIndex])) {
                 continue;
             }
             $literal = $args[$argIndex]->compileTimeString ?? null;

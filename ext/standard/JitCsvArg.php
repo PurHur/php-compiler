@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -14,15 +15,15 @@ use PHPLLVM\Value;
 /** LLVM validation for fputcsv() CSV option strings (#4530, ext/standard/file.c). */
 final class JitCsvArg
 {
-    public static function validateFputcsvCall(Context $context, int $argc, JITVariable ...$args): void
+    public static function validateFputcsvCall(Context $context, JITVariable ...$args): void
     {
-        if ($argc >= 3) {
+        if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             self::validateArg($context, $args[2], 3, 'separator', false);
         }
-        if ($argc >= 4) {
+        if (isset($args[3]) && !NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             self::validateArg($context, $args[3], 4, 'enclosure', false);
         }
-        if ($argc >= 5) {
+        if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             self::validateArg($context, $args[4], 5, 'escape', true);
         }
     }
