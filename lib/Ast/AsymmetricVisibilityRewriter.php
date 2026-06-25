@@ -139,17 +139,23 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Duplicate read+set visibility on the same keyword is a compile fatal (#6774, #9806).
+     * Duplicate or paired read+set visibility before the type is a compile fatal (#6774, #9806, #11656).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` is fatal
-     * (`Multiple access type modifiers are not allowed`). PHP 8.4 accepts explicit read+set pairs
-     * such as `public private(set)` (#11546, php.net/manual asymmetric visibility).
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` and
+     * `public private(set)` are fatal (`Multiple access type modifiers are not allowed`).
+     * Use set-only `private(set)` (implicit public read) or `private(set) public` ordering instead.
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (preg_match(
                 '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
                 $line
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
@@ -177,10 +183,10 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Promoted constructor parameters reject duplicate read+set modifiers (#10237, PHP 8.4 zend_compile.c).
+     * Promoted constructor parameters reject duplicate or paired read+set modifiers (#10237, #11656).
      *
-     * php-src: `public public(set) int $x` in `__construct` is fatal. `public private(set) int $x` is
-     * valid PHP 8.4 promoted asymmetric visibility (#11546). Set-only `private(set) int $x` remains valid (#9877).
+     * php-src: `public public(set) int $x` and `public private(set) int $x` in `__construct` are fatal.
+     * Set-only `private(set) int $x` remains valid (#9877).
      */
     private static function rejectPromotedParamMultipleAccessModifiers(string $source): void
     {
@@ -226,6 +232,12 @@ final class AsymmetricVisibilityRewriter
     {
         if (preg_match(
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $paramsText
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
             $paramsText
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);

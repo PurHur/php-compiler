@@ -1,5 +1,5 @@
 --TEST--
-Language: public private(set) explicit read+set compiles (#11546, PHP 8.4 zend_compile.c)
+Language: public private(set) compile fatal — multiple access modifiers (#11656, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -7,11 +7,5 @@ class C {
 }
 $c = new C();
 echo $c->x, "\n";
-try {
-    $c->x = 2;
-} catch (Error $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
---EXPECT--
-1
-Error: Cannot modify private(set) property C::$x from global scope
+--EXPECT_EXIT--
+255
