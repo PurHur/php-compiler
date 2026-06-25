@@ -12729,6 +12729,9 @@ class JIT {
     /** Reject ++/-- on stream/dir handles (issue #6396, zend_operators.c). */
     private function guardIncDecResourceOperand(JIT\Variable $read, bool $increment): void
     {
+        if (JIT\NestedJitCompileScope::isActive()) {
+            return;
+        }
         $longVal = null;
         if (JIT\Variable::TYPE_NATIVE_LONG === $read->type) {
             $longVal = $this->context->helper->loadValue($read);

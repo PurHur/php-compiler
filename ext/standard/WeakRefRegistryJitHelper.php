@@ -60,7 +60,7 @@ final class WeakRefRegistryJitHelper
         $idx = self::$refCount;
         self::$refTargetPtr[$idx] = $targetPtr;
         self::$refSlotPtr[$idx] = $slotPtr;
-        ++self::$refCount;
+        self::$refCount = self::$refCount + 1;
     }
 
     public static function registerMap(int $targetPtr, int $htPtr, string $key): void
@@ -76,7 +76,7 @@ final class WeakRefRegistryJitHelper
         self::$mapTargetPtr[$idx] = $targetPtr;
         self::$mapHtPtr[$idx] = $htPtr;
         self::$mapKey[$idx] = $stored;
-        ++self::$mapCount;
+        self::$mapCount = self::$mapCount + 1;
     }
 
     public static function unregisterMap(int $targetPtr, int $htPtr, string $key): void
@@ -85,7 +85,8 @@ final class WeakRefRegistryJitHelper
             return;
         }
         $stored = self::storeMapKey($key);
-        for ($i = 0; $i < self::$mapCount; ++$i) {
+        $i = 0;
+        while ($i < self::$mapCount) {
             if (self::$mapTargetPtr[$i] === $targetPtr) {
                 if (self::$mapHtPtr[$i] === $htPtr) {
                     if (self::$mapKey[$i] === $stored) {
@@ -95,6 +96,7 @@ final class WeakRefRegistryJitHelper
                     }
                 }
             }
+            $i = $i + 1;
         }
     }
 
