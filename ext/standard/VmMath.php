@@ -707,6 +707,32 @@ final class VmMath
         return \pow($num, $exponent);
     }
 
+    /** IEEE fmin pair (php-src ext/standard/math.c zend_fmin; #11728). */
+    public static function fminPair(float $a, float $b): float
+    {
+        if (\is_nan($a)) {
+            return $b;
+        }
+        if (\is_nan($b)) {
+            return $a;
+        }
+
+        return $a < $b ? $a : $b;
+    }
+
+    /** IEEE fmax pair (php-src ext/standard/math.c zend_fmax; #11728). */
+    public static function fmaxPair(float $a, float $b): float
+    {
+        if (\is_nan($a)) {
+            return $b;
+        }
+        if (\is_nan($b)) {
+            return $a;
+        }
+
+        return $a > $b ? $a : $b;
+    }
+
     /** @return float fractional part; writes integer part to $intPart (php-src modf). */
     public static function modf(float $num, float &$intPart): float
     {
