@@ -20,6 +20,7 @@ final class IniJitHelper
         'error_reporting',
         'display_errors',
         'memory_limit',
+        'precision',
         'serialize_precision',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
@@ -61,6 +62,8 @@ final class IniJitHelper
 
     private const CFG_MEMORY_LIMIT = '-1';
 
+    private const CFG_PRECISION = '14';
+
     private const CFG_SERIALIZE_PRECISION = '-1';
 
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
@@ -73,6 +76,8 @@ final class IniJitHelper
     private static ?string $displayErrorsLocalValue = null;
 
     private static string $memoryLimit = self::CFG_MEMORY_LIMIT;
+
+    private static int $precision = 14;
 
     private static int $serializePrecision = -1;
 
@@ -107,6 +112,11 @@ final class IniJitHelper
         return \sprintf('%d', self::$serializePrecision);
     }
 
+    private static function precisionAsIniString(): string
+    {
+        return \sprintf('%d', self::$precision);
+    }
+
     private static function sessionGcMaxlifetimeAsIniString(): string
     {
         return \sprintf('%d', self::$sessionGcMaxlifetime);
@@ -137,6 +147,9 @@ final class IniJitHelper
         }
         if ('memory_limit' === $key) {
             return self::$memoryLimit;
+        }
+        if ('precision' === $key) {
+            return self::precisionAsIniString();
         }
         if ('serialize_precision' === $key) {
             return self::serializePrecisionAsIniString();
@@ -180,6 +193,9 @@ final class IniJitHelper
         if ('memory_limit' === $key) {
             return self::setMemoryLimit($newValue);
         }
+        if ('precision' === $key) {
+            return self::setPrecision($newValue);
+        }
         if ('serialize_precision' === $key) {
             return self::setSerializePrecision($newValue);
         }
@@ -215,6 +231,9 @@ final class IniJitHelper
         }
         if ('memory_limit' === $key) {
             return self::CFG_MEMORY_LIMIT;
+        }
+        if ('precision' === $key) {
+            return self::CFG_PRECISION;
         }
         if ('serialize_precision' === $key) {
             return self::CFG_SERIALIZE_PRECISION;
@@ -264,6 +283,9 @@ final class IniJitHelper
             case 'memory_limit':
                 self::$memoryLimit = self::CFG_MEMORY_LIMIT;
                 break;
+            case 'precision':
+                self::$precision = VmIni::parsePrecision(self::CFG_PRECISION);
+                break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
                 break;
@@ -309,6 +331,14 @@ final class IniJitHelper
     {
         $old = self::$memoryLimit;
         self::$memoryLimit = $newValue;
+
+        return $old;
+    }
+
+    private static function setPrecision(string $newValue): string
+    {
+        $old = self::precisionAsIniString();
+        self::$precision = VmIni::parsePrecision($newValue);
 
         return $old;
     }
