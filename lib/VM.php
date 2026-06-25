@@ -640,7 +640,7 @@ class VM {
 
     /**
      * isset($obj->prop) — Zend zend_std_has_property / __isset parity (#3298, #4586).
-     * Hooked properties: same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467).
+     * Hooked properties: same-name backing probes storage only; separate backing invokes get (#11262, #10392, #11467, #11617).
      */
     public function objectPropertyIsSet(ObjectEntry $object, string $propName, ?Frame $frame = null): bool
     {
