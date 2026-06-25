@@ -3401,11 +3401,15 @@ class Object_ extends Type {
             return [];
         }
 
-        $chain = [];
-        $currentLc = $classLc;
-        while (null !== $currentLc) {
-            array_unshift($chain, $currentLc);
-            $currentLc = $this->classParentLc[$currentLc] ?? null;
+        if ($this->isInterfaceClassLc($classLc)) {
+            $chain = $this->expandInterfaceLc($classLc);
+        } else {
+            $chain = [];
+            $currentLc = $classLc;
+            while (null !== $currentLc) {
+                array_unshift($chain, $currentLc);
+                $currentLc = $this->classParentLc[$currentLc] ?? null;
+            }
         }
 
         /** @var array<string, string> method lc => display name */

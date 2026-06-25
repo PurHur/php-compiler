@@ -359,7 +359,7 @@ final class JitGetClassMethods
         if (null !== $vm && isset($vm->classes[$lc])) {
             return self::buildIndexedStringArray(
                 $context,
-                VmReflection::classMethodsList($vm->classes[$lc], $filter)
+                VmReflection::classMethodsList($vm->classes[$lc], $filter, $vm)
             );
         }
 
