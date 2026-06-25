@@ -43,7 +43,7 @@ final class get_class_methods_ extends Internal
             return;
         }
         $frame->returnVar->copyFrom(
-            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT)
+            VmReflection::classMethodsArray($entry, VmReflection::METHOD_FILTER_DEFAULT, $ctx)
         );
     }
 

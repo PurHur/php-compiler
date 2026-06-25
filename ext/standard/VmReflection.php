@@ -1526,37 +1526,71 @@ final class VmReflection
     /**
      * @return list<string>
      */
-    public static function classMethodsList(ClassEntry $entry, int $filter = 7): array
+    public static function classMethodsList(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): array
     {
-        if ($entry->isEnum) {
-            EnumSupport::ensureBuiltinCasesMethod($entry);
+        $entries = [$entry];
+        if ($entry->isInterface && null !== $ctx) {
+            $entries = self::interfaceDeclarationChain($entry, $ctx);
         }
         $names = [];
-        $methodLcs = array_keys($entry->methods);
-        foreach (array_keys($entry->abstractMethods) as $abstractLc) {
-            if (!in_array($abstractLc, $methodLcs, true)) {
-                $methodLcs[] = $abstractLc;
+        /** @var array<string, true> */
+        $seenMethodLcs = [];
+        foreach ($entries as $scan) {
+            if ($scan->isEnum) {
+                EnumSupport::ensureBuiltinCasesMethod($scan);
             }
-        }
-        foreach ($methodLcs as $methodLc) {
-            $vis = $entry->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-            if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
-                continue;
+            $methodLcs = array_keys($scan->methods);
+            foreach (array_keys($scan->abstractMethods) as $abstractLc) {
+                if (!in_array($abstractLc, $methodLcs, true)) {
+                    $methodLcs[] = $abstractLc;
+                }
             }
-            $handler = $entry->methods[$methodLc] ?? null;
-            if ($handler instanceof \PHPCompiler\Func\Internal) {
-                $names[] = $handler->getName();
-            } else {
-                $names[] = $entry->methodNames[$methodLc] ?? $methodLc;
+            foreach ($methodLcs as $methodLc) {
+                if (isset($seenMethodLcs[$methodLc])) {
+                    continue;
+                }
+                $vis = $scan->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+                if (0 !== ($filter & 7) && 0 === ($vis & $filter & 7)) {
+                    continue;
+                }
+                $seenMethodLcs[$methodLc] = true;
+                $handler = $scan->methods[$methodLc] ?? null;
+                if ($handler instanceof \PHPCompiler\Func\Internal) {
+                    $names[] = $handler->getName();
+                } else {
+                    $names[] = $scan->methodNames[$methodLc] ?? $methodLc;
+                }
             }
-        }
-        foreach (self::syntheticEnumMethodNames($entry, $filter) as $methodName) {
-            if (!in_array($methodName, $names, true)) {
-                $names[] = $methodName;
+            foreach (self::syntheticEnumMethodNames($scan, $filter) as $methodName) {
+                if (!in_array($methodName, $names, true)) {
+                    $names[] = $methodName;
+                }
             }
         }
 
         return $names;
+    }
+
+    /**
+     * Interface + parent interfaces for get_class_methods() (php-src basic_functions.c, #11689).
+     *
+     * @return list<ClassEntry>
+     */
+    private static function interfaceDeclarationChain(ClassEntry $entry, Context $ctx): array
+    {
+        $chain = [$entry];
+        foreach ($entry->interfaces as $parentLc) {
+            if (!isset($ctx->classes[$parentLc])) {
+                continue;
+            }
+            foreach (self::interfaceDeclarationChain($ctx->classes[$parentLc], $ctx) as $parent) {
+                if (!in_array($parent, $chain, true)) {
+                    $chain[] = $parent;
+                }
+            }
+        }
+
+        return $chain;
     }
 
     /**
@@ -1577,12 +1611,12 @@ final class VmReflection
         return ['from', 'tryFrom'];
     }
 
-    public static function classMethodsArray(ClassEntry $entry, int $filter = 7): Variable
+    public static function classMethodsArray(ClassEntry $entry, int $filter = 7, ?Context $ctx = null): Variable
     {
         $result = new Variable();
         $result->newArray();
         $ht = $result->toArray();
-        foreach (self::classMethodsList($entry, $filter) as $methodName) {
+        foreach (self::classMethodsList($entry, $filter, $ctx) as $methodName) {
             $value = new Variable();
             $value->string($methodName);
             $ht->append($value);
