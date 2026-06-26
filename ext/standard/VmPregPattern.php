@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * PHP PCRE delimiter/pattern parsing — shared by VmPregNative and future VmPregPure (#8935, #1492).
+ * PHP PCRE delimiter/pattern parsing — shared by VmPregNative and VmPregPure (#8935, #1492).
  *
  * php-src: ext/pcre/php_pcre.c — php_pcre_parse_pattern / compile failure messages
  */

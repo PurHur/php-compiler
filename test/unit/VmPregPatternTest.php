@@ -24,12 +24,13 @@ final class VmPregPatternTest extends TestCase
         $this->assertSame('Empty regular expression', VmPregPattern::patternWarningMessage(''));
     }
 
-    public function testVmPregNativeDelegatesPatternParseToVmPregPattern(): void
+    public function testVmPregPureDelegatesPatternParseToVmPregPattern(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregNative.php');
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregPure.php');
         $this->assertStringContainsString('VmPregPattern::parsePhpPattern', $source);
         $this->assertStringContainsString('VmPregPattern::patternWarningMessage', $source);
-        $this->assertDoesNotMatchRegularExpression('/private static function parsePhpPattern/', $source);
+        $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregNative.php');
+        $this->assertStringContainsString('VmPregPure::pregMatch', $native);
     }
 
     public function testPregMatchStillWorksAfterPatternExtract(): void
