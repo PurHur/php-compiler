@@ -12,9 +12,14 @@ $h2 = password_hash('secret', PASSWORD_BCRYPT, ['cost' => $cost]);
 $info2 = password_get_info($h2);
 var_export($info2['options']['cost']);
 echo "\n";
-echo password_hash('secret', PASSWORD_BCRYPT, ['cost' => 3]) === false ? "bad_cost\n" : "bad_cost_fail\n";
+try {
+    password_hash('secret', PASSWORD_BCRYPT, ['cost' => 3]);
+    echo "bad_cost_fail\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
 ok
 10
 11
-bad_cost
+Invalid bcrypt cost parameter specified: 3

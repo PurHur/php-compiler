@@ -300,7 +300,7 @@ final class VmPasswordNative
             }
         }
         if ($cost < self::BCRYPT_MIN_COST || $cost > self::BCRYPT_MAX_COST) {
-            return null;
+            throw new \ValueError(\sprintf('Invalid bcrypt cost parameter specified: %d', $cost));
         }
 
         return $cost;
