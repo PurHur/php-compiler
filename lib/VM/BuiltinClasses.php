@@ -30,6 +30,7 @@ use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetName;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetOffset;
+use PHPCompiler\VM\Builtin\DateTimeZoneListAbbreviations;
 use PHPCompiler\VM\Builtin\ExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionConstruct;
 use PHPCompiler\VM\Builtin\ErrorExceptionGetSeverity;
@@ -925,6 +926,7 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
 
         $tz = new ClassEntry('DateTimeZone');
         DateTimeZoneSupport::registerClassConstants($tz);
@@ -938,9 +940,10 @@ final class BuiltinClasses
         $tz->methodVisibility['getoffset'] = $pub;
         $tz->methods['getlocation'] = new DateTimeZoneGetLocation();
         $tz->methodVisibility['getlocation'] = $pub;
+        $tz->methods['listabbreviations'] = new DateTimeZoneListAbbreviations();
+        $tz->methodVisibility['listabbreviations'] = $pubStatic;
         $ctx->classes[DateTimeSupport::CLASS_DATETIMEZONE] = $tz;
 
-        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $dateTimeMethods = [
             'format' => new DateTimeFormat(),
             'gettimestamp' => new DateTimeGetTimestamp(),

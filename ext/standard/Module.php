@@ -848,6 +848,7 @@ class Module extends ModuleAbstract
             new date(),
             new timezone_version_get(),
             new timezone_identifiers_list(),
+            new timezone_abbreviations_list(),
             new timezone_open(),
             new timezone_name_get(),
             new timezone_offset_get(),
