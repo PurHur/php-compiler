@@ -1104,6 +1104,7 @@ require_once __DIR__.'/../../../ext/standard/VmHash.php';
 require_once __DIR__.'/../../../ext/standard/VmHashFile.php';
 require_once __DIR__.'/../../../ext/standard/VmHashNative.php';
 require_once __DIR__.'/../../../ext/standard/VmHashNonCrypto.php';
+require_once __DIR__.'/../../../ext/standard/VmHashXxhPure.php';
 require_once __DIR__.'/../../../ext/standard/VmHashXxh.php';
 require_once __DIR__.'/../../../ext/standard/VmHead.php';
 require_once __DIR__.'/../../../ext/standard/VmHebrev.php';
