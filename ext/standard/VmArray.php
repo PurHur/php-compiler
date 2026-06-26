@@ -600,10 +600,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** asort() — return array sorted by value ascending; packed lists are unchanged (handled in-place). */
+    /** asort() — return array sorted by value ascending, preserving keys (#11991). */
     public static function asortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
@@ -657,10 +657,10 @@ final class VmArray
         return self::hashTableFromSortedPairs($pairs);
     }
 
-    /** arsort() — return array sorted by value descending; packed lists are unchanged (handled in-place). */
+    /** arsort() — return array sorted by value descending, preserving keys (#11991). */
     public static function arsortCopy(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): HashTable
     {
-        if ($ht->getNumElements() < 2 || self::isList($ht)) {
+        if ($ht->getNumElements() < 2) {
             return $ht;
         }
         $pairs = self::copyKeyedPairs($ht);
