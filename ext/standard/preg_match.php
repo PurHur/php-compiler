@@ -23,6 +23,7 @@ final class preg_match extends Internal
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match() pattern', 0);
         $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match() subject', 1);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_match', $pattern);
 
         $flags = 0;
         $offset = 0;

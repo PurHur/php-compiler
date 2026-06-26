@@ -79,6 +79,7 @@ final class preg_replace extends Internal
         }
 
         $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
+        VmPregFailure::warnPatternCompileFailureOperand($frame, 'preg_replace', $pattern);
         $replacement = self::patternOrReplacementOperand(
             $replacementVar,
             $frame->calledArgs[1],
