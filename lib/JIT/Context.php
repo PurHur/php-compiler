@@ -670,7 +670,8 @@ class Context {
      */
     public function functionIsRegistered(string $name): bool
     {
-        $lc = strtolower($name);
+        $normalized = ltrim($name, '\\');
+        $lc = strtolower($normalized);
         if ($this->functionProxyIsCallable($lc)) {
             return true;
         }

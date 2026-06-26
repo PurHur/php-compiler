@@ -233,10 +233,11 @@ final class VmCallable
         }
         if (str_contains($name, '::')) {
             [$class, $method] = explode('::', $name, 2);
+            $class = VmReflection::normalizeGlobalIntrospectionName($class);
             if ('' === $class || '' === $method || !self::isValidMethodName($method)) {
                 return false;
             }
-            $callableName = $name;
+            $callableName = $class.'::'.$method;
             if ($syntaxOnly) {
                 return true;
             }

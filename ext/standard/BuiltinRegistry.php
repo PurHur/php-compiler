@@ -51,7 +51,7 @@ final class BuiltinRegistry
      */
     public static function resolve(string $name): ?Internal
     {
-        $lc = strtolower($name);
+        $lc = strtolower(VmReflection::normalizeGlobalIntrospectionName($name));
         if (null === self::$byName) {
             self::$byName = [];
             foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
