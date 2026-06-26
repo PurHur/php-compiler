@@ -83,6 +83,9 @@ final class VmPhpMemoryStream
         $take = \min($length, $remaining);
         $chunk = \substr($state->buffer, $state->position, $take);
         $state->position += $take;
+        if ($length > $remaining) {
+            $state->atEof = true;
+        }
 
         return $chunk;
     }
@@ -230,10 +233,13 @@ final class VmPhpMemoryStream
         if ($maxlength < 0) {
             $remaining = \strlen($state->buffer) - $state->position;
             if ($remaining <= 0) {
+                $state->atEof = true;
+
                 return '';
             }
             $data = \substr($state->buffer, $state->position, $remaining);
             $state->position += \strlen($data);
+            $state->atEof = true;
 
             return $data;
         }

@@ -75,6 +75,18 @@ final class VmPhpMemoryStreamRuntimeShrinkTest extends TestCase
         VmPhpMemoryStream::close($handle);
     }
 
+    public function testFeofTrueAfterFreadPastEndInOneCall(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        VmFs::fwrite($handle, 'hello');
+        VmFs::rewind($handle);
+        $this->assertFalse(VmFs::feof($handle));
+        VmFs::fread($handle, 9999);
+        $this->assertTrue(VmFs::feof($handle));
+        VmFs::fclose($handle);
+    }
+
     public function testFeofFalseUntilReadPastEnd(): void
     {
         $handle = VmPhpMemoryStream::open('php://memory', 'r+');
