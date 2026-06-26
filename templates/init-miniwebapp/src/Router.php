@@ -3,24 +3,6 @@
 declare(strict_types=1);
 
 /**
- * Contact name guard for VM (issue #697): use == and substr, not strlen compares.
- *
- * @return bool true when name is non-empty and at most 200 bytes
- */
-function miniwebapp_contact_name_is_valid(): bool
-{
-    $name = $_REQUEST['name'] ?? '';
-    if ($name == '') {
-        return false;
-    }
-    if ($name != substr($name, 0, Router::DEFAULT_CONTACT_NAME_MAX)) {
-        return false;
-    }
-
-    return true;
-}
-
-/**
  * Front-controller dispatch for MiniWebApp (issue #210).
  */
 class Router
@@ -29,6 +11,22 @@ class Router
 
     /** @var array<string, mixed> */
     private array $config;
+
+    /**
+     * Contact name guard for VM (issue #697): empty check + isset offset at max length.
+     */
+    private static function contactNameIsValid(): bool
+    {
+        $name = $_REQUEST['name'] ?? '';
+        if ($name == '') {
+            return false;
+        }
+        if (isset($name[self::DEFAULT_CONTACT_NAME_MAX])) {
+            return false;
+        }
+
+        return true;
+    }
 
     /**
      * @param array<string, mixed> $config
@@ -57,12 +55,13 @@ class Router
         switch ($method) {
             case 'POST':
                 if ('contact' === $route) {
-                    if (!miniwebapp_contact_name_is_valid()) {
+                    if (!self::contactNameIsValid()) {
                         $this->rejectContactInput();
 
                         return;
                     }
-                    $this->renderContactThankYou((string) $_REQUEST['name']);
+                    $contactName = $_REQUEST['name'] ?? '';
+                    $this->renderContactThankYou($contactName);
 
                     return;
                 }
