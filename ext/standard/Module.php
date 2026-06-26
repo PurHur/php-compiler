@@ -144,6 +144,11 @@ class Module extends ModuleAbstract
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
         }
+        foreach (DateConstants::registeredConstants() as $name => $value) {
+            $var = new VM\Variable();
+            $var->string($value);
+            $runtime->vmContext->defineConstant($name, $var);
+        }
     }
 
     public function getFunctions(): array
