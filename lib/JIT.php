@@ -6936,10 +6936,16 @@ class JIT {
                     $globalName = $block->constants[$op->arg2]->toString();
                     $globalVar = $this->ensureJitGlobal($globalName);
                     $this->context->bindVariableByName($globalName, $globalVar);
-                    $this->context->setVariableOp(
-                        $block->getOperand($op->arg1),
-                        $globalVar
-                    );
+                    $destOp = $block->getOperand($op->arg1);
+                    $this->context->setVariableOp($destOp, $globalVar);
+                    $globalSlot = $block->slotForOperand($destOp);
+                    if (null !== $globalSlot) {
+                        foreach ($block->scopedOperands() as $scopeOp) {
+                            if ($block->slotForOperand($scopeOp) === $globalSlot) {
+                                $this->context->setVariableOp($scopeOp, $globalVar);
+                            }
+                        }
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
                     if (!isset($block->constants[$op->arg2])) {
@@ -11544,7 +11550,10 @@ class JIT {
         if (
             $force
             && Variable::KIND_VALUE === $result->kind
-            && Variable::TYPE_STRING !== $result->type
+            && (
+                Variable::TYPE_STRING !== $result->type
+                || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+            )
             && !$value->isJitGenerator
             && null === $result->objectPropertySlot
             && !$result->functionStaticGlobal
@@ -11564,12 +11573,14 @@ class JIT {
             $result = $this->context->getVariableFromOp($resultOp);
         }
         if (
-            !$force
-            && $resultOp instanceof \PHPCfg\Operand\Temporary
+            ($resultOp instanceof \PHPCfg\Operand\Temporary || $resultOp instanceof \PHPCfg\Operand\Literal)
             && Variable::KIND_VALUE === $result->kind
-            && Variable::TYPE_STRING !== $result->type
+            && (
+                Variable::TYPE_STRING !== $result->type
+                || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+            )
         ) {
-            // Temporaries can start life as rvalues; promote to a boxed stack slot on first assignment.
+            // Temporaries/literals can start life as rvalues; promote to a boxed stack slot on first assignment.
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
