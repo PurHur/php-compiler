@@ -113,7 +113,7 @@ final class VmHashNative
         bool $raw = false
     ): string {
         $id = self::algoId($algo);
-        if (0 === $id || $iterations < 1) {
+        if (0 === $id) {
             return '';
         }
         $hlen = self::digestLen($id);
