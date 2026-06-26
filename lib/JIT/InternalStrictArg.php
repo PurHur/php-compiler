@@ -39,6 +39,38 @@ final class InternalStrictArg
         );
     }
 
+    /**
+     * Builtin signature int — always reject non-int operands (php-src ZEND_ARG_INFO IS_LONG; #12215).
+     */
+    public static function requireBuiltinTypedInt(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceExactValueBox(
+                $context,
+                $arg,
+                VmVariable::TYPE_INTEGER,
+                $function,
+                $paramName,
+                $argNumber,
+                'int'
+            );
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'int', $arg)
+        );
+    }
+
     /** float builtin args: int widens; string rejected under caller strict_types (#11497). */
     public static function requireFloat(
         Context $context,
