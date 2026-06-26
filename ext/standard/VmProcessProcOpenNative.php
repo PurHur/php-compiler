@@ -391,6 +391,7 @@ final class VmProcessProcOpenNative
         $exited = 0 === $lowByte;
         $stopped = 0x7f === $lowByte;
         $signaled = $lowByte > 0 && !$stopped;
+        $signals = self::termsigStopsigFromWaitStatus($statusVal);
 
         return [
             'command' => $slot['command'],
@@ -399,7 +400,27 @@ final class VmProcessProcOpenNative
             'exitcode' => $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
             'signaled' => $signaled,
             'stopped' => $stopped,
+            'termsig' => $signals['termsig'],
+            'stopsig' => $signals['stopsig'],
         ];
+    }
+
+    /**
+     * WTERMSIG / WSTOPSIG parity for proc_get_status() (php-src ext/standard/proc_open.c).
+     *
+     * @return array{termsig: int, stopsig: int}
+     */
+    public static function termsigStopsigFromWaitStatus(int $statusVal): array
+    {
+        $lowByte = $statusVal & 0xff;
+        if (0x7f === $lowByte) {
+            return ['termsig' => 0, 'stopsig' => ($statusVal >> 8) & 0xff];
+        }
+        if ($lowByte > 0) {
+            return ['termsig' => $lowByte, 'stopsig' => 0];
+        }
+
+        return ['termsig' => 0, 'stopsig' => 0];
     }
 
     public static function terminate(int $handle, int $signal = 15): bool
