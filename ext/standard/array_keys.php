@@ -13,15 +13,15 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayKeysRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitArrayElem;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * array_keys() for list arrays (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_keys() for list arrays (subset of PHP; JIT via ArrayKeysRuntime PHP bridge).
  */
 final class array_keys extends Internal
 {
@@ -65,21 +65,21 @@ final class array_keys extends Internal
                 $this->jitString($context, $args[1], 'array_keys() search_value');
             }
 
-            return ArrayBuiltinHelper::buildKeysArrayFiltered($context, $args[0], $args[1], $strict);
+            return ArrayKeysRuntime::keysFiltered($context, $args[0], $args[1], $strict);
         }
 
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type
             || ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
         ) {
-            return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
+            return ArrayKeysRuntime::keys($context, $args[0]);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
 
-            return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $args[0]);
+            return ArrayKeysRuntime::keys($context, $args[0]);
         }
         JitArrayElem::requireArrayArg($context, $args[0], 'array_keys');
 
-        return ArrayBuiltinHelper::buildKeysArray($context, HashTableHelper::alloc($context));
+        return ArrayKeysRuntime::keys($context, $args[0]);
     }
 }
