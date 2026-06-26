@@ -153,7 +153,14 @@ final class StdlibConstants
     public const STREAM_FILTER_WRITE = 2;
 
     /** stream_socket_client() / stream_socket_server() flags (ext/standard/streamsfuncs.c, #4993). */
+    public const STREAM_CLIENT_PERSISTENT = 1;
+
+    public const STREAM_CLIENT_ASYNC_CONNECT = 2;
+
     public const STREAM_CLIENT_CONNECT = 4;
+
+    /** stream_socket_client() error reporting (main/streams/php_stream_wrappers.h). */
+    public const STREAM_REPORT_ERRORS = 8;
 
     public const STREAM_SERVER_BIND = 4;
 
@@ -286,7 +293,10 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'stream_filter_read' => self::STREAM_FILTER_READ,
         'stream_filter_write' => self::STREAM_FILTER_WRITE,
+        'stream_client_persistent' => self::STREAM_CLIENT_PERSISTENT,
+        'stream_client_async_connect' => self::STREAM_CLIENT_ASYNC_CONNECT,
         'stream_client_connect' => self::STREAM_CLIENT_CONNECT,
+        'stream_report_errors' => self::STREAM_REPORT_ERRORS,
         'stream_server_bind' => self::STREAM_SERVER_BIND,
         'stream_server_listen' => self::STREAM_SERVER_LISTEN,
         'stream_pf_unix' => self::STREAM_PF_UNIX,
