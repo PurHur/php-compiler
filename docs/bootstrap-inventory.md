@@ -9870,19 +9870,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmErrorHandler.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 58)
-- new Variable (line 67)
 - new Variable (line 73)
-- new Variable (line 79)
-- new Variable (line 85)
-- new Variable (line 98)
-- new Variable (line 146)
-- new Variable (line 148)
-- new Variable (line 189)
-- new Variable (line 197)
-- new Variable (line 205)
-- new Variable (line 217)
-- 11 class method(s)
+- new Variable (line 82)
+- new Variable (line 88)
+- new Variable (line 94)
+- new Variable (line 100)
+- new Variable (line 113)
+- new Variable (line 161)
+- new Variable (line 163)
+- new Variable (line 204)
+- new Variable (line 212)
+- new Variable (line 220)
+- new Variable (line 232)
+- 12 class method(s)
 
 ### `ext/standard/VmErrorLog.php`
 
