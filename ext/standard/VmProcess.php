@@ -37,7 +37,7 @@ final class VmProcess
         return $ht;
     }
 
-    /** proc_nice() — libc nice(3) via FFI (php-src basic_functions.c; #5181, #7862). */
+    /** proc_nice() — /proc/self/autogroup pure path (php-src basic_functions.c; #5181, #12183). */
     public static function proc_nice(int $priority): bool
     {
         return VmProcNiceNative::proc_nice($priority);

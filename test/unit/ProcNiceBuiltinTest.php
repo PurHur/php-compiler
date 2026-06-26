@@ -10,13 +10,13 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
-/** VM builtin for proc_nice() (#5181). */
+/** VM builtin for proc_nice() (#5181, #12183). */
 final class ProcNiceBuiltinTest extends TestCase
 {
     public function testProcNiceReturnsBool(): void
     {
         if (!VmProcNiceNative::available()) {
-            $this->markTestSkipped('libc FFI nice unavailable');
+            $this->markTestSkipped('/proc/self/autogroup unavailable');
         }
 
         $runtime = new Runtime();
