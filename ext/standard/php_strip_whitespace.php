@@ -39,7 +39,14 @@ final class php_strip_whitespace extends Internal
             0,
             'file_name'
         );
-        $frame->returnVar->string(VmStripWhitespace::stripFile($path));
+        $contents = VmFs::fileGetContents($path);
+        if (false === $contents) {
+            VmStreamOpenFailure::warnFailedToOpen($frame, 'php_strip_whitespace', $path);
+            $frame->returnVar->string('');
+
+            return;
+        }
+        $frame->returnVar->string(VmStripWhitespace::stripSource($contents));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
