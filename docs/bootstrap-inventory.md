@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3276 |
-| Phase A inventory files (M2 ratio SSOT) | 3276 |
+| PHP files on vm.php path | 3277 |
+| Phase A inventory files (M2 ratio SSOT) | 3277 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8720 |
+| Source constructs flagged (warnings) | 8723 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -356,6 +356,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/FtokJitHelper.php` | 0 | 1 |
 | `ext/standard/FunctionExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesJitHelper.php` | 0 | 1 |
+| `ext/standard/GcCollectCyclesRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/GcStatusJitHelper.php` | 0 | 3 |
 | `ext/standard/GcToggleJitHelper.php` | 0 | 1 |
 | `ext/standard/GetBrowserJitHelper.php` | 0 | 1 |
@@ -2199,7 +2200,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/GcCollectCyclesCollectRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/GcCollectCyclesRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GcStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/GcToggleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 3 |
@@ -3251,21 +3252,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bcmath/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new bcadd (line 26)
-- new bcsub (line 27)
-- new bcmul (line 28)
-- new bcdiv (line 29)
-- new bcdivmod (line 30)
-- new bcmod (line 31)
-- new bcpow (line 32)
-- new bcsqrt (line 33)
-- new bcscale (line 34)
-- new bccomp (line 35)
-- new bcpowmod (line 36)
-- new bcceil (line 37)
-- new bcfloor (line 38)
-- new bcround (line 39)
-- 2 class method(s)
+- new bcadd (line 53)
+- new bcsub (line 54)
+- new bcmul (line 55)
+- new bcdiv (line 56)
+- new bcdivmod (line 57)
+- new bcmod (line 58)
+- new bcpow (line 59)
+- new bcsqrt (line 60)
+- new bcscale (line 61)
+- new bccomp (line 62)
+- new bcpowmod (line 63)
+- new bcceil (line 64)
+- new bcfloor (line 65)
+- new bcround (line 66)
+- 4 class method(s)
 
 ### `ext/bcmath/NumberAdd.php`
 
@@ -5519,6 +5520,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/GcCollectCyclesRegistryJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `ext/standard/GcStatusJitHelper.php`
 
@@ -10294,11 +10300,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 374)
-- new HashTable (line 381)
-- new Variable (line 389)
-- new Variable (line 402)
-- new Variable (line 410)
+- new HashTable (line 375)
+- new HashTable (line 382)
+- new Variable (line 390)
+- new Variable (line 403)
+- new Variable (line 411)
 - 28 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
@@ -16906,7 +16912,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 35 class method(s)
+- 36 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -17654,7 +17660,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcCollectCyclesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 32 class method(s)
+- new JIT (line 1335)
+- 44 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/GcStatusRuntime.php`
 
