@@ -188,6 +188,81 @@ final class VmArraySort
         return 0 === strcasecmp(ltrim($className, '\\'), 'Sorting');
     }
 
+    private static function isSortDirectionEnum(string $className): bool
+    {
+        return 0 === strcasecmp(ltrim($className, '\\'), 'SortDirection');
+    }
+
+    /**
+     * SortDirection pure enum → SORT_ASC / SORT_DESC (#7261, #9947).
+     */
+    public static function trySortDirectionOrderInt(Variable $var): ?int
+    {
+        if (!EnumCaseSupport::isEnumCaseVariable($var)) {
+            return null;
+        }
+        $enumClass = EnumCaseSupport::enumClassForCaseVariable($var);
+        if (null === $enumClass || !self::isSortDirectionEnum($enumClass->name)) {
+            return null;
+        }
+        $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+        if (null === $entry) {
+            throw new \LogicException('SortDirection case missing');
+        }
+
+        return match ($entry->caseName) {
+            'Ascending' => StdlibConstants::SORT_ASC,
+            'Descending' => StdlibConstants::SORT_DESC,
+            default => throw new \ValueError('Invalid SortDirection enum value'),
+        };
+    }
+
+    /**
+     * Merge optional SortDirection into sort-family flags (php-src basic_functions.c).
+     */
+    public static function applySortDirectionToFlags(int $flags, Variable $directionArg, string $function): int
+    {
+        $directionArg = $directionArg->resolveIndirect();
+        $order = self::trySortDirectionOrderInt($directionArg);
+        if (null === $order) {
+            if (EnumCaseSupport::isEnumCaseVariable($directionArg)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                    $function,
+                    EnumCaseSupport::typeNameForVariable($directionArg)
+                ));
+            }
+            throw new \TypeError(sprintf(
+                '%s(): Argument #3 ($direction) must be of type SortDirection, %s given',
+                $function,
+                VmInternalCompare::vmSortFlagsTypeName($directionArg->type)
+            ));
+        }
+
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
+        $typeMask = StdlibConstants::SORT_REGULAR
+            | StdlibConstants::SORT_NUMERIC
+            | StdlibConstants::SORT_STRING
+            | StdlibConstants::SORT_NATURAL
+            | StdlibConstants::SORT_LOCALE_STRING;
+        $type = $flags & $typeMask;
+        if (StdlibConstants::SORT_DESC === $order) {
+            if (StdlibConstants::SORT_REGULAR === $type) {
+                return StdlibConstants::SORT_DESC | $caseFlag;
+            }
+
+            return $type | StdlibConstants::SORT_DESC | $caseFlag;
+        }
+        if (StdlibConstants::SORT_DESC === $type) {
+            $type = StdlibConstants::SORT_REGULAR;
+        }
+        if (StdlibConstants::SORT_REGULAR === $type) {
+            return StdlibConstants::SORT_ASC | $caseFlag;
+        }
+
+        return $type | $caseFlag;
+    }
+
     public static function multisortOperandTypeError(int $argIndex, string $extra = ''): string
     {
         $argNum = $argIndex + 1;

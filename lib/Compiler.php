@@ -17513,7 +17513,7 @@ class Compiler {
         ?string $calleeName,
         ?Op $cfgCallOp = null
     ): ?int {
-        if (null === $calleeName || 'array_multisort' !== strtolower($calleeName)) {
+        if (null === $calleeName || !\in_array(strtolower($calleeName), ['array_multisort', 'sort', 'rsort'], true)) {
             return null;
         }
         if (null === $block->orig) {

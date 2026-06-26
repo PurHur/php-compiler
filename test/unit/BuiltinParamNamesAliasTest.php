@@ -277,7 +277,8 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'array', $fn));
             self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'callback', $fn));
         }
-        self::assertSame(['array', 'flags'], BuiltinParamNames::forFunction('sort'));
+        self::assertSame(['array', 'flags', 'direction'], BuiltinParamNames::forFunction('sort'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex(['array', 'flags', 'direction'], 'direction', 'sort'));
     }
 
     /** @covers issue #11147 */
