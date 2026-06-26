@@ -193,6 +193,17 @@ final class VmSettype
             return;
         }
         if (Variable::TYPE_ARRAY === $v->type) {
+            $vm = $frame?->vmContext?->runtime?->vm;
+            $ctx = $frame?->vmContext;
+            if (null !== $ctx) {
+                $ctx->errors->languageWarning(
+                    'Array to string conversion',
+                    null,
+                    0,
+                    $ctx,
+                    $frame
+                );
+            }
             $result->string('Array');
 
             return;
