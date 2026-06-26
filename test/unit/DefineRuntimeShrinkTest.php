@@ -37,4 +37,10 @@ final class DefineRuntimeShrinkTest extends TestCase
         $table = \PHPCompiler\ext\standard\DefineJitHelper::createTable();
         $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $table);
     }
+
+    public function testDefineJitHelperIsDefinedOnHost(): void
+    {
+        $table = \PHPCompiler\ext\standard\DefineJitHelper::createTable();
+        $this->assertFalse(\PHPCompiler\ext\standard\DefineJitHelper::isDefined($table, 'MISSING'));
+    }
 }
