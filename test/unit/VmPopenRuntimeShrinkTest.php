@@ -33,12 +33,14 @@ final class VmPopenRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmShellExecNative::shellExec', $source);
     }
 
-    public function testVmPopenNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmPopenNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPopenNative.php');
-        $this->assertStringContainsString('VmPopenPure::', $source);
+        $this->assertStringContainsString('VmPopenPure::open', $source);
+        $this->assertStringContainsString('VmPopenPure::pclose', $source);
         $this->assertStringContainsString('VmPopenPure::available()', $source);
-        $this->assertStringContainsString('$ffi->popen', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->popen/', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\popen\\(/', $source);
     }
 
@@ -51,59 +53,21 @@ final class VmPopenRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@\\\\popen\\(/', $source);
     }
 
-    public function testPopenRoundTripWhenFfiAvailable(): void
-    {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('libc FFI unavailable');
-        }
-
-        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
-        putenv('PHP_COMPILER_DISABLE_FFI');
-        try {
-            $opened = VmPopenNative::open('echo hello', 'r');
-            $this->assertIsArray($opened);
-            $this->assertIsInt($opened['handle']);
-            $output = VmFs::streamGetContents($opened['handle']);
-            VmFs::fclose($opened['handle']);
-            $status = VmPopenNative::pclose($opened['file']);
-            $this->assertSame("hello\n", $output);
-            $this->assertSame(0, $status);
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_DISABLE_FFI');
-            } else {
-                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
-            }
-        }
-    }
-
-    public function testPopenRoundTripWhenFfiDisabled(): void
+    public function testPopenRoundTrip(): void
     {
         if (!VmPopenPure::available()) {
             $this->markTestSkipped('host proc_open unavailable');
         }
 
-        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
-        putenv('PHP_COMPILER_DISABLE_FFI=1');
-        try {
-            $this->assertTrue(VmPopenNative::available());
-
-            $opened = VmPopenNative::open('echo hello', 'r');
-            $this->assertIsArray($opened);
-            $this->assertIsInt($opened['handle']);
-            $this->assertIsInt($opened['file']);
-            $output = VmFs::streamGetContents($opened['handle']);
-            VmFs::fclose($opened['handle']);
-            $status = VmPopenNative::pclose($opened['file']);
-            $this->assertSame("hello\n", $output);
-            $this->assertSame(0, $status);
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_DISABLE_FFI');
-            } else {
-                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
-            }
-        }
+        $opened = VmPopenNative::open('echo hello', 'r');
+        $this->assertIsArray($opened);
+        $this->assertIsInt($opened['handle']);
+        $this->assertIsInt($opened['file']);
+        $output = VmFs::streamGetContents($opened['handle']);
+        VmFs::fclose($opened['handle']);
+        $status = VmPopenNative::pclose($opened['file']);
+        $this->assertSame("hello\n", $output);
+        $this->assertSame(0, $status);
     }
 
     public function testShellExecCapturesOutputWhenFfiDisabled(): void

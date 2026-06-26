@@ -26,7 +26,7 @@ final class VmFs
     /** @var array<int, true> popen() handles — pclose() vs fclose() at libc layer in JIT/AOT */
     private static array $popenHandles = [];
 
-    /** @var array<int, \FFI\CData> libc FILE* for VmPopenNative handles (#8250) */
+    /** @var array<int, int> pclose tokens from VmPopenPure (#8250, #12266) */
     private static array $popenNativeFiles = [];
 
     /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamPure (#8936, #8220) */
@@ -694,7 +694,7 @@ final class VmFs
 
     /**
      * popen() — open pipe to subprocess (php-src ext/standard/exec.c; #6211, #8244, #8951).
-     * VmPopenNative with {@see VmPopenPure} fallback when libc FFI unavailable.
+     * VmPopenPure SSOT via VmPopenNative (#6211, #8244, #8951, #12266).
      *
      * @return int|false stream handle id
      */
