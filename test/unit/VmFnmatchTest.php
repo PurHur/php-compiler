@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmFnmatch;
 use PHPCompiler\ext\standard\VmFnmatchPure;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #7756 / #8016: VM fnmatch() must not delegate to host \\fnmatch(). */
+/** Issue #7756 / #8016 / #12075: VM fnmatch() via VmFnmatchPure, no libc FFI. */
 final class VmFnmatchTest extends TestCase
 {
     public function testVmFnmatchDoesNotDelegateToHostFnmatch(): void
@@ -16,8 +16,9 @@ final class VmFnmatchTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFnmatch.php');
         $this->assertStringNotContainsString('\\fnmatch(', $source);
         $this->assertStringNotContainsString('hostMatch', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('libcMatch', $source);
         $this->assertStringContainsString('VmFnmatchPure::match', $source);
-        $this->assertStringContainsString('libcMatch', $source);
     }
 
     public function testFnmatchBuiltinUsesVmFnmatch(): void
@@ -56,12 +57,8 @@ final class VmFnmatchTest extends TestCase
         $this->assertTrue(VmFnmatch::available());
     }
 
-    public function testMatchBasicPatternsWhenLibcAvailable(): void
+    public function testMatchBasicPatterns(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('libc fnmatch FFI unavailable on this host');
-        }
-
         $this->assertTrue(VmFnmatch::match('*.txt', 'readme.txt'));
         $this->assertFalse(VmFnmatch::match('*.txt', 'readme.php'));
         $this->assertTrue(VmFnmatch::match('file?.txt', 'file1.txt'));
