@@ -77,19 +77,19 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/readfile\([^)]+\)\s*\{[^}]*@fopen\(\$path/s', $source);
     }
 
-    public function testOpenNativeDeclaresLibcOpenDupClose(): void
+    public function testOpenNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsOpenNative.php');
-        $this->assertStringContainsString('VmFsOpenPure', $source);
-        $this->assertStringContainsString('int open(const char *pathname', $source);
-        $this->assertStringContainsString('int dup(int oldfd)', $source);
-        $this->assertStringContainsString('int close(int fd)', $source);
+        $this->assertStringContainsString('VmFsOpenPure::open', $source);
+        $this->assertStringContainsString('VmFsOpenPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int open(const char *pathname', $source);
     }
 
     public function testFopenReadWriteRoundTrip(): void
     {
         if (!VmFsOpenNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsOpenNative libc open');
+            $this->markTestSkipped('host fopen unavailable for VmFsOpenPure');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_fopen_');
@@ -113,7 +113,7 @@ final class VmFsOpenNativeRuntimeShrinkTest extends TestCase
     public function testReadfileOutputsBytesAndReturnsCount(): void
     {
         if (!VmFsOpenNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsOpenNative libc open');
+            $this->markTestSkipped('host fopen unavailable for VmFsOpenPure');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_rf_');
