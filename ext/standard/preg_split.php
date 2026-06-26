@@ -31,6 +31,7 @@ final class preg_split extends Internal
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_split() pattern', 0);
         $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_split() subject', 1);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_split', $pattern);
         $limit = -1;
         $flags = 0;
         if ($argc >= 3) {
