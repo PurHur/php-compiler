@@ -271,17 +271,17 @@ final class SplArrayStorage
 
             return [$key, false];
         }
-        if (Variable::TYPE_DOUBLE === $resolved->type) {
-            $key = new Variable(Variable::TYPE_INTEGER);
-            $key->int((int) $resolved->toDouble());
-
-            return [$key, true];
-        }
         if (Variable::TYPE_NULL === $resolved->type) {
             $key = new Variable(Variable::TYPE_STRING);
             $key->string('');
 
             return [$key, false];
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type) {
+            $key = new Variable(Variable::TYPE_INTEGER);
+            $key->int((int) $resolved->toFloat());
+
+            return [$key, true];
         }
 
         throw new \TypeError('Array access offset must be of type int or string');
