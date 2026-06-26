@@ -12525,6 +12525,27 @@ class Compiler {
             return $producers[$mappedIndex] ?? null;
         }
         if ($producerCount === $argCount) {
+            // filter_var('x', FILTER_*, ['options' => ['regexp' => '/a/']]) — ConstFetch + nested Array_ (#12007).
+            $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
+            if (null !== $leadingConstNested) {
+                [$constFetch, $arrayChain] = $leadingConstNested;
+                $arrayArgIndex = $argCount - 1;
+                if ($argIndex === $arrayArgIndex) {
+                    return $arrayChain[\count($arrayChain) - 1];
+                }
+                $constArgIndex = null;
+                for ($i = $arrayArgIndex - 1; $i >= 0; --$i) {
+                    if (!$this->isEmbeddedCallLiteralArg($callArgs[$i] ?? null)) {
+                        $constArgIndex = $i;
+                        break;
+                    }
+                }
+                if ($argIndex === $constArgIndex) {
+                    return $constFetch;
+                }
+
+                return null;
+            }
             // php-cfg `f(g(), h())` hoists sibling FuncCall producers with dead arg temps (#9463, #10917).
             if ($argIndex < $producerCount) {
                 $allSiblingFuncCalls = true;
@@ -13460,6 +13481,33 @@ class Compiler {
         }
 
         return [$arrayChain, $trailing];
+    }
+
+    /**
+     * ConstFetch prelude before nested inline Array_ call arg (#12007, filter_var + options array).
+     *
+     * e.g. filter_var('abc', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^a/']])
+     * — producers [ConstFetch, inner Array_, outer Array_].
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return array{0: Op\Expr\ConstFetch, 1: list<Op\Expr\Array_>}|null
+     */
+    private function splitLeadingConstFetchWithNestedArrayLiteralChain(array $producers): ?array
+    {
+        $first = $producers[0] ?? null;
+        if (!$first instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        $rest = array_slice($producers, 1);
+        if ([] === $rest || !$this->producersAreNestedArrayLiteralChain($rest)) {
+            return null;
+        }
+        if (!$this->arrayProducersFormNestedChain($rest)) {
+            return null;
+        }
+
+        return [$first, $rest];
     }
 
     /**

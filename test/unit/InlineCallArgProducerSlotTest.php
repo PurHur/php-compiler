@@ -1745,6 +1745,56 @@ PHP;
         self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #12007 — filter_var() ConstFetch + nested options Array_ map to filter and options slots. */
+    public function testFilterVarConstFetchAndNestedOptionsArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+filter_var('abc', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^a/']]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_options.php');
+
+        $constSlot = null;
+        $outerArraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $outerArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot);
+        self::assertNotNull($outerArraySlot);
+        self::assertCount(3, $sendSlots, 'filter_var arg sends='.json_encode($sendSlots));
+        self::assertSame($constSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($outerArraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #12007 — filter_var() nested inline options runtime parity with Zend. */
+    public function testFilterVarNestedOptionsArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$r = filter_var('abc', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^a/']]);
+echo $r === 'abc' ? "ok\n" : "bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_options_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
+    }
+
     /** Issue #10566 — count([nested inline], COUNT_RECURSIVE) wires outer Array_ + mode const. */
     public function testCountNestedInlineLiteralRecursiveUsesArrayAndModeSlots(): void
     {
