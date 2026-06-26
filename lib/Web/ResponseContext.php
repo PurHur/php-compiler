@@ -82,15 +82,13 @@ final class ResponseContext
     }
 
     /**
-     * http_response_code($code) — true on first set, prior int on later sets, false when invalid.
+     * http_response_code($code) — true on first set, prior int on later sets.
+     * php-src head.c accepts any non-zero code; 0 is getter-only (#12153).
      *
-     * @return true|int|false
+     * @return true|int
      */
     public static function writeHttpResponseCode(int $code)
     {
-        if ($code < 100 || $code > 599) {
-            return false;
-        }
         $previous = self::$status;
         self::$status = $code;
 
