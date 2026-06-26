@@ -11,15 +11,17 @@ use PHPCompiler\ext\standard\VmProcessIdentityNative;
 use PHPCompiler\ext\standard\VmProcessIdentityPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmProcessIdentityPure /proc path without libc FFI (#9017). */
+/** VmProcessIdentityPure /proc path without libc FFI (#9017, #12182). */
 final class VmProcessIdentityPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmProcessIdentityNativePrefersPurePath(): void
+    public function testVmProcessIdentityNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessIdentityNative.php');
         $this->assertStringContainsString('VmProcessIdentityPure::getpid()', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getuid()', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getpwuidName', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->getpid/', $source);
     }
 
     public function testJitDateRoutesGetmypidThroughProcessIdentityJit(): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Process identity via /proc/self/status + /etc/passwd — no libc FFI (#9017).
+ * Process identity via /proc/self/status + /etc/passwd — no libc FFI (#9017, #12182).
  *
  * php-src: ext/standard/basic_functions.c — getmypid, getmyuid, getmygid, get_current_user
  * Linux procfs: man 5 proc — Pid, Uid, Gid fields in /proc/self/status
