@@ -1,5 +1,5 @@
 --TEST--
-stdlib header() after output warns and returns false (#12085, ext/standard/head.c)
+stdlib header() after output warns and returns null (#12151, ext/standard/head.c)
 --FILE--
 <?php
 $warnings = [];
@@ -17,6 +17,6 @@ if ($warnings) {
     echo str_contains($warnings[0], 'Cannot modify header information') ? 'warn_ok' : 'warn_bad', "\n";
 }
 --EXPECT--
-xfalse
+xNULL
 warnings=1
 warn_ok
