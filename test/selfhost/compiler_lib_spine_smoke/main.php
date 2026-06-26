@@ -1982,6 +1982,7 @@ require_once __DIR__.'/../../../ext/standard/time.php';
 require_once __DIR__.'/../../../ext/standard/time_nanosleep.php';
 require_once __DIR__.'/../../../ext/standard/time_sleep_until.php';
 require_once __DIR__.'/../../../ext/standard/timezone_abbreviations_list.php';
+require_once __DIR__.'/../../../ext/standard/timezone_name_from_abbr.php';
 require_once __DIR__.'/../../../ext/standard/timezone_identifiers_list.php';
 require_once __DIR__.'/../../../ext/standard/timezone_location_get.php';
 require_once __DIR__.'/../../../ext/standard/timezone_name_get.php';
