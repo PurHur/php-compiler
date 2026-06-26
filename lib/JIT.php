@@ -4357,6 +4357,41 @@ class JIT {
         return $func;
     }
 
+    /** void(Runtime $this, object $a, object $b) — inventory argv emit bridge (#12036). */
+    private function emitM3EmitTuRuntimeTwoObjectVoidStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr, $objectPtr, $objectPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
     /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
     private function ensureM3EmitTuRuntimeParseSpineDeps(): void
     {
@@ -4521,6 +4556,42 @@ class JIT {
      */
     private function ensureM3EmitTuRuntimeInitSpineSymbols(Block $stubBlock): void
     {
+        if ($this->shouldEnsureInventoryArgvParseHelperStubs()
+            && !$this->shouldRealLowerInventoryArgvParseSpine()
+        ) {
+            foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules'] as $methodLc) {
+                $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                $lc = strtolower($logical);
+                if (isset($this->context->functions[$lc])) {
+                    continue;
+                }
+                $this->emitM3EmitTuRuntimeInitVoidStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+            $noteLogical = 'PHPCompiler\\Runtime::noteparsecompilenullforscript';
+            $noteLc = strtolower($noteLogical);
+            if (!isset($this->context->functions[$noteLc])) {
+                $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
+                    $this->llvmInternalName($noteLogical),
+                    $noteLogical,
+                    $stubBlock
+                );
+            }
+            $peekLogical = 'PHPCompiler\\Runtime::peeklastparsefailure';
+            $peekLc = strtolower($peekLogical);
+            if (!isset($this->context->functions[$peekLc])) {
+                $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $this->llvmInternalName($peekLogical),
+                    $peekLogical,
+                    $stubBlock
+                );
+            }
+
+            return;
+        }
         foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
