@@ -117,6 +117,16 @@ PHP;
         $this->assertSame("App\Web\nApp\Web\Home\n", $this->runVm($code));
     }
 
+    public function testClassMagicConstInGlobalScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+$class = __CLASS__;
+echo $class === '' ? "ok" : "fail";
+PHP;
+        $this->assertSame('ok', $this->runVm($code));
+    }
+
     private function runVm(string $code): string
     {
         $runtime = new Runtime(Runtime::MODE_NORMAL);
