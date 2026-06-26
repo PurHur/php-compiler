@@ -12,6 +12,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Web;
 
 use PHPCompiler\ext\standard\SuperglobalNames;
+use PHPCompiler\ext\standard\VmEnvEnvironNative;
 use PHPCompiler\ext\standard\VmParseStr;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
@@ -366,48 +367,85 @@ final class Superglobals
         self::populateFormEncoded($get->toArray(), $queryString);
     }
 
-    private static function populatePost(Context $context, string $postBody): void
+    /** JIT/AOT standalone refresh — $_GET table (#9907). */
+    public static function buildGetTableForRefresh(): HashTable
     {
-        $post = $context->ensureSuperglobal('_POST');
-        $files = $context->ensureSuperglobal('_FILES');
-        if (self::isJsonContentType()) {
-            self::populateJson($post->toArray(), $postBody);
-        } elseif (self::isMultipartContentType()) {
-            MultipartParser::populate($post->toArray(), $files->toArray(), $postBody);
-        } else {
-            self::populateFormEncoded($post->toArray(), $postBody);
+        $get = new HashTable();
+        $queryString = getenv('QUERY_STRING');
+
+        self::populateFormEncoded($get, false === $queryString ? '' : $queryString);
+
+        return $get;
+    }
+
+    /** JIT/AOT standalone refresh — $_COOKIE table (#9907). */
+    public static function buildCookieTableForRefresh(): HashTable
+    {
+        $cookie = new HashTable();
+        $cookieHeader = getenv('HTTP_COOKIE');
+        self::populateCookieHeader($cookie, false === $cookieHeader ? '' : $cookieHeader);
+
+        return $cookie;
+    }
+
+    /** JIT/AOT standalone refresh — $_REQUEST table (#9907). */
+    public static function buildRequestTableForRefresh(): HashTable
+    {
+        $request = new HashTable();
+        $queryString = getenv('QUERY_STRING');
+        $queryString = false === $queryString ? '' : $queryString;
+        if ('' !== $queryString) {
+            self::populateFormEncoded($request, $queryString);
         }
+        $postBody = self::readRequestBody();
+        if (self::shouldPopulatePost(self::requestMethod(), $postBody)) {
+            $post = new HashTable();
+            $files = new HashTable();
+            self::populatePostIntoTables($post, $files, $postBody);
+            $request->mergeStringKeysFrom($post, true);
+        }
+
+        return $request;
     }
 
     /**
-     * Decode application/json POST body into $_POST (issue #52).
+     * JIT/AOT standalone refresh — $_SERVER table (#9907).
+     *
+     * @param bool $aotSoftware when true, SERVER_SOFTWARE is PHP-Compiler-AOT (standalone binary)
      */
-    private static function populateJson(HashTable $ht, string $body): void
+    public static function buildServerTableForRefresh(bool $aotSoftware = true): HashTable
     {
-        if ('' === $body) {
-            return;
-        }
-        if (strlen($body) > DevServer::maxRequestBody()) {
-            return;
-        }
-        try {
-            $data = json_decode($body, true, self::MAX_JSON_DECODE_DEPTH, JSON_THROW_ON_ERROR);
-        } catch (\JsonException $e) {
-            return;
-        }
-        if (!is_array($data)) {
-            return;
-        }
-        VmParseStr::mergeInto($ht, $data);
+        $queryString = getenv('QUERY_STRING');
+        $queryString = false === $queryString ? '' : $queryString;
+        $postBody = self::readRequestBody();
+        $server = new HashTable();
+        self::populateServerTable($server, $queryString, $postBody, $aotSoftware);
+        self::applyCgiHeadersFromEnviron($server);
+
+        return $server;
     }
 
-    private static function populateServer(
-        Context $context,
-        string $queryString,
-        string $postBody
-    ): void {
-        $server = $context->ensureSuperglobal('_SERVER')->toArray();
+    /**
+     * Map HTTP_* / CONTENT_* keys from the process environ into a server table (#9907).
+     */
+    public static function applyCgiHeadersFromEnviron(HashTable $server): void
+    {
+        foreach (VmEnvEnvironNative::enumerate() as $key => $value) {
+            if (!is_string($key) || !is_string($value)) {
+                continue;
+            }
+            if (str_starts_with($key, 'HTTP_') || str_starts_with($key, 'CONTENT_')) {
+                self::setOrUpdateStringEntry($server, $key, $value);
+            }
+        }
+    }
 
+    private static function populateServerTable(
+        HashTable $server,
+        string $queryString,
+        string $postBody,
+        bool $aotSoftware
+    ): void {
         $method = self::requestMethod();
         if ('' === $method) {
             $method = '' !== $postBody ? 'POST' : 'GET';
@@ -449,7 +487,11 @@ final class Superglobals
             $serverProtocol = 'HTTP/1.1';
         }
         self::setOrUpdateStringEntry($server, 'SERVER_PROTOCOL', $serverProtocol);
-        self::setOrUpdateStringEntry($server, 'SERVER_SOFTWARE', 'PHP-Compiler-VM');
+        self::setOrUpdateStringEntry(
+            $server,
+            'SERVER_SOFTWARE',
+            $aotSoftware ? 'PHP-Compiler-AOT' : 'PHP-Compiler-VM'
+        );
 
         $documentRoot = getenv('DOCUMENT_ROOT');
         if (false !== $documentRoot && '' !== $documentRoot) {
@@ -475,6 +517,81 @@ final class Superglobals
         }
 
         self::applySchemeAndPort($server);
+    }
+
+    private static function populatePost(Context $context, string $postBody): void
+    {
+        $post = $context->ensureSuperglobal('_POST');
+        $files = $context->ensureSuperglobal('_FILES');
+        self::populatePostIntoTables($post->toArray(), $files->toArray(), $postBody);
+    }
+
+    /** JIT/AOT standalone refresh — $_POST table (#9907). */
+    public static function buildPostTableForRefresh(): HashTable
+    {
+        $post = new HashTable();
+        $files = new HashTable();
+        $postBody = self::readRequestBody();
+        if (self::shouldPopulatePost(self::requestMethod(), $postBody)) {
+            self::populatePostIntoTables($post, $files, $postBody);
+        }
+
+        return $post;
+    }
+
+    /** JIT/AOT standalone refresh — $_FILES table (#9907). */
+    public static function buildFilesTableForRefresh(): HashTable
+    {
+        $post = new HashTable();
+        $files = new HashTable();
+        $postBody = self::readRequestBody();
+        if (self::shouldPopulatePost(self::requestMethod(), $postBody)) {
+            self::populatePostIntoTables($post, $files, $postBody);
+        }
+
+        return $files;
+    }
+
+    private static function populatePostIntoTables(HashTable $post, HashTable $files, string $postBody): void
+    {
+        if (self::isJsonContentType()) {
+            self::populateJson($post, $postBody);
+        } elseif (self::isMultipartContentType()) {
+            MultipartParser::populate($post, $files, $postBody);
+        } else {
+            self::populateFormEncoded($post, $postBody);
+        }
+    }
+
+    /**
+     * Decode application/json POST body into $_POST (issue #52).
+     */
+    private static function populateJson(HashTable $ht, string $body): void
+    {
+        if ('' === $body) {
+            return;
+        }
+        if (strlen($body) > DevServer::maxRequestBody()) {
+            return;
+        }
+        try {
+            $data = json_decode($body, true, self::MAX_JSON_DECODE_DEPTH, JSON_THROW_ON_ERROR);
+        } catch (\JsonException $e) {
+            return;
+        }
+        if (!is_array($data)) {
+            return;
+        }
+        VmParseStr::mergeInto($ht, $data);
+    }
+
+    private static function populateServer(
+        Context $context,
+        string $queryString,
+        string $postBody
+    ): void {
+        $server = $context->ensureSuperglobal('_SERVER')->toArray();
+        self::populateServerTable($server, $queryString, $postBody, false);
     }
 
     /**
