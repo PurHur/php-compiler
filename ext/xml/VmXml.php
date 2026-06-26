@@ -89,11 +89,91 @@ final class VmXml
             return self::errorRecord(1, 1, 'Malformed XML document', 4);
         }
 
-        $inner = $matches[3];
-        if ('' !== $inner && '<' === $inner[0]) {
-            $nested = self::validateWellFormed('<'.$matches[1].'>'.$inner.'</'.$matches[1].'>');
+        return self::validateFragment($matches[3]);
+    }
 
-            return $nested;
+    /**
+     * Validate sibling content inside an element (text nodes and child elements).
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function validateFragment(string $content): ?array
+    {
+        $pos = 0;
+        $len = \strlen($content);
+        while ($pos < $len) {
+            if (preg_match('/\G\s+/s', $content, $m, 0, $pos)) {
+                $pos += \strlen($m[0]);
+
+                continue;
+            }
+            if ($pos >= $len) {
+                return null;
+            }
+            if ('<' !== $content[$pos]) {
+                $next = strpos($content, '<', $pos);
+                $pos = (false === $next) ? $len : $next;
+
+                continue;
+            }
+            $end = self::findElementEnd($content, $pos);
+            if (null === $end) {
+                return self::errorRecord(1, $pos + 1, 'Malformed XML document', 4);
+            }
+            $element = substr($content, $pos, $end - $pos);
+            $error = self::validateWellFormed($element);
+            if (null !== $error) {
+                return $error;
+            }
+            $pos = $end;
+        }
+
+        return null;
+    }
+
+    /** @return null|int byte offset after one element starting at $pos */
+    private static function findElementEnd(string $content, int $pos): ?int
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $content, $selfClose, 0, $pos)) {
+            return $pos + \strlen($selfClose[0]);
+        }
+        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $open, 0, $pos)) {
+            return null;
+        }
+
+        /** @var list<string> $stack */
+        $stack = [$open[1]];
+        $scan = $pos + \strlen($open[0]);
+        $len = \strlen($content);
+        while ($scan < $len && [] !== $stack) {
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/s', $content, $close, 0, $scan)) {
+                $name = $close[1];
+                if ([] === $stack || end($stack) !== $name) {
+                    return null;
+                }
+                array_pop($stack);
+                $scan += \strlen($close[0]);
+                if ([] === $stack) {
+                    return $scan;
+                }
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/s', $content, $sc, 0, $scan)) {
+                $scan += \strlen($sc[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $content, $nested, 0, $scan)) {
+                $stack[] = $nested[1];
+                $scan += \strlen($nested[0]);
+
+                continue;
+            }
+            ++$scan;
         }
 
         return null;
