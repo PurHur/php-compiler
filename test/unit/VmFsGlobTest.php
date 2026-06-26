@@ -22,20 +22,22 @@ final class VmFsGlobTest extends TestCase
         $this->assertStringContainsString('VmFsGlob::glob', $source);
     }
 
-    /** Issue #7906: VmFsGlob must not delegate to host \\glob(). */
+    /** Issue #7906 / #12208: VmFsGlob must not delegate to host \\glob() or libc FFI. */
     public function testVmFsGlobDoesNotReferenceHostGlob(): void
     {
         $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
-        $this->assertStringContainsString('globFallback', $source);
-        $this->assertStringContainsString('libcGlob', $source);
+        $pure = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlobPure.php');
+        $this->assertStringContainsString('VmFsGlobPure::glob', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString("function_exists('glob')", $source);
         $this->assertStringNotContainsString('hostGlob', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $pure);
     }
 
     /** Issue #8167: VmFsGlob pathIsDir must not delegate to host \\stat(). */
     public function testVmFsGlobDoesNotReferenceHostStat(): void
     {
-        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlob.php');
+        $source = (string) file_get_contents(self::$root.'/ext/standard/VmFsGlobPure.php');
         $this->assertStringContainsString('VmStatCache::stat', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\stat\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/[^:]\\\\stat\\s*\\(/', $source);
