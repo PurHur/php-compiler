@@ -334,6 +334,11 @@ final class VmSerialize
         if (Variable::TYPE_ARRAY === $value->type) {
             return self::encodeWireArray($ctx, $value, $state, $frame);
         }
+        $existing = $state->lookupVariableIndex($value);
+        if (null !== $existing) {
+            return 'R:'.$existing.';';
+        }
+        $state->assignVariableIndex($value);
 
         return VmSerializeFormat::encodeExported(VmJson::export($value, $ctx, $ctx->runtime->vm));
     }
@@ -344,6 +349,12 @@ final class VmSerialize
         VmSerializeRefState $state,
         ?Frame $frame = null
     ): string {
+        $value = $value->resolveIndirect();
+        $existing = $state->lookupVariableIndex($value);
+        if (null !== $existing) {
+            return 'R:'.$existing.';';
+        }
+        $state->assignVariableIndex($value);
         $body = '';
         $count = 0;
         foreach ($value->toArray()->iterateKeyed(true) as [$key, $elem]) {
@@ -1036,14 +1047,18 @@ final class VmSerialize
  */
 final class VmSerializeRefState
 {
-    public int $nextIndex = 2;
+    public int $nextIndex = 1;
 
     /** @var \SplObjectStorage<ObjectEntry, int> */
     public \SplObjectStorage $objectIndex;
 
+    /** @var \SplObjectStorage<Variable, int> */
+    public \SplObjectStorage $variableIndex;
+
     public function __construct()
     {
         $this->objectIndex = new \SplObjectStorage();
+        $this->variableIndex = new \SplObjectStorage();
     }
 
     public function reserveRootSlot(): void
@@ -1066,6 +1081,24 @@ final class VmSerializeRefState
         }
 
         return $this->objectIndex[$object];
+    }
+
+    /** php-src var_hash — shared scalar/array refs emit R: (var.c php_var_serialize). */
+    public function assignVariableIndex(Variable $variable): int
+    {
+        $index = $this->nextIndex++;
+        $this->variableIndex[$variable] = $index;
+
+        return $index;
+    }
+
+    public function lookupVariableIndex(Variable $variable): ?int
+    {
+        if (!$this->variableIndex->contains($variable)) {
+            return null;
+        }
+
+        return $this->variableIndex[$variable];
     }
 }
 
