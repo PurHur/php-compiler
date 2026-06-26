@@ -12,7 +12,7 @@ use PHPCompiler\ModuleAbstract;
  *
  * Register under {@see standard}; advertise logical {@code bz2} extension and
  * bzcompress()/bzdecompress() only when {@see CompilerVersion::supportsBz2()} and
- * {@see VmBz2Native} can load libbz2 — withheld on reference profile (#11992).
+ * {@see VmBz2Native} is available (pure PHP via {@see VmBz2Core}) — withheld on reference profile (#11992).
  */
 class Module extends ModuleAbstract
 {

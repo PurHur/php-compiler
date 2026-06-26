@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\bz2;
 
 /**
- * VM bzcompress()/bzdecompress() via libbz2 FFI (php-src ext/bz2/bz2.c; issue #3402).
+ * VM bzcompress()/bzdecompress() — pure PHP via {@see VmBz2Core} (#8868, #3402).
  *
- * No host bzcompress() delegation — bootstrap/self-host safe (#1492).
+ * Optional libbz2 FFI fast path when PHP_COMPILER_BZ2_FFI=1.
  */
 final class VmBz2Native
 {
@@ -19,10 +19,41 @@ final class VmBz2Native
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return VmBz2Core::available();
     }
 
     public static function compress(string $source, int $blockSize100k = 4, int $workFactor = 0): string|false
+    {
+        if (self::ffiEnabled()) {
+            $result = self::ffiCompress($source, $blockSize100k, $workFactor);
+            if (false !== $result) {
+                return $result;
+            }
+        }
+
+        return VmBz2Core::compress($source, $blockSize100k, $workFactor);
+    }
+
+    public static function decompress(string $source, int $small = 0): string|false
+    {
+        if (self::ffiEnabled()) {
+            $result = self::ffiDecompress($source, $small);
+            if (false !== $result) {
+                return $result;
+            }
+        }
+
+        return VmBz2Core::decompress($source, $small);
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $flag = \getenv('PHP_COMPILER_BZ2_FFI');
+
+        return false !== $flag && '1' === $flag;
+    }
+
+    private static function ffiCompress(string $source, int $blockSize100k, int $workFactor): string|false
     {
         $ffi = self::ffi();
         if (null === $ffi) {
@@ -65,7 +96,7 @@ final class VmBz2Native
         return \FFI::string($dest, $written);
     }
 
-    public static function decompress(string $source, int $small = 0): string|false
+    private static function ffiDecompress(string $source, int $small): string|false
     {
         $ffi = self::ffi();
         if (null === $ffi) {
