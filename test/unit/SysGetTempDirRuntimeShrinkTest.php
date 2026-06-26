@@ -17,6 +17,17 @@ final class SysGetTempDirRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmSysGetTempDirNative::resolve', $source);
     }
 
+    public function testVmSysGetTempDirNativeDelegatesToPureWithoutLibcFfi(): void
+    {
+        $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetTempDirNative.php');
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetTempDirPure.php');
+        $this->assertStringContainsString('VmSysGetTempDirPure::resolve', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $native);
+        $this->assertStringNotContainsString('\\FFI', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $pure);
+        $this->assertStringNotContainsString('\\FFI', $pure);
+    }
+
     public function testSysGetTempDirRuntimeUsesJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SysGetTempDirRuntime.php');
