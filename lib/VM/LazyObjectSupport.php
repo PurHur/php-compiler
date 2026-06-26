@@ -221,6 +221,21 @@ final class LazyObjectSupport
         $proxyArg->object($object);
         $result = $vm->invokeClosure($initializer, $proxyArg);
         $result = $result->resolveIndirect();
+        if ($result->isUndefined() || Variable::TYPE_NULL === $result->type) {
+            // Concrete lazy proxies may mutate the placeholder in place (#12310, zend_lazy_objects.c ghost parity).
+            if ($object->class->isInterface) {
+                throw new \TypeError(
+                    'Lazy proxy factory must return an instance of a class compatible with '
+                    .$object->class->name.', null returned'
+                );
+            }
+            $object->constructed = true;
+            $object->lazyPending = false;
+            $object->lazyInitException = null;
+            self::clearLazyRawInitializedProperties($object);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT !== $result->type) {
             throw new \LogicException('Lazy object initializer must return an object');
         }
