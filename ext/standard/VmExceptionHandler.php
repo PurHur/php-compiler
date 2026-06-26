@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\ExceptionHandlerCallbackPolicy;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -35,13 +35,19 @@ final class VmExceptionHandler
         return $context->exceptionHandlers->pop();
     }
 
-    public static function invoke(Context $context, Variable $handler, Variable $exception): bool
-    {
+    public static function invoke(
+        Context $context,
+        Variable $handler,
+        Variable $exception,
+        ?ClosureState $pinnedClosure = null
+    ): bool {
         $handler = $handler->resolveIndirect();
         $exceptionArg = new Variable();
         $exceptionArg->copyFrom($exception);
 
-        if (VmClosureCall::isClosure($handler)) {
+        if (null !== $pinnedClosure) {
+            $result = VmClosureCall::invoke($context, $pinnedClosure, $exceptionArg);
+        } elseif (VmClosureCall::isClosure($handler)) {
             $result = VmClosureCall::invoke(
                 $context,
                 VmClosureCall::resolve($handler),

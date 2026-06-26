@@ -464,6 +464,16 @@ final class ErrorReporter
         return $out;
     }
 
+    /**
+     * @param callable(Variable): void $visitVar
+     */
+    public function visitGcRoots(callable $visitVar): void
+    {
+        foreach ($this->handlerStack as [$handler]) {
+            $visitVar($handler);
+        }
+    }
+
     private function dispatchUserHandler(
         ?Context $context,
         ?Frame $frame,
