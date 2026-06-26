@@ -48,6 +48,7 @@ require_once __DIR__.'/../../../ext/bz2/Bz2JitHelper.php';
 require_once __DIR__.'/../../../ext/bz2/JitBz2.php';
 require_once __DIR__.'/../../../ext/bz2/Module.php';
 require_once __DIR__.'/../../../ext/bz2/VmBz2Native.php';
+require_once __DIR__.'/../../../ext/bz2/VmBz2Core.php';
 require_once __DIR__.'/../../../ext/bz2/bzcompress.php';
 require_once __DIR__.'/../../../ext/bz2/bzdecompress.php';
 require_once __DIR__.'/../../../ext/calendar/CalendarArgs.php';

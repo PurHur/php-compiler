@@ -19,6 +19,7 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Bz2Runtime.php');
         $this->assertStringContainsString('Bz2JitHelper', $runtime);
         $this->assertStringContainsString('VmBz2Native', $runtime);
+        $this->assertStringContainsString('VmBz2Core', (string) file_get_contents(__DIR__.'/../../ext/bz2/VmBz2Native.php'));
         $this->assertStringNotContainsString('BZ2_bzBuffToBuffCompress', $runtime);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringBz2Jit.php');
