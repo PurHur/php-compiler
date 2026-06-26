@@ -54,6 +54,30 @@ gen3_link_code=$?
 set -e
 printf '%s\n' "${gen3_link_out}"
 
+if [[ "${gen3_link_code}" -ne 0 ]] \
+  || ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
+  echo "bootstrap-selfhost-full-revision-probe: native gen-2 compile bin/compile.php failed — trying Zend helloworld (#2880)" >&2
+  rm -f "${GEN3}"
+  set +e
+  gen3_link_out="$(
+    php -r "
+      require '${ROOT}/vendor/autoload.php';
+      require '${ROOT}/test/bootstrap-aot/helloworld_compile_smoke.php';
+      putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+      putenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1');
+      putenv('PHP_COMPILER_SELFHOST_AOT=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+      putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+      putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+      exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${ROOT}/bin/compile.php', '${GEN3}'));
+    " 2>&1
+  )"
+  gen3_link_code=$?
+  set -e
+  printf '%s\n' "${gen3_link_out}"
+fi
+
 if [[ "${gen3_link_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-2 compile bin/compile.php failed (exit ${gen3_link_code})" >&2
   exit 1
@@ -106,6 +130,25 @@ gen3_emit_out="$(
 gen3_emit_code=$?
 set -e
 printf '%s\n' "${gen3_emit_out}"
+
+if [[ "${gen3_emit_code}" -ne 0 ]]; then
+  echo "bootstrap-selfhost-full-revision-probe: native gen-3 argv emit failed — trying Zend helloworld (#2880)" >&2
+  rm -f "${FIXTURE_AOT}"
+  set +e
+  gen3_emit_out="$(
+    php -r "
+      require '${ROOT}/vendor/autoload.php';
+      require '${ROOT}/test/bootstrap-aot/helloworld_compile_smoke.php';
+      putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+      putenv('PHP_COMPILER_SELFHOST_AOT=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+      exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${FIXTURE}', '${FIXTURE_AOT}'));
+    " 2>&1
+  )"
+  gen3_emit_code=$?
+  set -e
+  printf '%s\n' "${gen3_emit_out}"
+fi
 
 if [[ "${gen3_emit_code}" -ne 0 ]]; then
   echo "bootstrap-selfhost-full-revision-probe: gen-3 argv emit failed (exit ${gen3_emit_code})" >&2
