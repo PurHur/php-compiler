@@ -23,9 +23,6 @@ final class JitCheckdate
         JitInternalStrictArg::rejectNullInt($context, $args[0], 'checkdate', 'month', 1);
         JitInternalStrictArg::rejectNullInt($context, $args[1], 'checkdate', 'day', 2);
         JitInternalStrictArg::rejectNullInt($context, $args[2], 'checkdate', 'year', 3);
-        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[0], 'checkdate', 'month', 1);
-        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[1], 'checkdate', 'day', 2);
-        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[2], 'checkdate', 'year', 3);
         CheckdateRuntime::ensureLinked($context);
 
         $month = JitLongArg::lower($context, $args[0], 'checkdate() argument #1');

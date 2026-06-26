@@ -30,9 +30,9 @@ final class checkdate extends Internal
         InternalStrictArg::rejectNullInt($frame->calledArgs[0], 'checkdate', 'month', 0);
         InternalStrictArg::rejectNullInt($frame->calledArgs[1], 'checkdate', 'day', 1);
         InternalStrictArg::rejectNullInt($frame->calledArgs[2], 'checkdate', 'year', 2);
-        $month = InternalStrictArg::requireBuiltinTypedInt($frame, 0, 'checkdate', 'month')->toInt();
-        $day = InternalStrictArg::requireBuiltinTypedInt($frame, 1, 'checkdate', 'day')->toInt();
-        $year = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'checkdate', 'year')->toInt();
+        $month = VmMath::parseIntBuiltinArg($frame->calledArgs[0], 'checkdate', 0, 'month');
+        $day = VmMath::parseIntBuiltinArg($frame->calledArgs[1], 'checkdate', 1, 'day');
+        $year = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'checkdate', 2, 'year');
         $valid = VmDate::checkdate($month, $day, $year);
         BuiltinExecute::writeReturn($frame, static function ($ret) use ($valid): void {
             $ret->bool($valid);
