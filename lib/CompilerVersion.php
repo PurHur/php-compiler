@@ -152,4 +152,10 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinSince('8.3.0');
     }
+
+    /** PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845). */
+    public static function supportsPhp84ArraySearchFunctions(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
 }
