@@ -238,9 +238,7 @@ final class ReflectionTypeSupport
         $class = self::requireClass($ctx, ReflectionSupport::REFLECTION_NAMED_TYPE);
         $obj = new ObjectEntry($class);
         $obj->constructed = true;
-        $name = $type instanceof CfgType\Literal
-            ? $type->name
-            : self::referenceTypeName($type);
+        $name = self::cfgTypeString($type);
         self::storeCommonTypeProps($obj, $typeString, self::allowsNullFromCfg($type));
         $obj->getProperty(ReflectionSupport::PROP_TYPE_NAME)->string($name);
         $obj->getProperty(ReflectionSupport::PROP_TYPE_BUILTIN)->bool(self::isBuiltinTypeName($name));
