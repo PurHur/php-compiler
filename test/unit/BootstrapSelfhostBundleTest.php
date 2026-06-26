@@ -124,6 +124,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/Type/Object_.php',
         'lib/JIT/Builtin/StringParseStr.php',
         'lib/JIT/Builtin/StringPregMatch.php',
+        'ext/standard/PregJitHelper.php',
         'lib/JIT/Builtin/StringUnserialize.php',
         'lib/JIT/Builtin/StringUrldecode.php',
         'ext/standard/JitAddslashes.php',

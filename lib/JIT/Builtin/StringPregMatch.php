@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT MCJIT body for __compiler_preg_* — PHP-generated LLVM (issue #5289).
+ * JIT MCJIT body for __compiler_preg_* — embed PHP helper vs standalone LLVM (#5289, #9542).
  *
- * Delegates to {@see StringPregMatchJit} (libpcre2-8 via LLVM externals).
+ * Delegates to {@see StringPregMatchJit} (dispatch) → {@see PregMatchRuntime} or
+ * {@see StringPregMatchStandaloneLlvm}.
  *
  * Phase A / M2 spine: bundled in compiler_lib_spine_smoke (not ratio-deferred).
  */

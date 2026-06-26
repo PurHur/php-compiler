@@ -17,7 +17,7 @@ final class PregExpandRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PregExpandJitHelper', $source);
         $this->assertStringContainsString('PregReplacementExpand', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/phpc_preg_expand.c');
-        $pregJit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchJit.php');
+        $pregJit = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
         $this->assertStringContainsString('PregExpandRuntime::ensureLinked', $pregJit);
         $this->assertStringNotContainsString('phpc_preg_expand.c', $pregJit);
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
