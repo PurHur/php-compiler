@@ -1048,6 +1048,10 @@ class Block {
                     }
                 }
             }
+            // func_get_arg(s)/func_num_args() read calledArgs on the active frame (#12337).
+            if ([] !== $frame->calledArgs) {
+                $return->calledArgs = $frame->calledArgs;
+            }
         }
         return $return;
     }
