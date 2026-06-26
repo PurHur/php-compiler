@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayValuesRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -47,16 +47,16 @@ final class array_values extends Internal
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type
             || ($args[0]->type & JITVariable::IS_NATIVE_ARRAY)
         ) {
-            return ArrayBuiltinHelper::buildValuesArray($context, $args[0]);
+            return ArrayValuesRuntime::values($context, $args[0]);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             JitArrayElem::requireArrayArg($context, $args[0], 'array_values');
 
-            return ArrayBuiltinHelper::buildValuesArray($context, $args[0]);
+            return ArrayValuesRuntime::values($context, $args[0]);
         }
         JitArrayElem::requireArrayArg($context, $args[0], 'array_values');
 
-        return ArrayBuiltinHelper::buildValuesArray(
+        return ArrayValuesRuntime::values(
             $context,
             new JITVariable(
                 $context,
