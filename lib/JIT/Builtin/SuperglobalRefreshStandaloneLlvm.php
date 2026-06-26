@@ -55,6 +55,7 @@ final class SuperglobalRefreshStandaloneLlvm
         self::ensureLibc($context);
         self::ensureHashtableHelpers($context);
         self::ensureParseHelpers($context);
+        StringMultipartStandaloneLlvm::ensureLinked($context);
 
         self::implementHelper($context, '__phpc_sg_env_or_empty', self::emitEnvOrEmpty(...));
         self::implementHelper($context, '__phpc_sg_set_string_key', self::emitSetStringKey(...));

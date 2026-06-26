@@ -12,9 +12,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM __phpc_parse_multipart_post (mirrors superglobals_refresh.c multipart helpers, #7302).
+ * Standalone AOT LLVM multipart POST quarantine (#7302, #9394).
+ *
+ * Default standalone uses {@see \PHPCompiler\Web\MultipartParser} via {@see SuperglobalRefreshRuntime}.
+ * Opt-in LLVM superglobal refresh links these bodies from {@see SuperglobalRefreshStandaloneLlvm}.
+ * php-src: main/rfc1867.c, main/php_variables.c
  */
-final class StringMultipartJit
+final class StringMultipartStandaloneLlvm
 {
     private const MAX_BODY = 8 * 1024 * 1024;
 
@@ -30,6 +34,11 @@ final class StringMultipartJit
 
     /** Standalone AOT: multipart POST helper for superglobals_refresh.c (#7302). */
     public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureLinked(Context $context): void
     {
         self::implement($context);
     }
