@@ -11,8 +11,11 @@ namespace PHPCompiler\VM;
  */
 final class MemoryAccounting
 {
-    /** Zend MM per-request cache bucket (zend_alloc.c — typical gc_mem_caches first call). */
-    private const INITIAL_MM_CACHE = 65536;
+    /** Zend MM page size (zend_alloc.c ZEND_MM_PAGE_SIZE). */
+    private const ZEND_MM_PAGE_SIZE = 4096;
+
+    /** Zend MM per-request cache bucket: 15 pages (zend_alloc.c — gc_mem_caches first call ≈61440 on PHP 8.2). */
+    private const INITIAL_MM_CACHE = 15 * self::ZEND_MM_PAGE_SIZE;
 
     private static int $mmCacheRemaining = self::INITIAL_MM_CACHE;
 

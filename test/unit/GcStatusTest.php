@@ -80,8 +80,8 @@ PHP;
         $rt->run($block);
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('first=nonzero', $output);
-        $this->assertStringContainsString('second=zero', $output);
+        $this->assertStringContainsString('first=61440', $output);
+        $this->assertStringContainsString('second=0', $output);
     }
 
     public function testGcCollectCyclesUpdatesStatus(): void
