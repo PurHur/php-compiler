@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859).
+ * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859, #12144).
  *
  * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC).
- * Primary: libc FFI when ext/ffi is loaded. Fallback: /proc/uptime (µs only, #7315 bootstrap).
+ * Linux: /proc/uptime (µs precision). REALTIME: host microtime bootstrap path.
  * JIT/AOT: ext/standard/HrtimeJitHelper.php via StringHrtimeRuntime (#9182).
  */
 final class VmHrtimeNative
@@ -18,10 +18,6 @@ final class VmHrtimeNative
     public const CLOCK_REALTIME = 0;
 
     public const CLOCK_MONOTONIC = 1;
-
-    private static ?\FFI $ffi = null;
-
-    private static bool $ffiUnavailable = false;
 
     /**
      * @return array{0: int, 1: int} seconds and nanoseconds
@@ -36,12 +32,19 @@ final class VmHrtimeNative
      */
     public static function readClock(int $clockId): ?array
     {
-        $ffiPair = self::readClockFfi($clockId);
-        if (null !== $ffiPair) {
-            return $ffiPair;
-        }
+        return match ($clockId) {
+            self::CLOCK_MONOTONIC => self::readMonotonicClock(),
+            self::CLOCK_REALTIME => self::readRealtimeClock(),
+            default => null,
+        };
+    }
 
-        if (self::CLOCK_MONOTONIC === $clockId && 'Linux' === \PHP_OS_FAMILY) {
+    /**
+     * @return array{0: int, 1: int}|null
+     */
+    private static function readMonotonicClock(): ?array
+    {
+        if ('Linux' === \PHP_OS_FAMILY) {
             return self::readMonotonicLinux();
         }
 
@@ -51,27 +54,20 @@ final class VmHrtimeNative
     /**
      * @return array{0: int, 1: int}|null
      */
-    private static function readClockFfi(int $clockId): ?array
+    private static function readRealtimeClock(): ?array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        if (!\function_exists('microtime')) {
             return null;
         }
-
-        $ts = $ffi->new('struct timespec');
-        if (0 !== (int) $ffi->clock_gettime($clockId, \FFI::addr($ts))) {
-            return null;
+        $seconds = \microtime(true);
+        $sec = (int) $seconds;
+        $nsec = (int) \round(($seconds - $sec) * (float) self::NS_PER_SEC);
+        if ($nsec >= self::NS_PER_SEC) {
+            ++$sec;
+            $nsec -= self::NS_PER_SEC;
         }
 
-        return [(int) $ts->tv_sec, (int) $ts->tv_nsec];
-    }
-
-    /**
-     * @return array{0: int, 1: int}|null
-     */
-    private static function readMonotonicFfi(): ?array
-    {
-        return self::readClockFfi(self::CLOCK_MONOTONIC);
+        return [$sec, $nsec];
     }
 
     /**
@@ -103,60 +99,20 @@ final class VmHrtimeNative
     }
 
     /**
-     * CLOCK_MONOTONIC approximation via /proc/uptime when FFI is unavailable (#7315).
+     * CLOCK_MONOTONIC via /proc/uptime (#7315, #12144).
      *
-     * @return array{0: int, 1: int}
+     * @return array{0: int, 1: int}|null
      */
-    private static function readMonotonicLinux(): array
+    private static function readMonotonicLinux(): ?array
     {
         if (!\is_readable('/proc/uptime')) {
-            return [0, 0];
+            return null;
         }
         $raw = VmFsReadNative::read('/proc/uptime');
         if (false === $raw) {
-            return [0, 0];
-        }
-
-        return self::parseUptimeRaw($raw) ?? [0, 0];
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (self::$ffiUnavailable) {
-            return null;
-        }
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            self::$ffiUnavailable = true;
-
             return null;
         }
 
-        $cdef = <<<'CDEF'
-typedef long time_t;
-typedef int clockid_t;
-struct timespec {
-    time_t tv_sec;
-    long tv_nsec;
-};
-#define CLOCK_REALTIME 0
-#define CLOCK_MONOTONIC 1
-int clock_gettime(clockid_t clk_id, struct timespec *tp);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        self::$ffiUnavailable = true;
-
-        return null;
+        return self::parseUptimeRaw($raw);
     }
 }
