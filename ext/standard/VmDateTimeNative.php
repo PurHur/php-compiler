@@ -1103,13 +1103,8 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return 0;
             }
-            $ffi = self::ffi();
-            if (null === $ffi) {
-                return 0;
-            }
-            $asUtc = (int) $ffi->timegm(\FFI::addr($tm));
 
-            return $asUtc - $timestamp;
+            return (int) $tm->tm_gmtoff;
         });
     }
 
@@ -1357,14 +1352,9 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return ['offset' => 0, 'isdst' => false];
             }
-            $ffi = self::ffi();
             $isdst = 1 === (int) $tm->tm_isdst;
-            if (null === $ffi) {
-                return ['offset' => 0, 'isdst' => $isdst];
-            }
-            $asUtc = (int) $ffi->timegm(\FFI::addr($tm));
 
-            return ['offset' => $asUtc - $timestamp, 'isdst' => $isdst];
+            return ['offset' => (int) $tm->tm_gmtoff, 'isdst' => $isdst];
         });
     }
 
@@ -1831,6 +1821,8 @@ struct tm {
     int tm_wday;
     int tm_yday;
     int tm_isdst;
+    long tm_gmtoff;
+    const char *tm_zone;
 };
 int setenv(const char *name, const char *value, int overwrite);
 void tzset(void);
