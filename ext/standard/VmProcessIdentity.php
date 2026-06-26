@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 
 /**
- * Process identity builtins (issue #6119, pure /proc #9017, libc FFI fallback #7891).
+ * Process identity builtins (issue #6119, pure /proc #9017, #12182).
  *
  * php-src: ext/standard/basic_functions.c — getmyuid, getmygid, get_current_user.
  * No host \\posix_* / \\get*() delegation — VmProcessIdentityPure / VmProcessIdentityNative only.
