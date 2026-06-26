@@ -42,7 +42,7 @@ final class file_get_contents extends Internal
         }
 
         $useIncludePath = false;
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             $useIncludePath = VmMath::parseBoolBuiltinArg(
                 $frame->calledArgs[1],
                 'file_get_contents',
@@ -52,7 +52,7 @@ final class file_get_contents extends Internal
         }
 
         $offset = 0;
-        if ($argc >= 4) {
+        if (isset($frame->calledArgs[3])) {
             $offset = VmMath::parseIntBuiltinArg(
                 $frame->calledArgs[3]->resolveIndirect(),
                 'file_get_contents',
@@ -62,7 +62,7 @@ final class file_get_contents extends Internal
         }
 
         $length = null;
-        if ($argc >= 5) {
+        if (isset($frame->calledArgs[4])) {
             $lengthVar = $frame->calledArgs[4]->resolveIndirect();
             if (Variable::TYPE_NULL !== $lengthVar->type) {
                 $length = VmMath::parseIntBuiltinArg(
@@ -91,10 +91,12 @@ final class file_get_contents extends Internal
             return;
         }
 
+        $contextVar = isset($frame->calledArgs[2]) ? $frame->calledArgs[2]->resolveIndirect() : null;
+
         $data = VmFs::fileGetContents(
             $filename,
             $useIncludePath,
-            $argc >= 3 ? $frame->calledArgs[2]->resolveIndirect() : null,
+            $contextVar,
             $offset,
             $length,
             $frame->vmContext
