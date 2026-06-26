@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayCountValuesRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -15,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * array_count_values() for string or integer values (subset of PHP; issue #2356).
  *
- * VM: {@see VmArray::countValues()}; JIT/AOT: {@see ArrayBuiltinHelper::arrayCountValues()}.
+ * VM: {@see VmArray::countValues()}; JIT/AOT: {@see ArrayCountValuesRuntime::countValues()}.
  */
 final class array_count_values extends Internal
 {
@@ -49,6 +49,6 @@ final class array_count_values extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayCountValues($context, $args[0]);
+        return ArrayCountValuesRuntime::countValues($context, $args[0]);
     }
 }
