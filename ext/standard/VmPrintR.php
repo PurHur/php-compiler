@@ -23,7 +23,24 @@ final class VmPrintR
         int $level = 0,
         ?Frame $frame = null
     ): string {
+        /** @var \SplObjectStorage<int, true> $visited */
+        $visited = new \SplObjectStorage();
+
+        return self::formatNested($vm, $var, $level, $frame, $visited);
+    }
+
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function formatNested(
+        VM $vm,
+        Variable $var,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): string {
         TypedPropertyCheck::assertReadable($var);
+        $var = $var->resolveIndirect();
         if (Variable::TYPE_INTEGER === $var->type) {
             return (string) $var->toInt();
         }
@@ -44,13 +61,13 @@ final class VmPrintR
             return $resourceOut;
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            return self::formatArray($vm, $var->toArray(), $level, $frame);
+            return self::formatArray($vm, $var->toArray(), $level, $frame, $visited);
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            return self::formatObject($vm, $var->toObject(), $level, $frame);
+            return self::formatObject($vm, $var->toObject(), $level, $frame, $visited);
         }
         if (Variable::TYPE_ENUM_CASE === $var->type) {
-            return self::formatEnumCase($vm, $var->toEnumCase(), $level, $frame);
+            return self::formatEnumCase($vm, $var->toEnumCase(), $level, $frame, $visited);
         }
 
         return '';
@@ -61,7 +78,8 @@ final class VmPrintR
         VM $vm,
         VM\EnumCaseEntry $case,
         int $level,
-        ?Frame $frame = null
+        ?Frame $frame,
+        \SplObjectStorage $visited
     ): string {
         $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
         $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
@@ -72,11 +90,12 @@ final class VmPrintR
         $lines = ["{$header}\n", "{$openSpaces}(\n"];
         $lines[] = $keySpaces.'[name] => '.$case->caseName."\n";
         if (null !== $case->enumClass->backedType) {
-            $valueFormatted = self::formatVariable(
+            $valueFormatted = self::formatNested(
                 $vm,
                 $case->backingValue->resolveIndirect(),
                 $level + 1,
-                $frame
+                $frame,
+                $visited
             );
             $lines[] = $keySpaces.'[value] => '.$valueFormatted."\n";
         }
@@ -91,33 +110,77 @@ final class VmPrintR
         return VmPrintRFloat::format($value);
     }
 
-    private static function formatArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): string
-    {
-        $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
-        $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
-        $lines = ["Array\n", "{$openSpaces}(\n"];
-        foreach ($table->iterateKeyed(true) as [$key, $value]) {
-            $formatted = self::formatVariable($vm, $value->resolveIndirect(), $level + 1, $frame);
-            $lines[] = "{$keySpaces}".self::formatKey($key).' => '.$formatted."\n";
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function formatArray(
+        VM $vm,
+        VM\HashTable $table,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): string {
+        if ($visited->contains($table)) {
+            return self::formatArrayRecursionMarker();
         }
-        $lines[] = "{$openSpaces})\n";
+        $visited->attach($table);
+        try {
+            $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
+            $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+            $lines = ["Array\n", "{$openSpaces}(\n"];
+            foreach ($table->iterateKeyed(true) as [$key, $value]) {
+                $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
+                $lines[] = "{$keySpaces}".self::formatKey($key).' => '.$formatted."\n";
+            }
+            $lines[] = "{$openSpaces})\n";
 
-        return implode('', $lines);
+            return implode('', $lines);
+        } finally {
+            $visited->detach($table);
+        }
     }
 
-    private static function formatObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): string
-    {
-        $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
-        $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
-        $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
-        $lines = ["{$object->class->name} Object\n", "{$openSpaces}(\n"];
-        foreach ($props as $name => $value) {
-            $formatted = self::formatVariable($vm, $value->resolveIndirect(), $level + 1);
-            $lines[] = "{$keySpaces}[{$name}] => ".$formatted."\n";
+    /**
+     * @param \SplObjectStorage<int, true> $visited
+     */
+    private static function formatObject(
+        VM $vm,
+        VM\ObjectEntry $object,
+        int $level,
+        ?Frame $frame,
+        \SplObjectStorage $visited
+    ): string {
+        if ($visited->contains($object)) {
+            return self::formatObjectRecursionMarker($object->class->name);
         }
-        $lines[] = "{$openSpaces})\n";
+        $visited->attach($object);
+        try {
+            $openSpaces = 0 === $level ? '' : str_repeat(' ', 4 * ($level + 1));
+            $keySpaces = str_repeat(' ', 4 * (0 === $level ? 1 : $level + 2));
+            $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
+            $lines = ["{$object->class->name} Object\n", "{$openSpaces}(\n"];
+            foreach ($props as $name => $value) {
+                $formatted = self::formatNested($vm, $value->resolveIndirect(), $level + 1, $frame, $visited);
+                $lines[] = "{$keySpaces}[{$name}] => ".$formatted."\n";
+            }
+            $lines[] = "{$openSpaces})\n";
 
-        return implode('', $lines);
+            return implode('', $lines);
+        } finally {
+            $visited->detach($object);
+        }
+    }
+
+    /** php-src ext/standard/var.c — HASH_IS_APPLYING recursion marker (#11179). */
+    private static function formatArrayRecursionMarker(): string
+    {
+        return "Array\n *RECURSION*";
+    }
+
+    /** php-src ext/standard/var.c — object recursion marker (#11179). */
+    private static function formatObjectRecursionMarker(string $className): string
+    {
+        return "{$className} Object\n *RECURSION*";
     }
 
     private static function formatKey(Variable $key): string
