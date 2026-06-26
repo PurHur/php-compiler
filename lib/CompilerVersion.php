@@ -222,4 +222,10 @@ final class CompilerVersion
     {
         return false;
     }
+
+    /** disktotalspace() legacy alias not in php-src 8.2 — use disk_total_space() (#11922). */
+    public static function supportsDisktotalspace(): bool
+    {
+        return false;
+    }
 }
