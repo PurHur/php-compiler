@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM password_hash()/password_verify()/crypt() via libcrypt(3) FFI (#4794, #6906).
+ * VM password_hash()/password_verify()/crypt() via libcrypt(3) + libargon2 FFI (#4794, #6906, #8731).
  *
  * Mirrors {@see \PHPCompiler\ext\standard\PasswordJitHelper} — no host \\password_* delegation.
  *
@@ -27,9 +27,31 @@ final class VmPasswordNative
 
     private const BCRYPT_MAX_COST = 31;
 
+    private const ARGON2_HASH_LEN = 32;
+
+    private const ARGON2_SALT_RAW_LEN = 16;
+
+    private const ARGON2_DEFAULT_MEMORY_COST = 65536;
+
+    private const ARGON2_DEFAULT_TIME_COST = 4;
+
+    private const ARGON2_DEFAULT_THREADS = 1;
+
+    private const ARGON2_MIN_MEMORY = 8;
+
+    private const ARGON2_TYPE_I = 1;
+
+    private const ARGON2_TYPE_ID = 2;
+
+    private const ARGON2_VERSION = 19;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
+
+    private static ?\FFI $argon2Ffi = null;
+
+    private static bool $argon2FfiUnavailable = false;
 
     public static function available(): bool
     {
@@ -41,13 +63,13 @@ final class VmPasswordNative
      */
     public static function argon2Available(): bool
     {
-        return \defined('PASSWORD_ARGON2ID') && \function_exists('password_hash');
+        return null !== self::argon2Ffi();
     }
 
     public static function passwordHash(string $password, int $algo, array $options = []): string|false
     {
         if (self::PASSWORD_ARGON2I === $algo || self::PASSWORD_ARGON2ID === $algo) {
-            return self::hostPasswordHash($password, $algo, $options);
+            return self::argon2Hash($password, $algo, $options);
         }
         if ($algo !== self::PASSWORD_BCRYPT) {
             return false;
@@ -81,7 +103,7 @@ final class VmPasswordNative
     public static function passwordVerify(string $password, string $hash): bool
     {
         if (str_starts_with($hash, '$argon2')) {
-            return self::hostPasswordVerify($password, $hash);
+            return self::argon2Verify($password, $hash);
         }
         if (\strlen($hash) < 29 || !str_starts_with($hash, '$2y$')) {
             return false;
@@ -125,31 +147,140 @@ final class VmPasswordNative
         return $algos;
     }
 
-    /** @param array<string, mixed> $options */
-    private static function hostPasswordHash(string $password, int $algo, array $options): string|false
+    /**
+     * @param array<string, mixed> $options
+     */
+    private static function argon2Hash(string $password, int $algo, array $options): string|false
     {
-        if (!self::argon2Available()) {
+        $ffi = self::argon2Ffi();
+        if (null === $ffi) {
             return false;
         }
+
+        $resolved = self::resolveArgon2Options($options);
+        if (null === $resolved) {
+            return false;
+        }
+        [$memoryCost, $timeCost, $threads] = $resolved;
+        $type = self::PASSWORD_ARGON2I === $algo ? self::ARGON2_TYPE_I : self::ARGON2_TYPE_ID;
+
         try {
-            $result = \password_hash($password, $algo, $options);
+            $saltEncoded = self::bcryptEncodeSalt22(\random_bytes(self::ARGON2_SALT_RAW_LEN));
         } catch (\Throwable) {
             return false;
         }
 
-        return \is_string($result) ? $result : false;
+        $saltLen = \strlen($saltEncoded);
+        $encodedLen = (int) $ffi->argon2_encodedlen(
+            $timeCost,
+            $memoryCost,
+            $threads,
+            $saltLen,
+            self::ARGON2_HASH_LEN,
+            $type
+        );
+        if ($encodedLen <= 1) {
+            return false;
+        }
+
+        try {
+            $hashBuf = $ffi->new('char['.self::ARGON2_HASH_LEN.']', false);
+            $encodedBuf = $ffi->new('char['.$encodedLen.']', false);
+            $pwdBuf = self::copyCString($ffi, $password);
+            $saltBuf = self::copyCString($ffi, $saltEncoded);
+            $status = $ffi->argon2_hash(
+                $timeCost,
+                $memoryCost,
+                $threads,
+                $pwdBuf,
+                \strlen($password),
+                $saltBuf,
+                $saltLen,
+                $hashBuf,
+                self::ARGON2_HASH_LEN,
+                $encodedBuf,
+                $encodedLen,
+                $type,
+                self::ARGON2_VERSION
+            );
+            if (0 !== $status) {
+                return false;
+            }
+
+            return \FFI::string($encodedBuf, $encodedLen - 1);
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
-    private static function hostPasswordVerify(string $password, string $hash): bool
+    private static function argon2Verify(string $password, string $hash): bool
     {
-        if (!self::argon2Available()) {
+        $ffi = self::argon2Ffi();
+        if (null === $ffi) {
             return false;
         }
+
+        if (str_starts_with($hash, '$argon2i$')) {
+            $type = self::ARGON2_TYPE_I;
+        } elseif (str_starts_with($hash, '$argon2id$')) {
+            $type = self::ARGON2_TYPE_ID;
+        } else {
+            return false;
+        }
+
         try {
-            return \password_verify($password, $hash);
+            $pwdBuf = self::copyCString($ffi, $password);
+
+            return 0 === $ffi->argon2_verify($hash, $pwdBuf, \strlen($password), $type);
         } catch (\Throwable) {
             return false;
         }
+    }
+
+    /**
+     * @param array<string, mixed> $options
+     *
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private static function resolveArgon2Options(array $options): ?array
+    {
+        $memoryCost = self::ARGON2_DEFAULT_MEMORY_COST;
+        $timeCost = self::ARGON2_DEFAULT_TIME_COST;
+        $threads = self::ARGON2_DEFAULT_THREADS;
+
+        if (isset($options['memory_cost'])) {
+            $value = $options['memory_cost'];
+            if (!\is_int($value)) {
+                return null;
+            }
+            $memoryCost = $value;
+        }
+        if (isset($options['time_cost'])) {
+            $value = $options['time_cost'];
+            if (!\is_int($value)) {
+                return null;
+            }
+            $timeCost = $value;
+        }
+        if (isset($options['threads'])) {
+            $value = $options['threads'];
+            if (!\is_int($value)) {
+                return null;
+            }
+            $threads = $value;
+        }
+
+        if ($memoryCost < self::ARGON2_MIN_MEMORY || $memoryCost > 0xFFFFFFFF) {
+            return null;
+        }
+        if ($timeCost < 1 || $timeCost > 0xFFFFFFFF) {
+            return null;
+        }
+        if ($threads < 1 || $threads > 0xFFFFFF) {
+            return null;
+        }
+
+        return [$memoryCost, $timeCost, $threads];
     }
 
     /**
@@ -311,6 +442,42 @@ CDEF;
         }
 
         self::$ffiUnavailable = true;
+
+        return null;
+    }
+
+    private static function argon2Ffi(): ?\FFI
+    {
+        if (self::$argon2FfiUnavailable) {
+            return null;
+        }
+        if (null !== self::$argon2Ffi) {
+            return self::$argon2Ffi;
+        }
+        if (!\extension_loaded('ffi')
+            || !\in_array(strtolower((string) \ini_get('ffi.enable')), ['1', 'true', 'preload'], true)) {
+            self::$argon2FfiUnavailable = true;
+
+            return null;
+        }
+
+        $cdef = <<<'CDEF'
+typedef int argon2_type;
+size_t argon2_encodedlen(uint32_t t_cost, uint32_t m_cost, uint32_t parallelism, uint32_t saltlen, uint32_t hashlen, argon2_type type);
+int argon2_hash(uint32_t t_cost, uint32_t m_cost, uint32_t parallelism, void *pwd, size_t pwdlen, void *salt, size_t saltlen, void *hash, size_t hashlen, char *encoded, size_t encodedlen, argon2_type type, uint32_t version);
+int argon2_verify(const char *encoded, void *pwd, size_t pwdlen, argon2_type type);
+CDEF;
+
+        foreach (['libargon2.so.1', 'libargon2.so'] as $lib) {
+            try {
+                self::$argon2Ffi = \FFI::cdef($cdef, $lib);
+
+                return self::$argon2Ffi;
+            } catch (\Throwable) {
+            }
+        }
+
+        self::$argon2FfiUnavailable = true;
 
         return null;
     }

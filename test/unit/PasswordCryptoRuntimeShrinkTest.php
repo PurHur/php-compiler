@@ -65,4 +65,14 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $info = PasswordJitHelper::getInfoHashtable($hash);
         $this->assertSame('bcrypt', $info->find('algoName')->resolveIndirect()->toString());
     }
+
+    public function testVmPasswordNativeHasNoHostArgon2Delegation(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPasswordNative.php');
+        $this->assertStringContainsString('argon2Ffi', $source);
+        $this->assertStringNotContainsString('hostPasswordHash', $source);
+        $this->assertStringNotContainsString('hostPasswordVerify', $source);
+        $this->assertStringNotContainsString('\\password_hash(', $source);
+        $this->assertStringNotContainsString('\\password_verify(', $source);
+    }
 }
