@@ -33,6 +33,15 @@ final class StringGettextRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmGettextNative::textdomain', $source);
     }
 
+    public function testVmGettextNativeUsesPureMoReaderNotLibintlFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/gettext/VmGettextNative.php');
+        $this->assertStringContainsString('VmGettextPure', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('extension_loaded(\'ffi\')', $source);
+        $this->assertFileExists(__DIR__.'/../../ext/gettext/VmGettextPure.php');
+    }
+
     public function testStandaloneLlvmQuarantined(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextStandaloneLlvm.php');
