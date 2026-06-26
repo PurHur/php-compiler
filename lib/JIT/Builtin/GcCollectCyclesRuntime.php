@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -51,6 +54,36 @@ final class GcCollectCyclesRuntime
     private const G_FULL = 'phpc_gc_full';
 
     private const G_BUFFER_SIZE = 'phpc_gc_buffer_size';
+
+    private const REGISTRY_HELPER_PATH = '/ext/standard/GcCollectCyclesRegistryJitHelper.php';
+
+    private const REG_APPEND = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::appendObject';
+
+    private const REG_REMOVE = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::removeObject';
+
+    private const REG_INDEX_OF = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::indexOf';
+
+    private const REG_COUNT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::count';
+
+    private const REG_OBJECT_PTR = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::objectPtr';
+
+    private const REG_PROP_COUNT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::propCount';
+
+    private const REG_DESTRUCT_INVOKED = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::isDestructInvoked';
+
+    private const REG_MARK_DESTRUCT = 'PHPCompiler\\ext\\standard\\GcCollectCyclesRegistryJitHelper::markDestructInvoked';
+
+    /** @var list<string> */
+    private const REGISTRY_COMPILED_HELPERS = [
+        self::REG_APPEND,
+        self::REG_REMOVE,
+        self::REG_INDEX_OF,
+        self::REG_COUNT,
+        self::REG_OBJECT_PTR,
+        self::REG_PROP_COUNT,
+        self::REG_DESTRUCT_INVOKED,
+        self::REG_MARK_DESTRUCT,
+    ];
 
     private static int $blockSuffix = 0;
 
@@ -115,6 +148,9 @@ final class GcCollectCyclesRuntime
         self::$blockSuffix = 0;
         WeakRefRegistryRuntime::ensureLinked($context);
         GcToggleRuntime::ensureLinked($context);
+        if (self::usesPhpRegistry($context)) {
+            self::ensureRegistryJitHelperCompiled($context);
+        }
         self::ensureGlobals($context);
         self::ensureExternals($context);
         self::ensureInternalDeclarations($context);
@@ -177,6 +213,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementGcRegister(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementGcRegisterPhpBridge($context);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
@@ -238,6 +280,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementGcUnregister(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementGcUnregisterPhpBridge($context);
+
+            return;
+        }
+
         $voidTy = $context->getTypeFromString('void');
         $i32 = $context->getTypeFromString('int32');
         $i8p = $context->getTypeFromString('int8*');
@@ -358,7 +406,7 @@ final class GcCollectCyclesRuntime
         $allowPtr = self::globalPtr($context, self::G_ALLOW_DELREF, $i32);
         $i8 = $context->getTypeFromString('int8');
         $iSlot = $context->builder->alloca($i32, 1, 'shutdown_i');
-        $count = $context->builder->load($countPtr);
+        $count = self::llvmRegistryCount($context);
         $context->builder->store($context->builder->sub($count, $i32->constInt(1, false)), $iSlot);
         $context->builder->branch($loopHead);
 
@@ -368,14 +416,14 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf($continueLoop, $loopBody, $drainHead);
 
         $context->builder->positionAtEnd($loopBody);
-        $idxExt = $context->builder->zext($i, $sizeT);
-        $invoked = $context->builder->load(self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt));
+        $i = $context->builder->load($iSlot);
+        $invoked = self::llvmRegistryDestructInvoked($context, $i);
         $needsInvoke = $context->builder->icmp(Builder::INT_EQ, $invoked, $i8->constInt(0, false));
         $invokeBb = $fn->appendBasicBlock('shutdown_invoke');
         $context->builder->branchIf($needsInvoke, $invokeBb, $loopNext);
 
         $context->builder->positionAtEnd($invokeBb);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
+        $obj = self::llvmRegistryObjectPtr($context, $i);
         $context->builder->call($context->lookupFunction('phpc_destruct_try_invoke'), $obj);
         $context->builder->branch($loopNext);
 
@@ -385,14 +433,13 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($drainHead);
         $context->builder->store($i32->constInt(1, false), $allowPtr);
-        $countNow = $context->builder->load($countPtr);
+        $countNow = self::llvmRegistryCount($context);
         $hasMore = $context->builder->icmp(Builder::INT_SGT, $countNow, $i32->constInt(0, false));
         $context->builder->branchIf($hasMore, $drainBody, $done);
 
         $context->builder->positionAtEnd($drainBody);
         $lastIdx = $context->builder->sub($countNow, $i32->constInt(1, false));
-        $lastExt = $context->builder->zext($lastIdx, $sizeT);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $lastExt));
+        $obj = self::llvmRegistryObjectPtr($context, $lastIdx);
         $context->builder->call($context->lookupFunction('phpc_object_release_storage'), $obj);
         $context->builder->branch($drainHead);
 
@@ -444,6 +491,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementIndexOf(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementIndexOfPhpBridge($context);
+
+            return;
+        }
+
         $fn = $context->lookupFunction('phpc_gc_index_of');
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -509,8 +562,7 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf($hasIdx, $found, $miss);
 
         $context->builder->positionAtEnd($found);
-        $idxExt = $context->builder->zext($idx, $sizeT);
-        $inv = $context->builder->load(self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt));
+        $inv = self::llvmRegistryDestructInvoked($context, $idx);
         $context->builder->returnValue($context->builder->zext($inv, $i32));
 
         $context->builder->positionAtEnd($miss);
@@ -538,11 +590,7 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf($hasIdx, $work, $done);
 
         $context->builder->positionAtEnd($work);
-        $idxExt = $context->builder->zext($idx, $sizeT);
-        $context->builder->store(
-            $i8->constInt(1, false),
-            self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt)
-        );
+        self::llvmRegistryMarkDestructInvoked($context, $idx);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
@@ -640,8 +688,8 @@ final class GcCollectCyclesRuntime
 
         $objIndex = $fn->getParam(0);
         $idxExt = $context->builder->zext($objIndex, $sizeT);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
-        $propCount = $context->builder->load(self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $idxExt));
+        $obj = self::llvmRegistryObjectPtr($context, $objIndex);
+        $propCount = self::llvmRegistryPropCount($context, $objIndex);
         $headerSize = self::objectHeaderSizeConst($context);
         $base = $context->builder->pointerCast($obj, $i8p);
         $slotSlot = $context->builder->alloca($i32, 1, 'visit_slot');
@@ -732,7 +780,7 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($iLoop);
         $i = $context->builder->load($iSlot);
-        $count = $context->builder->load(self::globalPtr($context, self::G_COUNT, $i32));
+        $count = self::llvmRegistryCount($context);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $i, $count),
             $iBody,
@@ -740,9 +788,8 @@ final class GcCollectCyclesRuntime
         );
 
         $context->builder->positionAtEnd($iBody);
-        $idxExt = $context->builder->zext($i, $sizeT);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
-        $propCount = $context->builder->load(self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $idxExt));
+        $obj = self::llvmRegistryObjectPtr($context, $i);
+        $propCount = self::llvmRegistryPropCount($context, $i);
         $context->builder->store($i32->constInt(0, false), $sSlot);
         $context->builder->branch($sLoop);
 
@@ -851,8 +898,7 @@ final class GcCollectCyclesRuntime
         $context->builder->store($i32->constInt(0, false), $collectedSlot);
 
         $enabled = $context->builder->call($context->lookupFunction('phpc_gc_is_enabled'));
-        $countPtr = self::globalPtr($context, self::G_COUNT, $i32);
-        $count = $context->builder->load($countPtr);
+        $count = self::llvmRegistryCount($context);
         $disabled = $context->builder->icmp(Builder::INT_EQ, $enabled, $i32->constInt(0, false));
         $empty = $context->builder->icmp(Builder::INT_SLE, $count, $i32->constInt(0, false));
         $skip = $context->builder->or($disabled, $empty);
@@ -915,9 +961,9 @@ final class GcCollectCyclesRuntime
         );
 
         $context->builder->positionAtEnd($inBody);
-        $idxExt = $context->builder->zext($i, $sizeT);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
-        $propCount = $context->builder->load(self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $idxExt));
+        $i = $context->builder->load($iSlot);
+        $obj = self::llvmRegistryObjectPtr($context, $i);
+        $propCount = self::llvmRegistryPropCount($context, $i);
         $context->builder->store($i32->constInt(0, false), $sSlot);
         $context->builder->branch($sLoop);
 
@@ -969,7 +1015,7 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($rootLoop);
         $ri = $context->builder->load($iSlot);
-        $countNow = $context->builder->load($countPtr);
+        $countNow = self::llvmRegistryCount($context);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $ri, $countNow),
             $rootBody,
@@ -977,8 +1023,8 @@ final class GcCollectCyclesRuntime
         );
 
         $context->builder->positionAtEnd($rootBody);
+        $obj = self::llvmRegistryObjectPtr($context, $ri);
         $riExt = $context->builder->zext($ri, $sizeT);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $riExt));
         $objTyped = $context->builder->pointerCast($obj, $objPtr);
         $refcount = self::loadObjectRefcount($context, $objTyped);
         $inbound = $context->builder->load(self::arrayElemPtr($context, self::G_INBOUND, $i32, $riExt));
@@ -1008,7 +1054,7 @@ final class GcCollectCyclesRuntime
 
         $context->builder->positionAtEnd($sweepLoop);
         $si = $context->builder->load($iSlot);
-        $countSweep = $context->builder->load($countPtr);
+        $countSweep = self::llvmRegistryCount($context);
         $context->builder->branchIf(
             $context->builder->icmp(Builder::INT_SLT, $si, $countSweep),
             $sweepBody,
@@ -1026,7 +1072,7 @@ final class GcCollectCyclesRuntime
         $context->builder->branchIf($unmarked, $freeBb, $sweepNext);
 
         $context->builder->positionAtEnd($freeBb);
-        $obj = $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $siExt));
+        $obj = self::llvmRegistryObjectPtr($context, $si);
         $context->builder->call($context->lookupFunction('phpc_gc_free_object'), $obj);
         $curN = $context->builder->load($collectedSlot);
         $context->builder->store($context->builder->add($curN, $i32->constInt(1, false)), $collectedSlot);
@@ -1145,6 +1191,7 @@ final class GcCollectCyclesRuntime
         $i32 = $context->getTypeFromString('int32');
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
+        $standaloneRegistry = !self::usesPhpRegistry($context);
 
         if (null === $context->module->getNamedGlobal(self::G_COUNT)) {
             $g = $context->module->addGlobal($i32, self::G_COUNT);
@@ -1162,17 +1209,17 @@ final class GcCollectCyclesRuntime
             $g = $context->module->addGlobal($i32, self::G_ALLOW_DELREF);
             $g->setInitializer($i32->constInt(1, false));
         }
-        if (null === $context->module->getNamedGlobal(self::G_OBJECTS)) {
+        if ($standaloneRegistry && null === $context->module->getNamedGlobal(self::G_OBJECTS)) {
             $ty = $i8p->arrayType(self::MAX_OBJECTS);
             $g = $context->module->addGlobal($ty, self::G_OBJECTS);
             $g->setInitializer($ty->constNull());
         }
-        if (null === $context->module->getNamedGlobal(self::G_PROP_COUNTS)) {
+        if ($standaloneRegistry && null === $context->module->getNamedGlobal(self::G_PROP_COUNTS)) {
             $ty = $i32->arrayType(self::MAX_OBJECTS);
             $g = $context->module->addGlobal($ty, self::G_PROP_COUNTS);
             $g->setInitializer($ty->constNull());
         }
-        if (null === $context->module->getNamedGlobal(self::G_DESTRUCT_INVOKED)) {
+        if ($standaloneRegistry && null === $context->module->getNamedGlobal(self::G_DESTRUCT_INVOKED)) {
             $ty = $i8->arrayType(self::MAX_OBJECTS);
             $g = $context->module->addGlobal($ty, self::G_DESTRUCT_INVOKED);
             $g->setInitializer($ty->constNull());
@@ -1258,5 +1305,214 @@ final class GcCollectCyclesRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function usesPhpRegistry(Context $context): bool
+    {
+        return Builtin::LOAD_TYPE_STANDALONE !== $context->loadType;
+    }
+
+    private static function ensureRegistryJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::REGISTRY_COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::REGISTRY_HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GcCollectCyclesRegistryJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('GcCollectCyclesRegistryJitHelper.php parseAndCompile failed (#9541)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::REGISTRY_COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT GC registry (#9541)');
+            }
+        }
+    }
+
+    private static function registryHelperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureRegistryJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcCollectCyclesRegistryJitHelper compile (#9541)');
+        }
+
+        return $fn;
+    }
+
+    private static function syncRegistryCountGlobal(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $count = $context->builder->trunc(
+            $context->builder->call(self::registryHelperFunction($context, self::REG_COUNT)),
+            $i32
+        );
+        $context->builder->store($count, self::globalPtr($context, self::G_COUNT, $i32));
+    }
+
+    private static function llvmRegistryCount(Context $context): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        if (!self::usesPhpRegistry($context)) {
+            return $context->builder->load(self::globalPtr($context, self::G_COUNT, $i32));
+        }
+
+        return $context->builder->trunc(
+            $context->builder->call(self::registryHelperFunction($context, self::REG_COUNT)),
+            $i32
+        );
+    }
+
+    private static function llvmRegistryObjectPtr(Context $context, Value $index): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        if (!self::usesPhpRegistry($context)) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $idxExt = $context->builder->zext($index, $sizeT);
+
+            return $context->builder->load(self::arrayElemPtr($context, self::G_OBJECTS, $i8p, $idxExt));
+        }
+        $ptrI64 = $context->builder->call(
+            self::registryHelperFunction($context, self::REG_OBJECT_PTR),
+            $context->builder->sext($index, $i64)
+        );
+
+        return $context->builder->pointerCast($ptrI64, $i8p);
+    }
+
+    private static function llvmRegistryPropCount(Context $context, Value $index): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        if (!self::usesPhpRegistry($context)) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $idxExt = $context->builder->zext($index, $sizeT);
+
+            return $context->builder->load(self::arrayElemPtr($context, self::G_PROP_COUNTS, $i32, $idxExt));
+        }
+
+        return $context->builder->trunc(
+            $context->builder->call(
+                self::registryHelperFunction($context, self::REG_PROP_COUNT),
+                $context->builder->sext($index, $i64)
+            ),
+            $i32
+        );
+    }
+
+    private static function llvmRegistryDestructInvoked(Context $context, Value $index): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        if (!self::usesPhpRegistry($context)) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $idxExt = $context->builder->zext($index, $sizeT);
+
+            return $context->builder->load(self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt));
+        }
+        $flag = $context->builder->call(
+            self::registryHelperFunction($context, self::REG_DESTRUCT_INVOKED),
+            $context->builder->sext($index, $i64)
+        );
+
+        return $context->builder->trunc($flag, $i8);
+    }
+
+    private static function llvmRegistryMarkDestructInvoked(Context $context, Value $index): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        if (!self::usesPhpRegistry($context)) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $idxExt = $context->builder->zext($index, $sizeT);
+            $context->builder->store(
+                $i8->constInt(1, false),
+                self::arrayElemPtr($context, self::G_DESTRUCT_INVOKED, $i8, $idxExt)
+            );
+
+            return;
+        }
+        $context->builder->call(
+            self::registryHelperFunction($context, self::REG_MARK_DESTRUCT),
+            $context->builder->sext($index, $i64)
+        );
+    }
+
+    private static function implementGcRegisterPhpBridge(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($voidTy, false, $i8p, $i32);
+        $fn = self::functionOrCreate($context, 'phpc_gc_register', $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('gc_register_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->pointerCast($fn->getParam(0), $i64);
+        $prop = $fn->getParam(1);
+        $context->builder->call(self::registryHelperFunction($context, self::REG_APPEND), $objI64, $prop);
+        self::syncRegistryCountGlobal($context);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('phpc_gc_register', $fn);
+    }
+
+    private static function implementGcUnregisterPhpBridge(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $ft = $context->context->functionType($voidTy, false, $i8p);
+        $fn = self::functionOrCreate($context, 'phpc_gc_unregister', $ft);
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $entry = $fn->appendBasicBlock('gc_unregister_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->pointerCast($fn->getParam(0), $i64);
+        $context->builder->call(self::registryHelperFunction($context, self::REG_REMOVE), $objI64);
+        self::syncRegistryCountGlobal($context);
+        $context->builder->returnVoid();
+        $context->builder->clearInsertionPosition();
+        $context->registerFunction('phpc_gc_unregister', $fn);
+    }
+
+    private static function implementIndexOfPhpBridge(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_gc_index_of');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $entry = $fn->appendBasicBlock('gc_index_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $objI64 = $context->builder->pointerCast($fn->getParam(0), $i64);
+        $idx = $context->builder->call(self::registryHelperFunction($context, self::REG_INDEX_OF), $objI64);
+        $context->builder->returnValue($context->builder->trunc($idx, $i32));
+        $context->builder->clearInsertionPosition();
     }
 }
