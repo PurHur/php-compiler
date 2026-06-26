@@ -2842,6 +2842,10 @@ class VM {
         }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
+            if ($this->context->isolatedDestructorInvoke) {
+                throw new VM\DestructorThrowCatchSignal($catchFrame);
+            }
+
             return $catchFrame;
         }
         // Zend: finally-over-try uncaught fatal cites pending try exception first (#5867, #6457, #7342).
@@ -6928,6 +6932,12 @@ restart:
 
                 return self::FIBER_SUSPEND;
             } catch (VM\ArrayAccessOffsetSignal $signal) {
+                $frame = $signal->catchFrame;
+                goto restart;
+            } catch (VM\DestructorThrowCatchSignal $signal) {
+                if ($this->context->isolatedDestructorInvoke) {
+                    throw $signal;
+                }
                 $frame = $signal->catchFrame;
                 goto restart;
             }
@@ -14660,6 +14670,8 @@ restart:
         ObjectLifetime::addRef($object);
 
         $savedStack = $this->context->swapRunStack(null);
+        $destructorCatch = null;
+        $this->context->isolatedDestructorInvoke = true;
         try {
             $child = $destructor->getFrame($this->context, null);
             $thisIdx = $destructor->block->slotIndexForVariableName('this');
@@ -14672,9 +14684,15 @@ restart:
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('__destruct() failed in this compiler build');
             }
+        } catch (VM\DestructorThrowCatchSignal $signal) {
+            $destructorCatch = $signal;
         } finally {
+            $this->context->isolatedDestructorInvoke = false;
             $this->context->swapRunStack($savedStack);
             ObjectLifetime::releaseRef($object);
+        }
+        if (null !== $destructorCatch) {
+            throw $destructorCatch;
         }
     }
 

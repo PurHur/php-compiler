@@ -74,6 +74,9 @@ class Context {
     /** Catch frame for throw/TypeError during nested property-hook invoke; bubble to caller (#7301, #9503). */
     public ?Frame $propertyHookExternalCatchFrame = null;
 
+    /** True while {@see VM::invokeUserDestructor} runs on an isolated run stack (#12070). */
+    public bool $isolatedDestructorInvoke = false;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
