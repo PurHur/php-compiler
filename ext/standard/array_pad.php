@@ -7,9 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -27,18 +27,15 @@ final class array_pad extends Internal
         if (3 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_pad() requires exactly three arguments');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        $length = $frame->calledArgs[1]->resolveIndirect();
-        $value = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_pad', 1, 'array');
+        $length = $frame->calledArgs[1]->resolveIndirect();
+        $value = $frame->calledArgs[2]->resolveIndirect();
         $lengthInt = VmMath::parseIntBuiltinArg($length, 'array_pad', 2, 'length');
         $frame->returnVar->array(
-            VmArray::pad($array->toArray(), $lengthInt, $value)
+            VmArray::pad($ht, $lengthInt, $value)
         );
     }
 
@@ -47,10 +44,8 @@ final class array_pad extends Internal
         if (3 !== \count($args)) {
             throw new \LogicException('array_pad() requires exactly three arguments');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_pad() argument #1 must be an array in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_pad', 1, 'array');
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_pad() argument #'.((int) $i + 1));
