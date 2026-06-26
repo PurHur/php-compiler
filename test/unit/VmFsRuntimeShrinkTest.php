@@ -101,10 +101,10 @@ final class VmFsRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testDiskSpaceViaFfiMatchesStatvfs(): void
+    public function testDiskSpaceViaPureMatchesHost(): void
     {
         if (!VmFsDiskNative::available()) {
-            $this->markTestSkipped('FFI statvfs unavailable');
+            $this->markTestSkipped('disk_*() unavailable');
         }
         $path = sys_get_temp_dir();
         $free = VmFs::diskFreeSpace($path);

@@ -9,26 +9,27 @@ use PHPCompiler\ext\standard\VmFsDiskNative;
 use PHPCompiler\ext\standard\VmFsDiskPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmFs disk space via VmFsDiskNative (statvfs FFI or VmFsDiskPure); not host disk_*() (#8989). */
+/** VmFs disk space via VmFsDiskPure SSOT — no libc statvfs FFI (#8989, #12234). */
 final class VmFsDiskNativeTest extends TestCase
 {
-    public function testSourceUsesStatvfsPrimaryPath(): void
+    public function testSourceDelegatesToPureWithoutFfi(): void
     {
         $vmFs = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFs.php');
         $this->assertStringContainsString('VmFsDiskNative::diskFreeSpace', $vmFs);
         $this->assertStringContainsString('VmFsDiskNative::diskTotalSpace', $vmFs);
 
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDiskNative.php');
-        $this->assertStringContainsString('int statvfs(const char *path', $native);
-        $this->assertStringContainsString('$ffi->statvfs($path', $native);
         $this->assertStringContainsString('VmFsDiskPure::diskFreeSpace', $native);
+        $this->assertStringContainsString('VmFsDiskPure::diskTotalSpace', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $native);
+        $this->assertStringNotContainsString('$ffi->statvfs', $native);
         $this->assertDoesNotMatchRegularExpression('/\\\\disk_free_space\\s*\\(/', $native);
     }
 
     public function testNativeDiskSpaceMatchesHostOnLinux(): void
     {
         if (!VmFsDiskNative::available()) {
-            $this->markTestSkipped('FFI statvfs unavailable');
+            $this->markTestSkipped('disk_*() unavailable');
         }
         $path = sys_get_temp_dir();
         $nativeFree = VmFsDiskNative::diskFreeSpace($path);
@@ -60,6 +61,8 @@ final class VmFsDiskNativeTest extends TestCase
             $this->assertIsFloat($total);
             $this->assertGreaterThan(0.0, $free);
             $this->assertGreaterThan(0.0, $total);
+            $this->assertSame($free, VmFsDiskPure::diskFreeSpace($path));
+            $this->assertSame($total, VmFsDiskPure::diskTotalSpace($path));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
