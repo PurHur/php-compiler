@@ -26,7 +26,7 @@ final class DateTimeConstruct extends VmClassMethod
         }
         $receiver = DateTimeSupport::requireDateTime($frame->calledArgs[0], 'DateTime::__construct()');
         $time = 'now';
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTime::__construct', 'datetime', 0, $frame);
             $time = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
@@ -36,7 +36,7 @@ final class DateTimeConstruct extends VmClassMethod
             );
         }
         $timezone = null;
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $tzVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $tzVar->type) {
                 $timezone = DateTimeSupport::requireDateTimeZone($frame->calledArgs[2], 'DateTime::__construct() timezone');
