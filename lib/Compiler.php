@@ -7179,7 +7179,27 @@ class Compiler {
             || $child instanceof Op\Expr\NsFuncCall
             || $child instanceof Op\Expr\MethodCall
             || $child instanceof Op\Expr\StaticCall
-            || $child instanceof Op\Expr\New_;
+            || $child instanceof Op\Expr\New_
+            || $child instanceof Op\Expr\Include_;
+    }
+
+    /**
+     * php-cfg may leave include result usages empty when the value feeds a FuncCall arg
+     * in the {@see ErrorSuppressBlock} exit block (#12163, #10336).
+     */
+    private function includeNeedsReturnSlot(Operand $result, Block $block): bool
+    {
+        if (!empty($result->usages)) {
+            return true;
+        }
+        if ($block->callResultFeedsReturn($result) || $block->callResultFeedsEcho($result)) {
+            return true;
+        }
+        if ($block->callResultFeedsErrorSuppressExit($result)) {
+            return true;
+        }
+
+        return null !== $block->orig && $block->orig instanceof ErrorSuppressBlock;
     }
 
     private function findFuncCallExecReturnSlot(Block $block): ?int
@@ -8280,14 +8300,13 @@ class Compiler {
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
     {
         $resultSlot = null;
-        if (!$block->returnTypeVoid && !$block->returnTypeNever) {
-            if ($expr->result instanceof Operand\Temporary) {
-                if ([] !== $expr->result->usages) {
-                    $resultSlot = $this->compileOperand($expr->result, $block, false);
-                }
-            } else {
-                $resultSlot = $this->compileOperand($expr->result, $block, false);
-            }
+        if (
+            !$block->returnTypeVoid
+            && !$block->returnTypeNever
+            && isset($expr->result)
+            && $this->includeNeedsReturnSlot($expr->result, $block)
+        ) {
+            $resultSlot = $this->compileOperand($expr->result, $block, false);
         }
 
         $sourceFile = $expr->getFile() ?? '';
