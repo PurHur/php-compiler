@@ -8,14 +8,13 @@ use PHPCompiler\ext\standard\VmClockGettime;
 use PHPCompiler\ext\standard\VmHrtimeNative;
 use PHPUnit\Framework\TestCase;
 
-/** VmHrtimeNative — monotonic via /proc, no clock_gettime FFI (#12144). */
+/** VmHrtimeNative — clock_gettime FFI with /proc/uptime bootstrap fallback (#12144, #12225). */
 final class VmHrtimeNativeRuntimeShrinkTest extends TestCase
 {
-    public function testVmHrtimeNativeHasNoFfi(): void
+    public function testVmHrtimeNativeUsesClockGettimeWithProcFallback(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmHrtimeNative.php');
-        $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('$ffi->clock_gettime', $source);
+        $this->assertStringContainsString('$ffi->clock_gettime', $source);
         $this->assertStringContainsString('/proc/uptime', $source);
         $this->assertStringContainsString('microtime', $source);
     }
