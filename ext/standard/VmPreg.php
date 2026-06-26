@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -86,6 +88,34 @@ final class VmPreg
         int $argIndex = 2,
         string $paramName = 'subject'
     ): Variable {
+        return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
+     * Z_PARAM_STR_OR_ARR on preg and str replace $subject with null to empty string (#11938).
+     *
+     * @throws \TypeError
+     */
+    public static function resolveStringOrArraySubject(
+        Frame $frame,
+        Variable $var,
+        string $function,
+        int $argIndex = 2,
+        string $paramName = 'subject'
+    ): Variable {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(
+                    self::stringOrArraySubjectTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+            $empty = new Variable();
+            $empty->string('');
+
+            return $empty;
+        }
+
         return self::requireStringOrArrayArg($var, $function, $argIndex, $paramName);
     }
 
