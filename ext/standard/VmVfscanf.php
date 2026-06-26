@@ -26,9 +26,7 @@ final class VmVfscanf
             return false;
         }
         [$assigned, $consumed] = VmSscanf::parseWithConsumed($data, $format, $outVars);
-        if ($consumed > 0) {
-            VmFs::fseek($handle, $start + $consumed, \SEEK_SET);
-        }
+        self::repositionStreamAfterScan($handle, $start, $data, $consumed);
         if (0 === $assigned && '' === $data) {
             return false;
         }
@@ -56,9 +54,7 @@ final class VmVfscanf
             $temps[] = new Variable();
         }
         [$assigned, $consumed] = VmSscanf::parseWithConsumed($data, $format, $temps);
-        if ($consumed > 0) {
-            VmFs::fseek($handle, $start + $consumed, \SEEK_SET);
-        }
+        self::repositionStreamAfterScan($handle, $start, $data, $consumed);
         if (0 === $assigned && '' === $data) {
             return false;
         }
@@ -74,5 +70,21 @@ final class VmVfscanf
         }
 
         return $ht;
+    }
+
+    /**
+     * Advance stream position after scanf and set EOF when the scan consumed all remaining bytes.
+     *
+     * php-src ext/standard/scanf.c — feof() true after fscanf reads the last token (#11975).
+     */
+    private static function repositionStreamAfterScan(int $handle, int $start, string $data, int $consumed): void
+    {
+        if ($consumed <= 0) {
+            return;
+        }
+        VmFs::fseek($handle, $start + $consumed, \SEEK_SET);
+        if ($consumed >= \strlen($data)) {
+            VmFs::fread($handle, 1);
+        }
     }
 }
