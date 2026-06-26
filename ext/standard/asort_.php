@@ -9,14 +9,13 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118).
+ * asort() — sort by value ascending, preserve keys (subset of PHP; issue #2290, #4118, #11991).
  *
- * VM: homogeneous string or integer values; packed lists sort values in place.
+ * VM: key-preserving value sort via {@see VmArray::asortCopy()}.
  * JIT/AOT: packed list via __hashtable__sortPacked; string-key via __hashtable__sortStringKeyValues.
  */
 final class asort_ extends Internal
@@ -45,18 +44,7 @@ final class asort_ extends Internal
 
             return;
         }
-        if (VmArray::isList($ht)) {
-            $values = [];
-            foreach ($ht->iterate(true) as $value) {
-                $copy = new Variable();
-                $copy->copyFrom($value);
-                $values[] = $copy;
-            }
-            self::sortPackedValues($values, $flags, 'asort()');
-            $ht->replacePackedValues($values);
-        } else {
-            $array->array(VmArray::asortCopy($ht, $flags));
-        }
+        $array->array(VmArray::asortCopy($ht, $flags));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -76,20 +64,6 @@ final class asort_ extends Internal
         }
 
         return $context->getTypeFromString('int1')->constInt(1, false);
-    }
-
-    /**
-     * @param list<Variable> $values
-     */
-    private static function sortPackedValues(array &$values, int $flags, string $function): void
-    {
-        if (VmInternalCompare::valuesAreEnumOrObjectOnly($values)) {
-            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
-            VmInternalCompare::sortVariableValuesBySpaceship($values);
-
-            return;
-        }
-        VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
     }
 
     private static function resolveJitSortFlags(Context $context, JITVariable $flagsArg): int
