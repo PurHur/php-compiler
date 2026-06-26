@@ -139,23 +139,16 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Duplicate or paired read+set visibility before the type is a compile fatal (#6774, #9806, #11656).
+     * Duplicate set modifier on the same visibility is a compile fatal (#6774, #11656).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public public(set)` and
-     * `public private(set)` are fatal (`Multiple access type modifiers are not allowed`).
-     * Use set-only `private(set)` (implicit public read) or `private(set) public` ordering instead.
+     * php-src: `public public(set)` is fatal. Dual read+set with *different* modifiers
+     * (`public private(set)`, `public protected(set)`) is valid PHP 8.4 (#11868).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (preg_match(
                 '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
                 $line
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
@@ -183,10 +176,10 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Promoted constructor parameters reject duplicate or paired read+set modifiers (#10237, #11656).
+     * Promoted constructor parameters reject duplicate set modifiers (#10237, #11656).
      *
-     * php-src: `public public(set) int $x` and `public private(set) int $x` in `__construct` are fatal.
-     * Set-only `private(set) int $x` remains valid (#9877).
+     * Dual read+set with different modifiers is valid PHP 8.4 (#11868); invalid visibility
+     * ordering is caught later by AsymmetricVisibilityCompileCheck.
      */
     private static function rejectPromotedParamMultipleAccessModifiers(string $source): void
     {
@@ -232,12 +225,6 @@ final class AsymmetricVisibilityRewriter
     {
         if (preg_match(
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-            $paramsText
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
             $paramsText
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
