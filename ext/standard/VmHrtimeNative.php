@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859, #12144, #12225).
+ * Monotonic clock for VM/JIT/AOT (issue #7315, #5174, #9018, #10859, #12144, #12225, #12236).
  *
  * php-src: ext/standard/hrtime.c — clock_gettime(CLOCK_MONOTONIC).
- * Primary: libc clock_gettime (ns precision). Fallback: /proc/uptime (µs) on Linux bootstrap.
+ * Pure PHP: /proc/uptime (Linux monotonic, µs) + microtime(true) (realtime).
  * JIT/AOT: ext/standard/HrtimeJitHelper.php via StringHrtimeRuntime (#9182).
  */
 final class VmHrtimeNative
@@ -18,10 +18,6 @@ final class VmHrtimeNative
     public const CLOCK_REALTIME = 0;
 
     public const CLOCK_MONOTONIC = 1;
-
-    private static ?\FFI $ffi = null;
-
-    private static bool $ffiUnavailable = false;
 
     /**
      * @return array{0: int, 1: int} seconds and nanoseconds
@@ -36,42 +32,11 @@ final class VmHrtimeNative
      */
     public static function readClock(int $clockId): ?array
     {
-        $pair = self::readClockGettime($clockId);
-        if (null !== $pair) {
-            return $pair;
-        }
-
         return match ($clockId) {
             self::CLOCK_MONOTONIC => self::readMonotonicLinuxFallback(),
             self::CLOCK_REALTIME => self::readRealtimeMicrotimeFallback(),
             default => null,
         };
-    }
-
-    /**
-     * @return array{0: int, 1: int}|null
-     */
-    private static function readClockGettime(int $clockId): ?array
-    {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        try {
-            $ts = $ffi->new('struct timespec');
-            if (0 !== (int) $ffi->clock_gettime($clockId, \FFI::addr($ts))) {
-                return null;
-            }
-            $sec = (int) $ts->tv_sec;
-            $nsec = (int) $ts->tv_nsec;
-            if ($nsec < 0 || $nsec >= self::NS_PER_SEC) {
-                return null;
-            }
-
-            return [$sec, $nsec];
-        } catch (\Throwable) {
-            return null;
-        }
     }
 
     /**
@@ -122,7 +87,7 @@ final class VmHrtimeNative
     }
 
     /**
-     * CLOCK_MONOTONIC via /proc/uptime when clock_gettime unavailable (#7315, #12144).
+     * CLOCK_MONOTONIC via /proc/uptime (#7315, #12144, #12236).
      *
      * @return array{0: int, 1: int}|null
      */
@@ -137,48 +102,5 @@ final class VmHrtimeNative
         }
 
         return self::parseUptimeRaw($raw);
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (!self::ffiEnabled()) {
-            return null;
-        }
-        if (self::$ffiUnavailable) {
-            return null;
-        }
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            self::$ffiUnavailable = true;
-
-            return null;
-        }
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef(
-                    'struct timespec { long tv_sec; long tv_nsec; };
-                    int clock_gettime(int clock_id, struct timespec *tp);',
-                    $lib
-                );
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-        self::$ffiUnavailable = true;
-
-        return null;
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = \getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== \strtolower($v)) {
-            return false;
-        }
-
-        return true;
     }
 }
