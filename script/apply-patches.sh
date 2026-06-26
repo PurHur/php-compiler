@@ -339,7 +339,8 @@ patch_already_applied() {
         && grep -q 'callArgName' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-spread.patch)
-      grep -q 'callArgUnpack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      grep -q 'parseCallArgs($expr->args)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && ! grep -q 'parseExprList($expr->args, self::MODE_READ)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
     php-cfg-never-type.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Type/Never_.php" ]]
@@ -4225,7 +4226,28 @@ if 'public $unpack' not in array_text:
 
 parser = parser_path.read_text()
 if 'function parseCallArgs' not in parser:
-    old_arg = """        if (null !== $expr->name) {
+    old_after_parse_arg = """        return $site;
+    }
+
+    protected function parseExpr_Array(Expr\\Array_ $expr)"""
+    new_after_parse_arg = """        return $site;
+    }
+
+    /**
+     * @param list<Node\\Arg> $args
+     *
+     * @return Operand[]
+     */
+    protected function parseCallArgs(array $args): array
+    {
+        return array_map([$this, 'parseArg'], $args);
+    }
+
+    protected function parseExpr_Array(Expr\\Array_ $expr)"""
+    if old_after_parse_arg in parser:
+        parser = parser.replace(old_after_parse_arg, new_after_parse_arg, 1)
+    else:
+        old_arg = """        if (null !== $expr->name) {
             $op->callArgName = $expr->name->toString();
         }
 
@@ -4233,7 +4255,7 @@ if 'function parseCallArgs' not in parser:
     }
 
     protected function parseExpr_Array(Expr\\Array_ $expr)"""
-    new_arg = """        if (null !== $expr->name) {
+        new_arg = """        if (null !== $expr->name) {
             $op->callArgName = $expr->name->toString();
         }
         $op->callArgUnpack = $expr->unpack;
@@ -4252,10 +4274,10 @@ if 'function parseCallArgs' not in parser:
     }
 
     protected function parseExpr_Array(Expr\\Array_ $expr)"""
-    if old_arg not in parser:
-        sys.stderr.write("php-cfg-spread: Parser.php parseArg anchor not found\n")
-        raise SystemExit(1)
-    parser = parser.replace(old_arg, new_arg, 1)
+        if old_arg not in parser:
+            sys.stderr.write("php-cfg-spread: Parser.php parseArg anchor not found\\n")
+            raise SystemExit(1)
+        parser = parser.replace(old_arg, new_arg, 1)
 
 if '$unpack[] = $item->unpack' not in parser:
     old_array = """        $keys = [];
@@ -4300,6 +4322,10 @@ if '$unpack[] = $item->unpack' not in parser:
 parser = parser.replace(
     '$this->parseExprList($expr->args, self::MODE_READ)',
     '$this->parseCallArgs($expr->args)',
+)
+parser = parser.replace(
+    '$args = $this->parseExprList($expr->args, self::MODE_READ);',
+    '$args = $this->parseCallArgs($expr->args);',
 )
 if 'parseCallArgs($expr->args)' not in parser:
     sys.stderr.write("php-cfg-spread: Parser.php call-site anchor not found\n")
