@@ -1,5 +1,11 @@
 --TEST--
 Language: #[\Override] with incompatible signature fails at compile time (issue #4529)
+--SKIPIF--
+<?php
+if (!PHPCompiler\CompilerVersion::supportsOverrideAttribute()) {
+    echo "skip — Override validation disabled on reference profile\n";
+}
+?>
 --FILE--
 <?php
 class Base {

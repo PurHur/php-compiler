@@ -84,10 +84,15 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.3.0');
     }
 
-    /** PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, issue #6303). */
+    /**
+     * PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, #6303, #11559, #12201).
+     *
+     * Gated on builtin advertisement profile so Docker CI Zend 8.2 reference does not validate
+     * (php-src 8.2 treats Override as a normal attribute).
+     */
     public static function supportsOverrideAttribute(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /** PHP 8.3+ #[\Override] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
