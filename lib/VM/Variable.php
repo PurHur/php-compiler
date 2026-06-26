@@ -1288,6 +1288,10 @@ final class Variable {
                 $this->staticPropertyClassLc = $staticClass;
                 break;
             case self::TYPE_UNDEFINED:
+                if ($var->hasDeclaredTypeConstraint()) {
+                    $this->copyUninitializedStaticPropertySlot($var);
+                    break;
+                }
                 $owner = $this->objectPropertyOwner;
                 $propName = $this->objectPropertyName;
                 $staticClass = $this->staticPropertyClassLc;
