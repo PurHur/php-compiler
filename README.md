@@ -11,7 +11,7 @@
 
 > **Stable line (2026)** — First maintained **stable** release **[v1.0.0](https://github.com/PurHur/php-compiler/releases/tag/v1.0.0)**; **v1.1.0** prep adds M5 fast-path stability, enum/property-hook parity, `preg_match` JIT, `spl_autoload*`, and php-in-PHP JIT helpers. Demo-ready VM + AOT for a **web-capable PHP subset**, reference examples **000–009**, and an experimental **self-host** path. Not full Zend PHP compatibility — see [what’s missing](https://purhur.github.io/php-compiler/docs/pages/missing-implementation.html).
 
-**Snapshot (Jun 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **3242**/**3241** · **852** builtins · M5 fast + strict ✅ · VM probe ~**20ms**
+**Snapshot (Jun 2026, `master` — v1.1.0 prep):** VM + AOT for shipped examples ✅ · examples web smoke ✅ · self-host spine **3276**/**3276** · **852** builtins · M5 fast + strict ✅ · VM probe ~**20ms**
 
 ---
 
@@ -23,7 +23,7 @@
 | **AOT (`phpc build`)** | ✅ For curated subset | Standalone binaries for examples **000–009** and small CGI apps; not arbitrary Composer stacks |
 | **JIT (`bin/jit.php`)** | 🚧 Partial | LLVM IR for many constructs; **MCJIT execute** still flaky ([#98](https://github.com/PurHur/php-compiler/issues/98)); EH scripts VM-fallback ([#2114](https://github.com/PurHur/php-compiler/issues/2114)) |
 | **Language wave 3** | ✅ Closed batch | **12/12** language + **13/13** stdlib tracker items ([#1380](https://github.com/PurHur/php-compiler/issues/1380)); closures, try/catch, generators (VM), `parent::class`, backed enums (VM), intersection AOT checks |
-| **Self-host north star** | ✅ ~90% | M5 fast gate green; spine **3242**/**3241**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
+| **Self-host north star** | ✅ ~90% | M5 fast gate green; spine **3276**/**3276**; vendor prelink **3/3** ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 
 ### What you can rely on today
 
@@ -40,7 +40,7 @@ Counts from `php script/bootstrap-spine-count.php` (literal `require_once` in `c
 | Milestone | Status | What it means |
 |-----------|--------|----------------|
 | **M0–M1** | ✅ | `compiler_minimal` + compile-smoke bundles link and run natively |
-| **M2** | ✅ **3242**/**3241** | Full Phase A inventory in spine smoke; native link + lint ✅ |
+| **M2** | ✅ **3276**/**3276** | Full Phase A inventory in spine smoke; native link + lint ✅ |
 | **M3** | ✅ | HelloWorld strict native ✅; inventory argv `bin/compile.php` ✅ |
 | **M4** | ✅ | `make bootstrap-loop-probe` full ladder ✅ (gen-1→gen-2→gen-3 + full-revision) |
 | **M5** | ✅ | `make north-star5-verify-fast` (daily); `--strict` pre-merge ✅; vendor **3/3** ✅; gen-0 sidecars refreshed |
@@ -259,7 +259,7 @@ Full matrices (auto-generated): [`docs/capabilities.md`](docs/capabilities.md) (
 
 **Self-host (experimental, not “stable app” scope)**
 
-See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **3242**/**3241**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) + **`--strict`** pre-merge ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
+See [Current implementation status](#current-implementation-status-june-2026) for the full M0–M5 ladder. Summary: M0–M5 bootstrap gates ✅; spine **3276**/**3276**; M3 strict native + inventory argv ✅; M4 full `bootstrap-loop-probe` ✅; M5 **`north-star5-verify-fast`** (daily) + **`--strict`** pre-merge ✅ ([#1492](https://github.com/PurHur/php-compiler/issues/1492), [#8559](https://github.com/PurHur/php-compiler/issues/8559)). Recent: native spine bundle probe, fast VM execute smoke ([#2201](https://github.com/PurHur/php-compiler/issues/2201)), `GeneratorYieldSourceMarker` spine unit ([#10356](https://github.com/PurHur/php-compiler/pull/10356)).
 
 **What we do not target in v1.x**
 
