@@ -32,6 +32,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'getmygrgid_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsCrc32c()
+                && str_contains($name, 'crc32c')
+                && !str_contains($name, 'crc32c_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsJsonValidate()
                 && str_contains($name, 'json_validate')
                 && !str_contains($name, 'json_validate_phantom')) {

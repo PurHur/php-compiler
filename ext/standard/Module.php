@@ -421,7 +421,7 @@ class Module extends ModuleAbstract
             new range(),
             new bin2hex(),
             new crc32(),
-            new crc32c(),
+            ...(CompilerVersion::supportsCrc32c() ? [new crc32c()] : []),
             new hex2bin(),
             new base64_encode(),
             new base64_decode(),

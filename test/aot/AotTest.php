@@ -68,6 +68,9 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsGetmygrgid() && str_contains($name, 'getmygrgid')) {
                 continue;
             }
+            if (!CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports') || str_contains($name, 'stream_meta_seekable'))
                 && !str_contains($name, 'stream_supports_lock')) {
