@@ -5550,6 +5550,9 @@ restart:
                     $ifaceEntry->isInterface = true;
                     \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($ifaceEntry);
                     $ifaceEntry->interfaces = $op->classImplements;
+                    $ifaceEntry->attributeNames = $op->attributeNames;
+                    $ifaceEntry->attributeEntries = $op->attributeEntries;
+                    $ifaceEntry->classDeprecated = $op->deprecatedMetadata;
                     if ($op->isSealed) {
                         $ifaceEntry->sealed = true;
                         $ifaceEntry->sealedPermits = $this->normalizeSealedPermits($name, $op->sealedPermits);
@@ -5574,6 +5577,7 @@ restart:
                     \PHPCompiler\ext\standard\VmReflection::markCompilerBootstrapClassInternal($traitEntry);
                     $traitEntry->attributeNames = $op->attributeNames;
                     $traitEntry->attributeEntries = $op->attributeEntries;
+                    $traitEntry->classDeprecated = $op->deprecatedMetadata;
                     self::defineClass($traitEntry, $op->block1, $frame);
                     $this->context->classes[$lcname] = $traitEntry;
                     $this->flushDeferredTraitUses();

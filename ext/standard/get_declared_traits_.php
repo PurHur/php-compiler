@@ -6,9 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,32 +24,22 @@ final class get_declared_traits_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc > 0) {
-            throw new \ArgumentCountError('get_declared_traits() expects exactly 0 arguments, '.$argc.' given');
-        }
+        $excludeDeprecated = VmReflection::parseExcludeDeprecatedArg($frame, 'get_declared_traits');
         if (null === $frame->returnVar) {
             return;
         }
         $frame->returnVar->array(
-            VmReflection::declaredTraitsTable(VmReflection::requireContext($frame))
+            VmReflection::declaredTraitsTable(
+                VmReflection::requireContext($frame),
+                $excludeDeprecated
+            )
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 0) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'get_declared_traits() expects exactly 0 arguments, '.$argc.' given'
-            );
-            $slot = JitValueBox::alloc($context);
+        $literal = GetDeclaredExcludeDeprecatedJit::parseLiteral($context, $args, 'get_declared_traits');
 
-            return JitValueBox::pointer($context, $slot);
-        }
-
-        return JitGetDeclaredTraits::invoke($context);
+        return JitGetDeclaredTraits::invoke($context, $literal ?? false);
     }
 }

@@ -1,16 +1,25 @@
 --TEST--
-Stdlib: get_declared_classes/traits/interfaces() — ArgumentCountError for extra args (#4595)
+Stdlib: get_declared_* — ArgumentCountError only for more than one arg (#12177, #4595)
 --FILE--
 <?php
 foreach (['get_declared_classes', 'get_declared_traits', 'get_declared_interfaces'] as $fn) {
     try {
-        $fn(1);
-        echo $fn, ": no_error\n";
+        $fn(true);
+        echo $fn, ": one_arg_ok\n";
+    } catch (Throwable $e) {
+        echo $fn, ': ', get_class($e), ': ', $e->getMessage(), "\n";
+    }
+    try {
+        $fn(true, false);
+        echo $fn, ": two_arg_no_error\n";
     } catch (Throwable $e) {
         echo $fn, ': ', get_class($e), ': ', $e->getMessage(), "\n";
     }
 }
 --EXPECT--
-get_declared_classes: ArgumentCountError: get_declared_classes() expects exactly 0 arguments, 1 given
-get_declared_traits: ArgumentCountError: get_declared_traits() expects exactly 0 arguments, 1 given
-get_declared_interfaces: ArgumentCountError: get_declared_interfaces() expects exactly 0 arguments, 1 given
+get_declared_classes: one_arg_ok
+get_declared_classes: ArgumentCountError: get_declared_classes() expects at most 1 argument, 2 given
+get_declared_traits: one_arg_ok
+get_declared_traits: ArgumentCountError: get_declared_traits() expects at most 1 argument, 2 given
+get_declared_interfaces: one_arg_ok
+get_declared_interfaces: ArgumentCountError: get_declared_interfaces() expects at most 1 argument, 2 given

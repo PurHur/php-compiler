@@ -48,6 +48,29 @@ final class VmReflection
     }
 
     /**
+     * Optional $exclude_deprecated for get_declared_* (PHP 8.4, #12177 / #4711).
+     *
+     * php-src: ext/standard/basic_functions.c — Z_PARAM_OPTIONAL Z_PARAM_BOOL
+     */
+    public static function parseExcludeDeprecatedArg(Frame $frame, string $function): bool
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError("{$function}() expects at most 1 argument, {$argc} given");
+        }
+        if (0 === $argc) {
+            return false;
+        }
+
+        return $frame->calledArgs[0]->resolveIndirect()->toBool();
+    }
+
+    public static function isDeprecatedClassEntry(ClassEntry $entry): bool
+    {
+        return null !== $entry->classDeprecated;
+    }
+
+    /**
      * Coerce a string parameter for VM builtins / internal methods (php-src Z_PARAM_STR, #7163).
      *
      * @param int $calledArgsIndex index in Frame::calledArgs for Zend-shaped Argument #N
@@ -127,11 +150,14 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_interfaces)
      */
-    public static function declaredInterfacesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredInterfacesTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
             if (!$entry->isInterface || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();
@@ -164,7 +190,7 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_classes)
      */
-    public static function declaredClassesTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredClassesTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
@@ -174,6 +200,9 @@ final class VmReflection
             }
             // Hide compiler bootstrap types only — CE_INTERNAL builtins belong in the list (#11813, #11688).
             if (str_starts_with($entry->name, 'PHPCompiler\\')) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();
@@ -199,7 +228,7 @@ final class VmReflection
      *
      * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(get_declared_traits)
      */
-    public static function declaredTraitsTable(Context $ctx): \PHPCompiler\VM\HashTable
+    public static function declaredTraitsTable(Context $ctx, bool $excludeDeprecated = false): \PHPCompiler\VM\HashTable
     {
         $result = new \PHPCompiler\VM\HashTable();
         foreach ($ctx->classes as $lc => $entry) {
@@ -207,6 +236,9 @@ final class VmReflection
                 continue;
             }
             if (LazyGhostTraitSupport::isLazyGhostTrait($entry->name)) {
+                continue;
+            }
+            if ($excludeDeprecated && self::isDeprecatedClassEntry($entry)) {
                 continue;
             }
             $value = new Variable();

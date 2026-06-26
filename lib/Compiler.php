@@ -3493,6 +3493,7 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($iface);
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $return->classImplements = $extends;
         $this->applySealedMetadataFromOp($iface, $return);
@@ -3521,6 +3522,7 @@ class Compiler {
         AttributeNames::assertOverrideMethodTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'class');
         AttributeNames::assertSensitiveParameterParamTargetOnly($return->attributeNames, 'class');
+        $return->deprecatedMetadata = DeprecatedMetadata::fromOp($trait);
         $this->registerAttributeClassFromEntries($name, $return->attributeEntries);
         $traitLc = strtolower(ltrim($name, '\\'));
         $this->compiledClassStaticProperties[$traitLc] = $this->compiledClassStaticProperties[$traitLc] ?? [];
