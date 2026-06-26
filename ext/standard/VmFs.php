@@ -624,6 +624,26 @@ final class VmFs
     }
 
     /**
+     * Read full path via php_stream_open_wrapper parity (fopen + stream_get_contents + fclose).
+     *
+     * Use for highlight_file() and other builtins that must open wrapper URIs without
+     * bare filesystem reads (php-src ext/standard/url.c; #12095).
+     *
+     * @return string|false false when open fails
+     */
+    public static function readPathContentsViaOpen(string $path, ?\PHPCompiler\VM\Context $ctx = null): string|false
+    {
+        $handle = self::fopen($path, 'rb', $ctx);
+        if (false === $handle) {
+            return false;
+        }
+        $data = self::streamGetContents($handle);
+        self::fclose($handle);
+
+        return $data;
+    }
+
+    /**
      * @param string|list<string> $data
      */
     public static function filePutContents(string $path, $data, int $flags = 0) {
