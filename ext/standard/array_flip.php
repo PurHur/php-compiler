@@ -13,16 +13,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayFlipRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_flip() for arrays with int or string keys and values (subset of PHP; JIT via ArrayFlipRuntime).
  *
- * VM: {@see VmArray::flip()}; JIT/AOT: {@see ArrayBuiltinHelper::buildFlipArray()}.
+ * VM: {@see VmArray::flip()}; JIT/AOT: {@see ArrayFlipRuntime::flip()}.
  */
 final class array_flip extends Internal
 {
@@ -55,6 +55,6 @@ final class array_flip extends Internal
         }
         TypeErrorRaise::ensureLinked($context);
 
-        return ArrayBuiltinHelper::buildFlipArray($context, $args[0]);
+        return ArrayFlipRuntime::flip($context, $args[0]);
     }
 }

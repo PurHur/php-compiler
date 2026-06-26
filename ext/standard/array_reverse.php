@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayReverseRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
@@ -63,6 +63,6 @@ final class array_reverse extends Internal
             ? JitBoolArg::lower($context, $args[1], 'array_reverse() preserve_keys')
             : null;
 
-        return ArrayBuiltinHelper::buildReverseArray($context, $args[0], $preserveKeys);
+        return ArrayReverseRuntime::reverse($context, $args[0], $preserveKeys);
     }
 }
