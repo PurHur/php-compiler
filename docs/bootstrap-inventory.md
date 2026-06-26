@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3305 |
-| Phase A inventory files (M2 ratio SSOT) | 3305 |
+| PHP files on vm.php path | 3308 |
+| Phase A inventory files (M2 ratio SSOT) | 3308 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8798 |
+| Source constructs flagged (warnings) | 8801 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -381,6 +381,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HighlightJitHelper.php` | 0 | 1 |
 | `ext/standard/HrtimeJitHelper.php` | 0 | 1 |
 | `ext/standard/Html5NamedEntities.php` | 0 | 1 |
+| `ext/standard/Html5TranslationTable.php` | 0 | 1 |
 | `ext/standard/HtmlEntitiesJitHelper.php` | 0 | 1 |
 | `ext/standard/HtmlEntityDecodeJitHelper.php` | 0 | 1 |
 | `ext/standard/HtmlEntityTable.php` | 0 | 1 |
@@ -1141,8 +1142,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 7 |
-| `ext/standard/VmPregEngine.php` | 0 | 38 |
+| `ext/standard/VmPregEngine.php` | 0 | 39 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
+| `ext/standard/VmPregLimits.php` | 0 | 1 |
 | `ext/standard/VmPregMatches.php` | 0 | 12 |
 | `ext/standard/VmPregNative.php` | 0 | 1 |
 | `ext/standard/VmPregPattern.php` | 0 | 1 |
@@ -5305,7 +5307,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/AssertOptionsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 20 class method(s)
 
 ### `ext/standard/AttributeRegistryArgsJitHelper.php`
 
@@ -5676,6 +5678,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/Html5TranslationTable.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/HtmlEntitiesJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5760,7 +5767,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IniJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 25 class method(s)
 
 ### `ext/standard/IniParseQuantityJitHelper.php`
 
@@ -10396,12 +10403,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 393)
-- new HashTable (line 400)
-- new Variable (line 408)
-- new Variable (line 421)
-- new Variable (line 429)
-- 28 class method(s)
+- new HashTable (line 449)
+- new HashTable (line 456)
+- new Variable (line 464)
+- new Variable (line 477)
+- new Variable (line 485)
+- 32 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -10743,49 +10750,55 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 60)
-- new self (line 87)
-- new VmPregAstEmptyNode (line 163)
-- new VmPregCompileException (line 167)
-- new VmPregAstAltNode (line 184)
-- new VmPregAstEmptyNode (line 194)
-- new VmPregAstConcatNode (line 200)
-- new VmPregAstQuantNode (line 212)
-- new VmPregCompileException (line 267)
-- new VmPregCompileException (line 278)
-- new VmPregCompileException (line 284)
-- new VmPregCompileException (line 299)
-- new VmPregAstAnyNode (line 311)
-- new VmPregAstBolNode (line 316)
-- new VmPregAstEolNode (line 321)
-- new VmPregCompileException (line 327)
-- new VmPregAstCharNode (line 331)
-- new VmPregCompileException (line 349)
-- new VmPregCompileException (line 355)
-- new VmPregCompileException (line 359)
+- new self (line 64)
+- new self (line 91)
+- new VmPregAstEmptyNode (line 168)
+- new VmPregCompileException (line 172)
+- new VmPregAstAltNode (line 189)
+- new VmPregAstEmptyNode (line 199)
+- new VmPregAstConcatNode (line 205)
+- new VmPregAstQuantNode (line 217)
+- new VmPregCompileException (line 272)
+- new VmPregCompileException (line 283)
+- new VmPregCompileException (line 289)
+- new VmPregCompileException (line 304)
+- new VmPregAstAnyNode (line 316)
+- new VmPregAstBolNode (line 321)
+- new VmPregAstEolNode (line 326)
+- new VmPregCompileException (line 332)
+- new VmPregAstCharNode (line 336)
+- new VmPregCompileException (line 354)
+- new VmPregCompileException (line 360)
 - new VmPregCompileException (line 364)
-- new VmPregAstGroupNode (line 375)
-- new VmPregCompileException (line 382)
-- new VmPregCompileException (line 434)
-- new VmPregAstClassNode (line 438)
-- new VmPregCompileException (line 448)
-- new VmPregCompileException (line 468)
-- new VmPregAstClassNode (line 474)
-- new VmPregAstClassNode (line 475)
-- new VmPregAstClassNode (line 476)
-- new VmPregAstClassNode (line 477)
-- new VmPregAstClassNode (line 478)
+- new VmPregCompileException (line 369)
+- new VmPregAstGroupNode (line 380)
+- new VmPregCompileException (line 387)
+- new VmPregCompileException (line 439)
+- new VmPregAstClassNode (line 443)
+- new VmPregCompileException (line 453)
+- new VmPregCompileException (line 473)
 - new VmPregAstClassNode (line 479)
-- new VmPregAstBolNode (line 480)
-- new VmPregAstEolNode (line 481)
-- new VmPregAstEolNode (line 482)
-- new VmPregAstCharNode (line 483)
+- new VmPregAstClassNode (line 480)
+- new VmPregAstClassNode (line 481)
+- new VmPregAstClassNode (line 482)
+- new VmPregAstClassNode (line 483)
+- new VmPregAstClassNode (line 484)
+- new VmPregAstBolNode (line 485)
+- new VmPregAstEolNode (line 486)
+- new VmPregAstEolNode (line 487)
+- new VmPregAstCharNode (line 488)
+- new VmPregBacktrackLimitException (line 547)
 - 41 class method(s)
 
 ### `ext/standard/VmPregFailure.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/VmPregLimits.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmPregMatches.php`
 
@@ -10816,7 +10829,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmPregReplaceCallback.php`
