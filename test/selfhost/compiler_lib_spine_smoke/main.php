@@ -3093,6 +3093,7 @@ require_once __DIR__.'/../../../lib/VM/VmNumericDivisionGuard.php';
 require_once __DIR__.'/../../../lib/VM/VmPowNumericOperandGuard.php';
 require_once __DIR__.'/../../../lib/VM/VmResourceIdString.php';
 require_once __DIR__.'/../../../lib/VM/VmStringCompare.php';
+require_once __DIR__.'/../../../lib/VM/VmTryCatch.php';
 require_once __DIR__.'/../../../lib/VM/VmUnaryMinus.php';
 require_once __DIR__.'/../../../lib/VM/VmUnaryPlus.php';
 require_once __DIR__.'/../../../lib/VM/VmValueBoxWriteBool.php';
