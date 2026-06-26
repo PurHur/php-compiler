@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmFsPathNative;
+use PHPCompiler\ext\standard\VmFsPathPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmFsPathNative libc rename/copy/link without host builtin delegation (#5213). */
+/** VmFsPathNative routes rename/copy/link through VmFsPathPure (#5213, #12316). */
 final class VmFsPathNativeTest extends TestCase
 {
     public function testVmFsUsesPathNativeNotHostDelegation(): void
@@ -27,20 +28,17 @@ final class VmFsPathNativeTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@touch\\s*\\(/', $source);
     }
 
-    public function testNativeDefinesLibcPathOps(): void
+    public function testNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsPathNative.php');
-        $this->assertStringContainsString('int rename(const char *oldpath', $source);
-        $this->assertStringContainsString('int link(const char *oldpath', $source);
-        $this->assertStringContainsString('ssize_t readlink(const char *pathname', $source);
-        $this->assertStringContainsString('int symlinkat(const char *target', $source);
-        $this->assertStringContainsString('int open(const char *pathname', $source);
+        $this->assertStringContainsString('VmFsPathPure::rename', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
     }
 
     public function testRenameCopyLinkRoundTrip(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('ext/ffi required for VmFsPathNative libc path');
+        if (!VmFsPathPure::available()) {
+            $this->markTestSkipped('host rename unavailable');
         }
 
         $dir = sys_get_temp_dir();
