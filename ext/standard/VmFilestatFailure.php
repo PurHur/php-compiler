@@ -24,7 +24,7 @@ final class VmFilestatFailure
 
     public static function warnChmodFailed(Frame $frame, string $path): void
     {
-        self::triggerWarning($frame, \sprintf('chmod(): No such file or directory'));
+        self::triggerWarningWithHandlerFirst($frame, 'chmod(): No such file or directory');
     }
 
     public static function warnUnlinkFailed(Frame $frame, string $path): void
