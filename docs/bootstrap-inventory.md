@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3215 |
-| Phase A inventory files (M2 ratio SSOT) | 3215 |
+| PHP files on vm.php path | 3219 |
+| Phase A inventory files (M2 ratio SSOT) | 3219 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8540 |
+| Source constructs flagged (warnings) | 8557 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -158,6 +158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/intl/CollatorCreate.php` | 0 | 1 |
 | `ext/intl/IntlClassMethod.php` | 0 | 3 |
 | `ext/intl/IntlDateFormatterCreate.php` | 0 | 1 |
+| `ext/intl/IntlExtensionPolicy.php` | 0 | 1 |
 | `ext/intl/JitGrapheme.php` | 0 | 2 |
 | `ext/intl/Module.php` | 0 | 14 |
 | `ext/intl/UnicodeCanonical.php` | 0 | 1 |
@@ -889,6 +890,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SimilarTextJitHelper.php` | 0 | 1 |
 | `ext/standard/SleepJitHelper.php` | 0 | 1 |
 | `ext/standard/SplAutoloadJitHelper.php` | 0 | 1 |
+| `ext/standard/SprintfJitHelper.php` | 0 | 2 |
 | `ext/standard/SscanfJitHelper.php` | 0 | 1 |
 | `ext/standard/StatArrayJitHelper.php` | 0 | 3 |
 | `ext/standard/StatCacheJitHelper.php` | 0 | 1 |
@@ -1995,7 +1997,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/ValueBox.php` | 0 | 1 |
 | `lib/AbstractEnumSourceRewriter.php` | 0 | 1 |
 | `lib/Ast/AbstractEnumMarker.php` | 0 | 1 |
-| `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 12 |
+| `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 10 |
 | `lib/Ast/CloneWithDesugar.php` | 0 | 1 |
 | `lib/Ast/DnfParenTypeRewriter.php` | 0 | 1 |
 | `lib/Ast/EnumCaseImportRewriter.php` | 0 | 5 |
@@ -2349,7 +2351,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFilterEmail.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterInt.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFilterUrl.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringFormat.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFormat.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFormatJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringFsDir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFsDirJit.php` | 0 | 1 |
@@ -2464,7 +2466,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringZstdJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/SuperglobalRefreshStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/SysGetTempDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/TimeSleepRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/TimezoneLocationRuntime.php` | 0 | 3 |
@@ -3149,7 +3152,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Web/ResponseContext.php` | 0 | 1 |
 | `lib/Web/ServeCompileCache.php` | 0 | 1 |
 | `lib/Web/SourceBundler.php` | 0 | 1 |
-| `lib/Web/Superglobals.php` | 0 | 7 |
+| `lib/Web/SuperglobalRefreshJitHelper.php` | 0 | 1 |
+| `lib/Web/Superglobals.php` | 0 | 17 |
 | `lib/Web/UploadTemp.php` | 0 | 1 |
 | `lib/Web/VendorSpineAutoload.php` | 0 | 2 |
 
@@ -3362,9 +3366,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new bzcompress (line 17)
-- new bzdecompress (line 18)
-- 1 class method(s)
+- new bzcompress (line 37)
+- new bzdecompress (line 38)
+- 3 class method(s)
 
 ### `ext/bz2/VmBz2Native.php`
 
@@ -4038,6 +4042,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/intl/IntlExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/intl/JitGrapheme.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4047,19 +4056,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/intl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 33)
-- new grapheme_strlen (line 42)
-- new grapheme_substr (line 43)
-- new grapheme_strpos (line 44)
-- new grapheme_str_contains (line 45)
-- new grapheme_strstr (line 46)
-- new grapheme_stristr (line 47)
-- new grapheme_stripos (line 48)
-- new grapheme_strrpos (line 49)
-- new grapheme_extract (line 50)
-- new grapheme_levenshtein (line 51)
-- new grapheme_str_split (line 52)
-- new intl_get_error_code (line 53)
+- new VM\Variable (line 34)
+- new grapheme_strlen (line 47)
+- new grapheme_substr (line 48)
+- new grapheme_strpos (line 49)
+- new grapheme_str_contains (line 50)
+- new grapheme_strstr (line 51)
+- new grapheme_stristr (line 52)
+- new grapheme_stripos (line 53)
+- new grapheme_strrpos (line 54)
+- new grapheme_extract (line 55)
+- new grapheme_levenshtein (line 56)
+- new grapheme_str_split (line 57)
+- new intl_get_error_code (line 58)
 - 3 class method(s)
 
 ### `ext/intl/UnicodeCanonical.php`
@@ -8822,7 +8831,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/ParseIniEngine.php`
 
@@ -9015,6 +9024,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/SprintfJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 41)
+- 3 class method(s)
 
 ### `ext/standard/SscanfJitHelper.php`
 
@@ -15715,16 +15730,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/AsymmetricVisibilityRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 155)
-- new CompileError (line 161)
-- new CompileError (line 174)
-- new CompileError (line 180)
-- new CompileError (line 237)
-- new CompileError (line 243)
-- new CompileError (line 279)
-- new CompileError (line 348)
-- new CompileError (line 354)
-- new CompileError (line 366)
+- new CompileError (line 154)
+- new CompileError (line 167)
+- new CompileError (line 173)
+- new CompileError (line 230)
+- new CompileError (line 266)
+- new CompileError (line 335)
+- new CompileError (line 341)
+- new CompileError (line 353)
 - 22 class method(s)
 - 8 closure(s)
 
@@ -18404,7 +18417,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new JIT (line 274)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringFormatJit.php`
 
@@ -19063,6 +19078,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/SuperglobalRefreshRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 222)
+- 14 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/SuperglobalRefreshStandaloneLlvm.php`
 
 **Warnings** (review for bootstrap subset):
 - 42 class method(s)
@@ -24181,16 +24203,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 30 class method(s)
 
+### `lib/Web/SuperglobalRefreshJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 162)
-- new Variable (line 166)
-- new Variable (line 500)
-- new Variable (line 728)
-- new Variable (line 735)
-- new Variable (line 737)
-- 38 class method(s)
+- new Variable (line 163)
+- new Variable (line 167)
+- new HashTable (line 373)
+- new HashTable (line 384)
+- new HashTable (line 394)
+- new HashTable (line 402)
+- new HashTable (line 403)
+- new HashTable (line 421)
+- new HashTable (line 532)
+- new HashTable (line 533)
+- new HashTable (line 545)
+- new HashTable (line 546)
+- new Variable (line 617)
+- new Variable (line 845)
+- new Variable (line 852)
+- new Variable (line 854)
+- 47 class method(s)
 
 ### `lib/Web/UploadTemp.php`
 
