@@ -38,22 +38,20 @@ final class get_html_translation_table extends Internal
         $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         if ($argc >= 1) {
-            $tableVar = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $tableVar->type) {
-                throw new \LogicException(
-                    'get_html_translation_table() table must be an integer in this compiler build'
-                );
-            }
-            $table = $tableVar->toInt();
+            $table = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[0],
+                'get_html_translation_table',
+                1,
+                'table'
+            );
         }
         if ($argc >= 2) {
-            $flagsVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException(
-                    'get_html_translation_table() flags must be an integer in this compiler build'
-                );
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[1],
+                'get_html_translation_table',
+                2,
+                'flags'
+            );
         }
         if (3 === $argc) {
             $encVar = $frame->calledArgs[2]->resolveIndirect();
