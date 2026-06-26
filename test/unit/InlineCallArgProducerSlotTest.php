@@ -700,6 +700,48 @@ PHP;
         self::assertSame("array (\n  'a' => NULL,\n)\n", ob_get_clean());
     }
 
+    /** Issue #12258 — nested inline array + null replacement must use outer array slot, not inner. */
+    public function testArrayReplaceRecursiveNestedInlineNullUsesOuterArraySlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace_recursive(['a' => ['b' => 1]], ['a' => null]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline_null.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[1], $sendSlots[0], 'outer nested inline array must feed arg #1');
+        self::assertSame($arraySlots[2], $sendSlots[1], 'null overlay array must feed arg #2');
+    }
+
+    /** Issue #12258 — array_replace_recursive nested inline null runtime parity with Zend. */
+    public function testArrayReplaceRecursiveNestedInlineNullRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace_recursive(['a' => ['b' => 1]], ['a' => null]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_inline_null_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => NULL,\n)\n", ob_get_clean());
+    }
+
     /** Issue #10809 — inline assoc literal + negative offset + preserve_keys must wire array to arg #0. */
     public function testArraySliceInlineAssocNegativeOffsetPreserveKeysCompile(): void
     {

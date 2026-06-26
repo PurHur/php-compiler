@@ -12580,6 +12580,18 @@ class Compiler {
                     return $trailing[$argIndex - 1] ?? null;
                 }
             }
+            $leadingNestedRemaining = $this->splitLeadingNestedArrayLiteralChainWithRemainingProducers($producers);
+            if (null !== $leadingNestedRemaining) {
+                [$prefixChain, $remaining] = $leadingNestedRemaining;
+                $trailingArgCount = $this->countInlineCallArgProducersInRemaining($remaining);
+                if (1 + $trailingArgCount === $argCount) {
+                    if (0 === $argIndex) {
+                        return $prefixChain[\count($prefixChain) - 1];
+                    }
+
+                    return $this->inlineCallArgProducerAtRemainingIndex($remaining, $argIndex - 1);
+                }
+            }
             // php-cfg hoists compare/array-dim preludes before trailing literal args (#5901, #9660).
             if ($argIndex < $argCount - 1) {
                 $trailingForLaterArgs = $argCount - 1 - $argIndex;
@@ -13729,6 +13741,93 @@ class Compiler {
         }
 
         return [$arrayChain, $trailing];
+    }
+
+    /**
+     * Leading nested inline Array_ chain for one call arg plus remaining hoisted producers (#12258).
+     *
+     * e.g. array_replace_recursive(['a' => ['b' => 1]], ['a' => null])
+     * — producers [inner Array_, outer Array_, ConstFetch, Array_].
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return array{0: list<Op\Expr\Array_>, 1: list<Op\Expr>}|null
+     */
+    private function splitLeadingNestedArrayLiteralChainWithRemainingProducers(array $producers): ?array
+    {
+        $count = \count($producers);
+        if ($count < 2) {
+            return null;
+        }
+        for ($end = $count - 2; $end >= 1; --$end) {
+            $prefix = \array_slice($producers, 0, $end + 1);
+            if (
+                $this->producersAreNestedArrayLiteralChain($prefix)
+                && $this->arrayProducersFormNestedChain($prefix)
+            ) {
+                return [$prefix, \array_slice($producers, $end + 1)];
+            }
+        }
+        if ($producers[0] instanceof Op\Expr\Array_) {
+            return [[$producers[0]], \array_slice($producers, 1)];
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op\Expr> $remaining
+     */
+    private function countInlineCallArgProducersInRemaining(array $remaining): int
+    {
+        if ([] === $remaining) {
+            return 0;
+        }
+        if (
+            $this->producersAreNestedArrayLiteralChain($remaining)
+            && $this->arrayProducersFormNestedChain($remaining)
+        ) {
+            return 1;
+        }
+        $count = 0;
+        foreach ($remaining as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                ++$count;
+            } elseif (!$producer instanceof Op\Expr\ConstFetch) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * @param list<Op\Expr> $remaining
+     */
+    private function inlineCallArgProducerAtRemainingIndex(array $remaining, int $trailingIndex): ?Op\Expr
+    {
+        if (
+            $this->producersAreNestedArrayLiteralChain($remaining)
+            && $this->arrayProducersFormNestedChain($remaining)
+        ) {
+            return 0 === $trailingIndex ? $remaining[\count($remaining) - 1] : null;
+        }
+        $seen = 0;
+        foreach ($remaining as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                if ($seen === $trailingIndex) {
+                    return $producer;
+                }
+                ++$seen;
+            } elseif (!$producer instanceof Op\Expr\ConstFetch) {
+                if ($seen === $trailingIndex) {
+                    return $producer;
+                }
+                ++$seen;
+            }
+        }
+
+        return null;
     }
 
     /**
