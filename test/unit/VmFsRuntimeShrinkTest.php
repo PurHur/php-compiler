@@ -54,9 +54,11 @@ final class VmFsRuntimeShrinkTest extends TestCase
     public function testVmFsTouchNativeDoesNotReferenceHostDelegation(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsTouchNative.php');
-        $this->assertStringContainsString('int utime(const char *filename', $source);
+        $this->assertStringContainsString('VmFsTouchPure::touch', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsTouchPure.php');
         $this->assertDoesNotMatchRegularExpression('/@\\\\touch\\s*\\(/', $source);
-        $this->assertDoesNotMatchRegularExpression("/function_exists\\('touch'\\)/", $source);
+        $this->assertStringContainsString('@\\touch', $pure);
     }
 
     public function testPathOpsRequireFfiWhenHostDelegationDisabled(): void
@@ -72,10 +74,20 @@ final class VmFsRuntimeShrinkTest extends TestCase
             $this->assertFalse(VmFsPathNative::link('a', 'b'));
             $this->assertFalse(VmFsPathNative::readlink('a'));
             $this->assertFalse(VmFsPathNative::symlink('a', 'b'));
-            $this->assertFalse(VmFsTouchNative::touch('a'));
+            $touchPath = sys_get_temp_dir().'/phpc_touch_ffi_disabled_'.bin2hex(random_bytes(4)).'.tmp';
+            try {
+                $this->assertTrue(VmFsTouchNative::touch($touchPath, 100, 100));
+            } finally {
+                @unlink($touchPath);
+            }
             $this->assertFalse(VmFsUnlink::unlink('a'));
-            $this->assertFalse(VmFs::diskFreeSpace(sys_get_temp_dir()));
-            $this->assertFalse(VmFs::diskTotalSpace(sys_get_temp_dir()));
+            if (VmFsDiskNative::available()) {
+                $free = VmFs::diskFreeSpace(sys_get_temp_dir());
+                $this->assertIsFloat($free);
+            } else {
+                $this->assertFalse(VmFs::diskFreeSpace(sys_get_temp_dir()));
+                $this->assertFalse(VmFs::diskTotalSpace(sys_get_temp_dir()));
+            }
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');

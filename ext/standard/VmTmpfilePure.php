@@ -24,17 +24,14 @@ final class VmTmpfilePure
     {
         if (VmPhpFdStream::available()) {
             $opened = VmFsTempnamNative::mkstempOpen(VmSysGetTempDirNative::resolve(), 'php');
-            if (false === $opened) {
-                return false;
+            if (false !== $opened) {
+                [$fd, $path] = $opened;
+                VmFsTempnamNative::unlinkPath($path);
+                $handle = VmPhpFdStream::adopt($fd, $path, 'r+b');
+                if (false !== $handle) {
+                    return $handle;
+                }
             }
-            [$fd, $path] = $opened;
-            VmFsTempnamNative::unlinkPath($path);
-            $handle = VmPhpFdStream::adopt($fd, $path, 'r+b');
-            if (false === $handle) {
-                return false;
-            }
-
-            return $handle;
         }
 
         return VmPhpMemoryStream::open('php://temp', 'w+b');
