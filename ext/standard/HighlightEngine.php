@@ -16,6 +16,9 @@ final class HighlightEngine
 {
     private const COLOR_DEFAULT = '#000000';
 
+    /** Zend highlight_file() on unreadable path with $return=true (ext/standard/url.c, #12032). */
+    public const EMPTY_HIGHLIGHT_HTML = '<code><span style="color: #000000">'."\n".'</span>'."\n".'</code>';
+
     private const COLOR_KEYWORD = '#007700';
 
     private const COLOR_HTML = '#0000BB';

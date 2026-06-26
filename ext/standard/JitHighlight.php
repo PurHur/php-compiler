@@ -55,27 +55,82 @@ final class JitHighlight
         $strPtrTy = $context->getTypeFromString('__string__*');
         $readFailed = $context->builder->icmp(Builder::INT_EQ, $contents, $strPtrTy->constNull());
 
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
         $failBlock = BasicBlockHelper::append($context, $functionName.'_missing');
         $okBlock = BasicBlockHelper::append($context, $functionName.'_read_ok');
         $doneBlock = BasicBlockHelper::append($context, $functionName.'_done');
         $context->builder->branchIf($readFailed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
-        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $failResult = self::emitMissingFileResult($context, $args, $argc, $functionName);
+        $failEndBb = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
         $htmlStr = self::renderCodeString($context, $contents);
         $highlighted = self::emitResult($context, $htmlStr, $args, $argc, $functionName);
+        $okEndBb = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);
         $ptrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($ptrTy);
-        $result->addIncoming($ptr, $failBlock);
-        $result->addIncoming($highlighted, $okBlock);
+        $result->addIncoming($failResult, $failEndBb);
+        $result->addIncoming($highlighted, $okEndBb);
+
+        return $result;
+    }
+
+    /**
+     * highlight_file() read failure — Zend returns empty HTML when $return is true (#12032).
+     *
+     * @param list<JITVariable> $args
+     */
+    private static function emitMissingFileResult(
+        Context $context,
+        array $args,
+        int $argc,
+        string $functionName
+    ): Value {
+        $returnLit = self::compileTimeReturn($context, $args, $argc);
+        if (true === $returnLit) {
+            return self::materializeHtml($context, HighlightEngine::EMPTY_HIGHLIGHT_HTML, true);
+        }
+        if (false === $returnLit) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
+        if (1 === $argc) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+
+            return $ptr;
+        }
+
+        $returnBb = BasicBlockHelper::append($context, $functionName.'_missing_return');
+        $falseBb = BasicBlockHelper::append($context, $functionName.'_missing_false');
+        $doneBb = BasicBlockHelper::append($context, $functionName.'_missing_done');
+        $returns = self::boolValForBranch($context, $args[1], $functionName);
+        $context->builder->branchIf($returns, $returnBb, $falseBb);
+
+        $context->builder->positionAtEnd($returnBb);
+        $htmlPtr = self::materializeHtml($context, HighlightEngine::EMPTY_HIGHLIGHT_HTML, true);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($falseBb);
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $ptrTy = $context->getTypeFromString('__value__*');
+        $result = $context->builder->phi($ptrTy);
+        $result->addIncoming($htmlPtr, $returnBb);
+        $result->addIncoming($ptr, $falseBb);
 
         return $result;
     }
