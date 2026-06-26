@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\mbstring;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -46,9 +47,11 @@ class Module extends ModuleAbstract
             new mb_stripos(),
             new mb_strrpos(),
             new mb_strrichr(),
-            new mb_trim(),
-            new mb_ltrim(),
-            new mb_rtrim(),
+            ...(CompilerVersion::supportsMbTrimFunctions() ? [
+                new mb_trim(),
+                new mb_ltrim(),
+                new mb_rtrim(),
+            ] : []),
             new mb_scrub(),
             new mb_encode_numericentity(),
             new mb_decode_numericentity(),

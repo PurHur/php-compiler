@@ -188,4 +188,10 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinSince('8.4.0');
     }
+
+    /** PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901). */
+    public static function supportsMbTrimFunctions(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
 }
