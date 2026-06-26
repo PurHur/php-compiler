@@ -100,13 +100,13 @@ final class VmAssertState
     }
 
     /**
-     * @return int|string|bool|false
+     * @return int|string|bool|null|false
      */
     public static function getOption(int $what)
     {
         return match ($what) {
             StdlibConstants::ASSERT_ACTIVE => AssertOptionsJitHelper::getActiveInt(),
-            StdlibConstants::ASSERT_CALLBACK => AssertOptionsJitHelper::getCallbackString(),
+            StdlibConstants::ASSERT_CALLBACK => AssertOptionsJitHelper::getCallbackForOptions(),
             StdlibConstants::ASSERT_BAIL => AssertOptionsJitHelper::getBailInt(),
             StdlibConstants::ASSERT_WARNING => false,
             StdlibConstants::ASSERT_EXCEPTION => AssertOptionsJitHelper::getExceptionInt(),
@@ -115,7 +115,7 @@ final class VmAssertState
     }
 
     /**
-     * @return int|string|bool|false
+     * @return int|string|bool|null|false
      */
     public static function setOption(int $what, Variable $value)
     {
