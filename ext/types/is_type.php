@@ -9,9 +9,11 @@
 
 namespace PHPCompiler\ext\types;
 
+use PHPCompiler\ext\standard\JitStreamContextRepresentation;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitResourceArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TypedPropertyUninitGuard;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -38,10 +40,11 @@ class is_type extends Internal {
         TypedPropertyCheck::assertReadable($var);
         if (!is_null($frame->returnVar)) {
             if (Variable::TYPE_OBJECT === $this->type) {
-                // Zend is_object(): enum case operands are objects (zend_enum.c, #5448).
+                // Zend is_object(): enum cases yes; VM resources no (ext/standard/type.c, #12302).
                 $frame->returnVar->bool(
-                    Variable::TYPE_OBJECT === $var->type
-                    || Variable::TYPE_ENUM_CASE === $var->type
+                    !$var->isVmResource()
+                    && (Variable::TYPE_OBJECT === $var->type
+                        || Variable::TYPE_ENUM_CASE === $var->type)
                 );
 
                 return;
@@ -114,8 +117,13 @@ class is_type extends Internal {
                 if (Variable::TYPE_OBJECT === $this->type) {
                     $enumCaseTy = $i8->constInt(Variable::TYPE_ENUM_CASE, false);
                     $matchEnum = $context->builder->icmp(Builder::INT_EQ, $typeByte, $enumCaseTy);
+                    $isObjType = $context->builder->or($matchFull, $matchEnum);
+                    \PHPCompiler\JIT\Builtin\StringDir::ensureLinked($context);
+                    $streamCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+                    $handleRes = JitResourceArg::lowerIsResource($context, $args[0]);
+                    $isRes = $context->builder->or($streamCtx, $handleRes);
 
-                    return $context->builder->or($matchFull, $matchEnum);
+                    return $context->builder->and($isObjType, $context->builder->not($isRes));
                 }
                 if (Variable::TYPE_STRING === $this->type) {
                     $tag = $context->builder->and($typeByte, $i8->constInt(0x7f, false));

@@ -18,9 +18,9 @@ echo gettype($h), "\n";
 --EXPECT--
 true
 true
-true
+false
 resource (stream)
 resource
 bool(true)
 bool(false)
-resource
+resource (closed)
