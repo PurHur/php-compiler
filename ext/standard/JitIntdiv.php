@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
@@ -24,9 +25,25 @@ final class JitIntdiv
     public static function lowerOperands(Context $context, JITVariable $num1, JITVariable $num2): array
     {
         return [
-            self::lowerIntBuiltinArg($context, $num1, 'intdiv', 1, 'num1'),
-            self::lowerIntBuiltinArg($context, $num2, 'intdiv', 2, 'num2'),
+            self::lowerIntBuiltinArgForCaller($context, $num1, 'intdiv', 1, 'num1'),
+            self::lowerIntBuiltinArgForCaller($context, $num2, 'intdiv', 2, 'num2'),
         ];
+    }
+
+    /**
+     * Z_PARAM_LONG with caller strict_types parity (#12275 intdiv, #12273 dechex/decoct/decbin).
+     */
+    public static function lowerIntBuiltinArgForCaller(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        bool $warnFloatPrecision = false
+    ): Value {
+        JitInternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex);
+
+        return self::lowerIntBuiltinArg($context, $arg, $function, $argIndex, $paramName, $warnFloatPrecision);
     }
 
     /**

@@ -8,9 +8,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 final class VmString
@@ -142,6 +144,32 @@ final class VmString
         }
 
         return $var->toString();
+    }
+
+    /**
+     * Z_PARAM_STR with caller strict_types parity (#12276 bindec/hexdec/octdec, #12274 base_convert).
+     *
+     * @throws \TypeError when caller strict_types rejects non-string operands
+     */
+    public static function stringBuiltinArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+        }
+
+        return self::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $userArgIndex,
+            $paramName
+        );
     }
 
     /**

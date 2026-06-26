@@ -31,7 +31,7 @@ final class hexdec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('hexdec() requires exactly one argument');
         }
-        $hexString = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hexdec', 0, 'hex_string');
+        $hexString = VmString::stringBuiltinArgForFrame($frame, 0, 'hexdec', 0, 'hex_string');
         VmMath::assignRadixToReturn($frame->returnVar, $hexString, 16);
     }
 
@@ -48,7 +48,7 @@ final class hexdec extends Internal
             $context,
             $this->stringDataPtr(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'hexdec', 0, 'hex_string')
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'hexdec', 0, 'hex_string')
             ),
             16
         );
