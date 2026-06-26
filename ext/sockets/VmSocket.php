@@ -37,6 +37,9 @@ final class VmSocket
     /** @var array<int, int> object id => dup(2) socket fd */
     private static array $hostSocketFds = [];
 
+    /** @var array<int, int> JIT object handle (ptrToInt) => socket fd */
+    private static array $jitHandleFds = [];
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC])) {
@@ -113,6 +116,34 @@ final class VmSocket
         $handle = self::$streamHandles[$object->id] ?? null;
         if (null !== $handle) {
             return VmFs::socketFdForHandle($handle);
+        }
+
+        return null;
+    }
+
+    public static function registerJitHandleFd(int $handle, int $fd): void
+    {
+        if ($handle > 0 && $fd >= 0) {
+            self::$jitHandleFds[$handle] = $fd;
+        }
+    }
+
+    public static function fdForLookupKey(int $key): ?int
+    {
+        if ($key <= 0) {
+            return null;
+        }
+        if (isset(self::$jitHandleFds[$key])) {
+            return self::$jitHandleFds[$key];
+        }
+        if (isset(self::$hostSocketFds[$key])) {
+            return self::$hostSocketFds[$key];
+        }
+        if (isset(self::$streamHandles[$key])) {
+            return VmFs::socketFdForHandle(self::$streamHandles[$key]);
+        }
+        if (1 === \count(self::$hostSocketFds)) {
+            return (int) \reset(self::$hostSocketFds);
         }
 
         return null;

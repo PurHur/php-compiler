@@ -26,15 +26,22 @@ final class VmSockets
     public static function atmarkForObject(ObjectEntry $object): bool
     {
         $fd = VmSocket::fdForObject($object);
-        $ffi = self::ffi();
-        if (null !== $fd && null !== $ffi) {
-            $r = (int) $ffi->sockatmark($fd);
-            if ($r >= 0) {
-                return 0 !== $r;
-            }
+        if (null === $fd) {
+            return false;
         }
 
-        return false;
+        return self::atmarkForFd($fd);
+    }
+
+    public static function atmarkForFd(int $fd): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        $r = (int) $ffi->sockatmark($fd);
+
+        return $r >= 0 && 0 !== $r;
     }
 
     public static function triggerWarning(Frame $frame, string $message): void
