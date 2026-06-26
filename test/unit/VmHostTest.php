@@ -19,10 +19,10 @@ final class VmHostTest extends TestCase
         $this->assertStringNotContainsString("function_exists('gethostname')", $source);
     }
 
-    public function testGethostnameReturnsNonEmptyWhenLibcAvailable(): void
+    public function testGethostnameReturnsNonEmptyWhenHostnameSourcesAvailable(): void
     {
         if (!VmHost::available()) {
-            $this->markTestSkipped('libc FFI unavailable on this host');
+            $this->markTestSkipped('hostname sources unavailable on this host');
         }
 
         $host = VmHost::gethostname();
