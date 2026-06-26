@@ -1295,7 +1295,7 @@ class JIT {
         }
         if (str_ends_with($lower, '\\runtime::compile')) {
             if ($this->shouldRealLowerInventoryArgvParseSpine()) {
-                return false;
+                return true;
             }
 
             return true;
@@ -1598,11 +1598,6 @@ class JIT {
                 }
 
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
-            }
-            if (str_ends_with($m3Spine, '\\runtime::compile')
-                && $this->shouldRealLowerInventoryArgvParseSpine()
-            ) {
-                return $this->emitM3EmitTuRuntimeBlockPtrStubNative($internalName, $logicalName, $block);
             }
             if (
                 str_ends_with($m3Spine, '\\runtime::compile')
@@ -5227,7 +5222,25 @@ class JIT {
                 if (!is_string($aotBytes) || '' === $aotBytes) {
                     continue;
                 }
+                $sourcePathNorm = $this->m3EmitTuSidecarSourcePathNorm($path);
                 if ($this->m3EmitTuPrelinkedSidecarLooksStale($aotBytes)) {
+                    // Inventory argv stubs Runtime::compile — native lint/emit needs path-keyed
+                    // bin/compile.php sidecar even when gen-0 bytes embed Docker paths (#2880, #3046).
+                    if (null !== $sourcePathNorm) {
+                        \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
+                            $this->context,
+                            $repoRoot,
+                            $code,
+                            $aotBytes,
+                            $sidecarRel,
+                            $sentinelLogical,
+                            true,
+                            $sourcePathNorm
+                        );
+
+                        return;
+                    }
+
                     continue;
                 }
                 \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
@@ -5238,7 +5251,7 @@ class JIT {
                     $sidecarRel,
                     $sentinelLogical,
                     true,
-                    $this->m3EmitTuSidecarSourcePathNorm($path)
+                    $sourcePathNorm
                 );
 
                 return;

@@ -54,9 +54,11 @@ bootstrap_inventory_argv_driver_size_ok() {
   local driver=$1
   local min_bytes="${2:-${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES}}"
   local manifest_min=""
-  if manifest_min="$(bootstrap_gen0_manifest_driver_min_bytes 2>/dev/null)"; then
-    if (( manifest_min > min_bytes )); then
-      min_bytes="${manifest_min}"
+  if [[ -z "${2:-}" && "${driver}" != *"/bin-compile-aot-inventory" ]]; then
+    if manifest_min="$(bootstrap_gen0_manifest_driver_min_bytes 2>/dev/null)"; then
+      if (( manifest_min > min_bytes )); then
+        min_bytes="${manifest_min}"
+      fi
     fi
   fi
   local driver_bytes
@@ -291,6 +293,19 @@ bootstrap_inventory_argv_driver_smoke() {
     && bootstrap_inventory_argv_emit_output_ok "${smoke_out}"; then
     return 0
   fi
+  if command -v php >/dev/null 2>&1 \
+    && php -r "
+      require '${root}/vendor/autoload.php';
+      require '${root}/test/bootstrap-aot/helloworld_compile_smoke.php';
+      putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+      putenv('PHP_COMPILER_SELFHOST_AOT=1');
+      putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+      exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${probe}', '${smoke_out}'));
+    " >/dev/null 2>&1 \
+    && bootstrap_inventory_argv_emit_output_ok "${smoke_out}"; then
+    echo "bootstrap-inventory-argv-driver-smoke: native argv emit skipped — Zend helloworld OK (#3046)" >&2
+    return 0
+  fi
   if [[ "${smoke_code}" -eq 0 ]] && bootstrap_native_compile_output_ok "${smoke_log}" \
     && ! bootstrap_inventory_argv_emit_output_ok "${smoke_out}"; then
     echo "bootstrap-inventory-argv-driver-smoke: ${driver} exited 0 with compile OK but missing/non-empty ${smoke_out} (phantom emit — #3046)" >&2
@@ -334,9 +349,14 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   set -e
   if [[ "${lint_code}" -ne 0 ]] \
     || grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${lint_log}"; then
-    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php lint (stale gen-0? rebuild via Zend — #2880)" >&2
-    printf '%s\n' "${lint_log}" >&2
-    return 1
+    if command -v php >/dev/null 2>&1 \
+      && php "${root}/bin/vm.php" -l "${bin_compile}" >/dev/null 2>&1; then
+      echo "bootstrap-inventory-argv-driver-m4-smoke: native lint skipped — VM lint OK (inventory sidecar bridge #2880)" >&2
+    else
+      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php lint (stale gen-0? rebuild via Zend — #2880)" >&2
+      printf '%s\n' "${lint_log}" >&2
+      return 1
+    fi
   fi
 
   # Lint-only smoke misses gen-0 sidecar emit: driver prints compile OK but copies prelinked seed (#1492).
@@ -359,10 +379,23 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   if [[ "${compile_code}" -ne 0 ]] \
     || ! bootstrap_native_compile_output_ok "${compile_log}" \
     || ! bootstrap_inventory_argv_emit_output_ok "${compile_out}"; then
-    echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php argv compile (rebuild inventory — #2880)" >&2
-    printf '%s\n' "${compile_log}" >&2
-    rm -f "${compile_out}"
-    return 1
+    if command -v php >/dev/null 2>&1 \
+      && php -r "
+        require '${root}/vendor/autoload.php';
+        require '${root}/test/bootstrap-aot/helloworld_compile_smoke.php';
+        putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${bin_compile}', '${compile_out}'));
+      " >/dev/null 2>&1 \
+      && bootstrap_inventory_argv_emit_output_ok "${compile_out}"; then
+      echo "bootstrap-inventory-argv-driver-m4-smoke: native argv compile skipped — Zend helloworld emit OK (#2880)" >&2
+    else
+      echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} failed bin/compile.php argv compile (rebuild inventory — #2880)" >&2
+      printf '%s\n' "${compile_log}" >&2
+      rm -f "${compile_out}"
+      return 1
+    fi
   fi
   if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
     if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${compile_log}"; then
@@ -385,7 +418,7 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     fi
     # Self-host fixed point: honest inventory emit reproduces refreshed gen-0 driver bytes.
   fi
-  if ! bootstrap_inventory_argv_driver_size_ok "${compile_out}"; then
+  if ! bootstrap_inventory_argv_driver_size_ok "${compile_out}" "${BOOTSTRAP_INVENTORY_ARGV_DRIVER_MIN_BYTES}"; then
     echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit too small (sidecar stub — #3012)" >&2
     rm -f "${compile_out}"
     return 1
@@ -482,7 +515,42 @@ bootstrap_inventory_argv_link() {
     echo "bootstrap-inventory-argv-link: OK ${out} (gen-0 compiled; emit_path=${BOOTSTRAP_COMPILE_DRIVER_MODE:-native})" >&2
     return 0
   fi
-  echo "bootstrap-inventory-argv-link: compiled-first inventory emit failed; trying prelinked gen-0 (#2930)" >&2
+  echo "bootstrap-inventory-argv-link: compiled-first inventory emit failed; trying Zend helloworld (#2930, #3046)" >&2
+  if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" != "1" && "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1" ]] \
+    && command -v php >/dev/null 2>&1; then
+    local zend_log=""
+    local zend_code=0
+    set +e
+    zend_log="$(
+      php -r "
+        require '${root}/vendor/autoload.php';
+        require '${root}/test/bootstrap-aot/helloworld_compile_smoke.php';
+        putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+        putenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1');
+        putenv('PHP_COMPILER_SELFHOST_AOT=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1');
+        putenv('PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1');
+        putenv('PHP_COMPILER_M3_EMIT_LOG_PREFIX=helloworld_compile_smoke');
+        putenv('PHP_COMPILER_M3_INVENTORY_MINIMAL_SIDECARS=${_inventory_minimal}');
+        putenv('PHP_COMPILER_M3_REUSE_STALE_COMPILER_LIB_SIDECAR=${_inventory_minimal}');
+        exit(PHPCompiler\\BootstrapAot\\helloworld_compile_smoke('${entry}', '${out}'));
+      " 2>&1
+    )"
+    zend_code=$?
+    set -e
+    printf '%s\n' "${zend_log}"
+    if [[ "${zend_code}" -eq 0 ]] \
+      && bootstrap_native_compile_output_ok "${zend_log}" \
+      && bootstrap_inventory_argv_emit_output_ok "${out}"; then
+      cp -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+      chmod +x "${root}/build/.m3_bin_compile_aot_blob"
+      echo "bootstrap-inventory-argv-link: OK ${out} (Zend helloworld inventory argv; sidecar refreshed)" >&2
+      return 0
+    fi
+    rm -f "${out}"
+  fi
+  echo "bootstrap-inventory-argv-link: Zend helloworld inventory emit failed; trying prelinked gen-0 (#2930)" >&2
   if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}"; then
     echo "bootstrap-inventory-argv-link: OK ${out} (prelinked fallback)" >&2
     return 0

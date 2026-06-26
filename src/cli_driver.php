@@ -41,7 +41,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
     function php_compiler_cli_note_progress(string $msg): void
     {
         try {
-            if (!class_exists(\PHPCompiler\JIT\Progress::class)) {
+            if (!class_exists('PHPCompiler\\JIT\\Progress', false)) {
                 return;
             }
             \PHPCompiler\JIT\Progress::noteFunction($msg);
