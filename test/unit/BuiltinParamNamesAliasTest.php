@@ -377,4 +377,18 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'error_code', 'stream_socket_client'));
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'error_message', 'stream_socket_client'));
     }
+
+    /** @covers issue #12101 */
+    public function testAtan2HypotNamedParameters(): void
+    {
+        $atan2 = BuiltinParamNames::forFunction('atan2');
+        self::assertSame(['y', 'x'], $atan2);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($atan2, 'y', 'atan2'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($atan2, 'x', 'atan2'));
+
+        $hypot = BuiltinParamNames::forFunction('hypot');
+        self::assertSame(['x', 'y'], $hypot);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hypot, 'x', 'hypot'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hypot, 'y', 'hypot'));
+    }
 }

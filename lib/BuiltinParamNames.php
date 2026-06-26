@@ -137,6 +137,10 @@ final class BuiltinParamNames
                 return ['categorize'];
             case 'intdiv':
                 return ['num1', 'num2'];
+            case 'atan2':
+                return ['y', 'x'];
+            case 'hypot':
+                return ['x', 'y'];
             case 'random_int':
                 return ['min', 'max'];
             case 'hex2bin':
