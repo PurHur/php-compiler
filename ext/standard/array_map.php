@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -88,17 +89,11 @@ final class array_map extends Internal
 
     private static function lowerSingleArrayMap(Context $context, JITVariable $callback, JITVariable $array): Value
     {
-        if (!ArrayMapCallbackPolicy::isJitLowerable($callback)) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
-        if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            return ArrayBuiltinHelper::buildMapArrayWithClosure($context, $callback, $array);
-        }
         if (JITVariable::TYPE_STRING === $callback->type || JITVariable::TYPE_VALUE === $callback->type) {
             (new self())->jitString($context, $callback, 'array_map() callback');
         }
 
-        return ArrayBuiltinHelper::buildMapArray($context, $callback, $array);
+        return ArrayMapRuntime::mapSingle($context, $callback, $array);
     }
 
     private static function mapSingleArray(Frame $frame, Variable $callback, HashTable $src): HashTable
