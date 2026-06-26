@@ -39,6 +39,12 @@ final class getenv_ extends Internal
 
             return;
         }
+        $arg0 = $frame->calledArgs[0]->resolveIndirect();
+        if (1 === $argc && Variable::TYPE_NULL === $arg0->type) {
+            $frame->returnVar->array(VmEnv::getAllEnvironmentTable());
+
+            return;
+        }
         $localOnly = false;
         if (2 === $argc) {
             $localOnly = $frame->calledArgs[1]->resolveIndirect()->toBool();
@@ -59,6 +65,9 @@ final class getenv_ extends Internal
             throw new \LogicException('getenv() accepts at most two arguments');
         }
         if (0 === $argc) {
+            return JitEnv::getenvAll($context);
+        }
+        if (1 === $argc && (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false))) {
             return JitEnv::getenvAll($context);
         }
         $i8 = $context->getTypeFromString('int8');
