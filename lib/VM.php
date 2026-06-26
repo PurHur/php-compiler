@@ -14718,6 +14718,9 @@ restart:
             if ($frame->block->isNamedVariableSlot($slot)) {
                 continue;
             }
+            if ($this->isVmScopeSlotUsedByFollowingOps($frame, $slot)) {
+                continue;
+            }
             $this->releaseVmDeadScopeSlot($frame, $slot);
         }
     }
@@ -14726,6 +14729,33 @@ restart:
     {
         if (!isset($frame->scope[$slot]) || $frame->block->isNamedVariableSlot($slot)) {
             return;
+        }
+        $var = $frame->scope[$slot]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type) {
+            try {
+                $objectId = $var->toObject()->id;
+            } catch (\LogicException) {
+                $objectId = null;
+            }
+            if (null !== $objectId) {
+                foreach ($frame->scope as $otherSlot => $otherVar) {
+                    if ($otherSlot === $slot) {
+                        continue;
+                    }
+                    $other = $otherVar->resolveIndirect();
+                    if (Variable::TYPE_OBJECT !== $other->type) {
+                        continue;
+                    }
+                    try {
+                        if ($other->toObject()->id === $objectId) {
+                            $frame->scope[$slot]->null();
+
+                            return;
+                        }
+                    } catch (\LogicException) {
+                    }
+                }
+            }
         }
         ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
         $frame->scope[$slot]->null();
