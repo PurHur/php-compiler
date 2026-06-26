@@ -13,7 +13,8 @@ use PHPCompiler\VM;
  *
  * Grapheme builtins are partial PHP implementations without ICU. Register under
  * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
- * {@see IntlExtensionPolicy} withholds grapheme/intl_* from function_exists() until then (#11768).
+ * {@see IntlExtensionPolicy} withholds grapheme/intl_* from function_exists() and
+ * intl OOP classes from class_exists() until then (#11768, #12115).
  */
 class Module extends ModuleAbstract
 {
@@ -25,7 +26,9 @@ class Module extends ModuleAbstract
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
-        BuiltinClasses::register($runtime->vmContext);
+        if (IntlExtensionPolicy::advertisesBuiltins()) {
+            BuiltinClasses::register($runtime->vmContext);
+        }
         foreach ([
             'GRAPHEME_EXTR_COUNT' => VmGrapheme::EXTR_COUNT,
             'GRAPHEME_EXTR_MAXBYTES' => VmGrapheme::EXTR_MAXBYTES,
