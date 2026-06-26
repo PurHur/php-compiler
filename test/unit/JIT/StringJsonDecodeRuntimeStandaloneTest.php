@@ -25,8 +25,12 @@ final class StringJsonDecodeRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_json_decode.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringJsonDecode.php');
+        $this->assertStringContainsString('JsonDecodeJitHelper', $runtime);
         $this->assertStringContainsString('StringJsonDecodeJit', $runtime);
+        $this->assertStringNotContainsString('StringJsonDecodeJit::implement', $runtime);
         $this->assertStringNotContainsString('phpc_json_decode.c', $runtime);
+        $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/JsonDecodeJitHelper.php');
+        $this->assertStringContainsString('VmJsonFormat::decode', $helper);
     }
 
     public function testJsonDecodeJitCompileTimeBoolUsesLlvmIsAConstantInt(): void
