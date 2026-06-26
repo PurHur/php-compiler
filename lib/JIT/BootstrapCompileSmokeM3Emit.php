@@ -365,6 +365,19 @@ final class BootstrapCompileSmokeM3Emit
     private static function shouldUseEmitTuRealLowering(Context $context): bool
     {
         unset($context);
+        $emitTu = getenv('PHP_COMPILER_M3_EMIT_TU');
+        if ('1' === $emitTu || 'true' === strtolower((string) $emitTu)) {
+            return true;
+        }
+        $inventoryEmit = getenv('PHP_COMPILER_M3_INVENTORY_EMIT');
+        if ('1' === $inventoryEmit || 'true' === strtolower((string) $inventoryEmit)) {
+            return true;
+        }
+        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if ('1' === $m3Driver || 'true' === strtolower((string) $m3Driver)) {
+            // Zend helloworld bin/compile.php inventory argv: thin ctor, stub spine (#12036).
+            return false;
+        }
 
         // Emit-helper binaries must init parse/compiler spine (#2633); env may be unset at runtime.
         return true;
