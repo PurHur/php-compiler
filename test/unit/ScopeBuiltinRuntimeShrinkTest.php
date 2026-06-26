@@ -23,7 +23,9 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactInvalidArgumentWarning', $source);
         $this->assertStringNotContainsString('snprintf', $source);
+        $this->assertStringNotContainsString('emitCompactInvalidArgumentWarningMessage', $source);
     }
 
     public function testScopeBuiltinJitHelperExists(): void
@@ -31,6 +33,8 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ScopeBuiltinJitHelper.php');
         $this->assertStringContainsString('compiler_language_warning', $source);
         $this->assertStringContainsString('compact(): Undefined variable', $source);
+        $this->assertStringContainsString('compactInvalidArgumentMessage', $source);
+        $this->assertStringContainsString('emitCompactInvalidArgumentWarning', $source);
     }
 
     public function testScopeBuiltinHelperShrunkAtLeastFiftyPercent(): void
