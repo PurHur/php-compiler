@@ -48,6 +48,7 @@ final class IniJitHelper
     ];
 
     private const READONLY_BOOL_DEFAULTS = [
+        'enable_dl' => false,
         'short_open_tag' => false,
         'register_argc_argv' => true,
         'zend.enable_gc' => true,
