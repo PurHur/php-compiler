@@ -365,6 +365,7 @@ require_once __DIR__.'/../../../ext/standard/CoreExtensionFunctions.php';
 require_once __DIR__.'/../../../ext/standard/CslashesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CsvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CyrConvertTables.php';
+require_once __DIR__.'/../../../ext/standard/DateConstants.php';
 require_once __DIR__.'/../../../ext/standard/DateIntervalFormatJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DateMutationJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/DefaultTimezoneJitHelper.php';
