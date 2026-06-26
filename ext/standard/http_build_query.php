@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -34,10 +35,8 @@ final class http_build_query extends Internal
             throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
         }
 
+        VmArray::requireArrayParam($frame->calledArgs[0], 'http_build_query', 1, 'data');
         $data = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $data->type) {
-            throw new \LogicException('http_build_query() argument #1 must be an array in this compiler build');
-        }
 
         $prefix = self::resolveOptionalStringArg($frame->calledArgs, 1, 'numeric_prefix', '');
         $separator = self::resolveOptionalSeparatorArg($frame->calledArgs);
@@ -120,6 +119,9 @@ final class http_build_query extends Internal
         if (\count($args) > 4) {
             throw new \LogicException('http_build_query() accepts at most four arguments in this compiler build');
         }
+
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'http_build_query', 1, 'data');
 
         $data = $args[0];
         $prefix = $this->optionalStringArg($context, $args, 1, '');
