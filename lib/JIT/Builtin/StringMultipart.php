@@ -56,13 +56,11 @@ final class StringMultipart
             return false;
         }
 
-        foreach (['PHP_COMPILER_SUPERGLOBAL_REFRESH_LLVM', 'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] as $key) {
-            $flag = getenv($key);
-            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
-                return true;
-            }
+        $phpBridge = getenv('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP');
+        if ('1' === $phpBridge || 'true' === strtolower((string) $phpBridge)) {
+            return false;
         }
 
-        return false;
+        return true;
     }
 }

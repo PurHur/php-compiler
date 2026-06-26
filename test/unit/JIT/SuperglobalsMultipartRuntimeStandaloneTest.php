@@ -51,11 +51,16 @@ final class SuperglobalsMultipartRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/superglobals_refresh.c');
     }
 
-    public function testDefaultStandaloneSkipsMultipartLlvmUnlessOptIn(): void
+    public function testDefaultStandaloneLinksMultipartLlvmWithRefresh(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringMultipart.php');
-        $this->assertStringContainsString('PHP_COMPILER_SUPERGLOBAL_REFRESH_LLVM', $source);
-        $this->assertStringContainsString('shouldLinkStandaloneLlvm', $source);
-        $this->assertStringContainsString('return false', $source);
+        $this->assertStringContainsString('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP', $source);
+        $this->assertStringContainsString('return true', $source);
+    }
+
+    public function testPhpBridgeOptInSkipsMultipartLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringMultipart.php');
+        $this->assertStringContainsString('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP', $source);
     }
 }
