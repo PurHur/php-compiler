@@ -240,4 +240,10 @@ final class CompilerVersion
     {
         return false;
     }
+
+    /** ext/bz2 not on Zend reference profile — withhold until real module parity (#11992). */
+    public static function supportsBz2(): bool
+    {
+        return false;
+    }
 }
