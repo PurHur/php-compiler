@@ -13,6 +13,10 @@ final class VmUnserializeFormat
 {
     private const DEFAULT_MAX_DEPTH = 4096;
 
+    private static ?int $lastErrorOffset = null;
+
+    private static ?int $lastPayloadLength = null;
+
     private int $pos = 0;
 
     private readonly int $length;
@@ -31,6 +35,8 @@ final class VmUnserializeFormat
      */
     public static function decodePayload(string $payload, ?array $options = null): mixed
     {
+        self::$lastErrorOffset = null;
+        self::$lastPayloadLength = null;
         if ('' === $payload) {
             return false;
         }
@@ -41,11 +47,33 @@ final class VmUnserializeFormat
 
         $parser = new self($payload, $maxDepth);
         $value = $parser->parseValue(0);
-        if (false === $value || $parser->pos !== $parser->length) {
+        if (false === $value) {
             return false;
+        }
+        if ($parser->pos !== $parser->length) {
+            return $parser->fail();
         }
 
         return $value;
+    }
+
+    public static function lastErrorOffset(): ?int
+    {
+        return self::$lastErrorOffset;
+    }
+
+    public static function lastPayloadLength(): ?int
+    {
+        return self::$lastPayloadLength;
+    }
+
+    /** @return false */
+    private function fail(): bool
+    {
+        self::$lastErrorOffset = $this->pos;
+        self::$lastPayloadLength = $this->length;
+
+        return false;
     }
 
     /**
@@ -54,7 +82,7 @@ final class VmUnserializeFormat
     private function parseValue(int $depth): mixed
     {
         if ($this->pos >= $this->length) {
-            return false;
+            return $this->fail();
         }
 
         $type = $this->payload[$this->pos];
@@ -65,7 +93,7 @@ final class VmUnserializeFormat
             'd' => $this->parseDouble(),
             's' => $this->parseString(),
             'a' => $this->parseArray($depth),
-            default => false,
+            default => $this->fail(),
         };
     }
 
@@ -73,7 +101,7 @@ final class VmUnserializeFormat
     private function parseNull(): mixed
     {
         if (!$this->expect('N;')) {
-            return false;
+            return $this->fail();
         }
 
         return null;
@@ -83,11 +111,11 @@ final class VmUnserializeFormat
     private function parseBool(): mixed
     {
         if (!$this->expect('b:')) {
-            return false;
+            return $this->fail();
         }
         $digit = $this->readDigit();
         if (null === $digit || !$this->expect(';')) {
-            return false;
+            return $this->fail();
         }
 
         return 1 === $digit;
@@ -97,11 +125,11 @@ final class VmUnserializeFormat
     private function parseInt(): mixed
     {
         if (!$this->expect('i:')) {
-            return false;
+            return $this->fail();
         }
         $number = $this->readSignedInteger();
         if (null === $number || !$this->expect(';')) {
-            return false;
+            return $this->fail();
         }
 
         return $number;
@@ -111,14 +139,14 @@ final class VmUnserializeFormat
     private function parseDouble(): mixed
     {
         if (!$this->expect('d:')) {
-            return false;
+            return $this->fail();
         }
         $start = $this->pos;
         while ($this->pos < $this->length && ';' !== $this->payload[$this->pos]) {
             ++$this->pos;
         }
         if ($this->pos >= $this->length) {
-            return false;
+            return $this->fail();
         }
         $literal = \substr($this->payload, $start, $this->pos - $start);
         ++$this->pos;
@@ -135,15 +163,15 @@ final class VmUnserializeFormat
     private function parseString(): mixed
     {
         if (!$this->expect('s:')) {
-            return false;
+            return $this->fail();
         }
         $len = $this->readUnsignedInteger();
         if (null === $len || !$this->expect(':"')) {
-            return false;
+            return $this->fail();
         }
         $content = $this->readStringContent($len);
         if (null === $content || !$this->expect('";')) {
-            return false;
+            return $this->fail();
         }
 
         return $content;
@@ -155,34 +183,34 @@ final class VmUnserializeFormat
     private function parseArray(int $depth): mixed
     {
         if ($depth >= $this->maxDepth) {
-            return false;
+            return $this->fail();
         }
         if (!$this->expect('a:')) {
-            return false;
+            return $this->fail();
         }
         $count = $this->readUnsignedInteger();
         if (null === $count || !$this->expect(':')) {
-            return false;
+            return $this->fail();
         }
         if (!$this->expect('{')) {
-            return false;
+            return $this->fail();
         }
 
         $array = [];
         for ($i = 0; $i < $count; ++$i) {
             $key = $this->parseArrayKey();
             if (false === $key && !\is_int($key) && !\is_string($key)) {
-                return false;
+                return $this->fail();
             }
             $before = $this->pos;
             $value = $this->parseValue($depth + 1);
             if ($this->pos <= $before) {
-                return false;
+                return $this->fail();
             }
             $array[$key] = $value;
         }
         if (!$this->expect('}')) {
-            return false;
+            return $this->fail();
         }
 
         return $array;
@@ -192,7 +220,7 @@ final class VmUnserializeFormat
     private function parseArrayKey(): mixed
     {
         if ($this->pos >= $this->length) {
-            return false;
+            return $this->fail();
         }
         if ('i' === $this->payload[$this->pos]) {
             return $this->parseInt();
@@ -201,17 +229,17 @@ final class VmUnserializeFormat
             return $this->parseString();
         }
 
-        return false;
+        return $this->fail();
     }
 
     private function expect(string $literal): bool
     {
         $len = \strlen($literal);
         if ($this->pos + $len > $this->length) {
-            return false;
+            return $this->fail();
         }
         if ($literal !== \substr($this->payload, $this->pos, $len)) {
-            return false;
+            return $this->fail();
         }
         $this->pos += $len;
 

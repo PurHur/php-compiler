@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -43,13 +44,15 @@ final class unserialize extends Internal
             }
             $options = self::extractUnserializeOptions($optionsVar);
         }
+        $payload = $payloadVar->toString();
         $decoded = VmSerialize::unserializePayload(
             $frame->vmContext,
-            $payloadVar->toString(),
+            $payload,
             $options,
             $frame
         );
         if (false === $decoded) {
+            self::emitParseFailureNotice($frame, $payload);
             $frame->returnVar->bool(false);
 
             return;
@@ -184,5 +187,25 @@ final class unserialize extends Internal
     private static function extractUnserializeOptions(Variable $optionsVar): array
     {
         return self::parseUnserializeOptionsArray($optionsVar);
+    }
+
+    /** php-src var_unserializer.c — E_NOTICE + error_get_last even when @-silenced (#9206). */
+    private static function emitParseFailureNotice(Frame $frame, string $payload): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $offset = VmUnserializeFormat::lastErrorOffset();
+        $length = VmUnserializeFormat::lastPayloadLength();
+        if (null === $offset || null === $length) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf('unserialize(): Error at offset %d of %d bytes', $offset, $length),
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
