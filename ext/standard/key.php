@@ -35,6 +35,12 @@ final class key extends Internal
             throw new \ArgumentCountError('key() expects exactly 1 argument, '.\count($args).' given');
         }
 
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'key', 1, 'array');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'key', $args[0])) {
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }

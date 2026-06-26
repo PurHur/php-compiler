@@ -85,7 +85,10 @@ final class ReferencableCheck
             if (
                 0 === $paramIdx
                 && self::allowsEphemeralArrayLiteralByRef($fn)
-                && self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                && (
+                    self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                    || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+                )
             ) {
                 continue;
             }
@@ -135,6 +138,15 @@ final class ReferencableCheck
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
         return \in_array(strtolower($fn), ['current', 'key'], true);
+    }
+
+    /** Operand is array or object — other types get TypeError in the builtin (#11984). */
+    private static function isArrayOrObjectOperand(Variable $arg): bool
+    {
+        $resolved = $arg->resolveIndirect();
+
+        return Variable::TYPE_ARRAY === $resolved->type
+            || Variable::TYPE_OBJECT === $resolved->type;
     }
 
     /** Inline array literal operand — not an lvalue, but allowed for read-only pointer builtins (#10654). */

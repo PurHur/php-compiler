@@ -14747,6 +14747,20 @@ class JIT {
                 ) {
                     continue;
                 }
+                if (
+                    0 === $idx
+                    && VM\ReferencableCheck::allowsEphemeralArrayLiteralByRef($name)
+                    && !self::jitArgIsArrayOrObject($args[$idx])
+                ) {
+                    ext\standard\JitArrayElem::requireArrayParam(
+                        $this->context,
+                        $args[$idx],
+                        $name,
+                        1,
+                        'array'
+                    );
+                    continue;
+                }
                 JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
 
                 continue;
@@ -14790,6 +14804,18 @@ class JIT {
         }
 
         return JIT\Variable::TYPE_VALUE === $arg->type;
+    }
+
+    private static function jitArgIsArrayOrObject(JIT\Variable $arg): bool
+    {
+        if (JIT\Variable::TYPE_HASHTABLE === $arg->type
+            || JIT\ArrayBuiltinHelper::isNativeArray($arg->type)
+            || JIT\Variable::TYPE_OBJECT === $arg->type
+        ) {
+            return true;
+        }
+
+        return false;
     }
 
     /**

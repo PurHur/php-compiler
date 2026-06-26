@@ -35,6 +35,12 @@ final class current extends Internal
             throw new \ArgumentCountError('current() expects exactly 1 argument, '.\count($args).' given');
         }
 
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            JitArrayElem::requireArrayParam($context, $args[0], 'current', 1, 'array');
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
+
         if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'current', $args[0])) {
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
