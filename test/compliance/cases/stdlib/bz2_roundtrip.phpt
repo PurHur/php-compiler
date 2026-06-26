@@ -2,6 +2,9 @@
 stdlib bzcompress/bzdecompress via VmBz2Native FFI without host ext-bz2 (#3402)
 --SKIPIF--
 <?php
+if (!\PHPCompiler\CompilerVersion::supportsBz2()) {
+    die('skip bz2 withheld on reference profile (#11992)');
+}
 if (!\PHPCompiler\ext\bz2\VmBz2Native::available()) {
     die('skip libbz2 not available');
 }
