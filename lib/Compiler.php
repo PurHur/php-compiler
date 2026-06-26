@@ -13770,6 +13770,21 @@ class Compiler {
                     }
                     break;
                 }
+                // call_user_func_array(C::class.'::ok', []) — Concat feeds arg #0, Array_ is arg #1 (#11694).
+                if ($prev instanceof Op\Expr\BinaryOp\Concat) {
+                    $feedsCallArg = false;
+                    if (property_exists($callOp, 'args') && is_array($callOp->args)) {
+                        foreach ($callOp->args as $callArg) {
+                            if ($this->operandsReferToSameVariable($prev->result, $callArg)) {
+                                $feedsCallArg = true;
+                                break;
+                            }
+                        }
+                    }
+                    if ($feedsCallArg) {
+                        array_unshift($producers, $prev);
+                    }
+                }
                 break;
             }
             array_unshift($producers, $child);
