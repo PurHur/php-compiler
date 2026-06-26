@@ -8865,36 +8865,7 @@ restart:
 
     private function catchTypesMatch(OpCode $op, Variable $thrown): bool
     {
-        $encoded = $op->catchTypes;
-        if (null === $encoded || '' === $encoded) {
-            return true;
-        }
-        $types = explode('|', $encoded);
-        if (Variable::TYPE_OBJECT !== $thrown->type) {
-            return false;
-        }
-        $class = $thrown->toObject()->class;
-        foreach ($types as $typeName) {
-            if ('' === $typeName) {
-                continue;
-            }
-            if ($this->objectIsInstanceOfClass($class, $typeName)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    private function objectIsInstanceOfClass(ClassEntry $class, string $typeName): bool
-    {
-        $want = strtolower(ltrim($typeName, '\\'));
-        $target = $this->context->classes[$want] ?? null;
-        if (null !== $target && $target->isInterface) {
-            return VM\InterfaceCheck::entryImplements($class, $want, $this->context);
-        }
-
-        return VM\InterfaceCheck::entryIsInstanceOf($class, $want, $this->context);
+        return VM\VmTryCatch::encodedTypesMatchOpcode($op, $thrown, $this->context);
     }
 
     private function valueInstanceOfClassName(Variable $value, string $className): bool
