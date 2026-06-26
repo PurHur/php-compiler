@@ -44,7 +44,7 @@ final class SessionStart
         $context->builder->branchIf($isActive, $bbActive, $bbStart);
 
         $context->builder->positionAtEnd($bbActive);
-        self::emitWriteBool($context, $outPtr, false);
+        self::emitWriteBool($context, $outPtr, true);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbStart);
