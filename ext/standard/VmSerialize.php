@@ -57,12 +57,11 @@ final class VmSerialize
             }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
-                $exported = VmJson::export($data->resolveIndirect());
-                if (!\is_array($exported)) {
+                if (Variable::TYPE_ARRAY !== $data->type) {
                     self::throwSerializeMustReturnArray($entry->class->name);
                 }
 
-                return self::encodeCustomObject($entry->class->name, $exported);
+                return self::encodeMagicSerializeObject($ctx, $entry, $data, null, $frame);
             }
             if (self::implementsLegacySerializable($entry->class)) {
                 $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
@@ -257,6 +256,137 @@ final class VmSerialize
         $len = \strlen($className);
 
         return 'O:'.$len.':"'.$className.'":'.\substr($inner, 2);
+    }
+
+    /**
+     * __serialize() wire encoding with object reference markers (php-src ext/standard/var.c, #11903).
+     */
+    private static function encodeMagicSerializeObject(
+        Context $ctx,
+        ObjectEntry $entry,
+        Variable $data,
+        ?VmSerializeRefState $state = null,
+        ?Frame $frame = null
+    ): string {
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->reserveRootSlot();
+        }
+
+        $body = '';
+        $count = 0;
+        foreach ($data->toArray()->iterateKeyed(true) as [$key, $value]) {
+            $body .= self::encodeWireKey($key);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $className = $entry->class->name;
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
+    }
+
+    private static function encodeWireKey(Variable $key): string
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_STRING === $key->type) {
+            return VmSerializeFormat::encodeStringLiteral($key->toString());
+        }
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return 'i:'.$key->toInt().';';
+        }
+
+        throw new \LogicException(
+            'serialize() only supports string or integer keys in this compiler build'
+        );
+    }
+
+    private static function encodeWireVariable(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        $value = $value->resolveIndirect();
+        $resourceWire = self::serializeResourceWire($value);
+        if (null !== $resourceWire) {
+            return $resourceWire;
+        }
+        $enumRef = self::enumCaseRefFromVariable($value);
+        if (null !== $enumRef) {
+            return self::encodeEnumCaseLiteral($enumRef->className, $enumRef->caseName);
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            return self::encodeWireObject($ctx, $value->toObject(), $state, $frame);
+        }
+        if (Variable::TYPE_ARRAY === $value->type) {
+            return self::encodeWireArray($ctx, $value, $state, $frame);
+        }
+
+        return VmSerializeFormat::encodeExported(VmJson::export($value, $ctx, $ctx->runtime->vm));
+    }
+
+    private static function encodeWireArray(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        $body = '';
+        $count = 0;
+        foreach ($value->toArray()->iterateKeyed(true) as [$key, $elem]) {
+            $body .= self::encodeWireKey($key);
+            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame);
+            ++$count;
+        }
+
+        return 'a:'.$count.':{'.$body.'}';
+    }
+
+    private static function encodeWireObject(
+        Context $ctx,
+        ObjectEntry $entry,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        if (0 === strcasecmp($entry->class->name, 'Closure')) {
+            throw new \Exception("Serialization of 'Closure' is not allowed");
+        }
+        $existing = $state->lookupObjectIndex($entry);
+        if (null !== $existing) {
+            return 'r:'.$existing.';';
+        }
+        $state->assignObjectIndex($entry);
+
+        $lcClass = strtolower($entry->class->name);
+        if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
+            return DateTimeSupport::encodeZendSerializeWire($entry);
+        }
+        if (DateIntervalSupport::CLASS_DATEINTERVAL === $lcClass) {
+            return DateIntervalSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
+            return SplArraySerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (self::hasInstanceMethod($entry->class, '__serialize')) {
+            $magicData = self::invokeSerialize($ctx, $entry);
+            if (Variable::TYPE_ARRAY !== $magicData->type) {
+                self::throwSerializeMustReturnArray($entry->class->name);
+            }
+
+            return self::encodeMagicSerializeObject($ctx, $entry, $magicData, $state, $frame);
+        }
+        if (self::implementsLegacySerializable($entry->class)) {
+            $payload = self::invokeLegacySerializableSerialize($ctx, $entry);
+
+            return self::encodeSerializableObject($entry->class->name, $payload);
+        }
+        if (self::hasInstanceMethod($entry->class, '__sleep')) {
+            return self::encodeSleepObject($ctx, $entry);
+        }
+
+        return self::encodePlainObject($ctx, $entry, $frame);
     }
 
     /** Zend Serializable custom object format: C:len:"Class":datalen:{payload} */
@@ -856,6 +986,46 @@ final class VmSerialize
     private static function throwSerializeMustReturnArray(string $className): never
     {
         throw new \TypeError($className.'::__serialize() must return an array');
+    }
+}
+
+/**
+ * Object reference indices for serialize() wire format (php-src var.c php_add_var_hash).
+ *
+ * Root __serialize O: occupies stream index 1; nested object refs start at 2 (#11903).
+ */
+final class VmSerializeRefState
+{
+    public int $nextIndex = 2;
+
+    /** @var \SplObjectStorage<ObjectEntry, int> */
+    public \SplObjectStorage $objectIndex;
+
+    public function __construct()
+    {
+        $this->objectIndex = new \SplObjectStorage();
+    }
+
+    public function reserveRootSlot(): void
+    {
+        $this->nextIndex = 2;
+    }
+
+    public function assignObjectIndex(ObjectEntry $object): int
+    {
+        $index = $this->nextIndex++;
+        $this->objectIndex[$object] = $index;
+
+        return $index;
+    }
+
+    public function lookupObjectIndex(ObjectEntry $object): ?int
+    {
+        if (!$this->objectIndex->contains($object)) {
+            return null;
+        }
+
+        return $this->objectIndex[$object];
     }
 }
 
