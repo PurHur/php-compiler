@@ -28,6 +28,16 @@ final class VmXml
         return $id;
     }
 
+    public static function parserFree(int $parser): bool
+    {
+        if (!isset(self::$parsers[$parser])) {
+            return false;
+        }
+        unset(self::$parsers[$parser]);
+
+        return true;
+    }
+
     public static function parse(
         Context $ctx,
         int $parser,
@@ -64,6 +74,10 @@ final class VmXml
         }
         if ('<' !== $trimmed[0]) {
             return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4);
+        }
+
+        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed)) {
+            return null;
         }
 
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/s', $trimmed, $matches)) {

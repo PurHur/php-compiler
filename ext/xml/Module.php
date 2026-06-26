@@ -25,6 +25,7 @@ class Module extends ModuleAbstract
         return [
             new xml_parser_create(),
             new xml_parse(),
+            new xml_parser_free(),
         ];
     }
 }
