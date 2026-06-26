@@ -124,6 +124,9 @@ class MagicStringResolver extends NodeVisitorAbstract
             if (! empty($this->classStack)) {
                 return new Node\Scalar\String_(end($this->classStack), $node->getAttributes());
             }
+
+            // Global scope — Zend resolves T_CLASS_C to '' (#11910, zend_compile.c).
+            return new Node\Scalar\String_('', $node->getAttributes());
         } elseif ($node instanceof Node\Scalar\MagicConst\Trait_) {
             if (! empty($this->traitStack)) {
                 return new Node\Scalar\String_(end($this->traitStack), $node->getAttributes());
