@@ -29,7 +29,7 @@ final class DateTimeImmutableConstruct extends VmClassMethod
             'DateTimeImmutable::__construct()'
         );
         $time = 'now';
-        if ($argc >= 2) {
+        if (isset($frame->calledArgs[1])) {
             InternalStrictArg::rejectNullString($frame->calledArgs[1], 'DateTimeImmutable::__construct', 'datetime', 0, $frame);
             $time = VmString::coerceStringBuiltinArg(
                 $frame->calledArgs[1],
@@ -39,7 +39,7 @@ final class DateTimeImmutableConstruct extends VmClassMethod
             );
         }
         $timezone = null;
-        if ($argc >= 3) {
+        if (isset($frame->calledArgs[2])) {
             $tzVar = $frame->calledArgs[2]->resolveIndirect();
             if (Variable::TYPE_NULL !== $tzVar->type) {
                 $timezone = DateTimeSupport::requireDateTimeZone(
