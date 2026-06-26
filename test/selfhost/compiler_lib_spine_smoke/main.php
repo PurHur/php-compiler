@@ -1179,6 +1179,7 @@ require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallbackArray.php';
 require_once __DIR__.'/../../../ext/standard/VmPrintR.php';
 require_once __DIR__.'/../../../ext/standard/VmPrintRFloat.php';
 require_once __DIR__.'/../../../ext/standard/VmProcNiceNative.php';
+require_once __DIR__.'/../../../ext/standard/VmProcNicePure.php';
 require_once __DIR__.'/../../../ext/standard/VmProcess.php';
 require_once __DIR__.'/../../../ext/standard/VmProcessExecCaptureNative.php';
 require_once __DIR__.'/../../../ext/standard/VmProcessIdentity.php';
