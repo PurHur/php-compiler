@@ -191,11 +191,7 @@ final class VmFs
      * @return HashTable|false
      */
     public static function fstat(int $handle) {
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        $raw = @fstat($fp);
+        $raw = VmStreamFstat::forHandle($handle);
         if (false === $raw) {
             return false;
         }
