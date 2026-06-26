@@ -304,16 +304,16 @@ class Context {
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_STRING);
-                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2I);
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2I);
 
                 return $var;
             case 'password_argon2id':
                 if (!\PHPCompiler\ext\standard\VmPasswordNative::argon2Available()) {
                     return null;
                 }
-                $var = new Variable(Variable::TYPE_STRING);
-                $var->string(\PHPCompiler\ext\standard\StdlibConstants::PASSWORD_ARGON2ID);
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::PASSWORD_ARGON2ID);
 
                 return $var;
             case 'crypt_std_des':
