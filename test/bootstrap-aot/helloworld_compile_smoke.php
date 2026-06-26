@@ -18,6 +18,7 @@ namespace PHPCompiler\BootstrapAot;
  */
 
 require_once __DIR__.'/runtime_ctor_smoke.php';
+require_once __DIR__.'/../../lib/AOT/phpc_run_command_polyfill.php';
 
 function helloworld_compile_smoke(string $sourceFile, string $outFile): int
 {
@@ -98,6 +99,9 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         return 1;
     }
     $block = $runtime->compile($script);
+    if (null !== $block) {
+        $block->setScriptPath($compilePath);
+    }
     if (null === $block) {
         $detail = \PHPCompiler\Runtime::getLastParseFailure();
         if (null === $detail || '' === $detail) {
@@ -130,6 +134,7 @@ function helloworld_compile_smoke(string $sourceFile, string $outFile): int
         // Inventory driver stubs Runtime::standalone (sidecar copy). Emit via compileToFile (#3036, #3052, #3053).
         $jit = $runtime->loadJit();
         $context = $runtime->loadJitContext();
+        $context->setAotSourceFilename($resolved);
         $context->setMain($jit->compile($block));
         $context->compileToFile($outFile);
     } else {

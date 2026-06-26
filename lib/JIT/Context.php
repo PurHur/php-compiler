@@ -1716,6 +1716,78 @@ class Context {
     }
 
     /**
+     * php-cfg may use distinct {@see Operand\Variable}/{@see Operand\Temporary} objects for one scope slot (#72, #12036).
+     */
+    private function aliasVariableOpByName(Operand $op): bool
+    {
+        $name = OperandName::resolve($op);
+        if (null === $name || '' === $name) {
+            return false;
+        }
+        $resolved = $this->resolveRefAliasName($name);
+        if (isset($this->namedVariableBindings[$resolved])) {
+            $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
+
+            return true;
+        }
+        // CLI globals imported via `global $argv` / `global $argc` on inventory argv spine (#12036).
+        if ('argv' === $name || 'argc' === $name) {
+            $global = $this->ensureScriptGlobal($name);
+            $alias = new Variable(
+                $this,
+                Variable::TYPE_VALUE,
+                Variable::KIND_VARIABLE,
+                JitValueBox::alloc($this)
+            );
+            $alias->valueBoxAliasPtr = JitValueBox::valuePtrFromVariable($this, $global);
+            $alias->functionStaticGlobal = true;
+            $this->bindVariableByName($name, $alias);
+            $this->scope->variables[$op] = $alias;
+
+            return true;
+        }
+        foreach ($this->scope->variables as $scopeOp) {
+            if ($name === OperandName::resolve($scopeOp)) {
+                $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                return true;
+            }
+        }
+        foreach ($this->scopeStack as $scope) {
+            foreach ($scope->variables as $scopeOp) {
+                if ($name === OperandName::resolve($scopeOp)) {
+                    $this->scope->variables[$op] = $scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+        $block = $this->jitCurrentBlock;
+        if (null !== $block) {
+            if ($block->declaresGlobalName($name)) {
+                $global = $this->ensureScriptGlobal($name);
+                $this->bindVariableByName($name, $global);
+                $this->scope->variables[$op] = $global;
+
+                return true;
+            }
+            $slot = $block->slotForOperand($op);
+            if (null !== $slot) {
+                foreach ($block->scopedOperands() as $scopeOp) {
+                    if ($block->slotForOperand($scopeOp) !== $slot || !$this->scope->variables->contains($scopeOp)) {
+                        continue;
+                    }
+                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
+
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg may use distinct {@see Operand\Temporary} objects for one scope slot (#72).
      */
     public function aliasVariableOpFromSlot(Block $block, Operand $op): bool
@@ -1723,21 +1795,8 @@ class Context {
         if ($this->scope->variables->contains($op)) {
             return true;
         }
-        $name = OperandName::resolve($op);
-        if (null !== $name && '' !== $name) {
-            $resolved = $this->resolveRefAliasName($name);
-            if (isset($this->namedVariableBindings[$resolved])) {
-                $this->scope->variables[$op] = $this->namedVariableBindings[$resolved];
-
-                return true;
-            }
-            foreach ($this->scope->variables as $scopeOp) {
-                if ($name === OperandName::resolve($scopeOp)) {
-                    $this->scope->variables[$op] = $this->scope->variables[$scopeOp];
-
-                    return true;
-                }
-            }
+        if ($this->aliasVariableOpByName($op)) {
+            return true;
         }
         $slot = $block->slotForOperand($op);
         if (null === $slot) {
@@ -1866,6 +1925,8 @@ class Context {
                     Variable::KIND_VARIABLE,
                     $slot
                 );
+            } elseif ($op instanceof Operand\Variable && $this->aliasVariableOpByName($op)) {
+                // Distinct Variable operand for an already-allocated scope slot (#12036 inventory argv).
             } else {
                 throw new \LogicException("Unknown variable referenced: " . get_class($op));
             }

@@ -1528,6 +1528,17 @@ final class HashTableHelper
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_NATIVE_BOOL:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setObjectKeyLong'),
+                    $ht,
+                    $keyObj,
+                    $context->builder->zext(
+                        $context->helper->loadValue($element),
+                        $context->getTypeFromString('int64')
+                    )
+                );
+                break;
             case Variable::TYPE_OBJECT:
                 $context->builder->call(
                     $context->lookupFunction('__hashtable__setObjectKeyObject'),

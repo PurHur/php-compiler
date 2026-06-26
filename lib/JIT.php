@@ -133,6 +133,24 @@ class JIT {
             && (null !== $this->m3EmitTuMainBlock || null !== $this->m3CompileDriverMainBlock)
         ) {
             $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+            if ($this->shouldEnsureInventoryArgvParseHelperStubs()) {
+                $this->ensureM3EmitTuRuntimeParseSpineDeps();
+                $inventoryArgvStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+                if (null !== $inventoryArgvStubBlock) {
+                    $this->ensureM3EmitTuRuntimeParseAndCompileDeclBeforeQueue(
+                        ['parseandcompile' => true, 'parseandcompileemitsmoke' => true],
+                        $inventoryArgvStubBlock
+                    );
+                    $standaloneLc = strtolower('PHPCompiler\\Runtime::standalone');
+                    if (!isset($this->context->functions[$standaloneLc])) {
+                        $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                            $this->llvmInternalName('PHPCompiler\\Runtime::standalone'),
+                            'PHPCompiler\\Runtime::standalone',
+                            $inventoryArgvStubBlock
+                        );
+                    }
+                }
+            }
         }
         $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if (null !== $emitHelperStubBlock && ($this->shouldStubInventoryEmitHelperBundledBodies() || $this->shouldRealLowerInventoryArgvParseSpine())) {
@@ -186,7 +204,9 @@ class JIT {
         ) {
             $this->filterM4InventoryArgvMainFromQueue();
         }
-        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild($block)) {
+        $inventoryArgvStubOnly = $this->shouldEnsureInventoryArgvParseHelperStubs()
+            && !$this->shouldRealLowerInventoryArgvParseSpine();
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild($block) && !$inventoryArgvStubOnly) {
             $this->runQueue();
         }
         JIT\Progress::noteFunction('jit_compile_run_queue_done');
@@ -988,6 +1008,21 @@ class JIT {
     private function shouldRealLowerInventoryArgvParseSpine(): bool
     {
         return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
+    }
+
+    /** Register Runtime parse-diagnostic LLVM stubs for helloworld bin/compile.php inventory argv (#12036). */
+    private function shouldEnsureInventoryArgvParseHelperStubs(): bool
+    {
+        if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+            return true;
+        }
+        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if ('1' !== $m3Driver && 'true' !== strtolower((string) $m3Driver)) {
+            return false;
+        }
+        $main = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+
+        return null !== $main && $this->isM4BinCompileScriptMain($main);
     }
 
     /**
@@ -3694,14 +3729,18 @@ class JIT {
                 $this->compileM3EmitTuRuntimeSpineDecls($this->m3CompileDriverMainBlock);
                 $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
                 $inventoryEmit = $this->shouldUseM3InventoryEmitForCompileDriverBlock($block);
-                foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
-                    if ('standalone' === $methodLc && ($sidecar || $inventoryEmit)) {
-                        continue;
+                $inventoryArgvParseHelper = $this->shouldEnsureInventoryArgvParseHelperStubs()
+                    && !$this->shouldRealLowerInventoryArgvParseSpine();
+                if (!$inventoryArgvParseHelper) {
+                    foreach (['parse', 'compileemitsmoke', 'standalone'] as $methodLc) {
+                        if ('standalone' === $methodLc && ($sidecar || $inventoryEmit)) {
+                            continue;
+                        }
+                        $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
                     }
-                    $this->compileM3EmitTuRuntimeMethodFromQueue($methodLc);
-                }
-                if (!$m4BinCompileArgv) {
-                    $this->runQueue();
+                    if (!$m4BinCompileArgv) {
+                        $this->runQueue();
+                    }
                 }
             }
             if (null !== $this->m3CompileDriverMainBlock) {
@@ -3754,6 +3793,27 @@ class JIT {
         }
         $stubBlock = $emitTu ? $this->m3EmitTuMainBlock : $compileDriverStubBlock;
         if ($this->shouldUseM3CompileDriverRealLowering() || $inventoryArgvCompileDriver) {
+            $inventoryArgvParseHelper = $this->shouldEnsureInventoryArgvParseHelperStubs()
+                && !$this->shouldRealLowerInventoryArgvParseSpine();
+            if ($inventoryArgvParseHelper) {
+                $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+                $this->ensureM3EmitTuRuntimeParseSpineDeps();
+                if (null !== $stubBlock) {
+                    $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
+                    $this->ensureM3EmitTuEmitBridgeSpineSymbols();
+                    $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                        $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                        'PHPCompiler\\Runtime::__construct',
+                        $stubBlock
+                    );
+                }
+                $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
+                    'parseandcompile' => true,
+                    'parseandcompileemitsmoke' => true,
+                ]);
+
+                return;
+            }
             $sidecar = $emitTu && $this->isM3EmitTuTrivialEchoSidecarActive();
             $this->compileM3EmitTuRuntimeSpineMethodsForRealLowering();
             foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules', 'parseandcompileemitsmoke', 'standalone'] as $methodLc) {
@@ -3892,6 +3952,7 @@ class JIT {
             !$this->shouldUseM3EmitTuNativeBridge()
             && !$this->shouldUseM3InventoryEmitDriver()
             && !$this->shouldUseM4BinCompileArgvMainNative()
+            && !$this->shouldEnsureInventoryArgvParseHelperStubs()
         ) {
             return;
         }
@@ -3901,6 +3962,9 @@ class JIT {
         $this->context->scope->classId = $this->context->type->object->lookup('PHPCompiler\\Runtime');
         $this->context->scope->className = 'phpcompiler\\runtime';
         $forceRealParseSpine = $this->shouldRealLowerInventoryArgvParseSpine();
+        $inventoryArgvParseHelper = $this->shouldEnsureInventoryArgvParseHelperStubs()
+            && !$forceRealParseSpine;
+        $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock;
         if ($forceRealParseSpine) {
             // Inventory argv Zend rebuild keeps preprocess CFG stubs; only parse/emit spine is real (#11809).
             $forceRealUnset = $this->shouldUseM3InventoryEmitDriver()
@@ -3915,7 +3979,7 @@ class JIT {
                 );
             }
         }
-        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild() && !$inventoryArgvParseHelper) {
             $spineCompileList = $this->shouldUseM3InventoryEmitDriver()
                 ? ['parse', 'compileemitsmoke']
                 : [
@@ -3936,10 +4000,26 @@ class JIT {
                 }
             }
         }
-        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild()) {
+        if ($inventoryArgvParseHelper) {
+            $this->ensureM3EmitTuRuntimeParseAndCompileDeclBeforeQueue($methods, $stubBlock);
+        }
+        if (!$this->shouldUseM4InventoryArgvNativeEmitRebuild() && !$inventoryArgvParseHelper) {
             $this->runQueue();
         }
-        $stubBlock = $this->m3EmitTuMainBlock ?? $this->m3CompileDriverMainBlock;
+        if (!$inventoryArgvParseHelper) {
+            $this->ensureM3EmitTuRuntimeParseAndCompileDeclBeforeQueue($methods, $stubBlock);
+        }
+        $this->context->scope->classId = $savedClassId;
+        $this->context->scope->className = $savedClassName;
+    }
+
+    /**
+     * Register parse/compileEmitSmoke stubs and parseAndCompile* decls for inventory argv (#12036).
+     *
+     * @param array<string, true> $methods
+     */
+    private function ensureM3EmitTuRuntimeParseAndCompileDeclBeforeQueue(array $methods, ?Block $stubBlock): void
+    {
         foreach (['parse', 'compileemitsmoke'] as $spineLc) {
             $spineLogical = 'PHPCompiler\\Runtime::'.$spineLc;
             $spineLcKey = strtolower($spineLogical);
@@ -3975,8 +4055,6 @@ class JIT {
                 $methodLc
             );
         }
-        $this->context->scope->classId = $savedClassId;
-        $this->context->scope->className = $savedClassName;
     }
 
     /**
@@ -3987,6 +4065,11 @@ class JIT {
      */
     private function compileM3EmitTuRuntimeSpineMethodsForRealLowering(): void
     {
+        if ($this->shouldEnsureInventoryArgvParseHelperStubs()
+            && !$this->shouldRealLowerInventoryArgvParseSpine()
+        ) {
+            return;
+        }
         $sidecar = $this->isM3EmitTuTrivialEchoSidecarActive();
         if (!$this->shouldUseM3CompileDriverRealLowering()) {
             return;
@@ -4279,10 +4362,45 @@ class JIT {
         return $func;
     }
 
+    /** void(Runtime $this, ?Script $script) — inventory argv parse-null recorder (#12036). */
+    private function emitM3EmitTuRuntimeTwoObjectVoidStub(
+        string $internalName,
+        string $logicalName,
+        ?Block $block
+    ): PHPLLVM\Value {
+        $lcname = strtolower($logicalName);
+        if (isset($this->context->functions[$lcname])) {
+            return $this->context->functions[$lcname];
+        }
+        $objectPtr = $this->context->getTypeFromString('__object__*');
+        $voidTy = $this->context->getTypeFromString('void');
+        $func = $this->context->module->addFunction(
+            $internalName,
+            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
+        );
+        $bb = $func->appendBasicBlock('entry');
+        $saved = $this->context->builder;
+        $this->context->builder = $this->context->context->builderCreate();
+        $this->context->builder->positionAtEnd($bb);
+        $this->context->builder->returnVoid();
+        $this->context->builder->clearInsertionPosition();
+        $this->context->builder = $saved;
+        $this->context->functions[$lcname] = $func;
+        $this->context->functionReturnType[$lcname] = 'void';
+        $this->context->functionProxies[$lcname] = new JIT\Call\Native(
+            $func,
+            $logicalName,
+            [$objectPtr, $objectPtr],
+            null !== $block ? $this->collectParamDefaults($block) : []
+        );
+
+        return $func;
+    }
+
     /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
     private function ensureM3EmitTuRuntimeParseSpineDeps(): void
     {
-        if (!$this->shouldRealLowerInventoryArgvParseSpine()) {
+        if (!$this->shouldEnsureInventoryArgvParseHelperStubs()) {
             return;
         }
         $this->ensureM3EmitTuRuntimeInventoryArgvParsePreprocessStubs();
@@ -4298,6 +4416,8 @@ class JIT {
             'recordlastparsefailure',
             'formatphpparsererrorcontext',
             'emitparsecompilefailurestderr',
+            'setdebug',
+            'setaotdebugsymbols',
         ] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
@@ -4441,6 +4561,42 @@ class JIT {
      */
     private function ensureM3EmitTuRuntimeInitSpineSymbols(Block $stubBlock): void
     {
+        if ($this->shouldEnsureInventoryArgvParseHelperStubs()
+            && !$this->shouldRealLowerInventoryArgvParseSpine()
+        ) {
+            foreach (['initparsepipeline', 'initcompiler', 'initvmcontext', 'loadcoremodules'] as $methodLc) {
+                $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+                $lc = strtolower($logical);
+                if (isset($this->context->functions[$lc])) {
+                    continue;
+                }
+                $this->emitM3EmitTuRuntimeInitVoidStub(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+            $noteLogical = 'PHPCompiler\\Runtime::noteparsecompilenullforscript';
+            $noteLc = strtolower($noteLogical);
+            if (!isset($this->context->functions[$noteLc])) {
+                $this->emitM3EmitTuRuntimeTwoObjectVoidStub(
+                    $this->llvmInternalName($noteLogical),
+                    $noteLogical,
+                    $stubBlock
+                );
+            }
+            $peekLogical = 'PHPCompiler\\Runtime::peeklastparsefailure';
+            $peekLc = strtolower($peekLogical);
+            if (!isset($this->context->functions[$peekLc])) {
+                $this->emitM3EmitTuCompilerNullStringGetterStub(
+                    $this->llvmInternalName($peekLogical),
+                    $peekLogical,
+                    $stubBlock
+                );
+            }
+
+            return;
+        }
         foreach (['initparsepipeline', 'loadcoremodules'] as $methodLc) {
             $logical = 'PHPCompiler\\Runtime::'.$methodLc;
             $lc = strtolower($logical);
@@ -5698,6 +5854,7 @@ class JIT {
             !$this->shouldUseM3EmitTuNativeBridge()
             && !$this->shouldUseM3InventoryEmitDriver()
             && !$this->shouldUseM4BinCompileArgvMainNative()
+            && !$this->shouldEnsureInventoryArgvParseHelperStubs()
         ) {
             return;
         }
@@ -6936,10 +7093,16 @@ class JIT {
                     $globalName = $block->constants[$op->arg2]->toString();
                     $globalVar = $this->ensureJitGlobal($globalName);
                     $this->context->bindVariableByName($globalName, $globalVar);
-                    $this->context->setVariableOp(
-                        $block->getOperand($op->arg1),
-                        $globalVar
-                    );
+                    $destOp = $block->getOperand($op->arg1);
+                    $this->context->setVariableOp($destOp, $globalVar);
+                    $globalSlot = $block->slotForOperand($destOp);
+                    if (null !== $globalSlot) {
+                        foreach ($block->scopedOperands() as $scopeOp) {
+                            if ($block->slotForOperand($scopeOp) === $globalSlot) {
+                                $this->context->setVariableOp($scopeOp, $globalVar);
+                            }
+                        }
+                    }
                     break;
                 case OpCode::TYPE_DECLARE_FUNCTION_STATIC:
                     if (!isset($block->constants[$op->arg2])) {
@@ -11544,7 +11707,10 @@ class JIT {
         if (
             $force
             && Variable::KIND_VALUE === $result->kind
-            && Variable::TYPE_STRING !== $result->type
+            && (
+                Variable::TYPE_STRING !== $result->type
+                || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+            )
             && !$value->isJitGenerator
             && null === $result->objectPropertySlot
             && !$result->functionStaticGlobal
@@ -11564,12 +11730,14 @@ class JIT {
             $result = $this->context->getVariableFromOp($resultOp);
         }
         if (
-            !$force
-            && $resultOp instanceof \PHPCfg\Operand\Temporary
+            ($resultOp instanceof \PHPCfg\Operand\Temporary || $resultOp instanceof \PHPCfg\Operand\Literal)
             && Variable::KIND_VALUE === $result->kind
-            && Variable::TYPE_STRING !== $result->type
+            && (
+                Variable::TYPE_STRING !== $result->type
+                || !JIT\StringOffsetHelper::isWritableCharOffsetLvalue($result, $this->context)
+            )
         ) {
-            // Temporaries can start life as rvalues; promote to a boxed stack slot on first assignment.
+            // Temporaries/literals can start life as rvalues; promote to a boxed stack slot on first assignment.
             $slot = JIT\JitValueBox::alloc($this->context);
             $this->context->setVariableOp(
                 $resultOp,
@@ -13806,12 +13974,15 @@ class JIT {
             if (
                 'getfile' === $methodLc
                 && str_starts_with($declaringClassLc, 'phpcompiler\\')
-                && $this->shouldUseM3InventoryEmitDriver()
+                && ($this->shouldUseM3InventoryEmitDriver() || $this->shouldEnsureInventoryArgvParseHelperStubs())
             ) {
                 // $script->main->getFile() temps lose PHPCfg userType on inventory argv spine (#11809).
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('phpcfg\\func::getfile');
                 $this->context->scope->args = [$receiverVar];
 
+                return;
+            }
+            if ($this->tryInitInventoryArgvRuntimeParseHelperCall($methodLc, $dispatchReceiver)) {
                 return;
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
@@ -13868,6 +14039,74 @@ class JIT {
         }
         $this->context->scope->toCall = $staticProxy;
         $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
+    }
+
+    /** Lazily register Runtime inventory-argv stubs on helloworld bin/compile.php (#12036). */
+    private function tryInitInventoryArgvRuntimeParseHelperCall(
+        string $methodLc,
+        Variable $dispatchReceiver
+    ): bool {
+        if (!$this->shouldEnsureInventoryArgvParseHelperStubs()) {
+            return false;
+        }
+        $stubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+        if ('standalone' === $methodLc && null !== $stubBlock) {
+            $logical = 'PHPCompiler\\Runtime::standalone';
+            $lc = strtolower($logical);
+            if (!$this->context->functionIsRegistered($lc)) {
+                $this->emitM3EmitTuRuntimeStandaloneStubNative(
+                    $this->llvmInternalName($logical),
+                    $logical,
+                    $stubBlock
+                );
+            }
+            if ($this->context->functionIsRegistered($lc)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($lc);
+                $this->context->scope->args = [$dispatchReceiver];
+
+                return true;
+            }
+        }
+        if (('parseandcompile' === $methodLc || 'parseandcompileemitsmoke' === $methodLc) && null !== $stubBlock) {
+            $this->ensureM3EmitTuRuntimeParseAndCompileDeclBeforeQueue(
+                ['parseandcompile' => true, 'parseandcompileemitsmoke' => true],
+                $stubBlock
+            );
+            $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+            $lc = strtolower($logical);
+            if ($this->context->functionIsRegistered($lc)) {
+                $this->context->scope->toCall = $this->context->resolveFunctionProxy($lc);
+                $this->context->scope->args = [$dispatchReceiver];
+
+                return true;
+            }
+        }
+        static $allowed = [
+            'detectfilestricttypes' => true,
+            'resetparsernameresolverstate' => true,
+            'formatparseandcompilenulldetail' => true,
+            'emitparseandcompilenulldiagnostic' => true,
+            'recordlastparsefailure' => true,
+            'formatphpparsererrorcontext' => true,
+            'emitparsecompilefailurestderr' => true,
+            'setdebug' => true,
+            'setaotdebugsymbols' => true,
+        ];
+        if (!isset($allowed[$methodLc])) {
+            return false;
+        }
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+        $lc = strtolower($logical);
+        if (!$this->context->functionIsRegistered($lc)) {
+            $this->ensureM3EmitTuRuntimeParseSpineDeps();
+        }
+        if (!$this->context->functionIsRegistered($lc)) {
+            return false;
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lc);
+        $this->context->scope->args = [$dispatchReceiver];
+
+        return true;
     }
 
     /**
