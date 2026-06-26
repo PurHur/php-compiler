@@ -38,6 +38,16 @@ final class VmReflection
     }
 
     /**
+     * Strip leading backslash on global names for introspection builtins (#12176).
+     *
+     * php-src: ext/standard/basic_functions.c — php_stripcslashes / name normalization
+     */
+    public static function normalizeGlobalIntrospectionName(string $name): string
+    {
+        return ltrim($name, '\\');
+    }
+
+    /**
      * Coerce a string parameter for VM builtins / internal methods (php-src Z_PARAM_STR, #7163).
      *
      * @param int $calledArgsIndex index in Frame::calledArgs for Zend-shaped Argument #N
@@ -58,7 +68,7 @@ final class VmReflection
 
     public static function resolveClassEntry(Context $ctx, string $className): ?ClassEntry
     {
-        $lc = strtolower($className);
+        $lc = strtolower(self::normalizeGlobalIntrospectionName($className));
 
         return $ctx->classes[$lc] ?? null;
     }
@@ -72,7 +82,7 @@ final class VmReflection
 
     public static function enumExists(Context $ctx, string $enumName): bool
     {
-        return isset($ctx->enums[strtolower($enumName)]);
+        return isset($ctx->enums[strtolower(self::normalizeGlobalIntrospectionName($enumName))]);
     }
 
     /**
@@ -303,7 +313,7 @@ final class VmReflection
 
     public static function functionExists(Context $ctx, string $functionName): bool
     {
-        return isset($ctx->functions[strtolower($functionName)]);
+        return isset($ctx->functions[strtolower(self::normalizeGlobalIntrospectionName($functionName))]);
     }
 
     /**

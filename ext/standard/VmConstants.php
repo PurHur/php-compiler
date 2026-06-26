@@ -40,7 +40,7 @@ final class VmConstants
             return self::isClassConstantDefined($ctx, $name);
         }
 
-        return $ctx->constantDefinedBuiltin($name);
+        return $ctx->constantDefinedBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 
     /**

@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\DefineRuntime;
+use PHPCompiler\JIT\Builtin\GlobalIntrospectionNameRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -30,6 +31,7 @@ final class defined_ extends Internal
             throw new \LogicException('defined() requires VM context');
         }
         $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'defined', 0, 'constant_name');
+        $name = VmReflection::normalizeGlobalIntrospectionName($name);
         $defined = VmConstants::constantDefined($frame->vmContext, $name);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($defined);
@@ -46,6 +48,7 @@ final class defined_ extends Internal
         }
         $literal = JitStringArg::compileTimeLiteral($args[0]);
         if (null !== $literal) {
+            $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
             if (null !== $context->runtime->vmContext
                 && VmConstants::constantDefined($context->runtime->vmContext, $literal)) {
                 $i1 = $context->getTypeFromString('int1');
@@ -57,6 +60,7 @@ final class defined_ extends Internal
             return DefineRuntime::emitDefined($context, $nameStr);
         }
         $nameStr = $context->helper->loadValue($args[0]);
+        $nameStr = GlobalIntrospectionNameRuntime::normalizeString($context, $nameStr);
 
         return DefineRuntime::emitDefined($context, $nameStr);
     }

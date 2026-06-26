@@ -15,6 +15,6 @@ final class FunctionExistsJitHelper
 {
     public static function builtinExists(string $name): bool
     {
-        return null !== BuiltinRegistry::resolve($name);
+        return null !== BuiltinRegistry::resolve(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 }
