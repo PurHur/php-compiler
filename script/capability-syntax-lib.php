@@ -600,7 +600,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
                 'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
-                'PHP 8.5 errata: arrow-fn RHS must be parenthesized — $lhs |> (fn($p) => expr) (#7219, php-src #19533)',
+                'Arrow-fn RHS: $lhs |> fn($p) => expr and parenthesized form (#7219, #11858)',
                 'Chained pipes and parenthesized-callable LHS (#6705, #7219)',
                 'Zend/zend_compile.c pipe expression; requires first-class callable (#1363)',
             ],

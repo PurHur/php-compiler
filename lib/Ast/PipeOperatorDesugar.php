@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
-use PhpParser\Error as ParserError;
-
 /**
  * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243, #7219).
  *
@@ -16,9 +14,6 @@ final class PipeOperatorDesugar
 {
     /** Pipe binds tighter than comparison (php.net operator precedence). */
     private const PREC_LHS_STOP = 18;
-
-    /** PHP 8.5 errata: arrow functions on pipe RHS must be parenthesized (php-src #19533). */
-    private const ARROW_FN_PAREN_MESSAGE = 'Arrow functions on the right-hand side of the pipe operator must be parenthesized';
 
     public static function desugar(string $code): string
     {
@@ -262,11 +257,24 @@ final class PipeOperatorDesugar
         }
 
         if (isset($tokens[$startIdx]) && \is_array($tokens[$startIdx]) && \T_FN === $tokens[$startIdx][0]) {
-            $line = $tokens[$startIdx][2] ?? 1;
-            throw new ParserError(self::ARROW_FN_PAREN_MESSAGE, [
-                'startLine' => $line,
-                'endLine' => $line,
-            ]);
+            $endIdx = self::scanArrowFunctionForward($tokens, $startIdx);
+            if (null === $endIdx) {
+                return null;
+            }
+            $endIdx = self::extendWithTrailingEmptyInvoke($tokens, $endIdx);
+
+            $start = self::tokenByteOffset($tokens, $startIdx);
+            $end = self::tokenByteEnd($tokens, $endIdx);
+            if (null === $start || null === $end) {
+                return null;
+            }
+
+            return [
+                'start' => $start,
+                'end' => $end,
+                'endIdx' => $endIdx,
+                'text' => trim(substr($code, $start, $end - $start)),
+            ];
         }
 
         $endIdx = self::scanCallLikeForward($tokens, $startIdx);
@@ -637,6 +645,37 @@ final class PipeOperatorDesugar
         }
     }
 
+    /**
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function extendWithTrailingEmptyInvoke(array $tokens, int $endIdx): int
+    {
+        $invokeStart = $endIdx + 1;
+        while ($invokeStart < \count($tokens) && self::isIgnorable($tokens[$invokeStart])) {
+            ++$invokeStart;
+        }
+        if ($invokeStart >= \count($tokens) || !\is_string($tokens[$invokeStart]) || '(' !== $tokens[$invokeStart]) {
+            return $endIdx;
+        }
+
+        $invokeDepth = 0;
+        for ($j = $invokeStart; $j < \count($tokens); ++$j) {
+            $it = $tokens[$j];
+            if (\is_string($it) && '(' === $it) {
+                ++$invokeDepth;
+            } elseif (\is_string($it) && ')' === $it) {
+                --$invokeDepth;
+                if (0 === $invokeDepth) {
+                    return $j;
+                }
+            } elseif (\is_array($it) && \T_CURLY_OPEN === $it[0]) {
+                ++$invokeDepth;
+            }
+        }
+
+        return $endIdx;
+    }
+
     private static function rewritePipe(string $lhs, string $rhs): string
     {
         $trimmed = ltrim($rhs);
@@ -648,6 +687,15 @@ final class PipeOperatorDesugar
             }
 
             return $callable.'('.$lhs.')';
+        }
+
+        if (preg_match('/^fn\s*\(/s', $trimmed)) {
+            $callable = rtrim($rhs);
+            if (preg_match('/\(\s*\)$/', $callable)) {
+                $callable = preg_replace('/\(\s*\)$/', '', $callable);
+            }
+
+            return '('.$callable.')('.$lhs.')';
         }
 
         $open = strpos($rhs, '(');

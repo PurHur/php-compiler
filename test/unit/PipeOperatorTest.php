@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Ast\PipeOperatorDesugar;
-use PhpParser\Error as ParserError;
 use PHPUnit\Framework\TestCase;
 
 /** PHP 8.4+ pipe operator (|>) VM desugar (#3243, #7219). */
@@ -32,11 +31,42 @@ PHP;
         );
     }
 
-    public function testUnparenthesizedArrowFunctionRhsIsParseError(): void
+    public function testUnparenthesizedArrowFunctionRhsDesugarsAndRuns(): void
     {
-        $this->expectException(ParserError::class);
-        $this->expectExceptionMessage('Arrow functions on the right-hand side of the pipe operator must be parenthesized');
-        PipeOperatorDesugar::desugar('<?php echo 1 |> fn($x) => $x;');
+        $this->assertSame(
+            '<?php echo (fn($x) => $x * 2)(5);',
+            PipeOperatorDesugar::desugar('<?php echo 5 |> fn($x) => $x * 2;')
+        );
+
+        $code = <<<'PHP'
+<?php
+$x = 5 |> fn($v) => $v * 2;
+var_export($x);
+echo "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("10\n", ob_get_clean());
+    }
+
+    public function testUnparenthesizedChainedArrowFunctionPipe(): void
+    {
+        $this->assertSame(
+            '<?php echo (fn($x) => (fn($x) => $x * 2)($x + 1))(3), "\n";',
+            PipeOperatorDesugar::desugar('<?php echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";')
+        );
+
+        $code = <<<'PHP'
+<?php
+echo 3 |> fn($x) => $x + 1 |> fn($x) => $x * 2, "\n";
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("8\n", ob_get_clean());
     }
     public function testVmPipeWithFirstClassCallable(): void
     {
