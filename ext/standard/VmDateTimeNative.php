@@ -104,6 +104,58 @@ final class VmDateTimeNative
         return $copy;
     }
 
+    /**
+     * timezone_name_from_abbr() — timelib abbr_search + fallbackmap (ext/date/php_date.c, #10957).
+     *
+     * @return string|false
+     */
+    public static function timezoneNameFromAbbr(string $abbr, int $gmtoffset = -1, int $isdst = -1): string|false
+    {
+        if (0 === strcasecmp($abbr, 'utc') || 0 === strcasecmp($abbr, 'gmt')) {
+            return 'UTC';
+        }
+
+        /** @var array<string, list<array{dst: bool, offset: int, timezone_id: ?string}>> $data */
+        $data = require __DIR__.'/TimezoneAbbreviationsData.php';
+        $key = strtolower($abbr);
+
+        if (isset($data[$key])) {
+            $firstFound = null;
+            foreach ($data[$key] as $entry) {
+                $timezoneId = $entry['timezone_id'] ?? null;
+                if (!\is_string($timezoneId) || '' === $timezoneId) {
+                    continue;
+                }
+                if (null === $firstFound) {
+                    $firstFound = $timezoneId;
+                    if (-1 === $gmtoffset) {
+                        return $timezoneId;
+                    }
+                }
+                if ($entry['offset'] === $gmtoffset) {
+                    return $timezoneId;
+                }
+            }
+            if (null !== $firstFound) {
+                return $firstFound;
+            }
+        }
+
+        if (-1 === $gmtoffset || -1 === $isdst) {
+            return false;
+        }
+
+        /** @var list<array{dst: int, offset: int, timezone_id: string}> $fallback */
+        $fallback = require __DIR__.'/TimezoneFallbackData.php';
+        foreach ($fallback as $entry) {
+            if ($entry['offset'] === $gmtoffset && $entry['dst'] === $isdst) {
+                return $entry['timezone_id'];
+            }
+        }
+
+        return false;
+    }
+
     public static function validateTimezoneId(string $timezone): string
     {
         $timezone = trim($timezone);
