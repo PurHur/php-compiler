@@ -24,7 +24,7 @@ class Module extends ModuleAbstract
             'LIBXML_ERR_WARNING' => LibxmlConstants::LIBXML_ERR_WARNING,
             'LIBXML_ERR_ERROR' => LibxmlConstants::LIBXML_ERR_ERROR,
             'LIBXML_ERR_FATAL' => LibxmlConstants::LIBXML_ERR_FATAL,
-        ] as $name => $value) {
+        ] + LibxmlConstants::parseFlagConstants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
             $runtime->vmContext->defineConstant($name, $var);
