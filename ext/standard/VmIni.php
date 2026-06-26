@@ -29,6 +29,21 @@ final class VmIni
         'default_charset' => 'UTF-8',
     ];
 
+    /**
+     * Registered string ini directives with no local value — Zend returns '' (#12178).
+     *
+     * php-src: ext/standard/ini.c — zend_ini_string for unset PG() entries
+     *
+     * @var list<string>
+     */
+    public const EMPTY_STRING_INI_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'error_log',
+        'doc_root',
+        'user_dir',
+    ];
+
     /** @var list<string> */
     public const SUPPORTED_KEYS = [
         'error_reporting',
@@ -107,6 +122,9 @@ final class VmIni
         }
         if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
             return VmAssertState::iniGet($option);
+        }
+        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+            return '';
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;

@@ -136,6 +136,9 @@ final class IniJitHelper
         if (in_array($key, self::ASSERT_INI_KEYS, true)) {
             return self::assertIniGet($key);
         }
+        if (in_array($key, VmIni::EMPTY_STRING_INI_KEYS, true)) {
+            return '';
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
         }
