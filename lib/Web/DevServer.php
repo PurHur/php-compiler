@@ -680,6 +680,9 @@ final class DevServer
         $out .= "Content-Type: {$contentType}\r\n";
         $out .= 'Content-Length: '.strlen($body)."\r\n";
         foreach ($extraHeaders as $line) {
+            if ('' === $line) {
+                continue;
+            }
             if (stripos($line, 'Content-Type:') === 0) {
                 continue;
             }
