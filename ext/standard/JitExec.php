@@ -30,6 +30,7 @@ final class JitExec
         JitInternalStrictArg::rejectNullString($context, $args[0], 'exec', 'command', 1);
 
         $cmd = JitStringBuiltinArg::lower($context, $args[0], 'exec', 0, 'command');
+        self::rejectEmptyCommand($context, $args[0], $cmd, 'exec');
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(
             Builder::INT_EQ,
@@ -78,7 +79,7 @@ final class JitExec
 
         JitInternalStrictArg::rejectNullString($context, $args[0], 'passthru', 'command', 1);
 
-        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false);
+        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, false, 'passthru');
     }
 
     public static function system(Context $context, JITVariable ...$args): Value
@@ -90,16 +91,18 @@ final class JitExec
 
         JitInternalStrictArg::rejectNullString($context, $args[0], 'system', 'command', 1);
 
-        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true);
+        return self::runWithStdout($context, $args[0], $argc >= 2 ? $args[1] : null, true, 'system');
     }
 
     private static function runWithStdout(
         Context $context,
         JITVariable $commandArg,
         ?JITVariable $statusArg,
-        bool $returnLastLine
+        bool $returnLastLine,
+        string $function
     ): Value {
-        $cmd = JitStringBuiltinArg::lower($context, $commandArg, 'exec', 0, 'command');
+        $cmd = JitStringBuiltinArg::lower($context, $commandArg, $function, 0, 'command');
+        self::rejectEmptyCommand($context, $commandArg, $cmd, $function);
         $capture = self::capture($context, $cmd);
         $failed = $context->builder->icmp(
             Builder::INT_EQ,
@@ -323,5 +326,19 @@ final class JitExec
         $i8p = $context->getTypeFromString('int8*');
 
         return $context->builder->pointerCast($context->constantFromString($text), $i8p);
+    }
+
+    private static function rejectEmptyCommand(
+        Context $context,
+        JITVariable $arg,
+        Value $lowered,
+        string $function
+    ): void {
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $arg,
+            $lowered,
+            \sprintf('%s(): Argument #1 ($command) cannot be empty', $function)
+        );
     }
 }
