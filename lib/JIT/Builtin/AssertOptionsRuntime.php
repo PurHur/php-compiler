@@ -43,6 +43,8 @@ final class AssertOptionsRuntime
 
     private const GET_CALLBACK = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::getCallbackString';
 
+    private const HAS_CALLBACK = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::hasCallback';
+
     private const SET_CALLBACK = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::setCallbackString';
 
     public const INI_GET_ZEND_ASSERTIONS = 'PHPCompiler\\ext\\standard\\AssertOptionsJitHelper::iniGetZendAssertions';
@@ -78,6 +80,7 @@ final class AssertOptionsRuntime
         self::GET_EXCEPTION,
         self::SET_EXCEPTION,
         self::GET_CALLBACK,
+        self::HAS_CALLBACK,
         self::SET_CALLBACK,
         self::INI_GET_ZEND_ASSERTIONS,
         self::INI_SET_ZEND_ASSERTIONS,
@@ -343,8 +346,23 @@ final class AssertOptionsRuntime
         $i32 = $context->getTypeFromString('int32');
         $i8 = $context->getTypeFromString('int8');
 
+        $hasCb = $context->builder->call(self::lookupHelper($context, self::HAS_CALLBACK));
+        $nullBb = $fn->appendBasicBlock('aopt_cb_null_'.(string) ++self::$blockSeq);
+        $strBb = $fn->appendBasicBlock('aopt_cb_str_'.(string) self::$blockSeq);
+        $hasCbBool = $context->builder->icmp(Builder::INT_NE, $hasCb, $i32->constInt(0, false));
+        $context->builder->branchIf($hasCbBool, $strBb, $nullBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->call($context->lookupFunction('__value__writeNull'), $out);
+        $afterOldBb = $fn->appendBasicBlock('aopt_cb_after_old_'.(string) self::$blockSeq);
+        $context->builder->branch($afterOldBb);
+
+        $context->builder->positionAtEnd($strBb);
         $oldStr = $context->builder->call(self::lookupHelper($context, self::GET_CALLBACK));
         $context->builder->call($context->lookupFunction('__value__writeString'), $out, $oldStr);
+        $context->builder->branch($afterOldBb);
+
+        $context->builder->positionAtEnd($afterOldBb);
 
         $applyBb = $fn->appendBasicBlock('aopt_cb_apply_'.(string) ++self::$blockSeq);
         $doneBb = $fn->appendBasicBlock('aopt_cb_done_'.(string) self::$blockSeq);
