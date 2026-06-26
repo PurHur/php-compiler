@@ -197,13 +197,6 @@ final class VmReadline
 
     private static function readStdinFallback(?string $prompt): string|false
     {
-        if (null !== $prompt && '' !== $prompt) {
-            echo $prompt;
-            if (\defined('STDOUT') && (\is_resource(\STDOUT) || \STDOUT instanceof \Socket)) {
-                \fflush(\STDOUT);
-            }
-        }
-
         if (!\defined('STDIN')) {
             return false;
         }
@@ -211,6 +204,18 @@ final class VmReadline
         $stdin = \STDIN;
         if (!\is_resource($stdin) && !($stdin instanceof \Socket)) {
             return false;
+        }
+
+        // Zend readline.c — no prompt echo when stdin is not a TTY (#12301).
+        if (!\stream_isatty($stdin)) {
+            return false;
+        }
+
+        if (null !== $prompt && '' !== $prompt) {
+            echo $prompt;
+            if (\defined('STDOUT') && (\is_resource(\STDOUT) || \STDOUT instanceof \Socket)) {
+                \fflush(\STDOUT);
+            }
         }
 
         $line = \fgets($stdin);
