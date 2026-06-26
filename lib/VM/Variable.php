@@ -1364,7 +1364,7 @@ final class Variable {
         return $self->equals($other);
     }
 
-    public function equals(Variable $other): bool {
+    public function equals(Variable $other, ?\PHPCompiler\VM $vm = null): bool {
         $self = $this;
 restart:
         $pair = type_pair($self->type, $other->type);
@@ -1408,7 +1408,7 @@ restart:
                 } elseif (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
                     return false;
                 }
-                return $this->looseEqual($self, $other);
+                return $this->looseEqual($self, $other, $vm);
         }
         throw new \LogicException("Equals comparison between {$self->type} and {$other->type} not implemented");
     }
@@ -1623,7 +1623,11 @@ restart:
         return null;
     }
 
-    private function looseEqual(Variable $self, Variable $other): bool {
+    private function looseEqual(Variable $self, Variable $other, ?\PHPCompiler\VM $vm = null): bool {
+        $stringableEq = CompareStringableHelper::looseEqual($vm, $self, $other);
+        if (null !== $stringableEq) {
+            return $stringableEq;
+        }
         if ($self->type === self::TYPE_NULL) {
             switch ($other->type) {
                 case self::TYPE_NULL:
@@ -1643,7 +1647,7 @@ restart:
             }
         }
         if ($other->type === self::TYPE_NULL) {
-            return $this->looseEqual($other, $self);
+            return $this->looseEqual($other, $self, $vm);
         }
         // Zend: enum case loose == with backing scalar is false (#5798, #5819/#5835 switch labels).
         if (self::isEnumCaseOperand($self) || self::isEnumCaseOperand($other)) {
@@ -1766,10 +1770,10 @@ restart:
         throw new \TypeError("Object of class {$className} could not be converted to number");
     }
 
-    public function compareOp(int $opCode, Variable $left, Variable $right): void {
+    public function compareOp(int $opCode, Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->compareOp($opCode, $left, $right);
+            $result->compareOp($opCode, $left, $right, $vm);
             $this->indirect->copyFrom($result);
 
             return;
@@ -1831,7 +1835,7 @@ restart:
                 } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
                     $this->bool($this->_compareFromSpaceship(
                         $opCode,
-                        CompareJitHelper::zendUnlikeValueSpaceship($left, $right)
+                        CompareJitHelper::zendUnlikeValueSpaceship($left, $right, $vm)
                     ));
                 } else {
                     // Zend compare_function: unlike scalars use spaceship parity (#4681, #10243).
@@ -1924,10 +1928,10 @@ restart:
         return $result->integer;
     }
 
-    public function spaceshipOp(Variable $left, Variable $right): void {
+    public function spaceshipOp(Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): void {
         if ($this->type === self::TYPE_INDIRECT) {
             $result = new self();
-            $result->spaceshipOp($left, $right);
+            $result->spaceshipOp($left, $right, $vm);
             $this->indirect->copyFrom($result);
 
             return;
@@ -2003,7 +2007,7 @@ restart:
                         $this->int(1);
                     }
                 } elseif (self::needsZendUnlikeKindCompare($leftCopy, $rightCopy)) {
-                    $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy));
+                    $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy, $vm));
                 } else {
                     $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
                 }

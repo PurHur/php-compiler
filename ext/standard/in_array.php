@@ -41,12 +41,13 @@ final class in_array extends Internal
         if (3 === \count($frame->calledArgs)) {
             $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
+        $vm = null !== $frame->vmContext ? $frame->vmContext->runtime->vm() : null;
         if (null === $frame->returnVar) {
             return;
         }
         foreach ($haystack->iterate(true) as $value) {
             $stored = $value->resolveIndirect();
-            if ($strict ? $needle->identicalTo($stored) : self::looseEquals($needle, $stored)) {
+            if ($strict ? $needle->identicalTo($stored) : self::looseEquals($needle, $stored, $vm)) {
                 $frame->returnVar->bool(true);
 
                 return;
@@ -55,9 +56,9 @@ final class in_array extends Internal
         $frame->returnVar->bool(false);
     }
 
-    public static function looseEquals(Variable $left, Variable $right): bool
+    public static function looseEquals(Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): bool
     {
-        return $left->resolveIndirect()->equals($right->resolveIndirect());
+        return $left->resolveIndirect()->equals($right->resolveIndirect(), $vm);
     }
 
     public Context $context;

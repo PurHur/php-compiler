@@ -3710,13 +3710,25 @@ restart:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->bool($arg2->equals($arg3));
+                    try {
+                        $arg1->bool($arg2->equals($arg3, $this));
+                    } catch (VM\MagicMethodInvocationAborted) {
+                        $this->clearTryCatchUnwindState();
+                        ++$frame->pos;
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_NOT_EQUAL:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
-                    $arg1->bool(!$arg2->equals($arg3));
+                    try {
+                        $arg1->bool(!$arg2->equals($arg3, $this));
+                    } catch (VM\MagicMethodInvocationAborted) {
+                        $this->clearTryCatchUnwindState();
+                        ++$frame->pos;
+                        break;
+                    }
                     break;
                 case OpCode::TYPE_LOGICAL_XOR:
                     $arg1 = $frame->scope[$op->arg1];
@@ -3732,7 +3744,7 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     try {
-                        $arg1->compareOp($op->type, $arg2, $arg3);
+                        $arg1->compareOp($op->type, $arg2, $arg3, $this);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -3747,7 +3759,7 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     try {
-                        $arg1->spaceshipOp($arg2, $arg3);
+                        $arg1->spaceshipOp($arg2, $arg3, $this);
                     } catch (\TypeError $e) {
                         $catchFrame = $this->dispatchVmTypeError($e, $frame);
                         if (null !== $catchFrame) {
@@ -4145,9 +4157,15 @@ restart:
                 case OpCode::TYPE_CASE:
                     $arg1 = $frame->scope[$op->arg1];
                     $arg2 = $frame->scope[$op->arg2];
-                    if ($arg1->equals($arg2)) {
-                        $frame = $op->block1->getFrame($this->context, $frame);
-                        goto restart;
+                    try {
+                        if ($arg1->equals($arg2, $this)) {
+                            $frame = $op->block1->getFrame($this->context, $frame);
+                            goto restart;
+                        }
+                    } catch (VM\MagicMethodInvocationAborted) {
+                        $this->clearTryCatchUnwindState();
+                        ++$frame->pos;
+                        break;
                     }
                     break;
                 case OpCode::TYPE_CONST_FETCH:

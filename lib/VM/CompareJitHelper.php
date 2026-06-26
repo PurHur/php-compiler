@@ -72,8 +72,11 @@ final class CompareJitHelper
      * VM SSOT for relational < > <= >= and spaceship when {@see Variable::spaceshipMixedScalars()}
      * would coerce through toNumeric() and throw on array/object operands.
      */
-    public static function zendUnlikeValueSpaceship(Variable $left, Variable $right): int
-    {
+    public static function zendUnlikeValueSpaceship(
+        Variable $left,
+        Variable $right,
+        ?\PHPCompiler\VM $vm = null
+    ): int {
         $left = $left->resolveIndirect();
         $right = $right->resolveIndirect();
 
@@ -99,6 +102,12 @@ final class CompareJitHelper
                 $cmp = self::longSpaceship($casted, (int) $bool->bool);
 
                 return Variable::TYPE_OBJECT === $left->type ? $cmp : -$cmp;
+            }
+            if (Variable::TYPE_STRING === $left->type || Variable::TYPE_STRING === $right->type) {
+                $stringableCmp = CompareStringableHelper::spaceship($vm, $left, $right);
+                if (null !== $stringableCmp) {
+                    return $stringableCmp;
+                }
             }
 
             return Variable::TYPE_OBJECT === $left->type ? 1 : -1;
