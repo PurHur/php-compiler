@@ -4236,7 +4236,10 @@ restart:
                                 $parentKeywordScope = 'parent' === strtolower($className);
                             }
                             $lcClass = $this->resolveClassScopeName($className, $frame);
-                            $callableName = $this->context->classes[$lcClass]->name.'::'.$staticCallMethodName;
+                            $resolvedClassName = isset($this->context->classes[$lcClass])
+                                ? $this->context->classes[$lcClass]->name
+                                : $className;
+                            $callableName = $resolvedClassName.'::'.$staticCallMethodName;
                         }
                         $this->initStaticCallable($frame, $callableName, $parentKeywordScope);
                     } catch (\Error $e) {
@@ -11940,7 +11943,7 @@ restart:
             $this->context->autoloadClass($className);
         }
         if (!isset($this->context->classes[$lcClass])) {
-            throw new \LogicException("Call to undefined static method {$callableName}()");
+            throw new \Error($this->classNotFoundMessage($className));
         }
         $class = $this->context->classes[$lcClass];
         $frame->staticCallClass = $class->name;

@@ -11,7 +11,8 @@ use PHPCompiler\VM\Context;
 /**
  * Register intl builtin classes (php-src ext/intl/php_intl.c; issue #5774).
  *
- * ICU algorithms land in #3336, #5747, #5201; v1 skeleton enables class_exists() and inventory.
+ * ICU algorithms land in #3336, #5747, #5201; skeleton classes register only when
+ * {@see IntlExtensionPolicy::advertisesBuiltins()} (#12115).
  */
 final class BuiltinClasses
 {

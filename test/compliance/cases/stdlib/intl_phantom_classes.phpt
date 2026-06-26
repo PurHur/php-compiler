@@ -1,9 +1,10 @@
 --TEST--
-stdlib intl Collator/IntlDateFormatter skeleton stubs (issue #5925, superseded by #12115 phantom guard)
+stdlib intl OOP classes withheld without ext/intl — no phantom class_exists (#12115, ext/intl/php_intl.c)
 --FILE--
 <?php
-echo 'collator=', var_export(class_exists('Collator', false), true), "\n";
-echo 'formatter=', var_export(class_exists('IntlDateFormatter', false), true), "\n";
+echo 'intl_loaded=', (int) extension_loaded('intl'), "\n";
+echo 'collator=', (int) class_exists('Collator', false), "\n";
+echo 'formatter=', (int) class_exists('IntlDateFormatter', false), "\n";
 try {
     Collator::create('en_US');
     echo "collator_no_throw\n";
@@ -18,7 +19,8 @@ try {
 }
 ?>
 --EXPECT--
-collator=false
-formatter=false
+intl_loaded=0
+collator=0
+formatter=0
 Error: Class "Collator" not found
 Error: Class "IntlDateFormatter" not found
