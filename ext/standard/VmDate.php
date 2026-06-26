@@ -436,7 +436,7 @@ final class VmDate
         $isdst = (int) $tm->tm_isdst;
 
         return match ($formatChar) {
-            'B' => self::swatchBeat($hour, $min, $sec, $wday),
+            'B' => self::swatchBeat($timestamp),
             'd', 'j' => $mday,
             'h', 'g' => self::hour12($hour),
             'H' => $hour,
@@ -970,7 +970,7 @@ final class VmDate
 
                     break;
                 case 'B':
-                    $out .= (string) self::swatchBeat($hour, $minute, $second, $wday);
+                    $out .= self::padInt(self::swatchBeat($timestamp), 3);
 
                     break;
                 case 'I':
@@ -1140,13 +1140,17 @@ final class VmDate
         return $days[$month - 1];
     }
 
-    private static function swatchBeat(int $hour, int $minute, int $second, int $wday): int
+    /**
+     * Swatch Internet Time beats (php-src ext/date/php_date.c format 'B').
+     */
+    private static function swatchBeat(int $timestamp): int
     {
-        $seconds = ($hour * 3600) + ($minute * 60) + $second;
-        $daysFromMonday = ($wday + 6) % 7;
-        $total = $seconds + ($daysFromMonday * 86400);
+        $retval = ($timestamp - ($timestamp - ((($timestamp % 86400) + 3600) % 86400))) * 10;
+        if ($retval < 0) {
+            $retval += 864000;
+        }
 
-        return (int) \floor($total / 86.4);
+        return intdiv($retval, 864) % 1000;
     }
 
     /** ISO-8601 week number (php-src timelib_isoweek_from_date subset). */
