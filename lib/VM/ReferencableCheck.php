@@ -109,6 +109,12 @@ final class ReferencableCheck
             if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx])) {
                 continue;
             }
+            if (
+                self::allowsEphemeralArrayLiteralByRef($fn)
+                && self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+            ) {
+                continue;
+            }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
             self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
         }
@@ -133,11 +139,12 @@ final class ReferencableCheck
     }
 
     /**
-     * Zend accepts inline array literals for current()/key() only (zend_compile.c ZEND_SEND_REF temp).
+     * Zend accepts inline array literals for current()/key() and array_multisort() array operands
+     * (zend_compile.c ZEND_SEND_REF temp materialization).
      */
     public static function allowsEphemeralArrayLiteralByRef(string $fn): bool
     {
-        return \in_array(strtolower($fn), ['current', 'key'], true);
+        return \in_array(strtolower($fn), ['current', 'key', 'array_multisort'], true);
     }
 
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
