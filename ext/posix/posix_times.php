@@ -10,8 +10,6 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** posix_times() — process times (php-src ext/posix/posix.c; #7173). */
@@ -31,18 +29,7 @@ final class posix_times extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $raw = VmPosix::times();
-        $ht = new HashTable();
-        foreach ($raw as $key => $value) {
-            $slot = new Variable();
-            $slot->int((int) $value);
-            if (\is_int($key)) {
-                $ht->addIndex($key, $slot);
-            } else {
-                $ht->add((string) $key, $slot);
-            }
-        }
-        $frame->returnVar->array($ht);
+        $frame->returnVar->array(VmPosix::timesToHashTable(VmPosix::times()));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -59,6 +46,6 @@ final class posix_times extends Internal
             return JitValueBox::pointer($context, $slot);
         }
 
-        throw new \Error('posix_times() is not implemented for JIT in this compiler build (issue #7173)');
+        return JitPosixTimes::invoke($context);
     }
 }

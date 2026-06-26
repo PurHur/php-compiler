@@ -167,6 +167,22 @@ final class JitPosix
         return self::boxedPidOrFalse($context, $raw, 'posix_getpgid');
     }
 
+    /** posix_setsid() — create session (php-src ext/posix/posix.c; #9218 JIT). */
+    public static function setsid(Context $context): Value
+    {
+        self::ensureLibcSetsid($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('setsid'));
+        $rawI32 = $raw->typeOf() === $i32
+            ? $raw
+            : $context->builder->trunc($raw, $i32);
+        $slot = JitValueBox::alloc($context);
+        JitValueBox::writeLong($context, $slot, $context->builder->sext($rawI32, $i64));
+
+        return JitValueBox::pointer($context, $slot);
+    }
+
     /** posix_getsid() — session ID or false (php-src ext/posix/posix.c; #6505 JIT). */
     public static function getsid(Context $context, JITVariable $pidArg): Value
     {
@@ -354,6 +370,18 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false, $i32, $i32);
             $fn = $context->module->addFunction('setpgid', $ft);
             $context->registerFunction('setpgid', $fn);
+        }
+    }
+
+    private static function ensureLibcSetsid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('setsid');
+        } catch (\Throwable) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('setsid', $ft);
+            $context->registerFunction('setsid', $fn);
         }
     }
 
