@@ -6,6 +6,9 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\MethodVisibility;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -29,6 +32,7 @@ final class VmForwardStaticCall
         self::validateCallbackAtGlobalScope($frame, $callable, $builtinName);
         $calledScope = self::calledScopeClass($frame, $builtinName, $callable);
         $methodName = self::parseMethodName($callable, $builtinName);
+        self::assertForwardStaticCallable($frame->vmContext, $builtinName, $calledScope, $methodName);
         $vm = $frame->vmContext->runtime->vm;
 
         return $vm->invokeStaticWithCalledScope($calledScope, $methodName, ...$extraArgs);
@@ -261,10 +265,60 @@ final class VmForwardStaticCall
     }
 
     public static function resolveStaticMethod(
-        \PHPCompiler\VM\Context $ctx,
+        Context $ctx,
         string $calledScopeClass,
         string $methodName
     ): PhpFunc {
+        return self::locateStaticMethod($ctx, $calledScopeClass, $methodName)[2];
+    }
+
+    /**
+     * php-src zend_is_callable — forward_static_call* rejects inaccessible inherited private static (#11919).
+     */
+    private static function assertForwardStaticCallable(
+        Context $ctx,
+        string $builtinName,
+        string $calledScopeClass,
+        string $methodName
+    ): void {
+        [$declaringClass, $methodLc] = self::locateStaticMethod($ctx, $calledScopeClass, $methodName);
+        $vis = $declaringClass->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+        $callerClassLc = strtolower($calledScopeClass);
+        $declaringClassLc = strtolower($declaringClass->name);
+        $declaredName = $declaringClass->methodNames[$methodLc] ?? $methodName;
+        try {
+            MethodVisibility::assertCallable(
+                $vis,
+                $callerClassLc,
+                $declaringClassLc,
+                $declaringClass->name,
+                $declaredName,
+                false,
+                fn (string $classLc, string $ancestorLc): bool => self::isSameOrSubclassOf($ctx, $classLc, $ancestorLc),
+                $calledScopeClass
+            );
+        } catch (\LogicException) {
+            $kind = ($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0 ? 'private' : 'protected';
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #1 ($callback) must be a valid callback, cannot access %s method %s::%s()',
+                    $builtinName,
+                    $kind,
+                    $calledScopeClass,
+                    $declaredName
+                )
+            );
+        }
+    }
+
+    /**
+     * @return array{0: ClassEntry, 1: string, 2: PhpFunc}
+     */
+    private static function locateStaticMethod(
+        Context $ctx,
+        string $calledScopeClass,
+        string $methodName
+    ): array {
         $lcCalled = strtolower($calledScopeClass);
         if (!isset($ctx->classes[$lcCalled])) {
             $ctx->autoloadClass($calledScopeClass);
@@ -297,7 +351,7 @@ final class VmForwardStaticCall
                     );
                 }
 
-                return $func;
+                return [$class, $methodLc, $func];
             }
             if (null === $class->parentLc) {
                 break;
@@ -308,5 +362,23 @@ final class VmForwardStaticCall
         throw new \LogicException(
             "Call to undefined static method {$calledScopeClass}::{$methodName}()"
         );
+    }
+
+    private static function isSameOrSubclassOf(Context $ctx, string $classLc, string $ancestorLc): bool
+    {
+        $current = $classLc;
+        while (true) {
+            if ($current === $ancestorLc) {
+                return true;
+            }
+            if (!isset($ctx->classes[$current])) {
+                return false;
+            }
+            $parentLc = $ctx->classes[$current]->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            $current = $parentLc;
+        }
     }
 }
