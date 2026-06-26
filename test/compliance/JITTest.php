@@ -82,6 +82,25 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'bz2_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsBcmath()
+                && (str_contains($name, 'bcadd')
+                    || str_contains($name, 'bcsub')
+                    || str_contains($name, 'bcmul')
+                    || str_contains($name, 'bcdiv')
+                    || str_contains($name, 'bcmod')
+                    || str_contains($name, 'bcpow')
+                    || str_contains($name, 'bcsqrt')
+                    || str_contains($name, 'bcscale')
+                    || str_contains($name, 'bccomp')
+                    || str_contains($name, 'bcround')
+                    || str_contains($name, 'bcceil')
+                    || str_contains($name, 'bcfloor')
+                    || str_contains($name, 'bcpowmod')
+                    || str_contains($name, 'bcdivmod')
+                    || str_contains($name, 'bcmath_number'))
+                && !str_contains($name, 'bcmath_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsConvertCyrString()
                 && str_contains($name, 'convert_cyr_string')) {
                 continue;

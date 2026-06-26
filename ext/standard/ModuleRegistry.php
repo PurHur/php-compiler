@@ -211,6 +211,7 @@ final class ModuleRegistry
                 || str_starts_with($functionName, 'zlib_')
                 || 'readgzfile' === $functionName,
             'readline' => str_starts_with($functionName, 'readline'),
+            'bcmath' => str_starts_with($functionName, 'bc'),
             default => false,
         };
     }

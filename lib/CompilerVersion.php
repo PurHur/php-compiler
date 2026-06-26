@@ -246,4 +246,10 @@ final class CompilerVersion
     {
         return false;
     }
+
+    /** ext/bcmath not on Docker Zend 8.2 reference profile — withhold phantom registration (#12131). */
+    public static function supportsBcmath(): bool
+    {
+        return false;
+    }
 }
