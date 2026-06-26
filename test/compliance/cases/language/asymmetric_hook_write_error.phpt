@@ -3,8 +3,9 @@ Language: private(set) get-only property hook write — asymmetric Error not rea
 --FILE--
 <?php
 class C {
-    private(set) string $x {
+    public string $x {
         get => 'hi';
+        set (private) => $value;
     }
 }
 $c = new C();
