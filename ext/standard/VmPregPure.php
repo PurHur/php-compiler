@@ -43,7 +43,7 @@ final class VmPregPure
             return false;
         }
 
-        $ovector = VmPregEngine::match(
+        $ovector = self::engineMatch(
             $compiled['ast'],
             $compiled['groupNameToIndex'],
             $subject,
@@ -51,6 +51,9 @@ final class VmPregPure
             $compiled['opts'],
             self::fixedStartMatch($regex, $compiled['opts'])
         );
+        if (false === $ovector) {
+            return false;
+        }
         if (null === $ovector) {
             self::$lastError = 0;
             if (null !== $matches) {
@@ -103,7 +106,7 @@ final class VmPregPure
         $fixedStart = self::fixedStartMatch($regex, $compiled['opts']);
 
         while ($start <= $subjectLen) {
-            $ovector = VmPregEngine::match(
+            $ovector = self::engineMatch(
                 $compiled['ast'],
                 $compiled['groupNameToIndex'],
                 $subject,
@@ -111,6 +114,9 @@ final class VmPregPure
                 $compiled['opts'],
                 $fixedStart && $start === $offset
             );
+            if (false === $ovector) {
+                return false;
+            }
             if (null === $ovector) {
                 break;
             }
@@ -223,7 +229,7 @@ final class VmPregPure
         $fixedStart = self::fixedStartMatch($regex, $compiled['opts']);
 
         while ($offset <= $subjectLen && $count < $maxParts) {
-            $ovector = VmPregEngine::match(
+            $ovector = self::engineMatch(
                 $compiled['ast'],
                 $compiled['groupNameToIndex'],
                 $subject,
@@ -231,6 +237,9 @@ final class VmPregPure
                 $compiled['opts'],
                 $fixedStart && 0 === $offset
             );
+            if (false === $ovector) {
+                return false;
+            }
             if (null === $ovector) {
                 $tail = \substr($subject, $offset);
                 if (!$noEmpty || '' !== $tail) {
@@ -368,7 +377,7 @@ final class VmPregPure
         $fixedStart = self::fixedStartMatch($regex, $compiled['opts']);
 
         while ($replacements < $max && $offset <= $subjectLen) {
-            $ovector = VmPregEngine::match(
+            $ovector = self::engineMatch(
                 $compiled['ast'],
                 $compiled['groupNameToIndex'],
                 $subject,
@@ -376,6 +385,9 @@ final class VmPregPure
                 $compiled['opts'],
                 $fixedStart && $offset === 0
             );
+            if (false === $ovector) {
+                return false;
+            }
             if (null === $ovector) {
                 break;
             }
@@ -589,5 +601,27 @@ final class VmPregPure
         self::$lastError = 0;
 
         return $parts;
+    }
+
+    /**
+     * @param array<string, int> $groupNameToIndex
+     *
+     * @return list<int>|null|false ovector, null when no match, false on backtrack limit
+     */
+    private static function engineMatch(
+        VmPregAstNode $ast,
+        array $groupNameToIndex,
+        string $subject,
+        int $offset,
+        int $opts,
+        bool $anchoredAttempt
+    ): array|null|false {
+        try {
+            return VmPregEngine::match($ast, $groupNameToIndex, $subject, $offset, $opts, $anchoredAttempt);
+        } catch (VmPregBacktrackLimitException) {
+            self::$lastError = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
+
+            return false;
+        }
     }
 }

@@ -33,6 +33,7 @@ final class IniJitHelper
         'default_charset',
         'cfg_file_path',
         'user_agent',
+        'pcre.backtrack_limit',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -81,6 +82,8 @@ final class IniJitHelper
 
     private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
 
+    private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
+
     private static bool $displayErrors = false;
 
     /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
@@ -99,6 +102,8 @@ final class IniJitHelper
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
     private static string $userAgent = '';
+
+    private static int $pcreBacktrackLimit = 1_000_000;
 
     public static function getUserAgent(): string
     {
@@ -190,6 +195,9 @@ final class IniJitHelper
         if ('user_agent' === $key) {
             return self::$userAgent;
         }
+        if ('pcre.backtrack_limit' === $key) {
+            return (string) self::$pcreBacktrackLimit;
+        }
 
         return null;
     }
@@ -237,6 +245,9 @@ final class IniJitHelper
         }
         if ('user_agent' === $key) {
             return self::setUserAgent($newValue);
+        }
+        if ('pcre.backtrack_limit' === $key) {
+            return self::setPcreBacktrackLimit($newValue);
         }
 
         return null;
@@ -288,6 +299,9 @@ final class IniJitHelper
         if ('user_agent' === $key) {
             return '';
         }
+        if ('pcre.backtrack_limit' === $key) {
+            return self::CFG_PCRE_BACKTRACK_LIMIT;
+        }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
@@ -330,6 +344,9 @@ final class IniJitHelper
                 break;
             case 'user_agent':
                 self::$userAgent = '';
+                break;
+            case 'pcre.backtrack_limit':
+                self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
                 break;
         }
     }
@@ -418,6 +435,18 @@ final class IniJitHelper
     {
         $old = self::$userAgent;
         self::$userAgent = $newValue;
+
+        return $old;
+    }
+
+    private static function setPcreBacktrackLimit(string $newValue): ?string
+    {
+        $parsed = (int) $newValue;
+        if ($parsed < 0) {
+            return null;
+        }
+        $old = (string) self::$pcreBacktrackLimit;
+        self::$pcreBacktrackLimit = $parsed;
 
         return $old;
     }
