@@ -76,7 +76,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'lib/JIT/Builtin/StringJsonDecode.php' => 'JsonDecodeJitHelper',
             'lib/JIT/Builtin/PasswordCryptoRuntime.php' => 'password_hash',
             'lib/JIT/Builtin/StringHashCryptoPhp.php' => 'HashCryptoJitHelper',
-            'lib/JIT/Builtin/StringDirJit.php' => 'phpc_dir',
+            'lib/JIT/Builtin/StringDirRuntime.php' => 'DirHandleJitHelper',
             'lib/JIT/Builtin/StringFsDirJit.php' => 'StringFsDirJit',
             'ext/standard/stripcslashes.php' => 'VmString',
         ];
