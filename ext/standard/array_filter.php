@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Func\PHP;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
@@ -39,11 +40,7 @@ final class array_filter extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_filter() first argument must be an array in this compiler build');
-        }
-        $src = $array->toArray();
+        $src = VmArray::requireArrayParam($frame->calledArgs[0], 'array_filter', 1, 'array');
         $out = new HashTable();
         if (1 === $argc) {
             self::filterDefault($src, $out);
@@ -87,6 +84,8 @@ final class array_filter extends Internal
                 'array_filter() with a callback is not supported by the JIT compiler in this build'
             );
         }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
 
         return ArrayBuiltinHelper::buildFilterArray($context, $args[0]);
     }

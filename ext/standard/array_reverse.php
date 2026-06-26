@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -31,18 +32,15 @@ final class array_reverse extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_reverse() requires one or two arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_reverse() argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reverse', 1, 'array');
         $preserveKeys = false;
         if (2 === $argc) {
             $preserveKeys = $frame->calledArgs[1]->resolveIndirect()->toBool();
         }
-        $frame->returnVar->array($array->toArray()->reverseCopy($preserveKeys));
+        $frame->returnVar->array($ht->reverseCopy($preserveKeys));
     }
 
     public Context $context;
@@ -59,6 +57,8 @@ final class array_reverse extends Internal
                 $this->jitString($context, $arg, 'array_reverse() argument #'.((int) $i + 1));
             }
         }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_reverse', 1, 'array');
         $preserveKeys = 2 === $argc
             ? JitBoolArg::lower($context, $args[1], 'array_reverse() preserve_keys')
             : null;
