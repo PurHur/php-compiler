@@ -5591,6 +5591,21 @@ class Compiler {
         if ([] === $children) {
             return null;
         }
+        foreach ($children as $child) {
+            if (!$child instanceof Op\Stmt\JumpIf) {
+                continue;
+            }
+            $vm = $this->tryFoldCompileTimeTernaryDefault(
+                $child,
+                $param->defaultVar,
+                $block,
+                $children,
+                true
+            );
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
         $expr = $children[\count($children) - 1];
         if (!$expr instanceof Op\Expr) {
             return null;
@@ -5628,6 +5643,62 @@ class Compiler {
         $vm = $this->tryFoldCompileTimeExprDefault($expr, $block, $children, true);
         if (null !== $vm) {
             return $block->registerConstant($param->defaultVar, $vm);
+        }
+
+        return null;
+    }
+
+    /**
+     * Fold php-cfg ?: lowering (JumpIf + arm assigns) in param/static defaults (#12026).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeTernaryDefault(
+        Op\Stmt\JumpIf $jumpIf,
+        Operand $result,
+        Block $block,
+        array $defaultBlockChildren,
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        $ifMerge = $this->branchJumpMergeTarget($jumpIf->if);
+        $elseMerge = $this->branchJumpMergeTarget($jumpIf->else);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return null;
+        }
+        $ifExpr = $this->branchCfgAssignExprForResult($jumpIf->if, $result);
+        $elseExpr = $this->branchCfgAssignExprForResult($jumpIf->else, $result);
+        if (null === $ifExpr || null === $elseExpr) {
+            return null;
+        }
+        $condVm = $this->tryFoldCompileTimeOperandDefault(
+            $jumpIf->cond,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $condVm) {
+            return null;
+        }
+        $chosenExpr = $condVm->toBool() ? $ifExpr : $elseExpr;
+
+        return $this->tryFoldCompileTimeOperandDefault(
+            $chosenExpr,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+    }
+
+    private function branchCfgAssignExprForResult(CfgBlock $branchCfg, Operand $result): ?Operand
+    {
+        $assignVar = $this->mergeBranchAssignVarOperand($branchCfg);
+        if (null === $assignVar || !$this->operandsReferToSameVariable($assignVar, $result)) {
+            return null;
+        }
+        foreach ($branchCfg->children as $child) {
+            if ($child instanceof Op\Expr\Assign && $this->operandsReferToSameVariable($child->var, $result)) {
+                return $child->expr;
+            }
         }
 
         return null;
