@@ -32,7 +32,10 @@ final class IncludePathResolveJitHelper
      */
     public static function resolve(string $filename, string $includePath): string|false
     {
-        if ('' === $filename || \str_contains($filename, "\0")) {
+        if ('' === $filename || '.' === $filename) {
+            return self::resolveCwdFilename();
+        }
+        if (\str_contains($filename, "\0")) {
             return false;
         }
         if ($filename[0] === '/' || (\strlen($filename) > 1 && $filename[1] === ':')) {
@@ -63,7 +66,10 @@ final class IncludePathResolveJitHelper
      */
     public static function resolveJitZend(string $filename, string $includePath): string|false
     {
-        if ('' === $filename || \str_contains($filename, "\0")) {
+        if ('' === $filename || '.' === $filename) {
+            return self::resolveCwdFilename();
+        }
+        if (\str_contains($filename, "\0")) {
             return false;
         }
         if ($filename[0] === '/' || (\strlen($filename) > 1 && $filename[1] === ':')) {
@@ -90,5 +96,17 @@ final class IncludePathResolveJitHelper
         }
 
         return false;
+    }
+
+    /**
+     * php-src ext/standard/streams.c — stream_resolve_include_path(".") / ("") → getcwd().
+     *
+     * @return string|false
+     */
+    private static function resolveCwdFilename(): string|false
+    {
+        $cwd = VmFs::getcwd();
+
+        return false !== $cwd ? $cwd : false;
     }
 }
