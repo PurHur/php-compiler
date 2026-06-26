@@ -128,9 +128,9 @@ final class VmArraySort
         $fromEnum = self::trySortingOrderInt($arg);
         if (null !== $fromEnum) {
             if (0 === $parseState[self::PARSE_ORDER]) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                    $argIndex + 1
+                throw new \TypeError(self::multisortOperandTypeError(
+                    $argIndex,
+                    ' that has not already been specified'
                 ));
             }
             $sortOrder = $fromEnum;
@@ -139,16 +139,10 @@ final class VmArraySort
             return;
         }
         if (EnumCaseSupport::isEnumCaseVariable($arg)) {
-            throw new \TypeError(sprintf(
-                'array_multisort(): Argument #%d must be an array or a sort flag',
-                $argIndex + 1
-            ));
+            throw new \TypeError(self::multisortOperandTypeError($argIndex));
         }
         if (Variable::TYPE_INTEGER !== $arg->type) {
-            throw new \TypeError(sprintf(
-                'array_multisort(): Argument #%d must be an array or a sort flag',
-                $argIndex + 1
-            ));
+            throw new \TypeError(self::multisortOperandTypeError($argIndex));
         }
 
         $val = $arg->toInt();
@@ -157,9 +151,9 @@ final class VmArraySort
             case StdlibConstants::SORT_ASC:
             case StdlibConstants::SORT_DESC:
                 if (0 === $parseState[self::PARSE_ORDER]) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $argIndex + 1
+                    throw new \TypeError(self::multisortOperandTypeError(
+                        $argIndex,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortOrder = $masked;
@@ -172,9 +166,9 @@ final class VmArraySort
             case StdlibConstants::SORT_NATURAL:
             case StdlibConstants::SORT_LOCALE_STRING:
                 if (0 === $parseState[self::PARSE_TYPE]) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $argIndex + 1
+                    throw new \TypeError(self::multisortOperandTypeError(
+                        $argIndex,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortType = $val;
@@ -192,5 +186,19 @@ final class VmArraySort
     private static function isSortingEnum(string $className): bool
     {
         return 0 === strcasecmp(ltrim($className, '\\'), 'Sorting');
+    }
+
+    public static function multisortOperandTypeError(int $argIndex, string $extra = ''): string
+    {
+        $argNum = $argIndex + 1;
+        if (1 === $argNum) {
+            return 'array_multisort(): Argument #1 ($array) must be an array or a sort flag'.$extra;
+        }
+
+        return sprintf(
+            'array_multisort(): Argument #%d must be an array or a sort flag%s',
+            $argNum,
+            $extra
+        );
     }
 }

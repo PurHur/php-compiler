@@ -298,18 +298,15 @@ final class array_multisort extends Internal
 
             $flag = self::tryResolveJitMultisortFlag($context, $arg);
             if (null === $flag) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag',
-                    $i + 1
-                ));
+                throw new \TypeError(VmArraySort::multisortOperandTypeError($i));
             }
 
             $masked = $flag & ~StdlibConstants::SORT_FLAG_CASE;
             if (StdlibConstants::SORT_ASC === $masked || StdlibConstants::SORT_DESC === $masked) {
                 if (!$parseOrder) {
-                    throw new \TypeError(sprintf(
-                        'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                        $i + 1
+                    throw new \TypeError(VmArraySort::multisortOperandTypeError(
+                        $i,
+                        ' that has not already been specified'
                     ));
                 }
                 $sortOrder = $masked;
@@ -318,9 +315,9 @@ final class array_multisort extends Internal
             }
 
             if (!$parseType) {
-                throw new \TypeError(sprintf(
-                    'array_multisort(): Argument #%d must be an array or a sort flag that has not already been specified',
-                    $i + 1
+                throw new \TypeError(VmArraySort::multisortOperandTypeError(
+                    $i,
+                    ' that has not already been specified'
                 ));
             }
             $sortType = $flag;
