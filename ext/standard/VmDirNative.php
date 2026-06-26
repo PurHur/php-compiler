@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * opendir/readdir/closedir/rewinddir — libc scandir(3) FFI or {@see VmDirPure} fallback (#9034).
+ * opendir/readdir/closedir/rewinddir — pure PHP via {@see VmDirPure} (#9034, #5494, #12235).
  *
  * Mirrors {@see \PHPCompiler\JIT\Builtin\StringDirJit} handle table (#5494, php-in-php).
  *
@@ -17,10 +17,6 @@ final class VmDirNative
 
     private const MAX_HANDLES = 256;
 
-    private static ?\FFI $ffi = null;
-
-    private static bool $ffiUnavailable = false;
-
     /** @var array<int, array{entries: list<string>, pos: int}> */
     private static array $slots = [];
 
@@ -28,7 +24,7 @@ final class VmDirNative
 
     public static function available(): bool
     {
-        return null !== self::ffi() || VmDirPure::available();
+        return VmDirPure::available();
     }
 
     /** @return list<string>|false */
@@ -108,24 +104,6 @@ final class VmDirNative
         if (str_contains($path, "\0")) {
             return false;
         }
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            $namelist = $ffi->new('dirent**');
-            $count = (int) $ffi->scandir($path, \FFI::addr($namelist), null, null);
-            if ($count < 0) {
-                return false;
-            }
-
-            $entries = [];
-            for ($i = 0; $i < $count; ++$i) {
-                $entries[] = \FFI::string($namelist[$i]->d_name);
-                $ffi->free($namelist[$i]);
-            }
-            $ffi->free($namelist);
-            \sort($entries, \SORT_STRING);
-
-            return $entries;
-        }
 
         return VmDirPure::listSorted($path);
     }
@@ -142,59 +120,5 @@ final class VmDirNative
         }
 
         return $slot;
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (!self::ffiEnabled()) {
-            return null;
-        }
-        if (self::$ffiUnavailable) {
-            return null;
-        }
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            self::$ffiUnavailable = true;
-
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-typedef struct {
-    long d_ino;
-    long d_off;
-    unsigned short d_reclen;
-    unsigned char d_type;
-    char d_name[256];
-} dirent;
-
-int scandir(const char *dirp, dirent ***namelist, void *filter, void *compar);
-void free(void *ptr);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        self::$ffiUnavailable = true;
-
-        return null;
     }
 }
