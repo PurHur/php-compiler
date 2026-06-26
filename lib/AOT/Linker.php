@@ -26,7 +26,7 @@ final class Linker
     ];
 
     /** libz.so symlink is often absent without zlib1g-dev; link the versioned .so directly. */
-    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libzstd.so.1 -l:libbz2.so.1.0';
+    private const RUNTIME_LINK_LIBS = '-lpcre2-8 -lcrypt -l:libz.so.1 -l:libbz2.so.1.0';
 
     /** Host multiarch lib dir for bundled LLVM ld (libz.so.1 lives here, not in LLVM sysroot). */
     private const HOST_LIB_SEARCH = '-L/usr/lib/x86_64-linux-gnu';

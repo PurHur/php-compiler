@@ -1,5 +1,5 @@
 --TEST--
-stdlib zstd_compress/zstd_decompress via VmZstdNative FFI without host ext-zstd (#6387)
+stdlib zstd_compress/zstd_decompress via VmZstdCore pure PHP without libzstd FFI (#6387, #8869)
 --FILE--
 <?php
 $plain = 'hello zstd bootstrap';

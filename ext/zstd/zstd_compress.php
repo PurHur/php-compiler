@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** zstd_compress() — libzstd via FFI (php-src ext/zstd/zstd.c; #6382, #6387). */
+/** zstd_compress() — pure PHP via VmZstdCore (php-src ext/zstd/zstd.c; #6382, #6387, #8869). */
 final class zstd_compress extends Internal
 {
     public function __construct()

@@ -12,7 +12,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** zstd_decompress() — libzstd via FFI (php-src ext/zstd/zstd.c; #6382, #6387). */
+/** zstd_decompress() — pure PHP via VmZstdCore (php-src ext/zstd/zstd.c; #6382, #6387, #8869). */
 final class zstd_decompress extends Internal
 {
     public function __construct()

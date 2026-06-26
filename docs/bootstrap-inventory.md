@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3266 |
-| Phase A inventory files (M2 ratio SSOT) | 3266 |
+| PHP files on vm.php path | 3269 |
+| Phase A inventory files (M2 ratio SSOT) | 3269 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8666 |
+| Source constructs flagged (warnings) | 8670 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2013,7 +2013,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipEngine.php` | 0 | 1 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
 | `ext/zstd/Module.php` | 0 | 4 |
+| `ext/zstd/VmZstdCore.php` | 0 | 1 |
 | `ext/zstd/VmZstdNative.php` | 0 | 1 |
+| `ext/zstd/ZstdJitHelper.php` | 0 | 1 |
 | `ext/zstd/zstd_compress.php` | 0 | 1 |
 | `ext/zstd/zstd_decompress.php` | 0 | 1 |
 | `ext/zstd/zstd_uncompress.php` | 0 | 1 |
@@ -2407,6 +2409,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringHashAlgos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 3 |
@@ -2500,7 +2503,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVersionCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlibJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringZstd.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringZstdJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
@@ -15888,10 +15891,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new zstd_uncompress (line 19)
 - 1 class method(s)
 
+### `ext/zstd/VmZstdCore.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/zstd/VmZstdNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 3 class method(s)
+
+### `ext/zstd/ZstdJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 13 class method(s)
 
 ### `ext/zstd/zstd_compress.php`
 
@@ -18808,6 +18821,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 6 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringHashAlgos.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringHashCrypto.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19350,7 +19368,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringZstd.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new JIT (line 97)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/StringZstdJit.php`
 
