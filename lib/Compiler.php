@@ -571,6 +571,7 @@ class Compiler {
             return;
         }
         $this->assertFunctionSignatureNeverType($returnType);
+        $this->assertNoRedundantTrueFalseUnion($returnType);
         $block->returnDeclaredType = $returnType;
         if ($returnType instanceof Op\Type\Void_) {
             $block->returnTypeVoid = true;
@@ -4218,6 +4219,53 @@ class Compiler {
         return $type instanceof Op\Type\Literal && 'null' === strtolower($type->name);
     }
 
+    protected function cfgTypeIsLiteralBoolName(?Op\Type $type, string $name): bool
+    {
+        return $type instanceof Op\Type\Literal && $name === strtolower($type->name);
+    }
+
+    protected function cfgTypeContainsLiteralBool(?Op\Type $type, string $name): bool
+    {
+        if (null === $type) {
+            return false;
+        }
+        if ($this->cfgTypeIsLiteralBoolName($type, $name)) {
+            return true;
+        }
+        if ($type instanceof Op\Type\Union_) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsLiteralBool($member, $name)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Intersection) {
+            foreach ($type->types as $member) {
+                if ($this->cfgTypeContainsLiteralBool($member, $name)) {
+                    return true;
+                }
+            }
+        }
+        if ($type instanceof Op\Type\Nullable) {
+            return $this->cfgTypeContainsLiteralBool($type->subtype, $name);
+        }
+
+        return false;
+    }
+
+    /**
+     * Zend zend_compile_type — redundant true|false union must use bool (#12045).
+     */
+    protected function assertNoRedundantTrueFalseUnion(?Op\Type $type): void
+    {
+        if (
+            $this->cfgTypeContainsLiteralBool($type, 'true')
+            && $this->cfgTypeContainsLiteralBool($type, 'false')
+        ) {
+            $this->throwCompileError('Type contains both true and false, bool should be used instead');
+        }
+    }
+
     protected function cfgTypeContainsNull(?Op\Type $type): bool
     {
         if (null === $type) {
@@ -4272,6 +4320,7 @@ class Compiler {
      */
     protected function assertPropertyDeclaredType(?Op\Type $type, string $propName): void
     {
+        $this->assertNoRedundantTrueFalseUnion($type);
         if (!$this->cfgTypeContainsNever($type)) {
             return;
         }
@@ -4328,6 +4377,7 @@ class Compiler {
     protected function assertParamDeclaredType(?Op\Type $declared): void
     {
         $this->assertFunctionSignatureNeverType($declared);
+        $this->assertNoRedundantTrueFalseUnion($declared);
         if ($this->cfgTypeIsStandaloneNever($declared)) {
             $this->throwCompileError('never cannot be used as a parameter type');
         }
