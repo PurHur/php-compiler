@@ -45,6 +45,14 @@ final class header_ extends Internal
             throw new \LogicException('header() requires one to three arguments');
         }
         $line = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'header', 0, 'header');
+        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+            VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         $replace = true;
         $responseCode = 0;
         if (isset($frame->calledArgs[1])) {
@@ -60,6 +68,9 @@ final class header_ extends Internal
             ResponseContext::setStatus(302);
         }
         ResponseContext::addHeader($line, $replace);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
