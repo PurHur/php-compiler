@@ -74,6 +74,9 @@ class Context {
     /** Catch frame for throw/TypeError during nested property-hook invoke; bubble to caller (#7301, #9503). */
     public ?Frame $propertyHookExternalCatchFrame = null;
 
+    /** True while {@see VM::invokeUserDestructor} runs on an isolated run stack (#12070). */
+    public bool $isolatedDestructorInvoke = false;
+
     /** True while user __clone() runs on an isolated run stack (#12068, zend_object_handlers.c). */
     public bool $invokingCloneMagic = false;
 
