@@ -92,6 +92,7 @@ final class AsymmetricVisibilityRewriter
         }
 
         self::rejectExplicitPublicBeforeSetModifier($source);
+        self::rejectDualReadSetModifiers($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
@@ -140,15 +141,35 @@ final class AsymmetricVisibilityRewriter
 
     /**
      * Duplicate set modifier on the same visibility is a compile fatal (#6774, #11656).
-     *
-     * php-src: `public public(set)` is fatal. Dual read+set with *different* modifiers
-     * (`public private(set)`, `public protected(set)`) is valid PHP 8.4 (#11868).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (preg_match(
                 '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+        });
+    }
+
+    /**
+     * Explicit read plus asymmetric set modifier is a compile fatal (#12088, reverts #11868).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` is fatal.
+     */
+    private static function rejectDualReadSetModifiers(string $source): void
+    {
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+                $line
+            )) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+            }
+            if (preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
                 $line
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
@@ -175,12 +196,7 @@ final class AsymmetricVisibilityRewriter
         });
     }
 
-    /**
-     * Promoted constructor parameters reject duplicate set modifiers (#10237, #11656).
-     *
-     * Dual read+set with different modifiers is valid PHP 8.4 (#11868); invalid visibility
-     * ordering is caught later by AsymmetricVisibilityCompileCheck.
-     */
+    /** Promoted constructor parameters reject duplicate set modifiers (#10237, #11656, #12088). */
     private static function rejectPromotedParamMultipleAccessModifiers(string $source): void
     {
         if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
@@ -225,6 +241,18 @@ final class AsymmetricVisibilityRewriter
     {
         if (preg_match(
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $paramsText
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            $paramsText
+        )) {
+            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
             $paramsText
         )) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
