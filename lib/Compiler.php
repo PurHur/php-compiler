@@ -5613,6 +5613,12 @@ class Compiler {
                 return $block->registerConstant($param->defaultVar, $vm);
             }
         }
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            $vm = $this->tryFoldArrayDimFetchCompileTimeDefault($expr, $block, $children, true);
+            if (null !== $vm) {
+                return $block->registerConstant($param->defaultVar, $vm);
+            }
+        }
         if ($expr instanceof Op\Expr\UnaryMinus || $expr instanceof Op\Expr\UnaryPlus) {
             $vm = $this->tryFoldUnaryLiteralDefault($expr);
             if (null !== $vm) {
@@ -5670,6 +5676,14 @@ class Compiler {
         if ($expr instanceof Op\Expr\PropertyFetch) {
             return $this->tryFoldEnumCasePropertyFetchDefault($expr, $block, $defaultBlockChildren);
         }
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $this->tryFoldArrayDimFetchCompileTimeDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+        }
         if ($expr instanceof Op\Expr\Cast) {
             return $this->tryFoldCompileTimeCastDefault(
                 $expr,
@@ -5680,6 +5694,52 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Fold literal-array subscript in const-expr defaults (static/param/property, #12025).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldArrayDimFetchCompileTimeDefault(
+        Op\Expr\ArrayDimFetch $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        if (null === $expr->dim) {
+            return null;
+        }
+        $base = $this->tryFoldCompileTimeOperandDefault(
+            $expr->var,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $base || !$base->is(Variable::TYPE_ARRAY)) {
+            return null;
+        }
+        $dimVm = $this->tryFoldCompileTimeOperandDefault(
+            $expr->dim,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $dimVm) {
+            return null;
+        }
+        $table = $base->toArray();
+        if (!$table->keyExists($dimVm)) {
+            return null;
+        }
+        $elem = $table->findVariable($dimVm, false);
+        if (null === $elem) {
+            return null;
+        }
+        $value = new Variable();
+        $value->copyFrom($elem->resolveIndirect());
+
+        return $value;
     }
 
     /**
@@ -9336,11 +9396,11 @@ class Compiler {
             return true;
         }
         if ($op instanceof Op\Expr\ArrayDimFetch) {
-            return $this->functionStaticInitReferencesLocal($op->var)
+            return $this->functionStaticInitExprOrOperandReferencesLocal($op->var)
                 || (null !== $op->dim && $this->functionStaticInitOperandReferencesLocal($op->dim));
         }
         if ($op instanceof Op\Expr\PropertyFetch) {
-            return $this->functionStaticInitReferencesLocal($op->var)
+            return $this->functionStaticInitExprOrOperandReferencesLocal($op->var)
                 || $this->functionStaticInitOperandReferencesLocal($op->name);
         }
         if ($op instanceof Op\Expr\BinaryOp) {
@@ -9378,6 +9438,15 @@ class Compiler {
         }
 
         return false;
+    }
+
+    protected function functionStaticInitExprOrOperandReferencesLocal(Op|Operand $node): bool
+    {
+        if ($node instanceof Op) {
+            return $this->functionStaticInitReferencesLocal($node);
+        }
+
+        return $this->functionStaticInitOperandReferencesLocal($node);
     }
 
     protected function functionStaticInitOperandReferencesLocal(Operand $operand): bool
