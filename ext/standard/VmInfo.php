@@ -480,6 +480,7 @@ final class VmInfo
         $machine = self::php_uname('m');
         $html = '<table><tr class="h"><td colspan="2"><h1>PHP Version '.$version.'</h1></td></tr>';
         $html .= '<tr><td class="e">System </td><td class="v">'.$system.' '.$host.' '.$release.' '.$versionStr.' '.$machine.' </td></tr>';
+        $html .= '<tr><td class="e">Build Date </td><td class="v">'.CompilerVersion::BUILD_DATE.' </td></tr>';
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
         $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
