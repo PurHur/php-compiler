@@ -29,6 +29,11 @@ final class JitIptcEmbed
                 'iptcembed() requires compile-time string literals for JIT/AOT in this compiler build'
             );
         }
+        if (str_contains($pathLit, "\0")) {
+            throw new \ValueError(
+                'iptcembed(): Argument #2 ($filename) must not contain any null bytes'
+            );
+        }
 
         if (isset($args[2])) {
             throw new \LogicException(
