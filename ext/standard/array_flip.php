@@ -17,7 +17,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -32,14 +31,11 @@ final class array_flip extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_flip() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_flip() argument must be an array in this compiler build');
-        }
-        $frame->returnVar->array(VmArray::flip($array->toArray(), $frame));
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_flip', 1, 'array');
+        $frame->returnVar->array(VmArray::flip($ht, $frame));
     }
 
     public Context $context;
@@ -49,10 +45,8 @@ final class array_flip extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_flip() requires exactly one argument');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_flip() argument must be an array in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_flip', 1, 'array');
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
