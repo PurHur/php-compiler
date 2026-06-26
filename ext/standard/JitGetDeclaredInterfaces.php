@@ -14,23 +14,43 @@ use PHPLLVM\Value;
 /** LLVM lowering for get_declared_interfaces() (issue #3176). */
 final class JitGetDeclaredInterfaces
 {
-    public static function invoke(Context $context): Value
+    public static function invoke(Context $context, bool $excludeDeprecated = false): Value
     {
+        if ($excludeDeprecated && null !== $context->runtime->vmContext) {
+            $names = self::namesFromVmTable(
+                VmReflection::declaredInterfacesTable($context->runtime->vmContext, true)
+            );
+
+            return self::wrapHashTable($context, self::emitInterfaceNames($context, $names));
+        }
+
         $names = $context->type->object->allDeclaredInterfaceNames();
         if ([] === $names && null !== $context->runtime->vmContext) {
-            $table = VmReflection::declaredInterfacesTable($context->runtime->vmContext);
-            foreach ($table->iterate(true) as $valueVar) {
-                $resolved = $valueVar->resolveIndirect();
-                if (VMVariable::TYPE_STRING === $resolved->type) {
-                    $names[] = $resolved->toString();
-                }
-            }
+            $names = self::namesFromVmTable(
+                VmReflection::declaredInterfacesTable($context->runtime->vmContext, false)
+            );
         }
 
         return self::wrapHashTable(
             $context,
             self::emitInterfaceNames($context, $names)
         );
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function namesFromVmTable(\PHPCompiler\VM\HashTable $table): array
+    {
+        $names = [];
+        foreach ($table->iterate(true) as $valueVar) {
+            $resolved = $valueVar->resolveIndirect();
+            if (VMVariable::TYPE_STRING === $resolved->type) {
+                $names[] = $resolved->toString();
+            }
+        }
+
+        return $names;
     }
 
     /**

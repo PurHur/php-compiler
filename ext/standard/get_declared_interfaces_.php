@@ -6,9 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -26,32 +24,22 @@ final class get_declared_interfaces_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc > 0) {
-            throw new \ArgumentCountError('get_declared_interfaces() expects exactly 0 arguments, '.$argc.' given');
-        }
+        $excludeDeprecated = VmReflection::parseExcludeDeprecatedArg($frame, 'get_declared_interfaces');
         if (null === $frame->returnVar) {
             return;
         }
         $frame->returnVar->array(
-            VmReflection::declaredInterfacesTable(VmReflection::requireContext($frame))
+            VmReflection::declaredInterfacesTable(
+                VmReflection::requireContext($frame),
+                $excludeDeprecated
+            )
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc > 0) {
-            TypeErrorRaise::ensureLinked($context);
-            TypeErrorRaise::emitArgumentCountError(
-                $context,
-                'get_declared_interfaces() expects exactly 0 arguments, '.$argc.' given'
-            );
-            $slot = JitValueBox::alloc($context);
+        $literal = GetDeclaredExcludeDeprecatedJit::parseLiteral($context, $args, 'get_declared_interfaces');
 
-            return JitValueBox::pointer($context, $slot);
-        }
-
-        return JitGetDeclaredInterfaces::invoke($context);
+        return JitGetDeclaredInterfaces::invoke($context, $literal ?? false);
     }
 }
