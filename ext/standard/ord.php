@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -26,12 +27,7 @@ final class ord extends Internal
     public function execute(Frame $frame): void
     {
         $this->requireExactArgCount($frame, 'ord', 1);
-        $s = VmString::coerceStringBuiltinArgNoObject(
-            $frame->calledArgs[0],
-            'ord',
-            0,
-            'character'
-        );
+        $s = VmString::stringBuiltinArgForFrame($frame, 0, 'ord', 0, 'character');
         if (null === $frame->returnVar) {
             return;
         }
@@ -47,7 +43,13 @@ final class ord extends Internal
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
-        $strPtr = JitOrd::lowerCharacter($context, $args[0]);
+        $strPtr = JitStringBuiltinArg::lowerStrictOrCoercible(
+            $context,
+            $args[0],
+            'ord',
+            0,
+            'character'
+        );
         $structName = $strPtr->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
         $lenPtr = $context->builder->structGep($strPtr, $map['length']);
