@@ -210,6 +210,7 @@ final class ModuleRegistry
             'zlib' => str_starts_with($functionName, 'gz')
                 || str_starts_with($functionName, 'zlib_')
                 || 'readgzfile' === $functionName,
+            'readline' => str_starts_with($functionName, 'readline'),
             default => false,
         };
     }
