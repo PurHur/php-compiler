@@ -204,7 +204,10 @@ final class LazyObjectSupport
             }
             $result = $result->resolveIndirect();
             if (!$result->isUndefined() && Variable::TYPE_NULL !== $result->type) {
-                throw new \LogicException('Lazy object initializer must return NULL or no value');
+                // php-src ignores object returns from ghost initializers (#12309, zend_lazy_objects.c).
+                if (Variable::TYPE_OBJECT !== $result->type) {
+                    throw new \LogicException('Lazy object initializer must return NULL or no value');
+                }
             }
             $object->constructed = true;
             $object->lazyPending = false;
