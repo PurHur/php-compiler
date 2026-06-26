@@ -15,6 +15,15 @@ final class IniRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/IniJitHelper.php');
         $this->assertStringContainsString('VmIni::', $source);
         $this->assertStringContainsString('ErrorSilenceJitHelper', $source);
+        // Cross-class array const fetch breaks inventory argv AOT compile (#12178 regression).
+        $this->assertStringContainsString('EMPTY_STRING_INI_KEYS', $source);
+        $this->assertStringNotContainsString('VmIni::EMPTY_STRING_INI_KEYS', $source);
+    }
+
+    public function testIniJitHelperEmptyStringIniKeysParity(): void
+    {
+        $this->assertSame('', IniJitHelper::iniGet('auto_prepend_file'));
+        $this->assertSame('', IniJitHelper::iniGet('error_log'));
     }
 
     public function testIniRuntimeUsesJitHelperNotLlvmKeyWalk(): void
