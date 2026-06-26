@@ -24,9 +24,13 @@ final class DefineJitHelper
     /** Zend defined() / define() duplicate guard on user constant table (#10031). */
     public static function isDefined(HashTable $table, string $name): bool
     {
-        $key = new Variable(Variable::TYPE_STRING);
-        $key->string($name);
+        // String-key lookup via find() — nested JIT compile of Variable::string() is not lowered (#1492 M4).
+        $stored = $table->find($name);
+        if (null === $stored) {
+            return false;
+        }
+        $value = $stored->resolveIndirect();
 
-        return $table->offsetIsSet($key);
+        return !$value->isUndefined() && Variable::TYPE_NULL !== $value->type;
     }
 }
