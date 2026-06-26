@@ -89,6 +89,8 @@ final class BuiltinParamNames
                 return ['num', 'decimals', 'decimal_separator', 'thousands_separator'];
             case 'modf':
                 return ['num', 'num2'];
+            case 'round':
+                return ['num', 'precision', 'mode'];
             case 'frexp':
                 return ['arg1', 'exp'];
             case 'ldexp':

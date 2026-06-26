@@ -401,4 +401,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
             self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', $fn), $fn);
         }
     }
+
+    /** @covers issue #12103 */
+    public function testRoundNamedParameters(): void
+    {
+        $names = BuiltinParamNames::forFunction('round');
+        self::assertSame(['num', 'precision', 'mode'], $names);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'num', 'round'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'precision', 'round'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'mode', 'round'));
+    }
 }
