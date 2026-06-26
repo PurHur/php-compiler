@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -33,6 +34,7 @@ final class hash_hkdf extends Internal
                 'hash_hkdf() requires string algorithm and key in this compiler build'
             );
         }
+        VmString::rejectEmptyBuiltinStringArg($key->toString(), 'hash_hkdf', 1, 'key');
         $length = 0;
         if ($argc >= 3) {
             $length = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'hash_hkdf', 3, 'length');
@@ -77,11 +79,18 @@ final class hash_hkdf extends Internal
         }
         $info = JitStringArg::lower($context, $args[3] ?? self::emptyStringJit($context), 'hash_hkdf() info');
         $salt = JitStringArg::lower($context, $args[4] ?? self::emptyStringJit($context), 'hash_hkdf() salt');
+        $key = JitStringArg::lower($context, $args[1], 'hash_hkdf() key');
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[1],
+            $key,
+            'hash_hkdf(): Argument #2 ($key) cannot be empty'
+        );
 
         return JitHash::hashHkdf(
             $context,
             JitStringArg::lower($context, $args[0], 'hash_hkdf() algorithm'),
-            JitStringArg::lower($context, $args[1], 'hash_hkdf() key'),
+            $key,
             $length,
             $info,
             $salt

@@ -56,6 +56,10 @@ final class VmHash
         string $info = '',
         string $salt = ''
     ): string {
+        if ('' === $key) {
+            throw new \ValueError('hash_hkdf(): Argument #2 ($key) cannot be empty');
+        }
+
         return VmHashNative::hashHkdf($algo, $key, $length, $info, $salt);
     }
 
