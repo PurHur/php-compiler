@@ -73,6 +73,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'lib/JIT/Builtin/IniRuntime.php' => 'IniJitHelper',
             'lib/JIT/Builtin/IniIntrospectionRuntime.php' => 'IniIntrospectionJitHelper',
             'lib/JIT/Builtin/StringJsonDecodeJit.php' => '__compiler_json_decode',
+            'lib/JIT/Builtin/StringJsonDecode.php' => 'JsonDecodeJitHelper',
             'lib/JIT/Builtin/PasswordCryptoRuntime.php' => 'password_hash',
             'lib/JIT/Builtin/StringHashCryptoPhp.php' => 'HashCryptoJitHelper',
             'lib/JIT/Builtin/StringDirJit.php' => 'phpc_dir',
