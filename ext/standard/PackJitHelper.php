@@ -31,6 +31,16 @@ final class PackJitHelper
     }
 
     /**
+     * Decode argv blob from {@see PackArgvSerialize} for other JIT helpers (#9131).
+     *
+     * @return list<int|float|bool|string|null>
+     */
+    public static function decodePackedArgv(string $packed): array
+    {
+        return self::unpackArgv($packed);
+    }
+
+    /**
      * @return list<int|float|bool|string|null>
      */
     private static function unpackArgv(string $packed): array
