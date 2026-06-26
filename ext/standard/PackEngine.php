@@ -436,6 +436,11 @@ final class PackEngine
             }
         }
 
+        // php-src ext/standard/pack.c: odd nibble count emits high/low nibble as one byte (#12217).
+        if (!$first) {
+            $out .= \chr($byte);
+        }
+
         return $out;
     }
 
