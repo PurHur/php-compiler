@@ -80,7 +80,10 @@ final class proc_open extends Internal
     {
         $arg = $arg->resolveIndirect();
         if (Variable::TYPE_STRING === $arg->type) {
-            return $arg->toString();
+            $command = $arg->toString();
+            VmString::rejectEmptyBuiltinStringArg($command, $functionName, $argNum - 1, 'command');
+
+            return $command;
         }
         if (Variable::TYPE_ARRAY === $arg->type) {
             $parts = [];
@@ -92,6 +95,13 @@ final class proc_open extends Internal
                     $argNum,
                     'command'
                 );
+            }
+            if ([] === $parts) {
+                throw new \ValueError(\sprintf(
+                    '%s(): Argument #%d ($command) must have at least one element',
+                    $functionName,
+                    $argNum
+                ));
             }
 
             return $parts;
