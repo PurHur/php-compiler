@@ -72,7 +72,11 @@ final class VmSerialize
                 return self::encodeSleepObject($ctx, $entry);
             }
 
-            return self::encodePlainObject($ctx, $entry, $frame);
+            return self::encodePlainObjectWire($ctx, $entry, $frame);
+        }
+
+        if (Variable::TYPE_ARRAY === $value->type) {
+            return self::encodeWireArray($ctx, $value, new VmSerializeRefState(), $frame);
         }
 
         return self::serializeExported(self::exportForSerialize($ctx, $value));
@@ -211,10 +215,17 @@ final class VmSerialize
                 return false;
             }
 
+            if (\preg_match('/^O:(\d+):"((?:[^"\\\\]|\\\\.)*)":(\d+):\{(.*)\}$/s', $payload, $m)) {
+                $inner = $m[4];
+                $propCount = (int) $m[3];
+
+                return VmUnserializeFormat::decodeObjectPropertyBag($ctx, $class, $propCount, $inner, $frame);
+            }
+
             return self::instantiatePlainObject($ctx, $class, $data, $frame);
         }
 
-        return VmUnserializeFormat::decodeToVariable($payload, $options);
+        return VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload, $options, $frame);
     }
 
     /**
@@ -386,7 +397,7 @@ final class VmSerialize
             return self::encodeSleepObject($ctx, $entry);
         }
 
-        return self::encodePlainObject($ctx, $entry, $frame);
+        return self::encodePlainObjectWire($ctx, $entry, $frame, $state);
     }
 
     /** Zend Serializable custom object format: C:len:"Class":datalen:{payload} */
@@ -672,16 +683,45 @@ final class VmSerialize
     }
 
     /**
+     * Zend plain object wire with object-reference markers (ext/standard/var.c, #12082).
+     */
+    private static function encodePlainObjectWire(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?Frame $frame = null,
+        ?VmSerializeRefState $state = null
+    ): string {
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->objectIndex[$entry] = 1;
+            $state->nextIndex = 2;
+        } elseif (null === $state->lookupObjectIndex($entry)) {
+            $state->assignObjectIndex($entry);
+        }
+
+        $body = '';
+        $count = 0;
+        foreach (self::collectPlainObjectSerializeProperties($ctx, $entry, $frame) as $name => $value) {
+            $keyVar = new Variable();
+            $keyVar->string($name);
+            $body .= self::encodeWireKey($keyVar);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $className = $entry->class->name;
+        $classLen = \strlen($className);
+
+        return 'O:'.$classLen.':"'.$className.'":'.$count.':{'.$body.'}';
+    }
+
+    /**
      * Zend php_var_serialize() plain object branch — public properties + dynamic props (#3621, var.c).
      * Private/protected mangling deferred to #3497.
      */
     private static function encodePlainObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
-        return self::encodeObjectPropertyBag(
-            $ctx,
-            $entry->class->name,
-            self::collectPlainObjectSerializeProperties($ctx, $entry, $frame)
-        );
+        return self::encodePlainObjectWire($ctx, $entry, $frame);
     }
 
     /**
