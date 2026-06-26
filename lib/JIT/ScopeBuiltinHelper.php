@@ -62,13 +62,6 @@ final class ScopeBuiltinHelper
      */
     public static function extract(Context $context, Variable $array, ?Variable $flagsArg = null, ?Variable $prefixArg = null): Value
     {
-        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
-            throw new \LogicException('extract() first argument must be an array in this compiler build');
-        }
-        if (Variable::TYPE_HASHTABLE !== $array->type) {
-            throw new \LogicException('extract() first argument must be an array in this compiler build');
-        }
-
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $flags = self::resolveFlags($context, $flagsArg);
         $named = self::namedVariablesInScope($context);

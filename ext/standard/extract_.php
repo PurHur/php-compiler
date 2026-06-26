@@ -33,6 +33,7 @@ final class extract_ extends Internal
         if (\count($args) < 1 || \count($args) > 3) {
             throw new \LogicException('extract() requires one to three arguments in this compiler build');
         }
+        JitArrayKey::requireArrayArg($context, $args[0], 'extract');
         $flags = 2 <= \count($args) ? $args[1] : null;
         $prefix = 3 === \count($args) ? $args[2] : null;
 
