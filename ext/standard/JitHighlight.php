@@ -81,7 +81,7 @@ final class JitHighlight
     }
 
     /**
-     * highlight_file() read failure — Zend returns empty HTML when $return is true (#12032).
+     * highlight_file() read failure — Zend returns false when $return is true (#12140).
      *
      * @param list<JITVariable> $args
      */
@@ -92,17 +92,7 @@ final class JitHighlight
         string $functionName
     ): Value {
         $returnLit = self::compileTimeReturn($context, $args, $argc);
-        if (true === $returnLit) {
-            return self::materializeHtml($context, HighlightEngine::EMPTY_HIGHLIGHT_HTML, true);
-        }
-        if (false === $returnLit) {
-            $slot = JitValueBox::alloc($context);
-            $ptr = JitValueBox::pointer($context, $slot);
-            JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
-
-            return $ptr;
-        }
-        if (1 === $argc) {
+        if (true === $returnLit || false === $returnLit || 1 === $argc) {
             $slot = JitValueBox::alloc($context);
             $ptr = JitValueBox::pointer($context, $slot);
             JitValueBox::writeBool($context, $slot, $context->constantFromBool(false));
@@ -117,7 +107,9 @@ final class JitHighlight
         $context->builder->branchIf($returns, $returnBb, $falseBb);
 
         $context->builder->positionAtEnd($returnBb);
-        $htmlPtr = self::materializeHtml($context, HighlightEngine::EMPTY_HIGHLIGHT_HTML, true);
+        $returnSlot = JitValueBox::alloc($context);
+        $returnPtr = JitValueBox::pointer($context, $returnSlot);
+        JitValueBox::writeBool($context, $returnSlot, $context->constantFromBool(false));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($falseBb);
@@ -129,7 +121,7 @@ final class JitHighlight
         $context->builder->positionAtEnd($doneBb);
         $ptrTy = $context->getTypeFromString('__value__*');
         $result = $context->builder->phi($ptrTy);
-        $result->addIncoming($htmlPtr, $returnBb);
+        $result->addIncoming($returnPtr, $returnBb);
         $result->addIncoming($ptr, $falseBb);
 
         return $result;
