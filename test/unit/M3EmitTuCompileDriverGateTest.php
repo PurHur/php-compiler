@@ -20,6 +20,8 @@ final class M3EmitTuCompileDriverGateTest extends TestCase
         $this->assertStringContainsString('m3EmitTuCompilerCompileChainLoweringSuffixes', $jit);
         $this->assertStringContainsString('isM3EmitTuRuntimeCompileDriverSpineLoweringName', $jit);
         $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine', $jit);
+        $this->assertStringContainsString('shouldRealLowerInventoryArgvParseSpine())', $jit);
+        $this->assertStringContainsString('emitparseandcompilenulldiagnostic', $jit);
         $this->assertStringContainsString('shouldUseM4InventoryArgvNativeEmitRebuild', $jit);
         $this->assertStringContainsString('isLiteralIncludeDiscoveryRealLoweringMethod', $jit);
         $this->assertStringContainsString('isDeployRootRealLoweringMethod', $jit);
