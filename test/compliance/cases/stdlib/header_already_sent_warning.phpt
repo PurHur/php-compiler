@@ -14,7 +14,7 @@ var_export($r);
 echo "\n";
 echo 'warnings=', count($warnings), "\n";
 if ($warnings) {
-    echo str_contains($warnings[0], 'Cannot modify header information') ? 'warn_ok' : 'warn_bad', "\n";
+    echo str_contains($warnings[0], 'headers already sent by') ? 'warn_ok' : 'warn_bad', "\n";
 }
 --EXPECT--
 xNULL
