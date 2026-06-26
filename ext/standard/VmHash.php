@@ -70,6 +70,13 @@ final class VmHash
         int $length = 0,
         bool $raw = false
     ): string {
+        if ($iterations < 1) {
+            throw new \ValueError('hash_pbkdf2(): Argument #4 ($iterations) must be greater than 0');
+        }
+        if ($length < 0) {
+            throw new \ValueError('hash_pbkdf2(): Argument #5 ($length) must be greater than or equal to 0');
+        }
+
         return VmHashNative::hashPbkdf2($algo, $password, $salt, $iterations, $length, $raw);
     }
 
