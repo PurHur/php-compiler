@@ -74,6 +74,12 @@ class Context {
     /** Catch frame for throw/TypeError during nested property-hook invoke; bubble to caller (#7301, #9503). */
     public ?Frame $propertyHookExternalCatchFrame = null;
 
+    /** True while user __clone() runs on an isolated run stack (#12068, zend_object_handlers.c). */
+    public bool $invokingCloneMagic = false;
+
+    /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
+    public ?Frame $cloneMagicExternalCatchFrame = null;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 

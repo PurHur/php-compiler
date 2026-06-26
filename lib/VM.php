@@ -2110,11 +2110,14 @@ class VM {
      * Must run on an isolated run stack with parent frame linkage — nested runFrames() from
      * invokePhpFunctionOnStack would pop the clone opcode caller off the shared stack (#10165).
      */
-    protected function invokeCloneMagicMethod(ObjectEntry $object, Frame $parentFrame): void
+    /**
+     * @return null when __clone completed, or a catch frame when throw bubbled from isolated stack (#12068)
+     */
+    protected function invokeCloneMagicMethod(ObjectEntry $object, Frame $parentFrame): ?Frame
     {
         $class = $object->class;
         if (!isset($class->methods['__clone'])) {
-            return;
+            return null;
         }
         $func = $class->methods['__clone'];
         $thisVar = new Variable(Variable::TYPE_OBJECT);
@@ -2122,6 +2125,9 @@ class VM {
         $savedStack = null !== $this->context->currentFiber
             ? null
             : $this->context->swapRunStack(null);
+        $savedExternalCatch = $this->context->cloneMagicExternalCatchFrame;
+        $this->context->cloneMagicExternalCatchFrame = null;
+        $this->context->invokingCloneMagic = true;
         try {
             $child = $func->getFrame($this->context, $parentFrame);
             $child->calledArgs = [$thisVar];
@@ -2139,13 +2145,20 @@ class VM {
             $child->returnVar = $out;
             $this->context->push($child);
             $result = $this->runFrames();
+            if (null !== $this->context->cloneMagicExternalCatchFrame) {
+                return $this->context->cloneMagicExternalCatchFrame;
+            }
             if (self::FIBER_SUSPEND === $result) {
                 throw new \LogicException('Fiber suspend during __clone() is not supported in this compiler build');
             }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('__clone() invocation failed in this compiler build');
             }
+
+            return null;
         } finally {
+            $this->context->invokingCloneMagic = false;
+            $this->context->cloneMagicExternalCatchFrame = $savedExternalCatch;
             if (null !== $savedStack) {
                 $this->context->swapRunStack($savedStack);
             }
@@ -6110,8 +6123,12 @@ restart:
                         goto restart;
                     }
                     $cloned = $srcObject->cloneShallow();
+                    $catchFrame = $this->invokeCloneMagicMethod($cloned, $frame);
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
                     $result->object($cloned);
-                    $this->invokeCloneMagicMethod($cloned, $frame);
                     break;
                 case OpCode::TYPE_BOOLEAN_NOT:
                     $value = !($frame->scope[$op->arg2]->toBool());
@@ -6852,6 +6869,16 @@ restart:
                     $thrown = $frame->scope[$op->arg1]->resolveIndirect();
                     if (null !== $op->arg2) {
                         VM\ExceptionSupport::stampThrowLine($thrown, (int) $op->arg2);
+                    }
+                    if ($this->context->invokingCloneMagic) {
+                        $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
+                        if (null !== $catchFrame) {
+                            // Bubble to clone opcode caller — discard partial clone (#12068, zend_object_handlers.c).
+                            $this->context->cloneMagicExternalCatchFrame = $catchFrame;
+
+                            return self::FAILURE;
+                        }
+                        break;
                     }
                     if ($this->frameIsPropertyGetHook($frame)) {
                         $catchFrame = $this->dispatchEngineThrow($frame, $thrown);
