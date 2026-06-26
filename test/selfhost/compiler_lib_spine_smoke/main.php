@@ -1014,6 +1014,7 @@ require_once __DIR__.'/../../../ext/standard/VmChrootNative.php';
 require_once __DIR__.'/../../../ext/standard/VmClassHas.php';
 require_once __DIR__.'/../../../ext/standard/VmCli.php';
 require_once __DIR__.'/../../../ext/standard/VmCliArgv.php';
+require_once __DIR__.'/../../../ext/standard/VmCliProcessTitlePure.php';
 require_once __DIR__.'/../../../ext/standard/VmCliProcessTitleNative.php';
 require_once __DIR__.'/../../../ext/standard/VmClockGettime.php';
 require_once __DIR__.'/../../../ext/standard/VmClosureCall.php';
