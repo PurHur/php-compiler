@@ -69,4 +69,25 @@ final class StreamResolveIncludePathTest extends TestCase
         @\unlink($file);
         @\rmdir($dir);
     }
+
+    public function testDotAndEmptyResolveToCwd(): void
+    {
+        $cwd = \getcwd();
+        if (false === $cwd) {
+            $this->markTestSkipped('getcwd unavailable');
+        }
+        $runtime = new Runtime();
+        $resolve = new stream_resolve_include_path();
+        foreach (['.', ''] as $filename) {
+            $frame = $resolve->getFrame($runtime->vmContext);
+            $nameArg = new VMVariable();
+            $nameArg->string($filename);
+            $frame->calledArgs[] = $nameArg;
+            $frame->returnVar = new VMVariable();
+            $resolve->execute($frame);
+            $result = $frame->returnVar->resolveIndirect();
+            $this->assertSame(VMVariable::TYPE_STRING, $result->type);
+            $this->assertSame($cwd, $result->toString());
+        }
+    }
 }
