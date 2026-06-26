@@ -82,7 +82,7 @@ final class JitEnv
                 $cStr
             );
 
-            return $context->builder->constInt(1, false, $context->getTypeFromString('int1'));
+            return $context->getTypeFromString('int1')->constInt(1, false);
         }
 
         return $context->builder->call(

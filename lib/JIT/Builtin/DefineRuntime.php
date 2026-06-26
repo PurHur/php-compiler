@@ -4,39 +4,27 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\HashTableHelper;
-use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
-use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for define()/defined()/constant() via DefineJitHelper PHP (#4435, #9410).
+ * JIT/AOT link for define()/defined()/constant() (#4435, #9410).
+ *
+ * LLVM table ops use __hashtable__* intrinsics; VM host SSOT remains
+ * {@see \PHPCompiler\ext\standard\DefineJitHelper} (nested JIT cannot lower
+ * HashTable::find / Variable::string on the M4 inventory argv spine — #1492).
  *
  * php-src: ext/standard/basic_functions.c — define, defined, constant
  */
 final class DefineRuntime
 {
-    private const HELPER_PATH = '/ext/standard/DefineJitHelper.php';
-
-    private const CREATE_TABLE = 'PHPCompiler\\ext\\standard\\DefineJitHelper::createTable';
-
-    private const IS_DEFINED = 'PHPCompiler\\ext\\standard\\DefineJitHelper::isDefined';
-
     private const TABLE_GLOBAL = 'phpc_define_jit_table';
 
     private const SEEDED_GLOBAL = 'phpc_user_constants_seeded';
-
-    /** @var list<string> */
-    private const COMPILED_HELPERS = [
-        self::CREATE_TABLE,
-        self::IS_DEFINED,
-    ];
 
     private static int $blockSeq = 0;
 
@@ -91,22 +79,11 @@ final class DefineRuntime
 
     private static function callIsDefined(Context $context, Value $ht, Value $nameStr): Value
     {
-        self::ensureJitHelperCompiled($context);
-        $helperFn = self::helperFunction($context, self::IS_DEFINED);
-        $htArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
+        return $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
             $ht,
-            $helperFn->getParam(0)->typeOf()
+            $nameStr
         );
-        $nameArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $nameStr,
-            $helperFn->getParam(1)->typeOf()
-        );
-        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$htArg, $nameArg]);
-        $i1 = $context->getTypeFromString('int1');
-
-        return JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i1);
     }
 
     public static function loadTable(Context $context): Value
@@ -133,8 +110,7 @@ final class DefineRuntime
         $context->builder->branchIf($isNull, $init, $ready);
 
         $context->builder->positionAtEnd($init);
-        self::ensureJitHelperCompiled($context);
-        $ht = $context->builder->call(self::helperFunction($context, self::CREATE_TABLE));
+        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($ht, $global);
         $initEnd = $context->builder->getInsertBlock();
         $context->builder->branch($ready);
@@ -249,49 +225,6 @@ final class DefineRuntime
                 );
             default:
                 return null;
-        }
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after DefineJitHelper compile (#9410)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'DefineJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('DefineJitHelper.php parseAndCompile failed (#9410)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9410)');
-            }
         }
     }
 }

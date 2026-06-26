@@ -24,11 +24,11 @@ final class HashTableHelperShrinkTest extends TestCase
         $this->assertStringContainsString('HashTableReadLlvm::readIndexedToValueBox', $source);
     }
 
-    public function testDefineRuntimeUsesDefineJitHelperIsDefined(): void
+    public function testDefineRuntimeUsesLlvmOffsetIsSetStringKey(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DefineRuntime.php');
-        $this->assertStringContainsString('DefineJitHelper::isDefined', $source);
-        $this->assertStringNotContainsString('__hashtable__offsetIsSetStringKey', $source);
+        $this->assertStringContainsString('__hashtable__offsetIsSetStringKey', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
     }
 
     public function testHashTableJitHelperSemanticsOnHost(): void
