@@ -34,6 +34,9 @@ final class ArrayIteratorBuiltin
         if (isset($ctx->classes['countable'])) {
             $entry->interfaces[] = 'countable';
         }
+        if (isset($ctx->classes['arrayaccess'])) {
+            $entry->interfaces[] = 'arrayaccess';
+        }
 
         $entry->constructor = new ArrayIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -54,6 +57,14 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['getarraycopy'] = $pub;
         $entry->methods['append'] = new ArrayIteratorAppend();
         $entry->methodVisibility['append'] = $pub;
+        $entry->methods['offsetget'] = new ArrayIteratorOffsetGet();
+        $entry->methodVisibility['offsetget'] = $pub;
+        $entry->methods['offsetset'] = new ArrayIteratorOffsetSet();
+        $entry->methodVisibility['offsetset'] = $pub;
+        $entry->methods['offsetexists'] = new ArrayIteratorOffsetExists();
+        $entry->methodVisibility['offsetexists'] = $pub;
+        $entry->methods['offsetunset'] = new ArrayIteratorOffsetUnset();
+        $entry->methodVisibility['offsetunset'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -281,5 +292,110 @@ final class ArrayIteratorAppend extends VmClassMethod
             );
         }
         SplArrayStorage::append($object, $frame->calledArgs[1]);
+    }
+}
+
+final class ArrayIteratorOffsetGet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetGet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetGet()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetGet() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplArrayStorage::offsetGet($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+final class ArrayIteratorOffsetSet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetSet()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetSet() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+    }
+}
+
+final class ArrayIteratorOffsetExists extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetExists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetExists()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetExists() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(SplArrayStorage::offsetExists($object, $frame->calledArgs[1]));
+    }
+}
+
+final class ArrayIteratorOffsetUnset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetUnset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::offsetUnset()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::offsetUnset() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
     }
 }
