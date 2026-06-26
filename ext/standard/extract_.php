@@ -30,11 +30,12 @@ final class extract_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 1 || \count($args) > 2) {
-            throw new \LogicException('extract() requires one or two arguments in this compiler build');
+        if (\count($args) < 1 || \count($args) > 3) {
+            throw new \LogicException('extract() requires one to three arguments in this compiler build');
         }
-        $flags = 2 === \count($args) ? $args[1] : null;
+        $flags = 2 <= \count($args) ? $args[1] : null;
+        $prefix = 3 === \count($args) ? $args[2] : null;
 
-        return ScopeBuiltinHelper::extract($context, $args[0], $flags);
+        return ScopeBuiltinHelper::extract($context, $args[0], $flags, $prefix);
     }
 }
