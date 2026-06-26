@@ -30,6 +30,9 @@ final class HighlightEngine
 
     public static function render(string $code): string
     {
+        if ('' === $code) {
+            return self::EMPTY_HIGHLIGHT_HTML;
+        }
         $tokens = LanguageScanner::tokenize($code);
         $body = self::renderTokens($tokens);
 
