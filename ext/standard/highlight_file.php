@@ -46,6 +46,11 @@ final class highlight_file extends Internal
             if (null === $frame->returnVar) {
                 return;
             }
+            if ($return) {
+                $frame->returnVar->string(HighlightEngine::EMPTY_HIGHLIGHT_HTML);
+
+                return;
+            }
             $frame->returnVar->bool(false);
 
             return;
