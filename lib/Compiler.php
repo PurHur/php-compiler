@@ -12956,16 +12956,6 @@ class Compiler {
                 return null;
             }
         }
-        // array_column(nested inline array, column_key, …) — lone outer Array_ is always arg 0 (#9305, #10042).
-        if (
-            1 === \count($producers)
-            && $producers[0] instanceof Op\Expr\Array_
-            && \count($nonEmbeddedArgIndices) >= 2
-            && 0 === ($nonEmbeddedArgIndices[0] ?? -1)
-            && 0 === $argIndex
-        ) {
-            return $producers[0];
-        }
         // array_column([[..],[..]], 'name', null) — outer Array_ + trailing null ConstFetch (#9305).
         if (
             2 === \count($producers)
