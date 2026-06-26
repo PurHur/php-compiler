@@ -35,9 +35,9 @@ final class VmDirRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@\\\\scandir\\s*\\(/', $source);
     }
 
-    public function testVmFsGlobFallbackDoesNotCallHostOpendir(): void
+    public function testVmFsGlobPureDoesNotCallHostOpendir(): void
     {
-        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmFsGlob.php');
+        $source = (string) file_get_contents($this->repoRoot.'/ext/standard/VmFsGlobPure.php');
         $this->assertStringContainsString('VmDirNative::listSorted', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\opendir\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression('/@\\\\readdir\\s*\\(/', $source);
