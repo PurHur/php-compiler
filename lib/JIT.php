@@ -133,6 +133,9 @@ class JIT {
             && (null !== $this->m3EmitTuMainBlock || null !== $this->m3CompileDriverMainBlock)
         ) {
             $this->ensureM3EmitTuCompilerRuntimeCompileDeps();
+            if ($this->shouldEnsureInventoryArgvParseHelperStubs()) {
+                $this->ensureM3EmitTuRuntimeParseSpineDeps();
+            }
         }
         $emitHelperStubBlock = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
         if (null !== $emitHelperStubBlock && ($this->shouldStubInventoryEmitHelperBundledBodies() || $this->shouldRealLowerInventoryArgvParseSpine())) {
@@ -988,6 +991,21 @@ class JIT {
     private function shouldRealLowerInventoryArgvParseSpine(): bool
     {
         return $this->shouldUseM3InventoryEmitDriver() && $this->shouldUseM3CompileDriverRealLowering();
+    }
+
+    /** Register Runtime parse-diagnostic LLVM stubs for helloworld bin/compile.php inventory argv (#12036). */
+    private function shouldEnsureInventoryArgvParseHelperStubs(): bool
+    {
+        if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+            return true;
+        }
+        $m3Driver = getenv('PHP_COMPILER_M3_COMPILE_DRIVER');
+        if ('1' !== $m3Driver && 'true' !== strtolower((string) $m3Driver)) {
+            return false;
+        }
+        $main = $this->m3CompileDriverMainBlock ?? $this->m3EmitTuMainBlock;
+
+        return null !== $main && $this->isM4BinCompileScriptMain($main);
     }
 
     /**
@@ -4282,7 +4300,7 @@ class JIT {
     /** Private Runtime helpers required before lowering parse() on inventory argv links (#2967). */
     private function ensureM3EmitTuRuntimeParseSpineDeps(): void
     {
-        if (!$this->shouldRealLowerInventoryArgvParseSpine()) {
+        if (!$this->shouldEnsureInventoryArgvParseHelperStubs()) {
             return;
         }
         $this->ensureM3EmitTuRuntimeInventoryArgvParsePreprocessStubs();
@@ -13817,12 +13835,15 @@ class JIT {
             if (
                 'getfile' === $methodLc
                 && str_starts_with($declaringClassLc, 'phpcompiler\\')
-                && $this->shouldUseM3InventoryEmitDriver()
+                && ($this->shouldUseM3InventoryEmitDriver() || $this->shouldEnsureInventoryArgvParseHelperStubs())
             ) {
                 // $script->main->getFile() temps lose PHPCfg userType on inventory argv spine (#11809).
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy('phpcfg\\func::getfile');
                 $this->context->scope->args = [$receiverVar];
 
+                return;
+            }
+            if ($this->tryInitInventoryArgvRuntimeParseHelperCall($methodLc, $dispatchReceiver)) {
                 return;
             }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
@@ -13879,6 +13900,40 @@ class JIT {
         }
         $this->context->scope->toCall = $staticProxy;
         $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
+    }
+
+    /** Lazily register Runtime parse-diagnostic stubs on helloworld bin/compile.php inventory argv (#12036). */
+    private function tryInitInventoryArgvRuntimeParseHelperCall(
+        string $methodLc,
+        Variable $dispatchReceiver
+    ): bool {
+        if (!$this->shouldEnsureInventoryArgvParseHelperStubs()) {
+            return false;
+        }
+        static $allowed = [
+            'detectfilestricttypes' => true,
+            'resetparsernameresolverstate' => true,
+            'formatparseandcompilenulldetail' => true,
+            'emitparseandcompilenulldiagnostic' => true,
+            'recordlastparsefailure' => true,
+            'formatphpparsererrorcontext' => true,
+            'emitparsecompilefailurestderr' => true,
+        ];
+        if (!isset($allowed[$methodLc])) {
+            return false;
+        }
+        $logical = 'PHPCompiler\\Runtime::'.$methodLc;
+        $lc = strtolower($logical);
+        if (!$this->context->functionIsRegistered($lc)) {
+            $this->ensureM3EmitTuRuntimeParseSpineDeps();
+        }
+        if (!$this->context->functionIsRegistered($lc)) {
+            return false;
+        }
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($lc);
+        $this->context->scope->args = [$dispatchReceiver];
+
+        return true;
     }
 
     /**

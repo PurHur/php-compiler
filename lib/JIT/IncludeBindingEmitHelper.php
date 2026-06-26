@@ -136,7 +136,7 @@ final class IncludeBindingEmitHelper
 
     public static function emitCalleeLocalBinding(
         Context $context,
-        JIT $jit,
+        \PHPCompiler\JIT $jit,
         Operand $calleeOp,
         Variable $callerVar
     ): void {
