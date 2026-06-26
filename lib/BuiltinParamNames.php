@@ -10,10 +10,29 @@ namespace PHPCompiler;
 final class BuiltinParamNames
 {
     /**
+     * php-src stub parameter names for VM builtin class methods (#11785, ext/date/php_date.stub.php).
+     *
      * @return list<string>|null
      */
+    public static function forClassMethod(string $qualifiedMethod): ?array
+    {
+        return match (strtolower($qualifiedMethod)) {
+            'datetime::createfromformat',
+            'datetimeimmutable::createfromformat' => ['format', 'datetime', 'timezone'],
+            'datetime::__construct',
+            'datetimeimmutable::__construct' => ['datetime', 'timezone'],
+            'datetimezone::__construct' => ['timezone'],
+            default => null,
+        };
+    }
+
     public static function forFunction(string $name): ?array
     {
+        $classMethod = self::forClassMethod($name);
+        if (null !== $classMethod) {
+            return $classMethod;
+        }
+
         $lc = strtolower($name);
         switch ($lc) {
             case 'strlen':
@@ -320,6 +339,9 @@ final class BuiltinParamNames
     public static function aliasesForFunction(string $name): array
     {
         $lc = strtolower($name);
+        if (str_contains($lc, '::')) {
+            return self::aliasesForClassMethod($lc);
+        }
         if ('implode' === $lc || 'join' === $lc) {
             // php-src InternalArgInfo glue/pieces; public stub names separator/array (#9985).
             return [
@@ -332,6 +354,21 @@ final class BuiltinParamNames
             return [
                 'input' => 0,
             ];
+        }
+
+        return [];
+    }
+
+    /**
+     * Public stub names that differ from internal arginfo (#11785, DateTime::createFromFormat datetime).
+     *
+     * @return array<string, int>
+     */
+    public static function aliasesForClassMethod(string $qualifiedMethod): array
+    {
+        $lc = strtolower($qualifiedMethod);
+        if (str_ends_with($lc, '::createfromformat')) {
+            return ['datetime' => 1];
         }
 
         return [];

@@ -50,6 +50,9 @@ class Frame {
     /** Class used for the pending static call (set by STATICCALL_INIT / initStaticCallable). */
     public ?string $staticCallClass = null;
 
+    /** Qualified builtin callee for named-arg binding (e.g. DateTime::createFromFormat; #11785). */
+    public ?string $builtinCalleeQualifiedMethod = null;
+
     /** Active generator while executing a generator function body (issue #167). */
     public ?VM\GeneratorState $generatorState = null;
 
