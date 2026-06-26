@@ -95,6 +95,22 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'override_class_exists')) {
                 continue;
             }
+            // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
+            if (!CompilerVersion::supportsOverrideAttribute()
+                && (str_contains($name, 'override_attribute_invalid')
+                    || str_contains($name, 'override_attribute_fatal')
+                    || str_contains($name, 'override_attribute_invalid_target')
+                    || str_contains($name, 'override_signature_mismatch')
+                    || str_contains($name, 'override_private_parent')
+                    || str_contains($name, 'override_class_constant_invalid')
+                    || str_contains($name, 'override_property_invalid'))) {
+                continue;
+            }
+            if (CompilerVersion::supportsOverrideAttribute()
+                && (str_contains($name, 'override_attribute_82_no_validate')
+                    || str_contains($name, 'override_missing_parent_reference_profile'))) {
+                continue;
+            }
             if (!CompilerVersion::advertisesDeprecatedAttributeClass()
                 && str_contains($name, 'deprecated_attribute_class')) {
                 continue;

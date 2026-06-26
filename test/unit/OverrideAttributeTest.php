@@ -4,14 +4,44 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #3211 */
 final class OverrideAttributeTest extends TestCase
 {
+    private function requireOverrideValidation(): void
+    {
+        if (!CompilerVersion::supportsOverrideAttribute()) {
+            $this->markTestSkipped('Override validation disabled on reference profile');
+        }
+    }
+
+    public function testOverrideWithoutParentCompilesOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsOverrideAttribute()) {
+            $this->markTestSkipped('Requires PHP 8.2 reference profile');
+        }
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class A {}
+class B extends A {
+    #[\Override]
+    public function foo(): void {}
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'override_no_parent_ref.php'));
+        $this->assertSame("ok\n", ob_get_clean());
+    }
+
     public function testInvalidOverrideFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -63,6 +93,7 @@ PHP;
 
     public function testOverrideSignatureMismatchFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -120,6 +151,7 @@ PHP;
 
     public function testOverrideOnTraitMethodFailsWhenNoParentAtUseSite(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -156,6 +188,7 @@ PHP;
 
     public function testOverrideOnClassFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -174,6 +207,7 @@ PHP;
 
     public function testOverrideOnTraitDeclarationFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -187,6 +221,7 @@ PHP;
 
     public function testOverrideFailsWhenParentMethodIsPrivate(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -289,6 +324,7 @@ PHP;
 
     public function testInvalidOverrideOnClassConstantFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -315,6 +351,7 @@ PHP;
 
     public function testInvalidOverrideOnPropertyFailsAtCompileTime(): void
     {
+        $this->requireOverrideValidation();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
