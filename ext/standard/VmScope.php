@@ -81,10 +81,7 @@ final class VmScope
             throw new \LogicException('extract() requires one to three arguments in this compiler build');
         }
         $caller = self::requireCaller($frame);
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('extract() first argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'extract');
 
         $flags = self::EXTR_OVERWRITE;
         if ($argc >= 2) {
@@ -122,7 +119,7 @@ final class VmScope
             }
         }
 
-        return self::extractIntoCaller($caller, $array->toArray(), $extractType, $refs, $prefix, $frame);
+        return self::extractIntoCaller($caller, $ht, $extractType, $refs, $prefix, $frame);
     }
 
     /**
