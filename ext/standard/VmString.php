@@ -3397,6 +3397,11 @@ final class VmString
         $len = self::byteLength($string);
         for ($i = 0; $i < $len; ++$i) {
             $ch = $string[$i];
+            if ("\0" === $ch) {
+                // php-src string.c php_preg_quote: NUL -> \000 (backslash + three ASCII zeros)
+                $out .= '\\000';
+                continue;
+            }
             if (str_contains(self::PREG_QUOTE_ESCAPE, $ch) || (null !== $delim && $ch === $delim)) {
                 $out .= '\\'.$ch;
             } else {

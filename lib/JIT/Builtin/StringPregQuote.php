@@ -34,7 +34,10 @@ final class StringPregQuote
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
         $two = $i64->constInt(2, false);
+        $three = $i64->constInt(3, false);
+        $four = $i64->constInt(4, false);
         $backslash = $i8->constInt(92, false);
+        $zeroChar = $i8->constInt(48, false);
 
         $i1 = $context->getTypeFromString('int1');
         $delimNull = $context->builder->icmp(Builder::INT_EQ, $delimiter, $strPtr->constNull());
@@ -74,7 +77,7 @@ final class StringPregQuote
         $iSlot = $context->builder->alloca($i64, 1);
         $context->builder->store($zero, $iSlot);
 
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $hasDelim, $delimCh, $i64, $zero, $one, $two);
+        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $hasDelim, $delimCh, $i64, $zero, $one, $two, $four);
 
         $outLen = $context->builder->load($outLenSlot);
         $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
@@ -99,7 +102,10 @@ final class StringPregQuote
             $zero,
             $one,
             $two,
-            $backslash
+            $three,
+            $four,
+            $backslash,
+            $zeroChar
         );
 
         $context->builder->returnValue($dest);
@@ -118,7 +124,8 @@ final class StringPregQuote
         $i64,
         Value $zero,
         Value $one,
-        Value $two
+        Value $two,
+        Value $four
     ): void {
         $head = $fn->appendBasicBlock('preg_quote_count_head');
         $body = $fn->appendBasicBlock('preg_quote_count_body');
@@ -133,11 +140,26 @@ final class StringPregQuote
 
         $context->builder->positionAtEnd($body);
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
+        $isNul = $context->builder->icmp(Builder::INT_EQ, $ch, $ch->typeOf()->constInt(0, false));
+        $nulBlock = $fn->appendBasicBlock('preg_quote_count_nul');
+        $metaBlock = $fn->appendBasicBlock('preg_quote_count_meta');
+        $afterBlock = $fn->appendBasicBlock('preg_quote_count_after');
+        $context->builder->branchIf($isNul, $nulBlock, $metaBlock);
+
+        $context->builder->positionAtEnd($nulBlock);
+        $outLen = $context->builder->load($outLenSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($outLen, $four), $outLenSlot);
+        $context->builder->branch($afterBlock);
+
+        $context->builder->positionAtEnd($metaBlock);
         $chI64 = $context->builder->zExt($ch, $i64);
         $escape = self::shouldEscape($context, $chI64, $ch, $hasDelim, $delimCh);
         $add = $context->builder->select($escape, $two, $one);
         $outLen = $context->builder->load($outLenSlot);
         $context->builder->store($context->builder->addNoSignedWrap($outLen, $add), $outLenSlot);
+        $context->builder->branch($afterBlock);
+
+        $context->builder->positionAtEnd($afterBlock);
         $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
         $context->builder->branch($head);
 
@@ -158,7 +180,10 @@ final class StringPregQuote
         Value $zero,
         Value $one,
         Value $two,
-        Value $backslash
+        Value $three,
+        Value $four,
+        Value $backslash,
+        Value $zeroChar
     ): void {
         $head = $fn->appendBasicBlock('preg_quote_write_head');
         $body = $fn->appendBasicBlock('preg_quote_write_body');
@@ -173,6 +198,22 @@ final class StringPregQuote
 
         $context->builder->positionAtEnd($body);
         $ch = $context->builder->load($context->builder->gep($srcChars, $i));
+        $isNul = $context->builder->icmp(Builder::INT_EQ, $ch, $ch->typeOf()->constInt(0, false));
+        $nulBlock = $fn->appendBasicBlock('preg_quote_write_nul');
+        $metaBlock = $fn->appendBasicBlock('preg_quote_write_meta');
+        $afterBlock = $fn->appendBasicBlock('preg_quote_write_after');
+        $context->builder->branchIf($isNul, $nulBlock, $metaBlock);
+
+        $context->builder->positionAtEnd($nulBlock);
+        $pos = $context->builder->load($posSlot);
+        $context->builder->store($backslash, $context->builder->gep($destChars, $pos));
+        $context->builder->store($zeroChar, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
+        $context->builder->store($zeroChar, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $two)));
+        $context->builder->store($zeroChar, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $three)));
+        $context->builder->store($context->builder->addNoSignedWrap($pos, $four), $posSlot);
+        $context->builder->branch($afterBlock);
+
+        $context->builder->positionAtEnd($metaBlock);
         $chI64 = $context->builder->zExt($ch, $i64);
         $pos = $context->builder->load($posSlot);
         $destAt = $context->builder->gep($destChars, $pos);
@@ -180,18 +221,21 @@ final class StringPregQuote
 
         $escapedBlock = $fn->appendBasicBlock('preg_quote_write_escaped');
         $plainBlock = $fn->appendBasicBlock('preg_quote_write_plain');
-        $afterBlock = $fn->appendBasicBlock('preg_quote_write_after');
+        $metaAfterBlock = $fn->appendBasicBlock('preg_quote_write_meta_after');
         $context->builder->branchIf($escape, $escapedBlock, $plainBlock);
 
         $context->builder->positionAtEnd($escapedBlock);
         $context->builder->store($backslash, $destAt);
         $context->builder->store($ch, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
         $context->builder->store($context->builder->addNoSignedWrap($pos, $two), $posSlot);
-        $context->builder->branch($afterBlock);
+        $context->builder->branch($metaAfterBlock);
 
         $context->builder->positionAtEnd($plainBlock);
         $context->builder->store($ch, $destAt);
         $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
+        $context->builder->branch($metaAfterBlock);
+
+        $context->builder->positionAtEnd($metaAfterBlock);
         $context->builder->branch($afterBlock);
 
         $context->builder->positionAtEnd($afterBlock);
