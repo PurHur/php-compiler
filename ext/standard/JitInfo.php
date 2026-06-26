@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\StringPhpinfoRuntime;
 use PHPCompiler\JIT\Builtin\StringVersionCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -142,11 +143,14 @@ final class JitInfo
             }
         }
 
+        JitInternalStrictArg::rejectNullString($context, $ver1, 'version_compare', 'version1', 1);
+        JitInternalStrictArg::rejectNullString($context, $ver2, 'version_compare', 'version2', 2);
+
         StringVersionCompare::ensureLinked($context);
         $raw = $context->builder->call(
             $context->lookupFunction('__compiler_version_compare'),
-            JitStringBuiltinArg::lowerRequiredString($context, $ver1, 'version_compare', 0, 'version1'),
-            JitStringBuiltinArg::lowerRequiredString($context, $ver2, 'version_compare', 1, 'version2')
+            JitStringBuiltinArg::lower($context, $ver1, 'version_compare', 0, 'version1'),
+            JitStringBuiltinArg::lower($context, $ver2, 'version_compare', 1, 'version2')
         );
         if (null === $operator) {
             $slot = JitValueBox::alloc($context);
