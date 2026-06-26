@@ -9948,14 +9948,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 208)
 - new Variable (line 215)
 - new Variable (line 220)
-- new HashTable (line 1230)
-- new Variable (line 1232)
-- new HashTable (line 2040)
-- new Variable (line 2043)
-- new Variable (line 2049)
-- new Variable (line 2055)
-- new Variable (line 2061)
-- 113 class method(s)
+- new HashTable (line 1250)
+- new Variable (line 1252)
+- new HashTable (line 2060)
+- new Variable (line 2063)
+- new Variable (line 2069)
+- new Variable (line 2075)
+- new Variable (line 2081)
+- 114 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -10605,7 +10605,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregFailure.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmPregMatches.php`
 
@@ -10626,7 +10626,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 19 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmPregReplaceCallback.php`
@@ -14120,8 +14120,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_grep.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 52)
-- new Error (line 84)
+- new HashTable (line 53)
+- new Error (line 85)
 - 3 class method(s)
 
 ### `ext/standard/preg_last_error_.php`
@@ -14152,9 +14152,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 124)
-- new Variable (line 126)
-- new Variable (line 132)
+- new HashTable (line 125)
+- new Variable (line 127)
+- new Variable (line 133)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`
