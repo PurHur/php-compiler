@@ -15,6 +15,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\LazyGhostTraitSupport;
 use PHPCompiler\VM\ReflectionSupport;
@@ -1387,6 +1388,25 @@ final class VmReflection
      *
      * php-src: zend_get_properties_for(..., ZEND_PROP_PURPOSE_GET_OBJECT_VARS)
      */
+    /**
+     * Zend get_object_vars / var_export property map keys — numeric property names become int keys (#12042).
+     */
+    private static function addObjectPropertyEntry(HashTable $ht, string|int $name, Variable $value): void
+    {
+        if (\is_int($name)) {
+            $ht->addIndex($name, $value);
+
+            return;
+        }
+        $intKey = HashTable::tryIntFromNumericString($name);
+        if (null !== $intKey) {
+            $ht->addIndex($intKey, $value);
+
+            return;
+        }
+        $ht->add($name, $value);
+    }
+
     public static function getObjectVars(Variable $object, Frame $frame): Variable
     {
         $object = $object->resolveIndirect();
@@ -1395,7 +1415,7 @@ final class VmReflection
             $result->newArray();
             $ht = $result->toArray();
             foreach (EnumCaseSupport::objectVarsForCaseVariable($object) as $name => $value) {
-                $ht->add($name, $value);
+                self::addObjectPropertyEntry($ht, $name, $value);
             }
 
             return $result;
@@ -1411,7 +1431,7 @@ final class VmReflection
         $result->newArray();
         $ht = $result->toArray();
         foreach ($ctx->runtime->vm()->collectObjectVarsForBuiltin($object->toObject(), $frame) as $name => $value) {
-            $ht->add($name, $value);
+            self::addObjectPropertyEntry($ht, $name, $value);
         }
 
         return $result;
@@ -1443,7 +1463,7 @@ final class VmReflection
         $result->newArray();
         $ht = $result->toArray();
         foreach ($ctx->runtime->vm()->collectVarExportPropertiesForBuiltin($object->toObject(), $frame) as $name => $value) {
-            $ht->add($name, $value);
+            self::addObjectPropertyEntry($ht, $name, $value);
         }
 
         return $result;
