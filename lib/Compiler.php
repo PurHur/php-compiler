@@ -6097,6 +6097,16 @@ class Compiler {
 
                 return $value;
             }
+            $builtinClass = $this->staticNameFromOperand($expr->class);
+            if (null !== $builtinClass) {
+                $builtinName = BuiltinTypeClassConstant::classNameForTypeOperand($builtinClass);
+                if (null !== $builtinName) {
+                    $value = new Variable(Variable::TYPE_STRING);
+                    $value->string($builtinName);
+
+                    return $value;
+                }
+            }
         }
         $className = $this->staticNameFromOperand($expr->class);
         if (null === $constName || null === $className) {

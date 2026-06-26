@@ -4341,6 +4341,13 @@ restart:
                             $frame->scope[$op->arg1]->string($className);
                             break;
                         }
+                        if ('class' === $constName) {
+                            $builtinName = BuiltinTypeClassConstant::classNameForTypeOperand($className);
+                            if (null !== $builtinName) {
+                                $frame->scope[$op->arg1]->string($builtinName);
+                                break;
+                            }
+                        }
 
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);
                     }
