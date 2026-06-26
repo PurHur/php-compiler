@@ -64,6 +64,12 @@ final class setcookie extends Internal
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $namePtr = JitStringBuiltinArg::lower($context, $args[0], 'setcookie', 0, 'name');
+        JitStringBuiltinArg::rejectEmpty(
+            $context,
+            $args[0],
+            $namePtr,
+            'setcookie(): Argument #1 ($name) cannot be empty'
+        );
         $valuePtr = $context->builder->load($context->constantStringFromString(''));
         if ($argc >= 2) {
             $valuePtr = JitStringBuiltinArg::lower($context, $args[1], 'setcookie', 1, 'value');
