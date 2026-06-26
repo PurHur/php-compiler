@@ -225,4 +225,24 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #12309 */
+    public function testCreateLazyGhostIgnoresObjectReturnFromInitializer(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public int $v = 0;
+}
+$ghost = createLazyGhost(Svc::class, function (Svc $o) {
+    $o->v = 42;
+    return $o;
+});
+echo $ghost->v, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'create_lazy_ghost_object_return.php'));
+        $this->assertSame("42\n", ob_get_clean());
+    }
 }
