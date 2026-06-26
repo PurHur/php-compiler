@@ -87,7 +87,10 @@ final class VmHrtimeNative
     }
 
     /**
-     * CLOCK_MONOTONIC via /proc/uptime (#7315, #12144, #12236).
+     * CLOCK_MONOTONIC via /proc/uptime + microtime sub-ms refinement (#7315, #12144, #12236, #12279).
+     *
+     * /proc/uptime is coarse (µs–cs); overlay microtime(true) sub-microsecond digits for
+     * hrtime()[1] % 1000 parity without libc clock_gettime FFI.
      *
      * @return array{0: int, 1: int}|null
      */
@@ -100,7 +103,33 @@ final class VmHrtimeNative
         if (false === $raw) {
             return null;
         }
+        $pair = self::parseUptimeRaw($raw);
+        if (null === $pair) {
+            return null;
+        }
 
-        return self::parseUptimeRaw($raw);
+        return self::refineMonotonicNanoseconds($pair);
+    }
+
+    /**
+     * @param array{0: int, 1: int} $pair seconds and nanoseconds from /proc/uptime
+     *
+     * @return array{0: int, 1: int}
+     */
+    public static function refineMonotonicNanoseconds(array $pair): array
+    {
+        [$sec, $nsec] = $pair;
+        if (!\function_exists('microtime')) {
+            return [$sec, $nsec];
+        }
+        $micro = \microtime(true);
+        $microNsec = (int) \round(fmod($micro, 1.0) * (float) self::NS_PER_SEC);
+        $nsec = ($nsec & ~999) + ($microNsec % 1000);
+        if ($nsec >= self::NS_PER_SEC) {
+            ++$sec;
+            $nsec -= self::NS_PER_SEC;
+        }
+
+        return [$sec, $nsec];
     }
 }
