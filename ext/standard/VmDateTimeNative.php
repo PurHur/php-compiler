@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\DateTimeZoneSupport;
 use PHPCompiler\VM\NativeDateMalformedStringException;
+use PHPCompiler\VM\Variable;
 
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
@@ -28,6 +29,8 @@ final class VmDateTimeNative
 
     /** @var list<array{country: string, id: string}>|null */
     private static ?array $zoneTabEntries = null;
+
+    private static ?Variable $timezoneAbbreviationsCache = null;
 
     private static int $withTimezoneDepth = 0;
 
@@ -81,6 +84,24 @@ final class VmDateTimeNative
         }
 
         return $filtered;
+    }
+
+    /**
+     * timezone_abbreviations_list() / DateTimeZone::listAbbreviations() — timelib precompiled map.
+     *
+     * php-src: ext/date/php_date.c — PHP_FUNCTION(timezone_abbreviations_list)
+     */
+    public static function timezoneAbbreviationsListVariable(): Variable
+    {
+        if (null === self::$timezoneAbbreviationsCache) {
+            /** @var array<string, list<array{dst: bool, offset: int, timezone_id: ?string}>> $data */
+            $data = require __DIR__.'/TimezoneAbbreviationsData.php';
+            self::$timezoneAbbreviationsCache = VmJson::import($data);
+        }
+        $copy = new Variable();
+        $copy->copyFrom(self::$timezoneAbbreviationsCache);
+
+        return $copy;
     }
 
     public static function validateTimezoneId(string $timezone): string
