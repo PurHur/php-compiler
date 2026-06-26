@@ -37,6 +37,33 @@ final class VmStatNative
         return self::invoke($path, true);
     }
 
+    /**
+     * fstat(2) on an open fd — php_stream_stat for VmPhpFdStream (#10460).
+     *
+     * @return array<int|string, int>|false
+     */
+    public static function fstatFd(int $fd)
+    {
+        if ($fd < 0) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $buf = $ffi->new('struct stat');
+            if (0 !== (int) $ffi->fstat($fd, \FFI::addr($buf))) {
+                return false;
+            }
+
+            return self::toPhpStatArray($buf);
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public static function realpath(string $path): string|false
     {
         if ('' === $path) {
@@ -160,6 +187,7 @@ struct stat {
 };
 int stat(const char *pathname, struct stat *statbuf);
 int lstat(const char *pathname, struct stat *statbuf);
+int fstat(int fd, struct stat *statbuf);
 char *realpath(const char *path, char *resolved_path);
 void free(void *ptr);
 CDEF;
