@@ -77,6 +77,12 @@ class Context {
     /** True while {@see VM::invokeUserDestructor} runs on an isolated run stack (#12070). */
     public bool $isolatedDestructorInvoke = false;
 
+    /** True while user __clone() runs on an isolated run stack (#12068, zend_object_handlers.c). */
+    public bool $invokingCloneMagic = false;
+
+    /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
+    public ?Frame $cloneMagicExternalCatchFrame = null;
+
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
