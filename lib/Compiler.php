@@ -5678,8 +5678,74 @@ class Compiler {
                 $materializeEnumCase
             );
         }
+        if ($expr instanceof Op\Expr\ArrayDimFetch) {
+            return $this->tryFoldCompileTimeArrayDimFetchDefault(
+                $expr,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+        }
 
         return null;
+    }
+
+    /**
+     * Fold literal array subscript in parameter/static defaults (#12025, zend_compile_static_variable).
+     *
+     * @param list<Op> $defaultBlockChildren
+     */
+    protected function tryFoldCompileTimeArrayDimFetchDefault(
+        Op\Expr\ArrayDimFetch $expr,
+        Block $block,
+        array $defaultBlockChildren = [],
+        bool $materializeEnumCase = false
+    ): ?Variable {
+        if (null === $expr->dim) {
+            return null;
+        }
+        $container = null;
+        if ($expr->var instanceof Op\Expr\Array_) {
+            $container = $this->tryBuildCompileTimeArrayFromExpr(
+                $expr->var,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+        } else {
+            $container = $this->tryFoldCompileTimeOperandDefault(
+                $expr->var,
+                $block,
+                $defaultBlockChildren,
+                $materializeEnumCase
+            );
+        }
+        if (null === $container || !$container->is(Variable::TYPE_ARRAY)) {
+            return null;
+        }
+        $dim = $this->tryFoldCompileTimeOperandDefault(
+            $expr->dim,
+            $block,
+            $defaultBlockChildren,
+            $materializeEnumCase
+        );
+        if (null === $dim) {
+            return null;
+        }
+        $table = $container->toArray();
+        $dimKey = new Variable();
+        $dimKey->copyFrom($dim);
+        if (!$table->keyExists($dimKey)) {
+            return null;
+        }
+        $elem = $table->findVariable($dimKey, false);
+        if (null === $elem) {
+            return null;
+        }
+        $result = new Variable();
+        $result->copyFrom($elem->resolveIndirect());
+
+        return $result;
     }
 
     /**
@@ -9336,11 +9402,11 @@ class Compiler {
             return true;
         }
         if ($op instanceof Op\Expr\ArrayDimFetch) {
-            return $this->functionStaticInitReferencesLocal($op->var)
+            return $this->functionStaticInitContainerReferencesLocal($op->var)
                 || (null !== $op->dim && $this->functionStaticInitOperandReferencesLocal($op->dim));
         }
         if ($op instanceof Op\Expr\PropertyFetch) {
-            return $this->functionStaticInitReferencesLocal($op->var)
+            return $this->functionStaticInitContainerReferencesLocal($op->var)
                 || $this->functionStaticInitOperandReferencesLocal($op->name);
         }
         if ($op instanceof Op\Expr\BinaryOp) {
@@ -9393,6 +9459,15 @@ class Compiler {
         }
 
         return false;
+    }
+
+    private function functionStaticInitContainerReferencesLocal(Op|Operand $var): bool
+    {
+        if ($var instanceof Op) {
+            return $this->functionStaticInitReferencesLocal($var);
+        }
+
+        return $this->functionStaticInitOperandReferencesLocal($var);
     }
 
     private function isAllowedFunctionStaticDefaultType(int $type): bool
