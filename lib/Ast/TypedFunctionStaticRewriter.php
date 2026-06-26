@@ -32,6 +32,9 @@ final class TypedFunctionStaticRewriter
         $out = '';
         $classLikeDepth = 0;
         $pendingClassLike = false;
+        $pendingFunction = false;
+        $inFunction = false;
+        $functionBraceLevel = 0;
         $braceDepth = 0;
 
         for ($i = 0; $i < $n; ++$i) {
@@ -41,7 +44,11 @@ final class TypedFunctionStaticRewriter
             if (\is_array($tok)) {
                 if (\in_array($tok[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
                     $pendingClassLike = true;
-                } elseif (T_STATIC === $tok[0] && !self::staticIsVisibilityModifierContext($tokens, $i)) {
+                } elseif (T_FUNCTION === $tok[0]) {
+                    $pendingFunction = true;
+                } elseif (T_STATIC === $tok[0]
+                    && !self::staticIsVisibilityModifierContext($tokens, $i)
+                    && !($classLikeDepth > 0 && !$inFunction)) {
                     $typed = self::tryParseTypedStaticVar($tokens, $i + 1);
                     if (null !== $typed) {
                         [$typeExpr, $varStart, $varEnd] = $typed;
@@ -59,8 +66,16 @@ final class TypedFunctionStaticRewriter
                     ++$classLikeDepth;
                     $pendingClassLike = false;
                 }
+                if ($pendingFunction) {
+                    $inFunction = true;
+                    $functionBraceLevel = $braceDepth + 1;
+                    $pendingFunction = false;
+                }
                 ++$braceDepth;
             } elseif ('}' === $text) {
+                if ($inFunction && $braceDepth === $functionBraceLevel) {
+                    $inFunction = false;
+                }
                 if ($classLikeDepth > 0 && 1 === $braceDepth) {
                     --$classLikeDepth;
                 }
