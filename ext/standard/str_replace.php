@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -34,7 +35,8 @@ final class str_replace extends Internal
         $hasCount = $argc >= 4;
         $searchVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[0], 'str_replace', 0, 'search');
         $replaceVar = self::requireStringOrArrayReplace($frame, $frame->calledArgs[1], 'str_replace', 1, 'replace');
-        $subjectVar = VmPreg::requireStringOrArraySubject(
+        $subjectVar = VmPreg::resolveStringOrArraySubject(
+            $frame,
             $frame->calledArgs[2],
             'str_replace',
             2,
@@ -107,9 +109,10 @@ final class str_replace extends Internal
             throw new \LogicException('str_replace() requires 3 or 4 arguments in this compiler build');
         }
 
+        JitInternalStrictArg::rejectNullStringOrArray($context, $args[2], 'str_replace', 'subject', 3);
         JitPregSubject::requireStringOrArray($context, $args[2], 'str_replace', 2, 'subject');
         $countSlot = self::jitCountSlot($context, 4 === $argc);
-        if (JITVariable::TYPE_STRING === $args[2]->type) {
+        if (JitPregSubject::isStringOrCoercibleNullSubject($args[2])) {
             if (self::isArrayReplaceArg($args[0]) || self::isArrayReplaceArg($args[1])) {
                 $result = JitStrReplaceMulti::replace(
                     $context,
@@ -123,7 +126,7 @@ final class str_replace extends Internal
                     $context,
                     JitStringBuiltinArg::lower($context, $args[0], 'str_replace', 0, 'search', 'array|string'),
                     JitStringBuiltinArg::lower($context, $args[1], 'str_replace', 1, 'replace', 'array|string'),
-                    JitStringArg::lower($context, $args[2], 'str_replace() subject'),
+                    JitStringBuiltinArg::lower($context, $args[2], 'str_replace', 2, 'subject', 'array|string'),
                     false,
                     $countSlot
                 );

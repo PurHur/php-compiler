@@ -23,8 +23,10 @@ final class JitPregSubject
         int $argIndex,
         string $paramName = 'subject'
     ): void {
-        if (JITVariable::TYPE_STRING === $arg->type
-            || JITVariable::TYPE_HASHTABLE === $arg->type
+        if (self::isStringOrCoercibleNullSubject($arg)) {
+            return;
+        }
+        if (JITVariable::TYPE_HASHTABLE === $arg->type
             || (0 !== ($arg->type & JITVariable::IS_NATIVE_ARRAY))
         ) {
             return;
@@ -52,6 +54,18 @@ final class JitPregSubject
             $paramName,
             self::jitTypeLabel($arg->type)
         );
+    }
+
+    public static function isStringOrCoercibleNullSubject(JITVariable $arg): bool
+    {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return true;
+        }
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return true;
+        }
+
+        return false;
     }
 
     private static function requireBoxedStringOrArray(
