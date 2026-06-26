@@ -19,6 +19,7 @@ use PHPCfg\ErrorSuppressBlock;
 use PHPCfg\Operand;
 use PHPCfg\Operand\BoundVariable;
 use PHPCfg\Operand\Literal;
+use PHPCfg\Operand\NullOperand;
 use PHPCfg\Operand\Temporary;
 use PHPCfg\Operand\Variable as CfgVariable;
 use PHPCfg\Script;
@@ -1720,6 +1721,9 @@ class Compiler {
                 continue;
             }
             $child = $ops[$i];
+            if ($child instanceof Op\Expr\ArrayDimFetch) {
+                $this->rejectArrayEmptyOffsetRead($child, $block);
+            }
             $this->debugWriteLastPhase('Compiler::compileOps op', $block, $child);
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
@@ -7706,6 +7710,7 @@ class Compiler {
                     ? $this->findCoalesceArrayDimFetch($emptyOperand, $block)
                     : null;
                 if (null !== $dimFetch) {
+                    $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
                     $checkSlot = $this->compileBoolTemporary($block);
                     [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
@@ -7742,6 +7747,7 @@ class Compiler {
                     $line > 0 ? $line : null
                 )];
             case Op\Expr\ArrayDimFetch::class:
+                $this->rejectArrayEmptyOffsetRead($expr, $block);
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
                 if (null !== $mergeEcho && !$this->isArrayDimFetchForWrite($expr, $block)) {
                     $block->forceFreshVarSlot($expr->result, $mergeEcho);
@@ -8257,6 +8263,9 @@ class Compiler {
     private const ISSET_EXPRESSION_COMPILE_ERROR =
         'Cannot use isset() on the result of an expression (you can use "null !== expression" instead)';
 
+    /** Empty `[]` offset in read context — Zend/zend_language_parser.y (#12303). */
+    private const ARRAY_EMPTY_OFFSET_READ_COMPILE_ERROR = 'Cannot use [] for reading';
+
     /**
      * Zend zend_compile.c zend_is_variable(): isset() operands must be variables, dims, or properties (#8802).
      */
@@ -8285,6 +8294,9 @@ class Compiler {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
         $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
+        if (null !== $dimFetch) {
+            $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
+        }
         [$containerSlot, $dimSlot] = null !== $propFetch
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
             : (null !== $dimFetch
@@ -8678,6 +8690,9 @@ class Compiler {
                 ? null
                 : $this->findCoalesceArrayDimFetch($expr->left, $block);
         }
+        if (null !== $dimFetch) {
+            $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
+        }
         // ??= on $arr['key']: dim fetch temp is read on the left branch (#3792).
         if (
             null !== $dimFetch
@@ -8930,6 +8945,7 @@ class Compiler {
      */
     private function compileArrayDimFetchRead(Op\Expr\ArrayDimFetch $fetch, Block $block): void
     {
+        $this->rejectArrayEmptyOffsetRead($fetch, $block);
         $block->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH,
             $this->compileOperand($fetch->result, $block, false),
@@ -8975,6 +8991,7 @@ class Compiler {
 
     protected function compileNullsafeArrayDimFetch(Op\Expr\ArrayDimFetch $expr, Block $block): Block
     {
+        $this->rejectArrayEmptyOffsetRead($expr, $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $containerSlot = $this->compileOperand($expr->var, $block, true);
         $dimSlot = null !== $expr->dim ? $this->compileOperand($expr->dim, $block, true) : null;
@@ -10687,6 +10704,26 @@ class Compiler {
         }
 
         $this->throwCompileLogic('Unsupported isset target: ' . (is_object($expr) ? $expr->getType() : gettype($expr)));
+    }
+
+    /**
+     * Reject `$arr[]` in read context — Zend compile fatal (#12303, zend_language_parser.y).
+     */
+    protected function rejectArrayEmptyOffsetRead(Op\Expr\ArrayDimFetch $fetch, Block $block): void
+    {
+        if (!$this->isArrayAppendDim($fetch->dim)) {
+            return;
+        }
+        if ($this->isArrayDimFetchForWrite($fetch, $block)) {
+            return;
+        }
+        $this->throwCompileError(self::ARRAY_EMPTY_OFFSET_READ_COMPILE_ERROR);
+    }
+
+    /** True for `$arr[]` append syntax — php-cfg uses {@see NullOperand}, not PHP null. */
+    protected function isArrayAppendDim(?Operand $dim): bool
+    {
+        return null === $dim || $dim instanceof NullOperand;
     }
 
     /**
