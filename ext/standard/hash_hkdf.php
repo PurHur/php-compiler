@@ -42,19 +42,11 @@ final class hash_hkdf extends Internal
         }
         $info = '';
         if ($argc >= 4) {
-            $infoArg = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $infoArg->type) {
-                throw new \LogicException('hash_hkdf() info must be a string in this compiler build');
-            }
-            $info = $infoArg->toString();
+            $info = VmString::coerceStringBuiltinArg($frame->calledArgs[3], 'hash_hkdf', 4, 'info');
         }
         $salt = '';
         if (5 === $argc) {
-            $saltArg = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_STRING !== $saltArg->type) {
-                throw new \LogicException('hash_hkdf() salt must be a string in this compiler build');
-            }
-            $salt = $saltArg->toString();
+            $salt = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'hash_hkdf', 5, 'salt');
         }
         $algoName = strtolower($algo->toString());
         if (!\in_array($algoName, ['sha256', 'sha1', 'md5'], true)) {
