@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -63,6 +67,66 @@ final class VmUnserializeFormat
         $slotForCell = [];
 
         return self::cellToVariable($root, $canonical, $slotForCell);
+    }
+
+    public static function decodeToVariableWithContext(
+        Context $ctx,
+        string $payload,
+        ?array $options = null,
+        ?Frame $frame = null
+    ): Variable|false {
+        $root = self::parseRootCell($payload, $options);
+        if (false === $root) {
+            return false;
+        }
+
+        $canonical = [];
+        $slotForCell = [];
+
+        return self::cellToVariableWithContext($ctx, $root, $canonical, $slotForCell, $frame);
+    }
+
+    /**
+     * Decode O: property bag with r:1 self-reference (ext/standard/var_unserializer.re, #12082).
+     */
+    public static function decodeObjectPropertyBag(
+        Context $ctx,
+        ClassEntry $class,
+        int $propCount,
+        string $inner,
+        ?Frame $frame = null
+    ): Variable|false {
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $objectVar = new Variable();
+        $objectVar->object($entry);
+
+        $parser = new self('a:'.$propCount.':{'.$inner.'}', self::DEFAULT_MAX_DEPTH);
+        $rootCell = new VmUnserializeCell();
+        $rootCell->value = new VmUnserializeRootObject($objectVar);
+        $parser->refTable[1] = $rootCell;
+
+        $propsCell = $parser->parseArray(0);
+        if (false === $propsCell || $parser->pos !== $parser->length) {
+            return false;
+        }
+        if (!\is_array($propsCell->value)) {
+            return false;
+        }
+        foreach ($propsCell->value as $name => $child) {
+            \assert($child instanceof VmUnserializeCell);
+            $value = self::cellToVariableWithContext($ctx, $child, [], [], $frame);
+            if (null !== $frame) {
+                $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
+                continue;
+            }
+            $prop = $entry->hasProperty((string) $name)
+                ? $entry->getProperty((string) $name)
+                : $entry->allocateProperty((string) $name);
+            $prop->copyFrom($value);
+        }
+
+        return $objectVar;
     }
 
     /**
@@ -137,9 +201,81 @@ final class VmUnserializeFormat
             'd' => $this->parseDouble(),
             's' => $this->parseString(),
             'a' => $this->parseArray($depth),
+            'O' => $this->parseObject($depth),
+            'r' => $this->parseObjectReference(),
             'R' => $this->parseReference(),
             default => $this->failCell(),
         };
+    }
+
+    /** php-src object reference marker — r: index; (ext/standard/var_unserializer.re, #12082) */
+    private function parseObjectReference(): VmUnserializeCell|false
+    {
+        if (!$this->expect('r:')) {
+            return $this->failCell();
+        }
+        $index = $this->readUnsignedInteger();
+        if (null === $index || !$this->expect(';')) {
+            return $this->failCell();
+        }
+        if (!isset($this->refTable[$index])) {
+            return $this->failCell();
+        }
+        $cell = $this->refTable[$index];
+        $this->pushRef($cell);
+
+        return $cell;
+    }
+
+    /**
+     * @return VmUnserializeCell|false
+     */
+    private function parseObject(int $depth): VmUnserializeCell|false
+    {
+        if ($depth >= $this->maxDepth) {
+            return $this->failCell();
+        }
+        if (!$this->expect('O:')) {
+            return $this->failCell();
+        }
+        $classLen = $this->readUnsignedInteger();
+        if (null === $classLen || !$this->expect(':"')) {
+            return $this->failCell();
+        }
+        $className = $this->readStringContent($classLen);
+        if (null === $className || !$this->expect('":')) {
+            return $this->failCell();
+        }
+        $propCount = $this->readUnsignedInteger();
+        if (null === $propCount || !$this->expect(':')) {
+            return $this->failCell();
+        }
+        if (!$this->expect('{')) {
+            return $this->failCell();
+        }
+        $start = $this->pos;
+        /** @var array<int|string, VmUnserializeCell> $properties */
+        $properties = [];
+        for ($i = 0; $i < $propCount; ++$i) {
+            $keyCell = $this->parseArrayKey();
+            if (false === $keyCell) {
+                return $this->failCell();
+            }
+            $before = $this->pos;
+            $valueCell = $this->parseValue($depth + 1);
+            if (false === $valueCell || $this->pos <= $before) {
+                return $this->failCell();
+            }
+            $properties[self::cellScalar($keyCell)] = $valueCell;
+        }
+        if (!$this->expect('}')) {
+            return $this->failCell();
+        }
+        $cell = new VmUnserializeCell();
+        $cell->value = new VmUnserializeObjectPayload($className, $properties, $start, $this->pos);
+        $this->pushRef($cell);
+
+        return $cell;
     }
 
     /** php-src var_push_deref — R: index; (#12080) */
@@ -370,6 +506,19 @@ final class VmUnserializeFormat
             return $var;
         }
 
+        if ($cell->value instanceof VmUnserializeRootObject) {
+            $canonical[$id] = $cell->value->objectVar;
+            $slotForCell[$id] = $cell->value->objectVar;
+
+            return $cell->value->objectVar;
+        }
+
+        if ($cell->value instanceof VmUnserializeObjectPayload) {
+            throw new \LogicException(
+                'unserialize() nested object requires Context in this compiler build'
+            );
+        }
+
         $storage = new Variable();
         if (null === $cell->value) {
             $storage->null();
@@ -390,6 +539,97 @@ final class VmUnserializeFormat
         $slotForCell[$id] = $wrapper;
 
         return $wrapper;
+    }
+
+    /**
+     * @param array<int, Variable> $canonical
+     * @param array<int, Variable> $slotForCell
+     */
+    private static function cellToVariableWithContext(
+        Context $ctx,
+        VmUnserializeCell $cell,
+        array &$canonical,
+        array &$slotForCell,
+        ?Frame $frame
+    ): Variable {
+        $id = spl_object_id($cell);
+        if (isset($slotForCell[$id])) {
+            return $slotForCell[$id];
+        }
+        if (isset($canonical[$id])) {
+            $alias = new Variable();
+            $alias->indirect($canonical[$id]);
+            $slotForCell[$id] = $alias;
+
+            return $alias;
+        }
+
+        if ($cell->value instanceof VmUnserializeObjectPayload) {
+            $payload = $cell->value;
+            $lc = strtolower($payload->className);
+            if (!isset($ctx->classes[$lc])) {
+                $ctx->autoloadClass($payload->className);
+            }
+            $class = $ctx->classes[$lc] ?? null;
+            if (null === $class) {
+                throw new \LogicException(
+                    'unserialize(): class '.$payload->className.' not found in this compiler build'
+                );
+            }
+            if ($class->isInterface || $class->isTrait || $class->isEnum || $class->isAbstract) {
+                throw new \LogicException('unserialize(): invalid object class in this compiler build');
+            }
+            $entry = new ObjectEntry($class);
+            $entry->constructed = true;
+            $objectVar = new Variable();
+            $objectVar->object($entry);
+            $canonical[$id] = $objectVar;
+            $slotForCell[$id] = $objectVar;
+            foreach ($payload->properties as $name => $child) {
+                \assert($child instanceof VmUnserializeCell);
+                $value = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                if (null !== $frame) {
+                    $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
+                    continue;
+                }
+                $prop = $entry->hasProperty((string) $name)
+                    ? $entry->getProperty((string) $name)
+                    : $entry->allocateProperty((string) $name);
+                $prop->copyFrom($value);
+            }
+
+            return $objectVar;
+        }
+
+        if (\is_array($cell->value)) {
+            $var = new Variable();
+            $ht = new HashTable();
+            $isList = self::isListCellMap($cell->value);
+            foreach ($cell->value as $key => $child) {
+                \assert($child instanceof VmUnserializeCell);
+                $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                if ($isList) {
+                    if ($slot->isIndirect()) {
+                        $ht->updateIndirectIndex((int) $key, $slot);
+                    } else {
+                        $ht->addIndex((int) $key, $slot);
+                    }
+                } else {
+                    if ($slot->isIndirect()) {
+                        $ht->updateIndirect((string) $key, $slot);
+                    } else {
+                        $ht->add((string) $key, $slot);
+                    }
+                }
+            }
+            $var->array($ht);
+            $canonical[$id] = $var;
+            $slotForCell[$id] = $var;
+
+            return $var;
+        }
+
+        return self::cellToVariable($cell, $canonical, $slotForCell);
     }
 
     /**
@@ -528,6 +768,29 @@ final class VmUnserializeFormat
 /** Identity cell for php-src var_hash / R: markers (var_unserializer.re, #12080). */
 final class VmUnserializeCell
 {
-    /** @var array<int|string, VmUnserializeCell>|bool|float|int|null|string */
+    /** @var array<int|string, VmUnserializeCell>|bool|float|int|null|string|VmUnserializeObjectPayload|VmUnserializeRootObject */
     public mixed $value = null;
+}
+
+/** O: payload captured during parse (materialized with Context). */
+final class VmUnserializeObjectPayload
+{
+    /**
+     * @param array<int|string, VmUnserializeCell> $properties
+     */
+    public function __construct(
+        public readonly string $className,
+        public readonly array $properties,
+        public readonly int $start,
+        public readonly int $end,
+    ) {
+    }
+}
+
+/** Placeholder for r:1 object-under-construction (#12082). */
+final class VmUnserializeRootObject
+{
+    public function __construct(public readonly Variable $objectVar)
+    {
+    }
 }
