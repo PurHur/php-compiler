@@ -14733,6 +14733,12 @@ class JIT {
             if (null === $operand) {
                 continue;
             }
+            if (
+                'array_multisort' === strtolower($name)
+                && !self::jitArgLooksLikeArray($args[$idx])
+            ) {
+                continue;
+            }
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
                 if (
                     0 === $idx

@@ -40,6 +40,9 @@ final class BuiltinByRefParamsTest extends TestCase
 
         $this->assertTrue(BuiltinByRefParams::isByRefArg('array_multisort', 0, $array));
         $this->assertFalse(BuiltinByRefParams::isByRefArg('array_multisort', 1, $flag));
+        $null = new \PHPCompiler\VM\Variable();
+        $null->null();
+        $this->assertFalse(BuiltinByRefParams::isByRefArg('array_multisort', 0, $null));
     }
 
     public function testOpensslRandomPseudoBytesSecondArgument(): void
