@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 /**
  * preg_* for compiled JIT/AOT embed modules (#9542, php-in-PHP).
  *
- * SSOT: {@see VmPregNative} + {@see VmPregMatches}
+ * SSOT: {@see VmPregPure} via {@see VmPregNative} + {@see VmPregMatches}
  * php-src: ext/pcre/php_pcre.c
  */
 final class PregJitHelper
