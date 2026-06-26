@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * stat()/lstat() without libc stat(2) FFI — host stat bootstrap path (#8903, #1492).
+ * stat()/lstat()/fstat/realpath without libc stat(2) FFI — SSOT (#8903, #12265, #1492).
  *
- * VM under Zend PHP uses native \\stat()/\\lstat() when FFI is disabled; layout matches
- * {@see VmStatNative} / {@see JitStat} zend_stat field order.
+ * VM under Zend PHP uses native \\stat()/\\lstat()/\\realpath() on bootstrap paths; layout
+ * matches {@see JitStat} zend_stat field order. Linux fstat uses /proc/self/fd/N lstat.
  *
- * php-src: Zend/zend_stat.c — php_stat / php_lstat array keys
+ * php-src: Zend/zend_stat.c — php_stat / php_lstat array keys; ext/standard/filestat.c fstat
  */
 final class VmStatPure
 {
@@ -22,7 +22,13 @@ final class VmStatPure
 
     public static function available(): bool
     {
-        return \function_exists('stat');
+        return \function_exists('stat')
+            || ('Linux' === \PHP_OS_FAMILY && self::procFdStatAvailable());
+    }
+
+    private static function procFdStatAvailable(): bool
+    {
+        return \is_readable('/proc/self/fd');
     }
 
     /**
@@ -39,6 +45,43 @@ final class VmStatPure
     public static function lstat(string $path)
     {
         return self::invoke($path, true);
+    }
+
+    /**
+     * fstat(2) on an open fd via /proc/self/fd/N (Linux) or host lstat fallback.
+     *
+     * @return array<int|string, int>|false
+     */
+    public static function fstatFd(int $fd)
+    {
+        if ($fd < 0) {
+            return false;
+        }
+        if ('Linux' === \PHP_OS_FAMILY && self::procFdStatAvailable()) {
+            return self::lstat('/proc/self/fd/'.$fd);
+        }
+
+        return false;
+    }
+
+    public static function realpath(string $path): string|false
+    {
+        if ('' === $path) {
+            $path = '.';
+        }
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        if (\function_exists('realpath')) {
+            $out = @\realpath($path);
+
+            return (false === $out || '' === $out) ? false : $out;
+        }
+        if ('Linux' !== \PHP_OS_FAMILY) {
+            return false;
+        }
+
+        return self::realpathLinuxNormalized($path);
     }
 
     /**
@@ -73,7 +116,7 @@ final class VmStatPure
         if (str_contains($path, "\0")) {
             return false;
         }
-        if (!self::available()) {
+        if (!\function_exists('stat')) {
             return false;
         }
 
@@ -83,5 +126,39 @@ final class VmStatPure
         }
 
         return self::normalize($raw);
+    }
+
+    /**
+     * Linux bootstrap without host realpath(3): getcwd + normalizePath (no symlink walk).
+     */
+    private static function realpathLinuxNormalized(string $path): string|false
+    {
+        $absolute = '' !== $path && ('/' === $path[0] || '\\' === $path[0]);
+        if (!$absolute) {
+            $cwd = VmGetcwdNative::resolve();
+            if (false === $cwd || '' === $cwd) {
+                return false;
+            }
+            $path = VmString::normalizePath($cwd.'/'.$path);
+        } else {
+            $path = VmString::normalizePath($path);
+        }
+        if (!self::pathExistsForRealpath($path)) {
+            return false;
+        }
+
+        return $path;
+    }
+
+    private static function pathExistsForRealpath(string $path): bool
+    {
+        if ('' === $path) {
+            return false;
+        }
+        if (\function_exists('file_exists')) {
+            return @\file_exists($path);
+        }
+
+        return false !== self::stat($path);
     }
 }

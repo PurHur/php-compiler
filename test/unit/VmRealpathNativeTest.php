@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmStatNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPUnit\Framework\TestCase;
 
-/** Issue #4555: VM realpath() via VmStatNative libc FFI, not normalizePath only. */
+/** Issue #4555 / #12265: VM realpath() via VmStatPure, not libc FFI. */
 final class VmRealpathNativeTest extends TestCase
 {
     public function testVmStringRealpathUsesStatNativeWhenAvailable(): void
