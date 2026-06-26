@@ -57,6 +57,7 @@ final class fgetcsv extends Internal
         if (isset($frame->calledArgs[4])) {
             $escape = VmString::coerceStringBuiltinArg($frame->calledArgs[4], 'fgetcsv', 4, 'escape');
         }
+        VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
         $row = VmFs::fgetcsv($handle, $length, $separator, $enclosure, $escape);
         if (false === $row) {
             $frame->returnVar->bool(false);
@@ -99,6 +100,7 @@ final class fgetcsv extends Internal
         if (isset($args[4]) && !NamedOptionalCallArgs::isOmittedOptional($args[4])) {
             $escape = JitStringBuiltinArg::lower($context, $args[4], 'fgetcsv', 4, 'escape');
         }
+        JitCsvArg::validateFgetcsvCall($context, ...$args);
 
         return JitFgetcsv::invoke($context, $handle, $length, $separator, $enclosure, $escape);
     }
