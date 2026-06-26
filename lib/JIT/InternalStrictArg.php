@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 
@@ -33,6 +34,7 @@ final class InternalStrictArg
 
             return;
         }
+        JitNativeString::ensureInsertBlock($context);
         self::raiseTypeErrorAndAbort(
             $context,
             self::message($context, $function, $argNumber, $paramName, 'int', $arg)
@@ -350,6 +352,7 @@ final class InternalStrictArg
 
             return;
         }
+        JitNativeString::ensureInsertBlock($context);
         self::raiseTypeErrorAndAbort(
             $context,
             self::message($context, $function, $argNumber, $paramName, 'string', $arg)

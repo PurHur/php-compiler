@@ -18,6 +18,41 @@ use PHPLLVM\Value;
  */
 final class JitStringBuiltinArg
 {
+    /**
+     * Z_PARAM_STR with caller strict_types parity (#12276, #12274).
+     */
+    public static function lowerStrictOrCoercible(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        if ($context->callerStrictTypes) {
+            if (Variable::TYPE_VALUE === $arg->type || Variable::TYPE_OBJECT === $arg->type) {
+                return self::lowerRequiredString($context, $arg, $function, $argIndex, $paramName);
+            }
+            if (Variable::TYPE_STRING !== $arg->type) {
+                JitNativeString::ensureInsertBlock($context);
+                self::emitTypeErrorAndAbort(
+                    $context,
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    JitOperandTypeLabel::givenLabel($context, $arg)
+                );
+
+                return self::unreachableStringPtr($context);
+            }
+
+            return JitStringArg::lower($context, $arg, "{$function}() argument #" . ($argIndex + 1));
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
     public static function lower(
         Context $context,
         Variable $arg,

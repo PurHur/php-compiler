@@ -31,7 +31,7 @@ final class octdec extends Internal
         if (1 !== count($frame->calledArgs)) {
             throw new \LogicException('octdec() requires exactly one argument');
         }
-        $octalString = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'octdec', 0, 'octal_string');
+        $octalString = VmString::stringBuiltinArgForFrame($frame, 0, 'octdec', 0, 'octal_string');
         VmMath::assignRadixToReturn($frame->returnVar, $octalString, 8);
     }
 
@@ -48,7 +48,7 @@ final class octdec extends Internal
             $context,
             $this->stringDataPtr(
                 $context,
-                JitStringBuiltinArg::lower($context, $args[0], 'octdec', 0, 'octal_string')
+                JitStringBuiltinArg::lowerStrictOrCoercible($context, $args[0], 'octdec', 0, 'octal_string')
             ),
             8
         );
