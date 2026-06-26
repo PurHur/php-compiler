@@ -29,9 +29,7 @@ final class JitErrorHandler
             throw new \LogicException(ErrorHandlerCallbackPolicy::jitRejectionMessage());
         }
         if (!$context->functionIsRegistered($name)) {
-            throw new \LogicException(
-                "set_error_handler() callback '{$name}' is not a defined function in this compile unit"
-            );
+            throw new \TypeError(ErrorHandlerCallbackPolicy::invalidCallbackTypeError());
         }
         $proxy = $context->resolveFunctionProxy($name);
         if ($proxy instanceof ExternalMethod || !($proxy instanceof Native)) {
