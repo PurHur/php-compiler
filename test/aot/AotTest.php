@@ -70,6 +70,14 @@ class AotTest extends BaseTest
                 && !str_contains($name, 'stream_supports_lock')) {
                 continue;
             }
+            if (!CompilerVersion::supportsConvertCyrString()
+                && str_contains($name, 'convert_cyr_string')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStrxfrm()
+                && str_contains($name, 'strxfrm')) {
+                continue;
+            }
             // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             yield $name => $case;

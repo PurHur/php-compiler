@@ -194,4 +194,26 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinSince('8.4.0');
     }
+
+    /**
+     * Whether a builtin removed in $removedIn should appear in function_exists() for the active profile.
+     *
+     * php-src drops symbols at major boundaries (e.g. convert_cyr_string/strxfrm in 8.0 — #11907).
+     */
+    public static function advertisesBuiltinRemovedIn(string $removedIn): bool
+    {
+        return version_compare(self::builtinAdvertisementVersion(), $removedIn, '<');
+    }
+
+    /** PHP 8.0 removed strxfrm() (ext/standard/string.c, issue #11907). */
+    public static function supportsStrxfrm(): bool
+    {
+        return self::advertisesBuiltinRemovedIn('8.0.0');
+    }
+
+    /** PHP 8.0 removed convert_cyr_string() (ext/standard/cyr_convert.c, issue #11907). */
+    public static function supportsConvertCyrString(): bool
+    {
+        return self::advertisesBuiltinRemovedIn('8.0.0');
+    }
 }

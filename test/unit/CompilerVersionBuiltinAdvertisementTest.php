@@ -39,6 +39,16 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
+    public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsConvertCyrString());
+    }
+
+    public function testStrxfrmNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStrxfrm());
+    }
+
     public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
     {
         $runtime = new Runtime();
@@ -49,6 +59,18 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
+    }
+
+    public function testVmDoesNotRegisterConvertCyrStringOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['convert_cyr_string']));
+    }
+
+    public function testVmDoesNotRegisterStrxfrmOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['strxfrm']));
     }
 
     public function testVmDoesNotRegisterForwardCompatBuiltinAttributeClassesOnReferenceProfile(): void
