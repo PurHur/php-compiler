@@ -552,7 +552,7 @@ class Module extends ModuleAbstract
             new disk_free_space(),
             new disk_total_space(),
             new diskfreespace(),
-            new disktotalspace(),
+            ...(CompilerVersion::supportsDisktotalspace() ? [new disktotalspace()] : []),
             new dl(),
             new fileatime(),
             new filectime(),
