@@ -68,7 +68,7 @@ final class ExceptionHandlerJitHelper
     public static function restoreApply(): bool
     {
         if (self::$depth <= 0) {
-            return false;
+            return true;
         }
         --self::$depth;
         self::setFnAt(self::$depth, 0);
