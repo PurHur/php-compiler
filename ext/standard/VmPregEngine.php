@@ -52,6 +52,10 @@ final class VmPregEngine
 
     private int $pos = 0;
 
+    private int $backtrackCount = 0;
+
+    private int $backtrackLimit = 0;
+
     /**
      * @return array{0: VmPregAstNode, 1: array<string, int>}|null
      */
@@ -87,6 +91,7 @@ final class VmPregEngine
         $engine = new self();
         $engine->applyOptions($opts);
         $engine->groupNameToIndex = $groupNameToIndex;
+        $engine->backtrackLimit = VmPregLimits::backtrackLimit();
         $len = \strlen($subject);
         if ($offset < 0 || $offset > $len) {
             return null;
@@ -538,6 +543,10 @@ final class VmPregEngine
         int $len,
         array &$captures
     ): bool {
+        if ($this->backtrackLimit >= 0 && ++$this->backtrackCount > $this->backtrackLimit) {
+            throw new VmPregBacktrackLimitException();
+        }
+
         return $node->match($this, $subject, $pos, $len, $captures);
     }
 

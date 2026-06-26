@@ -62,8 +62,12 @@ final class VmIni
         'default_charset',
         'cfg_file_path',
         'user_agent',
+        'pcre.backtrack_limit',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
+
+    /** php-src PG(pcre.backtrack_limit) default 1000000 (ext/pcre/php_pcre.c). */
+    private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
 
     private const CFG_DISPLAY_ERRORS = '';
 
@@ -109,6 +113,8 @@ final class VmIni
                 return IncludePathJitHelper::push($newValue);
             case 'user_agent':
                 return self::setUserAgent($newValue);
+            case 'pcre.backtrack_limit':
+                return self::setPcreBacktrackLimit($newValue);
             default:
                 return false;
         }
@@ -154,6 +160,8 @@ final class VmIni
                 return IncludePathJitHelper::get();
             case 'user_agent':
                 return self::$userAgent;
+            case 'pcre.backtrack_limit':
+                return (string) self::$pcreBacktrackLimit;
             default:
                 return false;
         }
@@ -180,6 +188,7 @@ final class VmIni
             'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
             'cfg_file_path' => self::cfgFilePath(),
             'user_agent' => '',
+            'pcre.backtrack_limit' => self::CFG_PCRE_BACKTRACK_LIMIT,
             default => false,
         };
     }
@@ -218,6 +227,13 @@ final class VmIni
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
     private static string $userAgent = '';
+
+    private static int $pcreBacktrackLimit = 1_000_000;
+
+    public static function getPcreBacktrackLimit(): int
+    {
+        return self::$pcreBacktrackLimit;
+    }
 
     public static function getUserAgent(): string
     {
@@ -400,7 +416,23 @@ final class VmIni
             case 'user_agent':
                 self::$userAgent = '';
                 break;
+            case 'pcre.backtrack_limit':
+                self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+                break;
         }
+    }
+
+    /** @return string|false */
+    private static function setPcreBacktrackLimit(string $newValue): string|false
+    {
+        $old = (string) self::$pcreBacktrackLimit;
+        $parsed = (int) $newValue;
+        if ($parsed < 0) {
+            return false;
+        }
+        self::$pcreBacktrackLimit = $parsed;
+
+        return $old;
     }
 
     /**
