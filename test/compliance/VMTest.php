@@ -32,6 +32,14 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsConvertCyrString()
+                && str_contains($name, 'convert_cyr_string')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStrxfrm()
+                && str_contains($name, 'strxfrm')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {

@@ -224,13 +224,13 @@ class Module extends ModuleAbstract
             new chr(),
             new strcmp(),
             new strcoll(),
-            new strxfrm(),
+            ...(CompilerVersion::supportsStrxfrm() ? [new strxfrm()] : []),
             new levenshtein(),
             new similar_text(),
             new soundex(),
             new metaphone(),
             new hebrev(),
-            new convert_cyr_string(),
+            ...(CompilerVersion::supportsConvertCyrString() ? [new convert_cyr_string()] : []),
             new strnatcmp(),
             new strnatcasecmp(),
             new strcasecmp(),
@@ -933,14 +933,16 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('nl_langinfo', $ft);
             $context->registerFunction('nl_langinfo', $fn);
         }
-        try {
-            $context->lookupFunction('strxfrm');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('strxfrm', $ft);
-            $context->registerFunction('strxfrm', $fn);
+        if (CompilerVersion::supportsStrxfrm()) {
+            try {
+                $context->lookupFunction('strxfrm');
+            } catch (\Throwable $e) {
+                $i8p = $context->getTypeFromString('int8*');
+                $sizeT = $context->getTypeFromString('size_t');
+                $ft = $context->context->functionType($sizeT, false, $i8p, $i8p, $sizeT);
+                $fn = $context->module->addFunction('strxfrm', $ft);
+                $context->registerFunction('strxfrm', $fn);
+            }
         }
         try {
             $context->lookupFunction('memcmp');

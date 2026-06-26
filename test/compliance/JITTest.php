@@ -67,6 +67,14 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'bz2_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsConvertCyrString()
+                && str_contains($name, 'convert_cyr_string')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsStrxfrm()
+                && str_contains($name, 'strxfrm')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {
