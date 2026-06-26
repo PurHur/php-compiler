@@ -1941,6 +1941,7 @@ require_once __DIR__.'/../../../ext/standard/timezone_identifiers_list.php';
 require_once __DIR__.'/../../../ext/standard/timezone_location_get.php';
 require_once __DIR__.'/../../../ext/standard/timezone_name_get.php';
 require_once __DIR__.'/../../../ext/standard/timezone_offset_get.php';
+require_once __DIR__.'/../../../ext/standard/date_offset_get.php';
 require_once __DIR__.'/../../../ext/standard/timezone_open.php';
 require_once __DIR__.'/../../../ext/standard/timezone_transitions_get.php';
 require_once __DIR__.'/../../../ext/standard/timezone_version_get.php';

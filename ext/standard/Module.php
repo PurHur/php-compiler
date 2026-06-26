@@ -842,6 +842,7 @@ class Module extends ModuleAbstract
             new timezone_open(),
             new timezone_name_get(),
             new timezone_offset_get(),
+            new date_offset_get(),
             new timezone_location_get(),
             new timezone_transitions_get(),
             new gmdate(),

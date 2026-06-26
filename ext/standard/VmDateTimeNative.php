@@ -29,6 +29,13 @@ final class VmDateTimeNative
     /** @var list<array{country: string, id: string}>|null */
     private static ?array $zoneTabEntries = null;
 
+    private static int $withTimezoneDepth = 0;
+
+    /** @var string|false */
+    private static string|false $withTimezoneSavedVmEnvTz = false;
+
+    private static ?string $activeLibcTimezone = null;
+
     /**
      * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
      *
@@ -1501,22 +1508,27 @@ final class VmDateTimeNative
      */
     private static function withTimezone(string $tzName, callable $fn): mixed
     {
-        $previous = VmEnv::getenv('TZ');
         $ffi = self::ffi();
+        if (0 === self::$withTimezoneDepth) {
+            self::$withTimezoneSavedVmEnvTz = VmEnv::getenv('TZ');
+        }
+        ++self::$withTimezoneDepth;
         VmEnv::putenv('TZ='.$tzName);
-        if (null !== $ffi) {
+        if (null !== $ffi && self::$activeLibcTimezone !== $tzName) {
+            $ffi->setenv('TZ', $tzName, 1);
             $ffi->tzset();
+            self::$activeLibcTimezone = $tzName;
         }
         try {
             return $fn();
         } finally {
-            if (false === $previous || '' === $previous) {
-                VmEnv::putenv('TZ');
-            } else {
-                VmEnv::putenv('TZ='.$previous);
-            }
-            if (null !== $ffi) {
-                $ffi->tzset();
+            --self::$withTimezoneDepth;
+            if (0 === self::$withTimezoneDepth) {
+                if (false === self::$withTimezoneSavedVmEnvTz || '' === self::$withTimezoneSavedVmEnvTz) {
+                    VmEnv::putenv('TZ');
+                } else {
+                    VmEnv::putenv('TZ='.self::$withTimezoneSavedVmEnvTz);
+                }
             }
         }
     }

@@ -215,6 +215,17 @@ final class DateTimeSupport
         return VmDateTimeNative::timezoneOffsetSeconds(self::timezoneName($zone), $timestamp);
     }
 
+    /** php-src PHP_FUNCTION(date_offset_get) — getOffset(getTimezone()) (#11876). */
+    public static function dateOffsetGet(ObjectEntry $datetime): int
+    {
+        $label = self::classLabel($datetime);
+        self::requireInitializedDateTimeLike($datetime, 'date_offset_get()');
+        $tzName = self::requireStringProperty($datetime, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($datetime, self::TS_PROPERTY, $label)->toInt();
+
+        return VmDateTimeNative::timezoneOffsetSeconds($tzName, $timestamp);
+    }
+
     /** php-src zim_DateTimeZone_getLocation (#7131). */
     public static function timezoneLocationInto(ObjectEntry $zone, Variable $returnVar): void
     {
