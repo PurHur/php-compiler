@@ -39,6 +39,24 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesOverrideAttributeClass()
+                && str_contains($name, 'override_class_exists')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesDeprecatedAttributeClass()
+                && str_contains($name, 'deprecated_attribute_class')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesNoDiscardAttributeClass()
+                && str_contains($name, 'nodiscard_class_exists')) {
+                continue;
+            }
+            if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
+                    || !CompilerVersion::advertisesCompileTimeAttributeClass()
+                    || !CompilerVersion::advertisesNoDiscardAttributeClass())
+                && str_contains($name, 'builtin_attribute_classes_84')) {
+                continue;
+            }
             if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
                 && str_contains($name, 'grapheme_')
                 && !str_contains($name, 'grapheme_phantom')) {

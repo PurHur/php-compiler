@@ -49,6 +49,24 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesOverrideAttributeClass()
+                && str_contains($name, 'override_class_exists')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesDeprecatedAttributeClass()
+                && str_contains($name, 'deprecated_attribute_class')) {
+                continue;
+            }
+            if (!CompilerVersion::advertisesNoDiscardAttributeClass()
+                && str_contains($name, 'nodiscard_class_exists')) {
+                continue;
+            }
+            if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
+                    || !CompilerVersion::advertisesCompileTimeAttributeClass()
+                    || !CompilerVersion::advertisesNoDiscardAttributeClass())
+                && str_contains($name, 'builtin_attribute_classes_84')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {

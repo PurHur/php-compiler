@@ -54,6 +54,10 @@ PHP;
     /** @covers issue #6369 */
     public function testDeprecatedBuiltinAttributeClassExists(): void
     {
+        if (!\PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+            $this->markTestSkipped('Deprecated attribute class not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

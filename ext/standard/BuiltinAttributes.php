@@ -33,17 +33,19 @@ final class BuiltinAttributes
         self::registerReturnTypeWillChange($ctx);
         self::registerAllowDynamicProperties($ctx);
         self::registerSensitiveParameter($ctx);
-        if (CompilerVersion::supportsOverrideAttribute()) {
+        if (CompilerVersion::advertisesOverrideAttributeClass()) {
             self::registerOverride($ctx);
         }
-        self::registerDeprecated($ctx);
-        if (CompilerVersion::supportsNoDiscardAttribute()) {
+        if (CompilerVersion::advertisesDeprecatedAttributeClass()) {
+            self::registerDeprecated($ctx);
+        }
+        if (CompilerVersion::advertisesNoDiscardAttributeClass()) {
             self::registerNoDiscard($ctx);
         }
-        if (CompilerVersion::supportsDelayedTargetValidationAttribute()) {
+        if (CompilerVersion::advertisesDelayedTargetValidationAttributeClass()) {
             self::registerDelayedTargetValidation($ctx);
         }
-        if (CompilerVersion::supportsCompileTimeAttribute()) {
+        if (CompilerVersion::advertisesCompileTimeAttributeClass()) {
             self::registerCompileTime($ctx);
         }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {

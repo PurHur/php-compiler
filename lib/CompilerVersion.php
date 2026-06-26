@@ -81,10 +81,40 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.3.0');
     }
 
-    /** PHP 8.3+ #[\Override] builtin attribute class (Zend/zend_attributes.c, issue #6303). */
+    /** PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, issue #6303). */
     public static function supportsOverrideAttribute(): bool
     {
         return version_compare(self::VERSION, '8.3', '>=');
+    }
+
+    /** PHP 8.3+ #[\Override] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
+    public static function advertisesOverrideAttributeClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.3.0');
+    }
+
+    /** PHP 8.4+ #[\Deprecated] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
+    public static function advertisesDeprecatedAttributeClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
+
+    /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
+    public static function advertisesNoDiscardAttributeClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
+
+    /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
+    public static function advertisesDelayedTargetValidationAttributeClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
+
+    /** PHP 8.4+ #[\CompileTime] builtin attribute class advertisement (#11902). */
+    public static function advertisesCompileTimeAttributeClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** @deprecated Zend rejects `new` in class constants at compile time (#10391); always false. */
