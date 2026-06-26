@@ -746,6 +746,8 @@ final class SscanfJit
 
     private static function emitCompilerVfscanf(Context $context, LlvmFunction $fn): void
     {
+        StreamIo::ensureLinked($context);
+
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
 
@@ -793,6 +795,20 @@ final class SscanfJit
         $context->builder->call($context->lookupFunction('__compiler_fseek'), $handle, $newPos, $seekSet);
         $map = $context->structFieldMap['__string__'];
         $contentLen = $context->builder->load($context->builder->structGep($content, $map['length']));
+        $consumedAll = $context->builder->icmp(Builder::INT_UGE, $consumed, $contentLen);
+        $pastEof = $fn->appendBasicBlock('vfscanf_past_eof');
+        $retPrep = $fn->appendBasicBlock('vfscanf_ret_prep');
+        $context->builder->branchIf($consumedAll, $pastEof, $retPrep);
+
+        $context->builder->positionAtEnd($pastEof);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_fread'),
+            $handle,
+            $i64->constInt(1, false)
+        );
+        $context->builder->branch($retPrep);
+
+        $context->builder->positionAtEnd($retPrep);
         $emptyContent = $context->builder->icmp(Builder::INT_EQ, $contentLen, $sizeT->constInt(0, false));
         $noAssign = $context->builder->icmp(Builder::INT_EQ, $assigned, $zero64);
         $eofFalse = $context->builder->and($emptyContent, $noAssign);
