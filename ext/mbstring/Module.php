@@ -35,7 +35,7 @@ class Module extends ModuleAbstract
             new mb_strlen(),
             new mb_strwidth(),
             new mb_strimwidth(),
-            new mb_str_pad(),
+            ...(CompilerVersion::supportsMbStrPad() ? [new mb_str_pad()] : []),
             new mb_substr(),
             new mb_strcut(),
             new mb_substr_count(),

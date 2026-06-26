@@ -71,6 +71,9 @@ class AotTest extends BaseTest
             if (!CompilerVersion::supportsCrc32c() && str_contains($name, 'crc32c')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMbStrPad() && str_contains($name, 'mb_str_pad')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports') || str_contains($name, 'stream_meta_seekable'))
                 && !str_contains($name, 'stream_supports_lock')) {
