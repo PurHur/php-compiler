@@ -15,6 +15,10 @@ use PHPCompiler\VM\Variable;
  */
 final class SplArrayStorage
 {
+    public const FLAG_STD_PROP_LIST = 1;
+
+    public const FLAG_ARRAY_AS_PROPS = 2;
+
     /**
      * @var array<int, array{
      *   flags: int,
@@ -147,6 +151,18 @@ final class SplArrayStorage
     public static function setFlags(ObjectEntry $object, int $flags): void
     {
         self::$store[$object->id]['flags'] = $flags;
+    }
+
+    public static function isArrayObject(ObjectEntry $object): bool
+    {
+        return ArrayObjectBuiltin::CLASS_LC === strtolower(ltrim($object->class->name, '\\'));
+    }
+
+    /** php-src SPL_ARRAY_AS_PROPS — backing array keys as object properties (spl_array.c). */
+    public static function hasArrayAsProps(ObjectEntry $object): bool
+    {
+        return self::hasState($object)
+            && 0 !== (self::getFlags($object) & self::FLAG_ARRAY_AS_PROPS);
     }
 
     public static function createIterator(Context $ctx, ObjectEntry $object): Variable
