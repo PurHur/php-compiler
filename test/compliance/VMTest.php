@@ -32,6 +32,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'grapheme_')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports.phpt')
                     || str_contains($name, 'stream_support_constants')

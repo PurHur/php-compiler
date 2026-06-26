@@ -12,4 +12,4 @@ echo 'grapheme_strlen=', (int) function_exists('grapheme_strlen'), "\n";
 loaded=0
 in_list=0
 funcs=0
-grapheme_strlen=1
+grapheme_strlen=0
