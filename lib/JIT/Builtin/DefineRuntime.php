@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -25,6 +26,8 @@ final class DefineRuntime
 
     private const CREATE_TABLE = 'PHPCompiler\\ext\\standard\\DefineJitHelper::createTable';
 
+    private const IS_DEFINED = 'PHPCompiler\\ext\\standard\\DefineJitHelper::isDefined';
+
     private const TABLE_GLOBAL = 'phpc_define_jit_table';
 
     private const SEEDED_GLOBAL = 'phpc_user_constants_seeded';
@@ -32,6 +35,7 @@ final class DefineRuntime
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::CREATE_TABLE,
+        self::IS_DEFINED,
     ];
 
     private static int $blockSeq = 0;
@@ -52,11 +56,7 @@ final class DefineRuntime
     {
         self::ensureLinked($context);
         $ht = self::loadUserConstantsTable($context);
-        $exists = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
-            $ht,
-            $nameStr
-        );
+        $exists = self::callIsDefined($context, $ht, $nameStr);
         $tag = 'def'.(string) ++self::$blockSeq;
         $fail = BasicBlockHelper::append($context, 'user_const_def_fail_'.$tag);
         $store = BasicBlockHelper::append($context, 'user_const_def_store_'.$tag);
@@ -86,11 +86,27 @@ final class DefineRuntime
         self::ensureLinked($context);
         $ht = self::loadUserConstantsTable($context);
 
-        return $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSetStringKey'),
+        return self::callIsDefined($context, $ht, $nameStr);
+    }
+
+    private static function callIsDefined(Context $context, Value $ht, Value $nameStr): Value
+    {
+        self::ensureJitHelperCompiled($context);
+        $helperFn = self::helperFunction($context, self::IS_DEFINED);
+        $htArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
             $ht,
-            $nameStr
+            $helperFn->getParam(0)->typeOf()
         );
+        $nameArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $nameStr,
+            $helperFn->getParam(1)->typeOf()
+        );
+        $raw = JitNestedHelperCoerce::callHelper($context, $helperFn, [$htArg, $nameArg]);
+        $i1 = $context->getTypeFromString('int1');
+
+        return JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i1);
     }
 
     public static function loadTable(Context $context): Value
