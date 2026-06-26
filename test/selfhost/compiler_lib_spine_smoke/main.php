@@ -1081,6 +1081,7 @@ require_once __DIR__.'/../../../ext/standard/VmFsGlobPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsOpenNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsOpenPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsPathNative.php';
+require_once __DIR__.'/../../../ext/standard/VmFsPathPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsReadNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsReadPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFsStdio.php';
