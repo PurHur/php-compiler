@@ -198,7 +198,8 @@ final class VmArray
     }
 
     /**
-     * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607).
+     * natsort/natcasesort natural compare requires string operands — Zend rejects enum cases (#5607)
+     * and objects (#12244).
      */
     public static function rejectEnumCaseNaturalSortValue(Variable $value): void
     {
@@ -206,6 +207,11 @@ final class VmArray
         if (EnumCaseSupport::isEnumCaseVariable($value)) {
             throw new \Error(
                 'Object of class '.EnumCaseSupport::typeNameForVariable($value).' could not be converted to string'
+            );
+        }
+        if (Variable::TYPE_OBJECT === $value->type) {
+            throw new \Error(
+                'Object of class '.$value->toObject()->class->name.' could not be converted to string'
             );
         }
     }
