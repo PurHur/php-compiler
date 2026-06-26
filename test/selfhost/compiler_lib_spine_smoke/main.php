@@ -583,6 +583,7 @@ require_once __DIR__.'/../../../ext/standard/JitGetClass.php';
 require_once __DIR__.'/../../../ext/standard/JitGetClassMethods.php';
 require_once __DIR__.'/../../../ext/standard/JitGetClassVars.php';
 require_once __DIR__.'/../../../ext/standard/JitGetCurrentUser.php';
+require_once __DIR__.'/../../../ext/standard/GetDeclaredExcludeDeprecatedJit.php';
 require_once __DIR__.'/../../../ext/standard/JitGetDeclaredAttributes.php';
 require_once __DIR__.'/../../../ext/standard/JitGetDeclaredClasses.php';
 require_once __DIR__.'/../../../ext/standard/JitGetDeclaredInterfaces.php';
