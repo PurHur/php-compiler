@@ -1,5 +1,5 @@
 --TEST--
-Language: public private(set) compile fatal — multiple access modifiers (#11656, Zend/zend_compile.c)
+Language: public private(set) compiles and enforces write visibility (#11868, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -7,5 +7,11 @@ class C {
 }
 $c = new C();
 echo $c->x, "\n";
---EXPECT_EXIT--
-255
+try {
+    $c->x = 2;
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+1
+Error: Cannot modify private(set) property C::$x from global scope
