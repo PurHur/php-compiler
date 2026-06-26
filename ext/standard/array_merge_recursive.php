@@ -14,9 +14,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -35,24 +35,25 @@ final class array_merge_recursive extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $first = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException('array_merge_recursive() first argument must be an array in this compiler build');
-        }
+        $first = VmArray::requireArrayArgNum(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'array_merge_recursive',
+            1
+        );
         if (1 === $argc) {
-            $frame->returnVar->array($first->toArray()->duplicate());
+            $frame->returnVar->array($first->duplicate());
 
             return;
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException('array_merge_recursive() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray()->duplicate();
+            $others[] = VmArray::requireArrayArgNum(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_merge_recursive',
+                $i + 1
+            )->duplicate();
         }
-        $frame->returnVar->array($first->toArray()->duplicate()->mergeRecursiveCopy(...$others));
+        $frame->returnVar->array($first->duplicate()->mergeRecursiveCopy(...$others));
     }
 
     public Context $context;
@@ -63,10 +64,12 @@ final class array_merge_recursive extends Internal
             throw new \ArgumentCountError('array_merge_recursive() expects at least 1 argument, 0 given');
         }
 
+        TypeErrorRaise::ensureLinked($context);
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_merge_recursive() argument #'.((int) $i + 1));
             }
+            JitArrayElem::requireArrayArgNum($context, $arg, 'array_merge_recursive', $i + 1);
         }
 
         return ArrayBuiltinHelper::mergeRecursive($context, ...$args);
