@@ -824,7 +824,7 @@ class Module extends ModuleAbstract
             new php_ini_loaded_file(),
             new php_ini_scanned_files(),
             ...(CompilerVersion::supportsZendThreadId() ? [new zend_thread_id()] : []),
-            new getmygrgid(),
+            ...(CompilerVersion::supportsGetmygrgid() ? [new getmygrgid()] : []),
             new getmyinode(),
             new getlastmod(),
             new getrusage(),

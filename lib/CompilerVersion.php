@@ -216,4 +216,10 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinRemovedIn('8.0.0');
     }
+
+    /** getmygrgid() never exported in php-src — use getmygid() / posix_getgrgid() (#11923). */
+    public static function supportsGetmygrgid(): bool
+    {
+        return false;
+    }
 }

@@ -53,7 +53,6 @@ final class SelfHostBuiltinPolicy
         'getmyuid' => 'numeric',
         'getmygid' => 'numeric',
         'zend_thread_id' => 'numeric',
-        'getmygrgid' => 'numeric',
         'getmyinode' => 'numeric',
         'getlastmod' => 'numeric',
         'getrusage' => 'numeric',
