@@ -485,6 +485,7 @@ require_once __DIR__.'/../../../ext/standard/JitDateCreateFromFormat.php';
 require_once __DIR__.'/../../../ext/standard/JitDateIntervalCreateFromDateString.php';
 require_once __DIR__.'/../../../ext/standard/JitDateIntervalFormat.php';
 require_once __DIR__.'/../../../ext/standard/JitDateMutation.php';
+require_once __DIR__.'/../../../ext/standard/JitDateOffsetGet.php';
 require_once __DIR__.'/../../../ext/standard/JitDateParse.php';
 require_once __DIR__.'/../../../ext/standard/JitDateParseMaterializer.php';
 require_once __DIR__.'/../../../ext/standard/JitDateSunFunc.php';
