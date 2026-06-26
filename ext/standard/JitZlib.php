@@ -108,6 +108,15 @@ final class JitZlib
         ));
     }
 
+    public static function getCodingType(Context $context): Value
+    {
+        StringZlib::ensureLinked($context);
+
+        return self::stringOrFalse($context, $context->builder->call(
+            $context->lookupFunction('__compiler_zlib_get_coding_type')
+        ));
+    }
+
     private static function stringOrFalse(Context $context, Value $result): Value
     {
         $id = (string) (++self::$blockSerial);
