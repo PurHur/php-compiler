@@ -26,9 +26,7 @@ final class is_infinite extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== count($frame->calledArgs)) {
-            throw new \LogicException('is_infinite() requires exactly one argument');
-        }
+        $this->requireExactArgCount($frame, 'is_infinite', 1);
         $v = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
@@ -38,7 +36,7 @@ final class is_infinite extends Internal
 
             return;
         }
-        $num = VmMath::parseDoubleBuiltinArg($v, 'is_infinite', 1, 'num');
+        $num = VmMath::parseStrictFloatBuiltinArgForFrame($frame, 'is_infinite', 1, 'num');
         $frame->returnVar->bool(\is_infinite($num));
     }
 
@@ -47,8 +45,8 @@ final class is_infinite extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $this->context = $context;
-        if (1 !== count($args)) {
-            throw new \LogicException('is_infinite() requires exactly one argument');
+        if (!$this->requireExactJitArgCount($context, $args, 'is_infinite', 1)) {
+            return $context->constantFromBool(false);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             return $context->constantFromBool(false);
