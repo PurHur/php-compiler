@@ -14,12 +14,16 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmGetrusagePure
 {
+    public static function available(): bool
+    {
+        return null !== self::readProcSelfStat();
+    }
+
     /**
      * @return array<string, int>|false
      */
     public static function getrusage(int $who = 0): array|false
     {
-        // v1: treat children mode as best-effort self stats (issue allows documenting children gaps).
         unset($who);
 
         $stat = self::readProcSelfStat();
