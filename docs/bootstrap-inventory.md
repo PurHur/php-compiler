@@ -9856,7 +9856,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDirNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmDirPure.php`
 
@@ -10069,7 +10069,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsDiskNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/VmFsDiskPure.php`
 
@@ -10235,10 +10235,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 79)
-- new Variable (line 81)
-- new HashTable (line 92)
-- new Variable (line 94)
+- new HashTable (line 90)
+- new Variable (line 92)
+- new HashTable (line 103)
+- new Variable (line 105)
 - 8 class method(s)
 
 ### `ext/standard/VmHashFile.php`
@@ -10300,7 +10300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHrtimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmHttpBuildQuery.php`
 
@@ -13373,7 +13373,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hash_hkdf.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 93)
+- new JITVariable (line 102)
 - 3 class method(s)
 
 ### `ext/standard/hash_hmac.php`
@@ -17202,16 +17202,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13896)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13950)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14008)
-- new Variable (line 15132)
-- new VM (line 15176)
-- new VM\Variable (line 15183)
-- new Operand\Literal (line 15197)
-- new Operand\Literal (line 15201)
-- new Operand\Literal (line 15205)
-- new Variable (line 15209)
-- new Variable (line 15233)
-- new Variable (line 15245)
-- new Variable (line 15678)
+- new Variable (line 15135)
+- new VM (line 15179)
+- new VM\Variable (line 15186)
+- new Operand\Literal (line 15200)
+- new Operand\Literal (line 15204)
+- new Operand\Literal (line 15208)
+- new Variable (line 15212)
+- new Variable (line 15236)
+- new Variable (line 15248)
+- new Variable (line 15681)
 - 338 class method(s)
 - 7 closure(s)
 
@@ -21537,39 +21537,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11880)
 - new VM\PropertyIsInitializedHandler (line 11889)
 - new Error (line 11950)
-- new VM\EnumFromHandler (line 11972)
-- new CompileError (line 12687)
-- new VM\ClassProperty (line 12798)
-- new Variable (line 13088)
-- new Variable (line 13262)
-- new Variable (line 13264)
-- new VM\ClassProperty (line 13380)
-- new Func\PHP (line 13499)
-- new Variable (line 13575)
-- new Variable (line 13582)
-- new Variable (line 13588)
-- new Variable (line 13625)
-- new Variable (line 13654)
-- new Variable (line 13838)
-- new Variable (line 13884)
-- new VM\ClassProperty (line 13946)
-- new Error (line 13983)
-- new Error (line 14014)
+- new VM\EnumFromHandler (line 11975)
+- new CompileError (line 12690)
+- new VM\ClassProperty (line 12801)
+- new Variable (line 13091)
+- new Variable (line 13265)
+- new Variable (line 13267)
+- new VM\ClassProperty (line 13383)
+- new Func\PHP (line 13502)
+- new Variable (line 13578)
+- new Variable (line 13585)
+- new Variable (line 13591)
+- new Variable (line 13628)
+- new Variable (line 13657)
+- new Variable (line 13841)
+- new Variable (line 13887)
+- new VM\ClassProperty (line 13949)
+- new Error (line 13986)
 - new Error (line 14017)
 - new Error (line 14020)
-- new Error (line 14039)
-- new ObjectEntry (line 14043)
-- new Variable (line 14045)
-- new Variable (line 14059)
-- new Error (line 14184)
-- new Error (line 14188)
-- new VM\ObjectEntry (line 14192)
-- new Variable (line 14332)
-- new Variable (line 14350)
-- new NoDiscardMetadata (line 14468)
-- new Variable (line 14625)
-- new Variable (line 14627)
-- new Variable (line 14719)
+- new Error (line 14023)
+- new Error (line 14042)
+- new ObjectEntry (line 14046)
+- new Variable (line 14048)
+- new Variable (line 14062)
+- new Error (line 14187)
+- new Error (line 14191)
+- new VM\ObjectEntry (line 14195)
+- new Variable (line 14335)
+- new Variable (line 14353)
+- new NoDiscardMetadata (line 14471)
+- new Variable (line 14628)
+- new Variable (line 14630)
+- new Variable (line 14722)
 - 417 class method(s)
 - 14 closure(s)
 
