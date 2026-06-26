@@ -14400,7 +14400,10 @@ class JIT {
             }
             throw new \LogicException("Call to undefined static method {$className}::{$nameOp->value}()");
         }
-        $this->context->scope->lateStaticCallClassId = $declaringClassId;
+        // parent:: dispatches to parent code but must not clobber late-static scope (#12245).
+        if (!$parentScope) {
+            $this->context->scope->lateStaticCallClassId = $declaringClassId;
+        }
         $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
         $this->context->scope->args = [];
     }

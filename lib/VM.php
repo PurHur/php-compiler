@@ -11950,7 +11950,10 @@ restart:
             throw new \Error($this->classNotFoundMessage($className));
         }
         $class = $this->context->classes[$lcClass];
-        $frame->staticCallClass = $class->name;
+        // parent:: runs the parent implementation but keeps the caller's LSB scope (#12245).
+        $frame->staticCallClass = $parentKeywordScope
+            ? $this->lateStaticClassLc($frame)
+            : $class->name;
         $methodLc = strtolower($methodName);
         if ($class->isEnum && 'cases' === $methodLc) {
             VM\EnumSupport::ensureBuiltinCasesMethod($class);
