@@ -514,7 +514,7 @@ final class VmSprintf
     private static function formatFixed(float $value, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
-            return 'NAN';
+            return 'NaN';
         }
         if (\is_infinite($value)) {
             return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
@@ -527,7 +527,7 @@ final class VmSprintf
     private static function formatScientific(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
-            return 'NAN';
+            return 'NaN';
         }
         if (\is_infinite($value)) {
             return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
@@ -552,7 +552,7 @@ final class VmSprintf
     private static function formatGeneral(float $value, bool $upper, int $precision = 6, ?string $showSign = null): string
     {
         if (\is_nan($value)) {
-            return 'NAN';
+            return 'NaN';
         }
         if (\is_infinite($value)) {
             return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
