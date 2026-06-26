@@ -28,7 +28,7 @@ final class VmConstants
             return self::lookupClassConstant($ctx, $name);
         }
 
-        return $ctx->constantFetchBuiltin($name);
+        return $ctx->constantFetchBuiltin(VmReflection::normalizeGlobalIntrospectionName($name));
     }
 
     /**

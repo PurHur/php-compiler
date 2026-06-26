@@ -847,6 +847,7 @@ final class ReflectionSupport
      */
     public static function resolveFunctionForReflection(Context $ctx, string $functionName): Func
     {
+        $functionName = VmReflection::normalizeGlobalIntrospectionName($functionName);
         $lc = strtolower($functionName);
         $func = $ctx->functions[$lc] ?? null;
         if (null === $func) {
