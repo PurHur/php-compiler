@@ -62,4 +62,29 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
         $decoded = VmUnserializeFormat::decodePayload($payload);
         $this->assertSame(['ok' => true, 'n' => 1, 'msg' => 'hi'], $decoded);
     }
+
+    public function testDecodeRReferenceMarker(): void
+    {
+        $decoded = VmUnserializeFormat::decodePayload('a:2:{i:0;i:1;i:1;R:2;}');
+        $this->assertIsArray($decoded);
+        $this->assertSame(1, $decoded[0]);
+        $this->assertSame(1, $decoded[1]);
+        $decoded[0] = 5;
+        $this->assertSame(5, $decoded[1]);
+    }
+
+    public function testDecodeToVariableRReferenceMarker(): void
+    {
+        $var = VmUnserializeFormat::decodeToVariable('a:2:{i:0;i:1;i:1;R:2;}');
+        $this->assertInstanceOf(\PHPCompiler\VM\Variable::class, $var);
+        $ht = $var->toArray();
+        $s0 = $ht->findIndex(0);
+        $s1 = $ht->findIndex(1);
+        $this->assertNotNull($s0);
+        $this->assertNotNull($s1);
+        $t0 = $s0->directIndirectTarget();
+        $t1 = $s1->directIndirectTarget();
+        $this->assertNotNull($t0);
+        $this->assertSame($t0, $t1);
+    }
 }

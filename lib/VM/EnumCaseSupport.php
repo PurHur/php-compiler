@@ -769,12 +769,15 @@ final class EnumCaseSupport
             return false;
         }
 
-        foreach ($arrayVar->toArray()->iterate(true) as $element) {
-            $resolved = $element->resolveIndirect();
+        foreach ($arrayVar->toArray()->iterate(false) as $element) {
             if (
                 $element->is(Variable::TYPE_INDIRECT)
-                || $resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)
+                || $element->is(Variable::TYPE_PROPERTY_HOOK_REF)
             ) {
+                return true;
+            }
+            $resolved = $element->resolveIndirect();
+            if ($resolved->is(Variable::TYPE_PROPERTY_HOOK_REF)) {
                 return true;
             }
         }

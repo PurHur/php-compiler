@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+
 /**
  * Native unserialize() scalar/array decoder — pairs with {@see VmSerializeFormat} (issue #8191).
  *
@@ -21,6 +24,9 @@ final class VmUnserializeFormat
 
     private readonly int $length;
 
+    /** @var list<VmUnserializeCell|null> php-src var_hash — 1-indexed */
+    private array $refTable = [null];
+
     private function __construct(
         private readonly string $payload,
         private readonly int $maxDepth,
@@ -34,6 +40,35 @@ final class VmUnserializeFormat
      * @return array<mixed>|bool|float|int|null|string|false
      */
     public static function decodePayload(string $payload, ?array $options = null): mixed
+    {
+        $root = self::parseRootCell($payload, $options);
+        if (false === $root) {
+            return false;
+        }
+
+        return self::materializeCell($root);
+    }
+
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    public static function decodeToVariable(string $payload, ?array $options = null): Variable|false
+    {
+        $root = self::parseRootCell($payload, $options);
+        if (false === $root) {
+            return false;
+        }
+
+        $canonical = [];
+        $slotForCell = [];
+
+        return self::cellToVariable($root, $canonical, $slotForCell);
+    }
+
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    private static function parseRootCell(string $payload, ?array $options = null): VmUnserializeCell|false
     {
         self::$lastErrorOffset = null;
         self::$lastPayloadLength = null;
@@ -51,7 +86,7 @@ final class VmUnserializeFormat
             return false;
         }
         if ($parser->pos !== $parser->length) {
-            return $parser->fail();
+            return $parser->failCell();
         }
 
         return $value;
@@ -76,13 +111,22 @@ final class VmUnserializeFormat
         return false;
     }
 
-    /**
-     * @return array<mixed>|bool|float|int|null|string|false
-     */
-    private function parseValue(int $depth): mixed
+    private function failCell(): false
+    {
+        $this->fail();
+
+        return false;
+    }
+
+    private function pushRef(VmUnserializeCell $cell): void
+    {
+        $this->refTable[] = $cell;
+    }
+
+    private function parseValue(int $depth): VmUnserializeCell|false
     {
         if ($this->pos >= $this->length) {
-            return $this->fail();
+            return $this->failCell();
         }
 
         $type = $this->payload[$this->pos];
@@ -93,134 +137,173 @@ final class VmUnserializeFormat
             'd' => $this->parseDouble(),
             's' => $this->parseString(),
             'a' => $this->parseArray($depth),
-            default => $this->fail(),
+            'R' => $this->parseReference(),
+            default => $this->failCell(),
         };
     }
 
-    /** @return null|false */
-    private function parseNull(): mixed
+    /** php-src var_push_deref — R: index; (#12080) */
+    private function parseReference(): VmUnserializeCell|false
     {
-        if (!$this->expect('N;')) {
-            return $this->fail();
+        if (!$this->expect('R:')) {
+            return $this->failCell();
         }
+        $index = $this->readUnsignedInteger();
+        if (null === $index || !$this->expect(';')) {
+            return $this->failCell();
+        }
+        if (!isset($this->refTable[$index])) {
+            return $this->failCell();
+        }
+        $cell = $this->refTable[$index];
+        $this->pushRef($cell);
 
-        return null;
+        return $cell;
     }
 
-    /** @return bool|false */
-    private function parseBool(): mixed
+    private function parseNull(): VmUnserializeCell|false
+    {
+        if (!$this->expect('N;')) {
+            return $this->failCell();
+        }
+        $cell = new VmUnserializeCell();
+        $cell->value = null;
+        $this->pushRef($cell);
+
+        return $cell;
+    }
+
+    private function parseBool(): VmUnserializeCell|false
     {
         if (!$this->expect('b:')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $digit = $this->readDigit();
         if (null === $digit || !$this->expect(';')) {
-            return $this->fail();
+            return $this->failCell();
         }
+        $cell = new VmUnserializeCell();
+        $cell->value = 1 === $digit;
+        $this->pushRef($cell);
 
-        return 1 === $digit;
+        return $cell;
     }
 
-    /** @return int|false */
-    private function parseInt(): mixed
+    private function parseInt(): VmUnserializeCell|false
     {
         if (!$this->expect('i:')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $number = $this->readSignedInteger();
         if (null === $number || !$this->expect(';')) {
-            return $this->fail();
+            return $this->failCell();
         }
+        $cell = new VmUnserializeCell();
+        $cell->value = $number;
+        $this->pushRef($cell);
 
-        return $number;
+        return $cell;
     }
 
-    /** @return float|false */
-    private function parseDouble(): mixed
+    private function parseDouble(): VmUnserializeCell|false
     {
         if (!$this->expect('d:')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $start = $this->pos;
         while ($this->pos < $this->length && ';' !== $this->payload[$this->pos]) {
             ++$this->pos;
         }
         if ($this->pos >= $this->length) {
-            return $this->fail();
+            return $this->failCell();
         }
         $literal = \substr($this->payload, $start, $this->pos - $start);
         ++$this->pos;
 
-        return match ($literal) {
+        $decoded = match ($literal) {
             'NAN' => \NAN,
             'INF' => \INF,
             '-INF' => -\INF,
             default => is_numeric($literal) ? (float) $literal : false,
         };
+        if (false === $decoded) {
+            return $this->failCell();
+        }
+        $cell = new VmUnserializeCell();
+        $cell->value = $decoded;
+        $this->pushRef($cell);
+
+        return $cell;
     }
 
-    /** @return string|false */
-    private function parseString(): mixed
+    private function parseString(): VmUnserializeCell|false
     {
         if (!$this->expect('s:')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $len = $this->readUnsignedInteger();
         if (null === $len || !$this->expect(':"')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $content = $this->readStringContent($len);
         if (null === $content || !$this->expect('";')) {
-            return $this->fail();
+            return $this->failCell();
         }
+        $cell = new VmUnserializeCell();
+        $cell->value = $content;
+        $this->pushRef($cell);
 
-        return $content;
+        return $cell;
     }
 
     /**
-     * @return array<mixed>|false
+     * @return VmUnserializeCell|false
      */
-    private function parseArray(int $depth): mixed
+    private function parseArray(int $depth): VmUnserializeCell|false
     {
         if ($depth >= $this->maxDepth) {
-            return $this->fail();
+            return $this->failCell();
         }
         if (!$this->expect('a:')) {
-            return $this->fail();
+            return $this->failCell();
         }
         $count = $this->readUnsignedInteger();
         if (null === $count || !$this->expect(':')) {
-            return $this->fail();
+            return $this->failCell();
         }
         if (!$this->expect('{')) {
-            return $this->fail();
+            return $this->failCell();
         }
 
-        $array = [];
+        /** @var array<int|string, VmUnserializeCell> $elements */
+        $elements = [];
         for ($i = 0; $i < $count; ++$i) {
-            $key = $this->parseArrayKey();
-            if (false === $key && !\is_int($key) && !\is_string($key)) {
-                return $this->fail();
+            $keyCell = $this->parseArrayKey();
+            if (false === $keyCell) {
+                return $this->failCell();
             }
             $before = $this->pos;
-            $value = $this->parseValue($depth + 1);
-            if ($this->pos <= $before) {
-                return $this->fail();
+            $valueCell = $this->parseValue($depth + 1);
+            if (false === $valueCell || $this->pos <= $before) {
+                return $this->failCell();
             }
-            $array[$key] = $value;
+            $elements[self::cellScalar($keyCell)] = $valueCell;
         }
         if (!$this->expect('}')) {
-            return $this->fail();
+            return $this->failCell();
         }
 
-        return $array;
+        $cell = new VmUnserializeCell();
+        $cell->value = $elements;
+        $this->pushRef($cell);
+
+        return $cell;
     }
 
-    /** @return int|string|false */
-    private function parseArrayKey(): mixed
+    private function parseArrayKey(): VmUnserializeCell|false
     {
         if ($this->pos >= $this->length) {
-            return $this->fail();
+            return $this->failCell();
         }
         if ('i' === $this->payload[$this->pos]) {
             return $this->parseInt();
@@ -229,7 +312,126 @@ final class VmUnserializeFormat
             return $this->parseString();
         }
 
-        return $this->fail();
+        return $this->failCell();
+    }
+
+    private static function cellScalar(VmUnserializeCell $cell): int|string
+    {
+        if (!\is_int($cell->value) && !\is_string($cell->value)) {
+            throw new \LogicException('unserialize() array key must be int or string');
+        }
+
+        return $cell->value;
+    }
+
+    /**
+     * @param array<int, Variable> $canonical
+     * @param array<int, Variable> $slotForCell
+     */
+    private static function cellToVariable(VmUnserializeCell $cell, array &$canonical, array &$slotForCell): Variable
+    {
+        $id = spl_object_id($cell);
+        if (isset($slotForCell[$id])) {
+            return $slotForCell[$id];
+        }
+        if (isset($canonical[$id])) {
+            $alias = new Variable();
+            $alias->indirect($canonical[$id]);
+            $slotForCell[$id] = $alias;
+
+            return $alias;
+        }
+
+        if (\is_array($cell->value)) {
+            $var = new Variable();
+            $ht = new HashTable();
+            $isList = self::isListCellMap($cell->value);
+            foreach ($cell->value as $key => $child) {
+                \assert($child instanceof VmUnserializeCell);
+                $slot = self::cellToVariable($child, $canonical, $slotForCell);
+                if ($isList) {
+                    if ($slot->isIndirect()) {
+                        $ht->updateIndirectIndex((int) $key, $slot);
+                    } else {
+                        $ht->addIndex((int) $key, $slot);
+                    }
+                } else {
+                    if ($slot->isIndirect()) {
+                        $ht->updateIndirect((string) $key, $slot);
+                    } else {
+                        $ht->add((string) $key, $slot);
+                    }
+                }
+            }
+            $var->array($ht);
+            $canonical[$id] = $var;
+            $slotForCell[$id] = $var;
+
+            return $var;
+        }
+
+        $storage = new Variable();
+        if (null === $cell->value) {
+            $storage->null();
+        } elseif (\is_bool($cell->value)) {
+            $storage->bool($cell->value);
+        } elseif (\is_int($cell->value)) {
+            $storage->int($cell->value);
+        } elseif (\is_float($cell->value)) {
+            $storage->float($cell->value);
+        } elseif (\is_string($cell->value)) {
+            $storage->string($cell->value);
+        } else {
+            throw new \LogicException('unserialize() result type not supported in this compiler build');
+        }
+        $canonical[$id] = $storage;
+        $wrapper = new Variable();
+        $wrapper->indirect($storage);
+        $slotForCell[$id] = $wrapper;
+
+        return $wrapper;
+    }
+
+    /**
+     * @param array<int|string, VmUnserializeCell> $cells
+     */
+    private static function isListCellMap(array $cells): bool
+    {
+        $i = 0;
+        foreach ($cells as $key => $_) {
+            if ($key !== $i) {
+                return false;
+            }
+            ++$i;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<int|string, mixed> $seen
+     */
+    private static function &materializeCell(VmUnserializeCell $cell, array &$seen = []): mixed
+    {
+        $id = spl_object_id($cell);
+        if (isset($seen[$id])) {
+            return $seen[$id];
+        }
+
+        if (\is_array($cell->value)) {
+            $array = [];
+            $seen[$id] = &$array;
+            foreach ($cell->value as $key => $child) {
+                \assert($child instanceof VmUnserializeCell);
+                $array[$key] = &self::materializeCell($child, $seen);
+            }
+
+            return $array;
+        }
+
+        $seen[$id] = $cell->value;
+
+        return $seen[$id];
     }
 
     private function expect(string $literal): bool
@@ -321,4 +523,11 @@ final class VmUnserializeFormat
 
         return $content;
     }
+}
+
+/** Identity cell for php-src var_hash / R: markers (var_unserializer.re, #12080). */
+final class VmUnserializeCell
+{
+    /** @var array<int|string, VmUnserializeCell>|bool|float|int|null|string */
+    public mixed $value = null;
 }

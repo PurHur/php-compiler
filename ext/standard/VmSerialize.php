@@ -214,7 +214,7 @@ final class VmSerialize
             return self::instantiatePlainObject($ctx, $class, $data, $frame);
         }
 
-        return VmUnserializeFormat::decodePayload($payload, $options);
+        return VmUnserializeFormat::decodeToVariable($payload, $options);
     }
 
     /**
