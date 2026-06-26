@@ -31,6 +31,10 @@ final class StringTriggerErrorJit
 
     private const RECORD_TRIGGER_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::recordTrigger';
 
+    private const SHOULD_PRINT_TRIGGER_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::shouldPrintTrigger';
+
+    private const RECORD_TRIGGER_ERROR_HELPER = 'PHPCompiler\\ext\\standard\\TriggerErrorJitHelper::recordTriggerError';
+
     private const E_USER_ERROR = 256;
 
     /** @var list<string> */
@@ -39,6 +43,8 @@ final class StringTriggerErrorJit
         self::UNDEF_KEY_HELPER,
         self::UNDEF_KEY_LONG_HELPER,
         self::RECORD_TRIGGER_HELPER,
+        self::SHOULD_PRINT_TRIGGER_HELPER,
+        self::RECORD_TRIGGER_ERROR_HELPER,
     ];
 
     /** @var list<string> */
@@ -232,17 +238,6 @@ final class StringTriggerErrorJit
         $context->builder->positionAtEnd($bodyBb);
         $msgStr = self::cstrToStringWithLength($context, $message, $context->builder->zExt($len, $i64));
         $fileStr = self::nullSafeCstrToString($context, $fn, $file);
-        $shouldContinue = $context->builder->call(
-            self::helperFunction($context, self::RECORD_TRIGGER_HELPER),
-            $context->builder->sext($level, $i64),
-            $msgStr,
-            $fileStr,
-            $context->builder->sext($line, $i64)
-        );
-        $afterRecordBb = $fn->appendBasicBlock('trigger_error_after_record');
-        $context->builder->branchIf($shouldContinue, $afterRecordBb, $retBb);
-
-        $context->builder->positionAtEnd($afterRecordBb);
         $dispatched = $context->builder->call(
             $context->lookupFunction('__phpc_error_handler_dispatch'),
             $level,
@@ -253,8 +248,8 @@ final class StringTriggerErrorJit
         $zeroI32 = $i32->constInt(0, false);
         $handled = $context->builder->icmp(Builder::INT_NE, $dispatched, $zeroI32);
         $handledBb = $fn->appendBasicBlock('trigger_error_handled');
-        $stderrBb = $fn->appendBasicBlock('trigger_error_stderr');
-        $context->builder->branchIf($handled, $handledBb, $stderrBb);
+        $afterHandlerBb = $fn->appendBasicBlock('trigger_error_after_handler');
+        $context->builder->branchIf($handled, $handledBb, $afterHandlerBb);
 
         $context->builder->positionAtEnd($handledBb);
         $isFatal = $context->builder->icmp(
@@ -267,6 +262,21 @@ final class StringTriggerErrorJit
         $context->builder->positionAtEnd($abortBb);
         $context->builder->call($context->lookupFunction('abort'));
         $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($afterHandlerBb);
+        $context->builder->call(
+            self::helperFunction($context, self::RECORD_TRIGGER_ERROR_HELPER),
+            $context->builder->sext($level, $i64),
+            $msgStr,
+            $fileStr,
+            $context->builder->sext($line, $i64)
+        );
+        $shouldContinue = $context->builder->call(
+            self::helperFunction($context, self::SHOULD_PRINT_TRIGGER_HELPER),
+            $context->builder->sext($level, $i64)
+        );
+        $stderrBb = $fn->appendBasicBlock('trigger_error_stderr');
+        $context->builder->branchIf($shouldContinue, $stderrBb, $retBb);
 
         $context->builder->positionAtEnd($stderrBb);
         $context->builder->call(

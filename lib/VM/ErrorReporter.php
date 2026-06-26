@@ -281,8 +281,10 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & self::E_NOTICE)
-            && $this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
-            return;
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_NOTICE, $message, $file, $line)) {
+                return;
+            }
         }
         $this->recordLastError(self::E_NOTICE, $message, $file, $line);
         if (0 === ($this->errorReporting & self::E_NOTICE)) {
@@ -300,8 +302,10 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & self::E_WARNING)
-            && $this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
-            return;
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_WARNING, $message, $file, $line)) {
+                return;
+            }
         }
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if (0 === ($this->errorReporting & self::E_WARNING)) {
@@ -323,8 +327,10 @@ final class ErrorReporter
             $propertyName
         );
         if (0 !== ($this->errorReporting & self::E_DEPRECATED)
-            && $this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
-            return;
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
+                return;
+            }
         }
         $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
         if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
@@ -343,12 +349,14 @@ final class ErrorReporter
     ): void {
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         if (0 !== ($this->errorReporting & $level)
-            && $this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
-            if (self::E_USER_ERROR === $level) {
-                throw new \LogicException("Fatal error: {$message}");
-            }
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+                if (self::E_USER_ERROR === $level) {
+                    throw new \LogicException("Fatal error: {$message}");
+                }
 
-            return;
+                return;
+            }
         }
         $this->recordLastError($level, $message, $file, $line);
         if (0 === ($this->errorReporting & $level)) {
@@ -375,6 +383,8 @@ final class ErrorReporter
         [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
         $this->recordLastError($level, $message, $file, $line);
         if ($this->dispatchUserHandler($context, $frame, $level, $message, $file, $line)) {
+            NativeLastError::clear();
+
             return;
         }
         if (0 === ($this->errorReporting & $level)) {

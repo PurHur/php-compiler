@@ -30,6 +30,25 @@ final class TriggerErrorJitHelper
     }
 
     /**
+     * @return bool LLVM i1 ABI — whether stderr print is allowed (error_reporting / @ silence)
+     */
+    public static function shouldPrintTrigger(int $level): bool
+    {
+        return ErrorSilenceJitHelper::isErrorLevelEnabled($level);
+    }
+
+    public static function recordTriggerError(int $level, string $message, string $file, int $line): void
+    {
+        if ('' === $message) {
+            return;
+        }
+        if ($line < 0) {
+            $line = 0;
+        }
+        ErrorLastJitHelper::record($level, $message, $file, $line);
+    }
+
+    /**
      * Record last error and report whether dispatch/print should proceed.
      *
      * @return bool LLVM i1 ABI; bridge zext for __compiler_trigger_error control flow
