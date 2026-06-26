@@ -1250,6 +1250,7 @@ require_once __DIR__.'/../../../ext/standard/VmSysGetTempDirPure.php';
 require_once __DIR__.'/../../../ext/standard/VmSysGetloadavgPure.php';
 require_once __DIR__.'/../../../ext/standard/VmSysGetloadavgNative.php';
 require_once __DIR__.'/../../../ext/standard/VmSyslog.php';
+require_once __DIR__.'/../../../ext/standard/VmSyslogPure.php';
 require_once __DIR__.'/../../../ext/standard/VmTmpfileNative.php';
 require_once __DIR__.'/../../../ext/standard/VmTmpfilePure.php';
 require_once __DIR__.'/../../../ext/standard/VmUnameNative.php';
