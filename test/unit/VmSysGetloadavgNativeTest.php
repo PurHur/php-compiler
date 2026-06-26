@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmSys;
 use PHPCompiler\ext\standard\VmSysGetloadavgNative;
 use PHPUnit\Framework\TestCase;
 
-/** VmSysGetloadavgNative libc path without host \\sys_getloadavg() delegation (#4607). */
+/** VmSysGetloadavgNative /proc path without host \\sys_getloadavg() delegation (#4607, #12106). */
 final class VmSysGetloadavgNativeTest extends TestCase
 {
     public function testVmSysDoesNotReferenceHostSysGetloadavg(): void
@@ -19,18 +19,18 @@ final class VmSysGetloadavgNativeTest extends TestCase
         $this->assertStringNotContainsString('function_exists(\'sys_getloadavg\')', $source);
     }
 
-    public function testNativeDefinesLibcGetloadavgFfi(): void
+    public function testNativeDelegatesToPureProcLoadavg(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetloadavgNative.php');
-        $this->assertStringContainsString('int getloadavg(double loadavg[]', $source);
-        $this->assertStringContainsString('$ffi->getloadavg', $source);
+        $this->assertStringContainsString('VmSysGetloadavgPure', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\sys_getloadavg\\s*\\(/', $source);
     }
 
     public function testNativeGetLoadavgShapeOnLinux(): void
     {
         if (!VmSysGetloadavgNative::available()) {
-            $this->markTestSkipped('FFI getloadavg unavailable');
+            $this->markTestSkipped('/proc/loadavg unavailable');
         }
 
         $avg = VmSysGetloadavgNative::getLoadavg();
@@ -45,7 +45,7 @@ final class VmSysGetloadavgNativeTest extends TestCase
     public function testVmSysGetLoadavgMatchesNative(): void
     {
         if (!VmSysGetloadavgNative::available()) {
-            $this->markTestSkipped('FFI getloadavg unavailable');
+            $this->markTestSkipped('/proc/loadavg unavailable');
         }
 
         $avg = VmSys::getLoadavg();
