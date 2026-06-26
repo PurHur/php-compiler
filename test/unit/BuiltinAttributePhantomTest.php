@@ -8,26 +8,26 @@ use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #11902 */
+/** @covers issue #11902, #12328 */
 final class BuiltinAttributePhantomTest extends TestCase
 {
-    public function testForwardCompatAttributeClassesNotAdvertisedOnReferenceProfile(): void
+    public function testForwardCompatAttributeClassesAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
-        $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
-        $this->assertFalse(CompilerVersion::advertisesNoDiscardAttributeClass());
-        $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
-        $this->assertFalse(CompilerVersion::advertisesCompileTimeAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesDeprecatedAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesNoDiscardAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
+        $this->assertTrue(CompilerVersion::advertisesCompileTimeAttributeClass());
     }
 
-    public function testVmMaintainerReproGreen(): void
+    public function testVmRegistersForwardCompatAttributeClassesOn84DevProfile(): void
     {
         $runtime = new Runtime();
-        ob_start();
-        $runtime->run($runtime->parseAndCompile(
-            (string) file_get_contents(__DIR__.'/../repro/maintainer_gap_builtin_attribute_phantom.php'),
-            'maintainer_gap_builtin_attribute_phantom.php'
-        ));
-        $this->assertSame("ok\n", ob_get_clean());
+        $ctx = $runtime->vmContext;
+        $this->assertTrue(isset($ctx->classes['override']));
+        $this->assertTrue(isset($ctx->classes['deprecated']));
+        $this->assertTrue(isset($ctx->classes['nodiscard']));
+        $this->assertTrue(isset($ctx->classes['delayedtargetvalidation']));
+        $this->assertTrue(isset($ctx->classes['compiletime']));
     }
 }

@@ -27,9 +27,17 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }
+            if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow())
+                && str_contains($name, 'php84_math_string_builtins_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZendThreadId()
                 && str_contains($name, 'zend_thread_id')
                 && !str_contains($name, 'zend_thread_id_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsZendThreadId()
+                && str_contains($name, 'zend_thread_id_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsGetmygrgid()
@@ -47,11 +55,27 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad_phantom')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPhp84ArraySearchFunctions()
+                && (str_contains($name, 'array_find')
+                    || str_contains($name, 'array_any')
+                    || str_contains($name, 'array_all')
+                    || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key'))
+                    || str_contains($name, 'array_last'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports.phpt')
                     || str_contains($name, 'stream_support_constants')
                     || str_contains($name, 'stream_meta_seekable'))
                 && !str_contains($name, 'stream_supports_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsStreamSupports()
+                && str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
             if (!CompilerVersion::advertisesOverrideAttributeClass()
