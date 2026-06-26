@@ -24,6 +24,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
     }
 
+    public function testMbStrPadNotAdvertisedOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMbStrPad());
+    }
+
     public function testStrIncrementNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
@@ -104,6 +109,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
+    }
+
+    public function testVmDoesNotRegisterMbStrPadOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
     public function testVmDoesNotRegisterForwardCompatBuiltinAttributeClassesOnReferenceProfile(): void

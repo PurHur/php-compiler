@@ -42,6 +42,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'crc32c_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad')
+                && !str_contains($name, 'mb_str_pad_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports.phpt')
                     || str_contains($name, 'stream_support_constants')

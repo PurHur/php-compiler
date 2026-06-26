@@ -42,6 +42,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsMbStrPad()
+                && str_contains($name, 'mb_str_pad')
+                && !str_contains($name, 'mb_str_pad_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsConvertCyrString()
                 && str_contains($name, 'convert_cyr_string')) {
                 continue;
