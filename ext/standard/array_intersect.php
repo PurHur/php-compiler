@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -24,11 +25,11 @@ final class array_intersect extends Internal
         if ($argc < 1) {
             throw new \ArgumentCountError('array_intersect() expects at least 1 argument, 0 given');
         }
-        $first = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $first->type) {
-            throw new \LogicException('array_intersect() first argument must be an array in this compiler build');
-        }
-        $firstHt = $first->toArray();
+        $firstHt = VmArray::requireArrayArgNum(
+            $frame->calledArgs[0]->resolveIndirect(),
+            'array_intersect',
+            1
+        );
         $operandTables = [$firstHt];
         if (1 === $argc) {
             VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
@@ -40,11 +41,11 @@ final class array_intersect extends Internal
         }
         $others = [];
         for ($i = 1, $n = $argc; $i < $n; ++$i) {
-            $arg = $frame->calledArgs[$i]->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $arg->type) {
-                throw new \LogicException('array_intersect() arguments must be arrays in this compiler build');
-            }
-            $others[] = $arg->toArray();
+            $others[] = VmArray::requireArrayArgNum(
+                $frame->calledArgs[$i]->resolveIndirect(),
+                'array_intersect',
+                $i + 1
+            );
             $operandTables[] = $others[\count($others) - 1];
         }
         VmArray::rejectEnumCaseSetOpOperands($frame, ...$operandTables);
@@ -98,10 +99,12 @@ final class array_intersect extends Internal
             throw new \ArgumentCountError('array_intersect() expects at least 1 argument, 0 given');
         }
 
+        TypeErrorRaise::ensureLinked($context);
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
                 $this->jitString($context, $arg, 'array_intersect() argument #'.((int) $i + 1));
             }
+            JitArrayElem::requireArrayArgNum($context, $arg, 'array_intersect', $i + 1);
         }
 
         return ArrayBuiltinHelper::arrayIntersect($context, ...$args);
