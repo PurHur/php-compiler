@@ -6,30 +6,20 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** zstd JIT lowering — ZstdJitHelper embed; StringZstdJit gated standalone (#8869). */
+/** Dead StringZstdJit libzstd LLVM removed — embed uses ZstdJitHelper PHP (#8869). */
 final class ZstdRuntimeShrinkTest extends TestCase
 {
-    public function testZstdCompressCallUsesJitZstd(): void
+    public function testStringZstdJitFileRemoved(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/zstd/zstd_compress.php');
-        $this->assertStringContainsString('JitZstd::compress', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringZstdJit.php');
     }
 
-    public function testStringZstdCompilesZstdJitHelperForEmbed(): void
+    public function testStringZstdCompilesZstdJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringZstd.php');
         $this->assertStringContainsString('ZstdJitHelper::compress', $source);
-        $this->assertStringContainsString('StringZstdJit::implement', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertFileExists(__DIR__.'/../../ext/zstd/ZstdJitHelper.php');
-    }
-
-    public function testZstdJitHelperContainsCodec(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/zstd/ZstdJitHelper.php');
-        $this->assertStringContainsString('function compress(', $source);
-        $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('VmZstdCore::', $source);
+        $this->assertStringNotContainsString('StringZstdJit', $source);
+        $this->assertStringNotContainsString('libzstd', $source);
     }
 
     public function testVmZstdNativeHasNoLibzstdFfi(): void
@@ -37,6 +27,5 @@ final class ZstdRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/zstd/VmZstdNative.php');
         $this->assertStringContainsString('VmZstdCore::compress', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('libzstd.so', $source);
     }
 }
