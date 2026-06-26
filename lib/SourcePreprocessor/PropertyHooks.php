@@ -16,6 +16,9 @@ final class PropertyHooks
     /** Legacy message retained for tests/docs; static hooks compile since #6931 (PHP 8.4, zend_property_hooks.c). */
     public const STATIC_HOOK_COMPILE_ERROR = 'Cannot declare hooks for static property';
 
+    /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
+    public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -729,6 +732,15 @@ final class PropertyHooks
                 $skipSemicolonRequiredHooks,
                 $propertyType
             );
+            $this->rejectAsymmetricDeclSetWithoutSetHook(
+                $declPrefix.$propDeclHead,
+                $hookSource,
+                $lcClass,
+                $prop,
+                $filename,
+                $fullCode,
+                $bodyOffsetInFile + $declStart
+            );
             if (null !== $asymmetricSetVis) {
                 $marker = '/*phpc-asymmetric-set:'.$asymmetricSetVis.'*/ ';
                 if (preg_match('/^(\s*)/', $declPrefix, $indentM)) {
@@ -1397,5 +1409,40 @@ final class PropertyHooks
     private static function lineAtOffset(string $code, int $offset): int
     {
         return substr_count(substr($code, 0, max(0, $offset)), "\n") + 1;
+    }
+
+    /**
+     * php-src: Zend/zend_compile.c — asymmetric `(set)` on the property decl inside a hook block
+     * requires a set hook (`get; private set;`, `set =>`, …); get-only blocks are parse errors (#12203).
+     */
+    private function rejectAsymmetricDeclSetWithoutSetHook(
+        string $declHead,
+        string $hookSource,
+        string $lcClass,
+        string $prop,
+        string $filename,
+        string $fullCode,
+        int $declOffsetInFile
+    ): void {
+        if (!$this->declHeadHasAsymmetricSetVisibility($declHead)) {
+            return;
+        }
+        $propMeta = $this->registry[$lcClass][$prop] ?? [];
+        $hasSetHook = isset($propMeta['set'])
+            || !empty($propMeta['requiresSet'])
+            || $this->isImplicitAsymmetricBackingHookSource($hookSource);
+        if ($hasSetHook) {
+            return;
+        }
+        throw new CompileFatal(
+            $filename,
+            self::lineAtOffset($fullCode, $declOffsetInFile),
+            self::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE
+        );
+    }
+
+    private function declHeadHasAsymmetricSetVisibility(string $declHead): bool
+    {
+        return (bool) preg_match('/\b(public|protected|private)\s*\(\s*set\s*\)/i', $declHead);
     }
 }

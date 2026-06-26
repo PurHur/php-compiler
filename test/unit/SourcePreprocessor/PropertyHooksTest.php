@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
+use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
@@ -389,6 +390,40 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $email;', $out);
         self::assertArrayNotHasKey('requiresGet', $registry['user']['email'] ?? []);
         self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
+    }
+
+    /** @covers issue #12203 — `private(set)` decl + get-only hook is a Zend parse error */
+    public function testRejectsAsymmetricDeclSetWithGetOnlyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private(set) string $x {
+        get => 'hi';
+    }
+}
+PHP;
+        $this->expectException(CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE);
+
+        (new PropertyHooks())->process($src, 'asymmetric_get_only.php');
+    }
+
+    /** @covers issue #12203 — implicit `get; private set;` backing still allowed */
+    public function testAllowsAsymmetricDeclSetWithImplicitBackingHooks(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private(set) string $x {
+        get;
+        private set;
+    }
+}
+PHP;
+        [$out] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('private(set) string $x;', $out);
     }
 
     /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
