@@ -30,9 +30,9 @@ PHP;
         ob_start();
         $runtime->run($runtime->parseAndCompile($code, 'curl_handle_classes.php'));
         $this->assertSame(
-            "true\ntrue\ntrue\nfalse\nfalse\nfalse",
+            "false\nfalse\nfalse\nfalse\nfalse\nfalse",
             ob_get_clean(),
-            'php-src ext/curl/curl.stub.php registers final classes, not enums'
+            'php-src ext/curl/curl.stub.php registers handle classes only when ext/curl is loaded (#12117)'
         );
     }
 
