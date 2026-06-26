@@ -815,6 +815,7 @@ class Module extends ModuleAbstract
             new gzpassthru(),
             new zlib_encode(),
             new zlib_decode(),
+            new zlib_get_coding_type(),
             new fnmatch(),
             new time(),
             new getmypid(),

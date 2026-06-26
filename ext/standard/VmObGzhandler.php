@@ -22,6 +22,18 @@ final class VmObGzhandler
         self::$encoding = 0;
     }
 
+    /**
+     * php-src ext/zlib/zlib.c — PHP_FUNCTION(zlib_get_coding_type) (#12280).
+     */
+    public static function getCodingType(): string|false
+    {
+        return match (self::resolveEncoding()) {
+            \ZLIB_ENCODING_GZIP => 'gzip',
+            \ZLIB_ENCODING_DEFLATE => 'deflate',
+            default => false,
+        };
+    }
+
     public static function handle(string $data, int $mode, ?Context $ctx = null): string
     {
         $encoding = self::resolveEncoding();

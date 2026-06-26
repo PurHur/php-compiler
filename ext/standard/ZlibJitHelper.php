@@ -67,4 +67,11 @@ final class ZlibJitHelper
 
         return false === $result ? null : $result;
     }
+
+    public static function getCodingTypeArgv(): ?string
+    {
+        $result = VmObGzhandler::getCodingType();
+
+        return false === $result ? null : $result;
+    }
 }

@@ -38,6 +38,8 @@ final class ZlibRuntime
 
     private const ZLIB_DECODE_HELPER = 'PHPCompiler\\ext\\standard\\ZlibJitHelper::zlibDecodeArgv';
 
+    private const ZLIB_GET_CODING_TYPE_HELPER = 'PHPCompiler\\ext\\standard\\ZlibJitHelper::getCodingTypeArgv';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::COMPRESS_HELPER,
@@ -48,6 +50,7 @@ final class ZlibRuntime
         self::DECODE_HELPER,
         self::ZLIB_ENCODE_HELPER,
         self::ZLIB_DECODE_HELPER,
+        self::ZLIB_GET_CODING_TYPE_HELPER,
     ];
 
     /** @var list<string> */
@@ -60,6 +63,7 @@ final class ZlibRuntime
         '__compiler_gzdecode',
         '__compiler_zlib_encode',
         '__compiler_zlib_decode',
+        '__compiler_zlib_get_coding_type',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -97,6 +101,7 @@ final class ZlibRuntime
         self::implementIfMissing($context, '__compiler_gzdecode', self::DECODE_HELPER, 'decompress');
         self::implementIfMissing($context, '__compiler_zlib_encode', self::ZLIB_ENCODE_HELPER, 'zlib_encode');
         self::implementIfMissing($context, '__compiler_zlib_decode', self::ZLIB_DECODE_HELPER, 'decompress');
+        self::implementIfMissing($context, '__compiler_zlib_get_coding_type', self::ZLIB_GET_CODING_TYPE_HELPER, 'get_coding_type');
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -121,6 +126,35 @@ final class ZlibRuntime
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
+        if ('get_coding_type' === $shape) {
+            $fn = $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false)
+            );
+            $entry = $fn->appendBasicBlock('zlib_bridge_entry');
+            $failBb = $fn->appendBasicBlock('zlib_bridge_fail');
+            $okBb = $fn->appendBasicBlock('zlib_bridge_ok');
+            $context->builder->positionAtEnd($entry);
+
+            $raw = JitNestedHelperCoerce::callHelper(
+                $context,
+                self::helperFunction($context, $helperLogical),
+                []
+            );
+            $isNullResult = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+            $context->builder->branchIf($isNullResult, $failBb, $okBb);
+
+            $context->builder->positionAtEnd($okBb);
+            $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw);
+            $context->builder->returnValue($result);
+
+            $context->builder->positionAtEnd($failBb);
+            $context->builder->returnValue($strPtr->constNull());
+            $context->registerFunction($abiName, $fn);
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
         $params = match ($shape) {
             'compress' => [$strPtr, $i64, $i64],
             'zlib_encode' => [$strPtr, $i64, $i64],
