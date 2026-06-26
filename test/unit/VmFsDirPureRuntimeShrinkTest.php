@@ -12,11 +12,13 @@ use PHPUnit\Framework\TestCase;
 /** VmFsDirPure — mkdir/chmod/rmdir without libc FFI (#8991). */
 final class VmFsDirPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmFsDirNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmFsDirNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDirNative.php');
-        $this->assertStringContainsString('VmFsDirPure::', $source);
+        $this->assertStringContainsString('VmFsDirPure::mkdir', $source);
         $this->assertStringContainsString('VmFsDirPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int mkdir(const char', $source);
     }
 
     public function testVmFsDirPureDoesNotUseLibcFfi(): void
