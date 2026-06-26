@@ -15,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_gz* via ZlibJitHelper PHP (#9879).
  *
- * Replaces {@see StringZlibJit} LLVM (~1027 LOC libz). SSOT: {@see \PHPCompiler\ext\standard\VmZlibNative}.
+ * Replaces {@see StringZlibJit} LLVM (~1027 LOC libz). SSOT: {@see \PHPCompiler\ext\standard\VmZlibCore}.
  * php-src: ext/zlib/zlib.c
  */
 final class ZlibRuntime

@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Lowered into JIT/AOT modules for ob_gzhandler gzip compression (#9091, php-in-PHP).
  *
- * SSOT: {@see ZlibJitHelper::encodeArgv} → {@see VmZlibNative::gzencode}
+ * SSOT: {@see ZlibJitHelper::encodeArgv} → {@see VmZlibCore::gzencode}
  */
 final class ZlibEncodeJitHelper
 {

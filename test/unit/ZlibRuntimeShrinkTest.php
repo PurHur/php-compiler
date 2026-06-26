@@ -17,19 +17,19 @@ final class ZlibRuntimeShrinkTest extends TestCase
 
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ZlibRuntime.php');
         $this->assertStringContainsString('ZlibJitHelper', $runtime);
-        $this->assertStringContainsString('VmZlibNative', $runtime);
+        $this->assertStringContainsString('VmZlibCore', $runtime);
         $this->assertStringNotContainsString('deflateInit2_', $runtime);
 
         $this->assertFileExists(__DIR__.'/../../ext/standard/ZlibJitHelper.php');
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringZlibJit.php');
     }
 
-    public function testZlibJitHelperDelegatesToVmZlibNative(): void
+    public function testZlibJitHelperDelegatesToVmZlibCore(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ZlibJitHelper.php');
-        $this->assertStringContainsString('VmZlibNative::gzcompress', $source);
-        $this->assertStringContainsString('VmZlibNative::gzencode', $source);
-        $this->assertStringContainsString('VmZlibNative::zlib_encode', $source);
-        $this->assertStringContainsString('VmZlibNative::zlib_decode', $source);
+        $this->assertStringContainsString('VmZlibCore::gzcompress', $source);
+        $this->assertStringContainsString('VmZlibCore::gzencode', $source);
+        $this->assertStringContainsString('VmZlibCore::zlib_encode', $source);
+        $this->assertStringContainsString('VmZlibCore::zlib_decode', $source);
     }
 }

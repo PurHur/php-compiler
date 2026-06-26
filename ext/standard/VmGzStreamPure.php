@@ -17,7 +17,7 @@ final class VmGzStreamPure
 
     public static function available(): bool
     {
-        return VmZlibNative::available();
+        return VmZlibCore::available();
     }
 
     public static function isHandle(int $handle): bool

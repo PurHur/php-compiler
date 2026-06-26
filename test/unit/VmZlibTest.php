@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmZlib;
-use PHPCompiler\ext\standard\VmZlibNative;
+use PHPCompiler\ext\standard\VmZlibCore;
 use PHPUnit\Framework\TestCase;
 
 /** Issue #6356: VM zlib must not delegate to host \\gzcompress(). */
@@ -20,10 +20,10 @@ final class VmZlibTest extends TestCase
         $this->assertStringNotContainsString('hostGz', $source);
     }
 
-    public function testVmZlibRoundTripWhenNativeAvailable(): void
+    public function testVmZlibRoundTripWhenCoreAvailable(): void
     {
-        if (!VmZlibNative::available()) {
-            $this->markTestSkipped('libz FFI unavailable on this host');
+        if (!VmZlibCore::available()) {
+            $this->markTestSkipped('VmZlibCore unavailable');
         }
 
         $plain = 'bootstrap zlib';

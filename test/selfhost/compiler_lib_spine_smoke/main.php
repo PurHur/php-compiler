@@ -1244,7 +1244,7 @@ require_once __DIR__.'/../../../ext/standard/VmVprintf.php';
 require_once __DIR__.'/../../../ext/standard/VmZendDoubleString.php';
 require_once __DIR__.'/../../../ext/standard/VmZlib.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibArg.php';
-require_once __DIR__.'/../../../ext/standard/VmZlibNative.php';
+require_once __DIR__.'/../../../ext/standard/VmZlibCore.php';
 require_once __DIR__.'/../../../ext/standard/WeakRefRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ZlibEncodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ZlibJitHelper.php';
