@@ -361,6 +361,7 @@ final class JitSettype
             return;
         }
         if ('string' === $target) {
+            JitBuiltinWarning::emit($context, 'Array to string conversion');
             $context->builder->call(
                 $context->lookupFunction('__value__writeString'),
                 $dest,
