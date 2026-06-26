@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitIntdiv;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -29,13 +30,10 @@ final class array_change_key_case extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_change_key_case() requires one or two arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_change_key_case() argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_change_key_case', 1, 'array');
         $case = StdlibConstants::CASE_LOWER;
         if ($argc >= 2) {
             $case = VmMath::parseIntBuiltinArg(
@@ -45,7 +43,7 @@ final class array_change_key_case extends Internal
                 'case'
             );
         }
-        $frame->returnVar->array(VmArray::changeKeyCase($array->toArray(), $case));
+        $frame->returnVar->array(VmArray::changeKeyCase($ht, $case));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -54,10 +52,8 @@ final class array_change_key_case extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_change_key_case() requires one or two arguments in this compiler build');
         }
-        if (JITVariable::TYPE_HASHTABLE !== $args[0]->type
-            && !($args[0]->type & JITVariable::IS_NATIVE_ARRAY)) {
-            throw new \LogicException('array_change_key_case() argument must be an array in this compiler build');
-        }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_change_key_case', 1, 'array');
         $i64 = $context->getTypeFromString('int64');
         $case = $i64->constInt(StdlibConstants::CASE_LOWER, false);
         if ($argc >= 2) {

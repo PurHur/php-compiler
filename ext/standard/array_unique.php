@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -32,12 +33,8 @@ final class array_unique extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_unique() requires one or two arguments');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_unique() argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_unique', 1, 'array');
         $flags = self::resolveVmFlags($frame, $argc);
-        $ht = $array->toArray();
         $out = new HashTable();
         $seen = [];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
@@ -212,6 +209,8 @@ final class array_unique extends Internal
                 $this->jitString($context, $arg, 'array_unique() argument #'.((int) $i + 1));
             }
         }
+        TypeErrorRaise::ensureLinked($context);
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_unique', 1, 'array');
         $flags = StdlibConstants::SORT_STRING;
         if (2 === $argc) {
             $flags = self::resolveJitFlags($context, $args[1]);
