@@ -112,7 +112,7 @@ final class SetcookieOptions
             $httponly = VmMath::parseBoolBuiltinArg($args[6], $function, 7, 'httponly');
         }
 
-        return self::pack($name, $value, $expires, $path, $domain, $secure, $httponly, '', false);
+        return self::pack($function, $name, $value, $expires, $path, $domain, $secure, $httponly, '', false);
     }
 
     /**
@@ -180,7 +180,7 @@ final class SetcookieOptions
             }
         }
 
-        return self::pack($name, $value, $expires, $path, $domain, $secure, $httponly, $samesite, $partitioned);
+        return self::pack($function, $name, $value, $expires, $path, $domain, $secure, $httponly, $samesite, $partitioned);
     }
 
     /**
@@ -228,6 +228,7 @@ final class SetcookieOptions
      * }
      */
     private static function pack(
+        string $function,
         string $name,
         string $value,
         int $expires,
@@ -238,6 +239,8 @@ final class SetcookieOptions
         string $samesite,
         bool $partitioned
     ): array {
+        VmString::rejectEmptyBuiltinStringArg($name, $function, 0, 'name');
+
         return [
             'name' => $name,
             'value' => $value,
