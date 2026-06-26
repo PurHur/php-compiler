@@ -1182,6 +1182,7 @@ require_once __DIR__.'/../../../ext/standard/VmPopenPure.php';
 require_once __DIR__.'/../../../ext/standard/VmPreg.php';
 require_once __DIR__.'/../../../ext/standard/VmPregFailure.php';
 require_once __DIR__.'/../../../ext/standard/VmPregMatches.php';
+require_once __DIR__.'/../../../ext/standard/VmPregPattern.php';
 require_once __DIR__.'/../../../ext/standard/VmPregNative.php';
 require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallback.php';
 require_once __DIR__.'/../../../ext/standard/VmPregReplaceCallbackArray.php';

@@ -358,6 +358,7 @@ final class PregMatchRuntime
         $root = \dirname(__DIR__, 3);
         $paths = [
             $root.'/ext/standard/StdlibConstants.php',
+            $root.'/ext/standard/VmPregPattern.php',
             $root.'/ext/standard/VmPregNative.php',
             $root.'/ext/standard/VmPregMatches.php',
             $root.'/ext/standard/VmPreg.php',
