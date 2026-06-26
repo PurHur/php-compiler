@@ -2016,4 +2016,46 @@ PHP;
         self::assertNotNull($newSlot);
         self::assertSame($newSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #11694 — call_user_func_array(C::class.'::ok', []) wires Concat slot to arg #0. */
+    public function testCallUserFuncArrayInlineClassConcatCallableSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class CufaInlineClassMethodProbe {
+    public static function ok(): string {
+        return 'ok';
+    }
+}
+echo call_user_func_array(CufaInlineClassMethodProbe::class.'::ok', []);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'call_user_func_array_class_string.php');
+
+        $concatSlot = null;
+        $arraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONCAT === $op->type) {
+                $concatSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($concatSlot, 'concat slot missing');
+        self::assertNotNull($arraySlot, 'array slot missing');
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($concatSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('ok', $out);
+    }
 }
