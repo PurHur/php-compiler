@@ -467,6 +467,20 @@ class Block {
     }
 
     /**
+     * Per-run copy of a compile-time constant for frame scope (#12040, ServeCompileCache).
+     *
+     * Cached {@see Block} instances must not share {@see Variable} cells with execution
+     * scope — builtins may coerce/mutate argument operands in place.
+     */
+    private function scopeConstantVariable(int $slot): Variable
+    {
+        $copy = new Variable();
+        $copy->duplicateFrom($this->constants[$slot]);
+
+        return $copy;
+    }
+
+    /**
      * Copy cfg Var root slot mappings from a sibling branch (?: / if merge, #3790).
      */
     public function inheritCfgVarSlotsFrom(Block $sibling): void
@@ -875,7 +889,7 @@ class Block {
             // Variable reads in args must still resolve (#3787 merge + literal arm).
             if (isset($scope[$pos]) && !$this->args->contains($op)) {
                 if (isset($this->constants[$pos])) {
-                    $scope[$pos] = $this->constants[$pos];
+                    $scope[$pos] = $this->scopeConstantVariable($pos);
                 }
 
                 continue;
@@ -908,7 +922,7 @@ class Block {
             }
 
             if (isset($this->constants[$pos]) && !$this->args->contains($op)) {
-                $scope[$pos] = $this->constants[$pos];
+                $scope[$pos] = $this->scopeConstantVariable($pos);
             } elseif (isset($this->closureCaptureSlots[$pos])) {
                 $scope[$pos] = self::initialVariableForOperand($op, $context, $pos, $this);
             } elseif ($this->isArgRecvParameterSlot($pos)) {
@@ -1055,13 +1069,13 @@ class Block {
         for ($i = 0; $i <= $max; ++$i) {
             if (isset($scope[$i])) {
                 if (isset($this->constants[$i])) {
-                    $scope[$i] = $this->constants[$i];
+                    $scope[$i] = $this->scopeConstantVariable($i);
                 }
 
                 continue;
             }
             if (isset($this->constants[$i])) {
-                $scope[$i] = $this->constants[$i];
+                $scope[$i] = $this->scopeConstantVariable($i);
 
                 continue;
             }

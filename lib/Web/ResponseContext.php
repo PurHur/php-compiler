@@ -122,6 +122,9 @@ final class ResponseContext
 
     public static function addHeader(string $line, bool $replace = true): void
     {
+        if ('' === $line) {
+            return;
+        }
         self::assertSafeHeaderLine($line);
         if (preg_match('#^HTTP/\d(?:\.\d)?\s+(\d{3})#', $line, $m)) {
             self::setStatus((int) $m[1]);
