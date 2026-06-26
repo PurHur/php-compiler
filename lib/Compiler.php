@@ -5943,6 +5943,13 @@ class Compiler {
 
             return $value;
         }
+        $dateStr = \PHPCompiler\ext\standard\DateConstants::CORE_STRING_BY_NAME[$lc] ?? null;
+        if (null !== $dateStr) {
+            $v = new Variable(Variable::TYPE_STRING);
+            $v->string($dateStr);
+
+            return $v;
+        }
 
         return null;
     }

@@ -199,6 +199,7 @@ final class VmConstants
                 'input_get',
                 'input_post',
             ],
+            array_keys(DateConstants::CORE_STRING_BY_NAME),
             Context::errorReportingConstantFetchNames(),
             StdlibConstants::CORE_FETCH_NAMES,
         );

@@ -411,6 +411,13 @@ class Context {
 
             return $var;
         }
+        $dateStr = \PHPCompiler\ext\standard\DateConstants::CORE_STRING_BY_NAME[strtolower($name)] ?? null;
+        if (null !== $dateStr) {
+            $var = new Variable(Variable::TYPE_STRING);
+            $var->string($dateStr);
+
+            return $var;
+        }
         $phpCore = \PHPCompiler\ext\standard\VmPhpCoreConstants::fetchExact($name);
         if (null !== $phpCore) {
             return $phpCore;
