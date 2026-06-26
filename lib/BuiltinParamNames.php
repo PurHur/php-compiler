@@ -57,6 +57,7 @@ final class BuiltinParamNames
                 return ['string', 'array'];
             case 'sort':
             case 'rsort':
+                return ['array', 'flags', 'direction'];
             case 'asort':
             case 'arsort':
             case 'ksort':

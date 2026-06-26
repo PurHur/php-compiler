@@ -79,12 +79,98 @@ final class VmInternalCompare
      */
     public static function resolveFrameSortFlags(Frame $frame, string $function, int $argIndex = 1): int
     {
-        $flagsArg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        return self::resolveFrameSortFlagsOperand(
+            $frame->calledArgs[$argIndex]->resolveIndirect(),
+            $function,
+            $argIndex + 1,
+            '$flags',
+            false
+        );
+    }
+
+    /**
+     * sort()/rsort() flags + optional SortDirection (#9947, PHP 8.4 Sorting / SortDirection).
+     */
+    public static function resolveSortFunctionFlags(Frame $frame, string $function): int
+    {
+        $flags = StdlibConstants::SORT_REGULAR;
+        if (isset($frame->calledArgs[1])) {
+            $flags = self::resolveFrameSortFlagsOperand(
+                $frame->calledArgs[1]->resolveIndirect(),
+                $function,
+                2,
+                '$flags',
+                true
+            );
+        } elseif (isset($frame->calledArgs[2])) {
+            $order = VmArraySort::trySortDirectionOrderInt($frame->calledArgs[2]->resolveIndirect());
+            if (null !== $order) {
+                return $order;
+            }
+        }
+        if (isset($frame->calledArgs[2])) {
+            $flags = VmArraySort::applySortDirectionToFlags($flags, $frame->calledArgs[2], $function);
+        }
+
+        return $flags;
+    }
+
+    /**
+     * @throws \LogicException when $allowSortingEnum is false and operand is not int
+     * @throws \TypeError when $allowSortingEnum is true and operand is not int|Sorting
+     */
+    public static function resolveFrameSortFlagsOperand(
+        Variable $flagsArg,
+        string $function,
+        int $argNum,
+        string $paramName,
+        bool $allowSortingEnum
+    ): int {
+        if ($allowSortingEnum) {
+            $fromEnum = VmArraySort::trySortingOrderInt($flagsArg);
+            if (null !== $fromEnum) {
+                return $fromEnum;
+            }
+            if (EnumCaseSupport::isEnumCaseVariable($flagsArg)) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    $function,
+                    $argNum,
+                    $paramName,
+                    EnumCaseSupport::typeNameForVariable($flagsArg)
+                ));
+            }
+            if (Variable::TYPE_INTEGER !== $flagsArg->type) {
+                throw new \TypeError(sprintf(
+                    '%s(): Argument #%d (%s) must be of type int|Sorting, %s given',
+                    $function,
+                    $argNum,
+                    $paramName,
+                    self::vmSortFlagsTypeName($flagsArg->type)
+                ));
+            }
+
+            return $flagsArg->toInt();
+        }
         if (Variable::TYPE_INTEGER !== $flagsArg->type) {
             throw new \LogicException($function.'() flags must be an integer in this compiler build');
         }
 
         return $flagsArg->toInt();
+    }
+
+    public static function vmSortFlagsTypeName(int $type): string
+    {
+        return match ($type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
     }
 
     /**

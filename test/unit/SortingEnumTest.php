@@ -46,4 +46,22 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'sorting_multisort.php'));
         $this->assertSame("1,2,3\n3,2,1\n", ob_get_clean());
     }
+
+    /** @covers issue #9947 */
+    public function testSortAcceptsSortingEnumAndSortDirectionNamed(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$a = [3, 1, 2];
+sort($a, Sorting::Ascending);
+echo implode(',', $a), "\n";
+$b = [3, 1, 2];
+sort($b, direction: SortDirection::Ascending);
+echo implode(',', $b), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'sort_sorting_enum.php'));
+        $this->assertSame("1,2,3\n1,2,3\n", ob_get_clean());
+    }
 }

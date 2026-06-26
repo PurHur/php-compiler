@@ -28,14 +28,14 @@ final class rsort_ extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('rsort() requires one or two arguments');
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('rsort() requires one to three arguments');
         }
         $array = $frame->calledArgs[0]->resolveIndirect();
         $ht = VmArray::requireArray($frame->calledArgs[0], 'rsort');
         $flags = StdlibConstants::SORT_REGULAR;
-        if (2 === $argc) {
-            $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'rsort');
+        if ($argc > 1) {
+            $flags = VmInternalCompare::resolveSortFunctionFlags($frame, 'rsort');
         }
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
