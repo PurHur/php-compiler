@@ -54,7 +54,7 @@ final class ErrorHandlerJitHelper
     public static function restoreApply(): bool
     {
         if (self::$depth <= 0) {
-            return false;
+            return true;
         }
         if (self::$depth > 1) {
             self::$topFnAddr = self::$savedFnAddr;
