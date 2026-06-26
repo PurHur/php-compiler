@@ -27,6 +27,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'zend_thread_id_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetmygrgid()
+                && str_contains($name, 'getmygrgid')
+                && !str_contains($name, 'getmygrgid_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsJsonValidate()
                 && str_contains($name, 'json_validate')
                 && !str_contains($name, 'json_validate_phantom')) {
