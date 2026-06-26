@@ -49,8 +49,9 @@ final class json_decode extends Internal
         );
         $depth = 512;
         if (isset($frame->calledArgs[2])) {
-            $depth = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[2]->resolveIndirect(),
+            $depth = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                2,
                 'json_decode',
                 3,
                 'depth'
@@ -61,8 +62,9 @@ final class json_decode extends Internal
         }
         $flags = 0;
         if (isset($frame->calledArgs[3])) {
-            $flags = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[3]->resolveIndirect(),
+            $flags = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                3,
                 'json_decode',
                 4,
                 'flags'
@@ -169,6 +171,9 @@ final class json_decode extends Internal
         if (!isset($args[2]) || NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             return 512;
         }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireInt($context, $args[2], 'json_decode', 'depth', 3);
+        }
         $depth = self::compileTimeInt($context, $args[2]);
         if (null === $depth) {
             throw new \LogicException('json_decode() depth must be a compile-time integer in this compiler build');
@@ -187,6 +192,9 @@ final class json_decode extends Internal
     {
         if (!isset($args[3]) || NamedOptionalCallArgs::isOmittedOptional($args[3])) {
             return 0;
+        }
+        if ($context->callerStrictTypes) {
+            JitInternalStrictArg::requireInt($context, $args[3], 'json_decode', 'flags', 4);
         }
         $flags = self::compileTimeInt($context, $args[3]);
         if (null === $flags) {

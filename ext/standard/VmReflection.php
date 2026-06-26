@@ -1313,8 +1313,12 @@ final class VmReflection
      */
     public static function userCallArgs(Frame $frame): array
     {
+        $entryCandidate = null;
         for ($f = $frame->parent; null !== $f; $f = $f->parent) {
-            if (null !== $f->block && null !== $f->block->func && !$f->hasHandler()) {
+            if (null === $f->block || null === $f->block->func || $f->hasHandler()) {
+                continue;
+            }
+            if ([] !== $f->calledArgs) {
                 $args = $f->calledArgs;
                 if (null !== $f->block->func->class) {
                     return array_slice($args, 1);
@@ -1322,6 +1326,17 @@ final class VmReflection
 
                 return $args;
             }
+            if ($f->block->func instanceof Func\PHP && $f->block === $f->block->func->block) {
+                $entryCandidate = $f;
+            }
+        }
+        if (null !== $entryCandidate) {
+            $args = $entryCandidate->calledArgs;
+            if (null !== $entryCandidate->block->func->class) {
+                return array_slice($args, 1);
+            }
+
+            return $args;
         }
         throw new \LogicException('Must be called from a function context');
     }
