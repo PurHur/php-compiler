@@ -152,6 +152,23 @@ final class StringPasswordCryptoStandaloneLlvm
         $context->builder->branchIf($costBad, $costFail, $body);
 
         $context->builder->positionAtEnd($costFail);
+        TypeErrorRaise::ensureLinked($context);
+        $msgBuf = $context->builder->alloca($i8, 128, 'pw_cost_err');
+        $msgPtr = $context->builder->pointerCast($msgBuf, $i8p);
+        $errFmt = self::cstr($context, 'Invalid bcrypt cost parameter specified: %lld');
+        $context->builder->call(
+            $context->lookupFunction('snprintf'),
+            $msgPtr,
+            $i64->constInt(128, false),
+            $errFmt,
+            $effCostI64
+        );
+        $msgLen = $context->builder->call($context->lookupFunction('strlen'), $msgPtr);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_jit_raise_value_error'),
+            $msgPtr,
+            $context->builder->intCast($msgLen, $sizeT)
+        );
         $context->builder->returnValue($nullStr);
 
         $context->builder->positionAtEnd($body);
