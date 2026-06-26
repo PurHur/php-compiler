@@ -14271,7 +14271,9 @@ restart:
             return new Variable(Variable::TYPE_NULL);
         }
         if (isset($frame->scope[$slot])) {
-            $resolved = $frame->scope[$slot]->resolveIndirect();
+            $scopeVar = $frame->scope[$slot];
+            VM\TypedPropertyCheck::assertReadable($scopeVar);
+            $resolved = $scopeVar->resolveIndirect();
             if (!$resolved->isUndefined()) {
                 return $resolved;
             }
