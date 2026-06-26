@@ -39,6 +39,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\intl\IntlExtensionPolicy::advertisesBuiltins()
+                && str_contains($name, 'grapheme_')
+                && !str_contains($name, 'grapheme_phantom')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {

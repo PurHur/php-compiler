@@ -4,14 +4,34 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\intl\IntlExtensionPolicy;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7221 */
 final class GraphemeStrstrBuiltinTest extends TestCase
 {
+    public function testGraphemeStrstrNotAdvertisedWithoutIntl(): void
+    {
+        if (IntlExtensionPolicy::advertisesBuiltins()) {
+            $this->markTestSkipped('intl extension advertised — phantom guard N/A');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+echo (int) function_exists('grapheme_strstr'), "\n";
+echo (int) function_exists('grapheme_stristr'), "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'grapheme_strstr_phantom.php'));
+        $this->assertSame("0\n0\n", ob_get_clean());
+    }
+
     public function testGraphemeStrstrBuiltinExists(): void
     {
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            $this->markTestSkipped('intl extension not advertised (#11768)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -28,6 +48,9 @@ PHP;
 
     public function testGraphemeStrstrEnumTypeError(): void
     {
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            $this->markTestSkipped('intl extension not advertised (#11768)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

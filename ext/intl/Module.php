@@ -13,6 +13,7 @@ use PHPCompiler\VM;
  *
  * Grapheme builtins are partial PHP implementations without ICU. Register under
  * {@see standard} so extension_loaded('intl') stays false until full ext/intl (#11472).
+ * {@see IntlExtensionPolicy} withholds grapheme/intl_* from function_exists() until then (#11768).
  */
 class Module extends ModuleAbstract
 {
@@ -38,6 +39,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!IntlExtensionPolicy::advertisesBuiltins()) {
+            return [];
+        }
+
         return [
             new grapheme_strlen(),
             new grapheme_substr(),
