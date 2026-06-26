@@ -47,7 +47,7 @@ final class highlight_file extends Internal
                 return;
             }
             if ($return) {
-                $frame->returnVar->string(HighlightEngine::EMPTY_HIGHLIGHT_HTML);
+                $frame->returnVar->bool(false);
 
                 return;
             }
