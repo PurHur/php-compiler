@@ -1,5 +1,10 @@
 --TEST--
 stdlib bzcompress/bzdecompress via VmBz2Native FFI without host ext-bz2 (#3402)
+--SKIPIF--
+<?php
+if (!\PHPCompiler\ext\bz2\VmBz2Native::available()) {
+    die('skip libbz2 not available');
+}
 --FILE--
 <?php
 $plain = str_repeat('abc', 100);

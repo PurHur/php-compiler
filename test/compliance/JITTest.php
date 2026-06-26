@@ -44,6 +44,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'grapheme_phantom')) {
                 continue;
             }
+            if (!\PHPCompiler\ext\bz2\VmBz2Native::available()
+                && (str_contains($name, 'bz2') || str_contains($name, 'bzcompress'))
+                && !str_contains($name, 'bz2_phantom')) {
+                continue;
+            }
             // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables typed trait constants (#5993).
             if (CompilerVersion::supportsTypedTraitConstants()
                 && str_contains($name, 'trait_typed_const_reject')) {
