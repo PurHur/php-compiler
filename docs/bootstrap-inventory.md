@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3298 |
-| Phase A inventory files (M2 ratio SSOT) | 3298 |
+| PHP files on vm.php path | 3301 |
+| Phase A inventory files (M2 ratio SSOT) | 3301 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8751 |
+| Source constructs flagged (warnings) | 8755 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -957,7 +957,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VarDumpJitHelper.php` | 0 | 1 |
 | `ext/standard/VarExportJitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
-| `ext/standard/VmArray.php` | 0 | 31 |
+| `ext/standard/VmArray.php` | 0 | 32 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayFilterCallback.php` | 0 | 3 |
@@ -1042,6 +1042,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsReadPure.php` | 0 | 1 |
 | `ext/standard/VmFsStdio.php` | 0 | 1 |
 | `ext/standard/VmFsStdioNative.php` | 0 | 1 |
+| `ext/standard/VmFsStdioPure.php` | 0 | 1 |
 | `ext/standard/VmFsTempnam.php` | 0 | 1 |
 | `ext/standard/VmFsTempnamNative.php` | 0 | 1 |
 | `ext/standard/VmFsTempnamPure.php` | 0 | 1 |
@@ -1187,6 +1188,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStatPure.php` | 0 | 1 |
 | `ext/standard/VmStreamArg.php` | 0 | 1 |
 | `ext/standard/VmStreamBlockingNative.php` | 0 | 1 |
+| `ext/standard/VmStreamBlockingPure.php` | 0 | 1 |
 | `ext/standard/VmStreamBucket.php` | 0 | 3 |
 | `ext/standard/VmStreamContext.php` | 0 | 12 |
 | `ext/standard/VmStreamFilterChain.php` | 0 | 2 |
@@ -1203,6 +1205,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamSocketGetName.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairNative.php` | 0 | 1 |
+| `ext/standard/VmStreamSocketPairPure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPure.php` | 0 | 1 |
 | `ext/standard/VmStreamSupports.php` | 0 | 1 |
 | `ext/standard/VmStreamSync.php` | 0 | 1 |
@@ -9502,30 +9505,31 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 133)
 - new Error (line 190)
 - new Error (line 195)
-- new Error (line 207)
-- new HashTable (line 343)
-- new Variable (line 346)
-- new Variable (line 362)
-- new HashTable (line 401)
-- new Variable (line 403)
-- new HashTable (line 556)
-- new Variable (line 558)
-- new Variable (line 685)
-- new Variable (line 713)
-- new Variable (line 724)
-- new HashTable (line 730)
-- new Variable (line 732)
-- new HashTable (line 831)
-- new Variable (line 842)
-- new HashTable (line 882)
-- new Variable (line 893)
-- new Variable (line 906)
-- new HashTable (line 946)
-- new Variable (line 955)
-- new Variable (line 1039)
-- new Variable (line 1041)
-- new HashTable (line 1054)
-- new Variable (line 1057)
+- new Error (line 208)
+- new Error (line 213)
+- new HashTable (line 349)
+- new Variable (line 352)
+- new Variable (line 368)
+- new HashTable (line 407)
+- new Variable (line 409)
+- new HashTable (line 562)
+- new Variable (line 564)
+- new Variable (line 691)
+- new Variable (line 719)
+- new Variable (line 730)
+- new HashTable (line 736)
+- new Variable (line 738)
+- new HashTable (line 837)
+- new Variable (line 848)
+- new HashTable (line 888)
+- new Variable (line 899)
+- new Variable (line 912)
+- new HashTable (line 952)
+- new Variable (line 961)
+- new Variable (line 1045)
+- new Variable (line 1047)
+- new HashTable (line 1060)
+- new Variable (line 1063)
 - 53 class method(s)
 - 3 closure(s)
 
@@ -9819,10 +9823,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 101)
-- new RecursiveIteratorIterator (line 1452)
-- new RecursiveDirectoryIterator (line 1453)
-- new RecursiveIteratorIterator (line 1554)
-- new RecursiveDirectoryIterator (line 1555)
+- new RecursiveIteratorIterator (line 1442)
+- new RecursiveDirectoryIterator (line 1443)
+- new RecursiveIteratorIterator (line 1544)
+- new RecursiveDirectoryIterator (line 1545)
 - 55 class method(s)
 - 8 closure(s)
 
@@ -10037,14 +10041,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 208)
 - new Variable (line 215)
 - new Variable (line 220)
-- new HashTable (line 1250)
-- new Variable (line 1252)
-- new HashTable (line 2060)
-- new Variable (line 2063)
-- new Variable (line 2069)
-- new Variable (line 2075)
-- new Variable (line 2081)
-- 114 class method(s)
+- new HashTable (line 1261)
+- new Variable (line 1263)
+- new HashTable (line 2071)
+- new Variable (line 2074)
+- new Variable (line 2080)
+- new Variable (line 2086)
+- new Variable (line 2092)
+- 115 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -10119,7 +10123,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsStdioNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 2 class method(s)
+
+### `ext/standard/VmFsStdioPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmFsTempnam.php`
 
@@ -10673,7 +10682,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PhpFdStreamState (line 117)
-- 28 class method(s)
+- 30 class method(s)
 
 ### `ext/standard/VmPhpFilterStream.php`
 
@@ -11171,7 +11180,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamBlockingNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 3 class method(s)
+
+### `ext/standard/VmStreamBlockingPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmStreamBucket.php`
 
@@ -11275,7 +11289,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSocketPairNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 2 class method(s)
+
+### `ext/standard/VmStreamSocketPairPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmStreamSocketPure.php`
 
