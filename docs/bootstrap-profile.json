@@ -1148,7 +1148,7 @@
         "ext/standard/VmZendDoubleString.php",
         "ext/standard/VmZlib.php",
         "ext/standard/VmZlibArg.php",
-        "ext/standard/VmZlibNative.php",
+        "ext/standard/VmZlibCore.php",
         "ext/standard/ZlibEncodeJitHelper.php",
         "ext/standard/abs.php",
         "ext/standard/acos.php",
