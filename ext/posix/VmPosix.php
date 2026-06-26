@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmGetcwdNative;
 use PHPCompiler\VM\Variable;
@@ -355,6 +356,25 @@ final class VmPosix
             'cutime' => (int) $tms->tms_cutime,
             'cstime' => (int) $tms->tms_cstime,
         ];
+    }
+
+    /**
+     * @param array{ticks: int, utime: int, stime: int, cutime: int, cstime: int} $raw
+     */
+    public static function timesToHashTable(array $raw): HashTable
+    {
+        $ht = new HashTable();
+        foreach ($raw as $key => $value) {
+            $slot = new Variable();
+            $slot->int((int) $value);
+            if (\is_int($key)) {
+                $ht->addIndex($key, $slot);
+            } else {
+                $ht->add((string) $key, $slot);
+            }
+        }
+
+        return $ht;
     }
 
     /**
