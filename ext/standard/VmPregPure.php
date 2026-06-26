@@ -425,7 +425,7 @@ final class VmPregPure
         [$regex, $opts] = $parsed;
         $engineCompiled = VmPregEngine::compile($regex, $opts);
         if (null === $engineCompiled) {
-            self::$lastError = 4;
+            self::$lastError = 1;
 
             return null;
         }
