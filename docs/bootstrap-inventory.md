@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3316 |
-| Phase A inventory files (M2 ratio SSOT) | 3316 |
+| PHP files on vm.php path | 3317 |
+| Phase A inventory files (M2 ratio SSOT) | 3317 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8810 |
+| Source constructs flagged (warnings) | 8811 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1043,6 +1043,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsOpenNative.php` | 0 | 1 |
 | `ext/standard/VmFsOpenPure.php` | 0 | 1 |
 | `ext/standard/VmFsPathNative.php` | 0 | 1 |
+| `ext/standard/VmFsPathPure.php` | 0 | 1 |
 | `ext/standard/VmFsReadNative.php` | 0 | 1 |
 | `ext/standard/VmFsReadPure.php` | 0 | 1 |
 | `ext/standard/VmFsStdio.php` | 0 | 1 |
@@ -10100,7 +10101,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsDirNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmFsDirPure.php`
 
@@ -10130,7 +10131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmFsOpenPure.php`
 
@@ -10140,12 +10141,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsPathNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 6 class method(s)
+
+### `ext/standard/VmFsPathPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `ext/standard/VmFsReadNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/VmFsReadPure.php`
 
@@ -10205,7 +10211,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsWriteNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmFsWritePure.php`
 
