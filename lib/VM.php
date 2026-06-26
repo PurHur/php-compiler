@@ -2273,6 +2273,13 @@ class VM {
 
             return $proxy;
         }
+        if (SplArrayStorage::hasArrayAsProps($object)) {
+            $proxy = new Variable();
+            $proxy->arrayAsPropsTarget = $object;
+            $proxy->arrayAsPropsName = $name;
+
+            return $proxy;
+        }
         if ($this->instanceMethodReturnsByRef($object, '__get')) {
             return $this->invokeMagicGet($object, $name);
         }
@@ -2946,6 +2953,13 @@ restart:
                     $writeTarget = $arg2->resolveIndirect();
                     if (null !== $writeTarget->magicSetTarget && null !== $writeTarget->magicSetName) {
                         $this->invokeMagicSet($writeTarget->magicSetTarget, $writeTarget->magicSetName, $arg3);
+                        $arg1->copyFrom($arg3);
+                        break;
+                    }
+                    if (null !== $writeTarget->arrayAsPropsTarget && null !== $writeTarget->arrayAsPropsName) {
+                        $key = new Variable(Variable::TYPE_STRING);
+                        $key->string($writeTarget->arrayAsPropsName);
+                        SplArrayStorage::offsetSet($writeTarget->arrayAsPropsTarget, $key, $arg3);
                         $arg1->copyFrom($arg3);
                         break;
                     }
@@ -5978,6 +5992,12 @@ restart:
                     }
                     if ($magicGetForRead) {
                         $this->deliverMagicGetRead($result, $propertyObject, $name);
+                        break;
+                    }
+                    if (SplArrayStorage::hasArrayAsProps($propertyObject)) {
+                        $key = new Variable(Variable::TYPE_STRING);
+                        $key->string($name);
+                        $result->copyFrom(SplArrayStorage::offsetGet($propertyObject, $key));
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {

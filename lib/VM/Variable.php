@@ -115,6 +115,11 @@ final class Variable {
 
     public ?string $magicSetName = null;
 
+    /** Lvalue proxy for ArrayObject::ARRAY_AS_PROPS property writes (#11893). */
+    public ?ObjectEntry $arrayAsPropsTarget = null;
+
+    public ?string $arrayAsPropsName = null;
+
     /** Temporary from __get; []= / dim-write must throw (#4673, zend_object_handlers.c). */
     public ?ObjectEntry $magicGetOverloadedTarget = null;
 
