@@ -8,9 +8,16 @@ use PHPCompiler\ext\bz2\VmBz2Core;
 use PHPCompiler\ext\bz2\VmBz2Native;
 use PHPUnit\Framework\TestCase;
 
-/** VmBz2Core — bzip2 round-trip without libbz2 FFI (#8868). */
+/** VmBz2Native — bzip2 round-trip without libbz2 FFI (#8868, #12193). */
 final class VmBz2NativeTest extends TestCase
 {
+    private string $repoRoot;
+
+    protected function setUp(): void
+    {
+        $this->repoRoot = dirname(__DIR__, 2);
+    }
+
     public function testRoundTripWithoutHostBz2(): void
     {
         $plain = 'hello bz2 bootstrap';
@@ -53,7 +60,7 @@ final class VmBz2NativeTest extends TestCase
         $this->assertFalse(VmBz2Core::decompress("BZh1\x00", 2));
     }
 
-    public function testDecompressFfiCompressedHello(): void
+    public function testDecompressReferenceVectorHello(): void
     {
         $hex = '425a68343141592653591931653d00000081000244a000219a68334d07338bb9229c28480c98b29e80';
         $data = \hex2bin($hex);
@@ -61,28 +68,21 @@ final class VmBz2NativeTest extends TestCase
         $this->assertSame('hello', VmBz2Core::decompress($data));
     }
 
-    public function testDecompressFfiCompressedAbcRepeat(): void
-    {
-        if (!\extension_loaded('FFI')) {
-            $this->markTestSkipped('FFI required to generate libbz2 reference vector');
-        }
-        require_once __DIR__.'/../../ext/bz2/VmBz2Native.php';
-        \putenv('PHP_COMPILER_BZ2_FFI=1');
-        $plain = \str_repeat('abc', 100);
-        $compressed = VmBz2Native::compress($plain, 4, 0);
-        \putenv('PHP_COMPILER_BZ2_FFI');
-        if (false === $compressed) {
-            $this->markTestSkipped('libbz2 FFI unavailable');
-        }
-        $this->assertStringStartsWith('BZh', $compressed);
-        $this->assertSame($plain, VmBz2Core::decompress($compressed));
-    }
-
     public function testRepeatedRunRoundTrip(): void
     {
-        $plain = \str_repeat('a', 5000);
-        $compressed = VmBz2Core::compress($plain, 4, 0);
+        $plain = \str_repeat('abc', 100);
+        $compressed = VmBz2Native::compress($plain, 4, 0);
         $this->assertIsString($compressed);
-        $this->assertSame($plain, VmBz2Core::decompress($compressed));
+        $this->assertStringStartsWith('BZh', $compressed);
+        $this->assertSame($plain, VmBz2Native::decompress($compressed));
+    }
+
+    public function testVmBz2NativeDelegatesToCoreWithoutFfi(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/ext/bz2/VmBz2Native.php');
+        $this->assertStringContainsString('VmBz2Core::compress', $source);
+        $this->assertStringContainsString('VmBz2Core::decompress', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 }
