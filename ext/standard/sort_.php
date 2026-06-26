@@ -60,27 +60,28 @@ final class sort_ extends Internal
         $first = $values[0]->resolveIndirect();
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
-            if (StdlibConstants::SORT_NUMERIC === $sortType) {
-                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
-            } else {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
+            ) {
                 VmInternalCompare::sortVariableValues(
                     $values,
                     VmInternalCompare::stringCompareForSortFlags($flags)
                 );
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
             }
         } elseif (Variable::TYPE_INTEGER === $first->type) {
-            if (StdlibConstants::SORT_REGULAR === $sortType) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)
+            ) {
                 $n = \count($values);
                 for ($i = 1; $i < $n; ++$i) {
                     $j = $i;
                     while ($j > 0) {
                         $a = $values[$j - 1]->resolveIndirect();
                         $b = $values[$j]->resolveIndirect();
-                        if (Variable::TYPE_INTEGER !== $a->type || Variable::TYPE_INTEGER !== $b->type) {
-                            throw new \LogicException(
-                                'sort() only supports homogeneous string or integer arrays in this compiler build'
-                            );
-                        }
                         if ($a->toInt() <= $b->toInt()) {
                             break;
                         }
@@ -103,9 +104,7 @@ final class sort_ extends Internal
                 );
             }
         } else {
-            throw new \LogicException(
-                'sort() only supports homogeneous string or integer arrays in this compiler build'
-            );
+            VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
         }
         $array->separateArrayForWrite();
         $array->resolveIndirect()->toArray()->replacePackedValues($values);
