@@ -26,12 +26,14 @@ final class VmFsRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@\\\\copy\\s*\\(/', $source);
     }
 
-    public function testVmFsUnlinkDoesNotReferenceHostDelegation(): void
+    public function testVmFsUnlinkDelegatesToPureWithoutLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsUnlink.php');
-        $this->assertStringContainsString('int unlink(const char *pathname)', $source);
-        $this->assertDoesNotMatchRegularExpression("/function_exists\\('unlink'\\)/", $source);
-        $this->assertDoesNotMatchRegularExpression('/@\\\\unlink\\s*\\(/', $source);
+        $this->assertStringContainsString('VmFsUnlinkPure::unlink', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsUnlinkPure.php');
+        $this->assertStringContainsString('@\\unlink', $pure);
     }
 
     public function testVmFsDiskSpaceDoesNotReferenceHostDelegation(): void
@@ -77,6 +79,8 @@ final class VmFsRuntimeShrinkTest extends TestCase
             $touchPath = sys_get_temp_dir().'/phpc_touch_ffi_disabled_'.bin2hex(random_bytes(4)).'.tmp';
             try {
                 $this->assertTrue(VmFsTouchNative::touch($touchPath, 100, 100));
+                $this->assertTrue(VmFsUnlink::unlink($touchPath));
+                $this->assertFileDoesNotExist($touchPath);
             } finally {
                 @unlink($touchPath);
             }
