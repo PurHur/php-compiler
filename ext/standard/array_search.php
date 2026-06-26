@@ -42,11 +42,12 @@ final class array_search extends Internal
         if (3 === $argc) {
             $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
+        $vm = null !== $frame->vmContext ? $frame->vmContext->runtime->vm() : null;
         if (null === $frame->returnVar) {
             return;
         }
         foreach ($haystack->iterateKeyed(true) as [$key, $value]) {
-            if ($strict ? $needle->identicalTo($value) : in_array::looseEquals($needle, $value)) {
+            if ($strict ? $needle->identicalTo($value) : in_array::looseEquals($needle, $value, $vm)) {
                 $frame->returnVar->copyFrom($key);
 
                 return;
