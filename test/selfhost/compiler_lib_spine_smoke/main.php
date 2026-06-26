@@ -1102,6 +1102,7 @@ require_once __DIR__.'/../../../ext/standard/VmHashXxh.php';
 require_once __DIR__.'/../../../ext/standard/VmHead.php';
 require_once __DIR__.'/../../../ext/standard/VmHebrev.php';
 require_once __DIR__.'/../../../ext/standard/VmHighlight.php';
+require_once __DIR__.'/../../../ext/standard/VmHostPure.php';
 require_once __DIR__.'/../../../ext/standard/VmHost.php';
 require_once __DIR__.'/../../../ext/standard/VmHrtime.php';
 require_once __DIR__.'/../../../ext/standard/VmHrtimeNative.php';
