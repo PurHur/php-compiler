@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\Builtin\Sscanf;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -28,12 +29,16 @@ final class JitSscanf
         }
 
         $strLit = $args[0]->compileTimeString ?? null;
+        if (($args[0]->isNullConstant ?? false) && null === $strLit) {
+            $strLit = '';
+        }
         $fmtLit = $args[1]->compileTimeString ?? null;
         if (null !== $strLit && null !== $fmtLit && self::canFoldCompileTime($fmtLit, $argc - 2)) {
             return self::parseCompileTime($context, $strLit, $fmtLit, \array_slice($args, 2));
         }
 
-        $str = JitStringBuiltinArg::lowerRequiredString($context, $args[0], 'sscanf', 0, 'string');
+        JitInternalStrictArg::rejectNullString($context, $args[0], 'sscanf', 'string', 1);
+        $str = JitStringBuiltinArg::lower($context, $args[0], 'sscanf', 0, 'string');
         $fmt = JitStringBuiltinArg::lower($context, $args[1], 'sscanf', 1, 'format');
         $outCount = $argc - 2;
         $i64 = $context->getTypeFromString('int64');
