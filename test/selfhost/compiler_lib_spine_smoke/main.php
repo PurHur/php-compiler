@@ -1226,6 +1226,7 @@ require_once __DIR__.'/../../../ext/standard/VmStatNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStatPath.php';
 require_once __DIR__.'/../../../ext/standard/VmStatPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamArg.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamBlockingPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBlockingNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBucket.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
