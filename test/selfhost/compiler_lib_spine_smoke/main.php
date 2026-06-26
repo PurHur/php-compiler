@@ -397,6 +397,7 @@ require_once __DIR__.'/../../../ext/standard/FstatJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FtokJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FunctionExistsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcCollectCyclesJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GcCollectCyclesRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GcToggleJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetBrowserJitHelper.php';
