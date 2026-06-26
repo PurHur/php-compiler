@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3285 |
-| Phase A inventory files (M2 ratio SSOT) | 3285 |
+| PHP files on vm.php path | 3287 |
+| Phase A inventory files (M2 ratio SSOT) | 3287 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8732 |
+| Source constructs flagged (warnings) | 8734 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -973,6 +973,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmChdirPure.php` | 0 | 1 |
 | `ext/standard/VmCheckdate.php` | 0 | 1 |
 | `ext/standard/VmChrootNative.php` | 0 | 1 |
+| `ext/standard/VmChrootPure.php` | 0 | 1 |
 | `ext/standard/VmClassHas.php` | 0 | 1 |
 | `ext/standard/VmCli.php` | 0 | 1 |
 | `ext/standard/VmCliArgv.php` | 0 | 3 |
@@ -1043,6 +1044,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFsTouchNative.php` | 0 | 1 |
 | `ext/standard/VmFsTouchPure.php` | 0 | 1 |
 | `ext/standard/VmFsUnlink.php` | 0 | 1 |
+| `ext/standard/VmFsUnlinkPure.php` | 0 | 1 |
 | `ext/standard/VmFsWriteNative.php` | 0 | 1 |
 | `ext/standard/VmFsWritePure.php` | 0 | 1 |
 | `ext/standard/VmFtok.php` | 0 | 1 |
@@ -3451,7 +3453,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/VmBz2Native.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 3 class method(s)
 
 ### `ext/bz2/bzcompress.php`
 
@@ -9633,7 +9635,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmChrootNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
+
+### `ext/standard/VmChrootPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmClassHas.php`
 
@@ -10110,7 +10117,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsUnlink.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
+
+### `ext/standard/VmFsUnlinkPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmFsWriteNative.php`
 
