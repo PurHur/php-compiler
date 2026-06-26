@@ -12,6 +12,10 @@ final class BuiltinAttributeClasses84Test extends TestCase
 {
     public function testDelayedTargetValidationRegistered(): void
     {
+        if (!\PHPCompiler\CompilerVersion::advertisesDelayedTargetValidationAttributeClass()) {
+            $this->markTestSkipped('DelayedTargetValidation not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -26,6 +30,10 @@ PHP;
 
     public function testCompileTimeRegistered(): void
     {
+        if (!\PHPCompiler\CompilerVersion::advertisesCompileTimeAttributeClass()) {
+            $this->markTestSkipped('CompileTime not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

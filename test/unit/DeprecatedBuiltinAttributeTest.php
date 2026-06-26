@@ -12,6 +12,10 @@ final class DeprecatedBuiltinAttributeTest extends TestCase
 {
     public function testDeprecatedRegisteredFromExtStandard(): void
     {
+        if (!\PHPCompiler\CompilerVersion::advertisesDeprecatedAttributeClass()) {
+            $this->markTestSkipped('Deprecated attribute class not advertised on reference profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

@@ -50,4 +50,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
     }
+
+    public function testVmDoesNotRegisterForwardCompatBuiltinAttributeClassesOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $this->assertFalse(isset($ctx->classes['override']));
+        $this->assertFalse(isset($ctx->classes['deprecated']));
+        $this->assertFalse(isset($ctx->classes['nodiscard']));
+        $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
+        $this->assertFalse(isset($ctx->classes['compiletime']));
+    }
 }
