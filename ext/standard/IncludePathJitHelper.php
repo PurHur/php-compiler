@@ -46,9 +46,16 @@ final class IncludePathJitHelper
         return $old;
     }
 
-    /** @return string previous include_path */
-    public static function push(string $newPath): string
+    /**
+     * php-src ext/standard/basic_functions.c — zend_alter_ini_entry(include_path) rejects empty path.
+     *
+     * @return string|false previous include_path, or false when $newPath is empty after coercion
+     */
+    public static function push(string $newPath): string|false
     {
+        if ('' === $newPath) {
+            return false;
+        }
         $old = self::get();
         self::$stack = self::ensureStack()."\0".$newPath;
 

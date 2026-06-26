@@ -42,6 +42,23 @@ final class StreamResolveIncludePathTest extends TestCase
         $fn->execute($frame);
     }
 
+    public function testSetIncludePathRejectsEmptyPath(): void
+    {
+        $runtime = new Runtime();
+        $set = new set_include_path();
+        $frame = $set->getFrame($runtime->vmContext);
+        $before = \PHPCompiler\ext\standard\IncludePathJitHelper::get();
+        $emptyArg = new VMVariable();
+        $emptyArg->string('');
+        $frame->calledArgs[] = $emptyArg;
+        $frame->returnVar = new VMVariable();
+        $set->execute($frame);
+        $result = $frame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_BOOLEAN, $result->type);
+        $this->assertFalse($result->toBool());
+        $this->assertSame($before, \PHPCompiler\ext\standard\IncludePathJitHelper::get());
+    }
+
     public function testResolvesFromIncludePath(): void
     {
         $dir = \sys_get_temp_dir().'/phpc_stream_resolve_'.\getmypid();

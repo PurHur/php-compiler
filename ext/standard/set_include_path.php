@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPLLVM\Value;
@@ -34,7 +35,14 @@ final class set_include_path extends Internal
             'new_include_path'
         );
         $old = VmIncludePath::push($newPath);
-        BuiltinExecute::writeReturn($frame, static fn ($ret) => $ret->string($old));
+        BuiltinExecute::writeReturn($frame, static function ($ret) use ($old): void {
+            if (false === $old) {
+                $ret->bool(false);
+
+                return;
+            }
+            $ret->string($old);
+        });
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -52,6 +60,6 @@ final class set_include_path extends Internal
             'new_include_path'
         );
 
-        return JitIncludePath::set($context, $newPath);
+        return JitIncludePath::setValidated($context, $newPath);
     }
 }

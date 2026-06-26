@@ -22,8 +22,8 @@ final class VmIncludePath
         return IncludePathJitHelper::set($newPath);
     }
 
-    /** @return string previous include_path */
-    public static function push(string $newPath): string
+    /** @return string|false previous include_path, or false when $newPath is empty */
+    public static function push(string $newPath): string|false
     {
         return IncludePathJitHelper::push($newPath);
     }
