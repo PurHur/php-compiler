@@ -431,6 +431,13 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/Builtin/StreamFstat.php',
         'lib/JIT/Builtin/StreamFstatRuntime.php',
         'lib/VM/Builtin/DateTimeZoneListAbbreviations.php',
+        'ext/standard/JitRand.php',
+        'ext/standard/RandJitHelper.php',
+        'ext/standard/VmMt19937.php',
+        'ext/standard/getrandmax.php',
+        'ext/standard/mt_srand.php',
+        'ext/standard/rand_.php',
+        'lib/JIT/Builtin/Rand.php',
     ];
 
     public static function setUpBeforeClass(): void
@@ -453,7 +460,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         $this->assertFileExists($entry);
         $contents = (string) file_get_contents($entry);
         $count = bootstrap_spine_counts(self::$root)['spine'];
-        $this->assertSame(3235, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
+        $this->assertSame(3242, $count, 'M2 spine require_once units track Phase A inventory (#8559, #9234, #11629)');
         foreach (self::LIB_SPINE_SMOKE_NEW_UNITS as $unit) {
             $this->assertStringContainsString(
                 "require_once __DIR__.'/../../../{$unit}';",
