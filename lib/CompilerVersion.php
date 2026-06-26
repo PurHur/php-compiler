@@ -60,11 +60,15 @@ final class CompilerVersion
     /**
      * Version profile for builtin advertisement / function_exists parity (#11842).
      *
-     * Until stable 8.4.0, match Docker CI Zend 8.2 reference (php-env.sh) so forward-compat
-     * builtins are not phantom-registered on the reference profile.
+     * On the 8.4 development line, advertise implemented forward-compat builtins
+     * (json_validate, array_find family, str_increment, …) even while VERSION is
+     * 8.4.0-dev — version_compare treats -dev below stable (#12327, #12328).
      */
     public static function builtinAdvertisementVersion(): string
     {
+        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4)) {
+            return '8.4.0';
+        }
         if (version_compare(self::VERSION, '8.4.0', '<')) {
             return '8.2.0';
         }

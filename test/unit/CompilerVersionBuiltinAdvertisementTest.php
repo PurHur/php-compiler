@@ -6,42 +6,47 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** Builtin advertisement profile gates (#11842). */
+/** Builtin advertisement profile gates (#11842, #12327, #12328). */
 final class CompilerVersionBuiltinAdvertisementTest extends TestCase
 {
-    public function testBuiltinAdvertisementVersionMatchesZend82ReferenceUntilStable84(): void
+    public function testBuiltinAdvertisementVersionMatches84DevLine(): void
     {
-        $this->assertSame('8.2.0', CompilerVersion::builtinAdvertisementVersion());
+        $this->assertSame('8.4.0', CompilerVersion::builtinAdvertisementVersion());
     }
 
-    public function testZendThreadIdNotAdvertisedOnReferenceProfile(): void
+    public function testZendThreadIdAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsZendThreadId());
+        $this->assertTrue(CompilerVersion::supportsZendThreadId());
     }
 
-    public function testJsonValidateNotAdvertisedOnReferenceProfile(): void
+    public function testJsonValidateAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
-    public function testMbStrPadNotAdvertisedOnReferenceProfile(): void
+    public function testMbStrPadAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsMbStrPad());
+        $this->assertTrue(CompilerVersion::supportsMbStrPad());
     }
 
-    public function testStrIncrementNotAdvertisedOnReferenceProfile(): void
+    public function testStrIncrementAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
-    public function testFpowNotAdvertisedOnReferenceProfile(): void
+    public function testFpowAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsFpow());
+        $this->assertTrue(CompilerVersion::supportsFpow());
     }
 
-    public function testStreamSupportsNotAdvertisedOnReferenceProfile(): void
+    public function testStreamSupportsAdvertisedOn84DevProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStreamSupports());
+        $this->assertTrue(CompilerVersion::supportsStreamSupports());
+    }
+
+    public function testPhp84ArraySearchFunctionsAdvertisedOn84DevProfile(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
     public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
@@ -69,16 +74,31 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCrc32c());
     }
 
-    public function testVmDoesNotRegisterZendThreadIdOnReferenceProfile(): void
+    public function testVmRegistersZendThreadIdOn84DevProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
+        $this->assertTrue(isset($runtime->vmContext->functions['zend_thread_id']));
     }
 
-    public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void
+    public function testVmRegistersStreamSupportsOn84DevProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
+        $this->assertTrue(isset($runtime->vmContext->functions['stream_supports']));
+    }
+
+    public function testVmRegistersJsonValidateOn84DevProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
+    }
+
+    public function testVmRegistersArrayFindFamilyOn84DevProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last'] as $fn) {
+            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+        }
     }
 
     public function testVmDoesNotRegisterConvertCyrStringOnReferenceProfile(): void
@@ -111,20 +131,20 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['crc32c']));
     }
 
-    public function testVmDoesNotRegisterMbStrPadOnReferenceProfile(): void
+    public function testVmRegistersMbStrPadOn84DevProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
+        $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
-    public function testVmDoesNotRegisterForwardCompatBuiltinAttributeClassesOnReferenceProfile(): void
+    public function testVmRegistersForwardCompatBuiltinAttributeClassesOn84DevProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertFalse(isset($ctx->classes['override']));
-        $this->assertFalse(isset($ctx->classes['deprecated']));
-        $this->assertFalse(isset($ctx->classes['nodiscard']));
-        $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
-        $this->assertFalse(isset($ctx->classes['compiletime']));
+        $this->assertTrue(isset($ctx->classes['override']));
+        $this->assertTrue(isset($ctx->classes['deprecated']));
+        $this->assertTrue(isset($ctx->classes['nodiscard']));
+        $this->assertTrue(isset($ctx->classes['delayedtargetvalidation']));
+        $this->assertTrue(isset($ctx->classes['compiletime']));
     }
 }
