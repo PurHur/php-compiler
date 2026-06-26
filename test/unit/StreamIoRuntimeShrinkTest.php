@@ -52,4 +52,13 @@ final class StreamIoRuntimeShrinkTest extends TestCase
 
         VmFs::fclose($handle);
     }
+
+    public function testStandaloneLlvmQuarantinedSeparately(): void
+    {
+        $loc = substr_count(
+            (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php'),
+            "\n"
+        ) + 1;
+        $this->assertGreaterThan(900, $loc, 'StreamIoStandaloneLlvm retains libc LLVM quarantine (#9247)');
+    }
 }
