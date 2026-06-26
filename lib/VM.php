@@ -13359,7 +13359,7 @@ restart:
                             ));
                         }
                     }
-                    $storage = clone $frame->scope[$op->arg3];
+                    $storage = $this->cloneStaticPropertyStorage($frame->scope[$op->arg3]);
                     $default = $this->resolveCompileTimePropertyDefaultSlot($frame, $block, $op->arg2);
                     if (null !== $default) {
                         $storage->copyFrom($default);
@@ -13866,7 +13866,7 @@ restart:
                 $resultSlot
             );
             $name = strtolower($frame->scope[$declareOp->arg1]->toString());
-            $storage = clone $frame->scope[$declareOp->arg3];
+            $storage = $this->cloneStaticPropertyStorage($frame->scope[$declareOp->arg3]);
             $storage->copyFrom($value);
             $this->linkStaticTypedPropertySlot(
                 $storage,
