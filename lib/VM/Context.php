@@ -1025,6 +1025,8 @@ class Context {
             CycleCollector::markFrameRoots($stack->frame, $visitVar);
             $stack = $stack->prev;
         }
+        $this->exceptionHandlers->visitGcRoots($visitVar);
+        $this->errors->visitGcRoots($visitVar);
     }
 }
 
