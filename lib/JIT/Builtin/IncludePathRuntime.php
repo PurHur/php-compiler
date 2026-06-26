@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin as JitBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -167,6 +169,26 @@ final class IncludePathRuntime
 
         $entry = $fn->appendBasicBlock('include_path_set_bridge');
         $context->builder->positionAtEnd($entry);
+        $i64 = $context->getTypeFromString('int64');
+        $newLen = $context->builder->call(
+            $context->lookupFunction('__string__strlen'),
+            $fn->getParam(0)
+        );
+        $emptyBlock = BasicBlockHelper::append($context, 'include_path_set_empty');
+        $pushBlock = BasicBlockHelper::append($context, 'include_path_set_push');
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $i64->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyBlock, $pushBlock);
+
+        $context->builder->positionAtEnd($emptyBlock);
+        $i32 = $context->getTypeFromString('int32');
+        $context->builder->call(
+            $context->lookupFunction('__value__writeBool'),
+            $fn->getParam(1),
+            $i32->constInt(0, false)
+        );
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($pushBlock);
         $oldStrRaw = JitNestedHelperCoerce::callHelper(
             $context,
             self::stackHelperFunction($context, self::PUSH_HELPER),

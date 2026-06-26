@@ -24,6 +24,12 @@ final class JitIncludePath
 
     public static function set(Context $context, Value $newPath): Value
     {
+        return self::setValidated($context, $newPath);
+    }
+
+    /** php-src zend_alter_ini_entry — empty include_path returns false without mutation (#12165). */
+    public static function setValidated(Context $context, Value $newPath): Value
+    {
         IncludePathRuntime::ensureLinked($context);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
