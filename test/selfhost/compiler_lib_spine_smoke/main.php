@@ -135,6 +135,7 @@ require_once __DIR__.'/../../../ext/gettext/JitGettext.php';
 require_once __DIR__.'/../../../ext/gettext/Module.php';
 require_once __DIR__.'/../../../ext/gettext/VmGettext.php';
 require_once __DIR__.'/../../../ext/gettext/VmGettextNative.php';
+require_once __DIR__.'/../../../ext/gettext/VmGettextPure.php';
 require_once __DIR__.'/../../../ext/gettext/bind_textdomain_codeset.php';
 require_once __DIR__.'/../../../ext/gettext/bindtextdomain.php';
 require_once __DIR__.'/../../../ext/gettext/dcgettext.php';
