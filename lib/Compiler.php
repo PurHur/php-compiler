@@ -12986,6 +12986,15 @@ class Compiler {
             return null;
         }
         if ($argCount > $producerCount) {
+            if (0 === $argIndex) {
+                $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+                if (null !== $nestedTrailing) {
+                    [$arrayChain, ] = $nestedTrailing;
+
+                    return $arrayChain[\count($arrayChain) - 1];
+                }
+            }
+
             return $this->matchInlineCallArgProducerWithEmbeddedLiterals(
                 $producers,
                 $callArgs,
@@ -12994,12 +13003,30 @@ class Compiler {
             );
         }
         if ($argIndex < $producerCount) {
-            if (
-                0 === $argIndex
-                && $this->producersAreNestedArrayLiteralChain($producers)
-            ) {
-                // Nested inline array literal is one call arg — outer Array_ is the producer (#9305, #10042).
-                return $producers[$producerCount - 1];
+            if (0 === $argIndex) {
+                $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+                if (null !== $nestedTrailing) {
+                    [$arrayChain, ] = $nestedTrailing;
+
+                    return $arrayChain[\count($arrayChain) - 1];
+                }
+                if ($this->producersAreNestedArrayLiteralChain($producers)) {
+                    // Nested inline array literal is one call arg — outer Array_ is the producer (#9305, #10042).
+                    return $producers[$producerCount - 1];
+                }
+                $lastArray = null;
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\Array_) {
+                        $lastArray = $producer;
+                    }
+                }
+                if (null !== $lastArray) {
+                    return $lastArray;
+                }
+            }
+            // Embedded literal args must not consume hoisted Array_ slots (#12008, http_build_query).
+            if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+                return null;
             }
 
             return $producers[$argIndex];
@@ -13022,6 +13049,16 @@ class Compiler {
         int $argIndex,
         ?Op $cfgCallOp = null
     ): ?Op\Expr {
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null !== $nestedTrailing) {
+            [$arrayChain, $trailing] = $nestedTrailing;
+            if (0 === $argIndex) {
+                return $arrayChain[\count($arrayChain) - 1];
+            }
+            if ($argIndex === \count($callArgs) - 1 && [] !== $trailing) {
+                return $trailing[\count($trailing) - 1];
+            }
+        }
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
             return null;
         }

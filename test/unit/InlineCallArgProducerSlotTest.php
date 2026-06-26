@@ -2149,4 +2149,18 @@ PHP;
         $out = ob_get_clean();
         self::assertSame('ok', $out);
     }
+
+    /** Issue #12008 — nested inline array + 4th positional arg must not steal Array_ slots for literals. */
+    public function testHttpBuildQueryNestedInlineArrayFourPositionalArgsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo http_build_query(['a' => ['x', 'y']], '', '&', PHP_QUERY_RFC1738), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'http_build_query_nested_four_args.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("a%5B0%5D=x&a%5B1%5D=y\n", ob_get_clean());
+    }
 }
