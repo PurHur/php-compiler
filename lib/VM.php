@@ -5769,6 +5769,7 @@ restart:
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
                     $frame->callArgEntries = [];
+                    $frame->builtinCalleeQualifiedMethod = $class->name.'::__construct';
                     if (null === $frame->call) {
                         $object->constructed = true;
                         $newResultSlot = (int) $op->arg1;
@@ -11236,12 +11237,12 @@ restart:
         if (null !== $frame->magicCallMethodName) {
             $methodName = $frame->magicCallMethodName;
             $frame->magicCallMethodName = null;
-            [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
+            [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call, $frame);
             $userArgs = $this->resolveUserCallArgs(
                 $frame,
                 $paramNames,
                 $variadicIndex,
-                $this->internalBuiltinFunctionName($frame->call)
+                $this->internalBuiltinFunctionName($frame->call, $frame)
             );
             $nameVar = new Variable(Variable::TYPE_STRING);
             $nameVar->string($methodName);
@@ -11260,13 +11261,13 @@ restart:
             return $args;
         }
 
-        [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call);
+        [$paramNames, $variadicIndex] = $this->calleeParamMetadata($frame->call, $frame);
 
         $userArgs = $this->resolveUserCallArgs(
             $frame,
             $paramNames,
             $variadicIndex,
-            $this->internalBuiltinFunctionName($frame->call)
+            $this->internalBuiltinFunctionName($frame->call, $frame)
         );
         if ([] === $frame->callArgs) {
             $this->separateInternalByRefArgsForWrite($frame->call, $userArgs);
@@ -11494,12 +11495,19 @@ restart:
     /**
      * @return array{0: list<string>, 1: ?int}
      */
-    private function calleeParamMetadata(Func $call): array
+    private function calleeParamMetadata(Func $call, ?Frame $frame = null): array
     {
         if ($call instanceof Func\PHP) {
             return [$call->block->paramNames, $call->block->variadicParamIndex];
         }
         if ($call instanceof Func\Internal) {
+            $qualified = $frame?->builtinCalleeQualifiedMethod;
+            if (null !== $qualified) {
+                $names = BuiltinParamNames::forClassMethod($qualified);
+                if (null !== $names) {
+                    return [$names, null];
+                }
+            }
             $name = $call->getName();
 
             return [
@@ -11511,9 +11519,16 @@ restart:
         return [[], null];
     }
 
-    private function internalBuiltinFunctionName(Func $call): ?string
+    private function internalBuiltinFunctionName(Func $call, ?Frame $frame = null): ?string
     {
-        return $call instanceof Func\Internal ? $call->getName() : null;
+        if (!$call instanceof Func\Internal) {
+            return null;
+        }
+        if (null !== $frame?->builtinCalleeQualifiedMethod) {
+            return $frame->builtinCalleeQualifiedMethod;
+        }
+
+        return $call->getName();
     }
 
     protected function scopeSlot(Frame $frame, int $slot): Variable
@@ -11912,6 +11927,7 @@ restart:
         $frame->call = $declaringClass->methods[$methodLc];
         $frame->callArgs = [$receiver];
         $frame->callArgEntries = [];
+        $frame->builtinCalleeQualifiedMethod = $declaringClass->name.'::'.$declaredName;
 
         return null;
     }
@@ -12018,6 +12034,7 @@ restart:
         );
         $frame->call = $class->methods[$methodLc];
         $frame->callArgs = $this->callArgsForStaticMethod($frame, $lcClass, $frame->call, $parentKeywordScope);
+        $frame->builtinCalleeQualifiedMethod = $class->name.'::'.$declaredName;
     }
 
     /**
@@ -14832,6 +14849,7 @@ restart:
         $this->releaseOutgoingCallArgTemps($frame);
         $frame->callArgs = [];
         $frame->callArgEntries = [];
+        $frame->builtinCalleeQualifiedMethod = null;
     }
 
     private function releaseOutgoingCallArgTemps(Frame $frame): void
