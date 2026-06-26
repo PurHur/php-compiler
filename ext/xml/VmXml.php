@@ -63,6 +63,11 @@ final class VmXml
         return false;
     }
 
+    public static function isWellFormed(string $data): bool
+    {
+        return null === self::validateWellFormed($data);
+    }
+
     /**
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
      */

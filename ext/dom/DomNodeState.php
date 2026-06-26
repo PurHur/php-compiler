@@ -28,4 +28,8 @@ final class DomNodeState
     public ?string $doctypePublicId = null;
 
     public ?string $doctypeSystemId = null;
+
+    /** Child element object ids in document order (php-src dom_child_nodes). */
+    /** @var list<int> */
+    public array $childIds = [];
 }
