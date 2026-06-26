@@ -466,6 +466,9 @@ class Type extends Builtin {
         $fntypeStreamSetBlocking = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnStreamSetBlocking = $this->context->module->addFunction('__compiler_stream_set_blocking', $fntypeStreamSetBlocking);
         $this->context->registerFunction('__compiler_stream_set_blocking', $fnStreamSetBlocking);
+        $fntypeStreamSocketGetName = $this->context->context->functionType($strPtr, false, $i64, $i64);
+        $fnStreamSocketGetName = $this->context->module->addFunction('__compiler_stream_socket_get_name', $fntypeStreamSocketGetName);
+        $this->context->registerFunction('__compiler_stream_socket_get_name', $fnStreamSocketGetName);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
@@ -1357,6 +1360,7 @@ class Type extends Builtin {
         ProcessRuntime::ensureLinked($this->context);
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
+        StreamSocketGetNameRuntime::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);

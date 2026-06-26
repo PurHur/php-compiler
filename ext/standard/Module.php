@@ -600,6 +600,7 @@ class Module extends ModuleAbstract
             new stream_socket_client(),
             new stream_socket_server(),
             new stream_socket_pair(),
+            new stream_socket_get_name(),
             new fsockopen(),
             new pfsockopen(),
             new stream_set_chunk_size_(),
