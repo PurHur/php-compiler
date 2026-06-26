@@ -24,6 +24,23 @@ final class InternalStrictArg
         return $arg;
     }
 
+    /**
+     * Builtin signature int — always reject non-int operands (php-src ZEND_ARG_INFO IS_LONG; #12215).
+     */
+    public static function requireBuiltinTypedInt(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): Variable {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $arg->type) {
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'int', $arg));
+        }
+
+        return $arg;
+    }
+
     public static function requireBool(Frame $frame, int $argIndex, string $function, string $paramName): Variable
     {
         $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
