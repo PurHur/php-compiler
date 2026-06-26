@@ -635,6 +635,7 @@ class VM {
         Variable ...$args
     ): ?Frame {
         $handlerFrame = $func->getFrame($this->context, $callerFrame);
+        $handlerFrame->vmContext = $this->context;
         $handlerFrame->calledArgs = $args;
         $handlerFrame->returnVar = $returnVar;
 
