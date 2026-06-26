@@ -61,6 +61,7 @@ final class VmIni
         'max_execution_time',
         'default_charset',
         'cfg_file_path',
+        'user_agent',
         ...VmAssertState::SUPPORTED_INI_KEYS,
     ];
 
@@ -106,6 +107,8 @@ final class VmIni
                 return self::setSessionSavePath($newValue);
             case 'include_path':
                 return IncludePathJitHelper::push($newValue);
+            case 'user_agent':
+                return self::setUserAgent($newValue);
             default:
                 return false;
         }
@@ -149,6 +152,8 @@ final class VmIni
                 return self::$sessionSavePath;
             case 'include_path':
                 return IncludePathJitHelper::get();
+            case 'user_agent':
+                return self::$userAgent;
             default:
                 return false;
         }
@@ -174,6 +179,7 @@ final class VmIni
             'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
             'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
             'cfg_file_path' => self::cfgFilePath(),
+            'user_agent' => '',
             default => false,
         };
     }
@@ -210,6 +216,13 @@ final class VmIni
     private static int $sessionGcMaxLifetime = 1440;
 
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+
+    private static string $userAgent = '';
+
+    public static function getUserAgent(): string
+    {
+        return self::$userAgent;
+    }
 
     public static function getSessionGcMaxLifetime(): int
     {
@@ -282,6 +295,14 @@ final class VmIni
     private static function setSessionSavePath(string $newValue) {
         $old = self::$sessionSavePath;
         self::$sessionSavePath = $newValue;
+
+        return $old;
+    }
+
+    private static function setUserAgent(string $newValue): string
+    {
+        $old = self::$userAgent;
+        self::$userAgent = $newValue;
 
         return $old;
     }
@@ -375,6 +396,9 @@ final class VmIni
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'user_agent':
+                self::$userAgent = '';
                 break;
         }
     }

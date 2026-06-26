@@ -32,6 +32,7 @@ final class IniJitHelper
         'max_execution_time',
         'default_charset',
         'cfg_file_path',
+        'user_agent',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -96,6 +97,13 @@ final class IniJitHelper
     private static int $sessionGcMaxlifetime = 1440;
 
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+
+    private static string $userAgent = '';
+
+    public static function getUserAgent(): string
+    {
+        return self::$userAgent;
+    }
 
     public static function getSerializePrecisionInt(): int
     {
@@ -179,6 +187,9 @@ final class IniJitHelper
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
         }
+        if ('user_agent' === $key) {
+            return self::$userAgent;
+        }
 
         return null;
     }
@@ -223,6 +234,9 @@ final class IniJitHelper
         }
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
+        }
+        if ('user_agent' === $key) {
+            return self::setUserAgent($newValue);
         }
 
         return null;
@@ -271,6 +285,9 @@ final class IniJitHelper
 
             return false === $path ? null : $path;
         }
+        if ('user_agent' === $key) {
+            return '';
+        }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
@@ -310,6 +327,9 @@ final class IniJitHelper
                 break;
             case 'session.save_path':
                 self::$sessionSavePath = self::CFG_SESSION_SAVE_PATH;
+                break;
+            case 'user_agent':
+                self::$userAgent = '';
                 break;
         }
     }
@@ -390,6 +410,14 @@ final class IniJitHelper
     {
         $old = self::$sessionSavePath;
         self::$sessionSavePath = $newValue;
+
+        return $old;
+    }
+
+    private static function setUserAgent(string $newValue): string
+    {
+        $old = self::$userAgent;
+        self::$userAgent = $newValue;
 
         return $old;
     }
