@@ -3801,6 +3801,11 @@ class JIT {
                 if (null !== $stubBlock) {
                     $this->ensureM3EmitTuRuntimeInitSpineSymbols($stubBlock);
                     $this->ensureM3EmitTuEmitBridgeSpineSymbols();
+                    $this->emitM3EmitTuRuntimeConstructNativeFunction(
+                        $this->llvmInternalName('PHPCompiler\\Runtime::__construct'),
+                        'PHPCompiler\\Runtime::__construct',
+                        $stubBlock
+                    );
                 }
                 $this->compileM3EmitTuRuntimeParseAndCompileNativeDecl([
                     'parseandcompile' => true,
@@ -4357,7 +4362,7 @@ class JIT {
         return $func;
     }
 
-    /** void(Runtime $this, object $a, object $b) — inventory argv emit bridge (#12036). */
+    /** void(Runtime $this, ?Script $script) — inventory argv parse-null recorder (#12036). */
     private function emitM3EmitTuRuntimeTwoObjectVoidStub(
         string $internalName,
         string $logicalName,
@@ -4371,7 +4376,7 @@ class JIT {
         $voidTy = $this->context->getTypeFromString('void');
         $func = $this->context->module->addFunction(
             $internalName,
-            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr, $objectPtr)
+            $this->context->context->functionType($voidTy, false, $objectPtr, $objectPtr)
         );
         $bb = $func->appendBasicBlock('entry');
         $saved = $this->context->builder;
@@ -4385,7 +4390,7 @@ class JIT {
         $this->context->functionProxies[$lcname] = new JIT\Call\Native(
             $func,
             $logicalName,
-            [$objectPtr, $objectPtr, $objectPtr],
+            [$objectPtr, $objectPtr],
             null !== $block ? $this->collectParamDefaults($block) : []
         );
 

@@ -18,6 +18,7 @@ namespace PHPCompiler\BootstrapAot;
  */
 
 require_once __DIR__.'/runtime_ctor_smoke.php';
+require_once __DIR__.'/../../lib/AOT/phpc_run_command_polyfill.php';
 
 function helloworld_compile_smoke(string $sourceFile, string $outFile): int
 {
