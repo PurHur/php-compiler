@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -53,6 +54,9 @@ final class AotRegressionFixtureCatalogTest extends TestCase
     {
         $cases = [];
         foreach (self::REGRESSION_FIXTURES as $basename) {
+            if (!CompilerVersion::supportsCrc32c() && 'crc32c.phpt' === $basename) {
+                continue;
+            }
             $cases[$basename] = [$basename];
         }
 

@@ -11,6 +11,13 @@ use PHPUnit\Framework\TestCase;
  */
 final class Crc32cBuiltinTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsCrc32c()) {
+            $this->markTestSkipped('crc32c() not advertised on reference profile (#11920)');
+        }
+    }
+
     private const CODE = <<<'PHP'
 echo crc32c('test'), "\n";
 echo crc32c(''), "\n";

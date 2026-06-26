@@ -228,4 +228,10 @@ final class CompilerVersion
     {
         return false;
     }
+
+    /** Standalone crc32c() not in php-src — use hash('crc32c') via ext/hash (#11920). */
+    public static function supportsCrc32c(): bool
+    {
+        return false;
+    }
 }

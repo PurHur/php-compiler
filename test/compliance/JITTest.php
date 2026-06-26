@@ -37,6 +37,11 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'getmygrgid_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsCrc32c()
+                && str_contains($name, 'crc32c')
+                && !str_contains($name, 'crc32c_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamSupports()
                 && (str_contains($name, 'stream_supports.phpt')
                     || str_contains($name, 'stream_support_constants')

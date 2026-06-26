@@ -1,3 +1,3 @@
 <?php
 declare(strict_types=1);
-echo crc32c('bootstrap');
+echo crc32('bootstrap');
