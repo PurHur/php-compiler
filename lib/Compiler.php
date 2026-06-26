@@ -11511,7 +11511,7 @@ class Compiler {
                     ++$funcCallProducerCount;
                 }
             }
-            if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2) {
+            if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)) {
                 $matched = null;
                 if (
                     $this->callIncludesNamedParameter($callOp)
@@ -12806,6 +12806,27 @@ class Compiler {
 
                 return null;
             }
+            // filter_var('x', FILTER_*, ['flags' => FILTER_*]) — ConstFetch + element ConstFetch + Array_ (#12326).
+            $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
+            if (null !== $leadingConstArray) {
+                [$constFetch, $array] = $leadingConstArray;
+                $arrayArgIndex = $argCount - 1;
+                if ($argIndex === $arrayArgIndex) {
+                    return $array;
+                }
+                $constArgIndex = null;
+                for ($i = $arrayArgIndex - 1; $i >= 0; --$i) {
+                    if (!$this->isEmbeddedCallLiteralArg($callArgs[$i] ?? null)) {
+                        $constArgIndex = $i;
+                        break;
+                    }
+                }
+                if ($argIndex === $constArgIndex) {
+                    return $constFetch;
+                }
+
+                return null;
+            }
             // php-cfg `f(g(), h())` hoists sibling FuncCall producers with dead arg temps (#9463, #10917).
             if ($argIndex < $producerCount) {
                 $allSiblingFuncCalls = true;
@@ -13342,6 +13363,22 @@ class Compiler {
             if ($argIndex === $trailingNonEmbedded) {
                 return $lastProducer;
             }
+        }
+        // filter_var('x', FILTER_*, ['flags' => FILTER_*]) — embedded arg 0 + ConstFetch/Array_ (#12326).
+        $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
+        if (null !== $leadingConstArray) {
+            [$constFetch, $array] = $leadingConstArray;
+            $arrayArgIndex = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+            if ($argIndex === $arrayArgIndex) {
+                return $array;
+            }
+            foreach ($nonEmbeddedArgIndices as $idx) {
+                if ($idx !== $arrayArgIndex && $argIndex === $idx) {
+                    return $constFetch;
+                }
+            }
+
+            return null;
         }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
@@ -13895,6 +13932,43 @@ class Compiler {
     }
 
     /**
+     * ConstFetch prelude before single inline Array_ call arg (#12326, filter_var flags options).
+     *
+     * e.g. filter_var('not-int', FILTER_VALIDATE_INT, ['flags' => FILTER_NULL_ON_FAILURE])
+     * — producers [ConstFetch filter, ConstFetch flags, Array_ options].
+     *
+     * @param list<Op\Expr> $producers
+     *
+     * @return array{0: Op\Expr\ConstFetch, 1: Op\Expr\Array_}|null
+     */
+    private function splitLeadingConstFetchWithArrayLiteralCallArg(array $producers): ?array
+    {
+        $count = \count($producers);
+        if ($count < 2) {
+            return null;
+        }
+        $first = $producers[0];
+        if (!$first instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+        $last = $producers[$count - 1];
+        if (!$last instanceof Op\Expr\Array_) {
+            return null;
+        }
+        $rest = \array_slice($producers, 1);
+        if ($this->producersAreNestedArrayLiteralChain($rest) && $this->arrayProducersFormNestedChain($rest)) {
+            return null;
+        }
+        for ($i = 1; $i < $count - 1; ++$i) {
+            if (!$producers[$i] instanceof Op\Expr\ConstFetch) {
+                return null;
+            }
+        }
+
+        return [$first, $last];
+    }
+
+    /**
      * php-cfg hoists chained assignment before a call with a dead arg temp (#6758, #9405).
      *
      * @param list<Op\Expr> $producers
@@ -14185,7 +14259,8 @@ class Compiler {
                         if ($grandPrev instanceof Op\Expr\Array_) {
                             continue;
                         }
-                        break;
+                        // Element ConstFetch inside inline Array_ — keep walking for leading call-arg ConstFetch (#12326).
+                        continue;
                     }
                     if ($this->isInlineExprCallArgProducer($prev)) {
                         array_unshift($producers, $prev);
@@ -17843,6 +17918,32 @@ class Compiler {
                     );
                     if ([] !== $prefetchOps && !$this->callArgOperandIsClosureValue($arg, $block)) {
                         $valueSlot = $prefetchOps[0]->arg1;
+                    }
+                }
+                if (null === $valueSlot && null !== $cfgCallOp && null !== $block->orig) {
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    if ([] !== $producers) {
+                        $matched = $this->matchInlineCallArgProducer(
+                            $producers,
+                            $cfgCallOp->args ?? [],
+                            (int) $argIndex,
+                            $cfgCallOp,
+                            $block
+                        );
+                        if ($matched instanceof Op\Expr) {
+                            if (null === $block->slotForOperand($matched->result)) {
+                                foreach ($this->compileExpr($matched, $block) as $op) {
+                                    $block->addOpCode($op);
+                                }
+                            }
+                            $matchedSlot = $block->slotForOperand($matched->result);
+                            if (null !== $matchedSlot) {
+                                $valueSlot = $matchedSlot;
+                            }
+                        }
                     }
                 }
                 if (null === $valueSlot) {

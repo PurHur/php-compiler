@@ -1837,6 +1837,56 @@ PHP;
         self::assertSame("ok\n", $out);
     }
 
+    /** Issue #12326 — filter_var() flags options array maps ConstFetch + Array_ to filter/options slots. */
+    public function testFilterVarFlagsOptionsArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+filter_var('not-int', FILTER_VALIDATE_INT, ['flags' => FILTER_NULL_ON_FAILURE]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_flags_options.php');
+
+        $constSlot = null;
+        $arraySlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
+                $constSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($constSlot);
+        self::assertNotNull($arraySlot);
+        self::assertCount(3, $sendSlots, 'filter_var arg sends='.json_encode($sendSlots));
+        self::assertSame($constSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #12326 — filter_var() flags options array runtime parity with Zend. */
+    public function testFilterVarFlagsOptionsArrayRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$r = filter_var('not-int', FILTER_VALIDATE_INT, ['flags' => FILTER_NULL_ON_FAILURE]);
+echo null === $r ? "ok\n" : "bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_flags_options_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("ok\n", $out);
+    }
+
     /** Issue #10566 — count([nested inline], COUNT_RECURSIVE) wires outer Array_ + mode const. */
     public function testCountNestedInlineLiteralRecursiveUsesArrayAndModeSlots(): void
     {
