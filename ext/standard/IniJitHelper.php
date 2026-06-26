@@ -59,6 +59,15 @@ final class IniJitHelper
         'default_charset' => 'UTF-8',
     ];
 
+    /** Unset string ini directives return '' — mirror VmIni empty-string key list for JIT compile. */
+    private const EMPTY_STRING_INI_KEYS = [
+        'auto_prepend_file',
+        'auto_append_file',
+        'error_log',
+        'doc_root',
+        'user_dir',
+    ];
+
     private const CFG_DISPLAY_ERRORS = '';
 
     private const CFG_MEMORY_LIMIT = '-1';
@@ -136,7 +145,7 @@ final class IniJitHelper
         if (in_array($key, self::ASSERT_INI_KEYS, true)) {
             return self::assertIniGet($key);
         }
-        if (in_array($key, VmIni::EMPTY_STRING_INI_KEYS, true)) {
+        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
