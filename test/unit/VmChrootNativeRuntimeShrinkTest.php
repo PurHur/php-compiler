@@ -5,29 +5,39 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmChrootNative;
+use PHPCompiler\ext\standard\VmChrootPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmChrootNative libc chroot without host \\chroot() (#3500). */
+/** VmChrootPure / VmChrootNative — chroot without libc FFI (#12192). */
 final class VmChrootNativeRuntimeShrinkTest extends TestCase
 {
-    public function testVmChrootNativeDeclaresLibcChroot(): void
+    public function testVmChrootNativeDelegatesToPureWithoutLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmChrootNative.php');
-        $this->assertStringContainsString('without host \\chroot()', $source);
-        $this->assertStringContainsString('int chroot(const char *path)', $source);
-        $this->assertDoesNotMatchRegularExpression('/@\\\\chroot\\s*\\(/', $source);
-        $this->assertDoesNotMatchRegularExpression("/function_exists\\('chroot'\\)/", $source);
+        $this->assertStringContainsString('VmChrootPure::', $source);
+        $this->assertStringContainsString('VmChrootPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
+    }
+
+    public function testVmChrootPureDoesNotUseLibcFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmChrootPure.php');
+        $this->assertStringContainsString('chroot', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 
     public function testChrootReturnsFalseWhenFfiDisabled(): void
     {
-        if (!\extension_loaded('ffi')) {
-            $this->markTestSkipped('ext/ffi required');
+        if (!VmChrootPure::available()) {
+            $this->markTestSkipped('host chroot unavailable');
         }
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertFalse(VmChrootNative::chroot(sys_get_temp_dir()));
+            $this->assertTrue(VmChrootNative::available());
+            $this->assertFalse(VmChrootNative::chroot('/no/such/phpc-chroot-pure-path'));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
@@ -40,8 +50,8 @@ final class VmChrootNativeRuntimeShrinkTest extends TestCase
     public function testChrootDeniedForTypicalUnprivilegedProcess(): void
     {
         if (!VmChrootNative::available()) {
-            $this->markTestSkipped('FFI chroot unavailable');
+            $this->markTestSkipped('chroot unavailable');
         }
-        $this->assertFalse(VmChrootNative::chroot('/no/such/phpc-chroot-native-path'));
+        $this->assertFalse(VmChrootNative::chroot('/no/such/phpc-chroot-pure-path'));
     }
 }
