@@ -25,10 +25,25 @@ final class VmErrorHandler
     ): Variable {
         $reporter = $context->errors;
         $mask = self::parseMask($maskVar);
+        self::assertValidCallback($context, $callback);
         $storedCallback = self::normalizeCallbackForStorage($callback);
         $previous = $reporter->pushHandler($storedCallback, $mask);
 
         return self::handlerReturnValue($previous);
+    }
+
+    private static function assertValidCallback(Context $context, Variable $callback): void
+    {
+        $resolved = $callback->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return;
+        }
+        if (VmClosureCall::isClosure($resolved)) {
+            return;
+        }
+        if (!VmCallable::isCallable($context, $callback)) {
+            throw new \TypeError(ErrorHandlerCallbackPolicy::invalidCallbackTypeError());
+        }
     }
 
     public static function restore(Context $context): bool
