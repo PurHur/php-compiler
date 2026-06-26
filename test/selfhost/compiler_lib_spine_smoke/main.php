@@ -1077,6 +1077,7 @@ require_once __DIR__.'/../../../ext/standard/VmFsTouchNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsUnlink.php';
 require_once __DIR__.'/../../../ext/standard/VmFsWriteNative.php';
 require_once __DIR__.'/../../../ext/standard/VmFsWritePure.php';
+require_once __DIR__.'/../../../ext/standard/VmFtokPure.php';
 require_once __DIR__.'/../../../ext/standard/VmFtok.php';
 require_once __DIR__.'/../../../ext/standard/VmGcStatus.php';
 require_once __DIR__.'/../../../ext/standard/VmGeneratorArray.php';
