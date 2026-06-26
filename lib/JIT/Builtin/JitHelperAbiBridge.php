@@ -18,7 +18,7 @@ final class JitHelperAbiBridge
 {
     /**
      * @param list<string> $compiledHelpers logical helper names (Class::method)
-     * @param list<array{abi: string, helper: string, kind: string}> $bridges kind: void|bool_i32|obj_i64_void|i64_obj
+     * @param list<array{abi: string, helper: string, kind: string}> $bridges kind: void|bool_i32|obj_i64_void|i64_obj|value_i64_void|i64_value
      * @param list<string> $abiFunctions all ABI names to register after linking
      */
     public static function implement(
@@ -45,6 +45,8 @@ final class JitHelperAbiBridge
                 'bool_i32' => self::implementBoolI32Bridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
                 'obj_i64_void' => self::implementObjI64VoidBridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
                 'i64_obj' => self::implementI64ObjBridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
+                'value_i64_void' => self::implementValueI64VoidBridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
+                'i64_value' => self::implementI64ValueBridge($context, $bridge['abi'], $bridge['helper'], $issueTag),
                 default => throw new \LogicException('unknown JitHelperAbiBridge kind: '.$bridge['kind']),
             };
         }
@@ -172,6 +174,88 @@ final class JitHelperAbiBridge
         $phi = $context->builder->phi($objPtr);
         $phi->addIncoming($loaded, $ptrBb);
         $phi->addIncoming($objPtr->constNull(), $nullBb);
+        $context->builder->returnValue($phi);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementValueI64VoidBridge(Context $context, string $abiName, string $helperLogical, string $issueTag): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $valuePtr, $i32);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('jhab_value_i64_void_entry');
+        $context->builder->positionAtEnd($entry);
+        $valParam = $fn->getParam(0);
+        $voidParam = $fn->getParam(1);
+        $isVoid = $context->builder->icmp(
+            Builder::INT_NE,
+            $voidParam,
+            $i32->constInt(0, false)
+        );
+        $context->builder->call(
+            self::helperFunction($context, $helperLogical, $issueTag),
+            $context->builder->ptrToInt($valParam, $i64),
+            $isVoid
+        );
+        $context->builder->returnVoid();
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementI64ValueBridge(Context $context, string $abiName, string $helperLogical, string $issueTag): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($valuePtr, false);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $prefix = 'jhab_'.preg_replace('/[^a-z0-9_]/', '_', strtolower($abiName));
+        $entry = $fn->appendBasicBlock($prefix.'_entry');
+        $nullBb = $fn->appendBasicBlock($prefix.'_null');
+        $ptrBb = $fn->appendBasicBlock($prefix.'_ptr');
+        $doneBb = $fn->appendBasicBlock($prefix.'_done');
+        $context->builder->positionAtEnd($entry);
+
+        $addr = $context->builder->call(self::helperFunction($context, $helperLogical, $issueTag));
+        $isZero = $context->builder->icmp(
+            Builder::INT_EQ,
+            $addr,
+            $i64->constInt(0, false)
+        );
+        $context->builder->branchIf($isZero, $nullBb, $ptrBb);
+
+        $context->builder->positionAtEnd($ptrBb);
+        $loaded = $context->builder->intToPtr($addr, $valuePtr);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($nullBb);
+        $context->builder->branch($doneBb);
+
+        $context->builder->positionAtEnd($doneBb);
+        $phi = $context->builder->phi($valuePtr);
+        $phi->addIncoming($loaded, $ptrBb);
+        $phi->addIncoming($valuePtr->constNull(), $nullBb);
         $context->builder->returnValue($phi);
         $context->registerFunction($abiName, $fn);
     }
