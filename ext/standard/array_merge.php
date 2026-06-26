@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayMergeRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
@@ -65,6 +66,6 @@ final class array_merge extends Internal
                 $this->jitString($context, $arg, 'array_merge() argument #'.((int) $i + 1));
             }
         }
-        return ArrayBuiltinHelper::merge($context, ...$args);
+        return ArrayMergeRuntime::merge($context, ...$args);
     }
 }
