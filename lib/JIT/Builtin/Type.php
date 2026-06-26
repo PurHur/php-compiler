@@ -636,6 +636,11 @@ class Type extends Builtin {
             $fntypeHashHmacAlgos
         );
         $this->context->registerFunction('__compiler_hash_hmac_algos', $fnHashHmacAlgos);
+        $fnHashAlgos = $this->context->module->addFunction(
+            '__compiler_hash_algos',
+            $fntypeHashHmacAlgos
+        );
+        $this->context->registerFunction('__compiler_hash_algos', $fnHashAlgos);
         $double = $this->context->getTypeFromString('double');
         $fntypeMicrotimeStr = $this->context->context->functionType($strPtr, false);
         $fnMicrotimeStr = $this->context->module->addFunction('__compiler_microtime_string', $fntypeMicrotimeStr);

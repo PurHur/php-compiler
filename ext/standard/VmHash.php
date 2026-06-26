@@ -73,11 +73,11 @@ final class VmHash
         return VmHashNative::hashPbkdf2($algo, $password, $salt, $iterations, $length, $raw);
     }
 
-    /** hash_algos() — digest names supported by VmHashNative (ext/hash/hash.c, issue #6937). */
+    /** hash_algos() — digest names registered in ext/hash (ext/hash/hash.c, issues #6937, #11463). */
     public static function algos(): HashTable
     {
         $ht = new HashTable();
-        foreach (self::HASH_ALGOS as $algo) {
+        foreach (HashAlgosRegistry::ALL_ALGOS as $algo) {
             $var = new Variable();
             $var->string($algo);
             $ht->append($var);
