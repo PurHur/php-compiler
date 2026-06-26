@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3279 |
-| Phase A inventory files (M2 ratio SSOT) | 3279 |
+| PHP files on vm.php path | 3280 |
+| Phase A inventory files (M2 ratio SSOT) | 3280 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8725 |
+| Source constructs flagged (warnings) | 8726 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1200,6 +1200,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
+| `ext/standard/VmSysGetTempDirPure.php` | 0 | 1 |
 | `ext/standard/VmSysGetloadavgNative.php` | 0 | 1 |
 | `ext/standard/VmSysGetloadavgPure.php` | 0 | 1 |
 | `ext/standard/VmSyslog.php` | 0 | 1 |
@@ -9607,7 +9608,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmChdirNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmChdirPure.php`
 
@@ -10129,7 +10130,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmGetcwdNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmGetcwdPure.php`
 
@@ -11244,7 +11245,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSysGetTempDirNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 2 class method(s)
+
+### `ext/standard/VmSysGetTempDirPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmSysGetloadavgNative.php`
 
