@@ -241,6 +241,24 @@ final class BuiltinParamNames
                 return ['options', 'limit'];
             case 'file':
                 return ['filename', 'flags'];
+            case 'file_exists':
+            case 'filesize':
+            case 'filemtime':
+            case 'fileatime':
+            case 'filectime':
+            case 'fileinode':
+            case 'fileowner':
+            case 'filegroup':
+            case 'fileperms':
+            case 'is_file':
+            case 'is_dir':
+            case 'is_readable':
+            case 'is_writable':
+            case 'is_executable':
+            case 'is_link':
+            case 'stat':
+            case 'lstat':
+                return ['filename'];
         }
 
         return null;

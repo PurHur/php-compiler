@@ -391,4 +391,14 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($hypot, 'x', 'hypot'));
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($hypot, 'y', 'hypot'));
     }
+
+    /** @covers issue #12102 */
+    public function testFilestatFilenameNamedParameter(): void
+    {
+        foreach (['file_exists', 'is_readable', 'filesize', 'is_file', 'is_dir'] as $fn) {
+            $names = BuiltinParamNames::forFunction($fn);
+            self::assertSame(['filename'], $names, $fn);
+            self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($names, 'filename', $fn), $fn);
+        }
+    }
 }
