@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3269 |
-| Phase A inventory files (M2 ratio SSOT) | 3269 |
+| PHP files on vm.php path | 3268 |
+| Phase A inventory files (M2 ratio SSOT) | 3268 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8670 |
+| Source constructs flagged (warnings) | 8686 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1198,7 +1198,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmTmpfilePure.php` | 0 | 1 |
 | `ext/standard/VmUnameNative.php` | 0 | 1 |
 | `ext/standard/VmUnamePure.php` | 0 | 1 |
-| `ext/standard/VmUnserializeFormat.php` | 0 | 2 |
+| `ext/standard/VmUnserializeFormat.php` | 0 | 13 |
 | `ext/standard/VmUserCall.php` | 0 | 7 |
 | `ext/standard/VmUserStream.php` | 0 | 8 |
 | `ext/standard/VmVarDump.php` | 0 | 1 |
@@ -2026,7 +2026,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/AOT/ValueBox.php` | 0 | 1 |
 | `lib/AbstractEnumSourceRewriter.php` | 0 | 1 |
 | `lib/Ast/AbstractEnumMarker.php` | 0 | 1 |
-| `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 10 |
+| `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 14 |
 | `lib/Ast/CloneWithDesugar.php` | 0 | 1 |
 | `lib/Ast/DnfParenTypeRewriter.php` | 0 | 1 |
 | `lib/Ast/EnumCaseImportRewriter.php` | 0 | 5 |
@@ -2113,7 +2113,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/GenericArrayTypeSpec.php` | 0 | 4 |
 | `lib/Handler.php` | 0 | 1 |
 | `lib/HexFloat.php` | 0 | 1 |
-| `lib/JIT.php` | 0 | 110 |
+| `lib/JIT.php` | 0 | 111 |
 | `lib/JIT/Analyzer.php` | 0 | 1 |
 | `lib/JIT/AotDebugSymbols.php` | 0 | 1 |
 | `lib/JIT/ArrayAccessHelper.php` | 0 | 1 |
@@ -2504,7 +2504,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZlibJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringZstdJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/SuperglobalRefreshRuntime.php` | 0 | 3 |
@@ -2608,7 +2607,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/CoalesceHelper.php` | 0 | 1 |
 | `lib/JIT/CompileCache.php` | 0 | 1 |
 | `lib/JIT/CompilerOperandChainNative.php` | 0 | 3 |
-| `lib/JIT/Context.php` | 0 | 68 |
+| `lib/JIT/Context.php` | 0 | 69 |
 | `lib/JIT/DnfParamCheck.php` | 0 | 19 |
 | `lib/JIT/DynamicObjectReadonlyGuard.php` | 0 | 1 |
 | `lib/JIT/DynamicPropertyDeprecationGuard.php` | 0 | 1 |
@@ -11218,8 +11217,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmUnserializeFormat.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 48)
-- 17 class method(s)
+- new self (line 83)
+- new VmUnserializeCell (line 169)
+- new VmUnserializeCell (line 185)
+- new VmUnserializeCell (line 201)
+- new VmUnserializeCell (line 232)
+- new VmUnserializeCell (line 252)
+- new VmUnserializeCell (line 296)
+- new Variable (line 338)
+- new Variable (line 346)
+- new HashTable (line 347)
+- new Variable (line 373)
+- new Variable (line 388)
+- 26 class method(s)
 
 ### `ext/standard/VmUserCall.php`
 
@@ -15963,16 +15973,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/AsymmetricVisibilityRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 154)
-- new CompileError (line 167)
-- new CompileError (line 173)
-- new CompileError (line 230)
-- new CompileError (line 266)
-- new CompileError (line 335)
-- new CompileError (line 341)
-- new CompileError (line 353)
-- 22 class method(s)
-- 8 closure(s)
+- new CompileError (line 152)
+- new CompileError (line 169)
+- new CompileError (line 175)
+- new CompileError (line 188)
+- new CompileError (line 194)
+- new CompileError (line 246)
+- new CompileError (line 252)
+- new CompileError (line 258)
+- new CompileError (line 294)
+- new CompileError (line 363)
+- new CompileError (line 369)
+- new CompileError (line 381)
+- 23 class method(s)
+- 9 closure(s)
 
 ### `lib/Ast/CloneWithDesugar.php`
 
@@ -16909,115 +16923,116 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT\Call\ExternalMethod (line 266)
-- new JIT\Scope (line 292)
-- new Operand\Literal (line 702)
-- new Operand\Literal (line 718)
-- new Variable (line 1816)
-- new JIT\Call\Vararg (line 1827)
-- new JIT\Call\Native (line 1837)
-- new JIT\Call\Native (line 1989)
-- new JIT\Variable (line 2220)
-- new JIT\Call\Native (line 2237)
-- new JIT\Call\Native (line 2314)
-- new JIT\Call\Native (line 2356)
-- new JIT\Call\Native (line 2401)
-- new JIT\Call\Native (line 3502)
-- new JIT\Call\Native (line 3533)
-- new JIT\Call\Native (line 3580)
-- new JIT\Call\Native (line 3629)
-- new JIT\Call\Native (line 3683)
-- new JIT\Call\Native (line 3739)
-- new JIT\Call\Native (line 4135)
-- new JIT\Call\Native (line 4166)
-- new JIT\Call\Native (line 4202)
-- new JIT\Call\Native (line 4237)
-- new JIT\Call\Native (line 4272)
-- new JIT\Call\Native (line 4372)
-- new JIT\Call\Native (line 5510)
-- new JIT\Call\Native (line 5548)
-- new JIT\Call\Native (line 5582)
-- new JIT\Call\Native (line 5684)
-- new JIT\Call\Native (line 6155)
-- new JIT\Call\Native (line 6221)
-- new Variable (line 6768)
-- new Variable (line 6801)
-- new Variable (line 7169)
-- new Variable (line 7313)
-- new Variable (line 7321)
-- new Operand\Literal (line 7482)
-- new JIT\Variable (line 7517)
-- new Operand\Literal (line 7624)
-- new Variable (line 7925)
-- new Variable (line 8039)
-- new VM\Variable (line 8096)
-- new OpCode (line 8174)
-- new Variable (line 8613)
-- new Variable (line 8674)
-- new JIT\Call\ClosureWithBinding (line 8703)
-- new JIT\Call\RuntimeVariableFunction (line 8758)
-- new Variable (line 8869)
-- new VM\Variable (line 9048)
-- new VM (line 9054)
-- new VM\Variable (line 9067)
-- new Variable (line 9267)
-- new Type (line 9274)
-- new Variable (line 9295)
-- new Type (line 9303)
-- new Variable (line 9319)
-- new Type (line 9327)
-- new Variable (line 9423)
-- new Variable (line 9444)
-- new Variable (line 10404)
-- new CompileError (line 11118)
-- new CompileError (line 11222)
-- new Variable (line 11267)
-- new Variable (line 11475)
-- new Variable (line 11557)
-- new Variable (line 11576)
-- new Variable (line 11586)
-- new Variable (line 11738)
-- new Variable (line 11756)
-- new Variable (line 11789)
-- new Variable (line 12429)
-- new Variable (line 12449)
-- new Variable (line 12519)
-- new VM\Variable (line 12860)
-- new Variable (line 12894)
-- new Variable (line 12945)
-- new Variable (line 12961)
-- new Variable (line 12980)
-- new Variable (line 12987)
-- new OpCode (line 13007)
-- new Variable (line 13008)
-- new Variable (line 13178)
-- new Variable (line 13216)
-- new OpCode (line 13230)
-- new Variable (line 13231)
-- new Variable (line 13290)
-- new OpCode (line 13311)
-- new Variable (line 13312)
-- new Variable (line 13409)
-- new Variable (line 13431)
-- new Variable (line 13499)
-- new Operand\Literal (line 13508)
-- new Variable (line 13523)
-- new Variable (line 13657)
-- new VM\PropertyIsInitializedHandler (line 13688)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13728)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13782)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13837)
-- new Variable (line 14893)
-- new VM (line 14937)
-- new VM\Variable (line 14944)
-- new Operand\Literal (line 14958)
-- new Operand\Literal (line 14962)
-- new Operand\Literal (line 14966)
-- new Variable (line 14970)
-- new Variable (line 14994)
-- new Variable (line 15006)
-- new Variable (line 15439)
-- 334 class method(s)
+- new JIT\Call\ExternalMethod (line 286)
+- new JIT\Scope (line 312)
+- new Operand\Literal (line 722)
+- new Operand\Literal (line 738)
+- new Variable (line 1851)
+- new JIT\Call\Vararg (line 1862)
+- new JIT\Call\Native (line 1872)
+- new JIT\Call\Native (line 2024)
+- new JIT\Variable (line 2255)
+- new JIT\Call\Native (line 2272)
+- new JIT\Call\Native (line 2349)
+- new JIT\Call\Native (line 2391)
+- new JIT\Call\Native (line 2436)
+- new JIT\Call\Native (line 3537)
+- new JIT\Call\Native (line 3568)
+- new JIT\Call\Native (line 3615)
+- new JIT\Call\Native (line 3664)
+- new JIT\Call\Native (line 3718)
+- new JIT\Call\Native (line 3778)
+- new JIT\Call\Native (line 4218)
+- new JIT\Call\Native (line 4249)
+- new JIT\Call\Native (line 4285)
+- new JIT\Call\Native (line 4320)
+- new JIT\Call\Native (line 4355)
+- new JIT\Call\Native (line 4390)
+- new JIT\Call\Native (line 4492)
+- new JIT\Call\Native (line 5666)
+- new JIT\Call\Native (line 5704)
+- new JIT\Call\Native (line 5738)
+- new JIT\Call\Native (line 5840)
+- new JIT\Call\Native (line 6312)
+- new JIT\Call\Native (line 6378)
+- new Variable (line 6925)
+- new Variable (line 6958)
+- new Variable (line 7332)
+- new Variable (line 7476)
+- new Variable (line 7484)
+- new Operand\Literal (line 7645)
+- new JIT\Variable (line 7680)
+- new Operand\Literal (line 7787)
+- new Variable (line 8088)
+- new Variable (line 8202)
+- new VM\Variable (line 8259)
+- new OpCode (line 8337)
+- new Variable (line 8776)
+- new Variable (line 8837)
+- new JIT\Call\ClosureWithBinding (line 8866)
+- new JIT\Call\RuntimeVariableFunction (line 8921)
+- new Variable (line 9032)
+- new VM\Variable (line 9211)
+- new VM (line 9217)
+- new VM\Variable (line 9230)
+- new Variable (line 9430)
+- new Type (line 9437)
+- new Variable (line 9458)
+- new Type (line 9466)
+- new Variable (line 9482)
+- new Type (line 9490)
+- new Variable (line 9586)
+- new Variable (line 9607)
+- new Variable (line 10567)
+- new CompileError (line 11281)
+- new CompileError (line 11385)
+- new Variable (line 11430)
+- new Variable (line 11638)
+- new Variable (line 11723)
+- new Variable (line 11744)
+- new Variable (line 11754)
+- new Variable (line 11906)
+- new Variable (line 11924)
+- new Variable (line 11957)
+- new Variable (line 12597)
+- new Variable (line 12617)
+- new Variable (line 12687)
+- new VM\Variable (line 13028)
+- new Variable (line 13062)
+- new Variable (line 13113)
+- new Variable (line 13129)
+- new Variable (line 13148)
+- new Variable (line 13155)
+- new OpCode (line 13175)
+- new Variable (line 13176)
+- new Variable (line 13346)
+- new Variable (line 13384)
+- new OpCode (line 13398)
+- new Variable (line 13399)
+- new Variable (line 13458)
+- new OpCode (line 13479)
+- new Variable (line 13480)
+- new Variable (line 13577)
+- new Variable (line 13599)
+- new Variable (line 13667)
+- new Operand\Literal (line 13676)
+- new Variable (line 13691)
+- new Variable (line 13825)
+- new VM\PropertyIsInitializedHandler (line 13856)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13896)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13950)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14008)
+- new Variable (line 15132)
+- new VM (line 15176)
+- new VM\Variable (line 15183)
+- new Operand\Literal (line 15197)
+- new Operand\Literal (line 15201)
+- new Operand\Literal (line 15205)
+- new Variable (line 15209)
+- new Variable (line 15233)
+- new Variable (line 15245)
+- new Variable (line 15678)
+- 338 class method(s)
 - 7 closure(s)
 
 ### `lib/JIT/Analyzer.php`
@@ -17185,8 +17200,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/BootstrapCompileSmokeM3Emit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Call\Native (line 596)
-- new Call\Native (line 651)
+- new Call\Native (line 609)
+- new Call\Native (line 664)
 - 23 class method(s)
 
 ### `lib/JIT/BoundMethodCallableHelper.php`
@@ -19368,13 +19383,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringZstd.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 97)
-- 7 class method(s)
-
-### `lib/JIT/Builtin/StringZstdJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- new JIT (line 72)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/StripWhitespace.php`
 
@@ -20065,18 +20075,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Result (line 1013)
 - new Variable (line 1285)
 - new Variable (line 1605)
-- new Variable (line 1863)
-- new VMVariable (line 2010)
-- new VMVariable (line 2016)
-- new VMVariable (line 2022)
-- new VMVariable (line 2028)
-- new VMVariable (line 2035)
-- new VMVariable (line 2041)
-- new VMVariable (line 2047)
-- new VMVariable (line 2053)
-- new Variable (line 2078)
-- new Variable (line 2117)
-- 89 class method(s)
+- new Variable (line 1736)
+- new Variable (line 1922)
+- new VMVariable (line 2071)
+- new VMVariable (line 2077)
+- new VMVariable (line 2083)
+- new VMVariable (line 2089)
+- new VMVariable (line 2096)
+- new VMVariable (line 2102)
+- new VMVariable (line 2108)
+- new VMVariable (line 2114)
+- new Variable (line 2139)
+- new Variable (line 2178)
+- 90 class method(s)
 - 28 closure(s)
 
 ### `lib/JIT/DnfParamCheck.php`
@@ -20240,16 +20251,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1139)
 - new Variable (line 1386)
 - new Variable (line 1419)
-- new Variable (line 1754)
-- new Variable (line 1797)
-- new Variable (line 1799)
-- new Variable (line 1828)
-- new Variable (line 1841)
-- new Variable (line 1851)
-- new Variable (line 1925)
-- new Variable (line 1939)
-- new Variable (line 2025)
-- new Variable (line 2032)
+- new Variable (line 1765)
+- new Variable (line 1808)
+- new Variable (line 1810)
+- new Variable (line 1839)
+- new Variable (line 1852)
+- new Variable (line 1862)
+- new Variable (line 1936)
+- new Variable (line 1950)
+- new Variable (line 2036)
+- new Variable (line 2043)
 - 60 class method(s)
 
 ### `lib/JIT/HashTableReadLlvm.php`
@@ -23478,9 +23489,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 645)
 - new Variable (line 706)
 - new Variable (line 714)
-- new HashTable (line 790)
-- new Variable (line 799)
-- new Error (line 937)
+- new HashTable (line 793)
+- new Variable (line 802)
+- new Error (line 940)
 - 48 class method(s)
 
 ### `lib/VM/EnumCasesJitHelper.php`
