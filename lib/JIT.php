@@ -1249,12 +1249,27 @@ class JIT {
             return $this->shouldRealLowerInventoryArgvParseSpine();
         }
         if (str_ends_with($lower, '\\runtime::compileemitsmoke')) {
+            if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                return false;
+            }
+
             return true;
         }
         if (str_ends_with($lower, '\\runtime::parseandcompileemitsmoke')) {
             return true;
         }
         if (str_ends_with($lower, '\\runtime::compile')) {
+            if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                return false;
+            }
+
+            return true;
+        }
+        if (str_ends_with($lower, '\\runtime::emitparseandcompilenulldiagnostic')) {
+            if ($this->shouldRealLowerInventoryArgvParseSpine()) {
+                return false;
+            }
+
             return true;
         }
         if (str_ends_with($lower, '\\runtime::loadjit')) {
@@ -1548,6 +1563,11 @@ class JIT {
                 }
 
                 return $this->compileRuntimeSpinePhpLowering($internalName, $block, $logicalName);
+            }
+            if (str_ends_with($m3Spine, '\\runtime::compile')
+                && $this->shouldRealLowerInventoryArgvParseSpine()
+            ) {
+                return $this->emitM3EmitTuRuntimeBlockPtrStubNative($internalName, $logicalName, $block);
             }
             if (
                 str_ends_with($m3Spine, '\\runtime::compile')
