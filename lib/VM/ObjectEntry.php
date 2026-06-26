@@ -380,10 +380,7 @@ class ObjectEntry {
             return null;
         }
         if ($this->propertyInternalPointer >= $count) {
-            $last = $count - 1;
-            $this->propertyInternalPointer = $last;
-
-            return $this->propertyValueAt($last);
+            return null;
         }
         if (self::INVALID_PROPERTY_POINTER === $this->propertyInternalPointer) {
             return null;

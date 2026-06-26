@@ -383,17 +383,7 @@ final class JitArrayPointer
         $doneBb = BasicBlockHelper::append($context, 'arr_ptr_pprev_done');
         $context->builder->branchIf($pastEnd, $pastBb, $workBb);
         $context->builder->positionAtEnd($pastBb);
-        $idx = self::findPrevPackedIndex($context, $ht, $context->builder->sub($nextFree, $one));
-        $validBb = BasicBlockHelper::append($context, 'arr_ptr_pprev_past_valid');
-        $failBb = BasicBlockHelper::append($context, 'arr_ptr_pprev_past_fail');
-        self::branchIfPackedIndexValid($context, $ht, $idx, $validBb, $failBb);
-        $context->builder->positionAtEnd($failBb);
-        self::storeInternalPointer($context, $ht, $invalid);
         self::writeFalse($context, $resultPtr);
-        $context->builder->branch($doneBb);
-        $context->builder->positionAtEnd($validBb);
-        self::storeInternalPointer($context, $ht, $context->builder->sextOrBitCast($idx, $i64));
-        self::copyPackedValueAt($context, $ht, $idx, $resultPtr);
         $context->builder->branch($doneBb);
         $context->builder->positionAtEnd($workBb);
         $isInvalid = $context->builder->icmp(Builder::INT_EQ, $ip, $invalid);

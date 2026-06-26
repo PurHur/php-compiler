@@ -325,15 +325,7 @@ final class HashTable {
             return null;
         }
         if ($this->internalPointer >= $this->numUsed) {
-            $idx = $this->prevUsedBucketIndex($this->numUsed - 1);
-            if (self::INVALID_INDEX === $idx) {
-                $this->internalPointer = self::INVALID_INDEX;
-
-                return null;
-            }
-            $this->internalPointer = $idx;
-
-            return $this->iterCurrentValue();
+            return null;
         }
         if (self::INVALID_INDEX === $this->internalPointer) {
             return null;
