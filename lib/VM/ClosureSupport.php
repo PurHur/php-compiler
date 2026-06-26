@@ -162,7 +162,14 @@ final class ClosureSupport
         } else {
             $boundThis = new Variable();
             $boundThis->copyFrom($newThis);
-            $bound->boundThis = $boundThis;
+            $boundThis = $boundThis->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $boundThis->type && isset($boundThis->object)) {
+                // Inline `new` call args release temps after bind; keep $this alive (#11857).
+                ObjectLifetime::addRef($boundThis->object);
+            }
+            $stored = new Variable();
+            $stored->copyFrom($boundThis);
+            $bound->boundThis = $stored;
         }
         $scopeClass = self::resolveScopeClass($newScope, $newThis, $context);
         if (null !== $scopeClass && self::isExplicitStringScope($newScope)) {

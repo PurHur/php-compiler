@@ -5050,6 +5050,11 @@ restart:
                     if (is_null($frame->call)) {
                         // Used for null constructors, etc
                         $this->markPendingNewObjectConstructed($frame);
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && is_int($op->arg1)) {
+                            $this->markScopeSlotInitialized($frame, (int) $op->arg1);
+                        }
+                        $frame->callArgs = [];
+                        $frame->callArgEntries = [];
                         break;
                     }
                     $frame->callSiteLine = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
@@ -5704,6 +5709,7 @@ restart:
                         }
                     }
                     $result->object($object);
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     $frame->call = $object->constructor;
                     $frame->callArgs = [$result];
                     $frame->callArgEntries = [];
