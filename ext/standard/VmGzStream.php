@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * gzopen/gzwrite/gzread/gzclose — zlib stream resource API (ext/zlib/zlib.c, #6168).
  *
- * VM via {@see VmGzStreamNative} libz FFI — no host ext/zlib gz* delegation (#8220).
+ * VM via {@see VmGzStreamPure} buffered I/O + {@see VmZlib} — no libz gzFile FFI (#8936, #8220).
  * JIT/AOT via {@see \PHPCompiler\JIT\Builtin\GzStreamIoJit} + {@see JitGzfile} / {@see JitReadgzfile} (#4657 phase 2).
  */
 final class VmGzStream

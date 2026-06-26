@@ -1081,6 +1081,7 @@ require_once __DIR__.'/../../../ext/standard/VmGetrusageArg.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusageNative.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusagePure.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStream.php';
+require_once __DIR__.'/../../../ext/standard/VmGzStreamPure.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStreamNative.php';
 require_once __DIR__.'/../../../ext/standard/VmHash.php';
 require_once __DIR__.'/../../../ext/standard/VmHashFile.php';
