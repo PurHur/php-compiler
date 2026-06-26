@@ -129,6 +129,46 @@ final class VmPhpFdStream
         return self::$streams[$handle]->fd ?? null;
     }
 
+    public static function ownsFd(int $fd): bool
+    {
+        foreach (self::$streams as $state) {
+            if ($state->fd === $fd) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function setBlockingOnFd(int $fd, bool $mode): bool
+    {
+        if ($fd < 0 || !self::ownsFd($fd)) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        try {
+            $flags = (int) $ffi->fcntl($fd, 3, 0);
+            if (-1 === $flags) {
+                return false;
+            }
+            $nonBlockMask = ~2048;
+            $newFlags = $mode
+                ? ($flags & $nonBlockMask)
+                : ($flags | 2048);
+            if (-1 === (int) $ffi->fcntl($fd, 4, $newFlags)) {
+                return false;
+            }
+
+            return true;
+        } catch (\Throwable) {
+            return false;
+        }
+    }
+
     public static function uriForHandle(int $handle): string
     {
         return self::$streams[$handle]->uri ?? '';
@@ -605,6 +645,7 @@ int dup(int oldfd);
 int flock(int fd, int operation);
 int fsync(int fd);
 int fdatasync(int fd);
+int fcntl(int fd, int cmd, ...);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

@@ -7,13 +7,24 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\VmStreamBlockingNative;
 use PHPUnit\Framework\TestCase;
 
-/** VM stream_set_blocking via libc fcntl — fd streams avoid host stream_set_blocking (#6007, #7908). */
+/** VmStreamBlockingPure / VmStreamBlockingNative — no libc fcntl FFI (#12251). */
 final class VmStreamBlockingNativeRuntimeShrinkTest extends TestCase
 {
-    public function testVmStreamBlockingNativeUsesFcntl(): void
+    public function testVmStreamBlockingNativeDelegatesToPureWithoutLibcFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamBlockingNative.php');
-        $this->assertStringContainsString('fcntl', $source);
+        $this->assertStringContainsString('VmStreamBlockingPure::', $source);
+        $this->assertStringContainsString('VmStreamBlockingPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
+    }
+
+    public function testVmStreamBlockingPureDoesNotUseLibcFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamBlockingPure.php');
+        $this->assertStringContainsString('VmPhpFdStream::setBlockingOnFd', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 
     public function testVmStreamMetaDoesNotCallHostStreamSetBlocking(): void

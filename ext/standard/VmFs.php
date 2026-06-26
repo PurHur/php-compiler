@@ -809,6 +809,17 @@ final class VmFs
         return self::$handleSocketFds[$handle] ?? null;
     }
 
+    public static function findHandleIdForSocketFd(int $fd): ?int
+    {
+        foreach (self::$handleSocketFds as $handle => $socketFd) {
+            if ($socketFd === $fd) {
+                return $handle;
+            }
+        }
+
+        return null;
+    }
+
     /** @return int|false */
     public static function tmpfile()
     {
