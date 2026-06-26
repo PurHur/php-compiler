@@ -1823,6 +1823,11 @@ restart:
                 } elseif ($right->type === self::TYPE_INDIRECT) {
                     $right = $right->indirect;
                     goto restart;
+                } elseif (self::needsZendUnlikeKindCompare($left, $right)) {
+                    $this->bool($this->_compareFromSpaceship(
+                        $opCode,
+                        CompareJitHelper::zendUnlikeValueSpaceship($left, $right)
+                    ));
                 } else {
                     // Zend compare_function: unlike scalars use spaceship parity (#4681, #10243).
                     $this->bool($this->_compareFromSpaceship(
@@ -1831,6 +1836,27 @@ restart:
                     ));
                 }
         }
+    }
+
+    /** Unlike-kind compare that must not route through toNumeric() (#12033, zend_compare). */
+    private static function needsZendUnlikeKindCompare(Variable $left, Variable $right): bool
+    {
+        $left = $left->resolveIndirect();
+        $right = $right->resolveIndirect();
+        if ($left->type === $right->type) {
+            return false;
+        }
+        foreach ([self::TYPE_ARRAY, self::TYPE_OBJECT] as $kind) {
+            if ($left->type === $kind || $right->type === $kind) {
+                return true;
+            }
+        }
+        if ((self::TYPE_NULL === $left->type && self::TYPE_ARRAY === $right->type)
+            || (self::TYPE_ARRAY === $left->type && self::TYPE_NULL === $right->type)) {
+            return true;
+        }
+
+        return false;
     }
 
     private function _compareOp(int $opCode, $left, $right): bool {
@@ -1971,6 +1997,8 @@ restart:
                         // Zend compare_function: enum case vs non-case is always 1 (#4554).
                         $this->int(1);
                     }
+                } elseif (self::needsZendUnlikeKindCompare($leftCopy, $rightCopy)) {
+                    $this->int(CompareJitHelper::zendUnlikeValueSpaceship($leftCopy, $rightCopy));
                 } else {
                     $this->int(self::spaceshipMixedScalars($leftCopy, $rightCopy));
                 }
