@@ -918,6 +918,7 @@ require_once __DIR__.'/../../../ext/standard/PowIntJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregEmptyPatternReplace.php';
 require_once __DIR__.'/../../../ext/standard/PregEmptyPatternReplaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregExpandJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/PregJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PregReplacementExpand.php';
 require_once __DIR__.'/../../../ext/standard/PrintRJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ProcessIdentityJitHelper.php';
@@ -2491,6 +2492,8 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLl
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPhpinfoRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/PregMatchRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregQuote.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php';
