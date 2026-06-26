@@ -6,12 +6,13 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmGzStream;
 use PHPCompiler\ext\standard\VmGzStreamNative;
+use PHPCompiler\ext\standard\VmGzStreamPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmGzStream libz FFI without host gz* delegation (#6168, #8220). */
+/** VmGzStream buffered I/O without libz gzFile FFI (#8936, #6168, #8220). */
 final class VmGzStreamRuntimeShrinkTest extends TestCase
 {
-    public function testVmGzStreamUsesNativeFfiWithoutHostDelegation(): void
+    public function testVmGzStreamUsesPureBackendWithoutHostDelegation(): void
     {
         $stream = (string) file_get_contents(__DIR__.'/../../ext/standard/VmGzStream.php');
         $this->assertStringContainsString('VmGzStreamNative', $stream);
@@ -22,14 +23,26 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\gzclose(', $stream);
 
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmGzStreamNative.php');
-        $this->assertStringContainsString('$ffi->gzopen', $native);
+        $this->assertStringContainsString('VmGzStreamPure::gzopen', $native);
+        $this->assertStringNotContainsString('\\FFI', $native);
+        $this->assertStringNotContainsString('$ffi->gzopen', $native);
         $this->assertStringNotContainsString('\\gzopen(', $native);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmGzStreamPure.php');
+        $this->assertStringNotContainsString('\\FFI', $pure);
+        $this->assertStringContainsString('VmZlib::gzencode', $pure);
+        $this->assertStringContainsString('VmZlib::gzdecode', $pure);
     }
 
-    public function testLibzGzStreamFfiAvailableOnHarness(): void
+    public function testVmGzStreamNativeDelegatesToPure(): void
+    {
+        $this->assertSame(VmGzStreamPure::available(), VmGzStreamNative::available());
+    }
+
+    public function testLibzGzStreamAvailableOnHarness(): void
     {
         if (!VmGzStreamNative::available()) {
-            $this->markTestSkipped('libz gz* FFI unavailable on this host');
+            $this->markTestSkipped('VmZlib backend unavailable on this host');
         }
 
         $path = sys_get_temp_dir().'/phpc_gz_native_'.getmypid().'.gz';
@@ -46,10 +59,10 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
-    public function testReadgzfileGzfileGzpassthruUseNativeFfi(): void
+    public function testReadgzfileGzfileGzpassthruUsePureBackend(): void
     {
         if (!VmGzStreamNative::available()) {
-            $this->markTestSkipped('libz gz* FFI unavailable on this host');
+            $this->markTestSkipped('VmZlib backend unavailable on this host');
         }
 
         $path = sys_get_temp_dir().'/phpc_gz_file_'.getmypid().'.gz';
@@ -78,7 +91,7 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
     public function testGzgetsLineRead(): void
     {
         if (!VmGzStreamNative::available()) {
-            $this->markTestSkipped('libz gz* FFI unavailable on this host');
+            $this->markTestSkipped('VmZlib backend unavailable on this host');
         }
 
         $path = sys_get_temp_dir().'/phpc_gz_gets_'.getmypid().'.gz';

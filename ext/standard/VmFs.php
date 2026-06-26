@@ -29,7 +29,7 @@ final class VmFs
     /** @var array<int, \FFI\CData> libc FILE* for VmPopenNative handles (#8250) */
     private static array $popenNativeFiles = [];
 
-    /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamNative libz FFI (#8220) */
+    /** @var array<int, true> gz* stream placeholders — I/O via VmGzStreamPure (#8936, #8220) */
     private static array $gzNativePlaceholders = [];
 
     /** @var array<int, int> host stream identity => outstanding VM handle ids (#3384 pfsockopen persistent) */
