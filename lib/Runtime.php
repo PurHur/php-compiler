@@ -446,9 +446,9 @@ class Runtime {
     public function rewriteSourceBeforeParser(string $code): string
     {
         $code = GlobalTypedConstRewriter::rewrite($code);
-        $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = DnfParenTypeRewriter::rewrite($code);
         $code = AsymmetricVisibilityRewriter::rewrite($code);
+        $code = TypedFunctionStaticRewriter::rewrite($code);
         $code = HexFloatLiteralDesugar::desugar($code);
         $code = NewDereferenceableDesugar::desugar($code);
         $code = InOperatorDesugar::desugar($code);
