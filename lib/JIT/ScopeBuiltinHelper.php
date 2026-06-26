@@ -63,7 +63,7 @@ final class ScopeBuiltinHelper
      * @return Value
      * int64 import count
      */
-    public static function extract(Context $context, Variable $array, ?Variable $flagsArg = null): Value
+    public static function extract(Context $context, Variable $array, ?Variable $flagsArg = null, ?Variable $prefixArg = null): Value
     {
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             throw new \LogicException('extract() first argument must be an array in this compiler build');
@@ -83,7 +83,7 @@ final class ScopeBuiltinHelper
         $countSlot = $context->builder->alloca($i64, 1, 'extract_count');
         $context->builder->store($i64->constInt(0, false), $countSlot);
 
-        self::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot);
+        self::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot, $prefixArg);
 
         return $context->builder->load($countSlot);
     }
@@ -110,7 +110,8 @@ final class ScopeBuiltinHelper
         Value $ht,
         array $named,
         Value $flags,
-        ?Value $countSlot
+        ?Value $countSlot,
+        ?Variable $prefixArg = null,
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];

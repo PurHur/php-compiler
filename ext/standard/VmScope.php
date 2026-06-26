@@ -20,6 +20,18 @@ final class VmScope
     /** PHP EXTR_SKIP — do not overwrite variables that already hold a value (php_array.h). */
     public const EXTR_SKIP = StdlibConstants::EXTR_SKIP;
 
+    public const EXTR_PREFIX_SAME = StdlibConstants::EXTR_PREFIX_SAME;
+
+    public const EXTR_PREFIX_ALL = StdlibConstants::EXTR_PREFIX_ALL;
+
+    public const EXTR_PREFIX_INVALID = StdlibConstants::EXTR_PREFIX_INVALID;
+
+    public const EXTR_PREFIX_IF_EXISTS = StdlibConstants::EXTR_PREFIX_IF_EXISTS;
+
+    public const EXTR_IF_EXISTS = StdlibConstants::EXTR_IF_EXISTS;
+
+    public const EXTR_REFS = StdlibConstants::EXTR_REFS;
+
     public static function requireCaller(Frame $frame): Frame
     {
         if (null === $frame->parent || null === $frame->parent->block) {
@@ -64,16 +76,18 @@ final class VmScope
 
     public static function extract(Frame $frame): int
     {
-        if (\count($frame->calledArgs) < 1 || \count($frame->calledArgs) > 2) {
-            throw new \LogicException('extract() requires one or two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1 || $argc > 3) {
+            throw new \LogicException('extract() requires one to three arguments in this compiler build');
         }
         $caller = self::requireCaller($frame);
         $array = $frame->calledArgs[0]->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $array->type) {
             throw new \LogicException('extract() first argument must be an array in this compiler build');
         }
+
         $flags = self::EXTR_OVERWRITE;
-        if (2 === \count($frame->calledArgs)) {
+        if ($argc >= 2) {
             $flagsArg = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $flagsArg->type) {
                 throw new \LogicException('extract() flags must be an integer in this compiler build');
@@ -81,49 +95,196 @@ final class VmScope
             $flags = $flagsArg->toInt();
         }
 
-        return self::extractIntoCaller($caller, $array->toArray(), $flags, $frame);
+        $refs = 0 !== ($flags & self::EXTR_REFS);
+        $extractType = $flags & 0xFF;
+        if ($extractType < self::EXTR_OVERWRITE || $extractType > self::EXTR_IF_EXISTS) {
+            self::extractWarning($frame, 'Invalid extract type');
+
+            return 0;
+        }
+
+        $prefix = null;
+        if ($extractType > self::EXTR_SKIP && $extractType <= self::EXTR_PREFIX_IF_EXISTS) {
+            if ($argc < 3) {
+                self::extractWarning($frame, 'specified extract type requires the prefix parameter');
+
+                return 0;
+            }
+            $prefixArg = $frame->calledArgs[2]->resolveIndirect();
+            if (Variable::TYPE_STRING !== $prefixArg->type) {
+                throw new \LogicException('extract() prefix must be a string in this compiler build');
+            }
+            $prefix = $prefixArg->toString();
+            if ('' !== $prefix && !self::isValidVarName($prefix)) {
+                self::extractWarning($frame, 'prefix is not a valid identifier');
+
+                return 0;
+            }
+        }
+
+        return self::extractIntoCaller($caller, $array->toArray(), $extractType, $refs, $prefix, $frame);
     }
 
-    private static function extractIntoCaller(Frame $caller, HashTable $table, int $flags, Frame $builtinFrame): int
-    {
+    /**
+     * php-src: ext/standard/array.c — php_extract / ZEND_HASH_FOREACH_KEY_VAL_IND.
+     */
+    private static function extractIntoCaller(
+        Frame $caller,
+        HashTable $table,
+        int $extractType,
+        bool $refs,
+        ?string $prefix,
+        Frame $builtinFrame,
+    ): int {
         $imported = 0;
         foreach ($table->iterateKeyed(true) as [$keyVar, $valueVar]) {
-            if (Variable::TYPE_STRING !== $keyVar->type) {
+            $keyResolved = $keyVar->resolveIndirect();
+            $stringKey = null;
+            if (Variable::TYPE_STRING === $keyResolved->type) {
+                $stringKey = $keyResolved->toString();
+            } elseif (Variable::TYPE_INTEGER === $keyResolved->type) {
+                if (self::EXTR_PREFIX_ALL !== $extractType && self::EXTR_PREFIX_INVALID !== $extractType) {
+                    continue;
+                }
+                $stringKey = (string) $keyResolved->toInt();
+            } else {
                 continue;
             }
-            $name = $keyVar->toString();
-            if (null !== $caller->block) {
-                $slotHandled = false;
-                foreach ($caller->block->eachNamedScopeSlot() as [$slotName, $slot]) {
-                    if ($slotName !== $name) {
-                        continue;
-                    }
-                    $slotHandled = true;
-                    if (!isset($caller->scope[$slot])) {
-                        $caller->scope[$slot] = new Variable();
-                    }
-                    if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($caller->scope[$slot])) {
-                        continue;
-                    }
-                    $caller->scope[$slot]->copyFrom($valueVar);
-                    $caller->initializedSlots[$slot] = true;
-                    self::markGlobalEverAssignedForSlot($caller, $slot, $builtinFrame);
-                    ++$imported;
-                }
-                if ($slotHandled) {
+
+            if ('' === $stringKey) {
+                continue;
+            }
+
+            $varExists = self::callerNameExists($caller, $stringKey);
+            $finalName = self::resolveExtractFinalName($stringKey, $varExists, $extractType, $prefix);
+            if (null === $finalName || !self::isValidVarName($finalName)) {
+                continue;
+            }
+
+            if (self::EXTR_OVERWRITE === $extractType || self::EXTR_IF_EXISTS === $extractType) {
+                if ('GLOBALS' === $finalName) {
                     continue;
                 }
             }
-            $target = self::ensureCallerVariable($caller, $name);
-            if (self::EXTR_SKIP === ($flags & self::EXTR_SKIP) && self::callerVarIsSet($target)) {
-                continue;
+
+            $target = self::ensureCallerVariable($caller, $finalName);
+            if ($refs) {
+                $target->indirect($valueVar);
+            } else {
+                $target->copyFrom($valueVar);
             }
-            $target->copyFrom($valueVar);
-            self::markCallerVariableInitialized($caller, $name, $builtinFrame);
+            self::markCallerVariableInitialized($caller, $finalName, $builtinFrame);
             ++$imported;
         }
 
         return $imported;
+    }
+
+    /** php-src: php_prefix_varname — prefix and key joined by underscore. */
+    public static function prefixVarName(string $prefix, string $key): string
+    {
+        return $prefix.'_'.$key;
+    }
+
+    /**
+     * @see ext/standard/array.c switch (extract_type) in php_extract
+     */
+    private static function resolveExtractFinalName(
+        string $key,
+        bool $varExists,
+        int $extractType,
+        ?string $prefix,
+    ): ?string {
+        $finalName = null;
+
+        switch ($extractType) {
+            case self::EXTR_IF_EXISTS:
+                if (!$varExists) {
+                    return null;
+                }
+                // no break — fall through to EXTR_OVERWRITE
+
+            case self::EXTR_OVERWRITE:
+                return $key;
+
+            case self::EXTR_PREFIX_IF_EXISTS:
+                if ($varExists) {
+                    return self::prefixVarName($prefix ?? '', $key);
+                }
+
+                return null;
+
+            case self::EXTR_PREFIX_SAME:
+                if (!$varExists) {
+                    $finalName = $key;
+                }
+                // no break — fall through to EXTR_PREFIX_ALL
+
+            case self::EXTR_PREFIX_ALL:
+                if (null === $finalName) {
+                    return self::prefixVarName($prefix ?? '', $key);
+                }
+
+                return $finalName;
+
+            case self::EXTR_PREFIX_INVALID:
+                if (!self::isValidVarName($key)) {
+                    return self::prefixVarName($prefix ?? '', $key);
+                }
+
+                return $key;
+
+            case self::EXTR_SKIP:
+            default:
+                if (!$varExists) {
+                    return $key;
+                }
+
+                return null;
+        }
+    }
+
+    private static function callerNameExists(Frame $caller, string $name): bool
+    {
+        $slot = self::slotForName($caller, $name);
+        if (null !== $slot) {
+            if (!isset($caller->scope[$slot])) {
+                return false;
+            }
+
+            return isset($caller->initializedSlots[$slot]) || self::callerVarIsSet($caller->scope[$slot]);
+        }
+        $var = self::callerVariable($caller, $name);
+        if (null === $var) {
+            return false;
+        }
+
+        return !$var->resolveIndirect()->isUndefined();
+    }
+
+    private static function isValidVarName(string $name): bool
+    {
+        if ('' === $name) {
+            return false;
+        }
+
+        return 1 === \preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name);
+    }
+
+    private static function extractWarning(Frame $frame, string $message): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        [$file, $line] = self::compactCallSite($frame);
+        $frame->vmContext->errors->triggerError(
+            'extract(): '.$message,
+            ErrorReporter::E_WARNING,
+            $file,
+            $frame->vmContext,
+            $frame,
+            $line
+        );
     }
 
     /** Zend symbol-table import marks CVs initialized — no later undefined-variable warnings (#10590). */
