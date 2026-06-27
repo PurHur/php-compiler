@@ -27,6 +27,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_exclude_deprecated')
+                && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
             if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow())
                 && str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;

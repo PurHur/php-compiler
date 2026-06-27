@@ -167,6 +167,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_declared_* optional $exclude_deprecated (ext/standard/basic_functions.c, #12403).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects any argument like Zend 8.2.
+     */
+    public static function supportsGetDeclaredExcludeDeprecated(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps language-construct semantics.

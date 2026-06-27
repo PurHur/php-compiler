@@ -62,6 +62,15 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_exclude_deprecated')
+                && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGetDeclaredExcludeDeprecated()
+                && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsZendThreadId() && str_contains($name, 'zend_thread_id')) {
                 continue;
             }

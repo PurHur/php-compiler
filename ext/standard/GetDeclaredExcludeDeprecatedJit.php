@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
@@ -19,6 +20,19 @@ final class GetDeclaredExcludeDeprecatedJit
     public static function parseLiteral(Context $context, array $args, string $function): ?bool
     {
         $argc = \count($args);
+        if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()) {
+            if ($argc > 0) {
+                TypeErrorRaise::ensureLinked($context);
+                TypeErrorRaise::emitArgumentCountError(
+                    $context,
+                    "{$function}() expects exactly 0 arguments, {$argc} given"
+                );
+
+                return false;
+            }
+
+            return false;
+        }
         if ($argc > 1) {
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
