@@ -10,7 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
- * VM resolves via /etc/hosts without host Zend DNS builtins; optional libc getaddrinfo/res_query when FFI is loaded.
+ * VM resolves via /etc/hosts + VmDnsUdpPure UDP transport — no libc res_query/getaddrinfo FFI (#12428).
  * Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php → GethostbynamelJitHelper PHP (#9382),
  * CheckdnsrrRuntime.php → CheckdnsrrJitHelper PHP (#9379).
@@ -28,17 +28,6 @@ final class VmDns
     public const ERR_NOT_FOUND = 2;
 
     private const MAX_ADDRS = 64;
-
-    private const AF_INET = 2;
-    private const AF_INET6 = 10;
-
-    private const SOCK_STREAM = 1;
-
-    private const NI_MAXHOST = 1025;
-
-    private static ?\FFI $ffi = null;
-
-    private static ?\FFI $dnsFfi = null;
 
     /** DNS query class IN (arpa/nameser.h). */
     private const DNS_CLASS_IN = 1;
@@ -76,13 +65,6 @@ final class VmDns
             return false;
         }
 
-        if (self::ffiEnabled()) {
-            $ffiResult = self::checkdnsrrViaResQuery($hostname, $qtype);
-            if (null !== $ffiResult) {
-                return $ffiResult;
-            }
-        }
-
         return self::checkdnsrrPurePhp($hostname, $qtype);
     }
 
@@ -110,13 +92,9 @@ final class VmDns
             return [];
         }
 
-        // php-src: ext/standard/dns.c — php_network_getaddresses() via getaddrinfo when available.
-        $ips = null;
-        if (self::ffiEnabled()) {
-            $ips = self::resolveViaGetaddrinfo($hostname);
-        }
+        $ips = self::resolveViaEtcHosts($hostname);
         if (null === $ips || [] === $ips) {
-            $ips = self::resolveViaEtcHosts($hostname);
+            $ips = self::resolveViaUdpA($hostname);
         }
         if (null === $ips || [] === $ips) {
             return [];
@@ -180,9 +158,6 @@ final class VmDns
 
         $name = self::resolveHostnameViaEtcHosts($ipAddress);
         if (null === $name || '' === $name) {
-            $name = self::resolveHostnameViaGetnameinfo($ipAddress);
-        }
-        if (null === $name || '' === $name) {
             $error = self::isValidIpv4Address($ipAddress)
                 ? self::ERR_NOT_FOUND
                 : self::ERR_INVALID_ADDRESS;
@@ -204,7 +179,7 @@ final class VmDns
             return false;
         }
 
-        $packet = self::queryMxViaResQuery($hostname);
+        $packet = self::queryViaUdp($hostname, self::DNS_RECORD_TYPES['MX']);
         if (null === $packet) {
             return false;
         }
@@ -376,13 +351,7 @@ final class VmDns
             return [];
         }
 
-        $ips = null;
-        if (self::ffiEnabled()) {
-            $ips = self::resolveIpv6ViaGetaddrinfo($hostname);
-        }
-        if (null === $ips || [] === $ips) {
-            $ips = self::resolveIpv6ViaEtcHosts($hostname);
-        }
+        $ips = self::resolveIpv6ViaEtcHosts($hostname);
         if (null === $ips || [] === $ips) {
             return [];
         }
@@ -457,50 +426,6 @@ final class VmDns
         return self::inetPtonIpv4($ip);
     }
 
-    /**
-     * @return string|null null when libc FFI path unavailable or lookup failed
-     */
-    private static function resolveHostnameViaGetnameinfo(string $ip): ?string
-    {
-        if (!self::inetPtonIpv4($ip)) {
-            return null;
-        }
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        try {
-            $ffi = self::ffi();
-        } catch (\Throwable) {
-            return null;
-        }
-
-        $sin = $ffi->new('struct sockaddr_in');
-        $sin->sin_family = self::AF_INET;
-        $rc = (int) $ffi->inet_pton(self::AF_INET, $ip, \FFI::addr($sin->sin_addr));
-        if (1 !== $rc) {
-            return null;
-        }
-
-        $hostbuf = $ffi->new('char['.self::NI_MAXHOST.']');
-        $sa = $ffi->cast('struct sockaddr *', \FFI::addr($sin));
-        $gnRc = (int) $ffi->getnameinfo(
-            $sa,
-            \FFI::sizeof($sin),
-            $hostbuf,
-            self::NI_MAXHOST,
-            null,
-            0,
-            0
-        );
-        if (0 !== $gnRc) {
-            return null;
-        }
-
-        $name = \FFI::string($hostbuf);
-
-        return '' !== $name ? $name : null;
-    }
-
     private static function inetPtonIpv4(string $ip): bool
     {
         if (!\preg_match('/^\d{1,3}(\.\d{1,3}){3}$/', $ip)) {
@@ -556,111 +481,6 @@ final class VmDns
     }
 
     /**
-     * @return list<string>|null null when libc FFI path unavailable
-     */
-    private static function resolveViaGetaddrinfo(string $hostname): ?array
-    {
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        try {
-            $ffi = self::ffi();
-        } catch (\Throwable) {
-            return null;
-        }
-
-        $hints = $ffi->new('struct addrinfo');
-        $hints->ai_family = self::AF_INET;
-        $hints->ai_socktype = self::SOCK_STREAM;
-        $hints->ai_flags = 0;
-        $hints->ai_protocol = 0;
-
-        $resHead = $ffi->new('struct addrinfo *');
-        $rc = (int) $ffi->getaddrinfo($hostname, null, \FFI::addr($hints), \FFI::addr($resHead));
-        if (0 !== $rc) {
-            return null;
-        }
-
-        $stored = [];
-        $rp = $resHead[0];
-        while (null !== $rp) {
-            if (self::AF_INET === (int) $rp->ai_family && null !== $rp->ai_addr) {
-                $sin = $ffi->cast('struct sockaddr_in *', $rp->ai_addr);
-                $buf = $ffi->new('char[16]');
-                $ntop = $ffi->inet_ntop(
-                    self::AF_INET,
-                    \FFI::addr($sin->sin_addr),
-                    $buf,
-                    16
-                );
-                if (null !== $ntop) {
-                    $ip = \FFI::string($buf);
-                    // php-src add_hostname_address: append every AF_INET result (duplicates allowed).
-                    if ('' !== $ip && \count($stored) < self::MAX_ADDRS) {
-                        $stored[] = $ip;
-                    }
-                }
-            }
-            $rp = $rp->ai_next;
-        }
-        $ffi->freeaddrinfo($resHead);
-
-        return $stored;
-    }
-
-    /**
-     * @return list<string>|null null when libc FFI path unavailable
-     */
-    private static function resolveIpv6ViaGetaddrinfo(string $hostname): ?array
-    {
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        try {
-            $ffi = self::ffi();
-        } catch (\Throwable) {
-            return null;
-        }
-
-        $hints = $ffi->new('struct addrinfo');
-        $hints->ai_family = self::AF_INET6;
-        $hints->ai_socktype = self::SOCK_STREAM;
-        $hints->ai_flags = 0;
-        $hints->ai_protocol = 0;
-
-        $resHead = $ffi->new('struct addrinfo *');
-        $rc = (int) $ffi->getaddrinfo($hostname, null, \FFI::addr($hints), \FFI::addr($resHead));
-        if (0 !== $rc) {
-            return null;
-        }
-
-        $stored = [];
-        $rp = $resHead[0];
-        while (null !== $rp) {
-            if (self::AF_INET6 === (int) $rp->ai_family && null !== $rp->ai_addr) {
-                $sin6 = $ffi->cast('struct sockaddr_in6 *', $rp->ai_addr);
-                $buf = $ffi->new('char[46]');
-                $ntop = $ffi->inet_ntop(
-                    self::AF_INET6,
-                    \FFI::addr($sin6->sin6_addr),
-                    $buf,
-                    46
-                );
-                if (null !== $ntop) {
-                    $ip = \FFI::string($buf);
-                    if ('' !== $ip && \count($stored) < self::MAX_ADDRS) {
-                        $stored[] = $ip;
-                    }
-                }
-            }
-            $rp = $rp->ai_next;
-        }
-        $ffi->freeaddrinfo($resHead);
-
-        return $stored;
-    }
-
-    /**
      * @return list<string>|null
      */
     private static function resolveIpv6ViaEtcHosts(string $hostname): ?array
@@ -706,37 +526,50 @@ final class VmDns
     }
 
     /**
-     * @return string|null raw DNS response packet
+     * Pure-PHP DNS check via /etc/hosts + UDP (#7934, #12428).
      */
-    private static function queryMxViaResQuery(string $hostname): ?string
+    private static function checkdnsrrPurePhp(string $hostname, int $qtype): bool
     {
-        if (self::ffiEnabled() && \extension_loaded('ffi')) {
-            try {
-                $ffi = self::dnsFfi();
-                $buf = $ffi->new('unsigned char[4096]');
-                $qtype = self::DNS_RECORD_TYPES['MX'];
-                $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 4096);
-                if ($rc > 0) {
-                    return \FFI::string($buf, $rc);
-                }
-            } catch (\Throwable) {
+        if (1 === $qtype) {
+            $ips = self::resolveViaEtcHosts($hostname);
+            if (null !== $ips && [] !== $ips) {
+                return true;
             }
         }
 
-        return self::queryMxViaUdp($hostname);
+        $packet = self::queryViaUdp($hostname, $qtype);
+
+        return null !== $packet && self::dnsResponseHasAnswers($packet);
     }
 
     /**
-     * Pure-PHP UDP MX query when libc res_query FFI is unavailable (#4125, #7934).
+     * @return list<string>|null
      */
-    private static function queryMxViaUdp(string $hostname): ?string
+    private static function resolveViaUdpA(string $hostname): ?array
+    {
+        $packet = self::queryViaUdp($hostname, self::DNS_RECORD_TYPES['A']);
+        if (null === $packet) {
+            return null;
+        }
+
+        $ips = self::parseDnsIpv4Records($packet);
+
+        return [] === $ips ? null : $ips;
+    }
+
+    /**
+     * UDP DNS query via VmDnsUdpPure (#8937).
+     *
+     * @return string|null raw DNS response packet
+     */
+    private static function queryViaUdp(string $hostname, int $qtype): ?string
     {
         $nameservers = self::readResolvConfNameservers();
         if ([] === $nameservers) {
             return null;
         }
 
-        $query = self::buildDnsQueryPacket($hostname, self::DNS_RECORD_TYPES['MX']);
+        $query = self::buildDnsQueryPacket($hostname, $qtype);
         foreach ($nameservers as $nameserver) {
             $response = self::udpDnsExchange($nameserver, $query);
             if (null !== $response && '' !== $response) {
@@ -745,6 +578,66 @@ final class VmDns
         }
 
         return null;
+    }
+
+    private static function dnsResponseHasAnswers(string $packet): bool
+    {
+        if (\strlen($packet) < 12) {
+            return false;
+        }
+
+        return self::readUint16($packet, 6) > 0;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function parseDnsIpv4Records(string $packet): array
+    {
+        $len = \strlen($packet);
+        if ($len < 12) {
+            return [];
+        }
+
+        $qdcount = self::readUint16($packet, 4);
+        $ancount = self::readUint16($packet, 6);
+        $offset = 12;
+
+        for ($i = 0; $i < $qdcount; ++$i) {
+            $next = self::skipDnsName($packet, $len, $offset);
+            if (null === $next) {
+                return [];
+            }
+            $offset = $next + 4;
+            if ($offset > $len) {
+                return [];
+            }
+        }
+
+        $ips = [];
+        for ($i = 0; $i < $ancount; ++$i) {
+            $parsed = self::readDnsName($packet, $len, $offset);
+            if (null === $parsed) {
+                break;
+            }
+            [$offset] = $parsed;
+            if ($offset + 10 > $len) {
+                break;
+            }
+            $type = self::readUint16($packet, $offset);
+            $offset += 8;
+            $rdlength = self::readUint16($packet, $offset);
+            $offset += 2;
+            if ($offset + $rdlength > $len) {
+                break;
+            }
+            if (1 === $type && 4 === $rdlength) {
+                $ips[] = \inet_ntop(\substr($packet, $offset, 4)) ?: '';
+            }
+            $offset += $rdlength;
+        }
+
+        return \array_values(\array_filter($ips, static fn (string $ip): bool => '' !== $ip));
     }
 
     private static function buildDnsQueryPacket(string $hostname, int $qtype): string
@@ -942,152 +835,6 @@ final class VmDns
     }
 
     /**
-     * @return bool|null null when FFI path unavailable
-     */
-    private static function checkdnsrrViaResQuery(string $hostname, int $qtype): ?bool
-    {
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        try {
-            $ffi = self::dnsFfi();
-        } catch (\Throwable) {
-            return null;
-        }
-        $buf = $ffi->new('unsigned char[1024]');
-        $rc = (int) $ffi->res_query($hostname, self::DNS_CLASS_IN, $qtype, $buf, 1024);
-
-        return $rc > 0;
-    }
-
-    /**
-     * Pure-PHP fallback when libc res_query is unavailable (#7934, #7315 phase 2).
-     *
-     * A records: probe /etc/hosts then optional getaddrinfo FFI. Other qtypes need res_query.
-     */
-    private static function checkdnsrrPurePhp(string $hostname, int $qtype): bool
-    {
-        if (1 === $qtype) {
-            $ips = self::resolveViaEtcHosts($hostname);
-            if (null !== $ips && [] !== $ips) {
-                return true;
-            }
-            if (self::ffiEnabled()) {
-                $ips = self::resolveViaGetaddrinfo($hostname);
-
-                return null !== $ips && [] !== $ips;
-            }
-
-            return false;
-        }
-
-        return false;
-    }
-
-    private static function ffiEnabled(): bool
-    {
-        $v = \getenv('PHP_COMPILER_DISABLE_FFI');
-        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== \strtolower($v)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private static function dnsFfi(): \FFI
-    {
-        if (null !== self::$dnsFfi) {
-            return self::$dnsFfi;
-        }
-
-        $cdef = <<<'CDEF'
-int res_query(const char *dname, int class, int type, unsigned char *answer, int anslen);
-CDEF;
-
-        foreach (['libresolv.so', 'libresolv.so.2', 'libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$dnsFfi = \FFI::cdef($cdef, $lib);
-
-                return self::$dnsFfi;
-            } catch (\Throwable) {
-            }
-        }
-
-        throw new \RuntimeException('libc res_query FFI unavailable');
-    }
-
-    private static function ffi(): \FFI
-    {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-
-        $cdef = <<<'CDEF'
-typedef unsigned int socklen_t;
-typedef unsigned short int sa_family_t;
-typedef unsigned short int in_port_t;
-
-struct in_addr {
-    unsigned int s_addr;
-};
-
-struct in6_addr {
-    unsigned char s6_addr[16];
-};
-
-struct sockaddr_in {
-    sa_family_t sin_family;
-    in_port_t sin_port;
-    struct in_addr sin_addr;
-    unsigned char sin_zero[8];
-};
-
-struct sockaddr_in6 {
-    sa_family_t sin6_family;
-    in_port_t sin6_port;
-    unsigned int sin6_flowinfo;
-    struct in6_addr sin6_addr;
-    unsigned int sin6_scope_id;
-};
-
-struct sockaddr {
-    sa_family_t sa_family;
-    char sa_data[14];
-};
-
-struct addrinfo {
-    int ai_flags;
-    int ai_family;
-    int ai_socktype;
-    int ai_protocol;
-    socklen_t ai_addrlen;
-    struct sockaddr *ai_addr;
-    char *ai_canonname;
-    struct addrinfo *ai_next;
-};
-
-int getaddrinfo(const char *node, const char *service, const struct addrinfo *hints, struct addrinfo **res);
-void freeaddrinfo(struct addrinfo *res);
-const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
-int inet_pton(int af, const char *src, void *dst);
-int getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv, socklen_t servlen, int flags);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        throw new \RuntimeException('libc getaddrinfo FFI unavailable');
-    }
-
-    /**
-     * Pure-PHP fallback when FFI is absent (reads /etc/hosts only).
-     *
      * @return list<string>|null
      */
     private static function resolveViaEtcHosts(string $hostname): ?array
