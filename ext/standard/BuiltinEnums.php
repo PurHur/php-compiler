@@ -28,8 +28,10 @@ final class BuiltinEnums
         self::registerConnectionStatus($ctx);
         self::registerSessionStatus($ctx);
         self::registerResponseCode($ctx);
-        self::registerSorting($ctx);
-        self::registerSortDirection($ctx);
+        if (CompilerVersion::supportsSortingEnum()) {
+            self::registerSorting($ctx);
+            self::registerSortDirection($ctx);
+        }
         if (CompilerVersion::supportsFpow()) {
             self::registerRoundingMode($ctx);
         }

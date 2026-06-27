@@ -72,6 +72,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsSortingEnum()
+                && str_contains($name, 'sort_sorting_enum')
+                && !str_contains($name, 'sorting_enum_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsSortingEnum()
+                && str_contains($name, 'sorting_enum_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp84ArraySearchFunctions()
                 && (str_contains($name, 'array_find')
                     || str_contains($name, 'array_any')
