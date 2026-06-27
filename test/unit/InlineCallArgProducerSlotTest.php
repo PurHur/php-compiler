@@ -646,6 +646,46 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #12824 — var_export([NAN, INF], true) wires Array_ producer, not hoisted ConstFetch temps. */
+    public function testVarExportInlineNanInfArrayUsesArrayProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export([NAN, INF], true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_inline_nan_inf_array.php');
+
+        $arraySlot = null;
+        $trueSlot = null;
+        $sendSlots = [];
+        $afterArray = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ADD_ARRAY_ELEMENT === $op->type) {
+                $afterArray = true;
+            }
+            if ($afterArray && OpCode::TYPE_CONST_FETCH === $op->type) {
+                $trueSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($trueSlot);
+        self::assertSame([$arraySlot, $trueSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('NAN', $out);
+        self::assertStringContainsString('INF', $out);
+    }
+
     /** Issue #10231 — sibling inline Array_ producers map to distinct array_replace arg slots. */
     public function testArrayReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
     {
