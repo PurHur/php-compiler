@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -13,10 +12,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT `@` silence + error_reporting via ErrorSilenceJitHelper PHP (#9197).
+ * JIT/AOT `@` silence + error_reporting via ErrorSilenceJitHelper PHP (#9197, #12809).
  *
- * Standalone LLVM quarantine: {@see SilenceStandaloneLlvm}
- * Replaces LLVM globals phpc_ini_silence_* and phpc_ini_error_reporting for silence paths.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\ErrorSilenceJitHelper}; thin LLVM bridges
+ * forward the ABI. Replaces LLVM globals phpc_ini_silence_* and phpc_ini_error_reporting for silence paths.
  * php-src: Zend/zend_execute.c — ZEND_SILENCE
  */
 final class SilenceRuntime
@@ -75,15 +74,6 @@ final class SilenceRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $restoreBlock = self::captureInsertBlock($context);
-            SilenceStandaloneLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-            self::restoreInsertBlock($context, $restoreBlock);
-
-            return;
-        }
-
         self::ensureJitHelperCompiled($context);
         self::ensureValueWriters($context);
         self::implementVoidBridge($context, '__compiler_begin_silence', self::BEGIN_HELPER);
@@ -96,17 +86,6 @@ final class SilenceRuntime
 
     public static function emitIniGetErrorReporting(Context $context, Value $out): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            self::ensureValueWriters($context);
-            $i64 = $context->getTypeFromString('int64');
-            $context->builder->call(
-                $context->lookupFunction('__value__writeLong'),
-                $out,
-                $i64->constInt(30719, false)
-            );
-
-            return;
-        }
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::restoreInsertBlock($context, $restoreBlock);
@@ -117,9 +96,6 @@ final class SilenceRuntime
 
     public static function emitSetErrorReporting(Context $context, Value $level): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::restoreInsertBlock($context, $restoreBlock);
@@ -132,9 +108,6 @@ final class SilenceRuntime
 
     public static function emitIniRestoreErrorReporting(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
         $restoreBlock = self::captureInsertBlock($context);
         self::ensureJitHelperCompiled($context);
         self::restoreInsertBlock($context, $restoreBlock);

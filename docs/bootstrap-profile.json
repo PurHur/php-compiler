@@ -2508,7 +2508,6 @@
         "lib/JIT/Builtin/SessionWriteClose.php",
         "lib/JIT/Builtin/ShuffleRuntime.php",
         "lib/JIT/Builtin/SilenceRuntime.php",
-        "lib/JIT/Builtin/SilenceStandaloneLlvm.php",
         "lib/JIT/Builtin/SocketAtmarkRuntime.php",
         "lib/JIT/Builtin/SortRuntime.php",
         "lib/JIT/Builtin/SpaceshipCompareJit.php",
@@ -3655,9 +3654,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3425,
+        "inventory_files": 3424,
         "excluded": 0,
-        "eligible": 3425,
+        "eligible": 3424,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
