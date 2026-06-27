@@ -31,14 +31,10 @@ final class array_slice extends Internal
         if (!isset($frame->calledArgs[0], $frame->calledArgs[1])) {
             throw new \LogicException('array_slice() requires at least two arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        $offset = $frame->calledArgs[1]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_slice() first argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_slice');
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_slice', 2, 'offset');
         $length = null;
         if (isset($frame->calledArgs[2])) {
@@ -51,7 +47,7 @@ final class array_slice extends Internal
         if (isset($frame->calledArgs[3])) {
             $preserveKeys = $frame->calledArgs[3]->resolveIndirect()->toBool();
         }
-        $frame->returnVar->array($array->toArray()->sliceCopy($offsetInt, $length, $preserveKeys));
+        $frame->returnVar->array($ht->sliceCopy($offsetInt, $length, $preserveKeys));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
@@ -60,6 +56,7 @@ final class array_slice extends Internal
         if ($argc < 2 || $argc > 4) {
             throw new \LogicException('array_slice() requires two to four arguments in this compiler build');
         }
+        JitArrayElem::requireArrayArg($context, $args[0], 'array_slice');
         $hasExplicitLength = false;
         if ($argc >= 3 && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {

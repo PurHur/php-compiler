@@ -229,6 +229,14 @@ final class JitArrayElem
         ) {
             return;
         }
+        if (JITVariable::TYPE_NULL === $array->type || ($array->isNullConstant ?? false)) {
+            self::emitErrorAndAbort(
+                $context,
+                \sprintf(self::TYPE_ERROR_N, $fn, $argNum, $paramName, $expectedType, 'null')
+            );
+
+            return;
+        }
         if (JITVariable::TYPE_VALUE === $array->type) {
             $loaded = JitValueBox::valuePtrFromVariable($context, $array);
             $isArray = self::valueBoxIsArray($context, $loaded);

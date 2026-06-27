@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\boolval;
+use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -46,6 +47,7 @@ final class ArrayFindHelper
         Variable $callback,
         int $mode
     ): Value {
+        JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
         if (!ArrayFindCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
@@ -546,5 +548,16 @@ final class ArrayFindHelper
             return;
         }
         throw new \LogicException('array_find() native element type not supported for JIT');
+    }
+
+    private static function functionNameForMode(int $mode): string
+    {
+        return match ($mode) {
+            self::MODE_FIND => 'array_find',
+            self::MODE_FIND_KEY => 'array_find_key',
+            self::MODE_ANY => 'array_any',
+            self::MODE_ALL => 'array_all',
+            default => 'array_find',
+        };
     }
 }

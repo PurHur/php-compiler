@@ -17,7 +17,6 @@ use PHPCompiler\JIT\ArrayFindCallbackPolicy;
 use PHPCompiler\JIT\ArrayFindHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -33,12 +32,9 @@ final class array_find_key extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_find_key() first argument must be an array in this compiler build');
-        }
+        $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find_key');
         $callback = $frame->calledArgs[1];
-        foreach ($array->toArray()->iterateKeyed(true) as [$key, $value]) {
+        foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
             if (VmArrayValueCallback::isTruthy($result)) {
                 $frame->returnVar->copyFrom($key);
