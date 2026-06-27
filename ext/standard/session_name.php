@@ -41,10 +41,10 @@ class session_name extends Internal
 
             return;
         }
-        if ('' === $name) {
+        if (VmSession::isRejectedSessionName($name)) {
             if (null !== $frame->vmContext) {
                 $frame->vmContext->errors->triggerError(
-                    sprintf(VmSession::EMPTY_NAME_WARNING, $name),
+                    \sprintf(VmSession::EMPTY_NAME_WARNING, $name),
                     ErrorReporter::E_WARNING,
                     '' !== $frame->scriptPath ? $frame->scriptPath : null,
                     $frame->vmContext,
