@@ -12,19 +12,26 @@ use PHPCompiler\VM\Variable;
  *
  * VM SSOT delegates via {@see VmGcStatus}; JIT reads LLVM globals in
  * {@see \PHPCompiler\JIT\Builtin\GcStatusRuntime} and passes snapshots here.
- * php-src: ext/standard/php_gc.c — PHP_FUNCTION(gc_status)
+ * php-src: ext/standard/php_gc.c — PHP_FUNCTION(gc_status) (PHP 8.4 schema, #12780)
  */
 final class GcStatusJitHelper
 {
-    public static function buildTable(int $runs, int $collected, int $threshold, int $roots): HashTable
+    public static function buildTable(bool $running, bool $protected, bool $full, int $bufferSize): HashTable
     {
         $ht = new HashTable();
-        self::addInt($ht, 'runs', $runs);
-        self::addInt($ht, 'collected', $collected);
-        self::addInt($ht, 'threshold', $threshold);
-        self::addInt($ht, 'roots', $roots);
+        self::addBool($ht, 'running', $running);
+        self::addBool($ht, 'protected', $protected);
+        self::addBool($ht, 'full', $full);
+        self::addInt($ht, 'buffer_size', $bufferSize);
 
         return $ht;
+    }
+
+    private static function addBool(HashTable $ht, string $key, bool $value): void
+    {
+        $slot = new Variable();
+        $slot->bool($value);
+        $ht->add($key, $slot);
     }
 
     private static function addInt(HashTable $ht, string $key, int $value): void

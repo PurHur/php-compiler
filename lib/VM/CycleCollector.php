@@ -51,11 +51,7 @@ final class CycleCollector
      *     running: bool,
      *     protected: bool,
      *     full: bool,
-     *     runs: int,
-     *     collected: int,
-     *     threshold: int,
-     *     buffer_size: int,
-     *     roots: int
+     *     buffer_size: int
      * }
      *
      * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status)
@@ -65,10 +61,10 @@ final class CycleCollector
         $roots = self::countBufferedRoots($ctx);
 
         return [
-            'runs' => self::$runs,
-            'collected' => self::$totalCollected,
-            'threshold' => self::ROOT_THRESHOLD,
-            'roots' => $roots,
+            'running' => self::$running,
+            'protected' => self::$protected,
+            'full' => $roots >= self::ROOT_THRESHOLD,
+            'buffer_size' => self::DEFAULT_BUFFER_SIZE,
         ];
     }
 

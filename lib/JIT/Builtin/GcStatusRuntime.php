@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -97,7 +96,7 @@ final class GcStatusRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($htPtr, false);
+        $ft = $context->context->functionType($htPtr, false, $i1, $i1, $i1, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
@@ -105,17 +104,17 @@ final class GcStatusRuntime
         $entry = $fn->appendBasicBlock('gc_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
-        $runs = self::loadGlobalInt($context, self::G_RUNS, $i32, $i64);
-        $collected = self::loadGlobalInt($context, self::G_TOTAL_COLLECTED, $i32, $i64);
-        $threshold = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
-        $roots = self::loadGlobalInt($context, self::G_ROOT_COUNT, $i32, $i64);
+        $running = self::loadGlobalBool($context, self::G_RUNNING, $i32, $i1);
+        $protected = self::loadGlobalBool($context, self::G_PROTECTED, $i32, $i1);
+        $full = self::loadGlobalBool($context, self::G_FULL, $i32, $i1);
+        $bufferSize = self::loadGlobalInt($context, self::G_BUFFER_SIZE, $i32, $i64);
 
         $ht = $context->builder->call(
             self::helperFunction($context, self::BUILD_TABLE),
-            $runs,
-            $collected,
-            $threshold,
-            $roots
+            $running,
+            $protected,
+            $full,
+            $bufferSize
         );
         $context->builder->returnValue($ht);
         $context->registerFunction($abiName, $fn);
@@ -131,6 +130,21 @@ final class GcStatusRuntime
         $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
 
         return $context->builder->sext($loaded, $i64);
+    }
+
+    private static function loadGlobalBool(Context $context, string $globalName, $i32, $i1): Value
+    {
+        $global = $context->module->getNamedGlobal($globalName);
+        if (null === $global) {
+            throw new \LogicException('GcStatusRuntime: '.$globalName.' missing');
+        }
+        $loaded = $context->builder->load($context->builder->pointerCast($global, $i32->pointerType(0)));
+
+        return $context->builder->icmp(
+            \PHPLLVM\Builder::INT_NE,
+            $loaded,
+            $i32->constInt(0, false)
+        );
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
