@@ -109,10 +109,14 @@ final class CompilerVersion
         return version_compare(self::builtinAdvertisementVersion(), $since, '>=');
     }
 
-    /** PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697). */
+    /**
+     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsStrIncrement(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
@@ -262,10 +266,14 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
-    /** PHP 8.4+ zend_thread_id() (ext/standard/basic_functions.c, issue #6870, #11842). */
+    /**
+     * PHP 8.4+ zend_thread_id() (ext/standard/basic_functions.c, issue #6870, #11842, #12386).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsZendThreadId(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /** PHP 8.5+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #12422). */
@@ -274,10 +282,14 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.5.0');
     }
 
-    /** PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826). */
+    /**
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsJsonValidate(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
@@ -360,16 +372,24 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845). */
+    /**
+     * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsPhp84ArraySearchFunctions(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901). */
+    /**
+     * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsMbTrimFunctions(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

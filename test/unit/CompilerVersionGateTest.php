@@ -131,6 +131,20 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($ctx->classes['clockinterface']));
     }
 
+    public function testSupportsMbTrimFunctionsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMbTrimFunctions());
+    }
+
+    public function testVmDoesNotRegisterMbTrimOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+    }
+
     public function testVmDoesNotRegisterStreamContextSetOptionsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
