@@ -7,21 +7,20 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\DateIntervalFormatJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** DateIntervalFormatRuntime: standalone LLVM walk + embed DateIntervalFormatJitHelper PHP (#9499). */
+/** DateIntervalFormatRuntime: embed + standalone route through DateIntervalFormatJitHelper PHP (#9499, #12800). */
 final class DateIntervalFormatRuntimeShrinkTest extends TestCase
 {
-    public function testDateIntervalFormatRuntimeUsesDualPath(): void
+    public function testDateIntervalFormatRuntimeUsesJitHelperBridgeOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatRuntime.php');
         $this->assertStringContainsString('formatFromScalars', $source);
-        $this->assertStringContainsString('DateIntervalFormatStandaloneLlvm', $source);
+        $this->assertStringContainsString('DateIntervalFormatJitHelper', $source);
+        $this->assertStringNotContainsString('DateIntervalFormatStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitFormatCode', $source);
         $this->assertStringNotContainsString('implementFormat(', $source);
         $this->assertLessThan(200, \substr_count($source, "\n") + 1);
 
-        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php');
-        $this->assertStringContainsString('implementFormat', $llvm);
-        $this->assertStringContainsString('emitFormatCode', $llvm);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php');
     }
 
     public function testDateIntervalFormatJitHelperDelegatesToVmDateInterval(): void
