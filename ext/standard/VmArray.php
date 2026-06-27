@@ -425,6 +425,48 @@ final class VmArray
         return $out;
     }
 
+    /**
+     * array_diff() with one source array — copy keys/values (php-src array.c, issue #1206).
+     */
+    public static function diffSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff() two-array step — remove from $first values found in $other (loose compare).
+     */
+    public static function diffTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::looseValueInHashTable($value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function looseValueInHashTable(Variable $needle, HashTable $haystack): bool
+    {
+        $needle = $needle->resolveIndirect();
+        foreach ($haystack->iterate(true) as $value) {
+            if (in_array::looseEquals($needle, $value->resolveIndirect())) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** @param list<HashTable> $others */
     private static function allLists(array $others): bool
     {
