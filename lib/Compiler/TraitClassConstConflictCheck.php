@@ -22,10 +22,21 @@ final class TraitClassConstConflictCheck
      *     file: string,
      *     line: int,
      *     constants: array<string, array{display: string, value: ?Variable, file: string, line: int}>,
-     *     traitUses: list<string>
+     *     traitUses: list<array{lc: string, display: string, file: string, line: int}>
      * }>
      */
-    private array $types = [];
+    private array $traits = [];
+
+    /**
+     * @var array<string, array{
+     *     display: string,
+     *     file: string,
+     *     line: int,
+     *     constants: array<string, array{display: string, value: ?Variable, file: string, line: int}>,
+     *     traitUses: list<array{lc: string, display: string, file: string, line: int}>
+     * }>
+     */
+    private array $compositions = [];
 
     public static function validate(Script $script): void
     {
@@ -53,19 +64,24 @@ final class TraitClassConstConflictCheck
         if (null === $lc) {
             return;
         }
-        $this->types[$lc] = [
+        $entry = [
             'display' => $this->operandDisplayName($type->name, $lc),
             'file' => $type->getFile(),
             'line' => max(1, $type->getLine()),
             'constants' => $this->collectConstants($type->stmts->children),
             'traitUses' => $this->collectTraitUses($type->stmts->children),
         ];
+        if ($type instanceof Op\Stmt\Trait_) {
+            $this->traits[$lc] = $entry;
+        } else {
+            $this->compositions[$lc] = $entry;
+        }
     }
 
     /**
      * @param list<Op> $members
      *
-     * @return list<string>
+     * @return list<array{lc: string, display: string, file: string, line: int}>
      */
     private function collectTraitUses(array $members): array
     {
@@ -74,11 +90,19 @@ final class TraitClassConstConflictCheck
             if (!$member instanceof Op\Stmt\TraitUse) {
                 continue;
             }
+            $useFile = $member->getFile();
+            $useLine = max(1, $member->getLine());
             foreach ($member->traits as $traitOperand) {
                 $traitLc = $this->operandLcName($traitOperand);
-                if (null !== $traitLc) {
-                    $traits[] = $traitLc;
+                if (null === $traitLc) {
+                    continue;
                 }
+                $traits[] = [
+                    'lc' => $traitLc,
+                    'display' => $this->operandDisplayName($traitOperand, $traitLc),
+                    'file' => $useFile,
+                    'line' => $useLine,
+                ];
             }
         }
 
@@ -117,8 +141,11 @@ final class TraitClassConstConflictCheck
 
     private function verify(): void
     {
-        foreach ($this->types as $lc => $type) {
-            $this->verifyTypeComposition($lc, $type);
+        foreach ($this->traits as $lc => $type) {
+            $this->verifyTypeComposition($lc, $type, true);
+        }
+        foreach ($this->compositions as $lc => $type) {
+            $this->verifyTypeComposition($lc, $type, false);
         }
     }
 
@@ -128,21 +155,25 @@ final class TraitClassConstConflictCheck
      *     file: string,
      *     line: int,
      *     constants: array<string, array{display: string, value: ?Variable, file: string, line: int}>,
-     *     traitUses: list<string>
+     *     traitUses: list<array{lc: string, display: string, file: string, line: int}>
      * } $type
      */
-    private function verifyTypeComposition(string $lc, array $type): void
+    private function verifyTypeComposition(string $lc, array $type, bool $isTrait): void
     {
         /** @var array<string, array{display: string, value: Variable, sourceDisplay: string, file: string, line: int}> $merged */
         $merged = [];
         $applied = [];
-        foreach ($type['traitUses'] as $traitLc) {
+        foreach ($type['traitUses'] as $traitUse) {
+            $traitLc = $traitUse['lc'];
             if (isset($applied[$traitLc])) {
                 continue;
             }
             $applied[$traitLc] = true;
-            if (!isset($this->types[$traitLc])) {
-                continue;
+            if ($isTrait && $traitLc === $lc) {
+                $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
+            }
+            if (!isset($this->traits[$traitLc])) {
+                $this->throwTraitNotFound($traitUse['display'], $traitUse['file'], $traitUse['line']);
             }
             foreach ($this->effectiveTraitConstants($traitLc) as $constLc => $traitConst) {
                 if (null === $traitConst['value']) {
@@ -192,21 +223,29 @@ final class TraitClassConstConflictCheck
     /**
      * @return array<string, array{display: string, value: ?Variable, sourceDisplay: string, file: string, line: int}>
      */
-    private function effectiveTraitConstants(string $traitLc): array
+    private function effectiveTraitConstants(string $traitLc, array &$visiting = []): array
     {
-        if (!isset($this->types[$traitLc])) {
+        if (!isset($this->traits[$traitLc])) {
             return [];
         }
-        $trait = $this->types[$traitLc];
+        if (isset($visiting[$traitLc])) {
+            return [];
+        }
+        $visiting[$traitLc] = true;
+        $trait = $this->traits[$traitLc];
         /** @var array<string, array{display: string, value: ?Variable, sourceDisplay: string, file: string, line: int}> $merged */
         $merged = [];
         $applied = [];
-        foreach ($trait['traitUses'] as $usedTraitLc) {
+        foreach ($trait['traitUses'] as $usedTraitUse) {
+            $usedTraitLc = $usedTraitUse['lc'];
             if (isset($applied[$usedTraitLc])) {
                 continue;
             }
             $applied[$usedTraitLc] = true;
-            foreach ($this->effectiveTraitConstants($usedTraitLc) as $constLc => $usedConst) {
+            if (!isset($this->traits[$usedTraitLc])) {
+                continue;
+            }
+            foreach ($this->effectiveTraitConstants($usedTraitLc, $visiting) as $constLc => $usedConst) {
                 if (null === $usedConst['value']) {
                     continue;
                 }
@@ -275,6 +314,11 @@ final class TraitClassConstConflictCheck
                 $classDisplay
             )
         );
+    }
+
+    private function throwTraitNotFound(string $display, string $file, int $line): void
+    {
+        throw new CompileFatal($file, $line, sprintf('Trait "%s" not found', $display));
     }
 
     private function operandLcName(Operand $op): ?string
