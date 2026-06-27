@@ -302,6 +302,38 @@ final class InternalStrictArg
         $context->builder->positionAtEnd($okBlock);
     }
 
+    /**
+     * Builtin signature bool — always reject non-bool operands (php-src ZEND_ARG_INFO IS_BOOL; #12585, #12586).
+     */
+    public static function requireBuiltinTypedBool(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceExactValueBox(
+                $context,
+                $arg,
+                VmVariable::TYPE_BOOLEAN,
+                $function,
+                $paramName,
+                $argNumber,
+                'bool'
+            );
+
+            return;
+        }
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, 'bool', $arg)
+        );
+    }
+
     public static function requireBool(
         Context $context,
         Variable $arg,
