@@ -23,7 +23,8 @@ final class VmStreamPath
         int $argIndex = 0,
         string $paramName = 'filename'
     ): string {
-        $path = VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
+        $path = VmString::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+        VmString::rejectNullByteBuiltinStringArg($path, $function, $argIndex, $paramName);
         if ('' === $path) {
             throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
         }

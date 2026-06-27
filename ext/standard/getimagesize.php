@@ -31,7 +31,7 @@ final class getimagesize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $filename = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'getimagesize', 0, 'filename');
+        $filename = VmStreamPath::coerceNonEmptyPathArg($frame->calledArgs[0], 'getimagesize', 0, 'filename');
         $imageinfo = null;
         if (2 === $argc) {
             $imageinfo = [];
