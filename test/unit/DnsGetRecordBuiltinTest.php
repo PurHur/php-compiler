@@ -73,4 +73,11 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $this->assertSame(VMVariable::TYPE_ARRAY, $ret->type);
         $this->assertGreaterThan(0, $ret->toArray()->getNumElements());
     }
+
+    public function testNumericIpv4LiteralReturnsEmptyArray(): void
+    {
+        $result = VmDns::dnsGetRecord('127.0.0.1', StdlibConstants::DNS_A);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $result);
+        $this->assertSame(0, $result->getNumElements());
+    }
 }
