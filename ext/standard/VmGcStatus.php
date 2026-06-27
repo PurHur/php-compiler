@@ -18,10 +18,10 @@ final class VmGcStatus
         $s = CycleCollector::status($ctx);
 
         return GcStatusJitHelper::buildTable(
-            $s['runs'],
-            $s['collected'],
-            $s['threshold'],
-            $s['roots']
+            $s['running'],
+            $s['protected'],
+            $s['full'],
+            $s['buffer_size']
         );
     }
 

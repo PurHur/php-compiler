@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** gc_status() / gc_mem_caches() VM introspection (#3280). */
+/** gc_status() / gc_mem_caches() VM introspection (#3280, #12780 PHP 8.4 schema). */
 final class GcStatusTest extends TestCase
 {
     public function testGcStatusAndMemCachesRegistered(): void
@@ -18,8 +18,8 @@ foreach (['gc_status', 'gc_mem_caches'] as $fn) {
 }
 $st = gc_status();
 gc_mem_caches();
-echo 'runs=', $st['runs'], "\n";
-echo 'threshold=', $st['threshold'], "\n";
+echo 'running=', $st['running'] ? 'true' : 'false', "\n";
+echo 'buffer_size=', $st['buffer_size'], "\n";
 PHP;
 
         $rt = new Runtime();
@@ -30,8 +30,8 @@ PHP;
 
         $this->assertStringContainsString('gc_status=yes', $output);
         $this->assertStringContainsString('gc_mem_caches=yes', $output);
-        $this->assertStringContainsString('runs=0', $output);
-        $this->assertStringContainsString('threshold=10001', $output);
+        $this->assertStringContainsString('running=false', $output);
+        $this->assertStringContainsString('buffer_size=131072', $output);
     }
 
     public function testGcStatusPhpSrcShape(): void
@@ -55,12 +55,12 @@ PHP;
         $rt->run($block);
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('collected,roots,runs,threshold', $output);
+        $this->assertStringContainsString('buffer_size,full,protected,running', $output);
         foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
-            $this->assertStringContainsString($key.'=no', $output);
+            $this->assertStringContainsString($key.'=yes', $output);
         }
         foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
-            $this->assertStringContainsString($key.'=yes', $output);
+            $this->assertStringContainsString($key.'=no', $output);
         }
     }
 
@@ -93,13 +93,11 @@ $b = new stdClass();
 $a->b = $b;
 $b->a = $a;
 unset($a, $b);
-$roots = gc_status()['roots'];
 $n = gc_collect_cycles();
 $st = gc_status();
-echo 'roots_before=', $roots, "\n";
 echo 'collected=', $n, "\n";
-echo 'runs=', $st['runs'], "\n";
-echo 'total=', $st['collected'], "\n";
+echo 'running=', $st['running'] ? 'true' : 'false', "\n";
+echo 'full=', $st['full'] ? 'true' : 'false', "\n";
 PHP;
 
         $rt = new Runtime();
@@ -108,9 +106,8 @@ PHP;
         $rt->run($block);
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('roots_before=2', $output);
         $this->assertStringContainsString('collected=2', $output);
-        $this->assertStringContainsString('runs=1', $output);
-        $this->assertStringContainsString('total=2', $output);
+        $this->assertStringContainsString('running=false', $output);
+        $this->assertStringContainsString('full=false', $output);
     }
 }
