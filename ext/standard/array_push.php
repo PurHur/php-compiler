@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPushRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -37,16 +38,15 @@ final class array_push extends Internal
             throw new \Error(self::BY_REF_ERROR);
         }
         $ht = $array->toArray();
+        $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
-            $value = $frame->calledArgs[$i]->resolveIndirect();
-            $copy = new Variable();
-            $copy->copyFrom($value);
-            $ht->append($copy);
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
+        $count = ArrayPushJitHelper::push($ht, ...$values);
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int($ht->getNumElements());
+        $frame->returnVar->int($count);
     }
 
     public Context $context;
@@ -73,7 +73,7 @@ final class array_push extends Internal
                     }
                 }
 
-                return ArrayBuiltinHelper::push($context, $array, ...$values);
+                return ArrayPushRuntime::push($context, $array, ...$values);
             }
             return JitArrayPush::pushWithValueBoxGuard(
                 $context,
@@ -86,7 +86,7 @@ final class array_push extends Internal
                         }
                     }
 
-                    return ArrayBuiltinHelper::push($context, $array, ...$values);
+                    return ArrayPushRuntime::push($context, $array, ...$values);
                 }
             );
         }
@@ -97,6 +97,6 @@ final class array_push extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::push($context, $array, ...$values);
+        return ArrayPushRuntime::push($context, $array, ...$values);
     }
 }
