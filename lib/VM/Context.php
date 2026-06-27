@@ -80,6 +80,9 @@ class Context {
     /** True while user __clone() runs on an isolated run stack (#12068, zend_object_handlers.c). */
     public bool $invokingCloneMagic = false;
 
+    /** True while serialize/unserialize magic hooks run on an isolated stack (#12069). */
+    public bool $isolatedPhpFunctionInvoke = false;
+
     /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
     public ?Frame $cloneMagicExternalCatchFrame = null;
 

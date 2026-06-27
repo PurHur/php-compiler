@@ -507,7 +507,7 @@ final class VmSerialize
         $recv = new Variable();
         $recv->object($entry);
         $dataVar = VmJson::import($data);
-        $ctx->runtime->vm->invokePhpFunction($method, $recv, $dataVar);
+        $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv, $dataVar);
 
         return $recv;
     }
@@ -547,7 +547,7 @@ final class VmSerialize
         }
         $recv = new Variable();
         $recv->object($entry);
-        $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv);
 
         return $recv;
     }
