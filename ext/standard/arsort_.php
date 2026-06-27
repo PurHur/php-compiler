@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -58,7 +58,7 @@ final class arsort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'arsort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::arsortByValue($context, $args[0]);
+            ValueSortRuntime::arsortByValue($context, $args[0]);
         } else {
             self::jitSortByValueWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
         }
@@ -91,13 +91,13 @@ final class arsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
-            ArrayBuiltinHelper::arsortByValue($context, $array);
+            ValueSortRuntime::arsortByValue($context, $array);
 
             return;
         }
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             throw new \LogicException('arsort() flags are not supported in JIT/AOT in this compiler build');
         }
-        ArrayBuiltinHelper::arsortByValue($context, $array);
+        ValueSortRuntime::arsortByValue($context, $array);
     }
 }
