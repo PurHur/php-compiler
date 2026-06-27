@@ -119,6 +119,8 @@ final class BuiltinParamNames
                 return ['clear_realpath_cache', 'filename'];
             case 'mkdir':
                 return ['directory', 'permissions', 'recursive'];
+            case 'spl_autoload_register':
+                return ['callback', 'throw', 'prepend'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'getenv':
