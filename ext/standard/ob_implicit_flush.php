@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\OutputBuffer;
 use PHPLLVM\Value;
 
@@ -31,7 +32,11 @@ final class ob_implicit_flush extends Internal
         }
         $on = true;
         if (1 === $argc) {
-            $on = $frame->calledArgs[0]->resolveIndirect()->toBool();
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                $on = InternalStrictArg::requireBool($frame, 0, 'ob_implicit_flush', 'enable')->toBool();
+            } else {
+                $on = VmMath::parseBoolBuiltinArg($frame->calledArgs[0], 'ob_implicit_flush', 1, 'enable');
+            }
         }
         OutputBuffer::setImplicitFlush($on);
         if (null !== $frame->returnVar) {
