@@ -347,6 +347,17 @@ final class VmPregEngine
             if (':' === $flag) {
                 $capture = false;
                 $this->advance(1);
+            } elseif ('#' === $flag) {
+                $this->advance(1);
+                while (!$this->atEnd() && ')' !== $this->peek()) {
+                    $this->advance(1);
+                }
+                if ($this->peek() !== ')') {
+                    throw new VmPregCompileException();
+                }
+                $this->advance(1);
+
+                return new VmPregAstEmptyNode();
             } elseif ('P' === $flag || '<' === $flag) {
                 $this->advance(1);
                 if ('P' === $flag) {
@@ -360,6 +371,14 @@ final class VmPregEngine
                     throw new VmPregCompileException();
                 }
                 $this->advance(1);
+            } elseif ($this->isInlineModifierStart($flag)) {
+                $this->parseInlineModifiers();
+                if ($this->peek() !== ')') {
+                    throw new VmPregCompileException();
+                }
+                $this->advance(1);
+
+                return new VmPregAstEmptyNode();
             } else {
                 throw new VmPregCompileException();
             }
@@ -378,6 +397,60 @@ final class VmPregEngine
         }
 
         return new VmPregAstGroupNode($inner, $index);
+    }
+
+    private function isInlineModifierStart(string $ch): bool
+    {
+        if ('-' === $ch || '+' === $ch) {
+            return true;
+        }
+
+        return $this->isInlineModifierLetter($ch);
+    }
+
+    private function isInlineModifierLetter(string $ch): bool
+    {
+        return in_array($ch, ['i', 'm', 's', 'x', 'U', 'J', 'u', 'D', 'A'], true);
+    }
+
+    private function parseInlineModifiers(): void
+    {
+        while (!$this->atEnd() && ')' !== $this->peek()) {
+            $ch = $this->peek();
+            if ('-' === $ch || '+' === $ch) {
+                $enable = '+' === $ch;
+                $this->advance(1);
+                if ($this->atEnd() || !$this->isInlineModifierLetter($this->peek())) {
+                    throw new VmPregCompileException();
+                }
+                while (!$this->atEnd() && $this->isInlineModifierLetter($this->peek())) {
+                    $this->applyInlineModifier($this->peek(), $enable);
+                    $this->advance(1);
+                }
+                continue;
+            }
+            if (!$this->isInlineModifierLetter($ch)) {
+                throw new VmPregCompileException();
+            }
+            $this->applyInlineModifier($ch, true);
+            $this->advance(1);
+        }
+    }
+
+    private function applyInlineModifier(string $letter, bool $enable): void
+    {
+        match ($letter) {
+            'i' => $this->caseless = $enable,
+            'm' => $this->multiline = $enable,
+            's' => $this->dotall = $enable,
+            'x' => $this->extended = $enable,
+            'U' => $this->defaultGreedy = !$enable,
+            'J' => null, // DUPLICATE_GROUP — accepted, no VM engine effect (#12432)
+            'u' => $this->utf = $enable,
+            'D' => $this->dollarEndonly = $enable,
+            'A' => $this->anchored = $enable,
+            default => throw new VmPregCompileException(),
+        };
     }
 
     private function parseGroupName(): string
