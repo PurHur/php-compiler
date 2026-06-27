@@ -3375,6 +3375,7 @@ require_once __DIR__.'/../../../lib/VM/VmIsset.php';
 require_once __DIR__.'/../../../lib/VM/VmIteratorForeach.php';
 require_once __DIR__.'/../../../lib/VM/VmIteratorProtocol.php';
 require_once __DIR__.'/../../../lib/VM/VmLazyObject.php';
+require_once __DIR__.'/../../../lib/VM/VmNumericCoercion.php';
 require_once __DIR__.'/../../../lib/VM/VmNumericDivisionGuard.php';
 require_once __DIR__.'/../../../lib/VM/VmObjectPropertyForeach.php';
 require_once __DIR__.'/../../../lib/VM/VmPowNumericOperandGuard.php';
