@@ -2531,7 +2531,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamCaps.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamCapsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamCapsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamContextStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFilter.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFilterJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamFstat.php';
