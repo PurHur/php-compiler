@@ -1495,6 +1495,47 @@ PHP;
         self::assertStringContainsString("'b'", $out);
     }
 
+    /** Issue #12450 — array_merge(array_keys($src), [...]) wires FuncCall + sibling Array_ producer slots. */
+    public function testArrayMergeInlineArrayKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$src = ['a' => 1, 'b' => 2];
+var_export(array_merge(array_keys($src), ['b']));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_inline_array_keys.php');
+
+        $keysReturnSlot = null;
+        $mergeSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $mergeSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mergeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($keysReturnSlot);
+        self::assertCount(2, $mergeSends);
+        self::assertSame($keysReturnSlot, $mergeSends[0], 'merge sends='.json_encode($mergeSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'a'", $out);
+        self::assertStringContainsString("'b'", $out);
+    }
+
     /** Issue #11373 — in_array('md5', hash_algos(), true) nested producer runtime parity with Zend. */
     public function testInArrayNestedHashAlgosRuntime(): void
     {
