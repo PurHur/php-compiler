@@ -18799,7 +18799,13 @@ class Compiler {
                 $namedAssignDestProbe = $cfgCallOp->args[(int) $argIndex];
             }
             $namedAssignDest = $block->slotForNamedAssignDest($namedAssignDestProbe);
-            if (null !== $namedAssignDest) {
+            if (
+                null !== $namedAssignDest
+                && (
+                    null === $calleeName
+                    || !$this->callArgRequiresByRef($calleeName, (int) $argIndex, $namedAssignDestProbe, $block)
+                )
+            ) {
                 $valueSlot = (string) $namedAssignDest;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
