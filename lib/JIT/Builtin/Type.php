@@ -700,9 +700,8 @@ class Type extends Builtin {
             $fntypeGettimeofdayFloat
         );
         $this->context->registerFunction('__compiler_gettimeofday_float', $fnGettimeofdayFloat);
-        $i64 = $this->context->getTypeFromString('int64');
         $htPtr = $this->context->getTypeFromString('__hashtable__*');
-        $fntypeHrtimeNs = $this->context->context->functionType($i64, false);
+        $fntypeHrtimeNs = $this->context->context->functionType($double, false);
         $fnHrtimeNs = $this->context->module->addFunction('__compiler_hrtime_ns', $fntypeHrtimeNs);
         $this->context->registerFunction('__compiler_hrtime_ns', $fnHrtimeNs);
         $fntypeHrtimePair = $this->context->context->functionType($htPtr, false);

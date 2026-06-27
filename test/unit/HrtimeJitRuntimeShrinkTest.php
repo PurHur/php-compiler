@@ -20,6 +20,6 @@ final class HrtimeJitRuntimeShrinkTest extends TestCase
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHrtime.php');
         $this->assertStringContainsString('StringHrtimeRuntime::ensureLinked', $source);
         $runtimeSource = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHrtimeRuntime.php');
-        $this->assertStringContainsString('__hashtable__readLongAt', $runtimeSource);
+        $this->assertStringContainsString('HrtimeJitHelper::nsFloat', $runtimeSource);
     }
 }

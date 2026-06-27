@@ -14,11 +14,17 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StringHrtimeRuntime
 {
-    private const NS_PER_SEC = 1_000_000_000;
-
     private const HELPER_PATH = '/ext/standard/HrtimeJitHelper.php';
 
     private const PAIR_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::pair';
+
+    private const NS_FLOAT_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::nsFloat';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::PAIR_HELPER,
+        self::NS_FLOAT_HELPER,
+    ];
 
     public static function ensureLinked(Context $context): void
     {
@@ -43,36 +49,18 @@ final class StringHrtimeRuntime
 
         self::ensureJitHelperCompiled($context);
 
+        $doubleTy = $context->getTypeFromString('double');
         $fn = null !== $probe
             ? $probe
-            : $context->lookupFunction($abiName);
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($doubleTy, false)
+            );
 
         $entry = $fn->appendBasicBlock('hrtime_ns_entry');
         $context->builder->positionAtEnd($entry);
-
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $htRaw = JitNestedHelperCoerce::callHelper(
-            $context,
-            self::helperFunction($context, self::PAIR_HELPER),
-            []
-        );
-        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
-        $sec = $context->builder->call(
-            $context->lookupFunction('__hashtable__readLongAt'),
-            $ht,
-            $sizeT->constInt(0, false)
-        );
-        $nsec = $context->builder->call(
-            $context->lookupFunction('__hashtable__readLongAt'),
-            $ht,
-            $sizeT->constInt(1, false)
-        );
-        $total = $context->builder->add(
-            $context->builder->mul($sec, $i64->constInt(self::NS_PER_SEC, false)),
-            $nsec
-        );
-        $context->builder->returnValue($total);
+        $result = $context->builder->call(self::helperFunction($context, self::NS_FLOAT_HELPER));
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }
@@ -122,8 +110,14 @@ final class StringHrtimeRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $lc = \strtolower(self::PAIR_HELPER);
-        if (isset($context->functions[$lc])) {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
             return;
         }
 
@@ -149,8 +143,11 @@ final class StringHrtimeRuntime
                 }
             }
         }
-        if (!isset($context->functions[$lc])) {
-            throw new \LogicException($lc.' was not compiled for JIT (#9182)');
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#9182)');
+            }
         }
     }
 }

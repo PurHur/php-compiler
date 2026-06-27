@@ -219,7 +219,7 @@ final class JitDate
 
         $context->builder->positionAtEnd($numberBb);
         $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
+            $context->lookupFunction('__value__writeDouble'),
             $slotPtr,
             $context->builder->call($context->lookupFunction('__compiler_hrtime_ns'))
         );

@@ -15,13 +15,13 @@ final class VmHrtime
     private const NS_PER_SEC = 1_000_000_000;
 
     /**
-     * @return int|array{0: int, 1: int}
+     * @return float|array{0: int, 1: int}
      */
     public static function hrtime(bool $asNumber = false)
     {
         [$sec, $nsec] = VmHrtimeNative::readMonotonic();
         if ($asNumber) {
-            return (int) ($sec * self::NS_PER_SEC + $nsec);
+            return (float) ($sec * self::NS_PER_SEC + $nsec);
         }
 
         return [$sec, $nsec];
