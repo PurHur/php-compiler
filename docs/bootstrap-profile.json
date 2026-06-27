@@ -2612,7 +2612,6 @@
         "lib/JIT/Builtin/StringHrtimeRuntime.php",
         "lib/JIT/Builtin/StringHtmlspecialchars.php",
         "lib/JIT/Builtin/StringHtmlspecialcharsDecode.php",
-        "lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php",
         "lib/JIT/Builtin/StringHttpBuildQuery.php",
         "lib/JIT/Builtin/StringHttpBuildQueryStandaloneLlvm.php",
         "lib/JIT/Builtin/StringIdate.php",
@@ -3650,9 +3649,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3420,
+        "inventory_files": 3419,
         "excluded": 0,
-        "eligible": 3420,
+        "eligible": 3419,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

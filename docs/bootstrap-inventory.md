@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3420 |
-| Phase A inventory files (M2 ratio SSOT) | 3420 |
+| PHP files on vm.php path | 3419 |
+| Phase A inventory files (M2 ratio SSOT) | 3419 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9028 |
+| Source constructs flagged (warnings) | 9027 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2558,7 +2558,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHrtimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHttpBuildQueryStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
@@ -19917,11 +19916,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
-
-### `lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 8 class method(s)
 
 ### `lib/JIT/Builtin/StringHttpBuildQuery.php`
 
