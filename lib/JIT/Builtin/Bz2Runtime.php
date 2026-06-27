@@ -5,16 +5,16 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_bzcompress/__compiler_bzdecompress via Bz2JitHelper PHP (#8868).
+ * JIT/AOT link for __compiler_bzcompress/__compiler_bzdecompress via Bz2JitHelper PHP (#8868, #12827).
  *
- * Replaces {@see StringBz2Jit} LLVM (~284 LOC libbz2). SSOT: {@see \PHPCompiler\ext\bz2\VmBz2Native}.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\bz2\Bz2JitHelper}; thin LLVM bridges
+ * forward the ABI. SSOT: {@see \PHPCompiler\ext\bz2\VmBz2Native}.
  * php-src: ext/bz2/bz2.c
  */
 final class Bz2Runtime
@@ -42,14 +42,13 @@ final class Bz2Runtime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            Bz2StandaloneLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_bzcompress');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

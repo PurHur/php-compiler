@@ -2331,7 +2331,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Bcmath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/BcmathJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Builtin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Bz2Runtime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/Bz2StandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CallArgv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CallUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/CastArrayRuntime.php';
