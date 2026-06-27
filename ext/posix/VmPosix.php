@@ -38,11 +38,6 @@ final class VmPosix
             return $ppid;
         }
 
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->getppid();
-        }
-
         throw new \Error('posix_getppid() is not available in this compiler build');
     }
 
@@ -53,11 +48,6 @@ final class VmPosix
             return $euid;
         }
 
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->geteuid();
-        }
-
         throw new \Error('posix_geteuid() is not available in this compiler build');
     }
 
@@ -66,11 +56,6 @@ final class VmPosix
         $egid = VmProcessIdentityPure::getegid();
         if (null !== $egid) {
             return $egid;
-        }
-
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            return (int) $ffi->getegid();
         }
 
         throw new \Error('posix_getegid() is not available in this compiler build');
@@ -87,35 +72,7 @@ final class VmPosix
             return $groups;
         }
 
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getgroups() is not available in this compiler build');
-        }
-
-        $count = (int) $ffi->getgroups(0, null);
-        if ($count < 0) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-        if (0 === $count) {
-            return [];
-        }
-
-        $list = $ffi->new('gid_t['.$count.']');
-        $ngroups = (int) $ffi->getgroups($count, \FFI::addr($list[0]));
-        if ($ngroups < 0) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-
-        $groups = [];
-        for ($i = 0; $i < $ngroups; ++$i) {
-            $groups[] = (int) $list[$i];
-        }
-
-        return $groups;
+        throw new \Error('posix_getgroups() is not available in this compiler build');
     }
 
     /**
@@ -128,26 +85,7 @@ final class VmPosix
             return VmUnamePure::utsname();
         }
 
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_uname() is not available in this compiler build');
-        }
-
-        $buf = $ffi->new('struct utsname');
-        if (0 !== (int) $ffi->uname(\FFI::addr($buf))) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
-        }
-
-        return [
-            'sysname' => \FFI::string($buf->sysname),
-            'nodename' => \FFI::string($buf->nodename),
-            'release' => \FFI::string($buf->release),
-            'version' => \FFI::string($buf->version),
-            'machine' => \FFI::string($buf->machine),
-            'domainname' => \FFI::string($buf->domainname),
-        ];
+        throw new \Error('posix_uname() is not available in this compiler build');
     }
 
     public static function strerror(int $errno): string
@@ -567,19 +505,6 @@ typedef unsigned int mode_t;
 typedef unsigned long long dev_t;
 typedef unsigned int uid_t;
 typedef unsigned int gid_t;
-pid_t getppid(void);
-uid_t geteuid(void);
-gid_t getegid(void);
-int getgroups(int size, gid_t *list);
-struct utsname {
-    char sysname[65];
-    char nodename[65];
-    char release[65];
-    char version[65];
-    char machine[65];
-    char domainname[65];
-};
-int uname(struct utsname *buf);
 char *strerror(int errnum);
 int access(const char *pathname, int mode);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
