@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5344 / #6340: AOT standalone must define pending header helpers without phpc_pending_headers.c.
+ * Issue #5344 / #6340 / #12898: AOT standalone pending header helpers via PendingHeadersJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -21,10 +21,9 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('phpc_pending_headers.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php');
-        $this->assertStringContainsString('PendingHeadersStandaloneLlvm', $runtime);
-        $standalone = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
-        $this->assertStringContainsString('appendSetcookieExpires', $standalone);
-        $this->assertStringContainsString('gmtime', $standalone);
+        $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
+        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void

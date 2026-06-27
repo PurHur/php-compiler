@@ -14,9 +14,8 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545).
+ * JIT/AOT embed + standalone link for pending HTTP headers via PendingHeadersJitHelper PHP (#9545, #12898).
  *
- * Standalone AOT keeps LLVM in {@see PendingHeadersStandaloneLlvm}.
  * SSOT: {@see \PHPCompiler\ext\standard\PendingHeadersJitHelper}.
  * php-src: ext/standard/head.c
  */

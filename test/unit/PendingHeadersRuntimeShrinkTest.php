@@ -8,17 +8,19 @@ use PHPCompiler\ext\standard\HttpResponseJitHelper;
 use PHPCompiler\ext\standard\PendingHeadersJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** PendingHeadersRuntime routes embed through PendingHeadersJitHelper PHP (#9545). */
+/** PendingHeadersRuntime routes embed through PendingHeadersJitHelper PHP (#9545, #12898). */
 final class PendingHeadersRuntimeShrinkTest extends TestCase
 {
     public function testPendingHeadersRuntimeIsThinRouter(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersRuntime.php');
         $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
-        $this->assertStringContainsString('PendingHeadersStandaloneLlvm::implement', $runtime);
+        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
         $this->assertStringNotContainsString('implementAdd', $runtime);
         $this->assertStringNotContainsString('implementFlush', $runtime);
-        $this->assertLessThan(40, substr_count($runtime, "\n") + 1);
+        $this->assertLessThan(35, substr_count($runtime, "\n") + 1);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 
     public function testPendingHeadersJitBridgeUsesHelperNotLlvmGlobals(): void
@@ -28,15 +30,7 @@ final class PendingHeadersRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('NestedJitCompileScope', $bridge);
         $this->assertStringNotContainsString('phpc_pending_header_count', $bridge);
         $this->assertStringNotContainsString('phpc_pending_header_lines', $bridge);
-    }
-
-    public function testStandaloneLlvmQuarantinesHeaderQueue(): void
-    {
-        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
-        $this->assertStringContainsString('appendSetcookieExpires', $llvm);
-        $this->assertStringContainsString('HttpResponseRuntime::loadStatusRaw', $llvm);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $llvm);
-        $this->assertStringNotContainsString('ensureJitHelperCompiled', $llvm);
+        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $bridge);
     }
 
     public function testPendingHeadersJitHelperQueueSemantics(): void

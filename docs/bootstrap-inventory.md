@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3414 |
-| Phase A inventory files (M2 ratio SSOT) | 3414 |
+| PHP files on vm.php path | 3413 |
+| Phase A inventory files (M2 ratio SSOT) | 3413 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9022 |
+| Source constructs flagged (warnings) | 9021 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2399,7 +2399,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PendingHeaders.php` | 0 | 1 |
 | `lib/JIT/Builtin/PendingHeadersJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/PendingHeadersRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixCtermidRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixSessionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixStrerrorRuntime.php` | 0 | 1 |
@@ -9921,7 +9920,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/TriggerErrorJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/UnpackEngine.php`
 
@@ -11681,7 +11680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSleepPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/VmSplAutoload.php`
 
@@ -14605,7 +14604,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ob_flush.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/ob_get_clean.php`
 
@@ -14620,7 +14619,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ob_get_flush.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/ob_get_length.php`
 
@@ -16094,9 +16093,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/time_sleep_until.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
-- new ArgumentCountError (line 39)
-- 4 class method(s)
+- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 61)
+- 5 class method(s)
 
 ### `ext/standard/timezone_abbreviations_list.php`
 
@@ -18909,7 +18908,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObOutputJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 555)
+- new JIT (line 561)
 - 23 class method(s)
 - 10 closure(s)
 
@@ -18993,7 +18992,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PendingHeadersJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 339)
+- new JIT (line 338)
 - 14 class method(s)
 - 1 closure(s)
 
@@ -19001,11 +19000,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 38 class method(s)
 
 ### `lib/JIT/Builtin/PosixCtermidRuntime.php`
 
