@@ -199,11 +199,34 @@ class Block {
     /** Operand / cfg-Var roots assigned in this block (not inherited reads, #2059). */
     private \SplObjectStorage $localWrittenVars;
 
+    /** php-cfg assign.var root => result slot for `$local = …` reads (#5644). */
+    private \SplObjectStorage $namedAssignDestSlots;
+
+    /** @var array<int, true> */
+    private array $namedAssignDestSlotIndexes = [];
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
         $this->args = new \SplObjectStorage;
         $this->localWrittenVars = new \SplObjectStorage;
+        $this->namedAssignDestSlots = new \SplObjectStorage;
+    }
+
+    public function registerNamedAssignDest(Operand $varRoot, int $slot): void
+    {
+        $this->namedAssignDestSlots[$varRoot] = $slot;
+        $this->namedAssignDestSlotIndexes[$slot] = true;
+    }
+
+    public function slotForNamedAssignDest(Operand $operand): ?int
+    {
+        $root = self::cfgVarRoot($operand);
+        if (null === $root || !$this->namedAssignDestSlots->contains($root)) {
+            return null;
+        }
+
+        return $this->namedAssignDestSlots[$root];
     }
 
     public function setScriptPath(string $path): void
@@ -659,6 +682,9 @@ class Block {
     /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */
     public function isNamedVariableSlot(int $slot): bool
     {
+        if (isset($this->namedAssignDestSlotIndexes[$slot])) {
+            return true;
+        }
         foreach ($this->scope as $operand) {
             if ($this->scope[$operand] === $slot && null !== self::resolveVariableName($operand)) {
                 return true;
