@@ -616,6 +616,22 @@ PHP;
         self::assertSame("array (\n  'a' => 2,\n  'b' => 3,\n)\n", ob_get_clean());
     }
 
+    /** Issue #8930 — inline enum arrays must not treat numeric keys as enum backing aliases. */
+    public function testArrayReplaceInlineEnumLiteralsDistinctKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; case B = 2; }
+var_export(array_replace([E::A], [1 => E::B]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_inline_enum.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => \E::A,\n  1 => \E::B,\n)\n", ob_get_clean());
+    }
+
     /** Issue #10196 — nested inline array literals map to outermost Array_ per arg slot. */
     public function testArrayReplaceRecursiveNestedInlineLiteralsUseRootArraySlots(): void
     {
