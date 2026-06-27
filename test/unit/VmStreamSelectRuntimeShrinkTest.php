@@ -21,9 +21,9 @@ final class VmStreamSelectRuntimeShrinkTest extends TestCase
     public function testVmStreamSelectUsesPollNotHostStreamSelect(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelect.php');
-        $this->assertStringContainsString('VmPhpFdStream::fdForHandle', $source);
-        $this->assertStringContainsString('poll(', $source);
         $this->assertStringContainsString('VmStreamSelectPure::multiplex', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('poll(', $source);
         $this->assertStringNotContainsString('@\\stream_select', $source);
     }
 
