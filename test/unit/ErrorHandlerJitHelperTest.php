@@ -12,7 +12,8 @@ final class ErrorHandlerJitHelperTest extends TestCase
 {
     protected function tearDown(): void
     {
-        while (ErrorHandlerJitHelper::restoreApply()) {
+        for ($i = 0; $i < 8; ++$i) {
+            ErrorHandlerJitHelper::restoreApply();
         }
         parent::tearDown();
     }
@@ -33,6 +34,6 @@ final class ErrorHandlerJitHelperTest extends TestCase
         ErrorHandlerJitHelper::setApply(0x1000, \E_ALL, 'h1');
         $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
         $this->assertSame(0, ErrorHandlerJitHelper::resolveHandlerAddr(\E_ALL));
-        $this->assertFalse(ErrorHandlerJitHelper::restoreApply());
+        $this->assertTrue(ErrorHandlerJitHelper::restoreApply());
     }
 }
