@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3424 |
-| Phase A inventory files (M2 ratio SSOT) | 3424 |
+| PHP files on vm.php path | 3423 |
+| Phase A inventory files (M2 ratio SSOT) | 3423 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9032 |
+| Source constructs flagged (warnings) | 9031 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2303,7 +2303,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ErrorHandlerOutput.php` | 0 | 1 |
@@ -18439,14 +18438,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 291)
+- new JIT (line 278)
 - 10 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/EnvLocalStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 18 class method(s)
 
 ### `lib/JIT/Builtin/ErrorHandler.php`
 

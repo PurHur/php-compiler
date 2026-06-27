@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
@@ -14,9 +13,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814).
+ * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #12810).
  *
- * Replaces {@see StringEnvLocal} LLVM overlay table (phpc_env_local_entries).
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\EnvLocalJitHelper}; thin LLVM bridges
+ * forward the ABI. Replaces {@see StringEnvLocal} LLVM overlay table (phpc_env_local_entries).
  * SSOT: {@see \PHPCompiler\ext\standard\GetenvJitHelper}
  * php-src: ext/standard/basic_functions.c — zif_putenv, zif_getenv
  */
@@ -57,13 +57,6 @@ final class EnvLocalRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            EnvLocalStandaloneLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
         self::implementLookupBridge($context);
@@ -74,12 +67,6 @@ final class EnvLocalRuntime
 
     public static function emitMergeOverlay(Context $context, Value $ht): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            EnvLocalStandaloneLlvm::emitMergeOverlay($context, $ht);
-
-            return;
-        }
-
         self::ensureJitHelperCompiled($context);
         $context->builder->call(
             self::helperFunction($context, self::MERGE_HELPER),
