@@ -403,6 +403,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ array_replace_key() (ext/standard/array.c, issue #5650, #12826).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsArrayReplaceKey(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.

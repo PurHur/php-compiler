@@ -108,6 +108,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'php84_array_search_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key')
+                && !str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
