@@ -20,6 +20,9 @@ use PHPLLVM\Value;
  */
 final class get_parent_class_ extends Internal
 {
+    private const OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR =
+        'get_parent_class(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given';
+
     public function __construct()
     {
         parent::__construct('get_parent_class');
@@ -58,7 +61,7 @@ final class get_parent_class_ extends Internal
             VmReflection::stringArg($arg, 'get_parent_class() class name', 0);
             $entry = VmReflection::resolveClassEntry($ctx, $arg->toString());
         } else {
-            throw new \LogicException('get_parent_class() argument must be an object or class name string');
+            VmClassHas::requireObjectOrValidClassName($arg, 'get_parent_class');
         }
         if (null === $entry || $entry->isInterface || $entry->isTrait || $entry->isEnum) {
             $frame->returnVar->bool(false);
@@ -92,7 +95,43 @@ final class get_parent_class_ extends Internal
         if (JITVariable::TYPE_STRING === $args[0]->type || JITVariable::TYPE_VALUE === $args[0]->type) {
             $this->jitString($context, $args[0], 'get_parent_class() class name');
         }
+        if (JITVariable::TYPE_NULL === $args[0]->type || ($args[0]->isNullConstant ?? false)) {
+            self::emitJitTypeErrorAndAbort(
+                $context,
+                \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'null')
+            );
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
+        if (!\in_array($args[0]->type, [
+            JITVariable::TYPE_OBJECT,
+            JITVariable::TYPE_STRING,
+            JITVariable::TYPE_VALUE,
+        ], true)) {
+            self::emitJitTypeErrorAndAbort($context, self::jitTypeErrorMessage($args[0]->type));
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
+        }
 
         return JitGetParentClass::invoke($context, $args[0]);
+    }
+
+    private static function emitJitTypeErrorAndAbort(Context $context, string $message): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function jitTypeErrorMessage(int $type): string
+    {
+        return match ($type) {
+            JITVariable::TYPE_NATIVE_LONG => \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'int'),
+            JITVariable::TYPE_NATIVE_DOUBLE => \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'float'),
+            JITVariable::TYPE_NATIVE_BOOL => \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'bool'),
+            JITVariable::TYPE_NULL => \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'null'),
+            default => \sprintf(self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'mixed'),
+        };
     }
 }

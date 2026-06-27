@@ -450,7 +450,10 @@ final class VmReflection
                 'method_exists(): Argument #1 ($object_or_class) must be of type object|string, null given'
             );
         }
-        throw new \LogicException('Expected object or class name string in this compiler build');
+        throw new \TypeError(\sprintf(
+            'method_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given',
+            VmClassHas::vmTypeName($objectOrClass->type)
+        ));
     }
 
     /**

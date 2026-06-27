@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -16,6 +17,9 @@ use PHPLLVM\Value;
 /** LLVM lowering for get_parent_class() (issue #3483). */
 final class JitGetParentClass
 {
+    private const OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR =
+        'get_parent_class(): Argument #1 ($object_or_class) must be an object or a valid class name, %s given';
+
     private static int $seq = 0;
 
     public static function invoke(Context $context, JITVariable $whatArg): Value
@@ -36,6 +40,14 @@ final class JitGetParentClass
         throw new \LogicException(
             'get_parent_class() class name must be a string literal in this compiler build'
         );
+    }
+
+    private static function emitJitTypeErrorAndAbort(Context $context, string $template, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, \sprintf($template, $given));
+        $context->builder->call($context->lookupFunction('abort'));
     }
 
     private static function invokeForBoxedValue(Context $context, JITVariable $whatArg): Value
@@ -72,11 +84,14 @@ final class JitGetParentClass
             $obj,
             $objType->constNull()
         );
-        if (!$isObject) {
-            throw new \LogicException(
-                'get_parent_class() argument must be an object or class name string in this compiler build'
-            );
-        }
+        $objectOkBlock = BasicBlockHelper::append($context, $tag.'_obj_ok');
+        $invalidBlock = BasicBlockHelper::append($context, $tag.'_invalid');
+        $context->builder->branchIf($isObject, $objectOkBlock, $invalidBlock);
+
+        $context->builder->positionAtEnd($invalidBlock);
+        self::emitJitTypeErrorAndAbort($context, self::OBJECT_OR_VALID_CLASS_NAME_TYPE_ERROR, 'mixed');
+
+        $context->builder->positionAtEnd($objectOkBlock);
         $objVar = new JITVariable(
             $context,
             JITVariable::TYPE_OBJECT,
