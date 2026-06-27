@@ -22,6 +22,15 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsFpow()
+                && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
+                && !str_contains($name, 'rounding_mode_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsFpow()
+                && str_contains($name, 'rounding_mode_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                 && str_contains($name, 'get_declared_exclude_deprecated')
                 && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
