@@ -6,15 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** EnvLocalRuntime routes overlay through EnvLocalJitHelper/GetenvJitHelper PHP (#9814). */
+/** EnvLocalRuntime routes overlay through EnvLocalJitHelper/GetenvJitHelper PHP (#9814, #12810). */
 final class EnvLocalRuntimeShrinkTest extends TestCase
 {
     public function testStringEnvLocalDeletedAndEnvLocalRuntimeUsesJitHelper(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringEnvLocal.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/EnvLocalStandaloneLlvm.php');
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvLocalRuntime.php');
         $this->assertStringContainsString('EnvLocalJitHelper', $source);
-        $this->assertStringContainsString('GetenvJitHelper', $source);
+        $this->assertStringContainsString('GetenvJitHelper', (string) file_get_contents(__DIR__.'/../../ext/standard/EnvLocalJitHelper.php'));
+        $this->assertStringNotContainsString('EnvLocalStandaloneLlvm', $source);
         $this->assertStringNotContainsString("getNamedGlobal('phpc_env_local_entries')", $source);
         $this->assertStringNotContainsString("getNamedGlobal('phpc_env_local_count')", $source);
     }
