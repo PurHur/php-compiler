@@ -58,6 +58,10 @@ final class StringDirRuntime
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_opendir');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -72,11 +76,11 @@ final class StringDirRuntime
         }
 
         self::ensureJitHelperCompiled($context);
-        self::implementI32Bridge($context, '__compiler_is_dir_resource', self::IS_DIR_RESOURCE, 1);
-        self::implementOpendirBridge($context);
-        self::implementNullableStringBridge($context, '__compiler_readdir', self::READDIR, 1);
-        self::implementI32Bridge($context, '__compiler_closedir', self::CLOSEDIR, 1);
-        self::implementI32Bridge($context, '__compiler_rewinddir', self::REWINDDIR, 1);
+        self::implementIfMissing($context, '__compiler_is_dir_resource', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::IS_DIR_RESOURCE, 1));
+        self::implementIfMissing($context, '__compiler_opendir', static fn (Context $ctx, LlvmFunction $fn) => self::emitOpendirBridge($ctx, $fn));
+        self::implementIfMissing($context, '__compiler_readdir', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::READDIR, 1));
+        self::implementIfMissing($context, '__compiler_closedir', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::CLOSEDIR, 1));
+        self::implementIfMissing($context, '__compiler_rewinddir', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::REWINDDIR, 1));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -86,30 +90,44 @@ final class StringDirRuntime
         }
     }
 
-    private static function implementI32Bridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical,
-        int $argCount
-    ): void {
-        $probe = $context->module->getNamedFunction($abiName);
+    /**
+     * @param callable(Context, LlvmFunction): void $emit
+     */
+    private static function implementIfMissing(Context $context, string $name, callable $emit): void
+    {
+        $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
+            $context->registerFunction($name, $probe);
 
             return;
         }
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $params = array_fill(0, $argCount, $i64);
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, ...$params)
-        );
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = match ($name) {
+            '__compiler_opendir' => $context->context->functionType($i64, false, $strPtr),
+            '__compiler_readdir' => $context->context->functionType($strPtr, false, $i64),
+            default => $context->context->functionType($i32, false, $i64),
+        };
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($name, $ft);
+        $emit($context, $fn);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
+    }
 
+    private static function emitI32Bridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical,
+        int $argCount
+    ): void {
         $entry = $fn->appendBasicBlock('dir_i32_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
+        $i32 = $context->getTypeFromString('int32');
         $args = [];
         for ($i = 0; $i < $argCount; ++$i) {
             $args[] = $context->builder->trunc($fn->getParam($i), $i32);
@@ -122,26 +140,12 @@ final class StringDirRuntime
         $context->builder->returnValue(
             JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i32)
         );
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
-    private static function implementOpendirBridge(Context $context): void
+    private static function emitOpendirBridge(Context $context, LlvmFunction $fn): void
     {
-        $abiName = '__compiler_opendir';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i64, false, $strPtr)
-        );
 
         $entry = $fn->appendBasicBlock('opendir_bridge_entry');
         $fail = $fn->appendBasicBlock('opendir_bridge_fail');
@@ -164,31 +168,16 @@ final class StringDirRuntime
 
         $context->builder->positionAtEnd($fail);
         $context->builder->returnValue($i64->constInt(-1, true));
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
-    private static function implementNullableStringBridge(
+    private static function emitNullableStringBridge(
         Context $context,
-        string $abiName,
+        LlvmFunction $fn,
         string $helperLogical,
         int $i64ArgCount
     ): void {
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
         $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $params = array_fill(0, $i64ArgCount, $i64);
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($strPtr, false, ...$params)
-        );
 
         $entry = $fn->appendBasicBlock('dir_str_bridge_entry');
         $fail = $fn->appendBasicBlock('dir_str_bridge_fail');
@@ -214,8 +203,6 @@ final class StringDirRuntime
         $context->builder->returnValue(
             JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
         );
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
