@@ -16,7 +16,6 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -60,29 +59,7 @@ final class fputcsv extends Internal
             $escape = VmReflection::stringArg($frame->calledArgs[4], 'fputcsv() escape', 4);
         }
         VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
-        $fields = [];
-        foreach ($fieldsVar->toArray()->iterate(true) as $value) {
-            $value = $value->resolveIndirect();
-            if (EnumCaseSupport::isEnumCaseVariable($value)) {
-                $enumClass = EnumCaseSupport::enumClassForCaseVariable($value);
-                throw new \Error(
-                    'Object of class '.($enumClass->name ?? 'enum').' could not be converted to string'
-                );
-            }
-            if (Variable::TYPE_STRING === $value->type) {
-                $fields[] = $value->toString();
-            } elseif (Variable::TYPE_INTEGER === $value->type) {
-                $fields[] = (string) $value->toInt();
-            } elseif (Variable::TYPE_OBJECT === $value->type) {
-                throw new \Error(
-                    'Object of class '.$value->toObject()->class->name.' could not be converted to string'
-                );
-            } else {
-                throw new \LogicException(
-                    'fputcsv() fields must be a list of strings or integers in this compiler build'
-                );
-            }
-        }
+        $fields = VmFputcsv::coerceFieldList($fieldsVar->toArray()->iterate(true));
         $written = VmFs::fputcsv(
             $handle,
             $fields,
