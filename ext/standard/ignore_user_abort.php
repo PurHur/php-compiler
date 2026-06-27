@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -31,10 +32,10 @@ final class ignore_user_abort extends Internal
         }
         $setting = null;
         if (1 === $argc) {
-            $setting = VmMath::parseBoolBuiltinArg(
-                $frame->calledArgs[0]->resolveIndirect(),
+            $setting = InternalStrictArg::parseBuiltinNullableBoolArg(
+                $frame->calledArgs[0],
                 'ignore_user_abort',
-                1,
+                0,
                 'value'
             );
         }

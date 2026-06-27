@@ -41,6 +41,39 @@ final class InternalStrictArg
         return $arg;
     }
 
+    /** Builtin signature bool — always reject non-bool operands (php-src ZEND_ARG_INFO IS_BOOL; #12585). */
+    public static function requireBuiltinTypedBoolArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
+            throw new \TypeError(self::message($function, $argIndex, $paramName, 'bool', $var));
+        }
+
+        return $var->toBool();
+    }
+
+    /** Builtin signature ?bool — null or bool only (php-src nullable internal param; #12585). */
+    public static function parseBuiltinNullableBoolArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): ?bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool();
+        }
+
+        throw new \TypeError(self::message($function, $argIndex, $paramName, 'bool', $var));
+    }
+
     public static function requireBool(Frame $frame, int $argIndex, string $function, string $paramName): Variable
     {
         $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
