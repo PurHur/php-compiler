@@ -41,6 +41,8 @@ class MagicStringResolver extends NodeVisitorAbstract
     /** True while visiting StaticCall::class — preserve `parent` for runtime dispatch (#6735). */
     protected bool $inStaticCallClassName = false;
 
+    private const PRESERVE_LEXICAL_TYPE = 'phpcPreserveLexicalType';
+
     /** @var string */
     protected $compilationUnitFile = '';
 
@@ -90,11 +92,44 @@ class MagicStringResolver extends NodeVisitorAbstract
         $this->repairComments($node);
         if ($node instanceof Node\Stmt\Function_) {
             $this->functionStack[] = $node->namespacedName->toString();
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
         } elseif ($node instanceof Node\Stmt\ClassMethod) {
             $this->methodStack[] = end($this->classStack).'::'.$node->name;
             $prop = $this->propertyNameFromHookMethod($node->name->name);
             if (null !== $prop) {
                 $this->propertyStack[] = $prop;
+            }
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
+        } elseif ($node instanceof Node\Expr\Closure) {
+            if (null !== $node->returnType) {
+                $this->markTypeHintPreserveLexical($node->returnType);
+            }
+            foreach ($node->params as $param) {
+                if (null !== $param->type) {
+                    $this->markTypeHintPreserveLexical($param->type);
+                }
+            }
+        } elseif ($node instanceof Node\Stmt\Property) {
+            if (null !== $node->type) {
+                $this->markTypeHintPreserveLexical($node->type);
+            }
+        } elseif ($node instanceof Node\Stmt\ClassConst) {
+            if (null !== $node->type) {
+                $this->markTypeHintPreserveLexical($node->type);
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = true;
@@ -105,6 +140,9 @@ class MagicStringResolver extends NodeVisitorAbstract
                 return new Node\Scalar\String_($name, $node->getAttributes());
             }
         } elseif ($node instanceof Node\Name) {
+            if ($node->getAttribute(self::PRESERVE_LEXICAL_TYPE)) {
+                return null;
+            }
             switch (strtolower($node->toString())) {
                 case 'self':
                     if (! empty($this->classStack)) {
@@ -186,6 +224,25 @@ class MagicStringResolver extends NodeVisitorAbstract
             }
         } elseif ($node instanceof Node\Expr\StaticCall) {
             $this->inStaticCallClassName = false;
+        }
+    }
+
+    private function markTypeHintPreserveLexical(Node $type): void
+    {
+        if ($type instanceof Node\NullableType) {
+            $this->markTypeHintPreserveLexical($type->type);
+
+            return;
+        }
+        if ($type instanceof Node\UnionType || $type instanceof Node\IntersectionType) {
+            foreach ($type->types as $sub) {
+                $this->markTypeHintPreserveLexical($sub);
+            }
+
+            return;
+        }
+        if ($type instanceof Node\Name || $type instanceof Node\Identifier) {
+            $type->setAttribute(self::PRESERVE_LEXICAL_TYPE, true);
         }
     }
 
