@@ -45,6 +45,7 @@ final class GethostbyaddrRuntimeShrinkTest extends TestCase
         $expected = VmDns::gethostbyaddr('127.0.0.1');
         $this->assertIsString($expected);
         $this->assertSame($expected, GethostbyaddrJitHelper::resolve('127.0.0.1'));
+        $this->assertSame('10.0.0.1', GethostbyaddrJitHelper::resolve('10.0.0.1'));
         $this->assertSame('', GethostbyaddrJitHelper::resolve('not-an-ip'));
     }
 }

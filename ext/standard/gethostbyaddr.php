@@ -61,6 +61,11 @@ final class gethostbyaddr extends Internal
                 );
             }
         }
+        if (VmDns::ERR_NOT_FOUND === $error) {
+            $frame->returnVar->string($ip);
+
+            return;
+        }
         $frame->returnVar->bool(false);
     }
 

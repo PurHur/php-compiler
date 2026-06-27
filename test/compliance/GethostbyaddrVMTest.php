@@ -21,6 +21,10 @@ final class GethostbyaddrVMTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbyaddr_enum_typeerror.phpt',
             'gethostbyaddr_enum_typeerror.phpt'
         );
+        yield 'gethostbyaddr_not_found_ip.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyaddr_not_found_ip.phpt',
+            'gethostbyaddr_not_found_ip.phpt'
+        );
     }
 
     public function setUp(): void
