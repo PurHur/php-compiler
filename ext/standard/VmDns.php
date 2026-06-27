@@ -299,9 +299,27 @@ final class VmDns
         return $requested;
     }
 
+    /**
+     * Whether $hostname is a numeric IP literal (not a DNS name).
+     *
+     * php-src: ext/standard/dns.c — php_dns_get_record skips A queries for IP literals.
+     */
+    public static function isIpAddressLiteral(string $hostname): bool
+    {
+        if (self::isValidIpv4Address($hostname)) {
+            return true;
+        }
+
+        return false !== \filter_var($hostname, \FILTER_VALIDATE_IP, \FILTER_FLAG_IPV6);
+    }
+
     /** @return list<HashTable> */
     private static function collectARecords(string $hostname): array
     {
+        if (self::isIpAddressLiteral($hostname)) {
+            return [];
+        }
+
         $list = self::gethostbynamel($hostname);
         if (false === $list) {
             return [];
