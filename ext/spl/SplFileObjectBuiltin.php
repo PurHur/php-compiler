@@ -132,7 +132,7 @@ final class SplFileObjectFgets extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fgets()'
@@ -171,7 +171,7 @@ final class SplFileObjectFwrite extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileObjectBuiltin::CLASS_LC,
             'SplFileObject::fwrite()'
