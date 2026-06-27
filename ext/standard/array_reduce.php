@@ -14,8 +14,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayReduceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
@@ -48,6 +48,16 @@ final class array_reduce extends Internal
         $initial = $hasInitial ? $frame->calledArgs[2]->resolveIndirect() : null;
         [$closure, $callbackFn] = VmReduceCallback::resolve($frame, $callback);
         if (null === $frame->returnVar) {
+            return;
+        }
+        if ($callbackFn instanceof Internal && null === $closure) {
+            $nullInitial = new Variable();
+            $nullInitial->null();
+            $initialOrNull = $hasInitial ? $initial : $nullInitial;
+            $frame->returnVar->copyFrom(
+                ArrayReduceJitHelper::reduceWithBuiltin($array->toArray(), $callbackFn->name, $initialOrNull)
+            );
+
             return;
         }
         self::reduceVm($frame, $array, $hasInitial, $initial, $closure, $callbackFn, $frame->vmContext);
@@ -120,13 +130,10 @@ final class array_reduce extends Internal
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
         $initial = 3 === $argc ? $args[2] : null;
-        if (ArrayReduceCallbackPolicy::isClosureJitLowerable($args[1])) {
-            return ArrayBuiltinHelper::buildReduceArrayWithClosure($context, $args[0], $args[1], $initial);
-        }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_reduce() callback');
         }
 
-        return ArrayBuiltinHelper::buildReduceArray($context, $args[0], $args[1], $initial);
+        return ArrayReduceRuntime::reduce($context, $args[0], $args[1], $initial);
     }
 }
