@@ -186,7 +186,8 @@ class VMTest extends BaseTest {
                 && (str_contains($name, 'exit_function_php84')
                     || str_contains($name, 'exit_function_strict_types')
                     || str_contains($name, 'exit_die_two_args')
-                    || str_contains($name, 'exit_type_error'))) {
+                    || str_contains($name, 'exit_type_error')
+                    || str_contains($name, 'die_named_message'))) {
                 continue;
             }
             if (!CompilerVersion::supportsClassHasFunctions()
