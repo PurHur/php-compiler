@@ -132,7 +132,7 @@ final class ErrorReporter
     public function popHandler(): bool
     {
         if ([] === $this->handlerStack) {
-            return false;
+            return true;
         }
         array_pop($this->handlerStack);
 
