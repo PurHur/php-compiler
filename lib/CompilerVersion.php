@@ -214,10 +214,10 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
-    /** PHP 8.4+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819). */
+    /** PHP 8.5+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #12422). */
     public static function supportsStreamSupports(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return self::advertisesBuiltinSince('8.5.0');
     }
 
     /** PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826). */
