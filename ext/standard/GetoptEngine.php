@@ -19,8 +19,13 @@ final class GetoptEngine
      *
      * @return array|false
      */
-    public static function parse(array $argv, string $shortOptions, array $longOptions, ?int &$restIndex = null): array|false
-    {
+    public static function parse(
+        array $argv,
+        string $shortOptions,
+        array $longOptions,
+        ?int &$restIndex = null,
+        bool $trackRestIndex = false
+    ): array|false {
         $shortMap = self::parseShortOptions($shortOptions);
         if (null === $shortMap) {
             return false;
@@ -87,7 +92,7 @@ final class GetoptEngine
                         if (0 === \count($result)) {
                             return [];
                         }
-                        if (null !== $restIndex) {
+                        if ($trackRestIndex) {
                             $restIndex = $pos;
                         }
 
@@ -110,7 +115,7 @@ final class GetoptEngine
                             ++$pos;
                             continue 2;
                         }
-                        if (null !== $restIndex) {
+                        if ($trackRestIndex) {
                             $restIndex = $pos;
                         }
 
@@ -126,7 +131,7 @@ final class GetoptEngine
             break;
         }
 
-        if (null !== $restIndex) {
+        if ($trackRestIndex) {
             $restIndex = $pos;
         }
 

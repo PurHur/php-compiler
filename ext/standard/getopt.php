@@ -69,20 +69,21 @@ final class getopt extends Internal
             }
         }
 
-        $restIndex = null;
         $restIndexArg = null;
         if ($argc >= 3) {
             $restIndexArg = $frame->calledArgs[2];
             VmGetopt::validateRestIndexByRef($restIndexArg, 'getopt', 2);
         }
 
+        $restIndex = 0;
         $parsed = GetoptEngine::parse(
             $frame->vmContext->cliRequestArgv,
             $shortOptions,
             $longOptions,
-            $restIndex
+            $restIndex,
+            null !== $restIndexArg
         );
-        if (null !== $restIndexArg && null !== $restIndex) {
+        if (null !== $restIndexArg) {
             VmGetopt::writeRestIndex($restIndexArg, $restIndex);
         }
         if (false === $parsed) {
