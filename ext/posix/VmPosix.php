@@ -90,18 +90,7 @@ final class VmPosix
 
     public static function strerror(int $errno): string
     {
-        $ffi = self::ffi();
-        if (null !== $ffi) {
-            $msgPtr = $ffi->strerror($errno);
-            if (null !== $msgPtr) {
-                $msg = \FFI::string($msgPtr);
-                if ('' !== $msg) {
-                    return $msg;
-                }
-            }
-        }
-
-        return 'Unknown error '.$errno;
+        return VmPosixStrerrorPure::message($errno);
     }
 
     public static function access(string $path, int $mode): bool
@@ -497,7 +486,6 @@ typedef unsigned int mode_t;
 typedef unsigned long long dev_t;
 typedef unsigned int uid_t;
 typedef unsigned int gid_t;
-char *strerror(int errnum);
 int access(const char *pathname, int mode);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
 int mkfifo(const char *pathname, mode_t mode);

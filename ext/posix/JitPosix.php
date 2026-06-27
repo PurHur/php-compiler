@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
+use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
 use PHPCompiler\JIT\Context;
@@ -65,6 +66,12 @@ final class JitPosix
     }
 
     public static function strerror(Context $context, JITVariable $errnoArg): Value
+    {
+        return PosixStrerrorRuntime::strerror($context, $errnoArg);
+    }
+
+    /** Standalone AOT libc strerror LLVM quarantine (#12477). */
+    public static function strerrorStandalone(Context $context, JITVariable $errnoArg): Value
     {
         self::ensureLibcStrerror($context);
         $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror() errno');
