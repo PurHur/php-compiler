@@ -23,6 +23,9 @@ final class HighlightEngine
 
     private const COLOR_HTML = '#0000BB';
 
+    /** php-src php_highlight.h — STRING_COLOR for T_CONSTANT_ENCAPSED_STRING (#12401). */
+    private const COLOR_STRING = '#DD0000';
+
     private const COLOR_COMMENT = '#FF8000';
 
     /** @var array<string, int> */
@@ -112,10 +115,12 @@ final class HighlightEngine
         if (\in_array($id, [$ids['T_COMMENT'], $ids['T_DOC_COMMENT']], true)) {
             return self::COLOR_COMMENT;
         }
+        if ($id === $ids['T_CONSTANT_ENCAPSED_STRING']) {
+            return self::COLOR_STRING;
+        }
         if (\in_array(
             $id,
             [
-                $ids['T_CONSTANT_ENCAPSED_STRING'],
                 $ids['T_ENCAPSED_AND_WHITESPACE'],
                 $ids['T_LNUMBER'],
                 $ids['T_DNUMBER'],
