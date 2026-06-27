@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3422 |
-| Phase A inventory files (M2 ratio SSOT) | 3422 |
+| PHP files on vm.php path | 3424 |
+| Phase A inventory files (M2 ratio SSOT) | 3424 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9009 |
+| Source constructs flagged (warnings) | 9013 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1011,6 +1011,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
+| `ext/standard/ValueSortJitHelper.php` | 0 | 3 |
 | `ext/standard/VarDumpJitHelper.php` | 0 | 1 |
 | `ext/standard/VarExportJitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
@@ -2680,6 +2681,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/UploadTempJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/ValueBoxWriteBoolJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ValueEchoRuntime.php` | 0 | 2 |
+| `lib/JIT/Builtin/ValueSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/VarArg.php` | 0 | 1 |
 | `lib/JIT/Builtin/VarFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/WeakRefNative.php` | 0 | 1 |
@@ -9924,6 +9926,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/ValueSortJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 43)
+- new Variable (line 45)
+- 4 class method(s)
 
 ### `ext/standard/VarDumpJitHelper.php`
 
@@ -20647,6 +20656,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 209)
 - 16 class method(s)
+
+### `lib/JIT/Builtin/ValueSortRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/VarArg.php`
 

@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ValueSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -58,7 +58,7 @@ final class asort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'asort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::asortByValue($context, $args[0]);
+            ValueSortRuntime::asortByValue($context, $args[0]);
         } else {
             self::jitSortByValueWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
         }
@@ -86,7 +86,7 @@ final class asort_ extends Internal
     {
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
-            ArrayBuiltinHelper::asortByValueLocale($context, $array);
+            ValueSortRuntime::asortByValueLocale($context, $array);
 
             return;
         }
@@ -95,13 +95,13 @@ final class asort_ extends Internal
             || StdlibConstants::SORT_NUMERIC === $sortType
             || StdlibConstants::SORT_STRING === $sortType
         ) {
-            ArrayBuiltinHelper::asortByValue($context, $array);
+            ValueSortRuntime::asortByValue($context, $array);
 
             return;
         }
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             throw new \LogicException('asort() flags are not supported in JIT/AOT in this compiler build');
         }
-        ArrayBuiltinHelper::asortByValue($context, $array);
+        ValueSortRuntime::asortByValue($context, $array);
     }
 }
