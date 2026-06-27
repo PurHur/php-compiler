@@ -86,7 +86,7 @@ final class CycleCollector
         self::$running = true;
         self::$protected = true;
         ++self::$runs;
-        /** @var array<int, true> $marked */
+        /** @var array<string, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
             self::markVariable($var, $marked, $visitVar);
@@ -95,17 +95,17 @@ final class CycleCollector
         $ctx->visitGcRoots($visitVar);
 
         foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
         foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
 
         $collected = 0;
         /** @var array<int, ObjectEntry> $candidates */
         $candidates = [];
         foreach (ObjectRegistry::snapshot() as $object) {
-            if (!isset($marked[$object->id])) {
+            if (!isset($marked['o'.$object->id])) {
                 $candidates[$object->id] = $object;
             }
         }
@@ -162,7 +162,7 @@ final class CycleCollector
     /** Objects not reachable from VM roots — Zend GC root-buffer analogue. */
     private static function countBufferedRoots(Context $ctx): int
     {
-        /** @var array<int, true> $marked */
+        /** @var array<string, true> $marked */
         $marked = [];
         $visitVar = static function (Variable $var) use (&$marked, &$visitVar): void {
             self::markVariable($var, $marked, $visitVar);
@@ -171,15 +171,15 @@ final class CycleCollector
         $ctx->visitGcRoots($visitVar);
 
         foreach (WeakRefRegistry::weakTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
         foreach (WeakRefRegistry::weakMapKeyTargetIds() as $targetId) {
-            unset($marked[$targetId]);
+            unset($marked['o'.$targetId]);
         }
 
         $roots = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
-            if (!isset($marked[$object->id])) {
+            if (!isset($marked['o'.$object->id])) {
                 ++$roots;
             }
         }
@@ -188,7 +188,7 @@ final class CycleCollector
     }
 
     /**
-     * @param array<int, true> $marked
+     * @param array<string, true> $marked
      * @param callable(Variable): void $visitVar
      */
     private static function markVariable(Variable $var, array &$marked, callable $visitVar): void
@@ -212,10 +212,10 @@ final class CycleCollector
                 return;
             case Variable::TYPE_OBJECT:
                 $object = $var->toObject();
-                if (isset($marked[$object->id])) {
+                if (isset($marked['o'.$object->id])) {
                     return;
                 }
-                $marked[$object->id] = true;
+                $marked['o'.$object->id] = true;
                 foreach ($object->propertiesWithNames() as $name => $prop) {
                     if (WeakRefSupport::shouldSkipGcMark($object, $name)) {
                         continue;
@@ -231,7 +231,13 @@ final class CycleCollector
 
                 return;
             case Variable::TYPE_ARRAY:
-                foreach ($var->toArray()->iterate(true) as $element) {
+                $array = $var->toArray();
+                $arrayId = \spl_object_id($array);
+                if (isset($marked['a'.$arrayId])) {
+                    return;
+                }
+                $marked['a'.$arrayId] = true;
+                foreach ($array->iterate(true) as $element) {
                     $visitVar($element);
                 }
 
