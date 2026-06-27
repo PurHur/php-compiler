@@ -44,6 +44,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testReadonlyBuiltinWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReadonlyBuiltin());
+    }
+
     public function testStreamSupportsWithheldUntil85(): void
     {
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
@@ -89,6 +94,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
+    }
+
+    public function testVmDoesNotRegisterReadonlyBuiltinOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
     public function testVmRegistersJsonValidateOn84DevProfile(): void
