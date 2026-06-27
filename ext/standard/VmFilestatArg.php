@@ -11,13 +11,13 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename (php-src ext/standard/filestat.c — null coerces to "", #12653).
+     * Z_PARAM_PATH filename (php-src ext/standard/filestat.c — null is TypeError, #12765).
      *
      * @throws \TypeError
      */
     public static function coerceFilenameArg(Variable $var, string $function): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
+        return VmString::coerceTypedStringBuiltinArg($var, $function, 0, 'filename');
     }
 
     /**
