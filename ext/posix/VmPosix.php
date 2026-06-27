@@ -236,16 +236,7 @@ final class VmPosix
 
     public static function ctermid(): string
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return '';
-        }
-        $ptr = $ffi->ctermid(null);
-        if (null === $ptr) {
-            return '';
-        }
-
-        return \FFI::string($ptr);
+        return VmPosixCtermidPure::path();
     }
 
     public static function getLastError(): int
@@ -476,7 +467,6 @@ typedef unsigned int mode_t;
 typedef unsigned long long dev_t;
 typedef unsigned int uid_t;
 typedef unsigned int gid_t;
-int access(const char *pathname, int mode);
 int mknod(const char *pathname, mode_t mode, dev_t dev);
 int mkfifo(const char *pathname, mode_t mode);
 int setuid(uid_t uid);
@@ -484,7 +474,6 @@ int setgid(gid_t gid);
 int seteuid(uid_t uid);
 int setegid(gid_t gid);
 int *__errno_location(void);
-char *ctermid(char *s);
 typedef unsigned long rlim_t;
 struct rlimit {
     rlim_t rlim_cur;
