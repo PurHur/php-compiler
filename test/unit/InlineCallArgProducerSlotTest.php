@@ -2255,4 +2255,16 @@ PHP;
         $runtime->run($block);
         self::assertSame("a%5B0%5D=x&a%5B1%5D=y\n", ob_get_clean());
     }
+
+    /** Issue #12009 — hoisted FuncCall + ConstFetch siblings with embedded middle literal (try body). */
+    public function testJsonDecodeInlineStrRepeatJsonThrowOnErrorDepthRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_json_decode_throw_on_depth.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'json_decode_depth_throw.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
 }

@@ -13142,7 +13142,8 @@ class Compiler {
                     $producers,
                     $callArgs,
                     $argIndex,
-                    $cfgCallOp
+                    $cfgCallOp,
+                    $block
                 );
             }
 
@@ -13162,7 +13163,8 @@ class Compiler {
                 $producers,
                 $callArgs,
                 $argIndex,
-                $cfgCallOp
+                $cfgCallOp,
+                $block
             );
         }
         if ($argIndex < $producerCount) {
@@ -13210,8 +13212,26 @@ class Compiler {
         array $producers,
         array $callArgs,
         int $argIndex,
-        ?Op $cfgCallOp = null
+        ?Op $cfgCallOp = null,
+        ?Block $block = null
     ): ?Op\Expr {
+        if (null !== $cfgCallOp && null !== $block && null !== $block->orig) {
+            $leadingProducer = $producers[0] ?? null;
+            if ($leadingProducer instanceof Op\Expr\FuncCall || $leadingProducer instanceof Op\Expr\NsFuncCall) {
+                $callArg = $callArgs[$argIndex] ?? null;
+                if (null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg)) {
+                    $byIndex = $this->inlineHoistedProducerForCallArgIndex(
+                        $cfgCallOp,
+                        $argIndex,
+                        $producers,
+                        $block->orig->children
+                    );
+                    if ($byIndex instanceof Op\Expr) {
+                        return $byIndex;
+                    }
+                }
+            }
+        }
         $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
         if (null !== $nestedTrailing) {
             [$arrayChain, $trailing] = $nestedTrailing;
@@ -14244,7 +14264,27 @@ class Compiler {
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
                 && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
                 && !$this->isSiblingMultiArgFuncCallProducer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && !$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $child,
+                    $callOp,
+                    $i,
+                    $callIndex,
+                    $cfgChildren
+                )
             ) {
+                break;
+            }
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $child,
+                    $callOp,
+                    $i,
+                    $callIndex,
+                    $cfgChildren
+                )
+            ) {
+                array_unshift($producers, $child);
                 break;
             }
             if (
@@ -14593,7 +14633,22 @@ class Compiler {
         }
         // Trailing hoisted literal preludes only (e.g. var_export(g(), true), in_array('x', g(), true);
         // statement-level calls before multiple hoisted ConstFetch args must not match (#11312, #11373).
-        if ($literalPreludeCount !== $argCount - 1 - $targetArgIndex) {
+        // json_decode(str_repeat(...), true, 512, JSON_THROW_ON_ERROR): embedded 512 is not a cfg prelude (#12009).
+        $embeddedLiteralCount = 0;
+        $hoistedArgCount = 0;
+        foreach ($consumer->args as $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                ++$embeddedLiteralCount;
+            } elseif (null !== $callArg) {
+                ++$hoistedArgCount;
+            }
+        }
+        $useHoistedArgLiteralPreludeCount = $embeddedLiteralCount > 0
+            && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall);
+        $expectedLiteralPreludes = $useHoistedArgLiteralPreludeCount
+            ? max(0, $hoistedArgCount - 1 - $targetArgIndex)
+            : ($argCount - 1 - $targetArgIndex);
+        if ($literalPreludeCount !== $expectedLiteralPreludes) {
             // var_export(in_array(..., true), true) — nested producer feeds arg0, not arg1 (#11399).
             if (
                 0 !== $targetArgIndex
@@ -14801,6 +14856,10 @@ class Compiler {
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
                 --$i;
                 continue;
             }
