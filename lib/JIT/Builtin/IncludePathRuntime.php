@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin as JitBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -77,13 +78,18 @@ final class IncludePathRuntime
 
         $savedBlock = self::captureInsertBlock($context);
 
-        self::ensureStackHelperCompiled($context);
-        self::implementInitNoop($context);
-        self::implementGetBridge($context);
-        self::implementSetBridge($context);
-        self::implementRestoreBridge($context);
-        self::ensureResolveHelperCompiled($context);
-        self::implementResolveBridge($context);
+        if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            // Standalone AOT init cannot nested-JIT compile PHP helpers (#12801 regression, #1492).
+            IncludePathStandaloneLlvm::implement($context);
+        } else {
+            self::ensureStackHelperCompiled($context);
+            self::implementInitNoop($context);
+            self::implementGetBridge($context);
+            self::implementSetBridge($context);
+            self::implementRestoreBridge($context);
+            self::ensureResolveHelperCompiled($context);
+            self::implementResolveBridge($context);
+        }
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $savedBlock);
     }
