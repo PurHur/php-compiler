@@ -2600,7 +2600,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusage.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusageRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettext.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettextRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettextStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettimeofday.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGmgetdate.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGmmktime.php';

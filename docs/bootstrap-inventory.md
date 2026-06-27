@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3421 |
-| Phase A inventory files (M2 ratio SSOT) | 3421 |
+| PHP files on vm.php path | 3420 |
+| Phase A inventory files (M2 ratio SSOT) | 3420 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9029 |
+| Source constructs flagged (warnings) | 9028 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2545,7 +2545,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGettextRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringGettextStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 3 |
@@ -19840,14 +19839,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGettextRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 430)
-- 12 class method(s)
+- new JIT (line 429)
+- 13 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringGettextStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
 
 ### `lib/JIT/Builtin/StringGettimeofday.php`
 
