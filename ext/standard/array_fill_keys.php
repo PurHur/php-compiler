@@ -6,14 +6,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayFillKeysRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_fill_keys() for keys list and scalar fill value (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_fill_keys() for keys list and scalar fill value (subset of PHP; JIT via ArrayFillKeysRuntime).
  */
 final class array_fill_keys extends Internal
 {
@@ -56,6 +56,6 @@ final class array_fill_keys extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::fillKeys($context, $args[0], $args[1]);
+        return ArrayFillKeysRuntime::fillKeys($context, $args[0], $args[1]);
     }
 }
