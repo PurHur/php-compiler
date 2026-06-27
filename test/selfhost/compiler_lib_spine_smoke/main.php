@@ -2174,6 +2174,7 @@ require_once __DIR__.'/../../../lib/Ast/StaticClassPreprocessor.php';
 require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/VoidCastDesugar.php';
 require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
+require_once __DIR__.'/../../../lib/PropertyHookSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';

@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** class_parents() / get_class_vars() VM builtins (issue #3159). */
 final class ClassParentsGetClassVarsBuiltinTest extends TestCase
 {
+    use PropertyHookTestSkip;
+
     public function testVmClassParentsAndGetClassVars(): void
     {
         $code = <<<'PHP'
@@ -107,6 +110,7 @@ PHP;
     /** Issue #6603: get_class_vars() lists public hooked properties with declared defaults (null). */
     public function testVmGetClassVarsPropertyHooks(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $code = <<<'PHP'
 <?php
 class C6603 {

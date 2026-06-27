@@ -5,12 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\VM\PropertyHookJitHelper;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** PropertyHookDispatch routes guards through PropertyHookJitHelper PHP (#10112). */
 final class PropertyHookRuntimeShrinkTest extends TestCase
 {
-    public function testPropertyHookDispatchIsThinTrampoline(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testPropertyHookDispatchIsThinTrampoline(): void
     {
         $dispatch = (string) file_get_contents(__DIR__.'/../../lib/JIT/PropertyHookDispatch.php');
         $this->assertStringContainsString('PropertyHookDispatchLlvm::', $dispatch);

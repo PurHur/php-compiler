@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit\AOT;
 
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\LiteralIncludeDiscovery;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -13,7 +14,15 @@ use PHPUnit\Framework\TestCase;
  */
 final class PropertyHookAotCompileTest extends TestCase
 {
-    public function testLiteralIncludeDiscoveryParsesPropertyHookSyntax(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testLiteralIncludeDiscoveryParsesPropertyHookSyntax(): void
     {
         $src = <<<'PHP'
 <?php

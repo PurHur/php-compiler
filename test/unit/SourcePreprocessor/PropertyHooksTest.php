@@ -8,10 +8,13 @@ use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 final class PropertyHooksTest extends TestCase
 {
+    use PropertyHookTestSkip;
+
     public function testStripsSetHookAndInjectsMethod(): void
     {
         $src = <<<'PHP'
@@ -322,6 +325,7 @@ PHP;
     /** @covers issue #6650 — block hook syntax must preprocess before curly-brace rejector */
     public function testBlockGetHookSurvivesRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -503,6 +507,7 @@ PHP;
     /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
     public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -545,6 +550,7 @@ PHP;
     /** @covers issue #10393 — detached same-name backing field is duplicate property, not merged */
     public function testDetachedSameNameBackingFieldIsDuplicateProperty(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -611,6 +617,7 @@ PHP;
     /** @covers issue #11594 — end-to-end via Runtime preprocess */
     public function testDefaultInitializerWithPropertyHooksSurvivesRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
 <?php
 class C {
@@ -649,6 +656,7 @@ PHP;
     /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
     public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         if (!CompilerVersion::supportsAsymmetricVisibility()) {
             $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
         }

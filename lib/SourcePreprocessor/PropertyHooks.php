@@ -19,6 +19,12 @@ final class PropertyHooks
     /** php-src: Zend/zend_compile.c — `private(set)` decl + hook block requires set hook (#12203). */
     public const ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
 
+    /** Zend 8.2 reference profile — default initializer + hook block (#12574). */
+    public const REFERENCE_PROFILE_UNEXPECTED_ARROW = 'syntax error, unexpected token "=>"';
+
+    /** Zend 8.2 reference profile — hook block after property name (#12574). */
+    public const REFERENCE_PROFILE_UNEXPECTED_BRACE = 'syntax error, unexpected token "{", expecting "," or ";"';
+
     private const SET_METHOD_PREFIX = '__phpc_property_set_';
     private const GET_METHOD_PREFIX = '__phpc_property_get_';
     private const UNSET_METHOD_PREFIX = '__phpc_property_unset_';
@@ -69,6 +75,124 @@ final class PropertyHooks
         }
 
         return [$code, $this->registry];
+    }
+
+    /**
+     * First property-hook syntax for Zend 8.2 reference-profile rejection (#12574).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileHookSyntaxError(string $code): ?array
+    {
+        return (new self())->locateReferenceProfileHookSyntaxError($code);
+    }
+
+    private function locateReferenceProfileHookSyntaxError(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos, , ] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                $offset = $braceOpen + 1;
+                continue;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body);
+            if (null !== $error) {
+                return $error;
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    private function locateHookSyntaxErrorInBody(string $fullCode, int $bodyOffsetInFull, string $body): ?array
+    {
+        $offset = 0;
+        $len = strlen($body);
+        while ($offset < $len) {
+            $hook = $this->findNextPropertyHookDecl($body, $offset);
+            if (null === $hook) {
+                return null;
+            }
+            [$prop, $varStart, $hookOpen] = $hook;
+            $afterVar = $varStart + 1 + strlen($prop);
+            $between = substr($body, $afterVar, $hookOpen - $afterVar);
+            $hasDefault = str_contains($between, '=');
+            $absHookOpen = $bodyOffsetInFull + $hookOpen;
+            if ($hasDefault) {
+                $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+                if (null === $hookSpan) {
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                        'message' => self::REFERENCE_PROFILE_UNEXPECTED_BRACE,
+                    ];
+                }
+                [$open, $close] = $hookSpan;
+                $hookBody = substr($body, $open + 1, $close - $open - 1);
+                $arrowRel = $this->findFirstFatArrowOffset($hookBody);
+                if (null !== $arrowRel) {
+                    $absArrow = $bodyOffsetInFull + $open + 1 + $arrowRel;
+
+                    return [
+                        'line' => self::lineAtOffset($fullCode, $absArrow),
+                        'message' => self::REFERENCE_PROFILE_UNEXPECTED_ARROW,
+                    ];
+                }
+            }
+
+            return [
+                'line' => self::lineAtOffset($fullCode, $absHookOpen),
+                'message' => self::REFERENCE_PROFILE_UNEXPECTED_BRACE,
+            ];
+        }
+
+        return null;
+    }
+
+    private function findFirstFatArrowOffset(string $code): ?int
+    {
+        $len = strlen($code);
+        $inString = false;
+        $stringChar = '';
+        for ($i = 0; $i + 1 < $len; ++$i) {
+            $ch = $code[$i];
+            if ($inString) {
+                if ('\\' === $ch) {
+                    ++$i;
+                    continue;
+                }
+                if ($ch === $stringChar) {
+                    $inString = false;
+                }
+                continue;
+            }
+            if ('"' === $ch || '\'' === $ch) {
+                $inString = true;
+                $stringChar = $ch;
+                continue;
+            }
+            if ('=' === $ch && '>' === $code[$i + 1]) {
+                return $i;
+            }
+        }
+
+        return null;
     }
 
     /**

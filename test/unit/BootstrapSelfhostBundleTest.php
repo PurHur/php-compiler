@@ -445,6 +445,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/ArrayReplaceJitHelper.php',
         'ext/standard/ArraySearchJitHelper.php',
         'lib/AsymmetricVisibilityRejector.php',
+        'lib/PropertyHookSyntaxRejector.php',
         'lib/JIT/Builtin/ArrayReplaceRuntime.php',
         'lib/JIT/Builtin/ArraySearchRuntime.php',
     ];

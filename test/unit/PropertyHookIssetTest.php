@@ -5,12 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** isset()/empty() on property hooks — same-name backing probes storage; separate backing invokes get (#11262, #10680, #11467, #11617). */
 final class PropertyHookIssetTest extends TestCase
 {
-    public function testVmIssetOnUninitializedHookedBackingReturnsFalseWithoutGetHook(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testVmIssetOnUninitializedHookedBackingReturnsFalseWithoutGetHook(): void
     {
         $code = <<<'PHP'
 <?php
