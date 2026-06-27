@@ -108,7 +108,10 @@ final class VmReflection
     {
         $entry = self::resolveClassEntry($ctx, $className);
 
-        return null !== $entry && !$entry->isInterface && !$entry->isTrait;
+        return null !== $entry
+            && !$entry->isInterface
+            && !$entry->isTrait
+            && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry);
     }
 
     public static function enumExists(Context $ctx, string $enumName): bool
@@ -204,6 +207,9 @@ final class VmReflection
         foreach ($ctx->classes as $lc => $entry) {
             self::markCompilerBootstrapClassInternal($entry);
             if ($entry->isInterface || $entry->isTrait || isset($ctx->classAliases[$lc])) {
+                continue;
+            }
+            if (\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry)) {
                 continue;
             }
             // Hide compiler bootstrap types only — CE_INTERNAL builtins belong in the list (#11813, #11688).

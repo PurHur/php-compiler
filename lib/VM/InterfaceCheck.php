@@ -89,6 +89,10 @@ final class InterfaceCheck
             }
             $visited[$lc] = true;
             if ($lc === $classLc) {
+                if (ResourceSupport::isHiddenPseudoClassEntry($current)) {
+                    return false;
+                }
+
                 return true;
             }
             $wantEntry = $context->classes[$classLc] ?? null;
