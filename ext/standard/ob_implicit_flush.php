@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\OutputBuffer;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -32,14 +32,12 @@ final class ob_implicit_flush extends Internal
         }
         $on = true;
         if (1 === $argc) {
-            $arg = $frame->calledArgs[0]->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN === $arg->type) {
-                $on = $arg->toBool();
-            } elseif (Variable::TYPE_INTEGER === $arg->type) {
-                $on = 0 !== $arg->toInt();
-            } else {
-                throw new \LogicException('ob_implicit_flush() flag must be boolean or integer in this compiler build');
-            }
+            $on = InternalStrictArg::requireBuiltinTypedBoolArg(
+                $frame->calledArgs[0],
+                'ob_implicit_flush',
+                0,
+                'enable'
+            );
         }
         OutputBuffer::setImplicitFlush($on);
         if (null !== $frame->returnVar) {
