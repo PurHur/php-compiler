@@ -103,6 +103,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'php84_array_search_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key')
+                && !str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
                 && !str_contains($name, 'mb_str_pad_phantom')) {

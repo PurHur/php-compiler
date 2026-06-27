@@ -59,6 +59,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsHeaderList());
     }
 
+    public function testSupportsArrayReplaceKeyFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsArrayReplaceKey());
+    }
+
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
@@ -170,5 +175,12 @@ final class CompilerVersionGateTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->functions['header_list']));
         $this->assertTrue(isset($ctx->functions['header']));
+    }
+
+    public function testVmDoesNotRegisterArrayReplaceKeyOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['array_replace_key']));
+        $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
     }
 }

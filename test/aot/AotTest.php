@@ -96,6 +96,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'strxfrm')) {
                 continue;
             }
+            if (!CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key')
+                && !str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsArrayReplaceKey()
+                && str_contains($name, 'array_replace_key_phantom')) {
+                continue;
+            }
             $usesHeaderList = str_contains($name, 'header_list')
                 || str_contains($name, 'header_remove')
                 || str_contains($name, 'setcookie')
