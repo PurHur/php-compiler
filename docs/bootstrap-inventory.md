@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3340 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8857 |
+| Source constructs flagged (warnings) | 8859 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1234,7 +1234,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamSync.php` | 0 | 1 |
 | `ext/standard/VmStreamTransports.php` | 0 | 1 |
 | `ext/standard/VmStreamWrapperRegistry.php` | 0 | 1 |
-| `ext/standard/VmString.php` | 0 | 3 |
+| `ext/standard/VmString.php` | 0 | 5 |
 | `ext/standard/VmStripWhitespace.php` | 0 | 1 |
 | `ext/standard/VmSys.php` | 0 | 3 |
 | `ext/standard/VmSysGetTempDirNative.php` | 0 | 1 |
@@ -11542,6 +11542,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1323)
 - new Error (line 1334)
+- new Error (line 3392)
+- new Error (line 3417)
 - 195 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
