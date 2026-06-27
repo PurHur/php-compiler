@@ -397,6 +397,7 @@ require_once __DIR__.'/../../../ext/standard/ArrayReplaceRecursiveJitHelper.php'
 require_once __DIR__.'/../../../ext/standard/ArrayReverseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArraySearchJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayShiftJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ArrayUnshiftJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArraySliceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArraySumJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayUniqueJitHelper.php';
@@ -2293,6 +2294,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayMergeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPopRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayShiftRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayUnshiftRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayProductRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReduceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReplaceKeyRuntime.php';
