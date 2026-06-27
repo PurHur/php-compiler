@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -23,6 +24,7 @@ final class scandir extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('scandir() requires one or two arguments in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'scandir', 'directory', 0, $frame);
         $path = self::vmDirectoryArg($frame->calledArgs[0]);
         VmString::rejectEmptyBuiltinStringArg($path, 'scandir', 0, 'directory');
         $sortingOrder = \SCANDIR_SORT_ASCENDING;
