@@ -24,7 +24,9 @@ use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromMutable;
 use PHPCompiler\VM\Builtin\DateTimeModify;
+use PHPCompiler\VM\Builtin\DateTimeSetDate;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
+use PHPCompiler\VM\Builtin\DateTimeSetTime;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
@@ -950,6 +952,8 @@ final class BuiltinClasses
             'getmicrosecond' => new DateTimeGetMicrosecond(),
             'modify' => new DateTimeModify(),
             'diff' => new DateTimeDiff(),
+            'setdate' => new DateTimeSetDate(),
+            'settime' => new DateTimeSetTime(),
             'setmicrosecond' => new DateTimeSetMicrosecond(),
             'settimezone' => new DateTimeSetTimezone(),
         ];

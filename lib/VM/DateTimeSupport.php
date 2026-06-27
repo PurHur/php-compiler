@@ -568,6 +568,75 @@ final class DateTimeSupport
             ->int($microsecond);
     }
 
+    /** php-src zim_DateTime_setDate — mutable in-place (#12469). */
+    public static function setDate(ObjectEntry $dt, int $year, int $month, int $day): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setDate()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::replaceDateComponents(
+            $timestamp,
+            $microsecond,
+            $tzName,
+            $year,
+            $month,
+            $day
+        );
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src zim_DateTimeImmutable_setDate — returns new instance (#12469). */
+    public static function withDate(ObjectEntry $dt, int $year, int $month, int $day): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setDate($clone, $year, $month, $day);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTime_setTime — mutable in-place (#12469). */
+    public static function setTime(
+        ObjectEntry $dt,
+        int $hour,
+        int $minute,
+        int $second = 0,
+        int $microsecond = 0
+    ): void {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setTime()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+        $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $label)->toInt();
+        $currentMicrosecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->toInt();
+        $updated = VmDateTimeNative::replaceTimeComponents(
+            $timestamp,
+            $currentMicrosecond,
+            $tzName,
+            $hour,
+            $minute,
+            $second,
+            $microsecond
+        );
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($updated['timestamp']);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int($updated['microsecond']);
+    }
+
+    /** php-src zim_DateTimeImmutable_setTime — returns new instance (#12469). */
+    public static function withTime(
+        ObjectEntry $dt,
+        int $hour,
+        int $minute,
+        int $second = 0,
+        int $microsecond = 0
+    ): ObjectEntry {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setTime($clone, $hour, $minute, $second, $microsecond);
+
+        return $clone;
+    }
+
     /** php-src zim_DateTimeImmutable_setMicrosecond — returns new instance (#7082). */
     public static function withMicrosecond(ObjectEntry $dt, int $microsecond): ObjectEntry
     {

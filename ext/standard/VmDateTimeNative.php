@@ -1740,6 +1740,79 @@ final class VmDateTimeNative
     }
 
     /**
+     * php-src date_object_set_date — replace Y-M-D, preserve time of day (#12469).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function replaceDateComponents(
+        int $timestamp,
+        int $microsecond,
+        string $tzName,
+        int $year,
+        int $month,
+        int $day
+    ): array {
+        return self::withTimezone($tzName, static function () use (
+            $timestamp,
+            $microsecond,
+            $tzName,
+            $year,
+            $month,
+            $day
+        ): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                throw new \LogicException('Invalid timestamp for DateTime::setDate()');
+            }
+            $hour = (int) $tm->tm_hour;
+            $minute = (int) $tm->tm_min;
+            $second = (int) $tm->tm_sec;
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+                'microsecond' => $microsecond,
+            ];
+        });
+    }
+
+    /**
+     * php-src date_object_set_time — replace H:i:s.u, preserve calendar date (#12469).
+     *
+     * @return array{timestamp: int, microsecond: int}
+     */
+    public static function replaceTimeComponents(
+        int $timestamp,
+        int $microsecond,
+        string $tzName,
+        int $hour,
+        int $minute,
+        int $second,
+        int $microsecondNew
+    ): array {
+        return self::withTimezone($tzName, static function () use (
+            $timestamp,
+            $tzName,
+            $hour,
+            $minute,
+            $second,
+            $microsecondNew
+        ): array {
+            $tm = self::localtime($timestamp);
+            if (null === $tm) {
+                throw new \LogicException('Invalid timestamp for DateTime::setTime()');
+            }
+            $year = (int) $tm->tm_year + 1900;
+            $month = (int) $tm->tm_mon + 1;
+            $day = (int) $tm->tm_mday;
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+                'microsecond' => $microsecondNew,
+            ];
+        });
+    }
+
+    /**
      * Apply DateInterval fields to a timestamp (php-src php_date_add / php_date_sub, #4604).
      *
      * @param array{y: int, m: int, d: int, h: int, i: int, s: int, f: float, invert: int} $state
