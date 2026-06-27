@@ -99,7 +99,8 @@ export PHP_COMPILER_JIT_PROGRESS_FILE="${ROOT}/build/.last-jit-func"
 rm -f "${OUT}" "${PHP_COMPILER_JIT_PROGRESS_FILE}"
 if ! bootstrap_compile_invoke "${OUT}" "${ENTRY}" env \
   -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
-  PHP_COMPILER_SELFHOST_AOT=1 2>&1; then
+  PHP_COMPILER_SELFHOST_AOT=1 \
+  PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1 2>&1; then
   echo "bootstrap-selfhost-link: compile failed (progress gate; see stderr above)" >&2
   exit 1
 fi

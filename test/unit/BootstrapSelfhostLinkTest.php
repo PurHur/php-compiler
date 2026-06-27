@@ -63,7 +63,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_compile_invoke', $link);
         $this->assertStringContainsString('-u PHP_COMPILER_M3_SOURCE', $link);
         $this->assertStringContainsString('-u PHP_COMPILER_M3_OUT', $link);
-        $this->assertStringNotContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $link);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $link);
         $this->assertStringContainsString('BOOTSTRAP_GEN0_ENSURE_COMPILED_DRIVER', $link);
         $resolver = self::$root.'/script/bootstrap-resolve-compile-invoke.sh';
         $this->assertFileExists($resolver);
@@ -79,6 +79,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('refusing sidecar emit fallback', $body);
         $this->assertStringContainsString('BOOTSTRAP_M5_NO_ZEND=1 — refusing sidecar emit fallback', $body);
         $this->assertStringContainsString('bootstrap_loop_smoke/main.php', $body);
+        $this->assertStringContainsString('compiler_minimal/main.php', $body);
         $this->assertStringContainsString('.m3_bootstrap_loop_smoke_main_aot_blob', $body);
         $this->assertStringContainsString('gen-0 sidecar emit fallback', $body);
         $this->assertStringContainsString('native parse spine null', $body);

@@ -1,15 +1,15 @@
 {
     "version": 1,
-    "generated_at": "2026-06-26T06:56:15+00:00",
+    "generated_at": "2026-06-27T06:24:58+00:00",
     "driver": "prelinked/bootstrap-gen0/bin-compile-aot",
     "compiler_minimal_sidecar": "prelinked/bootstrap-gen0/compiler_minimal_aot_blob",
     "compiler_lib_sidecar": "prelinked/bootstrap-gen0/compiler_lib_aot_blob",
     "role": "gen-0 native argv compile driver + M0/M2/M4 link-time sidecars (no Zend)",
     "sha256_driver": "83ce0667bf262a4908c3d431d66aee730d969bd39d85541ef4dcd2f48e59755c",
-    "sha256_compiler_minimal_sidecar": "0e1b201f6e493f5838e5aa61112b6000063005e2bb5ab3755a872583f5714dbc",
+    "sha256_compiler_minimal_sidecar": "ecc681eb5caa780a187a605c0b0f970f78d602cfa4144cb00ee06ce5f4b2d7d8",
     "sha256_compiler_lib_sidecar": "c7c1c5d49f310d865866081fcc7f6aa58ecb9fa39fae4fe96657452782a7f7b8",
     "size_bytes_driver": 994944,
-    "size_bytes_compiler_minimal_sidecar": 185800,
+    "size_bytes_compiler_minimal_sidecar": 841608,
     "size_bytes_compiler_lib_sidecar": 4382920,
     "m3_sidecars": [
         ".m3_bin_compile_aot_blob",
