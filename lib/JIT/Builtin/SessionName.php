@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\SessionNameRejectRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -193,7 +194,8 @@ final class SessionName
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof Value\Function_);
 
-        $bbCheckEmpty = $fn->appendBasicBlock('sname_check_empty');
+        $bbCheckReject = $fn->appendBasicBlock('sname_check_reject');
+        $bbReject = $fn->appendBasicBlock('sname_reject');
         $bbFail = $fn->appendBasicBlock('sname_set_fail');
         $bbCopy = $fn->appendBasicBlock('sname_copy');
         $bbClamp = $fn->appendBasicBlock('sname_clamp_len');
@@ -202,16 +204,30 @@ final class SessionName
 
         $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $i8->constInt(0, false));
-        $context->builder->branchIf($isActive, $bbFail, $bbCheckEmpty);
+        $context->builder->branchIf($isActive, $bbFail, $bbCheckReject);
 
-        $context->builder->positionAtEnd($bbCheckEmpty);
+        $context->builder->positionAtEnd($bbCheckReject);
+        SessionNameRejectRuntime::ensureLinked($context);
+        $rejected = $context->builder->call(
+            SessionNameRejectRuntime::isRejectedFunction($context),
+            $newStr
+        );
+        $isRejected = $context->builder->icmp(Builder::INT_NE, $rejected, $i8->constInt(0, false));
+        $context->builder->branchIf($isRejected, $bbReject, $bbCopy);
+
+        $context->builder->positionAtEnd($bbReject);
+        $warningMsg = $context->builder->call(
+            SessionNameRejectRuntime::warningMessageFunction($context),
+            $newStr
+        );
+        SessionNameRejectRuntime::emitWarningFromString($context, $warningMsg);
+        self::emitWriteCurrentAsString($context, $outPtr);
+        $context->builder->branch($bbDone);
+
+        $context->builder->positionAtEnd($bbCopy);
         $newLen = $context->builder->load(
             $context->builder->structGep($newStr, $strMap['length'])
         );
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
-        $context->builder->branchIf($isEmpty, $bbFail, $bbCopy);
-
-        $context->builder->positionAtEnd($bbCopy);
         self::emitWriteCurrentAsString($context, $outPtr);
         $tooLong = $context->builder->icmp(Builder::INT_UGT, $newLen, $maxLen);
         $context->builder->branchIf($tooLong, $bbClamp, $bbStore);

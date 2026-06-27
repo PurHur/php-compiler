@@ -156,6 +156,19 @@ final class VmSession
     }
 
     /**
+     * php-src: ext/session/session.c — session.name must be non-empty and non-numeric.
+     */
+    public static function isRejectedSessionName(string $name): bool
+    {
+        return '' === $name || is_numeric($name);
+    }
+
+    public static function rejectedSessionNameMessage(string $name): string
+    {
+        return 'session.name "'.$name.'" cannot be numeric or empty';
+    }
+
+    /**
      * @return string|false
      * previous name, or false when session is active
      */
@@ -163,8 +176,8 @@ final class VmSession
         if (self::$active) {
             return false;
         }
-        if ('' === $name) {
-            return false;
+        if (self::isRejectedSessionName($name)) {
+            return self::$name;
         }
         $previous = self::$name;
         self::$name = $name;
