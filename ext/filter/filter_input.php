@@ -10,10 +10,12 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitFilterInputTypeArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\SuperglobalInit;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -34,12 +36,7 @@ final class filter_input extends Internal
             1,
             'variable_name'
         );
-        $filter = $frame->calledArgs[2]->resolveIndirect();
-        if (Variable::TYPE_INTEGER !== $filter->type) {
-            throw new \LogicException(
-                'filter_input() requires (int type, string key, int filter) in this compiler build'
-            );
-        }
+        $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input', 'filter');
         if (4 === $argc) {
             $options = $frame->calledArgs[3]->resolveIndirect();
             if (!$options->isUndefined() && Variable::TYPE_NULL !== $options->type) {
@@ -87,6 +84,7 @@ final class filter_input extends Internal
         if (\count($args) < 3 || \count($args) > 4) {
             throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
         }
+        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[2], 'filter_input', 'filter', 3);
         if (\count($args) > 3 && JITVariable::TYPE_NULL !== $args[3]->type) {
             throw new \LogicException('filter_input() options are not supported in this compiler build');
         }
