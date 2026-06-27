@@ -2282,11 +2282,13 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayMapRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayMergeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayPadRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayProductRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReplaceKeyRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReplaceRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayReverseRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySearchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySliceRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySumRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayUniqueRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayValuesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/AssertFail.php';
@@ -3404,10 +3406,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-require_once __DIR__.'/../../../ext/filter/FilterIpJitHelper.php';
-require_once __DIR__.'/../../../ext/standard/SessionNameJitHelper.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/SessionNameRejectRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterIp.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
