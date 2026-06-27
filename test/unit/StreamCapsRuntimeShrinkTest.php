@@ -17,10 +17,15 @@ final class StreamCapsRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamCapsJit.php');
         $this->assertStringContainsString('StreamCapsRuntime::ensureLinked', $source);
-        $this->assertStringContainsString('StreamCapsStandaloneLlvm::implement', $source);
+        $this->assertStringNotContainsString('StreamCapsStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitIsatty', $source);
         $this->assertStringNotContainsString('emitIsLocal', $source);
         $this->assertStringNotContainsString('emitSupports', $source);
+    }
+
+    public function testStreamCapsStandaloneLlvmDeleted(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamCapsStandaloneLlvm.php');
     }
 
     public function testStreamCapsRuntimeUsesJitHelper(): void
