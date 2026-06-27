@@ -25,7 +25,10 @@ final class sscanf extends Internal
     {
         $argc = \count($frame->calledArgs);
         if ($argc < 2) {
-            throw new \LogicException('sscanf() requires at least two arguments');
+            throw new \ArgumentCountError(\sprintf(
+                'sscanf() expects at least 2 arguments, %d given',
+                $argc
+            ));
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'sscanf', 'string', 0, $frame);
         $input = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'sscanf', 0, 'string');

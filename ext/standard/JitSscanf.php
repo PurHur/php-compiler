@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\Sscanf;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
@@ -25,7 +26,12 @@ final class JitSscanf
 
         $argc = \count($args);
         if ($argc < 2) {
-            throw new \LogicException('sscanf() requires at least two arguments');
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('sscanf() expects at least 2 arguments, %d given', $argc)
+            );
+
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
 
         $strLit = $args[0]->compileTimeString ?? null;
