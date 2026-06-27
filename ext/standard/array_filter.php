@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Func\PHP;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayFilterRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -87,7 +88,7 @@ final class array_filter extends Internal
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_filter', 1, 'array');
 
-        return ArrayBuiltinHelper::buildFilterArray($context, $args[0]);
+        return ArrayFilterRuntime::filterDefault($context, $args[0]);
     }
 
     private static function filterDefault(HashTable $src, HashTable $out): void
