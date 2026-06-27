@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCfg\Func;
 use PHPCompiler\VM\SensitiveParamSupport;
 use PHPCompiler\VM\Variable;
@@ -69,7 +70,7 @@ final class VmDebugBacktrace
             if (null === $line) {
                 continue;
             }
-            echo $line;
+            OutputBuffer::append($line);
             ++$index;
             ++$printed;
             if ($limit > 0 && $printed >= $limit) {
