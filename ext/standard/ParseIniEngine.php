@@ -54,6 +54,11 @@ final class ParseIniEngine
                 continue;
             }
             if ('[' === $line[0]) {
+                if (!str_ends_with($line, ']')) {
+                    self::setSyntaxError($lineNo + 1, "unexpected end of file, expecting ']'");
+
+                    return false;
+                }
                 $sectionName = self::parseSectionHeader($line);
                 if (null === $sectionName) {
                     self::setSyntaxError($lineNo + 1, "unexpected '='");
@@ -128,9 +133,6 @@ final class ParseIniEngine
 
     private static function parseSectionHeader(string $line): ?string
     {
-        if (!str_ends_with($line, ']')) {
-            return null;
-        }
         $inner = substr($line, 1, -1);
         $inner = self::trimWs($inner);
         if ('' === $inner) {
