@@ -186,6 +186,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4', '>=');
     }
 
+    /**
+     * PHP 8.4+ pipe operator (|>) — Zend/zend_language_parser.y (#7219, #12424).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects |> like Zend 8.2.
+     */
+    public static function supportsPipeOperator(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {

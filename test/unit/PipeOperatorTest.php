@@ -10,6 +10,13 @@ use PHPUnit\Framework\TestCase;
 /** PHP 8.4+ pipe operator (|>) VM desugar (#3243, #7219). */
 final class PipeOperatorTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsPipeOperator()) {
+            $this->markTestSkipped('pipe operator disabled on reference profile (#12424)');
+        }
+    }
+
     public function testVmPipeBareCallableName(): void
     {
         $code = <<<'PHP'

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Desugar PHP 8.4+ pipe operator (|>) before nikic/php-parser (#3243, #7219).
  *
@@ -17,6 +19,9 @@ final class PipeOperatorDesugar
 
     public static function desugar(string $code): string
     {
+        if (!CompilerVersion::supportsPipeOperator()) {
+            return $code;
+        }
         if (!str_contains($code, '|>')) {
             return $code;
         }
