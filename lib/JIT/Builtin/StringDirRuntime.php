@@ -14,7 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed link for directory handle ABI via DirHandleJitHelper PHP (#11811).
  *
- * Standalone AOT keeps LLVM in {@see StringDirStandaloneLlvm}.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\DirHandleJitHelper}; thin LLVM
+ * bridges forward the ABI (#11811, #12870).
  * SSOT: {@see \PHPCompiler\ext\standard\DirHandleJitHelper}
  * php-src: ext/standard/dir.c
  */

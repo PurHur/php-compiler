@@ -7,23 +7,26 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\DirHandleJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** StringDirJit embed routes through DirHandleJitHelper PHP not LLVM monolith (#11811). */
+/** StringDirJit routes through DirHandleJitHelper PHP not LLVM monolith (#11811, #12870). */
 final class StringDirRuntimeShrinkTest extends TestCase
 {
     public function testStringDirJitIsThinDispatcher(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDirJit.php');
         $this->assertStringContainsString('StringDirRuntime', $source);
-        $this->assertStringContainsString('StringDirStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('StringDirStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitOpendir', $source);
         $this->assertStringNotContainsString('emitReaddir', $source);
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringDirStandaloneLlvm.php');
     }
 
     public function testStringDirRuntimeUsesJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDirRuntime.php');
         $this->assertStringContainsString('DirHandleJitHelper', $source);
+        $this->assertStringNotContainsString('StringDirStandaloneLlvm', $source);
         $this->assertStringNotContainsString('scandir', $source);
     }
 

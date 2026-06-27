@@ -2576,7 +2576,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringDeployPath.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDirJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringDirRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringDirStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringErrorLog.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFgetcsvJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFileGetContents.php';
