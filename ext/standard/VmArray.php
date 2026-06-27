@@ -760,6 +760,18 @@ final class VmArray
     }
 
     /**
+     * array_first() / array_last() — empty haystack Error (php-src array.c, #11832, PHP 8.4).
+     *
+     * @throws \Error
+     */
+    public static function requireNonEmptyFirstLastArray(HashTable $ht, string $fn): void
+    {
+        if (0 === $ht->getNumElements()) {
+            throw new \Error(\sprintf('%s(): Argument #1 ($array) must not be empty', $fn));
+        }
+    }
+
+    /**
      * Variadic array builtins whose Zend messages omit ($param) — e.g. array_merge().
      *
      * @throws \TypeError when {@param $value} is not an array

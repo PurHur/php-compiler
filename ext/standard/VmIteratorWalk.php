@@ -145,14 +145,13 @@ final class VmIteratorWalk
         Variable $key,
         array $params
     ): bool {
-        unset($value, $key);
         $callback = $callback->resolveIndirect();
         if (VmClosureCall::isClosure($callback)) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('iterator_apply() requires VM context in this compiler build');
             }
             $closure = VmClosureCall::resolve($callback);
-            $result = VmClosureCall::invoke($frame->vmContext, $closure, ...$params);
+            $result = VmClosureCall::invoke($frame->vmContext, $closure, $value, $key, ...$params);
 
             return self::applyCallbackTruthy($result);
         }
@@ -164,13 +163,13 @@ final class VmIteratorWalk
         $name = $callback->toString();
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
-            $result = VmInternalCall::invoke($fn, ...$params);
+            $result = VmInternalCall::invoke($fn, $value, $key, ...$params);
         } catch (\LogicException) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('iterator_apply() requires VM context in this compiler build');
             }
             $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
-            $result = VmUserCall::invokeArgs($frame->vmContext, $fn, ...$params);
+            $result = VmUserCall::invokeArgs($frame->vmContext, $fn, $value, $key, ...$params);
         }
 
         return self::applyCallbackTruthy($result);

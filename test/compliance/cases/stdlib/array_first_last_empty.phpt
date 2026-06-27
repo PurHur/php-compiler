@@ -1,15 +1,15 @@
 --TEST--
-stdlib array_first() / array_last() — empty and all-unset return null (#7293)
+stdlib array_first() / array_last() — empty array Error (#11832, PHP 8.4)
 --FILE--
 <?php
-var_dump(array_first([]));
-var_dump(array_last([]));
-$allUnset = [0 => 1];
-unset($allUnset[0]);
-var_dump(array_first($allUnset));
-var_dump(array_last($allUnset));
+foreach (['array_first', 'array_last'] as $fn) {
+    try {
+        $fn([]);
+        echo $fn, ": uncaught\n";
+    } catch (Error $e) {
+        echo $fn, ': ', $e->getMessage(), "\n";
+    }
+}
 --EXPECT--
-NULL
-NULL
-NULL
-NULL
+array_first: array_first(): Argument #1 ($array) must not be empty
+array_last: array_last(): Argument #1 ($array) must not be empty

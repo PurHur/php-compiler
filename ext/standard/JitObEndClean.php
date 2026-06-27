@@ -16,7 +16,9 @@ final class JitObEndClean
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 0) {
-            throw new \LogicException('ob_end_clean() takes no arguments');
+            throw new \ArgumentCountError(
+                'ob_end_clean() expects exactly 0 arguments, '.\count($args).' given'
+            );
         }
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);

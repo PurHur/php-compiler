@@ -43,17 +43,26 @@ final class VmParseUrl
             ));
         }
 
-        return self::normalizeRawComponentInt($var->toInt());
+        return self::validateUserComponentInt($var->toInt());
     }
 
-    /** php-src url.c — unknown component ids return the full parsed array (#10645). */
-    public static function normalizeRawComponentInt(int $component): int
+    /** php-src url.c — invalid component id ValueError (#10645). */
+    public static function validateUserComponentInt(int $component): int
     {
         if ($component < self::PHP_URL_SCHEME || $component > self::PHP_URL_FRAGMENT) {
-            return -1;
+            throw new \ValueError(sprintf(
+                'parse_url(): Argument #2 ($component) must be a valid URL component identifier, %d given',
+                $component
+            ));
         }
 
         return $component;
+    }
+
+    /** @deprecated use validateUserComponentInt(); kept for JIT helpers that already validated */
+    public static function normalizeRawComponentInt(int $component): int
+    {
+        return self::validateUserComponentInt($component);
     }
 
     public static function tryParseUrlComponentInt(Variable $var): ?int
@@ -90,7 +99,7 @@ final class VmParseUrl
 
     private static function validateComponentInt(int $component): int
     {
-        return self::normalizeRawComponentInt($component);
+        return self::validateUserComponentInt($component);
     }
 
     private static function isParseUrlEnum(string $className): bool
