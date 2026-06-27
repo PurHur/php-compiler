@@ -8,6 +8,8 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** disk_total_space() — VM via VmFsDiskNative (statvfs FFI or VmFsDiskPure); JIT/AOT via JitStat (php-src filestat.c, #8989). */
@@ -26,7 +28,22 @@ final class disk_total_space extends Internal
         }
         $path = null;
         if ($argc >= 1) {
-            $path = VmString::coerceOptionalDirectoryArg($frame->calledArgs[0], 'disk_total_space');
+            $resolved = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_NULL === $resolved->type) {
+                if (InternalStrictArg::isCallerStrict($frame)) {
+                    throw new \TypeError(
+                        'disk_total_space(): Argument #1 ($directory) must be of type string, null given'
+                    );
+                }
+                if (null === $frame->returnVar) {
+                    return;
+                }
+                VmFilestatFailure::warnNoSuchFile($frame, 'disk_total_space');
+                $frame->returnVar->bool(false);
+
+                return;
+            }
+            $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'disk_total_space', 0, 'directory');
         }
         $result = VmFs::diskTotalSpace($path);
         if (null === $frame->returnVar) {
@@ -45,8 +62,6 @@ final class disk_total_space extends Internal
         if (\count($args) > 1) {
             throw new \LogicException('disk_total_space() accepts at most one argument in this compiler build');
         }
-        $path = JitDiskPath::lower($context, $args[0] ?? null, 'disk_total_space');
-
-        return JitStat::pathDiskTotalSpaceBoxed($context, $path);
+        return JitDiskPath::lowerDiskSpaceBoxed($context, $args[0] ?? null, 'disk_total_space', false);
     }
 }

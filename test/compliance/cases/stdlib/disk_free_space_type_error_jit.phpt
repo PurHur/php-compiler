@@ -34,4 +34,4 @@ diskfreespace: TypeError
 disk_total_space: TypeError
 TypeError: disk_free_space(): Argument #1 ($directory) must be of type string, stdClass given
 ok
-null_ok
+null_fail

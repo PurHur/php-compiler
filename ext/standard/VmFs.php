@@ -2204,7 +2204,9 @@ final class VmFs
      */
     public static function diskFreeSpace(?string $path)
     {
-        $path = $path ?? '.';
+        if (null === $path) {
+            return false;
+        }
 
         return VmFsDiskNative::diskFreeSpace($path);
     }
@@ -2216,7 +2218,9 @@ final class VmFs
      */
     public static function diskTotalSpace(?string $path)
     {
-        $path = $path ?? '.';
+        if (null === $path) {
+            return false;
+        }
 
         return VmFsDiskNative::diskTotalSpace($path);
     }
