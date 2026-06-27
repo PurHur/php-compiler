@@ -75,7 +75,8 @@ final class VmSyslogPure
             self::writeConsole($line);
         }
 
-        return $sent;
+        // php-src ext/standard/syslog.c PHP_FUNCTION(syslog) always RETURN_TRUE (#12507).
+        return true;
     }
 
     private static function writeLog(string $line): bool
