@@ -30,6 +30,10 @@ final class ErrorHandlerBuiltinTest extends BaseTest
             __DIR__.'/../compliance/cases/stdlib/restore_error_handler.phpt',
             'restore_error_handler.phpt'
         );
+        yield 'restore_error_handler_empty_stack.phpt' => self::parsePHPT(
+            __DIR__.'/../compliance/cases/stdlib/restore_error_handler_empty_stack.phpt',
+            'restore_error_handler_empty_stack.phpt'
+        );
     }
 
     public function testVmSetErrorHandlerReturnsPrevious(): void

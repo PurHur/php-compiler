@@ -34,9 +34,10 @@ final class ExceptionHandlerStack
 
     public function pop(): bool
     {
-        if ([] !== $this->stack) {
-            array_pop($this->stack);
+        if ([] === $this->stack) {
+            return false;
         }
+        array_pop($this->stack);
 
         return true;
     }
