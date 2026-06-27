@@ -8328,6 +8328,7 @@ class Compiler {
         }
         try {
             $funcBlock = $this->compileCfgBlock($func->cfg, $func->params, $func);
+            $funcBlock->parents[] = $block;
         } finally {
             $this->compilingArrowAutoCapture = $wasArrowAutoCapture;
         }
@@ -12798,8 +12799,12 @@ class Compiler {
     }
 
     /** StaticCall inline closure first arg — match hoisted Closure producer to TYPE_CLOSURE slot (#3673). */
-    private function resolveInlineClosureCallArgSlot(Operand $arg, Block $block, ?Op $cfgCallOp): ?int
-    {
+    private function resolveInlineClosureCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): ?int {
         if (null === $block->orig || null === $cfgCallOp) {
             return null;
         }
@@ -12830,7 +12835,7 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block, $calleeName);
         if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
             return $this->slotForInlineClosureProducer($producer, $block);
         }
@@ -12845,7 +12850,7 @@ class Compiler {
                 $candidate,
                 $callOp->args,
                 $argIndex,
-                $this->resolveCfgFuncCallName($callOp)
+                $this->resolveInlineCallArgFuncName($callOp, $calleeName)
             )) {
                 return $this->slotForInlineClosureProducer($candidate, $block);
             }
@@ -12865,8 +12870,12 @@ class Compiler {
     /**
      * Inline fn()/function() callback args with trailing literal flags (#10232, #9154).
      */
-    private function resolvePrecedingClosureCallArgSlot(Op $cfgCallOp, int $argIndex, Block $block): ?int
-    {
+    private function resolvePrecedingClosureCallArgSlot(
+        Op $cfgCallOp,
+        int $argIndex,
+        Block $block,
+        ?string $calleeName = null
+    ): ?int {
         if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
             return null;
         }
@@ -12917,10 +12926,10 @@ class Compiler {
             $closureProducer,
             $callArgs,
             $argIndex,
-            $this->resolveCfgFuncCallName($cfgCallOp)
+            $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName)
         );
         if (null === $matched) {
-            $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex, $cfgCallOp);
+            $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex, $cfgCallOp, $block, $calleeName);
             if ($matched !== $closureProducer) {
                 return null;
             }
@@ -12995,9 +13004,11 @@ class Compiler {
         array $callArgs,
         int $argIndex,
         ?Op $cfgCallOp = null,
-        ?Block $block = null
+        ?Block $block = null,
+        ?string $calleeName = null
     ): ?Op\Expr
     {
+        $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
@@ -13369,6 +13380,33 @@ class Compiler {
             }
             // Closure/FCC + inline Array_ — match by dead-temp operand wiring first (#10827, array_all/any/find);
             // array_map(callback, array) fallback when links are opaque (#10651, #11450).
+            // array_all/any/find(null, fn) — hoisted null ConstFetch + Closure (#12766).
+            if (
+                null !== $closureIdx
+                && null === $arrayIdx
+                && 2 === $producerCount
+                && 2 === $argCount
+            ) {
+                $constIdx = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $constIdx = $pi;
+                        break;
+                    }
+                }
+                $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
+                if (null !== $constIdx && $callbackArgIndex >= 0) {
+                    $constArgIndex = 1 - $callbackArgIndex;
+                    if ($argIndex === $callbackArgIndex) {
+                        return $producers[$closureIdx];
+                    }
+                    if ($argIndex === $constArgIndex) {
+                        return $producers[$constIdx];
+                    }
+
+                    return null;
+                }
+            }
             if (null !== $closureIdx && null !== $arrayIdx && 2 === $producerCount && 2 === $argCount) {
                 $callArg = $callArgs[$argIndex] ?? null;
                 if (null !== $callArg) {
@@ -13380,17 +13418,19 @@ class Compiler {
                     }
                 }
                 $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex(
-                    $this->resolveCfgFuncCallName($cfgCallOp)
+                    $inlineFuncName
                 );
-                $arrayArgIndex = 1 - $callbackArgIndex;
-                if ($argIndex === $callbackArgIndex) {
-                    return $producers[$closureIdx];
-                }
-                if ($argIndex === $arrayArgIndex) {
-                    return $producers[$arrayIdx];
-                }
+                if ($callbackArgIndex >= 0) {
+                    $arrayArgIndex = 1 - $callbackArgIndex;
+                    if ($argIndex === $callbackArgIndex) {
+                        return $producers[$closureIdx];
+                    }
+                    if ($argIndex === $arrayArgIndex) {
+                        return $producers[$arrayIdx];
+                    }
 
-                return null;
+                    return null;
+                }
             }
             if ($this->producersAreNestedArrayLiteralChain($producers)) {
                 // array_fill_keys([[1]], 1) — nested Array_ preludes map to the sole hoisted arg (#10848).
@@ -13487,7 +13527,7 @@ class Compiler {
             if (
                 ($producers[0] instanceof Op\Expr\ArrowFunction || $producers[0] instanceof Op\Expr\Closure)
                 && $argCount >= 2
-                && 'preg_replace_callback' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 'preg_replace_callback' === $inlineFuncName
             ) {
                 if (1 === $argIndex) {
                     return $producers[0];
@@ -13584,7 +13624,7 @@ class Compiler {
                 $producers[0],
                 $callArgs,
                 $argIndex,
-                $this->resolveCfgFuncCallName($cfgCallOp)
+                $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName)
             );
             if (null !== $closureMatch) {
                 return $closureMatch;
@@ -13596,7 +13636,8 @@ class Compiler {
                     $callArgs,
                     $argIndex,
                     $cfgCallOp,
-                    $block
+                    $block,
+                    $calleeName
                 );
             }
 
@@ -13617,7 +13658,8 @@ class Compiler {
                 $callArgs,
                 $argIndex,
                 $cfgCallOp,
-                $block
+                $block,
+                $calleeName
             );
         }
         if ($argIndex < $producerCount) {
@@ -13666,8 +13708,10 @@ class Compiler {
         array $callArgs,
         int $argIndex,
         ?Op $cfgCallOp = null,
-        ?Block $block = null
+        ?Block $block = null,
+        ?string $calleeName = null
     ): ?Op\Expr {
+        $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         if (null !== $cfgCallOp && null !== $block && null !== $block->orig) {
             $leadingProducer = $producers[0] ?? null;
             if ($leadingProducer instanceof Op\Expr\FuncCall || $leadingProducer instanceof Op\Expr\NsFuncCall) {
@@ -13717,7 +13761,7 @@ class Compiler {
         }
         // array_map(fn, [...], [...]) — php-cfg omits ArrowFunction from hoisted producers (#10094).
         if (
-            'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
+            'array_map' === $inlineFuncName
             && $this->producersAreNestedArrayLiteralChain($producers)
             && $argIndex >= 1
             && $argIndex - 1 < \count($producers)
@@ -13813,7 +13857,7 @@ class Compiler {
             if (
                 null !== $closureProducerIndex
                 && null !== $arrayProducerIndex
-                && 'preg_replace_callback' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 'preg_replace_callback' === $inlineFuncName
             ) {
                 if (1 === $argIndex) {
                     return $producers[$closureProducerIndex];
@@ -13827,7 +13871,7 @@ class Compiler {
             // array_map(fn(...), [...]) / array_reduce([...], fn(...)) — closure + inline Array_ (#10651, #10775).
             if (null !== $closureProducerIndex && null !== $arrayProducerIndex) {
                 $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex(
-                    $this->resolveCfgFuncCallName($cfgCallOp)
+                    $inlineFuncName
                 );
                 $arrayArgIndex = 1 - $callbackArgIndex;
                 if ($argIndex === $callbackArgIndex) {
@@ -15950,18 +15994,18 @@ class Compiler {
         }
         $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($funcName);
         // array_filter($a, fn(...), ARRAY_FILTER_USE_*) — callback slot from builtin signature (#10232, #9154).
-        if (\count($callArgs) >= 3 && $argIndex === $callbackArgIndex) {
+        if ($callbackArgIndex >= 0 && \count($callArgs) >= 3 && $argIndex === $callbackArgIndex) {
             return $producer;
         }
         // array_filter/array_any inline array + fn — callback is arg 1, not arg 0 (#12721).
-        if (2 === \count($callArgs) && $argIndex === $callbackArgIndex && $callbackArgIndex > 0) {
+        if ($callbackArgIndex > 0 && 2 === \count($callArgs) && $argIndex === $callbackArgIndex) {
             return $producer;
         }
         // array_map(fn(...), $arr) — callback is arg 0 (#10651).
         if (
-            2 === \count($callArgs)
+            0 === $callbackArgIndex
+            && 2 === \count($callArgs)
             && 0 === $argIndex
-            && 0 === $callbackArgIndex
             && \count($closureSlots) >= 1
             && 0 === $closureSlots[0]
         ) {
@@ -16530,9 +16574,26 @@ class Compiler {
         return null;
     }
 
+    /** Folded callee hint for variable calls ($fn = 'array_all'; $fn(...), #12766). */
+    private function resolveInlineCallArgFuncName(?Op $call, ?string $calleeName = null): ?string
+    {
+        $resolved = $this->resolveCfgFuncCallName($call);
+        if (null !== $resolved) {
+            return $resolved;
+        }
+        if (null === $calleeName || '' === $calleeName) {
+            return null;
+        }
+
+        return strtolower($calleeName);
+    }
+
     /** Callback arg index for closure + inline Array_ hoists (array_map vs array_reduce, #10775). */
     private function inlineClosureArrayPairCallbackArgIndex(?string $funcName): int
     {
+        if (null === $funcName || '' === $funcName) {
+            return -1;
+        }
         if (in_array($funcName, [
             'array_all',
             'array_any',
@@ -16545,8 +16606,13 @@ class Compiler {
         ], true)) {
             return 1;
         }
+        if (in_array($funcName, [
+            'array_map',
+        ], true)) {
+            return 0;
+        }
 
-        return 0;
+        return -1;
     }
 
     /** php-cfg dead temps: inline FuncCall/New_/Array_ producer before a call (#8561, #4633). */
@@ -17778,7 +17844,7 @@ class Compiler {
     }
 
     /** Inline or assigned closure comparators must not consume hoisted enum prelude slots (#8947). */
-    private function callArgOperandIsClosureValue(Operand $operand, Block $block): bool
+    private function callArgOperandIsClosureValue(Operand $operand, Block $block, ?string $calleeName = null): bool
     {
         if ($this->isEmbeddedCallLiteralArg($operand)) {
             return false;
@@ -17804,13 +17870,13 @@ class Compiler {
                             $candidate,
                             $callOp->args,
                             $argIndex,
-                            $this->resolveCfgFuncCallName($callOp)
+                            $this->resolveInlineCallArgFuncName($callOp, $calleeName)
                         )
                     ) {
                         return true;
                     }
                 }
-                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+                $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block, $calleeName);
                 if ($producer instanceof Op\Expr\ArrowFunction || $producer instanceof Op\Expr\Closure) {
                     return true;
                 }
@@ -18773,7 +18839,8 @@ class Compiler {
                         $cfgCallOp->args ?? [],
                         (int) $argIndex,
                         $cfgCallOp,
-                        $block
+                        $block,
+                        $calleeName
                     );
                     if ($newProducer instanceof Op\Expr\New_) {
                         if (null === $block->slotForOperand($newProducer->result)) {
@@ -18851,7 +18918,8 @@ class Compiler {
                             $cfgCallOp->args ?? [],
                             (int) $argIndex,
                             $cfgCallOp,
-                            $block
+                            $block,
+                            $calleeName
                         );
                         if ($matched instanceof Op\Expr) {
                             if (null === $block->slotForOperand($matched->result)) {
@@ -18872,16 +18940,16 @@ class Compiler {
                 if (null === $valueSlot && null !== $cfgCallOp) {
                     $valueSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 }
-                $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp);
+                $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp, $calleeName);
                 if (null === $closureSlot && null !== $cfgCallOp) {
-                    $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
+                    $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block, $calleeName);
                 }
                 if (
                     null !== $closureSlot
                     && null === $assignedNamedLocal
                     && !$this->isNamedVariableOperand($arg)
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
-                    && $this->callArgOperandIsClosureValue($arg, $block)
+                    && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
                 ) {
                     $valueSlot = $closureSlot;
                 }
@@ -18951,7 +19019,8 @@ class Compiler {
                                 $cfgCallOp->args ?? [],
                                 (int) $argIndex,
                                 $cfgCallOp,
-                                $block
+                                $block,
+                                $calleeName
                             );
                             if ($matched instanceof Op\Expr) {
                                 $matchedSlot = $block->slotForOperand($matched->result);
@@ -18998,7 +19067,9 @@ class Compiler {
                             $producers,
                             $cfgCallOp->args ?? [],
                             (int) $argIndex,
-                            $cfgCallOp
+                            $cfgCallOp,
+                            $block,
+                            $calleeName
                         );
                         if ($matched instanceof Op\Expr\Array_) {
                             $matchedSlot = $block->slotForOperand($matched->result);
@@ -19057,7 +19128,8 @@ class Compiler {
                         $cfgCallOp->args ?? [],
                         (int) $argIndex,
                         $cfgCallOp,
-                        $block
+                        $block,
+                        $calleeName
                     );
                     if ($matched instanceof Op\Expr) {
                         if (null === $block->slotForOperand($matched->result)) {
@@ -19341,7 +19413,7 @@ class Compiler {
             } elseif (
                 null !== $cfgCallOp
                 && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
-                && $this->callArgOperandIsClosureValue($arg, $block)
+                && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
             ) {
                 $closureSlot = $this->slotForRecentClosureCallArg($block);
                 if (null !== $closureSlot) {

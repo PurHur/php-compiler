@@ -2482,6 +2482,76 @@ PHP;
         $this->assertNotNull($block);
     }
 
+    /** Issue #12766 — array_all(null, static fn) via variable call must wire null to arg 0, closure to arg 1. */
+    public function testArrayAllNullStaticClosureVariableCallUsesNullAndClosureSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$fn = 'array_all';
+try {
+    $fn(null, static fn () => true);
+} catch (TypeError $e) {
+    echo $e->getMessage();
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_all_var_null_closure.php');
+
+        $nullSlot = null;
+        $closureSlot = null;
+        $sendSlots = [];
+        $walk = function (Block $b) use (&$walk, &$nullSlot, &$closureSlot, &$sendSlots): void {
+            static $seen = [];
+            $id = spl_object_id($b);
+            if (isset($seen[$id])) {
+                return;
+            }
+            $seen[$id] = true;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullSlot) {
+                    $nullSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_CLOSURE === $op->type) {
+                    $closureSlot = $op->arg1;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type) {
+                    $sendSlots[] = $op->arg1;
+                }
+                if (OpCode::TYPE_TRY === $op->type && $op->block1 instanceof Block) {
+                    $walk($op->block1);
+                }
+                if (OpCode::TYPE_CLOSURE === $op->type && $op->block1 instanceof Block) {
+                    $walk($op->block1);
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($nullSlot);
+        self::assertNotNull($closureSlot);
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($nullSlot, $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertSame($closureSlot, $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            'array_all(): Argument #1 ($array) must be of type array, null given',
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #12766 — foreach-key variable call array_find family null TypeError messages. */
+    public function testArrayFindFamilyNullStaticClosureVariableCallRuntime(): void
+    {
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_array_all_null_typeerror.php');
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_all_null_typeerror.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
     /** Issue #5644 — named closure locals must use assign.result slots across echo-separated var_export calls. */
     public function testNamedClosureLocalSurvivesEchoBetweenVarExportCalls(): void
     {
