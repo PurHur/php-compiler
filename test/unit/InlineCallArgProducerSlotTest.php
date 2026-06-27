@@ -2317,6 +2317,15 @@ PHP;
         self::assertSame("a%5B0%5D=x&a%5B1%5D=y\n", ob_get_clean());
     }
 
+    /** Bootstrap M4 (#2880): production driver must VM-parse (composer closure assign slot #5644). */
+    public function testBinCompilePhpVmParseAndCompile(): void
+    {
+        $root = dirname(__DIR__, 2);
+        $source = (string) file_get_contents($root.'/bin/compile.php');
+        $block = (new Runtime())->parseAndCompile($source, $root.'/bin/compile.php');
+        $this->assertNotNull($block);
+    }
+
     /** Issue #5644 — named closure locals must use assign.result slots across echo-separated var_export calls. */
     public function testNamedClosureLocalSurvivesEchoBetweenVarExportCalls(): void
     {

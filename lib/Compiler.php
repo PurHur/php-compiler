@@ -12408,10 +12408,10 @@ class Compiler {
             if (!$child instanceof Op\Expr\Assign) {
                 continue;
             }
-            if (!$this->operandsReferToSameVariable($child->expr, $producer)) {
+            if (!$this->assignExprMatchesClosureProducer($child->expr, $producer)) {
                 continue;
             }
-            if (!$this->operandDerivesFromClosure($child->expr)) {
+            if (!$this->exprDerivesFromClosure($child->expr)) {
                 continue;
             }
             if (null !== $child->result) {
@@ -17240,7 +17240,35 @@ class Compiler {
                 continue;
             }
 
-            return $this->operandDerivesFromClosure($child->expr);
+            return $this->exprDerivesFromClosure($child->expr);
+        }
+
+        return false;
+    }
+
+    /** Assign RHS is the same inline closure CFG node or a temp referring to it (#5644, composer autoload). */
+    private function assignExprMatchesClosureProducer(Operand|Op\Expr $assignExpr, Op\Expr $producer): bool
+    {
+        if ($assignExpr === $producer) {
+            return true;
+        }
+        if (!$assignExpr instanceof Operand) {
+            return false;
+        }
+        if (null !== $producer->result) {
+            return $this->operandsReferToSameVariable($assignExpr, $producer->result);
+        }
+
+        return false;
+    }
+
+    private function exprDerivesFromClosure(Operand|Op\Expr $expr): bool
+    {
+        if ($expr instanceof Op\Expr\Closure || $expr instanceof Op\Expr\ArrowFunction) {
+            return true;
+        }
+        if ($expr instanceof Operand) {
+            return $this->operandDerivesFromClosure($expr);
         }
 
         return false;
