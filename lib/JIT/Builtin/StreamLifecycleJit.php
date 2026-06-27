@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream lifecycle dispatch — embed PHP helper vs standalone LLVM (#9442).
+ * Stream lifecycle dispatch — embed and standalone AOT via StreamLifecycleJitHelper PHP (#9442, #12843).
  *
  * Replaces __compiler_is_resource / __compiler_fclose / __compiler_feof / __compiler_fflush
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
@@ -18,12 +18,6 @@ final class StreamLifecycleJit
     {
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamLifecycleStandaloneLlvm::implement($context);
 
             return;
         }

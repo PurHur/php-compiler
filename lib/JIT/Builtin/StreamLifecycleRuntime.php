@@ -13,7 +13,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed link for stream lifecycle ABI via StreamLifecycleJitHelper PHP (#9442).
  *
- * Standalone AOT keeps LLVM in {@see StreamLifecycleStandaloneLlvm}.
+ * JIT embed and AOT standalone compile {@see StreamLifecycleJitHelper}; thin LLVM bridges forward the ABI.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs}, {@see \PHPCompiler\ext\standard\StreamLifecycleJitHelper}
  * php-src: ext/standard/streamsfuncs.c
  */

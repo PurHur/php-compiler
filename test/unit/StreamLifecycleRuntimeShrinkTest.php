@@ -16,7 +16,7 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamLifecycleJit.php');
         $this->assertStringContainsString('StreamLifecycleRuntime', $source);
-        $this->assertStringContainsString('StreamLifecycleStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('StreamLifecycleStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitIsResource', $source);
         $this->assertStringNotContainsString('emitFclose', $source);
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
@@ -58,10 +58,14 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertSame(0, StreamLibcHandleJitHelper::resolvePtr(7));
     }
 
-    public function testStreamIoJitMirrorsHandleRegistrationOnEmbed(): void
+    public function testStreamLifecycleStandaloneLlvmDeleted(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php');
+    }
+
+    public function testStreamIoStandaloneLlvmRegistersLibcHandles(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
         $this->assertStringContainsString('StreamLibcHandleRuntime::emitRegisterHandle', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 }

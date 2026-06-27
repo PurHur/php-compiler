@@ -2549,7 +2549,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLibcHandleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycle.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamMeta.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamMetaJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamNotificationRuntime.php';
