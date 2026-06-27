@@ -7709,10 +7709,15 @@ class Compiler {
                     }
                 }
                 $rhsSlot = $this->compileOperand($expr->expr, $block, true);
+                $resultSlot = $this->compileOperand($expr->result, $block, false);
+                $varRoot = Block::cfgVarRoot($expr->var);
+                if (null !== $varRoot) {
+                    $block->registerNamedAssignDest($varRoot, (int) $resultSlot);
+                }
 
                 return [new OpCode(
                     OpCode::TYPE_ASSIGN,
-                    $this->compileOperand($expr->result, $block, false),
+                    $resultSlot,
                     $destSlot,
                     $rhsSlot
                 )];
@@ -12322,10 +12327,116 @@ class Compiler {
     }
 
     /** Resolve VM slot for a hoisted inline Closure/ArrowFunction call-arg producer (#3673). */
+    /** `$cmp = fn(...); f(..., $cmp)` — bind named locals when php-cfg uses assign-var temps (#5644). */
+    private function slotForNamedLocalFromAssignVarOperand(Operand $arg, Block $block): ?int
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->var, $arg)) {
+                continue;
+            }
+            $registered = $block->slotForNamedAssignDest($arg);
+            if (null !== $registered) {
+                return $registered;
+            }
+            if (null !== $child->result) {
+                $namedSlot = $block->slotForOperand($child->result);
+                if (null === $namedSlot) {
+                    $namedSlot = $this->slotForEmittedAssignResultSlot($block, $child);
+                }
+                if (null !== $namedSlot) {
+                    return (int) $namedSlot;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** Resolve assign.result slot from emitted TYPE_ASSIGN when cfg temps lack scope bindings (#5644). */
+    private function slotForEmittedAssignResultSlot(Block $block, Op\Expr\Assign $assign): ?int
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $assignOrdinal = 0;
+        $targetOrdinal = null;
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Assign) {
+                if ($child === $assign) {
+                    $targetOrdinal = $assignOrdinal;
+                    break;
+                }
+                ++$assignOrdinal;
+            }
+        }
+        if (null === $targetOrdinal) {
+            return null;
+        }
+        $seen = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($seen === $targetOrdinal) {
+                return (int) $op->arg1;
+            }
+            ++$seen;
+        }
+
+        return null;
+    }
+
+    /** `$cmp = fn(...); f(..., $cmp)` — use the named local, not the dead closure temp (#5644). */
+    private function slotForNamedClosureLocalFromProducer(Op\Expr $producer, Block $block): ?int
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        if (
+            !$producer instanceof Op\Expr\ArrowFunction
+            && !$producer instanceof Op\Expr\Closure
+        ) {
+            return null;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\Assign) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($child->expr, $producer)) {
+                continue;
+            }
+            if (!$this->operandDerivesFromClosure($child->expr)) {
+                continue;
+            }
+            if (null !== $child->result) {
+                $namedSlot = $block->slotForOperand($child->result);
+                if (null !== $namedSlot) {
+                    return (int) $namedSlot;
+                }
+            }
+            $namedSlot = $block->slotForOperand($child->var);
+            if (null !== $namedSlot && $block->isNamedVariableSlot((int) $namedSlot)) {
+                return (int) $namedSlot;
+            }
+        }
+
+        return null;
+    }
+
     private function slotForInlineClosureProducer(Op\Expr $producer, Block $block): ?int
     {
         if (null === $producer->result) {
             return null;
+        }
+        $namedLocal = $this->slotForNamedClosureLocalFromProducer($producer, $block);
+        if (null !== $namedLocal) {
+            return $namedLocal;
         }
         $slot = $block->slotForOperand($producer->result);
         if (null !== $slot) {
@@ -12447,6 +12558,9 @@ class Compiler {
             return null;
         }
         $callArg = $callOp->args[$argIndex] ?? null;
+        if (null !== $callArg && $this->isNamedVariableOperand($callArg)) {
+            return null;
+        }
         if (null !== $callArg) {
             $callArgRoot = $this->unwrapOperandChain($callArg);
             if ($callArgRoot instanceof Op\Expr\ArrowFunction || $callArgRoot instanceof Op\Expr\Closure) {
@@ -12493,6 +12607,10 @@ class Compiler {
             return null;
         }
         $callArgs = $cfgCallOp->args;
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null !== $callArg && $this->isNamedVariableOperand($callArg)) {
+            return null;
+        }
         if (\count($callArgs) < 2) {
             return null;
         }
@@ -12610,6 +12728,7 @@ class Compiler {
     {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
+        $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
         if (0 === $producerCount) {
@@ -13488,6 +13607,9 @@ class Compiler {
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
         }
+        if (null !== $block && null !== $callArg && null !== $this->slotForNamedLocalFromAssignVarOperand($callArg, $block)) {
+            return null;
+        }
         if ($this->isNamedVariableOperand($callArg)) {
             return null;
         }
@@ -13497,6 +13619,27 @@ class Compiler {
         }
 
         return $producers[$producerOrdinal] ?? null;
+    }
+
+    /** Drop void MethodCall preludes before a sibling MethodCall inline producer (#10778). */
+    private function filterKnownVoidMethodCallPreludes(array $producers): array
+    {
+        $filtered = [];
+        $count = \count($producers);
+        for ($i = 0; $i < $count; ++$i) {
+            $producer = $producers[$i];
+            if (
+                $producer instanceof Op\Expr\MethodCall
+                && null !== ($method = $this->staticNameFromOperand($producer->name))
+                && $this->methodCallIsKnownVoidReturn($method)
+                && ($producers[$i + 1] ?? null) instanceof Op\Expr\MethodCall
+            ) {
+                continue;
+            }
+            $filtered[] = $producer;
+        }
+
+        return $filtered;
     }
 
     /**
@@ -14546,6 +14689,10 @@ class Compiler {
         if (!property_exists($producer, 'result')) {
             return false;
         }
+        $method = $this->staticNameFromOperand($producer->name);
+        if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
+            return false;
+        }
         $type = $producer->result->type ?? null;
         if (null === $type) {
             return true;
@@ -14565,6 +14712,14 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /** php-cfg may leave void method results untyped; do not wire them as inline call-arg values (#10778). */
+    private function methodCallIsKnownVoidReturn(string $method): bool
+    {
+        return in_array(strtolower($method), [
+            'setiteratorclass',
+        ], true);
     }
 
     /**
@@ -18006,6 +18161,7 @@ class Compiler {
             }
             $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex);
             $prefetchOps = [];
+            $assignedNamedLocal = null;
             if (null !== $inlineArray) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);
                 if (null !== $existingArraySlot) {
@@ -18019,6 +18175,14 @@ class Compiler {
                 }
             } else {
                 $valueSlot = null;
+                $assignVarProbe = $arg;
+                if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
+                    $assignVarProbe = $cfgCallOp->args[(int) $argIndex];
+                }
+                $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($assignVarProbe, $block);
+                if (null !== $assignedNamedLocal) {
+                    $valueSlot = (string) $assignedNamedLocal;
+                }
                 if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
                         $arg,
@@ -18160,7 +18324,7 @@ class Compiler {
                 if (null === $closureSlot && null !== $cfgCallOp) {
                     $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
                 }
-                if (null !== $closureSlot) {
+                if (null !== $closureSlot && null === $assignedNamedLocal && !$this->isNamedVariableOperand($arg)) {
                     $valueSlot = $closureSlot;
                 }
                 if (
@@ -18191,7 +18355,8 @@ class Compiler {
                     $valueSlot = $this->registerNullConstantSlot($block, $arg);
                 }
                 if (
-                    null !== $valueSlot
+                    null === $assignedNamedLocal
+                    && null !== $valueSlot
                     && !$this->isCallArgDirectArrayDimFetch($arg)
                     && null !== $block->orig
                     && ($arg instanceof Operand\Variable || $arg instanceof Operand\Temporary)
@@ -18212,7 +18377,11 @@ class Compiler {
                     }
                     if (null === $this->findCoalesceStmtForCallArg($arg, $block)) {
                         $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
-                        if (null !== $producerSlot) {
+                        if (
+                            null !== $producerSlot
+                            && !$this->isNamedVariableOperand($arg)
+                            && null === $this->namedLocalCallArgSlotIfBound($arg, $block, $cfgCallOp, (int) $argIndex)
+                        ) {
                             $valueSlot = $producerSlot;
                         } elseif (null !== $cfgCallOp) {
                             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -18262,7 +18431,11 @@ class Compiler {
                             ++$arrayProducerCount;
                         }
                     }
-                    if ($arrayProducerCount >= 2 && !$this->callIncludesNamedParameter($cfgCallOp)) {
+                    if (
+                        $arrayProducerCount >= 2
+                        && !$this->callIncludesNamedParameter($cfgCallOp)
+                        && null === $this->slotForNamedLocalFromAssignVarOperand($arg, $block)
+                    ) {
                         $matched = $this->matchInlineCallArgProducer(
                             $producers,
                             $cfgCallOp->args ?? [],
@@ -18314,7 +18487,13 @@ class Compiler {
                     $cfgCallOp
                 );
                 $namedLocalSlot = $this->namedLocalCallArgSlotIfBound($arg, $block, $cfgCallOp, (int) $argIndex);
-                if (\count($producers) >= 2 && null === $namedLocalSlot) {
+                if (null === $namedLocalSlot) {
+                    $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($arg, $block);
+                    if (null !== $assignedNamedLocal) {
+                        $namedLocalSlot = (string) $assignedNamedLocal;
+                    }
+                }
+                if (\count($producers) >= 2 && null === $namedLocalSlot && null === $assignedNamedLocal) {
                     $matched = $this->matchInlineCallArgProducer(
                         $producers,
                         $cfgCallOp->args ?? [],
@@ -18340,6 +18519,8 @@ class Compiler {
                     }
                 } elseif (null !== $namedLocalSlot) {
                     $valueSlot = $namedLocalSlot;
+                } elseif (null !== $assignedNamedLocal) {
+                    $valueSlot = (string) $assignedNamedLocal;
                 }
                 if ('array_column' === strtolower($calleeName ?? '')) {
                     if (0 === $argIndex) {
@@ -18532,6 +18713,14 @@ class Compiler {
                     }
                 }
             }
+            $namedAssignDestProbe = $arg;
+            if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
+                $namedAssignDestProbe = $cfgCallOp->args[(int) $argIndex];
+            }
+            $namedAssignDest = $block->slotForNamedAssignDest($namedAssignDestProbe);
+            if (null !== $namedAssignDest) {
+                $valueSlot = (string) $namedAssignDest;
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -18587,6 +18776,10 @@ class Compiler {
             }
         }
         if (null === $name || '' === $name) {
+            $assignedNamed = $this->slotForNamedLocalFromAssignVarOperand($probe, $block);
+            if (null !== $assignedNamed) {
+                return (string) $assignedNamed;
+            }
             return null;
         }
         $namedSlot = $block->slotIndexForVariableName($name);
@@ -18610,7 +18803,15 @@ class Compiler {
         if (null === $valueSlot) {
             return null;
         }
-        if ($this->callArgOperandIsClosureValue($arg, $block)) {
+        $assignedNamed = $this->slotForNamedLocalFromAssignVarOperand($arg, $block);
+        if (null !== $assignedNamed) {
+            return (string) $assignedNamed;
+        }
+        if (
+            $this->callArgOperandIsClosureValue($arg, $block)
+            && !$this->isNamedVariableOperand($arg)
+            && null === $this->namedLocalCallArgSlotIfBound($arg, $block)
+        ) {
             return $valueSlot;
         }
         $name = Block::resolveVariableName($arg);

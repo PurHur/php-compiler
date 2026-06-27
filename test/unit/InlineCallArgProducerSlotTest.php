@@ -2317,6 +2317,27 @@ PHP;
         self::assertSame("a%5B0%5D=x&a%5B1%5D=y\n", ob_get_clean());
     }
 
+    /** Issue #5644 — named closure locals must use assign.result slots across echo-separated var_export calls. */
+    public function testNamedClosureLocalSurvivesEchoBetweenVarExportCalls(): void
+    {
+        $code = <<<'PHP'
+<?php
+$cmp = static fn ($a, $b) => $a <=> $b;
+$keycmp = static fn ($a, $b) => strcmp((string) $a, (string) $b);
+var_export(array_udiff([1, 2], [2, 3], $cmp));
+echo "\n";
+var_export(array_uintersect([1, 2, 3], [2, 3, 4], $cmp));
+echo "\n";
+var_export(array_udiff_uassoc(['a' => 1], ['a' => 1], $cmp, $keycmp));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'named_closure_var_export_echo.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("array (\n)", $out);
+    }
+
     /** Issue #12009 — hoisted FuncCall + ConstFetch siblings with embedded middle literal (try body). */
     public function testJsonDecodeInlineStrRepeatJsonThrowOnErrorDepthRuntime(): void
     {
