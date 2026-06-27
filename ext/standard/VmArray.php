@@ -497,6 +497,57 @@ final class VmArray
         return $out;
     }
 
+    /**
+     * array_intersect_key() with one source array — copy keys/values (php-src array.c, #12551).
+     */
+    public static function intersectKeySingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect_key() two-array step — keep entries whose keys exist in $other.
+     */
+    public static function intersectKeyTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::keyExistsInHashTable($key, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    private static function keyExistsInHashTable(Variable $key, HashTable $table): bool
+    {
+        return null !== self::valueAtKeyInHashTable($key, $table);
+    }
+
+    private static function valueAtKeyInHashTable(Variable $key, HashTable $table): ?Variable
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            return $table->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_FLOAT === $key->type) {
+            return $table->findIndex($key->toInt());
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            return $table->find($key->toString());
+        }
+
+        return null;
+    }
+
     /** @param list<HashTable> $others */
     private static function allLists(array $others): bool
     {
