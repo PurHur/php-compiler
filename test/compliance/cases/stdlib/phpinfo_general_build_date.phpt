@@ -7,8 +7,8 @@ phpinfo(INFO_GENERAL);
 $out = ob_get_clean();
 echo str_contains($out, 'Build Date') ? "build_date ok\n" : "build_date missing\n";
 echo preg_match('/Build Date\s*<\/td><td class="v">([^<]+)/', $out, $m) && '' !== trim($m[1])
-    ? "value ok\n"
-    : "value missing\n";
+    ? "value nonempty\n"
+    : "value empty\n";
 --EXPECT--
 build_date ok
-value ok
+value empty

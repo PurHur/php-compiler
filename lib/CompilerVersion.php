@@ -21,7 +21,7 @@ final class CompilerVersion
     public const VERSION_ID = 80400;
 
     /** Build timestamp for phpinfo() INFO_GENERAL Build Date row (php-src PHP_BUILD_DATE). */
-    public const BUILD_DATE = 'Jun 26 2026';
+    public const BUILD_DATE = '';
 
     /** SAPI name for CLI entrypoints (bin/vm.php, AOT binaries). */
     public const SAPI = 'cli';

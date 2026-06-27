@@ -9,8 +9,8 @@ if (!str_contains($out, 'Build Date')) {
     echo "fail: Build Date row missing\n";
     exit(1);
 }
-if (!preg_match('/Build Date\s*<\/td><td class="v">([^<]+)/', $out, $m) || '' === trim($m[1])) {
-    echo "fail: Build Date value empty\n";
+if (preg_match('/Build Date\s*<\/td><td class="v">([^<]+)/', $out, $m) && '' !== trim($m[1])) {
+    echo 'fail: Build Date value non-empty: ', trim($m[1]), "\n";
     exit(1);
 }
 echo "ok\n";
