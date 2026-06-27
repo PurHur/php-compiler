@@ -13,7 +13,8 @@ final class StringSscanfByRefRuntimeShrinkTest extends TestCase
     {
         $source = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/Sscanf.php');
         $this->assertStringContainsString('StringSscanfByRef::implement', $source);
-        $this->assertStringContainsString('SscanfJit::implementVfscanfOnly', $source);
+        $this->assertStringContainsString('StringVfscanf::implement', $source);
+        $this->assertStringNotContainsString('SscanfJit::implementVfscanfOnly', $source);
         $this->assertStringNotContainsString("StringSscanfByRef::implement(\$context);\n        SscanfJit::implement(\$context);", $source);
     }
 

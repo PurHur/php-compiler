@@ -57,6 +57,19 @@ final class SscanfJitHelper
         return \pack('qq', $assigned, $consumed).$payload;
     }
 
+    /**
+     * @param list<Variable> $outVars assigned prefix only
+     */
+    public static function packMetaFromVariables(int $assigned, int $consumed, array $outVars): string
+    {
+        $payload = '';
+        for ($i = 0; $i < $assigned; ++$i) {
+            $payload .= self::encodeVariable($outVars[$i]->resolveIndirect());
+        }
+
+        return self::packMeta($assigned, $consumed, $payload);
+    }
+
     private static function encodeVariable(Variable $value): string
     {
         switch ($value->type) {
