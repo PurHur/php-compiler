@@ -38,7 +38,7 @@ final class InfoJitHelper
 
     public static function zend_version(): string
     {
-        return '4.4.0';
+        return CompilerVersion::zendVersion();
     }
 
     public static function php_uname(?string $mode): string

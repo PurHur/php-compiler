@@ -52,9 +52,6 @@ final class VmInfo
 
     public const CREDITS_ALL = -1;
 
-    /** Zend engine version label for zend_version() (php-src Zend/zend.c ZEND_VERSION shape). */
-    public const ZEND_VERSION = '4.4.0';
-
     /** php-src maps the Zend engine module to extension name Core (ext/standard/info.c). */
     public static function isEngineExtensionName(string $extension): bool
     {
@@ -130,7 +127,7 @@ final class VmInfo
 
     public static function zend_version(): string
     {
-        return self::ZEND_VERSION;
+        return CompilerVersion::zendVersion();
     }
 
     /**
@@ -484,7 +481,7 @@ final class VmInfo
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
         $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
-        $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.self::ZEND_VERSION.' </td></tr>';
+        $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.CompilerVersion::zendVersion().' </td></tr>';
         $html .= '</table><br />';
 
         return $html;

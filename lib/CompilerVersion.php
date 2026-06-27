@@ -26,6 +26,22 @@ final class CompilerVersion
     /** SAPI name for CLI entrypoints (bin/vm.php, AOT binaries). */
     public const SAPI = 'cli';
 
+    /** Zend engine version for Docker/php-src 8.2 reference profile (Zend/zend.c, #12471). */
+    public const REFERENCE_ZEND_VERSION = '4.2.31';
+
+    /** Zend engine version when VERSION is stable 8.4+ (php-src 8.4.x → 4.4.x). */
+    public const FORWARD_ZEND_VERSION = '4.4.0';
+
+    /** Zend engine version reported by zend_version() for the active profile (Zend/zend.c). */
+    public static function zendVersion(): string
+    {
+        if (version_compare(self::VERSION, '8.4.0', '<')) {
+            return self::REFERENCE_ZEND_VERSION;
+        }
+
+        return self::FORWARD_ZEND_VERSION;
+    }
+
     /** PHP 8.3+ typed class constants in traits (Zend/zend_compile.c, issue #5212). */
     public static function supportsTypedTraitConstants(): bool
     {
