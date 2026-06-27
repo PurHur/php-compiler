@@ -383,6 +383,7 @@ require_once __DIR__.'/../../../ext/standard/ArrayMapJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayMergeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayMergeRecursiveJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayPadJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ArrayProductJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayReplaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayReplaceKeyJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayReverseJitHelper.php';
