@@ -1950,7 +1950,7 @@ class Compiler {
                             $child instanceof Op\Expr\ArrayDimFetch
                             || $this->isListSpreadAssignOp($child)
                         )
-                        && $this->isListDestructGroupStart($ops, $i)
+                        && $this->isListDestructGroupStart($ops, $i, $block)
                     ) {
                         [$block, $i] = $this->compileListDestructGroup($ops, $i, $block);
                     } else {
@@ -2001,7 +2001,7 @@ class Compiler {
         if (!$op->dim instanceof Literal || !is_string($op->dim->value)) {
             return false;
         }
-        if ($this->isKeyedListDestructDimFetch($ops, $index)) {
+        if ($this->isKeyedListDestructDimFetch($ops, $index, $block)) {
             return false;
         }
         foreach ($block->opCodes as $prev) {
@@ -2130,7 +2130,7 @@ class Compiler {
      *
      * @param Op[] $ops
      */
-    private function isKeyedListDestructDimFetch(array $ops, int $index): bool
+    private function isKeyedListDestructDimFetch(array $ops, int $index, ?Block $block = null): bool
     {
         if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
             return false;
@@ -2149,8 +2149,11 @@ class Compiler {
         }
         /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
         $assign = $ops[$assignIndex];
+        if ($assign->expr !== $fetch->result) {
+            return false;
+        }
 
-        return $assign->expr === $fetch->result;
+        return $this->assignIsListDestructSlotTarget($assign->var, $block);
     }
 
     private function assignIsListSpread(Op\Expr\Assign $assign): bool
@@ -2171,14 +2174,14 @@ class Compiler {
      *
      * @param Op[] $ops
      */
-    private function isListDestructGroupStart(array $ops, int $index): bool
+    private function isListDestructGroupStart(array $ops, int $index, ?Block $block = null): bool
     {
         if ($this->isListSpreadAssignOp($ops[$index])) {
-            return !$this->isListDestructSpreadTail($ops, $index);
+            return !$this->isListDestructSpreadTail($ops, $index, $block);
         }
         if (
-            !$this->isPlainListDestructDimFetch($ops, $index)
-            && !$this->isKeyedListDestructDimFetch($ops, $index)
+            !$this->isPlainListDestructDimFetch($ops, $index, $block)
+            && !$this->isKeyedListDestructDimFetch($ops, $index, $block)
         ) {
             return false;
         }
@@ -2193,7 +2196,7 @@ class Compiler {
             }
             if (
                 $op instanceof Op\Expr\ArrayDimFetch
-                && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p))
+                && ($this->isPlainListDestructDimFetch($ops, $p, $block) || $this->isKeyedListDestructDimFetch($ops, $p, $block))
                 && $op->var === $cur->var
             ) {
                 return false;
@@ -2210,7 +2213,7 @@ class Compiler {
      *
      * @param Op[] $ops
      */
-    private function isListDestructSpreadTail(array $ops, int $index): bool
+    private function isListDestructSpreadTail(array $ops, int $index, ?Block $block = null): bool
     {
         if (!$this->isListSpreadAssignOp($ops[$index])) {
             return false;
@@ -2224,18 +2227,18 @@ class Compiler {
         }
 
         return $p >= 0
-            && ($this->isPlainListDestructDimFetch($ops, $p) || $this->isKeyedListDestructDimFetch($ops, $p));
+            && ($this->isPlainListDestructDimFetch($ops, $p, $block) || $this->isKeyedListDestructDimFetch($ops, $p, $block));
     }
 
     /**
      * @param Op[] $ops
      */
-    private function isPlainListDestructDimFetch(array $ops, int $index): bool
+    private function isPlainListDestructDimFetch(array $ops, int $index, ?Block $block = null): bool
     {
         if (!$ops[$index] instanceof Op\Expr\ArrayDimFetch) {
             return false;
         }
-        if ($this->isKeyedListDestructDimFetch($ops, $index)) {
+        if ($this->isKeyedListDestructDimFetch($ops, $index, $block)) {
             return false;
         }
         /** @var Op\Expr\ArrayDimFetch $fetch */
@@ -2247,13 +2250,13 @@ class Compiler {
             return false;
         }
 
-        return $this->isListDestructDimFetchConsumer($ops, $index);
+        return $this->isListDestructDimFetchConsumer($ops, $index, $block);
     }
 
     /**
      * @param Op[] $ops
      */
-    private function isListDestructDimFetchConsumer(array $ops, int $index): bool
+    private function isListDestructDimFetchConsumer(array $ops, int $index, ?Block $block = null): bool
     {
         if ($index + 1 >= count($ops)) {
             return false;
@@ -2263,14 +2266,17 @@ class Compiler {
         if (null !== $assignIndex) {
             /** @var Op\Expr\Assign|Op\Expr\AssignRef $assign */
             $assign = $ops[$assignIndex];
+            if ($assign->expr !== $fetch->result) {
+                return false;
+            }
 
-            return $assign->expr === $fetch->result;
+            return $this->assignIsListDestructSlotTarget($assign->var, $block);
         }
         $next = $ops[$index + 1];
 
         return $next instanceof Op\Expr\ArrayDimFetch
             && $next->var === $fetch->result
-            && $this->isPlainListDestructDimFetch($ops, $index + 1);
+            && $this->isPlainListDestructDimFetch($ops, $index + 1, $block);
     }
 
     /**
@@ -2278,7 +2284,7 @@ class Compiler {
      *
      * @param Op[] $ops
      */
-    private function listDestructGroupEndIndex(array $ops, int $start): int
+    private function listDestructGroupEndIndex(array $ops, int $start, ?Block $block = null): int
     {
         $i = $start;
         if ($this->isListSpreadAssignOp($ops[$i])) {
@@ -2286,7 +2292,7 @@ class Compiler {
         }
         while (
             $i < count($ops)
-            && ($this->isPlainListDestructDimFetch($ops, $i) || $this->isKeyedListDestructDimFetch($ops, $i))
+            && ($this->isPlainListDestructDimFetch($ops, $i, $block) || $this->isKeyedListDestructDimFetch($ops, $i, $block))
         ) {
             $i = $this->listDestructOpEndIndex($ops, $i);
         }
@@ -2349,7 +2355,7 @@ class Compiler {
     private function compileListDestructGroup(array $ops, int $start, Block $block): array
     {
         $this->rejectLoneListSpreadAssign($ops, $start);
-        $end = $this->listDestructGroupEndIndex($ops, $start);
+        $end = $this->listDestructGroupEndIndex($ops, $start, $block);
         $this->rejectListDestructNonWritableWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
 
@@ -19833,7 +19839,7 @@ class Compiler {
      */
     private function rejectLoneListSpreadAssign(array $ops, int $start): void
     {
-        if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start)) {
+        if (!$this->isListSpreadAssignOp($ops[$start]) || $this->isListDestructSpreadTail($ops, $start, null)) {
             return;
         }
         /** @var Op\Expr\Assign $spread */
@@ -19866,6 +19872,9 @@ class Compiler {
             if (!$op instanceof Op\Expr\Assign && !$op instanceof Op\Expr\AssignRef) {
                 continue;
             }
+            if (!$this->assignIsListDestructSlotTarget($op->var, $block)) {
+                continue;
+            }
             $this->rejectThisReassignment($op->var);
             $this->rejectNullsafeInWriteContext($op->var, $block);
             if (
@@ -19875,6 +19884,40 @@ class Compiler {
                 $this->throwListDestructNonWritableWriteFatalFromOp($op);
             }
         }
+    }
+
+    /**
+     * True when an assign in a list-destruct group writes a slot, not an SSA read temp (#12602).
+     */
+    private function assignIsListDestructSlotTarget(Operand $var, ?Block $block = null): bool
+    {
+        if ($var instanceof Operand\Literal) {
+            return true;
+        }
+        if ($var instanceof Op\Expr\ConstFetch || $var instanceof Op\Expr\ClassConstFetch) {
+            return true;
+        }
+        if ($this->isNamedVariableOperand($var)) {
+            return true;
+        }
+        if (null !== $this->unwrapPropertyFetch($var) || null !== $this->unwrapStaticPropertyFetch($var)) {
+            return true;
+        }
+        if (null !== $this->unwrapArrayDimFetch($var)) {
+            return true;
+        }
+        if ($var instanceof Operand\Variable && null !== $block) {
+            $producer = $this->findListDestructWriteTargetProducer($var, $block);
+            if (null !== $producer) {
+                if ($producer instanceof Op\Expr\ArrayDimFetch) {
+                    return false;
+                }
+
+                return $this->isListDestructWriteTargetPreludeOp($producer);
+            }
+        }
+
+        return false;
     }
 
     /**
