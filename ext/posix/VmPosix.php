@@ -8,6 +8,8 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\ext\standard\VmDate;
 use PHPCompiler\ext\standard\VmGetcwdNative;
+use PHPCompiler\ext\standard\VmProcessIdentityPure;
+use PHPCompiler\ext\standard\VmUnamePure;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -29,6 +31,11 @@ final class VmPosix
 
     public static function getppid(): int
     {
+        $ppid = VmProcessIdentityPure::getppid();
+        if (null !== $ppid) {
+            return $ppid;
+        }
+
         $ffi = self::ffi();
         if (null !== $ffi) {
             return (int) $ffi->getppid();
@@ -39,6 +46,11 @@ final class VmPosix
 
     public static function geteuid(): int
     {
+        $euid = VmProcessIdentityPure::geteuid();
+        if (null !== $euid) {
+            return $euid;
+        }
+
         $ffi = self::ffi();
         if (null !== $ffi) {
             return (int) $ffi->geteuid();
@@ -49,6 +61,11 @@ final class VmPosix
 
     public static function getegid(): int
     {
+        $egid = VmProcessIdentityPure::getegid();
+        if (null !== $egid) {
+            return $egid;
+        }
+
         $ffi = self::ffi();
         if (null !== $ffi) {
             return (int) $ffi->getegid();
@@ -63,6 +80,11 @@ final class VmPosix
     public static function getgroups(): array|false
     {
         self::$lastError = 0;
+        $groups = VmProcessIdentityPure::getgroups();
+        if (null !== $groups) {
+            return $groups;
+        }
+
         $ffi = self::ffi();
         if (null === $ffi) {
             throw new \Error('posix_getgroups() is not available in this compiler build');
@@ -100,6 +122,10 @@ final class VmPosix
     public static function uname(): array|false
     {
         self::$lastError = 0;
+        if (VmUnamePure::available()) {
+            return VmUnamePure::utsname();
+        }
+
         $ffi = self::ffi();
         if (null === $ffi) {
             throw new \Error('posix_uname() is not available in this compiler build');
