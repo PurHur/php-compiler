@@ -28,7 +28,7 @@ class C {
     protected public(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
@@ -41,7 +41,7 @@ class C {
     private protected(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 

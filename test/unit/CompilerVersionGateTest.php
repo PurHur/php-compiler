@@ -64,9 +64,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
     }
 
-    public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
+    public function testSupportsAsymmetricVisibilityTrueOn84DevTarget(): void
     {
-        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
     }
 
     public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
