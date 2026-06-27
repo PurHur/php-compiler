@@ -179,7 +179,11 @@ final class ClosureSupport
                 return null;
             }
         }
-        if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
+        if (
+            null !== $scopeClass
+            && self::isExplicitScope($newScope)
+            && self::isInternalScopeClass($ctx, $scopeClass)
+        ) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
             return null;
@@ -200,6 +204,20 @@ final class ClosureSupport
         }
 
         return 'static' !== strtolower($newScope->toString());
+    }
+
+    /** True when $newScope was passed explicitly (not omitted / not the static alias). */
+    private static function isExplicitScope(?Variable $newScope): bool
+    {
+        if (null === $newScope) {
+            return false;
+        }
+        $newScope = $newScope->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $newScope->type) {
+            return true;
+        }
+
+        return self::isExplicitStringScope($newScope);
     }
 
     private static function scopeClassExists(Context $ctx, string $scopeClass): bool
