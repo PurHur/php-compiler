@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\NaturalSortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -50,7 +50,7 @@ final class natsort_ extends Internal
             throw new \LogicException('natsort() requires exactly one argument');
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'natsort');
-        ArrayBuiltinHelper::natsortByValue($context, $args[0]);
+        NaturalSortRuntime::natsortByValue($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
