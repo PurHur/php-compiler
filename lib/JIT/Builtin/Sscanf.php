@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
  * JIT/AOT link for __compiler_sscanf* (issue #7330, #9134, #12467).
  *
  * Array return and by-ref assignment use {@see SscanfJitHelper} PHP on JIT embed;
- * standalone keeps {@see SscanfJit} LLVM quarantine.
+ * vfscanf uses {@see StringVfscanf} + {@see VfscanfJitHelper}; standalone keeps {@see SscanfJit} LLVM quarantine.
  */
 final class Sscanf
 {
@@ -34,6 +34,6 @@ final class Sscanf
 
         StringSscanfArray::implement($context);
         StringSscanfByRef::implement($context);
-        SscanfJit::implementVfscanfOnly($context);
+        StringVfscanf::implement($context);
     }
 }
