@@ -105,6 +105,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($ctx->classes['clockinterface']));
     }
 
+    public function testVmDoesNotRegisterStreamContextSetOptionsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $this->assertFalse(isset($ctx->functions['stream_context_set_options']));
+        $this->assertTrue(isset($ctx->functions['stream_context_get_options']));
+    }
+
     public function testVmDoesNotRegisterClassConstantsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
