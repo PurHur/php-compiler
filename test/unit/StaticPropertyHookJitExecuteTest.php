@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\LlvmToolchain;
 use PHPUnit\Framework\TestCase;
 
@@ -14,6 +15,13 @@ use PHPUnit\Framework\TestCase;
  */
 final class StaticPropertyHookJitExecuteTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     private string $repoRoot;
 
     protected function setUp(): void

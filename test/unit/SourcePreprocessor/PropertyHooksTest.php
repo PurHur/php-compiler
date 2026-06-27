@@ -6,12 +6,15 @@ namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
 final class PropertyHooksTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
     public function testStripsSetHookAndInjectsMethod(): void
     {
         $src = <<<'PHP'
@@ -503,6 +506,7 @@ PHP;
     /** @covers issue #7313 — promoted hooked param end-to-end via Runtime preprocess */
     public function testPromotedConstructorParamPropertyHooksSurviveRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooks();
         $src = <<<'PHP'
 <?php
 class C {
@@ -561,6 +565,7 @@ PHP;
         self::assertStringContainsString('private int $x = 1;', $out);
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
 
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $this->expectException(\CompileError::class);
         $this->expectExceptionMessage('Cannot redeclare C::$x');
@@ -611,6 +616,7 @@ PHP;
     /** @covers issue #11594 — end-to-end via Runtime preprocess */
     public function testDefaultInitializerWithPropertyHooksSurvivesRuntimePreprocess(): void
     {
+        $this->skipUnlessPropertyHooks();
         $src = <<<'PHP'
 <?php
 class C {

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\PropertyHookRejector;
 
 /**
  * Strip PHP 8.4 property-hook blocks for nikic/php-parser v4 and inject hook methods.
@@ -1444,5 +1445,70 @@ final class PropertyHooks
     private function declHeadHasAsymmetricSetVisibility(string $declHead): bool
     {
         return (bool) preg_match('/\b(public|protected|private)\s*\(\s*set\s*\)/i', $declHead);
+    }
+
+    /**
+     * First property-hook block for reference-profile rejection (#12574).
+     *
+     * @return array{0: int, 1: string}|null [1-based line, Zend parse error message]
+     */
+    public function locateFirstPropertyHookViolation(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                break;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $hookDecl = $this->findNextPropertyHookDecl($body, 0);
+            if (null !== $hookDecl) {
+                [$prop, $varStart, $hookOpen] = $hookDecl;
+                $bodyBase = $bodyStart + 1;
+                $afterVar = $varStart + 1 + strlen($prop);
+                $segment = substr($body, $afterVar, $hookOpen - $afterVar);
+                if ((bool) preg_match('/=\s*\S/', $segment)) {
+                    $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+                    if (null !== $hookSpan) {
+                        $hookInner = substr($body, $hookOpen + 1, $hookSpan[1] - $hookOpen - 1);
+                        $arrowPos = $this->findHookBlockFatArrow($hookInner);
+                        if (null !== $arrowPos) {
+                            $absArrow = $bodyBase + $hookOpen + 1 + $arrowPos;
+
+                            return [self::lineAtOffset($code, $absArrow), PropertyHookRejector::UNEXPECTED_ARROW_MESSAGE];
+                        }
+                    }
+                }
+
+                return [self::lineAtOffset($code, $bodyBase + $hookOpen), PropertyHookRejector::UNEXPECTED_BRACE_MESSAGE];
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
+    private function findHookBlockFatArrow(string $hookInner): ?int
+    {
+        if (!preg_match('/\b(?:get|set|unset)\s*=>\s*/', $hookInner, $m, PREG_OFFSET_CAPTURE)) {
+            return null;
+        }
+        $posInMatch = strpos($m[0][0], '=>');
+        if (false === $posInMatch) {
+            return null;
+        }
+
+        return $m[0][1] + $posInMatch;
     }
 }

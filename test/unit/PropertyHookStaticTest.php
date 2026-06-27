@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7097 */
 final class PropertyHookStaticTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testStaticInPropertyHookGetBodyPersistsAcrossReads(): void
     {
         $runtime = new Runtime();

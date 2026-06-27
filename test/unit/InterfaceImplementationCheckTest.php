@@ -5,12 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #3386, #3536 */
 final class InterfaceImplementationCheckTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
     public function testMissingInterfaceMethodFailsAtCompileTime(): void
     {
         $runtime = new Runtime();
@@ -189,6 +192,7 @@ PHP;
 
     public function testMissingInterfacePropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -208,6 +212,7 @@ PHP;
 
     public function testImplementedInterfacePropertyHookCompiles(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -228,6 +233,7 @@ PHP;
 
     public function testMissingInterfaceStaticPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -245,6 +251,7 @@ PHP;
 
     public function testImplementedInterfaceStaticPropertyHookCompiles(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -269,6 +276,7 @@ PHP;
 
     public function testConcreteClassAbstractPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -286,6 +294,7 @@ PHP;
 
     public function testMissingParentAbstractPropertyHooksFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -306,6 +315,7 @@ PHP;
 
     public function testEvalAbstractPropertyHookFailsAtCompileTime(): void
     {
+        $this->skipUnlessPropertyHooks();
         $runtime = new Runtime();
         $outer = <<<'PHP'
 <?php

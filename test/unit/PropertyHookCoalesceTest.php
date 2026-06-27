@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** ?? on property hooks must not invoke get hook (#8919, #8902). */
 final class PropertyHookCoalesceTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testVmCoalesceOnSeparateBackingWithoutGetHook(): void
     {
         $code = <<<'PHP'

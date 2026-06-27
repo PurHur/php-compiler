@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
@@ -11,6 +12,8 @@ use PHPUnit\Framework\TestCase;
 /** Static property hooks compile and lower (#6931, PHP 8.4 zend_property_hooks.c). */
 final class StaticPropertyHooksTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
     public function testDirectClassStaticPropertyHooksLower(): void
     {
         $src = <<<'PHP'
@@ -52,6 +55,7 @@ PHP;
 
     public function testLiteralGetHookCompilesOnVm(): void
     {
+        $this->skipUnlessPropertyHooks();
         $src = <<<'PHP'
 <?php
 class C {
@@ -75,6 +79,7 @@ PHP;
 
     public function testSelfReferentialStaticHookDispatchOnVm(): void
     {
+        $this->skipUnlessPropertyHooks();
         $src = <<<'PHP'
 <?php
 class C {

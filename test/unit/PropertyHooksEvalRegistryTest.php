@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPCompiler\ext\standard\VmEval;
 use PHPUnit\Framework\TestCase;
@@ -11,6 +12,13 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #7031 */
 final class PropertyHooksEvalRegistryTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testEvalConcretePropertyHookMergesSameNameBackingField(): void
     {
         $runtime = new Runtime();

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit\AOT;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPCompiler\Web\LiteralIncludeDiscovery;
 use PHPUnit\Framework\TestCase;
@@ -13,6 +14,13 @@ use PHPUnit\Framework\TestCase;
  */
 final class PropertyHookAotCompileTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testLiteralIncludeDiscoveryParsesPropertyHookSyntax(): void
     {
         $src = <<<'PHP'

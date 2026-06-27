@@ -13,6 +13,7 @@ $_ENV['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 $_SERVER['PHP_COMPILER_SKIP_LLVM_PRELOAD'] = '1';
 require __DIR__.'/../src/llvm-env.php';
 require __DIR__.'/../vendor/autoload.php';
+require __DIR__.'/PropertyHookProfileSkipTrait.php';
 require __DIR__.'/LlvmToolchain.php';
 require __DIR__.'/support/MiniWebAppCgiEnv.php';
 require __DIR__.'/support/CgiCookieJar.php';

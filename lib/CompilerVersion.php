@@ -223,6 +223,23 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block, …).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects hook syntax like Zend 8.2 (#12574).
+     * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
+     */
+    public static function supportsPropertyHooks(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /** Compliance .phpt basename uses PHP 8.4 property-hook syntax. */
+    public static function complianceCaseUsesPropertyHooks(string $caseName): bool
+    {
+        return str_contains($caseName, 'property_hook');
+    }
+
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {

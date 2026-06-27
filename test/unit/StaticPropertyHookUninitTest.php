@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** Static property hooks on self-backed uninitialized typed slots (#9683). */
 final class StaticPropertyHookUninitTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testVmSelfBackedStaticHookGetSet(): void
     {
         $src = <<<'PHP'

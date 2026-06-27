@@ -107,6 +107,9 @@ PHP;
     /** Issue #6603: get_class_vars() lists public hooked properties with declared defaults (null). */
     public function testVmGetClassVarsPropertyHooks(): void
     {
+        if (!CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks disabled on Zend 8.2 reference profile (#12574)');
+        }
         $code = <<<'PHP'
 <?php
 class C6603 {

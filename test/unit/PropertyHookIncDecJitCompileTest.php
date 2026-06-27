@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
@@ -17,6 +18,13 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class PropertyHookIncDecJitCompileTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     private string $repoRoot;
 
     protected function setUp(): void

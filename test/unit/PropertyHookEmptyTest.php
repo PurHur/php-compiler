@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\PropertyHookProfileSkipTrait;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** empty() on property hooks — get hook runs when present; set-only probes backing (#10680, #9832). */
 final class PropertyHookEmptyTest extends TestCase
 {
+    use PropertyHookProfileSkipTrait;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooks();
+    }
+
     public function testVmEmptyOnVirtualGetHookInvokesGet(): void
     {
         $code = <<<'PHP'
