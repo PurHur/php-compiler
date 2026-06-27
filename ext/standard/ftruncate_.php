@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** ftruncate() — VM via VmFs; JIT/AOT via __compiler_ftruncate (issue #3256). */
@@ -26,15 +25,15 @@ final class ftruncate_ extends Internal
             throw new \LogicException('ftruncate() requires exactly two arguments in this compiler build');
         }
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $sizeVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'ftruncate');
         if (null === $frame->returnVar) {
             return;
         }
-        if (Variable::TYPE_INTEGER !== $sizeVar->type) {
-            throw new \LogicException('ftruncate() size must be an integer in this compiler build');
+        $size = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'ftruncate', 2, 'size');
+        if ($size < 0) {
+            throw new \ValueError('ftruncate(): Argument #2 ($size) must be greater than or equal to 0');
         }
-        $frame->returnVar->bool(VmFs::ftruncate($handle, $sizeVar->toInt()));
+        $frame->returnVar->bool(VmFs::ftruncate($handle, $size));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
