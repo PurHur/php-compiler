@@ -29,7 +29,7 @@ final class JitGetimagesize
             throw new \LogicException('getimagesize() imageinfo by-ref is VM-only in this compiler build (#3271)');
         }
         StringFileGetContents::implement($context);
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'getimagesize', 0, 'filename');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'getimagesize', 0, 'filename');
         $data = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $path
