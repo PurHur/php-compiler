@@ -1019,6 +1019,28 @@ final class VmArray
         }
     }
 
+    /** sort() on packed list — reindex 0..n-1 (#12769, php-src php_array_sort). */
+    public static function sortPackedInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
+    {
+        if ($ht->getNumElements() < 2) {
+            return;
+        }
+        $values = self::copyPackedValues($ht);
+        self::sortPackedValues($values, $flags, 'sort()', false);
+        $ht->replacePackedValues($values);
+    }
+
+    /** rsort() on packed list — reindex descending (#12769). */
+    public static function sortPackedReverseInPlace(HashTable $ht, int $flags = StdlibConstants::SORT_REGULAR): void
+    {
+        if ($ht->getNumElements() < 2) {
+            return;
+        }
+        $values = self::copyPackedValues($ht);
+        self::sortPackedValues($values, $flags, 'rsort()', true);
+        $ht->replacePackedValues($values);
+    }
+
     /**
      * array_rand() — pick {@param $num} unique keys (CSPRNG; issue #2321, #4460).
      */
@@ -1352,6 +1374,107 @@ final class VmArray
             default:
                 return 'mixed';
         }
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    private static function copyPackedValues(HashTable $ht): array
+    {
+        $values = [];
+        foreach ($ht->iterate(true) as $value) {
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $values[] = $copy;
+        }
+
+        return $values;
+    }
+
+    /**
+     * @param list<Variable> $values
+     */
+    private static function sortPackedValues(array &$values, int $flags, string $function, bool $desc): void
+    {
+        if (\count($values) < 2) {
+            return;
+        }
+        $first = $values[0]->resolveIndirect();
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+        if (Variable::TYPE_STRING === $first->type) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
+            ) {
+                $cmp = VmInternalCompare::stringCompareForSortFlags($flags);
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesDesc($values, $cmp);
+                } else {
+                    VmInternalCompare::sortVariableValues($values, $cmp);
+                }
+            } else {
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+                } else {
+                    VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+                }
+            }
+        } elseif (Variable::TYPE_INTEGER === $first->type) {
+            if (
+                StdlibConstants::SORT_REGULAR === $sortType
+                && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_INTEGER)
+            ) {
+                $n = \count($values);
+                for ($i = 1; $i < $n; ++$i) {
+                    $j = $i;
+                    while ($j > 0) {
+                        $a = $values[$j - 1]->resolveIndirect();
+                        $b = $values[$j]->resolveIndirect();
+                        $ordered = $desc ? ($a->toInt() >= $b->toInt()) : ($a->toInt() <= $b->toInt());
+                        if ($ordered) {
+                            break;
+                        }
+                        $tmp = $values[$j - 1];
+                        $values[$j - 1] = $values[$j];
+                        $values[$j] = $tmp;
+                        --$j;
+                    }
+                }
+            } else {
+                if ($desc) {
+                    VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+                } else {
+                    VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+                }
+            }
+        } elseif (Variable::TYPE_OBJECT === $first->type || EnumCaseSupport::isEnumCaseVariable($first)) {
+            VmInternalCompare::assertHomogeneousEnumOrObjectValues($values, $function);
+            if (!self::packedObjectSortUsesSpaceship($flags)) {
+                throw new \LogicException(
+                    $function.' flags are not supported for object arrays in this compiler build'
+                );
+            }
+            if ($desc) {
+                VmInternalCompare::sortVariableValuesBySpaceshipDesc($values);
+            } else {
+                VmInternalCompare::sortVariableValuesBySpaceship($values);
+            }
+        } else {
+            if ($desc) {
+                VmInternalCompare::sortVariableValuesWithFlagsDesc($values, $flags);
+            } else {
+                VmInternalCompare::sortVariableValuesWithFlags($values, $flags);
+            }
+        }
+    }
+
+    /** php-src php_array_sort — SORT_REGULAR uses zend_compare on object zvals. */
+    private static function packedObjectSortUsesSpaceship(int $flags): bool
+    {
+        $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
+
+        return StdlibConstants::SORT_REGULAR === $sortType
+            || StdlibConstants::SORT_NUMERIC === $sortType;
     }
 
     /**

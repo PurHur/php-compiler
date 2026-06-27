@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -123,7 +123,7 @@ final class sort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'sort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::sortPacked($context, $args[0]);
+            SortRuntime::sortPacked($context, $args[0]);
         } else {
             self::jitSortWithFlags($context, $args[0], VmInternalCompare::resolveJitSortFlags($context, $args[1], 'sort'));
         }
@@ -138,15 +138,15 @@ final class sort_ extends Internal
 
         if (StdlibConstants::SORT_NATURAL === $sortType) {
             if (0 !== $caseFlag) {
-                ArrayBuiltinHelper::sortPackedNaturalCase($context, $array);
+                SortRuntime::sortPackedNaturalCase($context, $array);
             } else {
-                ArrayBuiltinHelper::sortPackedNatural($context, $array);
+                SortRuntime::sortPackedNatural($context, $array);
             }
 
             return;
         }
         if (StdlibConstants::SORT_LOCALE_STRING === $sortType) {
-            ArrayBuiltinHelper::sortPackedLocale($context, $array);
+            SortRuntime::sortPackedLocale($context, $array);
 
             return;
         }
@@ -155,7 +155,7 @@ final class sort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
         ) {
-            ArrayBuiltinHelper::sortPacked($context, $array);
+            SortRuntime::sortPacked($context, $array);
 
             return;
         }
