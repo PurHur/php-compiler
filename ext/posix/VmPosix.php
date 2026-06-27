@@ -275,37 +275,29 @@ final class VmPosix
     }
 
     /**
-     * Resolve login name to uid via libc getpwnam(3) (#7917; JIT StringFsDirJit parity).
+     * Resolve login name to uid via /etc/passwd (#7917, #12454; JIT StringFsDirJit parity).
      */
     public static function uidForName(string $name): ?int
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $pw = $ffi->getpwnam($name);
-        if (null === $pw) {
-            return null;
+        $uid = VmProcessIdentityPure::uidForName($name);
+        if (null !== $uid) {
+            return $uid;
         }
 
-        return (int) $pw->pw_uid;
+        return null;
     }
 
     /**
-     * Resolve group name to gid via libc getgrnam(3) (#7917; JIT StringFsDirJit parity).
+     * Resolve group name to gid via /etc/group (#7917; JIT StringFsDirJit parity).
      */
     public static function gidForName(string $name): ?int
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $gr = $ffi->getgrnam($name);
-        if (null === $gr) {
-            return null;
+        $gid = VmProcessIdentityPure::gidForName($name);
+        if (null !== $gid) {
+            return $gid;
         }
 
-        return (int) $gr->gr_gid;
+        return null;
     }
 
     /**
@@ -513,23 +505,6 @@ int setuid(uid_t uid);
 int setgid(gid_t gid);
 int seteuid(uid_t uid);
 int setegid(gid_t gid);
-struct passwd {
-    char *pw_name;
-    char *pw_passwd;
-    uid_t pw_uid;
-    gid_t pw_gid;
-    char *pw_gecos;
-    char *pw_dir;
-    char *pw_shell;
-};
-struct group {
-    char *gr_name;
-    char *gr_passwd;
-    gid_t gr_gid;
-    char **gr_mem;
-};
-struct passwd *getpwnam(const char *name);
-struct group *getgrnam(const char *name);
 int *__errno_location(void);
 char *ctermid(char *s);
 typedef unsigned long rlim_t;
