@@ -16,7 +16,9 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -89,6 +91,12 @@ final class array_map extends Internal
 
     private static function lowerSingleArrayMap(Context $context, JITVariable $callback, JITVariable $array): Value
     {
+        if (ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType($callback->type)) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitRaise($context, ArrayMapCallbackPolicy::invalidCallbackTypeError());
+
+            return JitValueBox::pointer($context, JitValueBox::alloc($context));
+        }
         if (JITVariable::TYPE_STRING === $callback->type || JITVariable::TYPE_VALUE === $callback->type) {
             (new self())->jitString($context, $callback, 'array_map() callback');
         }
@@ -117,6 +125,9 @@ final class array_map extends Internal
             return $out;
         }
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
+            if (ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+                throw new \TypeError(ArrayMapCallbackPolicy::invalidCallbackTypeError());
+            }
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
         $fn = VmInternalCall::resolveStringCallback($callback->toString());
