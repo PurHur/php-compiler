@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\posix\posix_access;
 use PHPCompiler\ext\posix\posix_getegid;
 use PHPCompiler\ext\posix\posix_geteuid;
 use PHPCompiler\ext\posix\posix_getgroups;
 use PHPCompiler\ext\posix\posix_uname;
+use PHPCompiler\ext\posix\PosixConstants;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
@@ -87,6 +89,8 @@ final class PosixEuidBuiltinTest extends TestCase
         $this->assertStringContainsString('VmProcessIdentityPure::getgroups', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getppid', $source);
         $this->assertStringContainsString('VmUnamePure::utsname', $source);
+        $this->assertStringContainsString('VmFsAccessPure::access', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->access\(/', $source);
     }
 
     public function test_posix_identity_matches_host_with_ffi_disabled_on_linux(): void
@@ -110,6 +114,37 @@ final class PosixEuidBuiltinTest extends TestCase
                 $fn->execute($frame);
                 $this->assertSame($expected, $frame->returnVar->resolveIndirect()->toInt(), $class);
             }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
+    }
+
+    public function test_posix_access_matches_host_with_ffi_disabled_on_linux(): void
+    {
+        if ('Linux' !== \PHP_OS_FAMILY || !\function_exists('posix_access')) {
+            $this->markTestSkipped('Linux host posix_access parity probe only');
+        }
+
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $runtime = new Runtime();
+            $fn = new posix_access();
+            $frame = $fn->getFrame($runtime->vmContext);
+            $frame->returnVar = new VMVariable();
+            $frame->calledArgs[] = new VMVariable();
+            $frame->calledArgs[0]->string(__FILE__);
+            $frame->calledArgs[] = new VMVariable();
+            $frame->calledArgs[1]->int(PosixConstants::POSIX_R_OK);
+            $fn->execute($frame);
+            $this->assertSame(
+                (bool) \posix_access(__FILE__, PosixConstants::POSIX_R_OK),
+                $frame->returnVar->resolveIndirect()->toBool()
+            );
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
