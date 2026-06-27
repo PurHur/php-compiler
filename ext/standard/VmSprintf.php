@@ -559,6 +559,10 @@ final class VmSprintf
         }
         $abs = \abs($value);
         if (0.0 === $abs) {
+            if (Ieee754::isNegativeZero($value)) {
+                return '-0';
+            }
+
             return self::positiveFloatSignPrefix($value, $showSign).'0';
         }
         if ($abs < 1e-4 || $abs >= 1e6) {
