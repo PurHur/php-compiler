@@ -68,4 +68,32 @@ final class VmArraySortCallback
 
         throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
     }
+
+    /**
+     * JIT compile-time guard when array_u*() is called with fewer than three args (#12643).
+     */
+    public static function requireUassocCallbackJitArg(
+        \PHPCompiler\JIT\Variable $callback,
+        string $function,
+        int $argNum
+    ): void {
+        if (\PHPCompiler\JIT\Variable::TYPE_NULL === $callback->type || $callback->isNullConstant) {
+            throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
+        }
+        if (\PHPCompiler\JIT\Variable::TYPE_HASHTABLE === $callback->type
+            || ($callback->type & \PHPCompiler\JIT\Variable::IS_NATIVE_ARRAY)) {
+            throw new \TypeError(self::uassocInvalidArrayCallbackTypeError($function, $argNum));
+        }
+        if (\PHPCompiler\JIT\Variable::TYPE_STRING === $callback->type) {
+            return;
+        }
+        if (\PHPCompiler\JIT\Variable::TYPE_OBJECT === $callback->type) {
+            return;
+        }
+        if (null !== $callback->closureCall) {
+            return;
+        }
+
+        throw new \TypeError(self::uassocInvalidCallbackTypeError($function, $argNum));
+    }
 }
