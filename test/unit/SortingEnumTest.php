@@ -4,14 +4,23 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7229 */
 final class SortingEnumTest extends TestCase
 {
+    private function requireSortingEnum(): void
+    {
+        if (!CompilerVersion::supportsSortingEnum()) {
+            $this->markTestSkipped('Sorting enum withheld on reference profile');
+        }
+    }
+
     public function testSortingBuiltinEnumExists(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -30,6 +39,7 @@ PHP;
 
     public function testArrayMultisortAcceptsSortingEnumCases(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -50,6 +60,7 @@ PHP;
     /** @covers issue #9947 */
     public function testSortAcceptsSortingEnumAndSortDirectionNamed(): void
     {
+        $this->requireSortingEnum();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

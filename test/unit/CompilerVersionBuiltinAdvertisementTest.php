@@ -24,6 +24,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsZendThreadId());
     }
 
+    public function testSortingEnumWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsSortingEnum());
+    }
+
     public function testJsonValidateWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
@@ -88,6 +93,14 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
+    }
+
+    public function testVmDoesNotRegisterSortingEnumOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $this->assertFalse(isset($ctx->classes['sorting']));
+        $this->assertFalse(isset($ctx->classes['sortdirection']));
     }
 
     public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
