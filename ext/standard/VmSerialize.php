@@ -317,9 +317,41 @@ final class VmSerialize
         Context $ctx,
         Variable $value,
         VmSerializeRefState $state,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        ?Variable $containerArray = null
     ): string {
-        $value = $value->resolveIndirect();
+        if ($value->isIndirect()) {
+            $existingRef = $state->lookupRefCellIndex($value);
+            if (null !== $existingRef) {
+                return 'R:'.$existingRef.';';
+            }
+            $target = $value->resolveIndirect();
+            $targetExisting = $state->lookupVariableIndex($target);
+            if (null !== $targetExisting
+                && null !== $containerArray
+                && Variable::TYPE_ARRAY === $target->type
+                && $target->resolveIndirect() === $containerArray->resolveIndirect()
+            ) {
+                $state->assignRefCellIndex($value);
+
+                return self::encodeWireArray($ctx, $target, $state, $frame, $containerArray);
+            }
+            if (null !== $targetExisting) {
+                $state->assignRefCellIndex($value, $targetExisting);
+
+                return 'R:'.$targetExisting.';';
+            }
+            $refIndex = $state->assignRefCellIndex($value);
+            $state->assignVariableIndexWithIndex($target, $refIndex);
+            $value = $target;
+        } else {
+            $value = $value->resolveIndirect();
+            $existing = $state->lookupVariableIndex($value);
+            if (null !== $existing) {
+                return 'R:'.$existing.';';
+            }
+            $state->assignVariableIndex($value);
+        }
         $resourceWire = self::serializeResourceWire($value);
         if (null !== $resourceWire) {
             return $resourceWire;
@@ -334,11 +366,6 @@ final class VmSerialize
         if (Variable::TYPE_ARRAY === $value->type) {
             return self::encodeWireArray($ctx, $value, $state, $frame);
         }
-        $existing = $state->lookupVariableIndex($value);
-        if (null !== $existing) {
-            return 'R:'.$existing.';';
-        }
-        $state->assignVariableIndex($value);
 
         return VmSerializeFormat::encodeExported(VmJson::export($value, $ctx, $ctx->runtime->vm));
     }
@@ -347,19 +374,18 @@ final class VmSerialize
         Context $ctx,
         Variable $value,
         VmSerializeRefState $state,
-        ?Frame $frame = null
+        ?Frame $frame = null,
+        ?Variable $containerArray = null
     ): string {
         $value = $value->resolveIndirect();
-        $existing = $state->lookupVariableIndex($value);
-        if (null !== $existing) {
-            return 'R:'.$existing.';';
+        if (null === $state->lookupVariableIndex($value)) {
+            $state->assignVariableIndex($value);
         }
-        $state->assignVariableIndex($value);
         $body = '';
         $count = 0;
-        foreach ($value->toArray()->iterateKeyed(true) as [$key, $elem]) {
+        foreach ($value->toArray()->iterateKeyed(false) as [$key, $elem]) {
             $body .= self::encodeWireKey($key);
-            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame);
+            $body .= self::encodeWireVariable($ctx, $elem, $state, $frame, $value);
             ++$count;
         }
 
@@ -1055,10 +1081,14 @@ final class VmSerializeRefState
     /** @var \SplObjectStorage<Variable, int> */
     public \SplObjectStorage $variableIndex;
 
+    /** @var \SplObjectStorage<Variable, int> */
+    public \SplObjectStorage $refCellIndex;
+
     public function __construct()
     {
         $this->objectIndex = new \SplObjectStorage();
         $this->variableIndex = new \SplObjectStorage();
+        $this->refCellIndex = new \SplObjectStorage();
     }
 
     public function reserveRootSlot(): void
@@ -1099,6 +1129,37 @@ final class VmSerializeRefState
         }
 
         return $this->variableIndex[$variable];
+    }
+
+    /** php-src ISREF zval identity — R: markers keyed by ref cell, not target (#12825). */
+    public function assignRefCellIndex(Variable $refCell, ?int $index = null): int
+    {
+        if (null !== $index) {
+            $this->refCellIndex[$refCell] = $index;
+
+            return $index;
+        }
+        $index = $this->nextIndex++;
+        $this->refCellIndex[$refCell] = $index;
+
+        return $index;
+    }
+
+    public function lookupRefCellIndex(Variable $refCell): ?int
+    {
+        if (!$this->refCellIndex->contains($refCell)) {
+            return null;
+        }
+
+        return $this->refCellIndex[$refCell];
+    }
+
+    public function assignVariableIndexWithIndex(Variable $variable, int $index): void
+    {
+        $this->variableIndex[$variable] = $index;
+        if ($index >= $this->nextIndex) {
+            $this->nextIndex = $index + 1;
+        }
     }
 }
 
