@@ -61,9 +61,10 @@ final class IniJitHelper
     ];
 
     private const READONLY_STRING_DEFAULTS = [
-        'max_execution_time' => '0',
         'session.save_handler' => 'files',
     ];
+
+    private const CFG_MAX_EXECUTION_TIME = '0';
 
     private const CFG_DEFAULT_CHARSET = 'UTF-8';
 
@@ -119,6 +120,8 @@ final class IniJitHelper
 
     private static int $pcreRecursionLimit = 100_000;
 
+    private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
     public static function getUserAgent(): string
     {
         return self::$userAgent;
@@ -127,6 +130,11 @@ final class IniJitHelper
     public static function getSerializePrecisionInt(): int
     {
         return self::$serializePrecision;
+    }
+
+    public static function syncMaxExecutionTime(int $seconds): void
+    {
+        self::$maxExecutionTime = (string) $seconds;
     }
 
     private static function parseSerializePrecisionIni(string $newValue): int
@@ -221,6 +229,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return (string) self::$pcreRecursionLimit;
         }
+        if ('max_execution_time' === $key) {
+            return self::$maxExecutionTime;
+        }
 
         return null;
     }
@@ -281,6 +292,9 @@ final class IniJitHelper
         if ('pcre.recursion_limit' === $key) {
             return self::setPcreRecursionLimit($newValue);
         }
+        if ('max_execution_time' === $key) {
+            return self::setMaxExecutionTime($newValue);
+        }
 
         return null;
     }
@@ -321,7 +335,7 @@ final class IniJitHelper
             return self::CFG_SESSION_SAVE_PATH;
         }
         if ('max_execution_time' === $key) {
-            return self::READONLY_STRING_DEFAULTS['max_execution_time'];
+            return self::CFG_MAX_EXECUTION_TIME;
         }
         if ('default_charset' === $key) {
             return self::CFG_DEFAULT_CHARSET;
@@ -397,6 +411,10 @@ final class IniJitHelper
                 break;
             case 'pcre.recursion_limit':
                 self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
+                break;
+            case 'max_execution_time':
+                self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+                ExecutionLimitsJitHelper::applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
                 break;
         }
     }
@@ -525,6 +543,15 @@ final class IniJitHelper
         }
         $old = (string) self::$pcreRecursionLimit;
         self::$pcreRecursionLimit = $parsed;
+
+        return $old;
+    }
+
+    private static function setMaxExecutionTime(string $newValue): string
+    {
+        $parsed = (int) trim($newValue);
+        $old = self::$maxExecutionTime;
+        ExecutionLimitsJitHelper::applyMaxExecutionTime($parsed);
 
         return $old;
     }
