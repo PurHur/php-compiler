@@ -8,22 +8,18 @@ use PHPCompiler\ext\posix\posix_getegid;
 use PHPCompiler\ext\posix\posix_geteuid;
 use PHPCompiler\ext\posix\posix_getgroups;
 use PHPCompiler\ext\posix\posix_uname;
-use PHPCompiler\ext\posix\VmPosix;
 use PHPCompiler\VM\Variable as VMVariable;
 use PHPUnit\Framework\TestCase;
 
-/** VM builtins for posix effective identity + uname (#6123). */
+/** VM builtins for posix effective identity + uname (#6123); pure /proc path (#12395). */
 final class PosixEuidBuiltinTest extends TestCase
 {
-    protected function setUp(): void
-    {
-        if (!VmPosix::ffiAvailable()) {
-            $this->markTestSkipped('libc FFI unavailable');
-        }
-    }
-
     public function test_posix_geteuid_matches_host(): void
     {
+        if (!\function_exists('posix_geteuid')) {
+            $this->markTestSkipped('host posix_geteuid unavailable');
+        }
+
         $runtime = new Runtime();
         $fn = new posix_geteuid();
         $frame = $fn->getFrame($runtime->vmContext);
@@ -34,6 +30,10 @@ final class PosixEuidBuiltinTest extends TestCase
 
     public function test_posix_getegid_matches_host(): void
     {
+        if (!\function_exists('posix_getegid')) {
+            $this->markTestSkipped('host posix_getegid unavailable');
+        }
+
         $runtime = new Runtime();
         $fn = new posix_getegid();
         $frame = $fn->getFrame($runtime->vmContext);
@@ -44,6 +44,10 @@ final class PosixEuidBuiltinTest extends TestCase
 
     public function test_posix_getgroups_returns_list(): void
     {
+        if (!\function_exists('posix_getgroups')) {
+            $this->markTestSkipped('host posix_getgroups unavailable');
+        }
+
         $runtime = new Runtime();
         $fn = new posix_getgroups();
         $frame = $fn->getFrame($runtime->vmContext);
@@ -72,6 +76,46 @@ final class PosixEuidBuiltinTest extends TestCase
             $this->assertNotNull($slot, $key);
             $this->assertSame(VMVariable::TYPE_STRING, $slot->resolveIndirect()->type, $key);
             $this->assertNotSame('', $slot->resolveIndirect()->toString(), $key);
+        }
+    }
+
+    public function testVmPosixRoutesIdentityThroughPurePaths(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosix.php');
+        $this->assertStringContainsString('VmProcessIdentityPure::geteuid', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::getegid', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::getgroups', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::getppid', $source);
+        $this->assertStringContainsString('VmUnamePure::utsname', $source);
+    }
+
+    public function test_posix_identity_matches_host_with_ffi_disabled_on_linux(): void
+    {
+        if ('Linux' !== \PHP_OS_FAMILY || !\function_exists('posix_geteuid')) {
+            $this->markTestSkipped('Linux host posix parity probe only');
+        }
+
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $runtime = new Runtime();
+            $cases = [
+                [posix_geteuid::class, (int) \posix_geteuid()],
+                [posix_getegid::class, (int) \posix_getegid()],
+            ];
+            foreach ($cases as [$class, $expected]) {
+                $fn = new $class();
+                $frame = $fn->getFrame($runtime->vmContext);
+                $frame->returnVar = new VMVariable();
+                $fn->execute($frame);
+                $this->assertSame($expected, $frame->returnVar->resolveIndirect()->toInt(), $class);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
         }
     }
 }
