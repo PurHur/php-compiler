@@ -272,6 +272,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'array_spread_enum_cases')) {
                 continue;
             }
+            // var_export(StaticCall::__set_state([]), true): inline StaticCall producer wiring (#11896); VM only.
+            if (str_contains($name, 'var_export_set_state_inline')) {
+                continue;
+            }
             // count() on Countable objects is VM-only until JIT object dispatch (#3364).
             if (str_contains($name, 'countable')) {
                 continue;

@@ -11614,7 +11614,8 @@ class Compiler {
             }
             if (1 === $funcCallProducerCount && 0 === $arrayProducerCount) {
                 $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
-                if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall) {
+                if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall
+                    || $matched instanceof Op\Expr\StaticCall || $matched instanceof Op\Expr\MethodCall) {
                     $producerIndex = null;
                     foreach ($block->orig->children as $i => $child) {
                         if ($child === $matched) {
@@ -14275,6 +14276,20 @@ class Compiler {
                 break;
             }
             if (
+                ($child instanceof Op\Expr\StaticCall || $child instanceof Op\Expr\MethodCall)
+                && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
+                && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && !$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $child,
+                    $callOp,
+                    $i,
+                    $callIndex,
+                    $cfgChildren
+                )
+            ) {
+                break;
+            }
+            if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
                 && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
                     $child,
@@ -14288,7 +14303,29 @@ class Compiler {
                 break;
             }
             if (
+                ($child instanceof Op\Expr\StaticCall || $child instanceof Op\Expr\MethodCall)
+                && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $child,
+                    $callOp,
+                    $i,
+                    $callIndex,
+                    $cfgChildren
+                )
+            ) {
+                array_unshift($producers, $child);
+                break;
+            }
+            if (
                 ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && property_exists($callOp, 'args')
+                && is_array($callOp->args)
+            ) {
+                array_unshift($producers, $child);
+                break;
+            }
+            if (
+                ($child instanceof Op\Expr\StaticCall || $child instanceof Op\Expr\MethodCall)
                 && $this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
                 && property_exists($callOp, 'args')
                 && is_array($callOp->args)
@@ -14316,8 +14353,13 @@ class Compiler {
                 $next = $cfgChildren[$i + 1] ?? null;
                 // php-cfg `var_export(array_keys([...]), true)` — Array_ feeds sibling FuncCall arg (#10373).
                 if (
-                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
-                    && $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                    ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall
+                        || $next instanceof Op\Expr\StaticCall || $next instanceof Op\Expr\MethodCall)
+                    && (
+                        $this->isSiblingMultiArgFuncCallProducer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isNestedCallArgProducerForConsumer($next, $callOp, $i + 1, $callIndex, $cfgChildren)
+                        || $this->isAdjacentNestedFuncCallProducer($next, $callOp, $i + 1, $callIndex)
+                    )
                 ) {
                     continue;
                 }
