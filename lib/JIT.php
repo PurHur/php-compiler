@@ -9004,7 +9004,8 @@ class JIT {
                         $callArgs = $this->adaptByRefCallArgsForInternal(
                             $this->context->scope->toCall->getName(),
                             $callArgs,
-                            $callOperands
+                            $callOperands,
+                            $block
                         );
                         $callArgs = $this->foldSortFamilyFlagsArg(
                             $this->context->scope->toCall->getName(),
@@ -9076,7 +9077,8 @@ class JIT {
                         $callArgs = $this->adaptByRefCallArgsForInternal(
                             $this->context->scope->toCall->getName(),
                             $callArgs,
-                            $callOperands
+                            $callOperands,
+                            $block
                         );
                         $callArgs = $this->foldSortFamilyFlagsArg(
                             $this->context->scope->toCall->getName(),
@@ -14977,7 +14979,7 @@ class JIT {
         return $args;
     }
 
-    private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands): array
+    private function adaptByRefCallArgsForInternal(string $name, array $args, array $operands, Block $block): array
     {
         $byRef = BuiltinByRefParams::forFunction($name);
         foreach ($byRef as $idx) {
@@ -14998,6 +15000,11 @@ class JIT {
                 VM\ReferencableCheck::skipsByRefWhenNotArray($name)
                 && !self::jitArgLooksLikeArray($args[$idx])
             ) {
+                continue;
+            }
+            $namedLocalSlot = $block->slotForOperand($operand);
+            if (null !== $namedLocalSlot && $block->isNamedVariableSlot((int) $namedLocalSlot)) {
+                $args[$idx] = JIT\ClosureHelper::referenceCapture($this->context, $args[$idx]);
                 continue;
             }
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {

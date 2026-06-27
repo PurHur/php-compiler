@@ -12359,6 +12359,41 @@ class Compiler {
         return null;
     }
 
+    /** TYPE_ASSIGN arg2 for a registered assign.result temp — the live CV for by-ref sends (#12690). */
+    private function slotForAssignLvalueFromResultSlot(Block $block, int $resultSlot): ?int
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN === $op->type && (int) $op->arg1 === $resultSlot) {
+                return (int) $op->arg2;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Assign-expression result temps are fine for by-value args; by-ref must bind the CV lvalue (#12690).
+     */
+    private function resolveNamedAssignCallArgSlot(
+        Block $block,
+        int $namedAssignDestSlot,
+        ?string $calleeName,
+        int $argIndex,
+        ?Operand $argProbe
+    ): string {
+        if (
+            null !== $calleeName
+            && $this->callArgRequiresByRef($calleeName, $argIndex, $argProbe, $block)
+        ) {
+            $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $namedAssignDestSlot);
+            if (null !== $lvalue) {
+                return (string) $lvalue;
+            }
+        }
+
+        return (string) $namedAssignDestSlot;
+    }
+
     /** Resolve assign.result slot from emitted TYPE_ASSIGN when cfg temps lack scope bindings (#5644). */
     private function slotForEmittedAssignResultSlot(Block $block, Op\Expr\Assign $assign): ?int
     {
@@ -18262,7 +18297,16 @@ class Compiler {
                 }
                 $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($assignVarProbe, $block);
                 if (null !== $assignedNamedLocal) {
-                    $valueSlot = (string) $assignedNamedLocal;
+                    $namedAssignDest = $block->slotForNamedAssignDest($assignVarProbe);
+                    $valueSlot = null !== $namedAssignDest
+                        ? $this->resolveNamedAssignCallArgSlot(
+                            $block,
+                            (int) $namedAssignDest,
+                            $calleeName,
+                            (int) $argIndex,
+                            $assignVarProbe
+                        )
+                        : (string) $assignedNamedLocal;
                 }
                 if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
@@ -18799,14 +18843,14 @@ class Compiler {
                 $namedAssignDestProbe = $cfgCallOp->args[(int) $argIndex];
             }
             $namedAssignDest = $block->slotForNamedAssignDest($namedAssignDestProbe);
-            if (
-                null !== $namedAssignDest
-                && (
-                    null === $calleeName
-                    || !$this->callArgRequiresByRef($calleeName, (int) $argIndex, $namedAssignDestProbe, $block)
-                )
-            ) {
-                $valueSlot = (string) $namedAssignDest;
+            if (null !== $namedAssignDest) {
+                $valueSlot = $this->resolveNamedAssignCallArgSlot(
+                    $block,
+                    (int) $namedAssignDest,
+                    $calleeName,
+                    (int) $argIndex,
+                    $namedAssignDestProbe
+                );
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
