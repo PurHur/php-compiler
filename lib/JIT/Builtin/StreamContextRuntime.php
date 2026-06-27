@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
@@ -13,10 +12,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for stream context ABI via StreamContextJitHelper PHP (#9340).
+ * JIT/AOT link for stream context ABI via StreamContextJitHelper PHP (#9340, #12895).
  *
- * Replaces ~567-line LLVM hashtable walker for JIT embed; AOT standalone keeps
- * {@see StreamContextStandaloneLlvm} until HashTable iteration compiles in nested link (#9443).
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StreamContextJitHelper}; thin LLVM bridges
+ * forward the ABI. SSOT: {@see \PHPCompiler\ext\standard\VmStreamContext}
  * php-src: ext/standard/streams.c — stream_context_create, stream_context_get_default
  */
 final class StreamContextRuntime
@@ -55,11 +54,6 @@ final class StreamContextRuntime
         '__phpc_stream_context_set_params',
     ];
 
-    public static function ensureDefaultGlobalDeclared(Context $context): void
-    {
-        StreamContextStandaloneLlvm::ensureDefaultGlobalDeclared($context);
-    }
-
     public static function ensureLinked(Context $context): void
     {
         $savedInsert = $context->builder->getInsertBlock();
@@ -92,14 +86,6 @@ final class StreamContextRuntime
         $probe = $context->module->getNamedFunction('__phpc_stream_context_create');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamContextStandaloneLlvm::implement($context);
-            self::registerLinkedRuntime($context);
-            $context->builder->clearInsertionPosition();
 
             return;
         }

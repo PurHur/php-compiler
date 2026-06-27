@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3415 |
-| Phase A inventory files (M2 ratio SSOT) | 3415 |
+| PHP files on vm.php path | 3414 |
+| Phase A inventory files (M2 ratio SSOT) | 3414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9023 |
+| Source constructs flagged (warnings) | 9022 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2475,7 +2475,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamContextRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StreamContextStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFilter.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamFilterJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamFstat.php` | 0 | 1 |
@@ -6809,7 +6808,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/JitFiletype.php`
 
@@ -8190,7 +8189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamContextGetDefault.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitStreamContextGetOptions.php`
 
@@ -8205,7 +8204,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStreamContextSetDefault.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitStreamContextSetOptions.php`
 
@@ -10493,7 +10492,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmFilestatFailure.php`
 
@@ -11593,32 +11592,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 174)
 - new Variable (line 184)
 - new VmSerializeRefState (line 284)
-- new Exception (line 402)
-- new ObjectEntry (line 504)
-- new Variable (line 505)
-- new ObjectEntry (line 522)
-- new Variable (line 526)
-- new ObjectEntry (line 538)
-- new Variable (line 546)
-- new ObjectEntry (line 564)
-- new Variable (line 565)
+- new Exception (line 404)
+- new ObjectEntry (line 506)
+- new Variable (line 507)
+- new ObjectEntry (line 524)
+- new Variable (line 528)
+- new ObjectEntry (line 540)
+- new Variable (line 548)
+- new ObjectEntry (line 566)
 - new Variable (line 567)
-- new Variable (line 624)
-- new Exception (line 650)
-- new VmSerializeEnumCaseRef (line 700)
-- new VmSerializeEnumCaseRef (line 705)
-- new VmSerializeRefState (line 733)
-- new Variable (line 743)
-- new Variable (line 797)
-- new Variable (line 810)
-- new Variable (line 916)
-- new ObjectEntry (line 946)
-- new Variable (line 950)
-- new Frame (line 969)
-- new Variable (line 972)
-- new Variable (line 993)
-- new Variable (line 1012)
-- new Variable (line 1038)
+- new Variable (line 569)
+- new Variable (line 626)
+- new Exception (line 652)
+- new VmSerializeEnumCaseRef (line 702)
+- new VmSerializeEnumCaseRef (line 707)
+- new VmSerializeRefState (line 735)
+- new Variable (line 745)
+- new Variable (line 799)
+- new Variable (line 812)
+- new Variable (line 918)
+- new ObjectEntry (line 948)
+- new Variable (line 952)
+- new Frame (line 971)
+- new Variable (line 974)
+- new Variable (line 995)
+- new Variable (line 1014)
+- new Variable (line 1040)
 - 51 class method(s)
 - 1 closure(s)
 
@@ -19442,14 +19441,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamContextRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 255)
-- 12 class method(s)
+- new JIT (line 241)
+- 11 class method(s)
 - 5 closure(s)
-
-### `lib/JIT/Builtin/StreamContextStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 14 class method(s)
 
 ### `lib/JIT/Builtin/StreamFilter.php`
 
