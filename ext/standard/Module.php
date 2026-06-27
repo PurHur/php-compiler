@@ -473,7 +473,7 @@ class Module extends ModuleAbstract
             new connection_status(),
             new header_register_callback(),
             new register_shutdown_function(),
-            new readonly_(),
+            ...(CompilerVersion::supportsReadonlyBuiltin() ? [new readonly_()] : []),
             new setcookie(),
             new setrawcookie(),
             new header_remove(),

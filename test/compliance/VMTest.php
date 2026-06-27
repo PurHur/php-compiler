@@ -138,6 +138,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'clock_gettime_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReadonlyBuiltin()
+                && (str_contains($name, 'readonly_function') || str_contains($name, 'readonly_builtin'))
+                && !str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReadonlyBuiltin()
+                && str_contains($name, 'readonly_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsStreamContextSetOptions()
                 && str_contains($name, 'stream_context_set_options')
                 && !str_contains($name, 'stream_context_set_options_phantom')) {
