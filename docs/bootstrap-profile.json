@@ -2350,7 +2350,6 @@
         "lib/JIT/Builtin/CopyRuntime.php",
         "lib/JIT/Builtin/CtypeRuntime.php",
         "lib/JIT/Builtin/DateIntervalFormatRuntime.php",
-        "lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php",
         "lib/JIT/Builtin/DateMutationRuntime.php",
         "lib/JIT/Builtin/DefaultTimezoneRuntime.php",
         "lib/JIT/Builtin/DefineRuntime.php",
@@ -3657,9 +3656,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3427,
+        "inventory_files": 3426,
         "excluded": 0,
-        "eligible": 3427,
+        "eligible": 3426,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

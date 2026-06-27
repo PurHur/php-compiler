@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3427 |
-| Phase A inventory files (M2 ratio SSOT) | 3427 |
+| PHP files on vm.php path | 3426 |
+| Phase A inventory files (M2 ratio SSOT) | 3426 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9037 |
+| Source constructs flagged (warnings) | 9034 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2296,7 +2296,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/CopyRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/CtypeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateIntervalFormatRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php` | 0 | 3 |
 | `lib/JIT/Builtin/DateMutationRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/DefaultTimezoneRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/DefineRuntime.php` | 0 | 6 |
@@ -18397,14 +18396,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/DateIntervalFormatRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 147)
-- 6 class method(s)
-- 1 closure(s)
-
-### `lib/JIT/Builtin/DateIntervalFormatStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- new JIT (line 151)
+- new JIT (line 146)
 - 7 class method(s)
 - 1 closure(s)
 
