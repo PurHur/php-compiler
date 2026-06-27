@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayReplaceRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -67,6 +67,6 @@ final class array_replace extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayReplace($context, $args[0], ...\array_slice($args, 1));
+        return ArrayReplaceRuntime::replace($context, $args[0], ...\array_slice($args, 1));
     }
 }
