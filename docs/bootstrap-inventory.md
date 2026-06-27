@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3358 |
-| Phase A inventory files (M2 ratio SSOT) | 3358 |
+| PHP files on vm.php path | 3360 |
+| Phase A inventory files (M2 ratio SSOT) | 3360 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8882 |
+| Source constructs flagged (warnings) | 8884 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -413,6 +413,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HttpStatusEnumData.php` | 0 | 1 |
 | `ext/standard/IdateJitHelper.php` | 0 | 1 |
 | `ext/standard/Ieee754.php` | 0 | 1 |
+| `ext/standard/InArrayJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludeBindingJitHelper.php` | 0 | 2 |
 | `ext/standard/IncludeJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludePathJitHelper.php` | 0 | 1 |
@@ -2292,6 +2293,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/HttpResponseRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/Iconv.php` | 0 | 1 |
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IncludePathStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetLibcBridge.php` | 0 | 1 |
@@ -5899,6 +5901,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 13 class method(s)
+
+### `ext/standard/InArrayJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/IncludeBindingJitHelper.php`
 
@@ -9697,28 +9704,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 368)
 - new HashTable (line 407)
 - new Variable (line 409)
-- new HashTable (line 573)
-- new HashTable (line 578)
-- new Variable (line 581)
+- new HashTable (line 589)
 - new HashTable (line 594)
-- new Variable (line 596)
-- new Variable (line 723)
-- new Variable (line 751)
-- new Variable (line 762)
-- new HashTable (line 768)
-- new Variable (line 770)
-- new HashTable (line 869)
-- new Variable (line 880)
-- new HashTable (line 920)
-- new Variable (line 931)
-- new Variable (line 944)
-- new HashTable (line 984)
-- new Variable (line 993)
-- new Variable (line 1077)
-- new Variable (line 1079)
-- new HashTable (line 1092)
+- new Variable (line 597)
+- new HashTable (line 610)
+- new Variable (line 612)
+- new Variable (line 739)
+- new Variable (line 767)
+- new Variable (line 778)
+- new HashTable (line 784)
+- new Variable (line 786)
+- new HashTable (line 885)
+- new Variable (line 896)
+- new HashTable (line 936)
+- new Variable (line 947)
+- new Variable (line 960)
+- new HashTable (line 1000)
+- new Variable (line 1009)
+- new Variable (line 1093)
 - new Variable (line 1095)
-- 54 class method(s)
+- new HashTable (line 1108)
+- new Variable (line 1111)
+- 55 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
@@ -18290,6 +18297,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 161)
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/InArrayRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/IncludePathRuntime.php`
 
