@@ -557,6 +557,36 @@ final class VmArray
         return $out;
     }
 
+    /**
+     * array_diff_key() with one source array — copy keys/values (php-src array.c, #12553).
+     */
+    public static function diffKeySingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff_key() two-array step — remove entries whose keys exist in $other.
+     */
+    public static function diffKeyTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::keyExistsInHashTable($key, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
     private static function keyExistsInHashTable(Variable $key, HashTable $table): bool
     {
         return null !== self::valueAtKeyInHashTable($key, $table);
