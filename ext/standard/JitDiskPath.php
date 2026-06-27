@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
@@ -15,15 +16,39 @@ use PHPCompiler\VM\Variable as VmVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** Lower disk_*_space() path args; null defaults to "." (php-src filestat.c, #4915). */
+/** Lower disk_*_space() path args (php-src filestat.c; #12619 null directory). */
 final class JitDiskPath
 {
-    /** @return Value */
-    public static function lower(Context $context, ?JITVariable $arg, string $function): Value
-    {
-        if (null === $arg || JITVariable::TYPE_NULL === $arg->type) {
-            return $context->builder->load($context->constantStringFromString('.'));
+    /** @return Value boxed float|false */
+    public static function lowerDiskSpaceBoxed(
+        Context $context,
+        ?JITVariable $arg,
+        string $function,
+        bool $freeSpace
+    ): Value {
+        if (null === $arg) {
+            return self::nullDirectoryFailureBoxed($context, $function);
         }
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'null'));
+            }
+
+            return self::nullDirectoryFailureBoxed($context, $function);
+        }
+        if (JITVariable::TYPE_VALUE === $arg->type) {
+            return self::lowerBoxedDiskSpace($context, $arg, $function, $freeSpace);
+        }
+        $path = self::lowerPathString($context, $arg, $function);
+
+        return $freeSpace
+            ? JitStat::pathDiskFreeSpaceBoxed($context, $path)
+            : JitStat::pathDiskTotalSpaceBoxed($context, $path);
+    }
+
+    /** @return Value */
+    private static function lowerPathString(Context $context, JITVariable $arg, string $function): Value
+    {
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'array'));
 
@@ -35,7 +60,7 @@ final class JitDiskPath
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedDirectory($context, $arg, $function);
+            return self::lowerBoxedPathString($context, $arg, $function);
         }
         if ($context->callerStrictTypes) {
             JitInternalStrictArg::requireString($context, $arg, $function, 'directory', 1);
@@ -44,7 +69,94 @@ final class JitDiskPath
         return JitStringArg::lower($context, $arg, $function.'() directory');
     }
 
-    private static function lowerBoxedDirectory(Context $context, JITVariable $arg, string $function): Value
+    /** @return Value boxed float|false */
+    private static function lowerBoxedDiskSpace(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        bool $freeSpace
+    ): Value {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+        $arrayTy = $i8->constInt(VmVariable::TYPE_ARRAY, false);
+        $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
+
+        $nullBlock = BasicBlockHelper::append($context, 'diskspace_null');
+        $arrayBlock = BasicBlockHelper::append($context, 'diskspace_array');
+        $statBlock = BasicBlockHelper::append($context, 'diskspace_stat');
+        $mergeBlock = BasicBlockHelper::append($context, 'diskspace_merge');
+
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $context->builder->branchIf($isNull, $nullBlock, $arrayBlock);
+
+        $context->builder->positionAtEnd($nullBlock);
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'null'));
+        }
+        $nullResult = self::nullDirectoryFailureBoxed($context, $function);
+        $nullEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($arrayBlock);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $arrayTy);
+        $arrayErrBlock = BasicBlockHelper::append($context, 'diskspace_array_err');
+        $afterArrayBlock = BasicBlockHelper::append($context, 'diskspace_after_array');
+        $context->builder->branchIf($isArray, $arrayErrBlock, $afterArrayBlock);
+        $context->builder->positionAtEnd($arrayErrBlock);
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'array'));
+
+        $context->builder->positionAtEnd($afterArrayBlock);
+        $isObject = $context->builder->icmp(Builder::INT_EQ, $typeByte, $objectTy);
+        $objectErrBlock = BasicBlockHelper::append($context, 'diskspace_object_err');
+        $stringBlock = BasicBlockHelper::append($context, 'diskspace_string');
+        $context->builder->branchIf($isObject, $objectErrBlock, $stringBlock);
+        $context->builder->positionAtEnd($objectErrBlock);
+        self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'object'));
+
+        $context->builder->positionAtEnd($stringBlock);
+        if ($context->callerStrictTypes) {
+            $isString = $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(VmVariable::TYPE_STRING, false)
+            );
+            $strictErrBlock = BasicBlockHelper::append($context, 'diskspace_strict_err');
+            $strictOkBlock = BasicBlockHelper::append($context, 'diskspace_strict_ok');
+            $context->builder->branchIf($isString, $strictOkBlock, $strictErrBlock);
+            $context->builder->positionAtEnd($strictErrBlock);
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'mixed'));
+            $context->builder->positionAtEnd($strictOkBlock);
+        }
+        $path = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $valuePtr
+        );
+        $context->builder->branch($statBlock);
+
+        $context->builder->positionAtEnd($statBlock);
+        $statResult = $freeSpace
+            ? JitStat::pathDiskFreeSpaceBoxed($context, $path)
+            : JitStat::pathDiskTotalSpaceBoxed($context, $path);
+        $statEnd = $context->builder->getInsertBlock();
+        $context->builder->branch($mergeBlock);
+
+        $context->builder->positionAtEnd($mergeBlock);
+        $phi = $context->builder->phi($nullResult->typeOf());
+        $phi->addIncoming($nullResult, $nullEnd);
+        $phi->addIncoming($statResult, $statEnd);
+
+        return $phi;
+    }
+
+    /** @return Value */
+    private static function lowerBoxedPathString(Context $context, JITVariable $arg, string $function): Value
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
@@ -96,9 +208,40 @@ final class JitDiskPath
         );
     }
 
+    /** @return Value boxed false */
+    private static function nullDirectoryFailureBoxed(Context $context, string $function): Value
+    {
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $i1 = $context->getTypeFromString('int1');
+        self::emitDiskSpaceWarning($context, $function.'(): No such file or directory');
+        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
+
+        return $ptr;
+    }
+
+    private static function emitDiskSpaceWarning(Context $context, string $message): void
+    {
+        StringTriggerErrorJit::implement($context);
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i32 = $context->getTypeFromString('int32');
+        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
+        $msgLen = $sizeT->constInt(\strlen($message), false);
+        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_trigger_error'),
+            $msgPtr,
+            $msgLen,
+            $i32->constInt(\PHPCompiler\VM\ErrorReporter::E_WARNING, false),
+            $emptyFile,
+            $i32->constInt(0, false)
+        );
+    }
+
     private static function typeErrorMessage(string $function, string $given): string
     {
-        return sprintf(
+        return \sprintf(
             '%s(): Argument #1 ($directory) must be of type string, %s given',
             $function,
             $given

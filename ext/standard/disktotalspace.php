@@ -28,8 +28,6 @@ final class disktotalspace extends Internal
         if (\count($args) > 1) {
             throw new \LogicException('disktotalspace() accepts at most one argument in this compiler build');
         }
-        $path = JitDiskPath::lower($context, $args[0] ?? null, 'disktotalspace');
-
-        return JitStat::pathDiskTotalSpaceBoxed($context, $path);
+        return JitDiskPath::lowerDiskSpaceBoxed($context, $args[0] ?? null, 'disktotalspace', false);
     }
 }
