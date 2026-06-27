@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3427 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9036 |
+| Source constructs flagged (warnings) | 9037 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -410,7 +410,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/FunctionExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesJitHelper.php` | 0 | 1 |
 | `ext/standard/GcCollectCyclesRegistryJitHelper.php` | 0 | 1 |
-| `ext/standard/GcStatusJitHelper.php` | 0 | 4 |
+| `ext/standard/GcStatusJitHelper.php` | 0 | 5 |
 | `ext/standard/GcToggleJitHelper.php` | 0 | 1 |
 | `ext/standard/GetBrowserJitHelper.php` | 0 | 1 |
 | `ext/standard/GetClassJitHelper.php` | 0 | 1 |
@@ -5992,10 +5992,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GcStatusJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 21)
-- new Variable (line 32)
-- new Variable (line 39)
-- 3 class method(s)
+- new HashTable (line 26)
+- new HashTable (line 38)
+- new Variable (line 49)
+- new Variable (line 56)
+- 4 class method(s)
 
 ### `ext/standard/GcToggleJitHelper.php`
 
@@ -6106,7 +6107,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/HrtimeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/Html5NamedEntities.php`
 
@@ -6503,10 +6504,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 246)
-- new ArgumentCountError (line 249)
-- new ArgumentCountError (line 280)
-- new ArgumentCountError (line 283)
+- new ArgumentCountError (line 255)
+- new ArgumentCountError (line 258)
+- new ArgumentCountError (line 289)
+- new ArgumentCountError (line 292)
 - 14 class method(s)
 
 ### `ext/standard/JitDateCreate.php`
@@ -6625,7 +6626,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDiskPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/JitDl.php`
 
@@ -14060,9 +14061,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hrtime.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 48)
-- new Variable (line 49)
-- new Variable (line 52)
+- new HashTable (line 53)
+- new Variable (line 54)
+- new Variable (line 57)
 - 2 class method(s)
 
 ### `ext/standard/html_entity_decode.php`
@@ -17649,7 +17650,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 47 class method(s)
+- 49 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -18580,8 +18581,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GcStatusRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 186)
-- 10 class method(s)
+- new JIT (line 224)
+- 12 class method(s)
 
 ### `lib/JIT/Builtin/GcToggleRuntime.php`
 
@@ -19946,7 +19947,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHrtimeRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 135)
+- new JIT (line 151)
 - 6 class method(s)
 
 ### `lib/JIT/Builtin/StringHtmlspecialchars.php`
@@ -24532,7 +24533,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/CycleCollector.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 - 2 closure(s)
 
 ### `lib/VM/DateIntervalSupport.php`
