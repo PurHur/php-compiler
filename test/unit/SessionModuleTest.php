@@ -34,6 +34,7 @@ final class SessionModuleTest extends TestCase
                 'session_status',
                 'session_destroy',
                 'session_write_close',
+                'session_commit',
                 'session_regenerate_id',
                 'session_abort',
                 'session_reset',

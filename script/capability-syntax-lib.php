@@ -1183,6 +1183,10 @@ function builtinCapabilityCurations(): array
             'aot' => 'yes',
             'notes' => [$persistenceNote],
         ],
+        'session_commit' => [
+            'aot' => 'yes',
+            'notes' => [$persistenceNote, 'alias of session_write_close() (#12544)'],
+        ],
         'session_abort' => [
             'aot' => 'yes',
             'notes' => [$persistenceNote, 'lifecycle API (#6002)'],
