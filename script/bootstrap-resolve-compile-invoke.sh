@@ -796,6 +796,12 @@ bootstrap_compile_invoke() {
   fi
   printf '%s' "${entry}" > "${PHP_COMPILER_JIT_ENTRY_FILE}" 2>/dev/null || true
 
+  local root="${ROOT:-}"
+  if [[ -n "${root}" ]]; then
+    export PHP_COMPILER_REPO_ROOT="${PHP_COMPILER_REPO_ROOT:-${root}}"
+    bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  fi
+
   local no_zend_fallback=0
   if [[ "${BOOTSTRAP_M5_NO_ZEND:-0}" == "1" || "${BOOTSTRAP_NO_ZEND_FALLBACK:-0}" == "1" ]]; then
     no_zend_fallback=1
