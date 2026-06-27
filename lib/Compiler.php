@@ -15249,6 +15249,10 @@ class Compiler {
      */
     private function isDeferredSiblingInlineCallArgProducer(Op $op, array $ops, int $producerIndex): bool
     {
+        // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
+        if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
+            return false;
+        }
         $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null === $consumerIndex) {
             return false;
@@ -19538,6 +19542,26 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Statement-level VM builtins that take by-ref args must compile eagerly — deferring as
+     * sibling inline producers drops mutations (natcasesort + array_values + implode, #12732).
+     */
+    private function funcCallExprHasByRefMutatingSideEffects(Op $op): bool
+    {
+        if (!$op instanceof Op\Expr\FuncCall && !$op instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($op);
+        if (null === $calleeName) {
+            return false;
+        }
+        if ([] !== BuiltinByRefParams::forFunction($calleeName)) {
+            return true;
+        }
+
+        return null !== BuiltinByRefParams::variadicByRefFromIndex($calleeName);
     }
 
     /**
