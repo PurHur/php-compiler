@@ -8,10 +8,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Embed-only ob_gzhandler JIT helper — reads $_SERVER Accept-Encoding via HashTable (#9798).
+ * ob_gzhandler JIT helper — reads $_SERVER Accept-Encoding via HashTable (#9798, #12881).
  *
- * Split from {@see ObGzhandlerJitHelper}: AOT standalone nested link cannot JIT-compile
- * HashTable::find() yet; {@see \PHPCompiler\JIT\Builtin\ObGzhandlerStandaloneLlvm} walks sg_SERVER in LLVM.
+ * Compiled into embed and standalone AOT via {@see \PHPCompiler\JIT\Builtin\ObGzhandlerJitRuntime}.
  */
 final class ObGzhandlerServerJitHelper
 {
