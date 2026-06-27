@@ -34,6 +34,13 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/EnvLocalJitHelper.php');
         $this->assertStringContainsString('GetenvJitHelper::getenv', $source);
         $this->assertStringContainsString('GetenvJitHelper::putenv', $source);
-        $this->assertStringContainsString('GetenvJitHelper::getAllEnvironmentMap', $source);
+        $this->assertStringNotContainsString('Variable::string', $source);
+    }
+
+    public function testMergeOverlayUsesLlvmTableNotNestedJitHelper(): void
+    {
+        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvLocalRuntime.php');
+        $this->assertStringContainsString('EnvLocalOverlayTableLlvm::emitMergeOverlay', $runtime);
+        $this->assertStringNotContainsString('mergeOverlay', $runtime);
     }
 }

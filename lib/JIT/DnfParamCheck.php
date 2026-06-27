@@ -168,6 +168,9 @@ final class DnfParamCheck
             if (Variable::TYPE_NATIVE_BOOL !== $arg->type) {
                 return false;
             }
+            if ($arg->value instanceof \PHPLLVM\Value) {
+                return false;
+            }
             $isTrue = 0 !== (int) $arg->value;
 
             return ('true' === $name) === $isTrue;
