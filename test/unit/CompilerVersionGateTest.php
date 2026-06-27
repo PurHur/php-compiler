@@ -19,6 +19,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    public function testSupportsMbStrPadFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsMbStrPad());
+    }
+
     public function testSupportsFpowFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsFpow());
@@ -95,6 +100,12 @@ final class CompilerVersionGateTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->functions['str_decrement']));
         $this->assertFalse(isset($ctx->functions['str_increment']));
+    }
+
+    public function testVmDoesNotRegisterMbStrPadOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
     public function testVmDoesNotRegisterClockGettimeOnReferenceProfile(): void

@@ -319,10 +319,14 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964). */
+    /**
+     * PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
     public static function supportsMbStrPad(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /** PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845). */
