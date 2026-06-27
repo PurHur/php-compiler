@@ -225,4 +225,44 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** @covers issue #12310 */
+    public function testCreateLazyProxyAcceptsVoidFactoryReturn(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public int $v = 0;
+}
+$proxy = createLazyProxy(Svc::class, function (Svc $o): void {
+    $o->v = 99;
+});
+echo $proxy->v, "\n";
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'create_lazy_proxy_void_factory.php'));
+        $this->assertSame("99\nok\n", ob_get_clean());
+    }
+
+    /** @covers issue #12309 */
+    public function testCreateLazyGhostIgnoresObjectReturnFromInitializer(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class Svc {
+    public int $v = 0;
+}
+$ghost = createLazyGhost(Svc::class, function (Svc $o) {
+    $o->v = 42;
+    return $o;
+});
+echo $ghost->v, "\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'create_lazy_ghost_object_return.php'));
+        $this->assertSame("42\n", ob_get_clean());
+    }
 }

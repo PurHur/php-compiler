@@ -2370,6 +2370,12 @@ final class VmString
             $entries = $entHtml5
                 ? Html5TranslationTable::entities()
                 : HtmlEntityTable::entitiesEntQuotes();
+            if ($quoteBoth || $quoteDouble) {
+                $entries['"'] = '&quot;';
+            }
+            if ($quoteBoth) {
+                $entries["'"] = $entHtml5 ? '&apos;' : '&#039;';
+            }
             if (!$quoteBoth && !$quoteDouble) {
                 unset($entries['"']);
             }

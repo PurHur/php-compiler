@@ -9,6 +9,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\CallArgv;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -70,6 +71,7 @@ final class JitFuncArgs
         self::requireEnclosing($context);
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
+        JitInternalStrictArg::requireInt($context, $positionArg, 'func_get_arg', 'position', 1);
 
         $i64 = $context->getTypeFromString('int64');
         $position = JitZendScalarCast::emitIntCast($context, $positionArg);

@@ -481,7 +481,9 @@ final class DateTimeSupport
         } catch (NativeDateMalformedStringException $e) {
             self::throwDateMalformedStringException($e->getMessage());
         }
-        self::applyParsedState($dt, $parsed, $tzName);
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
+        unset($parsed['timezone']);
+        self::applyParsedState($dt, $parsed, $effectiveTz);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }

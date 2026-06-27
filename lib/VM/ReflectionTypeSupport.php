@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
-use PHPCfg\Op\Type as CfgType;
+use PHPCfg\Operand;
 use PHPCfg\Operand\Literal;
+use PHPCfg\Op\Type as CfgType;
 
 /**
  * Build ReflectionNamedType / ReflectionUnionType / ReflectionIntersectionType (#3355).
@@ -269,11 +270,24 @@ final class ReflectionTypeSupport
 
     private static function referenceTypeName(CfgType\Reference $type): string
     {
-        if ($type->declaration instanceof Literal && is_string($type->declaration->value)) {
-            return ltrim($type->declaration->value, '\\');
+        $name = self::staticNameFromOperand($type->declaration);
+        if (null === $name || '' === $name) {
+            throw new \LogicException('Unsupported reference type for reflection');
         }
 
-        throw new \LogicException('Unsupported reference type for reflection');
+        return ltrim($name, '\\');
+    }
+
+    private static function staticNameFromOperand(Operand $op): ?string
+    {
+        if ($op instanceof Literal && is_string($op->value)) {
+            return $op->value;
+        }
+        if ($op instanceof Operand\Variable) {
+            return self::staticNameFromOperand($op->name);
+        }
+
+        return null;
     }
 
     private static function isBuiltinTypeName(string $name): bool

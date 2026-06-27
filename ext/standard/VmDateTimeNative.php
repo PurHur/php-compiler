@@ -162,6 +162,10 @@ final class VmDateTimeNative
         if ('' === $timezone) {
             self::throwInvalidTimezone($timezone);
         }
+        $canonicalOffset = self::canonicalNumericTimezoneId($timezone);
+        if (null !== $canonicalOffset) {
+            return $canonicalOffset;
+        }
         if (self::zoneinfoPath($timezone)) {
             return $timezone;
         }
@@ -171,7 +175,47 @@ final class VmDateTimeNative
     /** php-src ext/date/php_date.c — date_default_timezone_set() validation without throwing. */
     public static function timezoneIdIsValid(string $timezone): bool
     {
-        return null !== self::zoneinfoPath(trim($timezone)) && '' !== trim($timezone);
+        $timezone = trim($timezone);
+        if ('' === $timezone) {
+            return false;
+        }
+        if (null !== self::canonicalNumericTimezoneId($timezone)) {
+            return true;
+        }
+
+        return null !== self::zoneinfoPath($timezone);
+    }
+
+    /**
+     * Fixed numeric offset from a timezone id (+0530 / +05:30), or null.
+     */
+    public static function parseNumericTimezoneOffset(string $timezone): ?int
+    {
+        $timezone = trim($timezone);
+        if (1 !== preg_match('/^([+-])(\d{2}):?(\d{2})$/', $timezone, $matches)) {
+            return null;
+        }
+        $hours = (int) $matches[2];
+        $minutes = (int) $matches[3];
+        if ($hours > 18 || $minutes >= 60) {
+            return null;
+        }
+        $seconds = $hours * 3600 + $minutes * 60;
+
+        return '-' === $matches[1] ? -$seconds : $seconds;
+    }
+
+    /**
+     * php-src timelib canonical spelling (+HH:MM) for numeric offset ids.
+     */
+    public static function canonicalNumericTimezoneId(string $timezone): ?string
+    {
+        $offset = self::parseNumericTimezoneOffset($timezone);
+        if (null === $offset) {
+            return null;
+        }
+
+        return self::formatOffset($offset);
     }
 
     /**
@@ -198,7 +242,7 @@ final class VmDateTimeNative
             return ['timestamp' => (int) $time, 'microsecond' => 0];
         }
         if (1 === preg_match(
-            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?$/',
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?(?:Z|([+-]\d{2}:?\d{2}))?$/',
             $time,
             $matches
         )) {
@@ -209,6 +253,16 @@ final class VmDateTimeNative
             if (isset($matches[7]) && '' !== $matches[7]) {
                 $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
             }
+            $useTz = $tzName;
+            if (str_ends_with($time, 'Z')) {
+                $useTz = 'UTC';
+            } elseif (isset($matches[8]) && '' !== $matches[8]) {
+                $embedded = self::canonicalNumericTimezoneId($matches[8]);
+                if (null === $embedded) {
+                    self::throwMalformedDateTime($time);
+                }
+                $useTz = $embedded;
+            }
 
             return [
                 'timestamp' => self::mktimeInTimezone(
@@ -218,9 +272,10 @@ final class VmDateTimeNative
                     $hour,
                     $minute,
                     $second,
-                    $tzName
+                    $useTz
                 ),
                 'microsecond' => $microsecond,
+                'timezone' => $useTz !== $tzName ? $useTz : null,
             ];
         }
 
@@ -1085,6 +1140,16 @@ final class VmDateTimeNative
 
     public static function format(int $timestamp, int $microsecond, string $tzName, string $format): string
     {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            $tm = self::gmtime($timestamp + $fixed);
+            if (null === $tm) {
+                return '';
+            }
+
+            return VmDate::formatDateTimeFromTm($format, $timestamp, $microsecond, $tm, $fixed, $tzName);
+        }
+
         return self::withTimezone($tzName, static function () use ($timestamp, $microsecond, $format, $tzName): string {
             $tm = self::localtime($timestamp);
             if (null === $tm) {
@@ -1098,6 +1163,11 @@ final class VmDateTimeNative
 
     public static function timezoneOffsetSeconds(string $tzName, int $timestamp): int
     {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return $fixed;
+        }
+
         return self::withTimezone($tzName, static function () use ($timestamp): int {
             $tm = self::localtime($timestamp);
             if (null === $tm) {
@@ -1193,6 +1263,11 @@ final class VmDateTimeNative
         int $second,
         string $tzName
     ): int {
+        $fixedOffset = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixedOffset) {
+            return self::mktimeUtc($year, $month, $day, $hour, $minute, $second) - $fixedOffset;
+        }
+
         return self::withTimezone($tzName, static function () use (
             $year,
             $month,
@@ -1220,6 +1295,34 @@ final class VmDateTimeNative
 
             return $result;
         });
+    }
+
+    private static function mktimeUtc(
+        int $year,
+        int $month,
+        int $day,
+        int $hour,
+        int $minute,
+        int $second
+    ): int {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            self::throwMalformedDateTime("{$year}-{$month}-{$day}");
+        }
+        $tm = $ffi->new('struct tm');
+        $tm->tm_sec = $second;
+        $tm->tm_min = $minute;
+        $tm->tm_hour = $hour;
+        $tm->tm_mday = $day;
+        $tm->tm_mon = $month - 1;
+        $tm->tm_year = $year - 1900;
+        $tm->tm_isdst = 0;
+        $result = (int) $ffi->timegm(\FFI::addr($tm));
+        if (-1 === $result) {
+            self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
+        }
+
+        return $result;
     }
 
     /**
@@ -1250,6 +1353,19 @@ final class VmDateTimeNative
         $buf = $ffi->new('struct tm');
 
         return null === $ffi->localtime_r(\FFI::addr($ts), \FFI::addr($buf)) ? null : $buf;
+    }
+
+    private static function gmtime(int $timestamp): ?\FFI\CData
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+        $ts = $ffi->new('time_t');
+        $ts->cdata = $timestamp;
+        $buf = $ffi->new('struct tm');
+
+        return null === $ffi->gmtime_r(\FFI::addr($ts), \FFI::addr($buf)) ? null : $buf;
     }
 
     private static function formatOffset(int $offsetSeconds): string
@@ -1347,6 +1463,11 @@ final class VmDateTimeNative
      */
     private static function transitionState(string $tzName, int $timestamp): array
     {
+        $fixed = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixed) {
+            return ['offset' => $fixed, 'isdst' => false];
+        }
+
         return self::withTimezone($tzName, static function () use ($timestamp): array {
             $tm = self::localtime($timestamp);
             if (null === $tm) {
@@ -1829,6 +1950,7 @@ void tzset(void);
 time_t mktime(struct tm *tm);
 time_t timegm(struct tm *tm);
 struct tm *localtime_r(const time_t *timep, struct tm *result);
+struct tm *gmtime_r(const time_t *timep, struct tm *result);
 int gettimeofday(struct timeval *tv, void *tz);
 size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
 CDEF;
