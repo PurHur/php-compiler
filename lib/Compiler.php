@@ -11167,8 +11167,8 @@ class Compiler {
                     $argIndex,
                     $block
                 );
-                if ($unassigned instanceof Op\Expr\Array_) {
-                    return $unassigned;
+                if ($this->inlineCallArgProducerUsesExprResultSlot($unassigned)) {
+                    return $unassigned instanceof Op\Expr\Array_ ? $unassigned : null;
                 }
             }
         }
@@ -11215,7 +11215,7 @@ class Compiler {
         Op $callOp,
         int $argIndex,
         Block $block
-    ): ?Op\Expr\Array_ {
+    ): ?Op\Expr {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
@@ -11250,11 +11250,33 @@ class Compiler {
         }
         // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
         $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
-        if ($matched instanceof Op\Expr\Array_) {
+        if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
             return $matched;
         }
 
         return $unassigned[$positionAmongDeadArrays] ?? null;
+    }
+
+    /** Hoisted inline call-arg producers whose Expr::result is the callee operand (#10490, #12763). */
+    private function inlineCallArgProducerUsesExprResultSlot(?Op\Expr $matched): bool
+    {
+        return $matched instanceof Op\Expr\Array_
+            || $matched instanceof Op\Expr\BinaryOp\Plus
+            || $matched instanceof Op\Expr\BinaryOp\Concat;
+    }
+
+    /** True when hoisted producers before $callOp include array union / concat (#12763, re-#10578). */
+    private function precedingInlineCallArgHasPlusOrConcatProducer(array $cfgChildren, Op $callOp): bool
+    {
+        foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp) as $producer) {
+            if ($producer instanceof Op\Expr\BinaryOp\Plus
+                || $producer instanceof Op\Expr\BinaryOp\Concat
+            ) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
@@ -19000,7 +19022,7 @@ class Compiler {
                             (int) $argIndex,
                             $cfgCallOp
                         );
-                        if ($matched instanceof Op\Expr\Array_) {
+                        if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
                             $matchedSlot = $block->slotForOperand($matched->result);
                             if (null === $matchedSlot) {
                                 foreach ($this->compileExpr($matched, $block) as $op) {
@@ -19210,7 +19232,7 @@ class Compiler {
                     (int) $argIndex,
                     $block
                 );
-                if ($matched instanceof Op\Expr\Array_) {
+                if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
                     if (null === $block->slotForOperand($matched->result)) {
                         foreach ($this->compileExpr($matched, $block) as $op) {
                             $sends[] = $op;
@@ -19297,6 +19319,8 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && 1 === $this->countDeadArrayInlineCallArgs($cfgCallOp)
+                && null !== $block->orig
+                && !$this->precedingInlineCallArgHasPlusOrConcatProducer($block->orig->children, $cfgCallOp)
             ) {
                 $producers = null !== $block->orig
                     ? $this->precedingInlineCallArgProducersBeforeCfgOp(
