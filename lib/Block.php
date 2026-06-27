@@ -1041,7 +1041,14 @@ class Block {
                 $return->generatorState = $frame->generatorState;
             }
             // Zend CV "initialized" bitmap survives across CFG block frames (#4489, generator_nested.phpt).
+            // Do not inherit caller slot-init bits when entering a nested user function (#12421).
             for ($f = $frame; null !== $f; $f = $f->parent) {
+                if (
+                    null !== $this->func
+                    && (null === $f->block->func || $f->block->func !== $this->func)
+                ) {
+                    break;
+                }
                 foreach ($f->initializedSlots as $slot => $_) {
                     if (isset($scope[$slot])) {
                         $return->initializedSlots[$slot] = true;

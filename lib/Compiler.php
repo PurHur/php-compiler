@@ -14769,6 +14769,15 @@ class Compiler {
         return null;
     }
 
+    /** Hoisted FuncCall / MethodCall / StaticCall sibling inline call-arg producers (#9463, #9351, #12421). */
+    private function isSiblingInlineCallProducerExpr(Op $op): bool
+    {
+        return $op instanceof Op\Expr\FuncCall
+            || $op instanceof Op\Expr\NsFuncCall
+            || $op instanceof Op\Expr\MethodCall
+            || $op instanceof Op\Expr\StaticCall;
+    }
+
     /**
      * php-cfg `var_dump($g(), $g())` hoists sibling FuncCall producers with dead arg temps (#9463).
      *
@@ -14781,10 +14790,7 @@ class Compiler {
         int $consumerIndex,
         array $cfgChildren
     ): bool {
-        if (
-            !$producer instanceof Op\Expr\FuncCall
-            && !$producer instanceof Op\Expr\NsFuncCall
-        ) {
+        if (!$this->isSiblingInlineCallProducerExpr($producer)) {
             return false;
         }
         if (
@@ -14841,10 +14847,7 @@ class Compiler {
 
                 return false;
             }
-            if (
-                !$mid instanceof Op\Expr\FuncCall
-                && !$mid instanceof Op\Expr\NsFuncCall
-            ) {
+            if (!$this->isSiblingInlineCallProducerExpr($mid)) {
                 return false;
             }
         }
@@ -14897,7 +14900,7 @@ class Compiler {
         $i = $consumerIndex - 1;
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
-            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
                 --$i;
                 continue;
             }
@@ -14907,7 +14910,7 @@ class Compiler {
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($child) && $i > 0) {
                 $before = $cfgChildren[$i - 1] ?? null;
-                if ($before instanceof Op\Expr\FuncCall || $before instanceof Op\Expr\NsFuncCall) {
+                if ($this->isSiblingInlineCallProducerExpr($before)) {
                     --$i;
                     continue;
                 }
@@ -14919,7 +14922,7 @@ class Compiler {
             return null;
         }
         $firstChild = $cfgChildren[$first] ?? null;
-        if (!$firstChild instanceof Op\Expr\FuncCall && !$firstChild instanceof Op\Expr\NsFuncCall) {
+        if (!$this->isSiblingInlineCallProducerExpr($firstChild)) {
             return null;
         }
 
@@ -15010,7 +15013,7 @@ class Compiler {
         }
         $producerIndex = $firstSibling + $argIndex;
         $producer = $block->orig->children[$producerIndex] ?? null;
-        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+        if (!$this->isSiblingInlineCallProducerExpr($producer)) {
             return null;
         }
         if (!$this->isSiblingMultiArgFuncCallProducer(
@@ -19292,7 +19295,7 @@ class Compiler {
         if (
             null === $cfgCallOp
             || null === $block->orig
-            || (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall)
+            || !$this->isSiblingInlineCallProducerExpr($cfgCallOp)
         ) {
             return false;
         }
