@@ -6,6 +6,8 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\ext\standard\ob_end_clean;
 use PHPCompiler\ext\standard\ob_end_flush;
+use PHPCompiler\ext\standard\ob_flush;
+use PHPCompiler\ext\standard\ob_get_flush;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -113,13 +115,13 @@ final class ObOutputJitBridge
         ObOutputStandaloneLlvm::implementObEchoSubstr($context);
         ObOutputStandaloneLlvm::implementObEchoLl($context);
         ObOutputStandaloneLlvm::implementObEchoDouble($context);
-        self::implementContentsBridge($context, '__phpc_ob_get_contents', self::CONTENTS_HELPER, false);
+        self::implementContentsBridge($context, '__phpc_ob_get_contents', self::CONTENTS_HELPER, false, null);
         self::implementLengthBridge($context);
         self::implementBoolResultBridge($context, '__phpc_ob_end_clean', self::END_CLEAN_HELPER, ob_end_clean::NO_BUFFER_NOTICE);
-        self::implementContentsBridge($context, '__phpc_ob_get_clean', self::GET_CLEAN_HELPER, true);
+        self::implementContentsBridge($context, '__phpc_ob_get_clean', self::GET_CLEAN_HELPER, true, null);
         self::implementBoolResultBridge($context, '__phpc_ob_end_flush', self::END_FLUSH_HELPER, ob_end_flush::NO_BUFFER_NOTICE);
-        self::implementContentsBridge($context, '__phpc_ob_get_flush', self::GET_FLUSH_HELPER, true);
-        self::implementBoolResultBridge($context, '__phpc_ob_flush', self::FLUSH_BUFFER_HELPER, null);
+        self::implementContentsBridge($context, '__phpc_ob_get_flush', self::GET_FLUSH_HELPER, true, ob_get_flush::NO_BUFFER_NOTICE);
+        self::implementBoolResultBridge($context, '__phpc_ob_flush', self::FLUSH_BUFFER_HELPER, ob_flush::NO_BUFFER_NOTICE);
         self::implementBoolResultBridge($context, '__phpc_ob_clean', self::CLEAN_HELPER, null);
         self::implementVoidBridge($context, '__phpc_ob_end_all', self::END_ALL_HELPER);
         self::implementVoidBridge($context, '__phpc_flush', self::FLUSH_STDOUT_HELPER);
@@ -169,9 +171,10 @@ final class ObOutputJitBridge
         Context $context,
         string $abiName,
         string $helperLogical,
-        bool $popOnSuccess
+        bool $popOnSuccess,
+        ?string $emptyBufferNotice = null
     ): void {
-        self::implementIfMissing($context, $abiName, static function (Context $context, LlvmFunction $fn) use ($helperLogical, $popOnSuccess): void {
+        self::implementIfMissing($context, $abiName, static function (Context $context, LlvmFunction $fn) use ($helperLogical, $popOnSuccess, $emptyBufferNotice): void {
             $entry = $fn->appendBasicBlock('ob_val_entry');
             $fail = $fn->appendBasicBlock('ob_val_fail');
             $work = $fn->appendBasicBlock('ob_val_work');
@@ -185,6 +188,9 @@ final class ObOutputJitBridge
                 $work
             );
             $context->builder->positionAtEnd($fail);
+            if (null !== $emptyBufferNotice) {
+                self::emitObNoBufferNotice($context, $emptyBufferNotice);
+            }
             if (!$popOnSuccess) {
                 $context->builder->call($context->lookupFunction('__value__writeBool'), $out, $i32->constInt(0, false));
             }
