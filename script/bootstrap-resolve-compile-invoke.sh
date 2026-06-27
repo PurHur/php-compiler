@@ -207,6 +207,9 @@ bootstrap_sidecar_emit_fallback_allowed() {
       */test/selfhost/compiler_lib_spine_smoke/main.php)
         return 0
         ;;
+      */test/selfhost/compiler_minimal/main.php)
+        return 0
+        ;;
     esac
     return 1
   fi
