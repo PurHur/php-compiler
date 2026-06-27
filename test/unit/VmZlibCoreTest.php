@@ -47,4 +47,18 @@ final class VmZlibCoreTest extends TestCase
         $this->assertLessThan(strlen($data), strlen($c));
         $this->assertSame($data, VmZlibCore::gzinflate(substr($c, 2, -4)));
     }
+
+    /** Issue #12706 — raw deflate EOB must match libz (no sdefl zlib-partial-flush tail). */
+    public function testRawDeflateHelloMatchesLibzHex(): void
+    {
+        if (!\function_exists('zlib_encode')) {
+            $this->markTestSkipped('zlib extension required for reference hex');
+        }
+
+        $plain = 'hello';
+        $zendHex = bin2hex((string) zlib_encode($plain, ZLIB_ENCODING_RAW));
+        $vmHex = bin2hex((string) VmZlibCore::gzdeflate($plain));
+        $this->assertSame($zendHex, $vmHex);
+        $this->assertSame($plain, VmZlibCore::gzinflate((string) VmZlibCore::gzdeflate($plain)));
+    }
 }

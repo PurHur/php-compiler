@@ -479,8 +479,10 @@ final class VmZlibCore
         }
 
         $op = self::putBits($out, $op, $bits, $cnt, 0, 7);
-        $op = self::putBits($out, $op, $bits, $cnt, 2, 10);
-        $op = self::putBits($out, $op, $bits, $cnt, 2, 3);
+        // RFC1951 end-of-block only — sdefl's put(2,10)+put(2,3) "zlib partial flush" breaks libz parity (#12706).
+        if ($cnt > 0) {
+            $op = self::putBits($out, $op, $bits, $cnt, 0, 8 - $cnt);
+        }
         if ($op > $outCap) {
             return false;
         }
