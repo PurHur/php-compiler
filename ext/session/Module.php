@@ -39,6 +39,7 @@ class Module extends ModuleAbstract
             new session_status(),
             new session_destroy(),
             new session_write_close(),
+            new session_commit(),
             new session_regenerate_id(),
             new session_abort(),
             new session_reset(),

@@ -10,12 +10,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** session_write_close() — persist $_SESSION and close (issue #1185). */
+/** session_write_close() / session_commit() alias — persist $_SESSION and close (issue #1185, #12544). */
 class session_write_close extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'session_write_close')
     {
-        parent::__construct('session_write_close');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void
