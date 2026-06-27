@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** IncludePathRuntime embed path uses IncludePathJitHelper PHP; standalone AOT keeps thin LLVM (#9245, #12801). */
+/** IncludePathRuntime embed + standalone route through IncludePathJitHelper PHP (#9245, #12801, #12882). */
 final class IncludePathRuntimeShrinkTest extends TestCase
 {
     public function testIncludePathRuntimeUsesJitHelperNotLlvmGlobals(): void
@@ -14,7 +14,7 @@ final class IncludePathRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IncludePathRuntime.php');
         $this->assertStringContainsString('IncludePathJitHelper', $source);
         $this->assertStringContainsString('IncludePathResolveJitHelper', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('IncludePathStandaloneLlvm', $source);
         $this->assertStringNotContainsString('include_path_get_standalone', $source);
         $this->assertStringNotContainsString("addGlobal(\$i32, 'phpc_include_path_depth')", $source);
         $this->assertStringNotContainsString('phpc_include_path_current', $source);
@@ -23,7 +23,7 @@ final class IncludePathRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("lookupFunction('realpath')", $source);
         $this->assertLessThan(360, \substr_count($source, "\n") + 1);
 
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
     }
 
     public function testVmIncludePathDelegatesToJitHelper(): void
