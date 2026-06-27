@@ -2105,7 +2105,11 @@ class Compiler {
         for ($cursor = $index + 1, $count = count($ops); $cursor < $count; ++$cursor) {
             $op = $ops[$cursor];
             if ($op instanceof Op\Expr\Assign || $op instanceof Op\Expr\AssignRef) {
-                return $op->expr === $fetch->result ? $cursor : null;
+                if ($op->expr !== $fetch->result) {
+                    return null;
+                }
+
+                return $this->assignIsListDestructSlotTarget($op) ? $cursor : null;
             }
             if (!$this->isListDestructWriteTargetPreludeOp($op)) {
                 return null;
@@ -2113,6 +2117,25 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * True when Assign/AssignRef var is a list-destruct slot (incl. invalid literals), not an SSA read temp (#12602).
+     */
+    private function assignIsListDestructSlotTarget(Op\Expr\Assign|Op\Expr\AssignRef $assign): bool
+    {
+        $var = $assign->var;
+        if (null === $var) {
+            return false;
+        }
+        if ($var instanceof Operand\Temporary) {
+            return false;
+        }
+        if ($var instanceof Operand\Variable && !$this->isNamedVariableOperand($var)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -19862,18 +19885,39 @@ class Compiler {
     private function rejectListDestructNonWritableWriteTargets(array $ops, int $start, int $end, Block $block): void
     {
         for ($i = $start; $i <= $end; ++$i) {
-            $op = $ops[$i];
-            if (!$op instanceof Op\Expr\Assign && !$op instanceof Op\Expr\AssignRef) {
+            if ($this->isListSpreadAssignOp($ops[$i])) {
+                $this->rejectListDestructSlotAssignTarget($ops[$i], $block);
                 continue;
             }
-            $this->rejectThisReassignment($op->var);
-            $this->rejectNullsafeInWriteContext($op->var, $block);
             if (
-                !$this->lvalueIsWritableListDestructTarget($op->var, $block)
-                || $this->lvalueContainsNewExpr($op->var, $block)
+                !$this->isPlainListDestructDimFetch($ops, $i)
+                && !$this->isKeyedListDestructDimFetch($ops, $i)
             ) {
-                $this->throwListDestructNonWritableWriteFatalFromOp($op);
+                continue;
             }
+            $assignIndex = $this->listDestructSlotAssignIndex($ops, $i);
+            if (null === $assignIndex) {
+                continue;
+            }
+            $assign = $ops[$assignIndex];
+            if ($assign instanceof Op\Expr\Assign || $assign instanceof Op\Expr\AssignRef) {
+                $this->rejectListDestructSlotAssignTarget($assign, $block);
+            }
+        }
+    }
+
+    private function rejectListDestructSlotAssignTarget(Op $assign, Block $block): void
+    {
+        if (!$assign instanceof Op\Expr\Assign && !$assign instanceof Op\Expr\AssignRef) {
+            return;
+        }
+        $this->rejectThisReassignment($assign->var);
+        $this->rejectNullsafeInWriteContext($assign->var, $block);
+        if (
+            !$this->lvalueIsWritableListDestructTarget($assign->var, $block)
+            || $this->lvalueContainsNewExpr($assign->var, $block)
+        ) {
+            $this->throwListDestructNonWritableWriteFatalFromOp($assign);
         }
     }
 
