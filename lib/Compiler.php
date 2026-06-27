@@ -2350,7 +2350,7 @@ class Compiler {
     {
         $this->rejectLoneListSpreadAssign($ops, $start);
         $end = $this->listDestructGroupEndIndex($ops, $start);
-        $this->rejectListDestructNewExprWriteTargets($ops, $start, $end, $block);
+        $this->rejectListDestructNonWritableWriteTargets($ops, $start, $end, $block);
         $rhs = $this->listDestructRhsOperand($ops, $start);
 
         $checkOp = new OpCode(
@@ -19850,7 +19850,7 @@ class Compiler {
     }
 
     /**
-     * Zend zend_compile.c: list()/[] slots on `new` property/array offsets are not writable (#6691, #7286).
+     * Zend zend_compile.c: list()/[] slots must target writable lvalues (#6691, #7286, #12498).
      *
      * Scan every assign in the destructuring group — php-cfg may emit New/PropertyFetch between
      * the RHS dim fetch and Assign so dim-fetch walking alone misses slots.
@@ -19859,33 +19859,184 @@ class Compiler {
      *
      * @return never
      */
-    private function rejectListDestructNewExprWriteTargets(array $ops, int $start, int $end, Block $block): void
+    private function rejectListDestructNonWritableWriteTargets(array $ops, int $start, int $end, Block $block): void
     {
         for ($i = $start; $i <= $end; ++$i) {
             $op = $ops[$i];
-            if (!$op instanceof Op\Expr\Assign) {
+            if (!$op instanceof Op\Expr\Assign && !$op instanceof Op\Expr\AssignRef) {
                 continue;
             }
-            if ($this->lvalueContainsNewExpr($op->var, $block)) {
-                $this->throwListDestructNewExprWriteFatal($op);
+            $this->rejectThisReassignment($op->var);
+            $this->rejectNullsafeInWriteContext($op->var, $block);
+            if (
+                !$this->lvalueIsWritableListDestructTarget($op->var, $block)
+                || $this->lvalueContainsNewExpr($op->var, $block)
+            ) {
+                $this->throwListDestructNonWritableWriteFatalFromOp($op);
             }
         }
     }
 
     /**
+     * Writable list-destruct slot: variable, property/static-property, or dim fetch on writable base.
+     */
+    protected function lvalueIsWritableListDestructTarget(?Operand $var, ?Block $block = null): bool
+    {
+        if (null === $var) {
+            return false;
+        }
+        if ($var instanceof Operand\Temporary && null !== $var->original) {
+            return $this->lvalueIsWritableListDestructTarget($var->original, $block);
+        }
+        if ($var instanceof Op\Expr\ConstFetch || $var instanceof Op\Expr\ClassConstFetch) {
+            return false;
+        }
+        if ($var instanceof Operand\Literal) {
+            return false;
+        }
+        $dimFetch = $this->unwrapArrayDimFetch($var);
+        if (null !== $dimFetch) {
+            if (null !== $block && $this->operandDerivesFromNew($dimFetch->var, $block)) {
+                return false;
+            }
+
+            return $this->lvalueIsWritableListDestructTarget($dimFetch->var, $block);
+        }
+        $propFetch = $this->unwrapPropertyFetch($var);
+        if (null !== $propFetch) {
+            if (null !== $block && $this->operandDerivesFromNew($propFetch->var, $block)) {
+                return false;
+            }
+
+            return $this->lvalueIsWritableListDestructTarget($propFetch->var, $block);
+        }
+        if (null !== $this->unwrapStaticPropertyFetch($var)) {
+            return true;
+        }
+        if (null !== $block) {
+            $dimFetch = $this->findArrayDimFetchForResult($var, $block);
+            if (null !== $dimFetch) {
+                if ($this->operandDerivesFromNew($dimFetch->var, $block)) {
+                    return false;
+                }
+
+                return $this->lvalueIsWritableListDestructTarget($dimFetch->var, $block);
+            }
+            $propFetch = $this->findPropertyFetchForResult($var, $block);
+            if (null !== $propFetch) {
+                if ($this->operandDerivesFromNew($propFetch->var, $block)) {
+                    return false;
+                }
+
+                return $this->lvalueIsWritableListDestructTarget($propFetch->var, $block);
+            }
+            if (null !== $this->findStaticPropertyFetchForAssign($var, $block)) {
+                return true;
+            }
+        }
+        if ($var instanceof Operand\Variable) {
+            if ($this->isNamedVariableOperand($var)) {
+                return true;
+            }
+            if (null !== $block) {
+                $producer = $this->findListDestructWriteTargetProducer($var, $block);
+                if (null !== $producer) {
+                    return $this->listDestructWriteTargetProducerIsWritable($producer, $block);
+                }
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg may bind list slots to inline producer temps (ConstFetch, FuncCall, …) (#12498).
+     */
+    protected function findListDestructWriteTargetProducer(Operand $var, Block $block): ?Op\Expr
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $root = $this->unwrapOperandChain($var);
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if ($this->unwrapOperandChain($child->result) === $root) {
+                return $child;
+            }
+        }
+
+        return null;
+    }
+
+    protected function listDestructWriteTargetProducerIsWritable(Op\Expr $producer, Block $block): bool
+    {
+        if ($producer instanceof Op\Expr\ConstFetch || $producer instanceof Op\Expr\ClassConstFetch) {
+            return false;
+        }
+        if (
+            $producer instanceof Op\Expr\FuncCall
+            || $producer instanceof Op\Expr\MethodCall
+            || $producer instanceof Op\Expr\StaticCall
+            || $producer instanceof Op\Expr\New_
+        ) {
+            return false;
+        }
+        if ($producer instanceof Op\Expr\BinaryOp) {
+            return false;
+        }
+        if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+            return false;
+        }
+        if ($producer instanceof Op\Expr\Array_) {
+            return false;
+        }
+        if ($producer instanceof Op\Expr\ArrayDimFetch) {
+            if ($this->operandDerivesFromNew($producer->var, $block)) {
+                return false;
+            }
+
+            return $this->lvalueIsWritableListDestructTarget($producer->var, $block);
+        }
+        if ($producer instanceof Op\Expr\PropertyFetch) {
+            if ($this->operandDerivesFromNew($producer->var, $block)) {
+                return false;
+            }
+
+            return $this->lvalueIsWritableListDestructTarget($producer->var, $block);
+        }
+        if ($producer instanceof Op\Expr\StaticPropertyFetch) {
+            return true;
+        }
+
+        return true;
+    }
+
+    /**
      * @return never
      */
-    private function throwListDestructNewExprWriteFatal(Op\Expr\Assign $assign): void
+    private function throwListDestructNonWritableWriteFatalFromOp(Op $op): void
     {
-        $sourceFile = $assign->getFile() ?? '';
+        $sourceFile = $op->getFile() ?? '';
         if ('' === $sourceFile) {
             $sourceFile = 'unknown';
         }
         throw new CompileFatal(
             $sourceFile,
-            max(1, $assign->getLine()),
+            max(1, $op->getLine()),
             'Assignments can only happen to writable values'
         );
+    }
+
+    /**
+     * @return never
+     */
+    private function throwListDestructNonWritableWriteFatal(Op\Expr\Assign $assign): void
+    {
+        $this->throwListDestructNonWritableWriteFatalFromOp($assign);
     }
 
     /**
@@ -20107,7 +20258,7 @@ class Compiler {
         }
         if (null !== $assignExpr && null !== $block && null !== $this->findArrayDimFetchForResult($assignExpr, $block)) {
             if ($assignOp instanceof Op\Expr\Assign) {
-                $this->throwListDestructNewExprWriteFatal($assignOp);
+                $this->throwListDestructNonWritableWriteFatal($assignOp);
             }
             $this->throwCompileError('Assignments can only happen to writable values');
         }
