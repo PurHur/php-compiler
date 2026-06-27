@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** gc_status() / gc_mem_caches() VM introspection (#3280, #12780 PHP 8.4 schema). */
+/** gc_status() / gc_mem_caches() VM introspection (#3280, #12780, #12790). */
 final class GcStatusTest extends TestCase
 {
     public function testGcStatusAndMemCachesRegistered(): void
@@ -18,8 +18,14 @@ foreach (['gc_status', 'gc_mem_caches'] as $fn) {
 }
 $st = gc_status();
 gc_mem_caches();
-echo 'running=', $st['running'] ? 'true' : 'false', "\n";
-echo 'buffer_size=', $st['buffer_size'], "\n";
+echo 'schema=', array_key_exists('runs', $st) ? 'legacy' : '84', "\n";
+if (array_key_exists('runs', $st)) {
+    echo 'runs=', $st['runs'], "\n";
+    echo 'threshold=', $st['threshold'], "\n";
+} else {
+    echo 'running=', $st['running'] ? 'true' : 'false', "\n";
+    echo 'buffer_size=', $st['buffer_size'], "\n";
+}
 PHP;
 
         $rt = new Runtime();
@@ -30,8 +36,15 @@ PHP;
 
         $this->assertStringContainsString('gc_status=yes', $output);
         $this->assertStringContainsString('gc_mem_caches=yes', $output);
-        $this->assertStringContainsString('running=false', $output);
-        $this->assertStringContainsString('buffer_size=131072', $output);
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            $this->assertStringContainsString('schema=84', $output);
+            $this->assertStringContainsString('running=false', $output);
+            $this->assertStringContainsString('buffer_size=131072', $output);
+        } else {
+            $this->assertStringContainsString('schema=legacy', $output);
+            $this->assertStringContainsString('runs=0', $output);
+            $this->assertStringContainsString('threshold=10001', $output);
+        }
     }
 
     public function testGcStatusPhpSrcShape(): void
@@ -55,12 +68,22 @@ PHP;
         $rt->run($block);
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('buffer_size,full,protected,running', $output);
-        foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
-            $this->assertStringContainsString($key.'=yes', $output);
-        }
-        foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
-            $this->assertStringContainsString($key.'=no', $output);
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            $this->assertStringContainsString('buffer_size,full,protected,running', $output);
+            foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+                $this->assertStringContainsString($key.'=yes', $output);
+            }
+            foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
+                $this->assertStringContainsString($key.'=no', $output);
+            }
+        } else {
+            $this->assertStringContainsString('collected,roots,runs,threshold', $output);
+            foreach (['runs', 'collected', 'threshold', 'roots'] as $key) {
+                $this->assertStringContainsString($key.'=yes', $output);
+            }
+            foreach (['running', 'protected', 'full', 'buffer_size'] as $key) {
+                $this->assertStringContainsString($key.'=no', $output);
+            }
         }
     }
 
@@ -96,8 +119,14 @@ unset($a, $b);
 $n = gc_collect_cycles();
 $st = gc_status();
 echo 'collected=', $n, "\n";
-echo 'running=', $st['running'] ? 'true' : 'false', "\n";
-echo 'full=', $st['full'] ? 'true' : 'false', "\n";
+echo 'schema=', array_key_exists('runs', $st) ? 'legacy' : '84', "\n";
+if (array_key_exists('runs', $st)) {
+    echo 'runs=', $st['runs'], "\n";
+    echo 'gc_collected=', $st['collected'], "\n";
+} else {
+    echo 'running=', $st['running'] ? 'true' : 'false', "\n";
+    echo 'full=', $st['full'] ? 'true' : 'false', "\n";
+}
 PHP;
 
         $rt = new Runtime();
@@ -107,7 +136,14 @@ PHP;
         $output = ob_get_clean();
 
         $this->assertStringContainsString('collected=2', $output);
-        $this->assertStringContainsString('running=false', $output);
-        $this->assertStringContainsString('full=false', $output);
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            $this->assertStringContainsString('schema=84', $output);
+            $this->assertStringContainsString('running=false', $output);
+            $this->assertStringContainsString('full=false', $output);
+        } else {
+            $this->assertStringContainsString('schema=legacy', $output);
+            $this->assertStringContainsString('runs=1', $output);
+            $this->assertStringContainsString('gc_collected=2', $output);
+        }
     }
 }

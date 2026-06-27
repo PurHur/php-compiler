@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\CycleCollector;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -35,11 +37,14 @@ final class GcStatusRuntime
 
     private const BUILD_TABLE = 'PHPCompiler\\ext\\standard\\GcStatusJitHelper::buildTable';
 
+    private const BUILD_LEGACY_TABLE = 'PHPCompiler\\ext\\standard\\GcStatusJitHelper::buildLegacyTable';
+
     private const FN_STATUS = '__phpc_gc_status_ht';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::BUILD_TABLE,
+        self::BUILD_LEGACY_TABLE,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -93,16 +98,31 @@ final class GcStatusRuntime
         }
 
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $i1 = $context->getTypeFromString('int1');
-        $ft = $context->context->functionType($htPtr, false, $i1, $i1, $i1, $i64);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction($abiName, $ft);
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($htPtr, false)
+            );
 
         $entry = $fn->appendBasicBlock('gc_status_bridge_entry');
         $context->builder->positionAtEnd($entry);
+
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            self::emitPhp84StatusBridge($context, $fn);
+        } else {
+            self::emitLegacyStatusBridge($context, $fn);
+        }
+
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitPhp84StatusBridge(Context $context, LlvmFunction $fn): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i1 = $context->getTypeFromString('int1');
 
         $running = self::loadGlobalBool($context, self::G_RUNNING, $i32, $i1);
         $protected = self::loadGlobalBool($context, self::G_PROTECTED, $i32, $i1);
@@ -117,8 +137,26 @@ final class GcStatusRuntime
             $bufferSize
         );
         $context->builder->returnValue($ht);
-        $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+    }
+
+    private static function emitLegacyStatusBridge(Context $context, LlvmFunction $fn): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        $runs = self::loadGlobalInt($context, self::G_RUNS, $i32, $i64);
+        $collected = self::loadGlobalInt($context, self::G_TOTAL_COLLECTED, $i32, $i64);
+        $roots = self::loadGlobalInt($context, self::G_ROOT_COUNT, $i32, $i64);
+        $threshold = $i64->constInt(CycleCollector::ROOT_THRESHOLD, false);
+
+        $ht = $context->builder->call(
+            self::helperFunction($context, self::BUILD_LEGACY_TABLE),
+            $runs,
+            $collected,
+            $threshold,
+            $roots
+        );
+        $context->builder->returnValue($ht);
     }
 
     private static function loadGlobalInt(Context $context, string $globalName, $i32, $i64): Value

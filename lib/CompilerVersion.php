@@ -290,6 +290,26 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps legacy runs/collected/threshold/roots (#12790).
+     */
+    public static function supportsGcStatusPhp84Schema(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps integer nanoseconds (#12789).
+     */
+    public static function supportsHrtimeAsNumberFloat(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ class_constants() (ext/standard/basic_functions.c, #7309, #12448).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.

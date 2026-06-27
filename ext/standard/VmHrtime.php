@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * hrtime() for VM without host Zend \hrtime() (issue #5174, #3195, #7315).
  *
@@ -15,13 +17,15 @@ final class VmHrtime
     private const NS_PER_SEC = 1_000_000_000;
 
     /**
-     * @return float|array{0: int, 1: int}
+     * @return float|int|array{0: int, 1: int}
      */
     public static function hrtime(bool $asNumber = false)
     {
         [$sec, $nsec] = VmHrtimeNative::readMonotonic();
         if ($asNumber) {
-            return (float) ($sec * self::NS_PER_SEC + $nsec);
+            $ns = $sec * self::NS_PER_SEC + $nsec;
+
+            return CompilerVersion::supportsHrtimeAsNumberFloat() ? (float) $ns : $ns;
         }
 
         return [$sec, $nsec];
