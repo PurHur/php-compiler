@@ -19252,6 +19252,15 @@ class Compiler {
                 if (null !== $initArraySlot) {
                     $valueSlot = $initArraySlot;
                 }
+            } else            if (
+                null !== $cfgCallOp
+                && 0 === $argIndex
+                && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                if (null !== $initArraySlot) {
+                    $valueSlot = $initArraySlot;
+                }
             } elseif (
                 null !== $cfgCallOp
                 && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
