@@ -212,7 +212,7 @@ final class SessionName
             SessionNameRejectRuntime::isRejectedFunction($context),
             $newStr
         );
-        $isRejected = $context->builder->icmp(Builder::INT_NE, $rejected, $i8->constInt(0, false));
+        $isRejected = $context->castToBool($rejected);
         $context->builder->branchIf($isRejected, $bbReject, $bbCopy);
 
         $context->builder->positionAtEnd($bbReject);

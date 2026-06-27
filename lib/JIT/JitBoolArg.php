@@ -131,11 +131,7 @@ final class JitBoolArg
             $context->getTypeFromString('int64')->constInt(0, false)
         );
 
-        return $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load($firstByte),
-            $i8->constInt(0, false)
-        );
+        return $context->castToBool($context->builder->load($firstByte));
     }
 
     private static function lowerBoxed(Context $context, Variable $arg, string $contextLabel): Value
@@ -201,11 +197,7 @@ final class JitBoolArg
             $context->getTypeFromString('int32')->constInt(0, false),
             $context->getTypeFromString('int64')->constInt(0, false)
         );
-        $boolVal = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->load($firstByte),
-            $i8->constInt(0, false)
-        );
+        $boolVal = $context->castToBool($context->builder->load($firstByte));
         $boolEnd = $context->builder->getInsertBlock();
         $context->builder->branch($mergeBlock);
 
