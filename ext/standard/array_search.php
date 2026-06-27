@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArraySearchRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -46,14 +46,7 @@ final class array_search extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        foreach ($haystack->iterateKeyed(true) as [$key, $value]) {
-            if ($strict ? $needle->identicalTo($value) : in_array::looseEquals($needle, $value, $vm)) {
-                $frame->returnVar->copyFrom($key);
-
-                return;
-            }
-        }
-        $frame->returnVar->bool(false);
+        $frame->returnVar->copyFrom(VmArray::searchKey($needle, $haystack, $strict, $vm));
     }
 
     public Context $context;
@@ -73,6 +66,6 @@ final class array_search extends Internal
         }
         JitArrayElem::requireArrayParam($context, $args[1], 'array_search', 2, 'haystack');
 
-        return ArrayBuiltinHelper::arraySearch($context, $args[0], $args[1], $strict);
+        return ArraySearchRuntime::search($context, $args[0], $args[1], $strict);
     }
 }
