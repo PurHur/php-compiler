@@ -35,6 +35,9 @@ final class JitTypedClassConstCompileTest extends TestCase
      */
     public function testTypedClassConstModuleVerify(string $fixture): void
     {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+        }
         $runtime = new Runtime();
         $code = $this->phptFixtureCode($fixture);
         $block = $runtime->parseAndCompile($code, $fixture);

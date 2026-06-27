@@ -54,6 +54,17 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.3', '>=');
     }
 
+    /**
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse error.
+     * Trait typed constants remain on supportsTypedTraitConstants() for 8.3+ dev target (#5993).
+     */
+    public static function supportsTypedClassConstants(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.3+ typed constants at compile-unit scope (Zend/zend_compile.c, issue #7081). */
     public static function supportsGlobalTypedConstants(): bool
     {
