@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream capability probes — embed PHP helper vs standalone LLVM (#5343, #11413).
+ * Stream capability probes — embed and standalone AOT via StreamCapsJitHelper PHP (#5343, #11413, #12845).
  *
  * php-src: ext/standard/streamsfuncs.c
  */
@@ -29,13 +29,7 @@ final class StreamCapsJit
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamCapsStandaloneLlvm::implement($context);
-            StreamCapsRuntime::ensureLocalUriLinked($context);
-        } else {
-            StreamCapsRuntime::ensureLinked($context);
-        }
-
+        StreamCapsRuntime::ensureLinked($context);
         self::registerLinkedRuntime($context);
     }
 

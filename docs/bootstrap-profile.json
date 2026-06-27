@@ -2530,7 +2530,6 @@
         "lib/JIT/Builtin/StreamCaps.php",
         "lib/JIT/Builtin/StreamCapsJit.php",
         "lib/JIT/Builtin/StreamCapsRuntime.php",
-        "lib/JIT/Builtin/StreamCapsStandaloneLlvm.php",
         "lib/JIT/Builtin/StreamContextRuntime.php",
         "lib/JIT/Builtin/StreamContextStandaloneLlvm.php",
         "lib/JIT/Builtin/StreamFilter.php",
@@ -3649,9 +3648,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3419,
+        "inventory_files": 3418,
         "excluded": 0,
-        "eligible": 3419,
+        "eligible": 3418,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
