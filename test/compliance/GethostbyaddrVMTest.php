@@ -25,6 +25,10 @@ final class GethostbyaddrVMTest extends BaseTest
             __DIR__.'/cases/stdlib/gethostbyaddr_not_found_ip.phpt',
             'gethostbyaddr_not_found_ip.phpt'
         );
+        yield 'gethostbyaddr_ptr_miss_no_warning.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/gethostbyaddr_ptr_miss_no_warning.phpt',
+            'gethostbyaddr_ptr_miss_no_warning.phpt'
+        );
     }
 
     public function setUp(): void
