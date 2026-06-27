@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Directory handle dispatch — embed PHP helper vs standalone LLVM (#11811).
+ * Directory handle dispatch — embed and standalone route through DirHandleJitHelper PHP (#11811, #12870).
  *
  * php-src: ext/standard/dir.c — opendir/readdir/closedir/rewinddir
  */
@@ -26,12 +26,6 @@ final class StringDirJit
     {
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringDirStandaloneLlvm::implement($context);
 
             return;
         }
