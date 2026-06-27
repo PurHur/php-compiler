@@ -53,4 +53,35 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
             $this->assertStringContainsString(AsymmetricVisibilityRejector::PARSE_MESSAGE, $e->getMessage());
         }
     }
+
+    public function testRejectorThrowsMultipleModifiersOnPublicPrivateSet(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        AsymmetricVisibilityRejector::reject(
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_double_modifier.php'),
+            'asymmetric_double_modifier.php'
+        );
+    }
+
+    public function testRuntimeRejectsPublicPrivateSetWithZendMessage(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_asymmetric_double_modifier.php'),
+                'asymmetric_double_modifier.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString(AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE, $e->getMessage());
+            $this->assertSame(5, $e->sourceLine);
+        }
+    }
 }
