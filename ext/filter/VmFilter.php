@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -26,8 +27,14 @@ final class VmFilter
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_URL */
     public const FILTER_VALIDATE_URL = 273;
     public const FILTER_VALIDATE_EMAIL = 274;
+    /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_IP */
+    public const FILTER_VALIDATE_IP = 275;
     /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
     public const FILTER_NULL_ON_FAILURE = 134217728;
+    /** php-src ext/filter/php_filter.h — FILTER_FLAG_IPV4 */
+    public const FILTER_FLAG_IPV4 = 1048576;
+    /** php-src ext/filter/php_filter.h — FILTER_FLAG_IPV6 */
+    public const FILTER_FLAG_IPV6 = 2097152;
     /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_OCTAL */
     public const FILTER_FLAG_ALLOW_OCTAL = 8;
     /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_HEX */
@@ -52,7 +59,8 @@ final class VmFilter
             || self::FILTER_VALIDATE_FLOAT === $filter
             || self::FILTER_VALIDATE_REGEXP === $filter
             || self::FILTER_VALIDATE_URL === $filter
-            || self::FILTER_VALIDATE_EMAIL === $filter;
+            || self::FILTER_VALIDATE_EMAIL === $filter
+            || self::FILTER_VALIDATE_IP === $filter;
     }
 
     public static function unknownFilterWarningMessage(int $filter): string
@@ -81,6 +89,9 @@ final class VmFilter
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
             return self::validateEmail($value, $nullOnFailure);
+        }
+        if (self::FILTER_VALIDATE_IP === $filter) {
+            return self::validateIp($value, $nullOnFailure, $parsed['flags']);
         }
 
         return self::failureResult(false);
@@ -451,6 +462,57 @@ final class VmFilter
         $out->string($s);
 
         return $out;
+    }
+
+    /**
+     * FILTER_VALIDATE_IP (php-src ext/filter/logical_filters.c — php_filter_validate_ip).
+     */
+    private static function validateIp(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        if (Variable::TYPE_STRING !== $value->type) {
+            return self::failureResult($nullOnFailure);
+        }
+        $s = $value->toString();
+        if (!self::isValidIpAddress($s, $flags)) {
+            return self::failureResult($nullOnFailure);
+        }
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /**
+     * php-src ext/filter/logical_filters.c — php_filter_validate_ip / _php_parse_ip.
+     */
+    public static function isValidIpAddress(string $s, int $flags = 0): bool
+    {
+        if ('' === $s) {
+            return false;
+        }
+        $addr = $s;
+        if (str_starts_with($s, '[') && str_ends_with($s, ']')) {
+            $addr = substr($s, 1, -1);
+        }
+        $packed = VmInetPure::inet_pton($addr);
+        if (false === $packed) {
+            return false;
+        }
+        $isV4 = 4 === \strlen($packed);
+        $isV6 = 16 === \strlen($packed);
+        $ipv4Only = 0 !== ($flags & self::FILTER_FLAG_IPV4);
+        $ipv6Only = 0 !== ($flags & self::FILTER_FLAG_IPV6);
+        if ($ipv4Only && !$ipv6Only) {
+            return $isV4;
+        }
+        if ($ipv6Only && !$ipv4Only) {
+            return $isV6;
+        }
+
+        return $isV4 || $isV6;
     }
 
     private static function validateUrl(Variable $value, bool $nullOnFailure = false): Variable
