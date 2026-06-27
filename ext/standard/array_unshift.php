@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayUnshiftRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitReferencableCheck;
 use PHPCompiler\JIT\JitValueBox;
@@ -40,17 +40,15 @@ final class array_unshift extends Internal
             if (null === $frame->returnVar) {
                 return;
             }
-            $frame->returnVar->int($ht->getNumElements());
+            $frame->returnVar->int(ArrayUnshiftJitHelper::countElements($ht));
 
             return;
         }
         $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
-            $copy = new Variable();
-            $copy->copyFrom($frame->calledArgs[$i]->resolveIndirect());
-            $values[] = $copy;
+            $values[] = $frame->calledArgs[$i]->resolveIndirect();
         }
-        $count = $ht->unshiftPrepend(...$values);
+        $count = ArrayUnshiftJitHelper::unshift($ht, ...$values);
         if (null === $frame->returnVar) {
             return;
         }
@@ -76,6 +74,6 @@ final class array_unshift extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::unshift($context, $array, ...$values);
+        return ArrayUnshiftRuntime::unshift($context, $array, ...$values);
     }
 }
