@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3365 |
-| Phase A inventory files (M2 ratio SSOT) | 3365 |
+| PHP files on vm.php path | 3369 |
+| Phase A inventory files (M2 ratio SSOT) | 3369 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8894 |
+| Source constructs flagged (warnings) | 8902 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -325,9 +325,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayChunkJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCombineJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCountValuesJitHelper.php` | 0 | 4 |
+| `ext/standard/ArrayDiffJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayFillKeysJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayFilterJitHelper.php` | 0 | 2 |
 | `ext/standard/ArrayFlipJitHelper.php` | 0 | 3 |
+| `ext/standard/ArrayIntersectJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayKeysJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayMapJitHelper.php` | 0 | 4 |
 | `ext/standard/ArrayMergeJitHelper.php` | 0 | 1 |
@@ -983,7 +985,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VarDumpJitHelper.php` | 0 | 1 |
 | `ext/standard/VarExportJitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
-| `ext/standard/VmArray.php` | 0 | 37 |
+| `ext/standard/VmArray.php` | 0 | 41 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayFilterCallback.php` | 0 | 3 |
@@ -1287,7 +1289,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_combine.php` | 0 | 1 |
 | `ext/standard/array_count.php` | 0 | 1 |
 | `ext/standard/array_count_values.php` | 0 | 1 |
-| `ext/standard/array_diff.php` | 0 | 5 |
+| `ext/standard/array_diff.php` | 0 | 3 |
 | `ext/standard/array_diff_assoc.php` | 0 | 5 |
 | `ext/standard/array_diff_key.php` | 0 | 5 |
 | `ext/standard/array_diff_uassoc.php` | 0 | 1 |
@@ -1299,7 +1301,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_find_key.php` | 0 | 1 |
 | `ext/standard/array_first.php` | 0 | 1 |
 | `ext/standard/array_flip.php` | 0 | 1 |
-| `ext/standard/array_intersect.php` | 0 | 5 |
+| `ext/standard/array_intersect.php` | 0 | 3 |
 | `ext/standard/array_intersect_assoc.php` | 0 | 5 |
 | `ext/standard/array_intersect_key.php` | 0 | 5 |
 | `ext/standard/array_intersect_uassoc.php` | 0 | 1 |
@@ -2199,9 +2201,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayChunkRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCombineRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCountValuesRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayFillKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFilterRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFlipRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayIntersectRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayMapRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php` | 0 | 4 |
@@ -5408,6 +5412,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 48)
 - 2 class method(s)
 
+### `ext/standard/ArrayDiffJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/ArrayFillKeysJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5424,6 +5433,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 24)
 - new Variable (line 35)
+- 2 class method(s)
+
+### `ext/standard/ArrayIntersectJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/standard/ArrayKeysJitHelper.php`
@@ -9719,30 +9733,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 368)
 - new HashTable (line 407)
 - new Variable (line 409)
-- new Variable (line 585)
-- new Variable (line 591)
-- new HashTable (line 613)
-- new HashTable (line 618)
-- new Variable (line 621)
-- new HashTable (line 634)
-- new Variable (line 636)
-- new Variable (line 763)
-- new Variable (line 791)
-- new Variable (line 802)
-- new HashTable (line 808)
-- new Variable (line 810)
-- new HashTable (line 909)
-- new Variable (line 920)
-- new HashTable (line 960)
-- new Variable (line 971)
-- new Variable (line 984)
-- new HashTable (line 1024)
-- new Variable (line 1033)
-- new Variable (line 1117)
-- new Variable (line 1119)
-- new HashTable (line 1132)
-- new Variable (line 1135)
-- 56 class method(s)
+- new HashTable (line 441)
+- new Variable (line 446)
+- new HashTable (line 483)
+- new Variable (line 488)
+- new Variable (line 657)
+- new Variable (line 663)
+- new HashTable (line 685)
+- new HashTable (line 690)
+- new Variable (line 693)
+- new HashTable (line 706)
+- new Variable (line 708)
+- new Variable (line 835)
+- new Variable (line 863)
+- new Variable (line 874)
+- new HashTable (line 880)
+- new Variable (line 882)
+- new HashTable (line 981)
+- new Variable (line 992)
+- new HashTable (line 1032)
+- new Variable (line 1043)
+- new Variable (line 1056)
+- new HashTable (line 1096)
+- new Variable (line 1105)
+- new Variable (line 1189)
+- new Variable (line 1191)
+- new HashTable (line 1204)
+- new Variable (line 1207)
+- 61 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
@@ -11893,11 +11911,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_diff.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new HashTable (line 62)
-- new Variable (line 67)
-- new ArgumentCountError (line 101)
-- 3 class method(s)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 72)
+- 2 class method(s)
 
 ### `ext/standard/array_diff_assoc.php`
 
@@ -11969,11 +11985,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_intersect.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
-- new HashTable (line 55)
-- new Variable (line 60)
-- new ArgumentCountError (line 99)
-- 3 class method(s)
+- new ArgumentCountError (line 24)
+- new ArgumentCountError (line 65)
+- 2 class method(s)
 
 ### `ext/standard/array_intersect_assoc.php`
 
@@ -17742,6 +17756,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/ArrayDiffRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 221)
+- 12 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/ArrayFillKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17756,6 +17777,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/ArrayIntersectRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 221)
+- 12 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayKeysRuntime.php`
 
