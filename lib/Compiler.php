@@ -11080,8 +11080,36 @@ class Compiler {
         if (1 === \count($deadArrayArgIndices)) {
             return $unassigned[\count($unassigned) - 1];
         }
+        // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
+        $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        if ($matched instanceof Op\Expr\Array_) {
+            return $matched;
+        }
 
         return $unassigned[$positionAmongDeadArrays] ?? null;
+    }
+
+    /**
+     * Dead php-cfg call-arg temps that expect hoisted Array_ producers (#11586, #12730).
+     *
+     * @param Op\Expr\FuncCall|Op\Expr\NsFuncCall|Op $callOp
+     */
+    private function countDeadArrayInlineCallArgs(Op $callOp): int
+    {
+        if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return 0;
+        }
+        $count = 0;
+        foreach ($callOp->args as $callArg) {
+            if (!$this->callArgIsDeadInlineTemporary($callArg) || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+                ++$count;
+            }
+        }
+
+        return $count;
     }
 
     /**
@@ -19019,6 +19047,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
+                && 1 === $this->countDeadArrayInlineCallArgs($cfgCallOp)
             ) {
                 $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
                 if (null !== $initArraySlot) {

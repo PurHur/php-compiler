@@ -2350,6 +2350,90 @@ PHP;
         self::assertSame('ok', $out);
     }
 
+    /** Issue #12730 — sibling flat inline array literals must map to distinct arg slots. */
+    public function testArrayDiffInlineFlatLiteralsUseDistinctArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_diff(['1', '2'], [1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_diff_inline_flat.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'first inline array must feed arg #1');
+        self::assertSame($arraySlots[1], $sendSlots[1], 'second inline array must feed arg #2');
+    }
+
+    /** Issue #12730 — array_diff() inline literal runtime parity with Zend. */
+    public function testArrayDiffInlineFlatLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_diff(['1', '2'], [1]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_diff_inline_flat_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  1 => '2',\n)\n", ob_get_clean());
+    }
+
+    /** Issue #12729 — nested sibling inline array literals must map to distinct outer roots. */
+    public function testArrayReplaceRecursiveNestedSiblingInlineLiteralsUseDistinctArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_replace_recursive(['a' => ['b' => 1]], ['a' => ['c' => 2]]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_sibling_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(4, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[1], $sendSlots[0], 'first nested inline array root must feed arg #1');
+        self::assertSame($arraySlots[3], $sendSlots[1], 'second nested inline array root must feed arg #2');
+    }
+
+    /** Issue #12729 — array_replace_recursive nested sibling inline literal runtime parity. */
+    public function testArrayReplaceRecursiveNestedSiblingInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_replace_recursive(['a' => ['b' => 1]], ['a' => ['c' => 2]]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_replace_recursive_nested_sibling_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => array (\n    'b' => 1,\n    'c' => 2,\n  ),\n)\n", ob_get_clean());
+    }
+
     /** Issue #12008 — nested inline array + 4th positional arg must not steal Array_ slots for literals. */
     public function testHttpBuildQueryNestedInlineArrayFourPositionalArgsRuntime(): void
     {
