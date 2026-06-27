@@ -283,6 +283,16 @@ final class VmJsonFormat
                     continue;
                 }
             }
+            if (!$unescapedUnicode && $ord >= 0x80) {
+                $decoded = self::utf8CodePointAt($value, $i);
+                if (null !== $decoded) {
+                    [$cp, $run] = $decoded;
+                    $out .= self::escapeUnicodeCodePoint($cp);
+                    $i += $run - 1;
+
+                    continue;
+                }
+            }
             $hexTag = 0 !== ($flags & VmJsonFlags::HEX_TAG);
             $hexAmp = 0 !== ($flags & VmJsonFlags::HEX_AMP);
             $hexApos = 0 !== ($flags & VmJsonFlags::HEX_APOS);
@@ -338,5 +348,43 @@ final class VmJsonFormat
         }
 
         return $need;
+    }
+
+    /** @return array{0: int, 1: int}|null Unicode code point and UTF-8 byte length. */
+    private static function utf8CodePointAt(string $value, int $offset): ?array
+    {
+        $run = self::utf8RunLength($value, $offset);
+        if ($run <= 0) {
+            return null;
+        }
+        $b0 = \ord($value[$offset]);
+        $cp = match ($run) {
+            2 => (($b0 & 0x1F) << 6) | (\ord($value[$offset + 1]) & 0x3F),
+            3 => (($b0 & 0x0F) << 12)
+                | ((\ord($value[$offset + 1]) & 0x3F) << 6)
+                | (\ord($value[$offset + 2]) & 0x3F),
+            4 => (($b0 & 0x07) << 18)
+                | ((\ord($value[$offset + 1]) & 0x3F) << 12)
+                | ((\ord($value[$offset + 2]) & 0x3F) << 6)
+                | (\ord($value[$offset + 3]) & 0x3F),
+            default => null,
+        };
+        if (null === $cp || $cp > 0x10FFFF) {
+            return null;
+        }
+
+        return [$cp, $run];
+    }
+
+    private static function escapeUnicodeCodePoint(int $cp): string
+    {
+        if ($cp <= 0xFFFF) {
+            return \sprintf('\\u%04x', $cp);
+        }
+        $cp -= 0x10000;
+        $high = 0xD800 | ($cp >> 10);
+        $low = 0xDC00 | ($cp & 0x3FF);
+
+        return \sprintf('\\u%04x\\u%04x', $high, $low);
     }
 }
