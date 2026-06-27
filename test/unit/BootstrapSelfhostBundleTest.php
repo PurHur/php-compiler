@@ -442,6 +442,11 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'lib/JIT/HashTableReadLlvm.php',
         'lib/JIT/HashTableWriteLlvm.php',
         'lib/VM/HashTableJitHelper.php',
+        'ext/standard/ArrayReplaceJitHelper.php',
+        'ext/standard/ArraySearchJitHelper.php',
+        'lib/AsymmetricVisibilityRejector.php',
+        'lib/JIT/Builtin/ArrayReplaceRuntime.php',
+        'lib/JIT/Builtin/ArraySearchRuntime.php',
     ];
 
     public static function setUpBeforeClass(): void
