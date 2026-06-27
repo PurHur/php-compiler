@@ -173,7 +173,6 @@ final class VmStreamSocketNative
         int $flags,
         ?Variable $contextVar = null
     ): array {
-        unset($contextVar);
         if (!self::available()) {
             return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
         }
@@ -195,13 +194,16 @@ final class VmStreamSocketNative
             $flags = self::STREAM_SERVER_BIND | self::STREAM_SERVER_LISTEN;
         }
 
+        if (null === self::ffi()) {
+            return VmStreamSocketPure::server($local, $flags, $contextVar);
+        }
+
+        unset($contextVar);
+
         $sockType = 'udp' === $parsed['transport'] ? self::SOCK_DGRAM : self::SOCK_STREAM;
         $port = (string) $parsed['port'];
 
         $ffi = self::ffi();
-        if (null === $ffi) {
-            return [false, 0, 'VmStreamSocketNative FFI unavailable', null];
-        }
 
         $hints = $ffi->new('struct addrinfo');
         $hints->ai_family = \str_contains($parsed['host'], ':') ? self::AF_INET6 : self::AF_INET;
