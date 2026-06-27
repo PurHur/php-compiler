@@ -218,6 +218,36 @@ final class VmPhpMemoryStream
         return $previous;
     }
 
+    /**
+     * stream_set_write_buffer() / set_file_buffer() for php://memory|temp (#12532, php-src streamsfuncs.c).
+     *
+     * @return int|false previous buffer size (-1 on memory streams)
+     */
+    public static function setWriteBuffer(int $handle, int $buffer): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return -1;
+    }
+
+    /**
+     * stream_set_read_buffer() for php://memory|temp (#10489, php-src streamsfuncs.c).
+     *
+     * @return int|false previous buffer size (0 on memory streams)
+     */
+    public static function setReadBuffer(int $handle, int $buffer): int|false
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state) {
+            return false;
+        }
+
+        return 0;
+    }
+
     public static function streamGetContents(int $handle, int $maxlength = -1, int $offset = -1): string|false
     {
         $state = self::$streams[$handle] ?? null;
