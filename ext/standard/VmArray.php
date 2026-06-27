@@ -555,6 +555,38 @@ final class VmArray
     }
 
     /**
+     * array_combine() — keys from {@param $keys}, values from {@param $values} (ext/standard/array.c).
+     *
+     * @throws \ValueError when operand lengths differ (non-empty mismatch)
+     */
+    public static function combine(HashTable $keys, HashTable $values, ?Frame $frame = null): HashTable
+    {
+        $keyList = [];
+        foreach ($keys->iterateKeyed(true) as [, $key]) {
+            $keyList[] = $key;
+        }
+        $valList = [];
+        foreach ($values->iterateKeyed(true) as [, $value]) {
+            $valList[] = $value;
+        }
+        if (0 === \count($keyList) && 0 === \count($valList)) {
+            return new HashTable();
+        }
+        if (\count($keyList) !== \count($valList)) {
+            throw new \ValueError(array_combine::LENGTH_MISMATCH_ERROR);
+        }
+        $ht = new HashTable();
+        $n = \count($keyList);
+        for ($i = 0; $i < $n; ++$i) {
+            $stored = new Variable();
+            $stored->copyFrom($valList[$i]);
+            self::storeCombineKey($ht, $keyList[$i], $stored, $frame);
+        }
+
+        return $ht;
+    }
+
+    /**
      * array_fill_keys() — keys from values of {@param $keys}, uniform {@param $value}.
      */
     public static function fillKeys(HashTable $keys, Variable $value, ?Frame $frame = null): HashTable
