@@ -94,7 +94,7 @@ PHP;
         $sendSlots = [];
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_ASSIGN === $op->type && null === $arraySlot) {
-                $arraySlot = $op->arg2;
+                $arraySlot = $op->arg1;
             }
             if (OpCode::TYPE_CLOSURE === $op->type) {
                 $closureSlot = $op->arg1;
