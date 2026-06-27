@@ -121,6 +121,27 @@ class VM {
     }
 
     /**
+     * Invoke user PHP on an isolated run stack — serialize/unserialize magic hooks (#12069).
+     *
+     * Prevents outer user catch handlers from absorbing __wakeup/__unserialize throws while
+     * nested inside a builtin execute() call.
+     */
+    public function invokePhpFunctionIsolated(Func\PHP $func, Variable ...$args): Variable
+    {
+        $savedStack = $this->context->swapRunStack(null);
+        $savedTryHandlers = $this->context->activeTryHandlerFrames;
+        $this->context->activeTryHandlerFrames = [];
+        $this->context->isolatedPhpFunctionInvoke = true;
+        try {
+            return $this->invokePhpFunctionOnStack($func, ...$args);
+        } finally {
+            $this->context->isolatedPhpFunctionInvoke = false;
+            $this->context->activeTryHandlerFrames = $savedTryHandlers;
+            $this->context->swapRunStack($savedStack);
+        }
+    }
+
+    /**
      * Invoke a user function with positional/named call arg entries (call_user_func forwarding, #10637).
      *
      * @param list<array{0: string, 1?: mixed, 2?: Variable}> $entries
@@ -8927,12 +8948,14 @@ restart:
         }
         if (Variable::TYPE_OBJECT === $thrown->type) {
             $entry = $thrown->toObject();
-            VM\ExceptionSupport::emitNativeUncaughtFatal(
-                VM\ExceptionSupport::nativeUncaughtThrowable(
-                    $entry,
-                    VM\ExceptionSupport::readThrowableMessage($entry)
-                )
+            $native = VM\ExceptionSupport::nativeUncaughtThrowable(
+                $entry,
+                VM\ExceptionSupport::readThrowableMessage($entry)
             );
+            if ($this->context->isolatedPhpFunctionInvoke) {
+                throw $native;
+            }
+            VM\ExceptionSupport::emitNativeUncaughtFatal($native);
         }
         throw new \Exception($thrown->toString());
     }
