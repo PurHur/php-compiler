@@ -25,15 +25,18 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/phpc_array_replace_recursive.c');
     }
 
-    public function testJitLoweringUsesArrayBuiltinHelperOverlay(): void
+    public function testJitLoweringUsesArrayReplaceRecursiveRuntime(): void
     {
-        $helper = file_get_contents($this->repoRoot.'/lib/JIT/ArrayBuiltinHelper.php');
-        $this->assertIsString($helper);
-        $this->assertStringContainsString('array_replace_recursive', $helper);
-        $this->assertStringContainsString('arrayReplaceRecursive', $helper);
+        $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayReplaceRecursiveRuntime.php');
+        $this->assertIsString($runtime);
+        $this->assertStringContainsString('ArrayReplaceRecursiveJitHelper', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $runtime);
+        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_replace_recursive.php');
         $this->assertIsString($builtin);
+        $this->assertStringContainsString('ArrayReplaceRecursiveRuntime::replaceRecursive', $builtin);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $builtin);
         $this->assertStringContainsString('replaceRecursiveCopy', $builtin);
     }
 }

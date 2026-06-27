@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayReplaceRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -64,6 +64,6 @@ final class array_replace_recursive extends Internal
             JitArrayElem::requireArrayArgNum($context, $arg, 'array_replace_recursive', $i + 1);
         }
 
-        return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));
+        return ArrayReplaceRecursiveRuntime::replaceRecursive($context, ...$args);
     }
 }
