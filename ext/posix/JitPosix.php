@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
 use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
+use PHPCompiler\JIT\Builtin\PosixSessionRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
@@ -164,6 +165,12 @@ final class JitPosix
     /** posix_getpgid() — process group ID or false (php-src ext/posix/posix.c; #6505 JIT). */
     public static function getpgid(Context $context, JITVariable $pidArg): Value
     {
+        return PosixSessionRuntime::getpgid($context, $pidArg);
+    }
+
+    /** Standalone AOT libc getpgid LLVM quarantine (#12685). */
+    public static function getpgidStandalone(Context $context, JITVariable $pidArg): Value
+    {
         self::ensureLibcPidLookup($context, 'getpgid');
         $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getpgid', 1, 'pid');
         $i32 = $context->getTypeFromString('int32');
@@ -193,6 +200,12 @@ final class JitPosix
 
     /** posix_getsid() — session ID or false (php-src ext/posix/posix.c; #6505 JIT). */
     public static function getsid(Context $context, JITVariable $pidArg): Value
+    {
+        return PosixSessionRuntime::getsid($context, $pidArg);
+    }
+
+    /** Standalone AOT libc getsid LLVM quarantine (#12685). */
+    public static function getsidStandalone(Context $context, JITVariable $pidArg): Value
     {
         self::ensureLibcPidLookup($context, 'getsid');
         $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getsid', 1, 'pid');
@@ -297,7 +310,7 @@ final class JitPosix
         return $ptr;
     }
 
-    private static function boxedPidOrFalse(Context $context, Value $raw, string $label): Value
+    public static function boxedPidOrFalse(Context $context, Value $raw, string $label): Value
     {
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
