@@ -141,7 +141,7 @@ final class VmHashNative
         return $hex;
     }
 
-    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32, 9 xxh3, 10 xxh128 */
+    /** 0 unknown, 1 sha256, 2 sha1, 3 md5, 4 crc32b, 5 crc32, 6 adler32, 7 fnv132, 8 fnv1a32, 9 xxh3, 10 xxh128, 11 crc32c */
     private static function algoId(string $algo): int
     {
         if (self::eqCi($algo, 'sha256')) {
@@ -173,6 +173,9 @@ final class VmHashNative
         }
         if (self::eqCi($algo, 'xxh128')) {
             return 10;
+        }
+        if (self::eqCi($algo, 'crc32c')) {
+            return 11;
         }
 
         return 0;
@@ -261,6 +264,9 @@ final class VmHashNative
         if ($algo >= 4 && $algo <= 8) {
             return 4;
         }
+        if (11 === $algo) {
+            return 4;
+        }
         if (1 === $algo) {
             return self::SHA256_DIGEST_SIZE;
         }
@@ -326,6 +332,9 @@ final class VmHashNative
         }
         if (10 === $algo) {
             return VmHashXxh::xxh128DigestBytes($data);
+        }
+        if (11 === $algo) {
+            return VmHashNonCrypto::digestBytes(VmCrc32c::compute($data));
         }
 
         return self::md5($data);
