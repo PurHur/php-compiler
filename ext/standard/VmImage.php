@@ -279,13 +279,19 @@ final class VmImage
      */
     private static function parseGif(string $data)
     {
+        if (\strlen($data) < 11) {
+            return false;
+        }
         $width = self::readUint16Le($data, 6);
         $height = self::readUint16Le($data, 8);
         if ($width <= 0 || $height <= 0) {
             return false;
         }
+        $packed = \ord($data[10]);
+        $bits = (($packed >> 4) & 0x07) + 1;
+        $channels = (0 !== ($packed & 0x80)) ? 3 : null;
 
-        return self::buildImageSizeResult($width, $height, self::IMAGETYPE_GIF, 8, 3);
+        return self::buildImageSizeResult($width, $height, self::IMAGETYPE_GIF, $bits, $channels);
     }
 
     /**
@@ -411,7 +417,7 @@ final class VmImage
 
     private static function shouldIncludeChannels(int $type, int $channels): bool
     {
-        if (self::IMAGETYPE_JPEG === $type) {
+        if (\in_array($type, [self::IMAGETYPE_JPEG, self::IMAGETYPE_GIF], true)) {
             return true;
         }
 
