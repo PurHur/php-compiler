@@ -288,6 +288,7 @@ require_once __DIR__.'/../../../ext/posix/PosixStrerrorJitHelper.php';
 require_once __DIR__.'/../../../ext/posix/PosixTimesJitHelper.php';
 require_once __DIR__.'/../../../ext/posix/VmPosix.php';
 require_once __DIR__.'/../../../ext/posix/VmPosixRlimitPure.php';
+require_once __DIR__.'/../../../ext/posix/VmPosixSessionPure.php';
 require_once __DIR__.'/../../../ext/posix/VmPosixStrerrorPure.php';
 require_once __DIR__.'/../../../ext/posix/VmPosixTimesPure.php';
 require_once __DIR__.'/../../../ext/posix/posix_access.php';
