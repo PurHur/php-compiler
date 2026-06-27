@@ -5507,7 +5507,7 @@ class Compiler {
 
             return $return;
         }
-        if ($this->cfgDeclaredTypeIsMixed($cfgType)) {
+        if (null !== $cfgType && $this->cfgDeclaredTypeIsMixed($cfgType)) {
             return $return;
         }
         // PHPTypes Type::fromDecl('mixed') mis-parses as object userType mixed (#12348).
