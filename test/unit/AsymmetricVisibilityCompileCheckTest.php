@@ -58,24 +58,22 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompileErrors(): void
+    public function testPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'asymmetric_public_private.php');
+        $this->assertNotNull($block);
     }
 
-    public function testPromotedPublicPrivateSetCompileErrors(): void
+    public function testPromotedPublicPrivateSetCompiles(): void
     {
         $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class User {
     public function __construct(
@@ -83,32 +81,19 @@ class User {
     ) {}
 }
 PHP, 'promoted_asymmetric.php');
-            $this->fail('Expected compile failure');
-        } catch (\Throwable $e) {
-            $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
-                $e->getMessage()
-            );
-        }
+        $this->assertNotNull($block);
     }
 
-    public function testPromotedSingleLinePublicPrivateSetCompileErrors(): void
+    public function testPromotedSingleLinePublicPrivateSetCompiles(): void
     {
         $runtime = new Runtime();
-        try {
-            $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
 PHP, 'promoted_single_line.php');
-            $this->fail('Expected compile failure');
-        } catch (\Throwable $e) {
-            $this->assertStringContainsString(
-                AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE,
-                $e->getMessage()
-            );
-        }
+        $this->assertNotNull($block);
     }
 
     public function testValidPrivateSetStillCompiles(): void
