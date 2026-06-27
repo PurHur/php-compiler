@@ -1147,6 +1147,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetWriteBuffer(int $handle, int $buffer) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::setWriteBuffer($handle, $buffer);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
@@ -1165,6 +1168,9 @@ final class VmFs
      * @return int|false previous buffer size
      */
     public static function streamSetReadBuffer(int $handle, int $buffer) {
+        if (VmPhpMemoryStream::isValidHandle($handle)) {
+            return VmPhpMemoryStream::setReadBuffer($handle, $buffer);
+        }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;

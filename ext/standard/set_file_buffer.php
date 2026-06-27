@@ -19,11 +19,11 @@ final class set_file_buffer extends Internal
 {
     public function execute(Frame $frame): void
     {
-        stream_set_read_buffer_::run($frame, $this->getName());
+        stream_set_write_buffer_::run($frame, $this->getName());
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return stream_set_read_buffer_::callJit($context, $this->getName(), ...$args);
+        return stream_set_write_buffer_::callJit($context, $this->getName(), ...$args);
     }
 }
