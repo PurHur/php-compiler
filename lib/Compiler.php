@@ -11025,6 +11025,7 @@ class Compiler {
                 if (
                     \count($arrayProducers) >= 2
                     && $this->producersAreNestedArrayLiteralChain($arrayProducers)
+                    && $this->arrayProducersFormNestedChain($arrayProducers)
                 ) {
                     return $arrayProducers[\count($arrayProducers) - 1];
                 }
@@ -14442,6 +14443,13 @@ class Compiler {
                     $cfgChildren
                 )
             ) {
+                if (
+                    $child instanceof Op\Expr\MethodCall
+                    && null !== ($method = $this->staticNameFromOperand($child->name))
+                    && $this->methodCallIsKnownVoidReturn($method)
+                ) {
+                    continue;
+                }
                 break;
             }
             if (
@@ -14563,6 +14571,14 @@ class Compiler {
                 if ($prev instanceof Op\Expr\Array_) {
                     if ($this->cfgExprUsesOperand($child, $prev->result)) {
                         // Inner→outer nesting within one inline call arg (#10196, #10662); keep walking for siblings.
+                        continue;
+                    }
+                    $grandPrev = $cfgChildren[$i - 2] ?? null;
+                    if (
+                        $grandPrev instanceof Op\Expr\Array_
+                        && !$this->cfgExprUsesOperand($prev, $grandPrev->result)
+                    ) {
+                        // 3+ sibling inline array call args — keep walking (#5644).
                         continue;
                     }
                     array_unshift($producers, $prev);
@@ -15079,6 +15095,13 @@ class Compiler {
         $i = $consumerIndex - 1;
         while ($i >= 0) {
             $child = $cfgChildren[$i] ?? null;
+            if ($child instanceof Op\Expr\MethodCall) {
+                $method = $this->staticNameFromOperand($child->name);
+                if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
+                    --$i;
+                    continue;
+                }
+            }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
                 --$i;
                 continue;
@@ -15101,6 +15124,17 @@ class Compiler {
             break;
         }
         $first = $i + 1;
+        while ($first < $consumerIndex) {
+            $skip = $cfgChildren[$first] ?? null;
+            if ($skip instanceof Op\Expr\MethodCall) {
+                $method = $this->staticNameFromOperand($skip->name);
+                if (null !== $method && $this->methodCallIsKnownVoidReturn($method)) {
+                    ++$first;
+                    continue;
+                }
+            }
+            break;
+        }
         if ($first >= $consumerIndex) {
             return null;
         }
