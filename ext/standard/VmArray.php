@@ -467,6 +467,36 @@ final class VmArray
         return false;
     }
 
+    /**
+     * array_intersect() with one source array — copy keys/values (php-src array.c, issue #1207).
+     */
+    public static function intersectSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect() two-array step — keep values from $first found in $other (loose compare).
+     */
+    public static function intersectTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::looseValueInHashTable($value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
     /** @param list<HashTable> $others */
     private static function allLists(array $others): bool
     {

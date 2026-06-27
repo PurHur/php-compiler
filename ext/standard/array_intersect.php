@@ -6,12 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayIntersectRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -34,7 +32,7 @@ final class array_intersect extends Internal
         if (1 === $argc) {
             VmArray::rejectEnumCaseSetOpOperands($frame, $firstHt);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->array($firstHt->replaceCopy());
+                $frame->returnVar->array(VmArray::intersectSingleArgumentCopy($firstHt));
             }
 
             return;
@@ -52,43 +50,11 @@ final class array_intersect extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $out = new HashTable();
-        foreach ($firstHt->iterateKeyed(true) as [$key, $value]) {
-            if (!self::valueInAllArrays($value, $others)) {
-                continue;
-            }
-            $stored = new Variable();
-            $stored->copyFrom($value);
-            if (Variable::TYPE_INTEGER === $key->type) {
-                $out->addIndex($key->toInt(), $stored);
-            } else {
-                $out->add($key->toString(), $stored);
-            }
+        $result = VmArray::intersectSingleArgumentCopy($firstHt);
+        foreach ($others as $other) {
+            $result = VmArray::intersectTwo($result, $other);
         }
-        $frame->returnVar->array($out);
-    }
-
-    /**
-     * @param list<HashTable> $arrays
-     */
-    private static function valueInAllArrays(Variable $needle, array $arrays): bool
-    {
-        $needle = $needle->resolveIndirect();
-        foreach ($arrays as $haystack) {
-            $found = false;
-            foreach ($haystack->iterate(true) as $value) {
-                $stored = $value->resolveIndirect();
-                if (in_array::looseEquals($needle, $stored)) {
-                    $found = true;
-                    break;
-                }
-            }
-            if (!$found) {
-                return false;
-            }
-        }
-
-        return true;
+        $frame->returnVar->array($result);
     }
 
     public Context $context;
@@ -107,6 +73,6 @@ final class array_intersect extends Internal
             JitArrayElem::requireArrayArgNum($context, $arg, 'array_intersect', $i + 1);
         }
 
-        return ArrayBuiltinHelper::arrayIntersect($context, ...$args);
+        return ArrayIntersectRuntime::intersect($context, $args[0], ...\array_slice($args, 1));
     }
 }
