@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsReadNative;
 use PHPUnit\Framework\TestCase;
 
-/** VmFsReadNative libc read without host file_get_contents delegation (#1492). */
+/** VmFsReadNative → VmFsReadPure SSOT without host file_get_contents delegation (#12315, #12859). */
 final class VmFsReadNativeRuntimeShrinkTest extends TestCase
 {
     public function testVmFsFileGetContentsRoutesThroughReadNativeForLocalPaths(): void
@@ -36,7 +36,7 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
     public function testFileBuiltinRoundTripViaReadNative(): void
     {
         if (!VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+            $this->markTestSkipped('host fopen unavailable');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_file_');
@@ -56,7 +56,7 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
     public function testFileZeroByteReturnsEmptyArray(): void
     {
         if (!VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+            $this->markTestSkipped('host fopen unavailable');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_file_empty_');
@@ -69,19 +69,20 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
         @unlink($path);
     }
 
-    public function testReadNativeDeclaresLibcOpenReadClose(): void
+    public function testReadNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsReadNative.php');
-        $this->assertStringContainsString('VmFsReadPure', $source);
-        $this->assertStringContainsString('int open(const char *pathname', $source);
-        $this->assertStringContainsString('ssize_t read(int fd', $source);
-        $this->assertStringContainsString('int close(int fd)', $source);
+        $this->assertStringContainsString('VmFsReadPure::readSlice', $source);
+        $this->assertStringContainsString('VmFsReadPure::read', $source);
+        $this->assertStringContainsString('VmFsReadPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int open(const char', $source);
     }
 
     public function testReadRoundTrip(): void
     {
         if (!VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+            $this->markTestSkipped('host fopen unavailable');
         }
 
         $path = tempnam(sys_get_temp_dir(), 'phpc_read_');
@@ -97,7 +98,7 @@ final class VmFsReadNativeRuntimeShrinkTest extends TestCase
     public function testReadProcUptimeStreamsWithoutLseek(): void
     {
         if (!VmFsReadNative::available()) {
-            $this->markTestSkipped('ext/ffi required for VmFsReadNative libc read');
+            $this->markTestSkipped('host fopen unavailable');
         }
         if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
             $this->markTestSkipped('/proc/uptime unavailable');
