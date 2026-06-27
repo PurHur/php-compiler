@@ -1294,6 +1294,9 @@ final class VmFs
         }
         switch ($feature) {
             case VmStreamSupports::STREAM_LOCK:
+                if (VmPhpFdStream::isValidHandle($handle)) {
+                    return VmPhpFdStream::available();
+                }
                 $fp = self::lookup($handle);
                 if (null === $fp) {
                     return false;
