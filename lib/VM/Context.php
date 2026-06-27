@@ -86,6 +86,9 @@ class Context {
     /** Active object-to-string coercion via __toString (issue #4284). */
     public bool $coercingObjectToString = false;
 
+    /** count() on Countable — php-src zval_get_long, skip interface return check (#12867). */
+    public int $suppressReturnTypeCheckDepth = 0;
+
     /** Ghost object currently running its lazy initializer (#6531, Zend/zend_lazy_objects.c). */
     public ?ObjectEntry $lazyGhostInitializing = null;
 
