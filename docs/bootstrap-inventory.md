@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3369 |
-| Phase A inventory files (M2 ratio SSOT) | 3369 |
+| PHP files on vm.php path | 3373 |
+| Phase A inventory files (M2 ratio SSOT) | 3373 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8902 |
+| Source constructs flagged (warnings) | 8913 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -316,6 +316,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 10 |
+| `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
+| `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
+| `ext/spl/SplFileObjectBuiltin.php` | 0 | 5 |
+| `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/VmSplIterators.php` | 0 | 10 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
@@ -5266,7 +5270,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 35)
+- new ClassEntry (line 37)
 - 3 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
@@ -5349,10 +5353,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 281)
 - 28 class method(s)
 
+### `ext/spl/SplFileInfoBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 30)
+- new SplFileInfoConstruct (line 36)
+- new ArgumentCountError (line 75)
+- 8 class method(s)
+
+### `ext/spl/SplFileInfoStorage.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
+### `ext/spl/SplFileObjectBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 35)
+- new SplFileObjectConstruct (line 48)
+- new ArgumentCountError (line 84)
+- new ArgumentCountError (line 180)
+- 5 class method(s)
+
+### `ext/spl/SplFileObjectStorage.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/spl/SplIteratorSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `ext/spl/VmSplIterators.php`
 
