@@ -250,6 +250,10 @@ final class VmJsonFormat
         $preserveZero = 0 !== ($flags & VmJsonFlags::PRESERVE_ZERO_FRACTION);
         $isWhole = (float) (int) $num === $num && abs($num) < 1.0e15;
         if ($isWhole && !$preserveZero) {
+            if (self::isNegativeZero($num)) {
+                return '-0';
+            }
+
             return (string) (int) $num;
         }
 
@@ -264,6 +268,12 @@ final class VmJsonFormat
     private static function hasDecimalOrExponent(string $text): bool
     {
         return str_contains($text, '.') || str_contains($text, 'E') || str_contains($text, 'e');
+    }
+
+    /** php-src ext/json/php_json_encoder.c — preserve IEEE754 negative zero sign. */
+    private static function isNegativeZero(float $num): bool
+    {
+        return 0.0 == $num && 0.0 !== \atan2(0.0, $num);
     }
 
     private static function escapeString(string $value, int $flags): string
