@@ -141,6 +141,53 @@ PHP;
         self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #12721 — array_filter([..], fn) must wire inline array to arg 0, closure to arg 1. */
+    public function testArrayFilterInlineClosureUsesArrayAndClosureSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_filter([1, 2, 3], fn (int $v): bool => $v > 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_filter_inline_closure.php');
+
+        $arraySlot = null;
+        $closureSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertNotNull($closureSlot);
+        self::assertSame($arraySlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($closureSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #12721 — array_filter inline closure runtime parity. */
+    public function testArrayFilterInlineClosureRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(array_filter([1, 2, 3], fn (int $v): bool => $v > 1));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_filter_inline_closure_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  1 => 2,\n  2 => 3,\n)\n", ob_get_clean());
+    }
+
     /** Issue #11153 — vacuous array_all on inline [] matches Zend. */
     public function testArrayAllInlineEmptyArrayRuntime(): void
     {

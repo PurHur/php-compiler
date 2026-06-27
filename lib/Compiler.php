@@ -12645,7 +12645,12 @@ class Compiler {
             if (!$candidate instanceof Op\Expr\Closure && !$candidate instanceof Op\Expr\ArrowFunction) {
                 continue;
             }
-            if (null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)) {
+            if (null !== $this->matchSingleClosureInlineProducer(
+                $candidate,
+                $callOp->args,
+                $argIndex,
+                $this->resolveCfgFuncCallName($callOp)
+            )) {
                 return $this->slotForInlineClosureProducer($candidate, $block);
             }
         }
@@ -12709,7 +12714,12 @@ class Compiler {
         if (null === $closureProducer) {
             return null;
         }
-        $matched = $this->matchSingleClosureInlineProducer($closureProducer, $callArgs, $argIndex);
+        $matched = $this->matchSingleClosureInlineProducer(
+            $closureProducer,
+            $callArgs,
+            $argIndex,
+            $this->resolveCfgFuncCallName($cfgCallOp)
+        );
         if (null === $matched) {
             $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex, $cfgCallOp);
             if ($matched !== $closureProducer) {
@@ -13351,7 +13361,12 @@ class Compiler {
 
                 return $producers[0];
             }
-            $closureMatch = $this->matchSingleClosureInlineProducer($producers[0], $callArgs, $argIndex);
+            $closureMatch = $this->matchSingleClosureInlineProducer(
+                $producers[0],
+                $callArgs,
+                $argIndex,
+                $this->resolveCfgFuncCallName($cfgCallOp)
+            );
             if (null !== $closureMatch) {
                 return $closureMatch;
             }
@@ -15644,7 +15659,8 @@ class Compiler {
     private function matchSingleClosureInlineProducer(
         Op\Expr $producer,
         array $callArgs,
-        int $argIndex
+        int $argIndex,
+        ?string $funcName = null
     ): ?Op\Expr {
         if (
             !($producer instanceof Op\Expr\ArrowFunction)
@@ -15669,12 +15685,23 @@ class Compiler {
         if (1 === count($closureSlots) && $closureSlots[0] === $argIndex) {
             return $producer;
         }
-        // array_filter($a, fn(...), ARRAY_FILTER_USE_*) — callback is first dead-temp slot (#10232, #9154).
-        if (\count($callArgs) >= 3 && \count($closureSlots) >= 1 && $argIndex === $closureSlots[0]) {
+        $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($funcName);
+        // array_filter($a, fn(...), ARRAY_FILTER_USE_*) — callback slot from builtin signature (#10232, #9154).
+        if (\count($callArgs) >= 3 && $argIndex === $callbackArgIndex) {
+            return $producer;
+        }
+        // array_filter/array_any inline array + fn — callback is arg 1, not arg 0 (#12721).
+        if (2 === \count($callArgs) && $argIndex === $callbackArgIndex && $callbackArgIndex > 0) {
             return $producer;
         }
         // array_map(fn(...), $arr) — callback is arg 0 (#10651).
-        if (2 === \count($callArgs) && \count($closureSlots) >= 1 && 0 === $argIndex && 0 === $closureSlots[0]) {
+        if (
+            2 === \count($callArgs)
+            && 0 === $argIndex
+            && 0 === $callbackArgIndex
+            && \count($closureSlots) >= 1
+            && 0 === $closureSlots[0]
+        ) {
             return $producer;
         }
 
@@ -17507,7 +17534,12 @@ class Compiler {
                 foreach ($producers as $candidate) {
                     if (
                         ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure)
-                        && null !== $this->matchSingleClosureInlineProducer($candidate, $callOp->args, $argIndex)
+                        && null !== $this->matchSingleClosureInlineProducer(
+                            $candidate,
+                            $callOp->args,
+                            $argIndex,
+                            $this->resolveCfgFuncCallName($callOp)
+                        )
                     ) {
                         return true;
                     }
