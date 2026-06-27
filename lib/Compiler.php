@@ -5393,6 +5393,12 @@ class Compiler {
 
     protected function typeFromPropertyDecl(Op\Stmt\Property $child): Type
     {
+        if ($child->declaredType instanceof Op\Type\Mixed_) {
+            return Type::mixed();
+        }
+        if ($child->declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($child->declaredType->name)) {
+            return Type::mixed();
+        }
         if ($child->declaredType instanceof Op\Type\Literal) {
             return Type::fromDecl($child->declaredType->name);
         }
@@ -5405,6 +5411,12 @@ class Compiler {
 
     protected function typeFromParamDecl(Op\Expr\Param $param): Type
     {
+        if ($param->declaredType instanceof Op\Type\Mixed_) {
+            return Type::mixed();
+        }
+        if ($param->declaredType instanceof Op\Type\Literal && 'mixed' === strtolower($param->declaredType->name)) {
+            return Type::mixed();
+        }
         if ($param->declaredType instanceof Op\Type\Literal) {
             return Type::fromDecl($param->declaredType->name);
         }
@@ -5441,6 +5453,13 @@ class Compiler {
             $var->literalBoolType = $literalBoolName;
             $var->declaredTypeLabel = $literalBoolName;
 
+            return $return;
+        }
+        if ($this->cfgDeclaredTypeIsMixed($cfgType)) {
+            return $return;
+        }
+        // PHPTypes Type::fromDecl('mixed') mis-parses as object userType mixed (#12348).
+        if (Type::TYPE_OBJECT === $type->type && 'mixed' === strtolower((string) ($type->userType ?? ''))) {
             return $return;
         }
         if ($this->cfgTypeUsesDnfShape($cfgType)) {
