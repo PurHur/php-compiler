@@ -7,8 +7,9 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** symlink() — VM via VmFs; JIT/AOT via libc symlinkat(2) (issue #3227). */
@@ -24,12 +25,11 @@ final class symlink_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
         }
-        $targetVar = $frame->calledArgs[0]->resolveIndirect();
-        $linkVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $targetVar->type || Variable::TYPE_STRING !== $linkVar->type) {
-            throw new \LogicException('symlink() requires string paths in this compiler build');
-        }
-        $ok = VmFs::symlink($targetVar->toString(), $linkVar->toString());
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'symlink', 'target', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'symlink', 'link', 1, $frame);
+        $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'symlink', 0, 'target');
+        $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'symlink', 1, 'link');
+        $ok = VmFs::symlink($target, $linkPath);
         if (!$ok) {
             VmFilestatFailure::warnNoSuchFile($frame, 'symlink');
         }
@@ -43,8 +43,8 @@ final class symlink_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('symlink() requires exactly two arguments in this compiler build');
         }
-        $target = $this->jitString($context, $args[0], 'symlink() argument #1');
-        $linkPath = $this->jitString($context, $args[1], 'symlink() argument #2');
+        $target = JitStringBuiltinArg::lower($context, $args[0], 'symlink', 0, 'target');
+        $linkPath = JitStringBuiltinArg::lower($context, $args[1], 'symlink', 1, 'link');
 
         return JitSymlink::invoke($context, $target, $linkPath);
     }
