@@ -51,14 +51,6 @@ final class gethostbyaddr extends Internal
                     $frame->vmContext,
                     $frame
                 );
-            } elseif (VmDns::ERR_NOT_FOUND === $error) {
-                $frame->vmContext->errors->triggerError(
-                    'Address '.$ip.' is not in the reverse hosts table',
-                    ErrorReporter::E_WARNING,
-                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                    $frame->vmContext,
-                    $frame
-                );
             }
         }
         if (VmDns::ERR_NOT_FOUND === $error) {
