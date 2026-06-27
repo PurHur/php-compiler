@@ -16,6 +16,8 @@ error_reporting(E_ALL);
 ini_set('display_errors', '0');
 ob_end_flush();
 ob_end_clean();
+ob_flush();
+ob_get_flush();
 PHP;
 
     public function testVmStderrNoticeWithDisplayErrorsOff(): void
@@ -27,6 +29,14 @@ PHP;
         );
         $this->assertStringContainsString(
             'ob_end_clean(): Failed to delete buffer. No buffer to delete',
+            $stderr
+        );
+        $this->assertStringContainsString(
+            'ob_flush(): Failed to flush buffer. No buffer to flush',
+            $stderr
+        );
+        $this->assertStringContainsString(
+            'ob_get_flush(): Failed to delete and flush buffer. No buffer to delete or flush',
             $stderr
         );
         $this->assertStringContainsString('PHP Notice:', $stderr);
