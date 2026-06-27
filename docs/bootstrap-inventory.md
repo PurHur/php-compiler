@@ -10562,11 +10562,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 220)
 - new HashTable (line 1267)
 - new Variable (line 1269)
-- new HashTable (line 2077)
-- new Variable (line 2080)
-- new Variable (line 2086)
-- new Variable (line 2092)
-- new Variable (line 2098)
+- new HashTable (line 2080)
+- new Variable (line 2083)
+- new Variable (line 2089)
+- new Variable (line 2095)
+- new Variable (line 2101)
 - 115 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -17645,7 +17645,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 51 class method(s)
+- 52 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
