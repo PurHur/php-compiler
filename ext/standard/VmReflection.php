@@ -474,6 +474,93 @@ final class VmReflection
     }
 
     /**
+     * is_callable() class-string probe — instance methods are not statically invokable (#12545).
+     *
+     * php-src: ext/standard/basic_functions.c — zend_is_callable_at_frame
+     */
+    public static function isStaticallyCallableMethod(Context $ctx, string $className, string $method): bool
+    {
+        $lcClass = strtolower(ltrim($className, '\\'));
+        $methodLc = strtolower($method);
+        if ('' === $lcClass || '' === $methodLc || '__construct' === $methodLc) {
+            return false;
+        }
+        $entry = self::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            $ctx->autoloadClass($className);
+            $entry = self::resolveClassEntry($ctx, $className);
+            if (null === $entry) {
+                return false;
+            }
+        }
+        if ($entry->isEnum) {
+            EnumSupport::ensureBuiltinCasesMethod($entry);
+            if ('cases' === $methodLc) {
+                return true;
+            }
+            if (null !== $entry->backedType && ('from' === $methodLc || 'tryfrom' === $methodLc)) {
+                return true;
+            }
+        }
+        if ($entry->usesLazyGhostTrait && 'createlazyghost' === $methodLc) {
+            LazyGhostTraitSupport::ensureBuiltinLazyGhostMethods($entry);
+
+            return true;
+        }
+        $visited = [];
+        $walk = $lcClass;
+        while (!isset($visited[$walk])) {
+            $visited[$walk] = true;
+            if (!isset($ctx->classes[$walk])) {
+                break;
+            }
+            $class = $ctx->classes[$walk];
+            if (isset($class->methods[$methodLc])) {
+                $vis = $class->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
+                if (($vis & CfgFunc::FLAG_STATIC) !== 0) {
+                    return true;
+                }
+                $func = $class->methods[$methodLc];
+                if ($func instanceof Func\PHP) {
+                    $decl = $func->block->func;
+                    if (null !== $decl && (($decl->flags ?? 0) & CfgFunc::FLAG_STATIC) !== 0) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+            if (null === $class->parentLc) {
+                break;
+            }
+            $walk = $class->parentLc;
+        }
+
+        return self::classHasStaticMagicCall($ctx, $lcClass);
+    }
+
+    private static function classHasStaticMagicCall(Context $ctx, string $lcClass): bool
+    {
+        $visited = [];
+        while (!isset($visited[$lcClass])) {
+            $visited[$lcClass] = true;
+            if (!isset($ctx->classes[$lcClass])) {
+                return false;
+            }
+            $entry = $ctx->classes[$lcClass];
+            if (isset($entry->methods['__callstatic'])) {
+                return true;
+            }
+            if (null === $entry->parentLc) {
+                return false;
+            }
+            $lcClass = $entry->parentLc;
+        }
+
+        return false;
+    }
+
+    /**
      * property_exists() scope check — php-src ext/standard/class.c + zend_get_property_info(silent=1).
      */
     public static function propertyExistsOnClass(ClassEntry $class, string $property, Context $ctx): bool

@@ -242,7 +242,7 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::classMethExists($ctx, $class, $method);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method);
         }
         $callableName = $name;
         if (!self::isValidFunctionName($name)) {
@@ -303,8 +303,7 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::classMethExists($ctx, $class, $method)
-                || self::hasStaticMagicCall($ctx, $class);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method);
         }
 
         return false;
