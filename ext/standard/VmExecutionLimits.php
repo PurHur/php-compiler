@@ -39,10 +39,17 @@ final class VmExecutionLimits
         if ($ctx->scriptStack->depth() > 1) {
             return false;
         }
-        $this->activeLimitSeconds = $seconds;
-        $this->resetTimer($seconds);
+        $this->applyMaxExecutionTime($seconds);
 
         return true;
+    }
+
+    /** ini_set('max_execution_time') / internal sync — no include-depth guard (#12481). */
+    public function applyMaxExecutionTime(int $seconds): void
+    {
+        $this->activeLimitSeconds = $seconds;
+        $this->resetTimer($seconds);
+        VmIni::syncMaxExecutionTime($seconds);
     }
 
     /** ignore_user_abort(?bool $setting) — returns previous int flag. */

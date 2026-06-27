@@ -27,9 +27,11 @@ final class VmIni
 
     /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
     private const READONLY_STRING_DEFAULTS = [
-        'max_execution_time' => '0',
         'session.save_handler' => 'files',
     ];
+
+    /** php-src php.ini compile-time default for max_execution_time (ext/standard/ini.c, #12481). */
+    private const CFG_MAX_EXECUTION_TIME = '0';
 
     /** php-src PG(default_charset) default UTF-8 (ext/standard/ini.c, INI_ALL, #12531). */
     private const CFG_DEFAULT_CHARSET = 'UTF-8';
@@ -131,6 +133,8 @@ final class VmIni
                 return self::setPcreJit($newValue);
             case 'pcre.recursion_limit':
                 return self::setPcreRecursionLimit($newValue);
+            case 'max_execution_time':
+                return self::setMaxExecutionTime($ctx, $newValue);
             default:
                 return false;
         }
@@ -184,6 +188,8 @@ final class VmIni
                 return self::formatBoolIniGet(self::$pcreJit);
             case 'pcre.recursion_limit':
                 return (string) self::$pcreRecursionLimit;
+            case 'max_execution_time':
+                return self::$maxExecutionTime;
             default:
                 return false;
         }
@@ -209,7 +215,7 @@ final class VmIni
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
-            'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
+            'max_execution_time' => self::CFG_MAX_EXECUTION_TIME,
             'default_charset' => self::CFG_DEFAULT_CHARSET,
             'cfg_file_path' => self::cfgFilePath(),
             'user_agent' => '',
@@ -262,6 +268,14 @@ final class VmIni
     private static bool $pcreJit = true;
 
     private static int $pcreRecursionLimit = 100_000;
+
+    private static string $maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+
+    /** Observable ini_get('max_execution_time') after set_time_limit / ini_set (#12481). */
+    public static function syncMaxExecutionTime(int $seconds): void
+    {
+        self::$maxExecutionTime = (string) $seconds;
+    }
 
     public static function getPcreBacktrackLimit(): int
     {
@@ -484,6 +498,10 @@ final class VmIni
             case 'pcre.recursion_limit':
                 self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
                 break;
+            case 'max_execution_time':
+                self::$maxExecutionTime = self::CFG_MAX_EXECUTION_TIME;
+                $ctx->executionLimits->applyMaxExecutionTime((int) self::CFG_MAX_EXECUTION_TIME);
+                break;
         }
     }
 
@@ -516,6 +534,16 @@ final class VmIni
             return false;
         }
         self::$pcreRecursionLimit = $parsed;
+
+        return $old;
+    }
+
+    /** @return string|false */
+    private static function setMaxExecutionTime(Context $ctx, string $newValue): string|false
+    {
+        $parsed = (int) trim($newValue);
+        $old = self::$maxExecutionTime;
+        $ctx->executionLimits->applyMaxExecutionTime($parsed);
 
         return $old;
     }
