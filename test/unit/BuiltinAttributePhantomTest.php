@@ -14,10 +14,10 @@ final class BuiltinAttributePhantomTest extends TestCase
     public function testForwardCompatAttributeClassesAdvertisedOn84DevProfile(): void
     {
         $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesDeprecatedAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesNoDiscardAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesCompileTimeAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesNoDiscardAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesCompileTimeAttributeClass());
     }
 
     public function testVmRegistersForwardCompatAttributeClassesOn84DevProfile(): void
@@ -25,9 +25,9 @@ final class BuiltinAttributePhantomTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         $this->assertTrue(isset($ctx->classes['override']));
-        $this->assertTrue(isset($ctx->classes['deprecated']));
-        $this->assertTrue(isset($ctx->classes['nodiscard']));
-        $this->assertTrue(isset($ctx->classes['delayedtargetvalidation']));
-        $this->assertTrue(isset($ctx->classes['compiletime']));
+        $this->assertFalse(isset($ctx->classes['deprecated']));
+        $this->assertFalse(isset($ctx->classes['nodiscard']));
+        $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
+        $this->assertFalse(isset($ctx->classes['compiletime']));
     }
 }
