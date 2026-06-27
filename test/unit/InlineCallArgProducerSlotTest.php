@@ -2170,7 +2170,7 @@ PHP;
     {
         $code = <<<'PHP'
 <?php
-$packed = iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false);
+echo json_encode(array_values(iterator_to_array(new ArrayObject(['a' => 1, 'b' => 2]), false)), JSON_THROW_ON_ERROR), "\n";
 PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'iterator_to_array_preserve_false.php');
@@ -2198,6 +2198,10 @@ PHP;
 
         self::assertNotNull($newSlot);
         self::assertSame($newSlot, $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("[1,2]\n", ob_get_clean());
     }
 
     /** Issue #11694 — call_user_func_array(C::class.'::ok', []) wires Concat slot to arg #0. */
