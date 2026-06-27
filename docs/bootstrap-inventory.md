@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3419 |
-| Phase A inventory files (M2 ratio SSOT) | 3419 |
+| PHP files on vm.php path | 3421 |
+| Phase A inventory files (M2 ratio SSOT) | 3421 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9027 |
+| Source constructs flagged (warnings) | 9028 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -395,7 +395,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/DeployPathJitHelper.php` | 0 | 1 |
 | `ext/standard/DirHandleJitHelper.php` | 0 | 1 |
 | `ext/standard/EmbedObJitHelper.php` | 0 | 1 |
-| `ext/standard/EnvLocalJitHelper.php` | 0 | 2 |
+| `ext/standard/EnvLocalJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLastJitHelper.php` | 0 | 1 |
 | `ext/standard/ErrorLogJitHelper.php` | 0 | 1 |
@@ -2300,6 +2300,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 3 |
@@ -2346,6 +2347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/IconvRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/InArrayRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/IncludePathRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/IncludePathStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetLibcBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/InetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/IniGet.php` | 0 | 1 |
@@ -5908,8 +5910,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/EnvLocalJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 31)
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/ErrorHandlerJitHelper.php`
 
@@ -11598,33 +11599,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 174)
 - new Variable (line 184)
 - new VmSerializeRefState (line 284)
-- new Exception (line 376)
-- new ObjectEntry (line 478)
-- new Variable (line 479)
-- new ObjectEntry (line 496)
-- new Variable (line 500)
-- new ObjectEntry (line 512)
-- new Variable (line 520)
+- new Exception (line 402)
+- new ObjectEntry (line 504)
+- new Variable (line 505)
+- new ObjectEntry (line 522)
+- new Variable (line 526)
 - new ObjectEntry (line 538)
-- new Variable (line 539)
-- new Variable (line 541)
-- new Variable (line 598)
-- new Exception (line 624)
-- new VmSerializeEnumCaseRef (line 674)
-- new VmSerializeEnumCaseRef (line 679)
-- new VmSerializeRefState (line 707)
-- new Variable (line 717)
-- new Variable (line 771)
-- new Variable (line 784)
-- new Variable (line 890)
-- new ObjectEntry (line 920)
-- new Variable (line 924)
-- new Frame (line 943)
-- new Variable (line 946)
-- new Variable (line 967)
-- new Variable (line 986)
+- new Variable (line 546)
+- new ObjectEntry (line 564)
+- new Variable (line 565)
+- new Variable (line 567)
+- new Variable (line 624)
+- new Exception (line 650)
+- new VmSerializeEnumCaseRef (line 700)
+- new VmSerializeEnumCaseRef (line 705)
+- new VmSerializeRefState (line 733)
+- new Variable (line 743)
+- new Variable (line 797)
+- new Variable (line 810)
+- new Variable (line 916)
+- new ObjectEntry (line 946)
+- new Variable (line 950)
+- new Frame (line 969)
+- new Variable (line 972)
+- new Variable (line 993)
 - new Variable (line 1012)
-- 48 class method(s)
+- new Variable (line 1038)
+- 51 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
@@ -16768,13 +16769,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/AsymmetricVisibilityRewriter.php`
 
 **Warnings** (review for bootstrap subset):
-- new CompileError (line 203)
-- new CompileError (line 213)
-- new CompileError (line 262)
-- new CompileError (line 373)
-- new CompileError (line 450)
-- new CompileError (line 456)
-- new CompileError (line 468)
+- new CompileError (line 207)
+- new CompileError (line 217)
+- new CompileError (line 266)
+- new CompileError (line 377)
+- new CompileError (line 454)
+- new CompileError (line 460)
+- new CompileError (line 472)
 - 32 class method(s)
 - 8 closure(s)
 
@@ -18421,10 +18422,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
+### `lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 15 class method(s)
+
 ### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 278)
+- new JIT (line 276)
 - 10 class method(s)
 - 1 closure(s)
 
@@ -18697,9 +18703,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/IncludePathRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 312)
+- new JIT (line 318)
 - 16 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/IncludePathStandaloneLlvm.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/InetLibcBridge.php`
 
@@ -21157,20 +21168,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 147)
 - new Variable (line 151)
 - new Variable (line 162)
-- new Variable (line 198)
-- new Variable (line 209)
-- new Variable (line 220)
+- new Variable (line 201)
+- new Variable (line 212)
 - new Variable (line 223)
-- new Variable (line 236)
-- new Variable (line 246)
+- new Variable (line 226)
+- new Variable (line 239)
 - new Variable (line 249)
-- new Variable (line 273)
-- new Variable (line 283)
-- new Variable (line 312)
-- new Variable (line 316)
-- new Variable (line 324)
-- new Variable (line 338)
-- new Variable (line 384)
+- new Variable (line 252)
+- new Variable (line 276)
+- new Variable (line 286)
+- new Variable (line 315)
+- new Variable (line 319)
+- new Variable (line 327)
+- new Variable (line 341)
+- new Variable (line 387)
 - 21 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
