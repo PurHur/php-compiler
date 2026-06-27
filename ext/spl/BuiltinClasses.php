@@ -18,6 +18,7 @@ final class BuiltinClasses
         self::registerArrayObject($ctx);
         self::registerSplDoublyLinkedList($ctx);
         SplFileInfoBuiltin::registerClass($ctx);
+        SplFileObjectBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
