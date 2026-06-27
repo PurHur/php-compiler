@@ -14,6 +14,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertSame('8.4.0', CompilerVersion::builtinAdvertisementVersion());
     }
 
+    public function testZendVersionMatchesReferenceProfile(): void
+    {
+        $this->assertSame('4.2.31', CompilerVersion::zendVersion());
+    }
+
     public function testZendThreadIdAdvertisedOn84DevProfile(): void
     {
         $this->assertTrue(CompilerVersion::supportsZendThreadId());
