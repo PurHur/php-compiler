@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -114,7 +114,7 @@ final class rsort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'rsort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::sortPackedReverse($context, $args[0]);
+            SortRuntime::sortPackedReverse($context, $args[0]);
         } else {
             self::jitSortWithFlags($context, $args[0], VmInternalCompare::resolveJitSortFlags($context, $args[1], 'rsort'));
         }
@@ -141,7 +141,7 @@ final class rsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_NUMERIC === $sortType
         ) {
-            ArrayBuiltinHelper::sortPackedReverse($context, $array);
+            SortRuntime::sortPackedReverse($context, $array);
 
             return;
         }
