@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayChunkRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
@@ -58,6 +58,6 @@ final class array_chunk extends Internal
             ? JitBoolArg::lower($context, $args[2], 'array_chunk() preserve_keys')
             : null;
 
-        return ArrayBuiltinHelper::buildChunkArray($context, $args[0], $size, $preserveKeys);
+        return ArrayChunkRuntime::chunk($context, $args[0], $size, $preserveKeys);
     }
 }
