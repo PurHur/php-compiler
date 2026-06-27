@@ -695,6 +695,15 @@ final class BootstrapSelfhostHelloWorldTest extends TestCase
         $this->assertStringNotContainsString("'initparsepipeline', 'initcompiler', 'loadcoremodules'", $emit);
     }
 
+    /** #12486: gen-0 argv driver must default repo root + bootstrap selfhost main gate before standalone emit. */
+    public function testEmitTuInventoryArgvDefaultsRepoRootAndBootstrapSelfhostGate(): void
+    {
+        $emit = (string) file_get_contents(self::$root.'/lib/JIT/BootstrapCompileSmokeM3Emit.php');
+        $this->assertStringContainsString('emitEnsureRepoRootEnvIfUnset', $emit);
+        $this->assertStringContainsString('emitPutenvM3CompileDriverMainForBootstrapSelfhost', $emit);
+        $this->assertStringContainsString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1', $emit);
+    }
+
     public function testEmitTuEnsureEmitBridgeSpineSymbols(): void
     {
         $jit = (string) file_get_contents(self::$root.'/lib/JIT.php');

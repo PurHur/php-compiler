@@ -28,6 +28,7 @@ final class BootstrapCompileSmokeM3Emit
     /** M3 emit TU {main}: argv `-o OUT SOURCE` (preferred) or env PHP_COMPILER_M3_* (#1937, #2697, #2866). */
     public static function emitMainEntry(Context $context, string $logPrefix): void
     {
+        self::emitEnsureRepoRootEnvIfUnset($context);
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $retFail = $i64->constInt(1, false);
@@ -300,6 +301,7 @@ final class BootstrapCompileSmokeM3Emit
         self::exitWithStatus($context, $retFail);
 
         $context->builder->positionAtEnd($pacOk);
+        self::emitPutenvM3CompileDriverMainForBootstrapSelfhost($context, $sourceFile);
         $context->builder->call(
             self::runtimeSpine($context, 'standalone', 'void', ['__object__*', '__object__*', '__string__*']),
             $runtime,
@@ -317,6 +319,84 @@ final class BootstrapCompileSmokeM3Emit
         );
         ValueEchoHelper::echoLiteral($context, "\n");
         $context->builder->returnValue($retOk);
+    }
+
+    /** Default PHP_COMPILER_REPO_ROOT for gen-0 argv drivers when unset (#12486, #3046). */
+    private static function emitEnsureRepoRootEnvIfUnset(Context $context): void
+    {
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $key = $context->builder->pointerCast(
+            $context->constantFromString('PHP_COMPILER_REPO_ROOT'),
+            $charPtr
+        );
+        $existing = $context->builder->call($context->lookupFunction('getenv'), $key);
+        $isUnset = $context->builder->icmp(Builder::INT_EQ, $existing, $i8p->constNull());
+        $setBb = BasicBlockHelper::append($context, 'csm3_repo_root_set');
+        $skipBb = BasicBlockHelper::append($context, 'csm3_repo_root_skip');
+        $doneBb = BasicBlockHelper::append($context, 'csm3_repo_root_done');
+        $context->builder->branchIf($isUnset, $setBb, $skipBb);
+        $context->builder->positionAtEnd($setBb);
+        $bakedRoot = str_replace('\\', '/', dirname(__DIR__, 2));
+        $context->builder->call(
+            $context->lookupFunction('putenv'),
+            $context->builder->pointerCast(
+                $context->constantFromString('PHP_COMPILER_REPO_ROOT='.$bakedRoot),
+                $charPtr
+            )
+        );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    /**
+     * Mirror {@see Context::isBootstrapNonSpineSelfhostEntry()} for stale gen-0 argv drivers (#11642, #12486).
+     */
+    private static function emitPutenvM3CompileDriverMainForBootstrapSelfhost(Context $context, Value $sourceFile): void
+    {
+        $charPtr = $context->getTypeFromString('char*');
+        $i8p = $context->getTypeFromString('int8*');
+        $strMap = $context->structFieldMap['__string__'];
+        $srcChars = $context->builder->structGep($sourceFile, $strMap['value']);
+        $selfhostNeedle = $context->builder->pointerCast(
+            $context->constantFromString('/test/selfhost/'),
+            $charPtr
+        );
+        $spineNeedle = $context->builder->pointerCast(
+            $context->constantFromString('/test/selfhost/compiler_lib_spine_smoke/main.php'),
+            $charPtr
+        );
+        $foundSelfhost = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $srcChars,
+            $selfhostNeedle
+        );
+        $foundSpine = $context->builder->call(
+            $context->lookupFunction('strstr'),
+            $srcChars,
+            $spineNeedle
+        );
+        $hasSelfhost = $context->builder->icmp(Builder::INT_NE, $foundSelfhost, $i8p->constNull());
+        $isSpine = $context->builder->icmp(Builder::INT_NE, $foundSpine, $i8p->constNull());
+        $shouldSet = $context->builder->and($hasSelfhost, $context->builder->not($isSpine));
+        $setBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_set');
+        $skipBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_skip');
+        $doneBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_done');
+        $context->builder->branchIf($shouldSet, $setBb, $skipBb);
+        $context->builder->positionAtEnd($setBb);
+        $context->builder->call(
+            $context->lookupFunction('putenv'),
+            $context->builder->pointerCast(
+                $context->constantFromString('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN=1'),
+                $charPtr
+            )
+        );
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($doneBb);
+        $context->builder->positionAtEnd($doneBb);
     }
 
     /**
