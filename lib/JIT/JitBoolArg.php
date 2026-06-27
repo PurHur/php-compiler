@@ -59,42 +59,47 @@ final class JitBoolArg
         Variable $arg,
         string $function,
         string $paramName,
-        int $argNumber
+        int $argNumber,
+        string $expectedType = 'bool'
     ): Value {
         $contextLabel = sprintf('%s(): Argument #%d ($%s)', $function, $argNumber, $paramName);
         $literal = JitStringArg::compileTimeLiteral($arg);
         if (null !== $literal) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string', $expectedType);
         }
         if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
             return $context->helper->loadValue($arg);
         }
         if (Variable::TYPE_NATIVE_LONG === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'int');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'int', $expectedType);
         }
         if (Variable::TYPE_STRING === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'string');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'string', $expectedType);
         }
         if (Variable::TYPE_VALUE === $arg->type) {
-            return self::lowerBoxedStrict($context, $arg, $contextLabel);
+            return self::lowerBoxedStrict($context, $arg, $contextLabel, $expectedType);
         }
         if (Variable::TYPE_NULL === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'null');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'null', $expectedType);
         }
         if (Variable::TYPE_HASHTABLE === $arg->type || ($arg->type & Variable::IS_NATIVE_ARRAY)) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'array');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'array', $expectedType);
         }
         if (Variable::TYPE_OBJECT === $arg->type) {
-            self::emitTypeErrorAndAbort($context, $contextLabel, 'object');
+            self::emitTypeErrorAndAbort($context, $contextLabel, 'object', $expectedType);
         }
 
-        self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed');
+        self::emitTypeErrorAndAbort($context, $contextLabel, 'mixed', $expectedType);
 
         return $context->constantFromBool(false);
     }
 
-    private static function lowerBoxedStrict(Context $context, Variable $arg, string $contextLabel): Value
-    {
+    private static function lowerBoxedStrict(
+        Context $context,
+        Variable $arg,
+        string $contextLabel,
+        string $expectedType = 'bool'
+    ): Value {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
@@ -120,7 +125,7 @@ final class JitBoolArg
             $bad = BasicBlockHelper::append($context, 'jit_bool_strict_bad_'.$label);
             $context->builder->branchIf($check, $bad, $ok);
             $context->builder->positionAtEnd($bad);
-            self::emitTypeErrorAndAbort($context, $contextLabel, $label);
+            self::emitTypeErrorAndAbort($context, $contextLabel, $label, $expectedType);
             $context->builder->positionAtEnd($ok);
         }
 
@@ -232,27 +237,32 @@ final class JitBoolArg
         throw new \LogicException(self::typeErrorMessage($contextLabel, 'string'));
     }
 
-    private static function emitTypeErrorAndAbort(Context $context, string $contextLabel, string $given): void
-    {
+    private static function emitTypeErrorAndAbort(
+        Context $context,
+        string $contextLabel,
+        string $given,
+        string $expectedType = 'bool'
+    ): void {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($contextLabel, $given));
+        TypeErrorRaise::emitRaise($context, self::typeErrorMessage($contextLabel, $given, $expectedType));
         $context->builder->call($context->lookupFunction('abort'));
     }
 
-    private static function typeErrorMessage(string $contextLabel, string $given): string
+    private static function typeErrorMessage(string $contextLabel, string $given, string $expectedType = 'bool'): string
     {
         if (preg_match('/^(.+\(\)): Argument #(\d+) \(\$([^)]+)\)$/', $contextLabel, $m)) {
             return sprintf(
-                '%s(): Argument #%s ($%s) must be of type bool, %s given',
+                '%s(): Argument #%s ($%s) must be of type %s, %s given',
                 $m[1],
                 $m[2],
                 $m[3],
+                $expectedType,
                 $given
             );
         }
 
-        return "{$contextLabel} must be of type bool, {$given} given";
+        return "{$contextLabel} must be of type {$expectedType}, {$given} given";
     }
 
     private static function compileTimeEnumGivenLabel(Context $context, Variable $arg): string

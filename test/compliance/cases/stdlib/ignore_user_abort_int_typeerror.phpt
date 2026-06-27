@@ -1,6 +1,5 @@
 --TEST--
-stdlib ignore_user_abort() int operand JIT must TypeError (#12715, ext/standard/basic_functions.c)
---JIT--
+stdlib ignore_user_abort() — int operand must TypeError (#12715, ext/standard/basic_functions.c)
 --FILE--
 <?php
 declare(strict_types=1);
