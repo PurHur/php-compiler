@@ -840,7 +840,7 @@ class Module extends ModuleAbstract
             new microtime(),
             new gettimeofday(),
             new hrtime(),
-            new clock_gettime(),
+            ...(CompilerVersion::supportsClockGettime() ? [new clock_gettime()] : []),
             new phpversion(),
             new php_sapi_name(),
             new getopt(),

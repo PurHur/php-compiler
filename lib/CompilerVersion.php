@@ -264,6 +264,16 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.3.0');
     }
 
+    /**
+     * PHP 8.3+ clock_gettime() / ClockInterface (ext/standard/hrtime.c, #11624, #12470).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsClockGettime(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964). */
     public static function supportsMbStrPad(): bool
     {
