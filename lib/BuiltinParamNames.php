@@ -267,6 +267,8 @@ final class BuiltinParamNames
                 return ['options', 'limit'];
             case 'file':
                 return ['filename', 'flags'];
+            case 'substr_compare':
+                return ['haystack', 'needle', 'offset', 'length', 'case_insensitive'];
             case 'file_exists':
             case 'filesize':
             case 'filemtime':

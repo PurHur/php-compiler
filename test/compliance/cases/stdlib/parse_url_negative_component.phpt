@@ -1,14 +1,13 @@
 --TEST--
-stdlib parse_url() invalid component returns full array (#10645)
+stdlib parse_url() invalid component ValueError (#10645)
 --FILE--
 <?php
-$url = 'http://example.com/path';
-var_export(parse_url($url, -1));
-echo "\n";
+try {
+    parse_url('http://example.com/path', -1);
+    echo "uncaught\n";
+} catch (ValueError $e) {
+    echo $e->getMessage(), "\n";
+}
 ?>
 --EXPECT--
-array (
-  'scheme' => 'http',
-  'host' => 'example.com',
-  'path' => '/path',
-)
+parse_url(): Argument #2 ($component) must be a valid URL component identifier, -1 given

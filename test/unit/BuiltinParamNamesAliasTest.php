@@ -96,6 +96,15 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($names, 'limit', 'debug_backtrace'));
     }
 
+    /** @covers issue #10320 */
+    public function testSubstrCompareNamedParamsResolve(): void
+    {
+        $names = BuiltinParamNames::forFunction('substr_compare');
+        self::assertSame(['haystack', 'needle', 'offset', 'length', 'case_insensitive'], $names);
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($names, 'offset', 'substr_compare'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($names, 'length', 'substr_compare'));
+    }
+
     /** @covers issue #10474 */
     public function testFileFlagsNamedParamResolves(): void
     {
