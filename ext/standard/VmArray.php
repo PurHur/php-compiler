@@ -555,6 +555,22 @@ final class VmArray
     }
 
     /**
+     * in_array() — scan {@param $haystack} for {@param $needle} (ext/standard/array.c).
+     */
+    public static function contains(Variable $needle, HashTable $haystack, bool $strict): bool
+    {
+        $needle = $needle->resolveIndirect();
+        foreach ($haystack->iterate(true) as $value) {
+            $stored = $value->resolveIndirect();
+            if ($strict ? $needle->identicalTo($stored) : $needle->equals($stored)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * array_combine() — keys from {@param $keys}, values from {@param $values} (ext/standard/array.c).
      *
      * @throws \ValueError when operand lengths differ (non-empty mismatch)

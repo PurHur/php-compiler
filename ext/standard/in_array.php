@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\InArrayRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -21,7 +21,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * in_array() for arrays of scalar values (subset of PHP; JIT via ArrayBuiltinHelper).
+ * in_array() for arrays of scalar values (subset of PHP; JIT via InArrayRuntime).
  */
 final class in_array extends Internal
 {
@@ -41,19 +41,10 @@ final class in_array extends Internal
         if (3 === \count($frame->calledArgs)) {
             $strict = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
-        $vm = null !== $frame->vmContext ? $frame->vmContext->runtime->vm() : null;
         if (null === $frame->returnVar) {
             return;
         }
-        foreach ($haystack->iterate(true) as $value) {
-            $stored = $value->resolveIndirect();
-            if ($strict ? $needle->identicalTo($stored) : self::looseEquals($needle, $stored, $vm)) {
-                $frame->returnVar->bool(true);
-
-                return;
-            }
-        }
-        $frame->returnVar->bool(false);
+        $frame->returnVar->bool(VmArray::contains($needle, $haystack, $strict));
     }
 
     public static function looseEquals(Variable $left, Variable $right, ?\PHPCompiler\VM $vm = null): bool
@@ -77,6 +68,6 @@ final class in_array extends Internal
         }
         JitArrayElem::requireArrayParam($context, $args[1], 'in_array', 2, 'haystack');
 
-        return ArrayBuiltinHelper::inArray($context, $args[0], $args[1], $strict);
+        return InArrayRuntime::inArray($context, $args[0], $args[1], $strict);
     }
 }
