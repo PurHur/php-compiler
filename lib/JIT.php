@@ -14994,6 +14994,12 @@ class JIT {
             ) {
                 continue;
             }
+            if (
+                VM\ReferencableCheck::skipsByRefWhenNotArray($name)
+                && !self::jitArgLooksLikeArray($args[$idx])
+            ) {
+                continue;
+            }
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
                 if (
                     0 === $idx

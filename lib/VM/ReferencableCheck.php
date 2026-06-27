@@ -84,10 +84,18 @@ final class ReferencableCheck
             }
             if (
                 0 === $paramIdx
-                && self::allowsEphemeralArrayLiteralByRef($fn)
                 && (
-                    self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
-                    || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+                    (
+                        self::allowsEphemeralArrayLiteralByRef($fn)
+                        && (
+                            self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                            || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+                        )
+                    )
+                    || (
+                        self::skipsByRefWhenNotArray($fn)
+                        && !self::isArrayOperand($calledArgs[$paramIdx])
+                    )
                 )
             ) {
                 continue;
@@ -147,6 +155,24 @@ final class ReferencableCheck
         return \in_array(strtolower($fn), ['current', 'key', 'array_multisort'], true);
     }
 
+    /**
+     * Array sort mutators — non-array operands get TypeError in the builtin, not by-ref Error (#12675).
+     *
+     * @return list<string>
+     */
+    public static function arraySortMutatorFunctions(): array
+    {
+        return [
+            'sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort',
+            'usort', 'uasort', 'uksort', 'natsort', 'natcasesort',
+        ];
+    }
+
+    public static function skipsByRefWhenNotArray(string $fn): bool
+    {
+        return \in_array(strtolower($fn), self::arraySortMutatorFunctions(), true);
+    }
+
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
     private static function isArrayOrObjectOperand(Variable $arg): bool
     {
@@ -154,6 +180,11 @@ final class ReferencableCheck
 
         return Variable::TYPE_ARRAY === $resolved->type
             || Variable::TYPE_OBJECT === $resolved->type;
+    }
+
+    private static function isArrayOperand(Variable $arg): bool
+    {
+        return Variable::TYPE_ARRAY === $arg->resolveIndirect()->type;
     }
 
     /** Inline array literal operand — not an lvalue, but allowed for read-only pointer builtins (#10654). */
