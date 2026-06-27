@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayShiftRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitReferencableCheck;
 use PHPCompiler\JIT\JitValueBox;
@@ -36,13 +36,8 @@ final class array_shift extends Internal
             throw new \LogicException('array_shift() argument must be an array in this compiler build');
         }
         $ht = $array->toArray();
-        $shifted = $ht->shiftFirst();
+        $shifted = ArrayShiftJitHelper::shift($ht);
         if (null === $frame->returnVar) {
-            return;
-        }
-        if (null === $shifted) {
-            $frame->returnVar->null();
-
             return;
         }
         $frame->returnVar->copyFrom($shifted);
@@ -64,6 +59,6 @@ final class array_shift extends Internal
                 $this->jitString($context, $arg, 'array_shift() argument #'.((int) $i + 1));
             }
         }
-        return ArrayBuiltinHelper::shiftFirst($context, $args[0]);
+        return ArrayShiftRuntime::shift($context, $args[0]);
     }
 }
