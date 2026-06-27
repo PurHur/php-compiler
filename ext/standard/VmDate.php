@@ -403,7 +403,7 @@ final class VmDate
     }
 
     /**
-     * @return int|array{0: int, 1: int}
+     * @return float|array{0: int, 1: int}
      */
     public static function hrtime(bool $asNumber = false)
     {

@@ -18,6 +18,7 @@ final class VmHrtimeTest extends TestCase
         }
         $a = VmHrtime::hrtime(true);
         $b = VmHrtime::hrtime(true);
+        $this->assertIsFloat($a);
         $this->assertGreaterThan(0, $a);
         $this->assertGreaterThanOrEqual($a, $b);
 

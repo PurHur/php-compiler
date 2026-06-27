@@ -40,7 +40,7 @@ final class hrtime extends Internal
             );
         }
         if ($asNumber) {
-            $frame->returnVar->int(VmDate::hrtime(true));
+            $frame->returnVar->float((float) VmDate::hrtime(true));
 
             return;
         }
