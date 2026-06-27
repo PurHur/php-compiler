@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445).
+ * JIT/AOT link for __string__htmlspecialchars via HtmlspecialcharsJitHelper PHP (#9445, #12829).
  *
- * JIT/normal modules use compiled PHP SSOT; AOT standalone keeps
- * {@see StringHtmlspecialcharsStandaloneLlvm} until native link can host compiled helpers reliably.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\HtmlspecialcharsJitHelper}; thin LLVM
+ * bridge forwards the ABI. php-src: ext/standard/html.c
  */
 final class StringHtmlspecialchars
 {
@@ -39,8 +38,9 @@ final class StringHtmlspecialchars
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringHtmlspecialcharsStandaloneLlvm::implement($context);
+        $probe = $context->module->getNamedFunction('__string__htmlspecialchars');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__string__htmlspecialchars', $probe);
 
             return;
         }

@@ -2613,7 +2613,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHrtimeRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialchars.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQueryStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringIdate.php';
