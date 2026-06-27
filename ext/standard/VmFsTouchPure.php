@@ -20,7 +20,7 @@ final class VmFsTouchPure
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
     {
-        if (str_contains($path, "\0")) {
+        if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
 
