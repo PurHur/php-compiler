@@ -19017,6 +19017,14 @@ class Compiler {
                     if ($valueOperand instanceof Operand\Literal
                         && (\is_int($valueOperand->value) || \is_string($valueOperand->value))
                     ) {
+                        // Enum-as-key recovery requires key/value literals to match (both the backing scalar).
+                        // `[1 => E::B]` / `[1 => 2]` must keep the numeric key (#8930).
+                        $elementValue = $arrayExpr->values[$elementIndex] ?? null;
+                        if (!$elementValue instanceof Operand\Literal
+                            || $elementValue->value !== $valueOperand->value
+                        ) {
+                            break;
+                        }
                         $className = $this->staticNameFromOperand($fetch->class);
                         $constName = $this->staticNameFromOperand($fetch->name);
                         if (null !== $className && null !== $constName) {
