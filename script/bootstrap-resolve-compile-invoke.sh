@@ -314,9 +314,56 @@ bootstrap_inventory_argv_driver_smoke() {
   return 1
 }
 
+# M2 link gate: inventory argv driver must emit compiler_minimal (not only HelloWorld — #12486).
+bootstrap_inventory_argv_driver_minimal_smoke() {
+  local driver=$1
+  local root="${ROOT:-}"
+  local probe="${root}/test/selfhost/compiler_minimal/main.php"
+  local smoke_out="${root}/build/.bootstrap-inventory-argv-driver-minimal-smoke-aot"
+  if [[ -z "${root}" || ! -x "${driver}" || ! -f "${probe}" ]]; then
+    return 1
+  fi
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
+  rm -f "${smoke_out}"
+  local smoke_log=""
+  local smoke_code=0
+  set +e
+  smoke_log="$(
+    env -u PHP_COMPILER_M3_SOURCE -u PHP_COMPILER_M3_OUT \
+      PHP_COMPILER_REPO_ROOT="${root}" \
+      PHP_COMPILER_SELFHOST_AOT=1 \
+      PHP_COMPILER_M3_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M4_BIN_COMPILE_DRIVER=1 \
+      PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 \
+      BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 \
+      "${driver}" -o "${smoke_out}" "${probe}" 2>&1
+  )"
+  smoke_code=$?
+  set -e
+  if [[ "${smoke_code}" -eq 0 ]] \
+    && bootstrap_native_compile_output_ok "${smoke_log}" \
+    && bootstrap_inventory_argv_emit_output_ok "${smoke_out}" \
+    && ! grep -qE 'parseAndCompile returned null|native emit failed at phase=parseAndCompile' <<< "${smoke_log}"; then
+    rm -f "${smoke_out}"
+    return 0
+  fi
+  echo "bootstrap-inventory-argv-driver-minimal-smoke: ${driver} failed compiler_minimal (refresh gen-0 — #12486)" >&2
+  printf '%s\n' "${smoke_log}" >&2
+  rm -f "${smoke_out}"
+  return 1
+}
+
 bootstrap_inventory_argv_driver_accepts() {
   local driver=$1
   if ! bootstrap_inventory_argv_driver_smoke "${driver}"; then
+    return 1
+  fi
+  if ! bootstrap_inventory_argv_driver_minimal_smoke "${driver}"; then
     return 1
   fi
   bootstrap_inventory_argv_driver_m4_smoke "${driver}"
@@ -574,6 +621,17 @@ bootstrap_ensure_inventory_argv_driver() {
     echo "bootstrap-ensure-inventory-argv-driver: ${out} failed inventory smoke (rebuilding)" >&2
     rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
   fi
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}" 2>/dev/null \
+    && bootstrap_inventory_argv_driver_accepts "${out}"; then
+    echo "bootstrap-ensure-inventory-argv-driver: using prelinked gen-0 inventory driver (#12486)" >&2
+    return 0
+  fi
+  rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
   if [[ ! -f "${root}/bin/compile.php" ]]; then
     echo "bootstrap-ensure-inventory-argv-driver: missing ${root}/bin/compile.php" >&2
     return 1
@@ -633,7 +691,14 @@ bootstrap_ensure_inventory_argv_driver() {
     return 1
   fi
   if ! bootstrap_inventory_argv_driver_accepts "${out}"; then
-    echo "bootstrap-ensure-inventory-argv-driver: ${out} failed post-build inventory smoke (phantom emit? rebuild via Zend — #3046)" >&2
+    echo "bootstrap-ensure-inventory-argv-driver: ${out} failed post-build inventory smoke (trying prelinked gen-0 — #12486)" >&2
+    rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
+    bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+    if bootstrap_gen0_copy_prelinked_inventory_driver "${out}" "" "${out}" 2>/dev/null \
+      && bootstrap_inventory_argv_driver_accepts "${out}"; then
+      echo "bootstrap-ensure-inventory-argv-driver: OK ${out} (prelinked gen-0 fallback — #12486)" >&2
+      return 0
+    fi
     rm -f "${out}" "${root}/build/.m3_bin_compile_aot_blob"
     return 1
   fi

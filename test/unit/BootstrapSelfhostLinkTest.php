@@ -85,7 +85,10 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('gen-0 native emit failed — recovered via sidecar', $body);
         $this->assertStringContainsString('bootstrap_is_gen0_prelinked_seed_driver', $body);
         $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
+        $this->assertStringContainsString('bootstrap_inventory_argv_driver_minimal_smoke', $body);
         $this->assertStringContainsString('bootstrap_inventory_argv_driver_m4_smoke', $body);
+        $this->assertStringContainsString('prelinked gen-0 inventory driver (#12486)', $body);
+        $this->assertStringContainsString('prelinked gen-0 fallback — #12486', $body);
         $this->assertStringContainsString('*/bin/compile.php) return 1', $body);
         $this->assertStringContainsString('#11142', $body);
         $this->assertStringContainsString('bootstrap_ensure_m3_compiler_lib_sidecar', $body);
