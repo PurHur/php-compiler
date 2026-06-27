@@ -8,7 +8,7 @@ use PHPCompiler\ext\standard\PasswordJitHelper;
 use PHPCompiler\ext\standard\VmPassword;
 use PHPUnit\Framework\TestCase;
 
-/** StringPasswordCrypto must route through PasswordJitHelper PHP, not libcrypt LLVM (#9908). */
+/** StringPasswordCrypto routes through PasswordJitHelper PHP, not libcrypt LLVM (#9908, #12869). */
 final class PasswordCryptoRuntimeShrinkTest extends TestCase
 {
     public function testStringPasswordCryptoUsesPasswordCryptoRuntimeNotLlvmJit(): void
@@ -17,7 +17,7 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('PasswordCryptoRuntime', $source);
         $this->assertStringNotContainsString('StringPasswordCryptoJit', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCryptoJit.php');
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
     }
 
     public function testPasswordCryptoRuntimeRoutesThroughPasswordJitHelper(): void
@@ -25,22 +25,11 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PasswordCryptoRuntime.php');
         $this->assertStringContainsString('PasswordJitHelper', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
-        $this->assertStringContainsString('StringPasswordCryptoStandaloneLlvm', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringNotContainsString('StringPasswordCryptoStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitPasswordHash', $source);
         $this->assertStringNotContainsString('BCRYPT_ITOA64', $source);
         $this->assertLessThan(280, \substr_count($source, "\n") + 1);
-    }
-
-    public function testStandaloneLlvmQuarantinedFromDefaultJitPath(): void
-    {
-        $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PasswordCryptoRuntime.php');
-        $this->assertMatchesRegularExpression(
-            '/if \(Builtin::LOAD_TYPE_STANDALONE === \$context->loadType\) \{\s*\n\s*StringPasswordCryptoStandaloneLlvm::implement/',
-            $runtime
-        );
-        $standalone = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
-        $this->assertStringContainsString("lookupFunction('crypt')", $standalone);
     }
 
     public function testPasswordJitHelperDelegatesToVmPassword(): void

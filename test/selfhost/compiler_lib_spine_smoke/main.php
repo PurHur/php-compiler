@@ -2639,7 +2639,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringPackJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStrJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPhpinfoRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPosixTimes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php';
