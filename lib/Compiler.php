@@ -1271,6 +1271,50 @@ class Compiler {
         return null;
     }
 
+    /** && / || merge-arm tail before JUMP — literal assign dest or long-arm (bool) cast result (#10626, #12745). */
+    private function logicalShortCircuitTailPhiSlot(Block $branchBlock): ?int
+    {
+        for ($i = $branchBlock->nOpCodes - 1; $i >= 0; --$i) {
+            $op = $branchBlock->opCodes[$i];
+            if (OpCode::TYPE_JUMP === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                return (int) $op->arg2;
+            }
+            if (OpCode::TYPE_CAST_BOOL === $op->type) {
+                return (int) $op->arg1;
+            }
+
+            break;
+        }
+
+        return null;
+    }
+
+    /** && / || short-arm literal assign — phi slot from already-compiled sibling tail (#12745). */
+    private function logicalShortCircuitSiblingPhiSlot(Block $branch): ?int
+    {
+        if (null === $branch->orig) {
+            return null;
+        }
+        $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null === $mergeCfg) {
+            return null;
+        }
+        foreach ($mergeCfg->parents as $parentCfg) {
+            if ($parentCfg === $branch->orig || !$this->seen->contains($parentCfg)) {
+                continue;
+            }
+            $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
+            if (null !== $phi) {
+                return $phi;
+            }
+        }
+
+        return null;
+    }
+
     /** && / || long-arm bool cast must store into the recorded phi merge slot (#10626). */
     private function logicalShortCircuitPhiMergeSlot(Block $branch): ?int
     {
@@ -1289,18 +1333,9 @@ class Compiler {
                 if ($parentCfg === $branch->orig || !$this->seen->contains($parentCfg)) {
                     continue;
                 }
-                $sibling = $this->seen[$parentCfg];
-                for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
-                    $op = $sibling->opCodes[$i];
-                    if (OpCode::TYPE_ASSIGN === $op->type) {
-                        return (int) $op->arg2;
-                    }
-                    if (OpCode::TYPE_CAST_BOOL === $op->type) {
-                        return (int) $op->arg1;
-                    }
-                    if (OpCode::TYPE_JUMP === $op->type) {
-                        break;
-                    }
+                $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
+                if (null !== $phi) {
+                    return $phi;
                 }
             }
         }
@@ -1410,6 +1445,10 @@ class Compiler {
 
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
     {
+        $jumpMerge = $this->branchJumpMergeTarget($branchCfg);
+        if (null !== $jumpMerge && $this->mergeCfgBlockUsesLogicalShortCircuit($jumpMerge)) {
+            $this->recordTernaryMergePhiRhsSlot($jumpMerge, $compiled);
+        }
         foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
             if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
                 $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
@@ -1509,6 +1548,19 @@ class Compiler {
         if ($this->isArrayDimWriteAssign($assign, $branch)) {
             return null;
         }
+        $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null !== $mergeCfg && $this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+            $tail = $this->branchTailExprBeforeJump($branch->orig);
+            if (
+                $tail === $assign
+                && $assign->expr instanceof Operand\Literal
+            ) {
+                $phi = $this->logicalShortCircuitPhiMergeSlot($branch);
+                if (null !== $phi) {
+                    return $phi;
+                }
+            }
+        }
         if (!$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
@@ -1577,18 +1629,9 @@ class Compiler {
             if ($parentCfg === $currentBranch || !$this->seen->contains($parentCfg)) {
                 continue;
             }
-            $sibling = $this->seen[$parentCfg];
-            for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
-                $op = $sibling->opCodes[$i];
-                if (OpCode::TYPE_ASSIGN === $op->type) {
-                    return $op->arg2;
-                }
-                if (OpCode::TYPE_CAST_BOOL === $op->type) {
-                    return (int) $op->arg1;
-                }
-                if (OpCode::TYPE_JUMP === $op->type) {
-                    break;
-                }
+            $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
+            if (null !== $phi) {
+                return $phi;
             }
         }
 
@@ -1643,16 +1686,9 @@ class Compiler {
         if ($this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
             return;
         }
-        for ($i = $compiled->nOpCodes - 1; $i >= 0; --$i) {
-            $op = $compiled->opCodes[$i];
-            if (OpCode::TYPE_ASSIGN === $op->type) {
-                $this->ternaryMergePhiRhsSlots[$mergeCfg] = (int) $op->arg2;
-
-                return;
-            }
-            if (OpCode::TYPE_JUMP === $op->type) {
-                break;
-            }
+        $phi = $this->logicalShortCircuitTailPhiSlot($compiled);
+        if (null !== $phi) {
+            $this->ternaryMergePhiRhsSlots[$mergeCfg] = $phi;
         }
     }
 
@@ -7788,6 +7824,22 @@ class Compiler {
                 }
 
                 $mergeAssignSlot = $this->branchMergeAssignSlot($block, $expr);
+                if ($expr->expr instanceof Operand\Literal && null !== $block->orig) {
+                    $literalMerge = $this->branchJumpMergeTarget($block->orig);
+                    if (
+                        null !== $literalMerge
+                        && $this->mergeCfgBlockUsesLogicalShortCircuit($literalMerge)
+                    ) {
+                        $tail = $this->branchTailExprBeforeJump($block->orig);
+                        if ($tail === $expr) {
+                            $literalPhi = $this->logicalShortCircuitSiblingPhiSlot($block)
+                                ?? $this->logicalShortCircuitPhiMergeSlot($block);
+                            if (null !== $literalPhi) {
+                                $mergeAssignSlot = $literalPhi;
+                            }
+                        }
+                    }
+                }
                 if (null !== $block->orig && $this->isMergeBranchAssign($block, $expr)) {
                     $mergeCfg = $this->branchJumpMergeTarget($block->orig);
                     if (null !== $mergeCfg && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)) {
