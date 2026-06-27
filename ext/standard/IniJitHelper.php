@@ -34,6 +34,8 @@ final class IniJitHelper
         'cfg_file_path',
         'user_agent',
         'pcre.backtrack_limit',
+        'pcre.jit',
+        'pcre.recursion_limit',
         'zend.assertions',
         'assert.active',
         'assert.bail',
@@ -84,6 +86,8 @@ final class IniJitHelper
 
     private const CFG_PCRE_BACKTRACK_LIMIT = '1000000';
 
+    private const CFG_PCRE_RECURSION_LIMIT = '100000';
+
     private static bool $displayErrors = false;
 
     /** Raw ini_set() value; null uses php.ini default formatting (#11835). */
@@ -104,6 +108,10 @@ final class IniJitHelper
     private static string $userAgent = '';
 
     private static int $pcreBacktrackLimit = 1_000_000;
+
+    private static bool $pcreJit = true;
+
+    private static int $pcreRecursionLimit = 100_000;
 
     public static function getUserAgent(): string
     {
@@ -198,6 +206,12 @@ final class IniJitHelper
         if ('pcre.backtrack_limit' === $key) {
             return (string) self::$pcreBacktrackLimit;
         }
+        if ('pcre.jit' === $key) {
+            return VmIni::formatBoolIniGet(self::$pcreJit);
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return (string) self::$pcreRecursionLimit;
+        }
 
         return null;
     }
@@ -248,6 +262,12 @@ final class IniJitHelper
         }
         if ('pcre.backtrack_limit' === $key) {
             return self::setPcreBacktrackLimit($newValue);
+        }
+        if ('pcre.jit' === $key) {
+            return self::setPcreJit($newValue);
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return self::setPcreRecursionLimit($newValue);
         }
 
         return null;
@@ -302,6 +322,12 @@ final class IniJitHelper
         if ('pcre.backtrack_limit' === $key) {
             return self::CFG_PCRE_BACKTRACK_LIMIT;
         }
+        if ('pcre.jit' === $key) {
+            return '1';
+        }
+        if ('pcre.recursion_limit' === $key) {
+            return self::CFG_PCRE_RECURSION_LIMIT;
+        }
         if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
             return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
@@ -347,6 +373,12 @@ final class IniJitHelper
                 break;
             case 'pcre.backtrack_limit':
                 self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
+                break;
+            case 'pcre.jit':
+                self::$pcreJit = true;
+                break;
+            case 'pcre.recursion_limit':
+                self::$pcreRecursionLimit = (int) self::CFG_PCRE_RECURSION_LIMIT;
                 break;
         }
     }
@@ -447,6 +479,26 @@ final class IniJitHelper
         }
         $old = (string) self::$pcreBacktrackLimit;
         self::$pcreBacktrackLimit = $parsed;
+
+        return $old;
+    }
+
+    private static function setPcreJit(string $newValue): string
+    {
+        $old = VmIni::formatBoolIniGet(self::$pcreJit);
+        self::$pcreJit = VmIni::parseBoolIni($newValue);
+
+        return $old;
+    }
+
+    private static function setPcreRecursionLimit(string $newValue): ?string
+    {
+        $parsed = (int) $newValue;
+        if ($parsed < 0) {
+            return null;
+        }
+        $old = (string) self::$pcreRecursionLimit;
+        self::$pcreRecursionLimit = $parsed;
 
         return $old;
     }
