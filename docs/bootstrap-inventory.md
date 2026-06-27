@@ -6475,7 +6475,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitDiskPath.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/JitDl.php`
 
@@ -11740,10 +11740,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1344)
-- new Error (line 1355)
-- new Error (line 3413)
-- new Error (line 3438)
+- new Error (line 1345)
+- new Error (line 1356)
+- new Error (line 3414)
+- new Error (line 3439)
 - 196 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
