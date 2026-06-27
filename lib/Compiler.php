@@ -12405,11 +12405,15 @@ class Compiler {
         ) {
             return null;
         }
+        $producerResult = $producer->result;
+        if (!$producerResult instanceof Operand) {
+            return null;
+        }
         foreach ($block->orig->children as $child) {
             if (!$child instanceof Op\Expr\Assign) {
                 continue;
             }
-            if (!$this->operandsReferToSameVariable($child->expr, $producer)) {
+            if (!$this->operandsReferToSameVariable($child->expr, $producerResult)) {
                 continue;
             }
             if (!$this->operandDerivesFromClosure($child->expr)) {
