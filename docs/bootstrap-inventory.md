@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3333 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8841 |
+| Source constructs flagged (warnings) | 8840 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -262,7 +262,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/Module.php` | 0 | 27 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 21 |
+| `ext/posix/VmPosix.php` | 0 | 20 |
 | `ext/posix/posix_access.php` | 0 | 3 |
 | `ext/posix/posix_ctermid.php` | 0 | 2 |
 | `ext/posix/posix_errno.php` | 0 | 2 |
@@ -4871,26 +4871,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/VmPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 37)
-- new Error (line 47)
-- new Error (line 57)
-- new Error (line 68)
-- new Error (line 105)
-- new Error (line 146)
-- new Error (line 162)
-- new Error (line 179)
-- new Error (line 341)
-- new Error (line 349)
-- new HashTable (line 366)
-- new Variable (line 368)
-- new Error (line 389)
-- new Error (line 398)
-- new Error (line 412)
-- new Error (line 432)
-- new Error (line 448)
-- new Error (line 466)
-- new Error (line 484)
-- new Error (line 500)
+- new Error (line 46)
+- new Error (line 61)
+- new Error (line 76)
+- new Error (line 92)
+- new Error (line 133)
+- new Error (line 203)
+- new Error (line 220)
+- new Error (line 382)
+- new Error (line 390)
+- new HashTable (line 407)
+- new Variable (line 409)
+- new Error (line 430)
+- new Error (line 439)
+- new Error (line 453)
+- new Error (line 473)
+- new Error (line 489)
+- new Error (line 507)
+- new Error (line 525)
+- new Error (line 541)
 - 38 class method(s)
 
 ### `ext/posix/posix_access.php`
@@ -10008,7 +10007,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDnsUdpNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmDnsUdpPure.php`
 
@@ -10170,7 +10169,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsAccessPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/VmFsDirNative.php`
 
@@ -10597,9 +10596,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JsonException (line 57)
 - new JsonException (line 65)
 - new VmJsonExportException (line 97)
-- new VmJsonExportException (line 117)
-- new VmJsonExportException (line 247)
-- 16 class method(s)
+- new VmJsonExportException (line 118)
+- new VmJsonExportException (line 248)
+- 19 class method(s)
 
 ### `ext/standard/VmJsonParser.php`
 
@@ -10991,12 +10990,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessIdentityNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmProcessIdentityPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/VmProcessProcOpenNative.php`
 
@@ -14767,7 +14766,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 41)
-- new Variable (line 51)
+- new Variable (line 53)
 - 2 class method(s)
 
 ### `ext/standard/rename_.php`
