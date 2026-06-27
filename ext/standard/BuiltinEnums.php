@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\session\SessionConstants;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
@@ -33,7 +34,9 @@ final class BuiltinEnums
         self::registerParseUrl($ctx);
         self::registerRequestMethod($ctx);
         self::registerInfoView($ctx);
-        self::registerClockInterface($ctx);
+        if (CompilerVersion::supportsClockGettime()) {
+            self::registerClockInterface($ctx);
+        }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }

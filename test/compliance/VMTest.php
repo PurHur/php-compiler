@@ -128,6 +128,16 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'stream_supports_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClockGettime()
+                && (str_contains($name, 'clock_gettime')
+                    || str_contains($name, 'hrtime_nsec_precision'))
+                && !str_contains($name, 'clock_gettime_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClockGettime()
+                && str_contains($name, 'clock_gettime_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesOverrideAttributeClass()
                 && str_contains($name, 'override_class_exists')) {
                 continue;
