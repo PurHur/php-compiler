@@ -742,7 +742,7 @@ class Module extends ModuleAbstract
             new interface_exists_(),
             new trait_exists_(),
             new class_uses_(),
-            new class_uses_recursive(),
+            ...(CompilerVersion::supportsClassUsesRecursive() ? [new class_uses_recursive()] : []),
             new class_implements_(),
             new class_parents_(),
             new function_exists(),

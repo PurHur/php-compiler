@@ -120,6 +120,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ class_uses_recursive() (ext/standard/basic_functions.c, issue #6469, #12816).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsClassUsesRecursive(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.3+ #[\Override] compile-time validation (Zend/zend_compile.c, #6303, #11559, #12201).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 (no validation;
