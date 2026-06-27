@@ -55,6 +55,9 @@ final class BuiltinParamNames
                 return ['search', 'replace', 'subject', 'count'];
             case 'parse_str':
                 return ['string', 'array'];
+            case 'dns_get_mx':
+            case 'getmxrr':
+                return ['hostname', 'mxhosts', 'weight'];
             case 'sort':
             case 'rsort':
                 return ['array', 'flags', 'direction'];
