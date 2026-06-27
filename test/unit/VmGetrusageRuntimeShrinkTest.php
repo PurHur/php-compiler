@@ -42,6 +42,7 @@ final class VmGetrusageRuntimeShrinkTest extends TestCase
         $usage = VmGetrusageNative::getrusage(0);
         $this->assertIsArray($usage);
         $this->assertArrayHasKey('ru_maxrss', $usage);
+        $this->assertGreaterThan(0, $usage['ru_maxrss'], 'ru_maxrss must reflect live RSS on Linux (#12744)');
         $this->assertArrayHasKey('ru_utime.tv_sec', $usage);
         $this->assertArrayNotHasKey(0, $usage);
     }
