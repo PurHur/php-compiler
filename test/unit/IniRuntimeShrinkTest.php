@@ -53,4 +53,15 @@ final class IniRuntimeShrinkTest extends TestCase
     {
         $this->assertNull(IniJitHelper::iniGet('bogus_ini_key'));
     }
+
+    public function testIniJitHelperDefaultCharsetRoundTrip(): void
+    {
+        $orig = IniJitHelper::iniGet('default_charset');
+        $this->assertSame('UTF-8', $orig);
+        $old = IniJitHelper::iniSet('default_charset', 'ISO-8859-1');
+        $this->assertSame('UTF-8', $old);
+        $this->assertSame('ISO-8859-1', IniJitHelper::iniGet('default_charset'));
+        IniJitHelper::iniRestore('default_charset');
+        $this->assertSame('UTF-8', IniJitHelper::iniGet('default_charset'));
+    }
 }

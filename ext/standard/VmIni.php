@@ -28,9 +28,11 @@ final class VmIni
     /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
     private const READONLY_STRING_DEFAULTS = [
         'max_execution_time' => '0',
-        'default_charset' => 'UTF-8',
         'session.save_handler' => 'files',
     ];
+
+    /** php-src PG(default_charset) default UTF-8 (ext/standard/ini.c, INI_ALL, #12531). */
+    private const CFG_DEFAULT_CHARSET = 'UTF-8';
 
     /**
      * Registered string ini directives with no local value — Zend returns '' (#12178).
@@ -119,6 +121,8 @@ final class VmIni
                 return self::setSessionSavePath($newValue);
             case 'include_path':
                 return IncludePathJitHelper::push($newValue);
+            case 'default_charset':
+                return self::setDefaultCharset($newValue);
             case 'user_agent':
                 return self::setUserAgent($newValue);
             case 'pcre.backtrack_limit':
@@ -170,6 +174,8 @@ final class VmIni
                 return self::$sessionSavePath;
             case 'include_path':
                 return IncludePathJitHelper::get();
+            case 'default_charset':
+                return self::$defaultCharset;
             case 'user_agent':
                 return self::$userAgent;
             case 'pcre.backtrack_limit':
@@ -201,7 +207,7 @@ final class VmIni
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
             'max_execution_time' => self::READONLY_STRING_DEFAULTS['max_execution_time'],
-            'default_charset' => self::READONLY_STRING_DEFAULTS['default_charset'],
+            'default_charset' => self::CFG_DEFAULT_CHARSET,
             'cfg_file_path' => self::cfgFilePath(),
             'user_agent' => '',
             'pcre.backtrack_limit' => self::CFG_PCRE_BACKTRACK_LIMIT,
@@ -246,6 +252,8 @@ final class VmIni
 
     private static string $userAgent = '';
 
+    private static string $defaultCharset = self::CFG_DEFAULT_CHARSET;
+
     private static int $pcreBacktrackLimit = 1_000_000;
 
     private static bool $pcreJit = true;
@@ -270,6 +278,11 @@ final class VmIni
     public static function getUserAgent(): string
     {
         return self::$userAgent;
+    }
+
+    public static function getDefaultCharset(): string
+    {
+        return self::$defaultCharset;
     }
 
     public static function getSessionGcMaxLifetime(): int
@@ -351,6 +364,14 @@ final class VmIni
     {
         $old = self::$userAgent;
         self::$userAgent = $newValue;
+
+        return $old;
+    }
+
+    private static function setDefaultCharset(string $newValue): string
+    {
+        $old = self::$defaultCharset;
+        self::$defaultCharset = $newValue;
 
         return $old;
     }
@@ -447,6 +468,9 @@ final class VmIni
                 break;
             case 'user_agent':
                 self::$userAgent = '';
+                break;
+            case 'default_charset':
+                self::$defaultCharset = self::CFG_DEFAULT_CHARSET;
                 break;
             case 'pcre.backtrack_limit':
                 self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
