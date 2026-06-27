@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -32,12 +31,7 @@ final class ob_implicit_flush extends Internal
         }
         $on = true;
         if (1 === $argc) {
-            $on = InternalStrictArg::requireBuiltinTypedBoolArg(
-                $frame->calledArgs[0],
-                'ob_implicit_flush',
-                0,
-                'enable'
-            );
+            $on = $frame->calledArgs[0]->resolveIndirect()->toBool();
         }
         OutputBuffer::setImplicitFlush($on);
         if (null !== $frame->returnVar) {
