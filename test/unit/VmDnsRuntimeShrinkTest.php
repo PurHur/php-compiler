@@ -17,6 +17,9 @@ final class VmDnsRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('hostCheckdnsrr', $source);
         $this->assertDoesNotMatchRegularExpression('/\\\\checkdnsrr\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression("/function_exists\\('checkdnsrr'\\)/", $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->res_query/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->getaddrinfo/', $source);
     }
 
     public function testVmDnsDoesNotDelegateEtcHostsReadsToHostFile(): void
