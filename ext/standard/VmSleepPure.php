@@ -16,6 +16,8 @@ final class VmSleepPure
 {
     private const NS_PER_SEC = 1_000_000_000;
 
+    public const PAST_TIMESTAMP_WARNING = 'time_sleep_until(): Argument #1 ($timestamp) must be greater than or equal to the current time';
+
     public static function sleep(int $seconds): int|false
     {
         if ($seconds < 0) {
@@ -69,15 +71,15 @@ final class VmSleepPure
 
     public static function timeSleepUntil(float $timestamp): bool
     {
+        if (self::isTimestampInPast($timestamp)) {
+            return false;
+        }
         $tv = VmDate::wallClock();
         $currentNs = (float) $tv['sec'] * (float) self::NS_PER_SEC + (float) $tv['usec'] * 1000.0;
         if (0.0 === $currentNs && 0.0 === $tv['usec']) {
             return false;
         }
         $targetNs = $timestamp * (float) self::NS_PER_SEC;
-        if ($targetNs < $currentNs) {
-            return false;
-        }
         $diffNs = (int) \round($targetNs - $currentNs);
         if (0 === $diffNs) {
             return true;
@@ -88,6 +90,18 @@ final class VmSleepPure
         self::delayNanos($diffNs);
 
         return true;
+    }
+
+    public static function isTimestampInPast(float $timestamp): bool
+    {
+        $tv = VmDate::wallClock();
+        $currentNs = (float) $tv['sec'] * (float) self::NS_PER_SEC + (float) $tv['usec'] * 1000.0;
+        if (0.0 === $currentNs && 0.0 === $tv['usec']) {
+            return false;
+        }
+        $targetNs = $timestamp * (float) self::NS_PER_SEC;
+
+        return $targetNs < $currentNs;
     }
 
     private static function monotonicAvailable(): bool
