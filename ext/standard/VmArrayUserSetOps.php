@@ -67,9 +67,16 @@ final class VmArrayUserSetOps
     private static function runValueOp(Frame $frame, string $fn, bool $intersect): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
-                $fn.'() expects at least 3 arguments, '.$argc.' given'
+                $fn.'() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc < 3) {
+            VmArraySortCallback::requireUassocCallback(
+                $frame->calledArgs[$argc - 1],
+                $fn,
+                $argc
             );
         }
         $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], $fn, $argc);
@@ -334,7 +341,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**

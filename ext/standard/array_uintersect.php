@@ -23,10 +23,13 @@ final class array_uintersect extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 3) {
+        if ($argc < 2) {
             throw new \ArgumentCountError(
-                'array_uintersect() expects at least 3 arguments, '.$argc.' given'
+                'array_uintersect() expects at least 2 arguments, '.$argc.' given'
             );
+        }
+        if ($argc < 3) {
+            VmArraySortCallback::requireUassocCallbackJitArg($args[$argc - 1], 'array_uintersect', $argc);
         }
         $callback = $args[$argc - 1];
         if (!UsortCallbackPolicy::isJitLowerable($callback)) {

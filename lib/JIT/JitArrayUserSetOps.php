@@ -67,9 +67,6 @@ final class JitArrayUserSetOps
         Variable $first,
         Variable ...$others
     ): Value {
-        if ([] === $others) {
-            throw new \ArgumentCountError('array_udiff() expects at least 3 arguments, 2 given');
-        }
         [$closureCall, $returnTypeTag] = self::resolveCompareCallback($context, $callback);
         $src = ArrayBuiltinHelper::loadHashTable($context, $first);
         $otherHts = self::loadOtherHashTables($context, $others);
