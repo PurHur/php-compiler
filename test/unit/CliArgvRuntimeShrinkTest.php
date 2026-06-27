@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** CliArgvRuntime embed routes hashtable materialization through CliArgvJitHelper PHP (#9439). */
+/** CliArgvRuntime routes hashtable materialization through CliArgvJitHelper PHP (#9439, #12811). */
 final class CliArgvRuntimeShrinkTest extends TestCase
 {
     public function testCliArgvRuntimeUsesJitHelperNotLlvmHashtableAllocOnEmbed(): void
@@ -15,17 +15,10 @@ final class CliArgvRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('CliArgvJitHelper', $source);
         $this->assertStringContainsString('VmCliArgv', (string) file_get_contents(__DIR__.'/../../ext/standard/VmCliArgv.php'));
         $this->assertStringNotContainsString('__hashtable__alloc', $source);
-        $this->assertStringContainsString('CliArgvStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('CliArgvStandaloneLlvm', $source);
         $this->assertStringContainsString('CREATE_TABLE_HELPER', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
-    }
-
-    public function testCliArgvStandaloneLlvmQuarantinesHashtableAlloc(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/CliArgvStandaloneLlvm.php');
-        $this->assertStringContainsString('__hashtable__alloc', $source);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
-        $this->assertStringNotContainsString('CliArgvJitHelper', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/CliArgvStandaloneLlvm.php');
     }
 
     public function testVmCliArgvBuildsIndexedArgvTable(): void

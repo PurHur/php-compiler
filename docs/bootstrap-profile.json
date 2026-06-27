@@ -2342,7 +2342,6 @@
         "lib/JIT/Builtin/ChownRuntime.php",
         "lib/JIT/Builtin/ClassConstFetchRuntime.php",
         "lib/JIT/Builtin/CliArgvRuntime.php",
-        "lib/JIT/Builtin/CliArgvStandaloneLlvm.php",
         "lib/JIT/Builtin/ClockGettimeJit.php",
         "lib/JIT/Builtin/CloneWithReinitRuntime.php",
         "lib/JIT/Builtin/ClosureBindRuntime.php",
@@ -3653,9 +3652,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3423,
+        "inventory_files": 3422,
         "excluded": 0,
-        "eligible": 3423,
+        "eligible": 3422,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
