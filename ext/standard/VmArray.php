@@ -571,6 +571,30 @@ final class VmArray
     }
 
     /**
+     * array_search() — first matching key or false (ext/standard/array.c).
+     */
+    public static function searchKey(
+        Variable $needle,
+        HashTable $haystack,
+        bool $strict,
+        ?\PHPCompiler\VM $vm = null
+    ): Variable {
+        $needle = $needle->resolveIndirect();
+        foreach ($haystack->iterateKeyed(true) as [$key, $value]) {
+            if ($strict ? $needle->identicalTo($value) : $needle->equals($value, $vm)) {
+                $result = new Variable();
+                $result->copyFrom($key);
+
+                return $result;
+            }
+        }
+        $false = new Variable();
+        $false->bool(false);
+
+        return $false;
+    }
+
+    /**
      * array_combine() — keys from {@param $keys}, values from {@param $values} (ext/standard/array.c).
      *
      * @throws \ValueError when operand lengths differ (non-empty mismatch)
