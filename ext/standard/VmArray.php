@@ -12,6 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\VmNumericCoercion;
 
 /** VM array helpers (no PHP internal wrappers in compiled paths). */
 final class VmArray
@@ -1332,15 +1333,12 @@ final class VmArray
                     . $entry->name . ' given'
                 );
             }
-            $result = $ctx->runtime->vm->invokeInstanceMethod($v->toObject(), 'count')->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $result->type) {
-                throw new \TypeError(
-                    'Return value of ' . $entry->name . '::count() must be of type int, '
-                    . self::valueTypeLabel($result) . ' returned'
-                );
-            }
+            $result = $ctx->runtime->vm->invokeInstanceMethodWithoutReturnCheck(
+                $v->toObject(),
+                'count'
+            )->resolveIndirect();
 
-            return $result->toInt();
+            return VmNumericCoercion::zvalGetLong($result);
         }
 
         throw new \TypeError(

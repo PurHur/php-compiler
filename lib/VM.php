@@ -393,6 +393,40 @@ class VM {
     /** Invoke an instance method from VM internals (e.g. __debugInfo, #3259, #7069). */
     public function invokeInstanceMethod(ObjectEntry $object, string $methodName, Variable ...$extraArgs): Variable
     {
+        return $this->invokeInstanceMethodInternal($object, $methodName, false, ...$extraArgs);
+    }
+
+    /**
+     * Invoke Countable::count() for count() builtin — Zend skips return-type check (#12867).
+     */
+    public function invokeInstanceMethodWithoutReturnCheck(
+        ObjectEntry $object,
+        string $methodName,
+        Variable ...$extraArgs
+    ): Variable {
+        return $this->invokeInstanceMethodInternal($object, $methodName, true, ...$extraArgs);
+    }
+
+    private function invokeInstanceMethodInternal(
+        ObjectEntry $object,
+        string $methodName,
+        bool $suppressReturnTypeCheck,
+        Variable ...$extraArgs
+    ): Variable {
+        if ($suppressReturnTypeCheck) {
+            ++$this->context->suppressReturnTypeCheckDepth;
+        }
+        try {
+            return $this->invokeInstanceMethodBody($object, $methodName, ...$extraArgs);
+        } finally {
+            if ($suppressReturnTypeCheck) {
+                --$this->context->suppressReturnTypeCheckDepth;
+            }
+        }
+    }
+
+    private function invokeInstanceMethodBody(ObjectEntry $object, string $methodName, Variable ...$extraArgs): Variable
+    {
         $methodLc = strtolower($methodName);
         [$declaring] = $this->resolveInstanceMethod($object->class, $methodLc);
         $func = $declaring->methods[$methodLc];
@@ -14356,6 +14390,9 @@ restart:
 
     private function enforceReturnType(Frame $frame, ?Variable $value): void
     {
+        if ($this->context->suppressReturnTypeCheckDepth > 0) {
+            return;
+        }
         $block = $frame->block;
         if (null === $block) {
             return;
