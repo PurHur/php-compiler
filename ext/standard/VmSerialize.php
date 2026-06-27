@@ -346,11 +346,13 @@ final class VmSerialize
             $value = $target;
         } else {
             $value = $value->resolveIndirect();
-            $existing = $state->lookupVariableIndex($value);
-            if (null !== $existing) {
-                return 'R:'.$existing.';';
+            if (Variable::TYPE_OBJECT !== $value->type) {
+                $existing = $state->lookupVariableIndex($value);
+                if (null !== $existing) {
+                    return 'R:'.$existing.';';
+                }
+                $state->assignVariableIndex($value);
             }
-            $state->assignVariableIndex($value);
         }
         $resourceWire = self::serializeResourceWire($value);
         if (null !== $resourceWire) {
