@@ -10,7 +10,7 @@ set_error_handler(static function (int $severity, string $message) use (&$warnin
 });
 echo 'x';
 $r = header_remove();
-if (false === $r) {
+if (null === $r) {
     echo "ok\n";
 } else {
     echo 'fail: header_remove() return=', var_export($r, true), ' type=', gettype($r), "\n";

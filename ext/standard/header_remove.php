@@ -35,7 +35,7 @@ final class header_remove extends Internal
         if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
             VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(false);
+                $frame->returnVar->null();
             }
 
             return;

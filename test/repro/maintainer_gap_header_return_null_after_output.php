@@ -10,7 +10,7 @@ set_error_handler(static function (int $severity, string $message) use (&$warnin
 });
 echo 'x';
 $r = header('Y: z');
-if (false === $r) {
+if (null === $r) {
     echo "ok\n";
 } else {
     echo 'fail: header() return=', var_export($r, true), ' type=', gettype($r), "\n";
