@@ -32,8 +32,19 @@ final class header_remove extends Internal
                 'header_remove() expects at most 1 argument, '.$argc.' given'
             );
         }
+        if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
+            VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         if (0 === $argc) {
             ResponseContext::removeHeader(null);
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
 
             return;
         }
@@ -44,6 +55,9 @@ final class header_remove extends Internal
             'name'
         );
         ResponseContext::removeHeader($name);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
     }
 
     public function call(Context $context, JITVariable ...$args): Value
