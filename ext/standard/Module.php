@@ -531,6 +531,7 @@ class Module extends ModuleAbstract
             new file_get_contents(),
             new readfile(),
             new mime_content_type(),
+            new mail(),
             new file_(),
             new readline(),
             new readline_info(),
