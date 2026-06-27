@@ -12867,6 +12867,9 @@ class Compiler {
         if (null !== $callArg && $this->isNamedVariableOperand($callArg)) {
             return null;
         }
+        if ($this->isEmbeddedCallLiteralArg($callArg)) {
+            return null;
+        }
         if (\count($callArgs) < 2) {
             return null;
         }
@@ -13464,6 +13467,18 @@ class Compiler {
             return $paired;
         }
         if (1 === $producerCount) {
+            // preg_replace_callback($pat, fn(...), $subj) — lone hoisted closure maps to arg 1 (#12755).
+            if (
+                ($producers[0] instanceof Op\Expr\ArrowFunction || $producers[0] instanceof Op\Expr\Closure)
+                && $argCount >= 2
+                && 'preg_replace_callback' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                if (1 === $argIndex) {
+                    return $producers[0];
+                }
+
+                return null;
+            }
             if (
                 ($producers[0] instanceof Op\Expr\ConstFetch || $producers[0] instanceof Op\Expr\ClassConstFetch)
                 && $argCount - 1 === $argIndex
@@ -17705,6 +17720,9 @@ class Compiler {
     /** Inline or assigned closure comparators must not consume hoisted enum prelude slots (#8947). */
     private function callArgOperandIsClosureValue(Operand $operand, Block $block): bool
     {
+        if ($this->isEmbeddedCallLiteralArg($operand)) {
+            return false;
+        }
         if ($this->operandDerivesFromClosure($operand)) {
             return true;
         }
@@ -18798,7 +18816,13 @@ class Compiler {
                 if (null === $closureSlot && null !== $cfgCallOp) {
                     $closureSlot = $this->resolvePrecedingClosureCallArgSlot($cfgCallOp, (int) $argIndex, $block);
                 }
-                if (null !== $closureSlot && null === $assignedNamedLocal && !$this->isNamedVariableOperand($arg)) {
+                if (
+                    null !== $closureSlot
+                    && null === $assignedNamedLocal
+                    && !$this->isNamedVariableOperand($arg)
+                    && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                    && $this->callArgOperandIsClosureValue($arg, $block)
+                ) {
                     $valueSlot = $closureSlot;
                 }
                 if (
@@ -19221,6 +19245,16 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
+                && 0 === $argIndex
+                && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                if (null !== $initArraySlot) {
+                    $valueSlot = $initArraySlot;
+                }
+            } elseif (
+                null !== $cfgCallOp
+                && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
                 && $this->callArgOperandIsClosureValue($arg, $block)
             ) {
                 $closureSlot = $this->slotForRecentClosureCallArg($block);
