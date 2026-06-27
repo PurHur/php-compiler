@@ -168,6 +168,18 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413).
+            if (CompilerVersion::supportsExitFunctionForm()
+                && str_contains($name, 'exit_named_status_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsExitFunctionForm()
+                && (str_contains($name, 'exit_function_php84')
+                    || str_contains($name, 'exit_function_strict_types')
+                    || str_contains($name, 'exit_die_two_args')
+                    || str_contains($name, 'exit_type_error'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;
