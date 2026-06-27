@@ -42,6 +42,7 @@ final class stream_wrapper_register extends Internal
             1,
             'class'
         );
+        VmStreamWrapperRegistry::requireValidWrapperClass($frame, $className);
         $frame->returnVar->bool(VmStreamWrapperRegistry::register($protocol, $className));
     }
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+
 /**
  * User stream wrapper protocol registry (php-src main/streams; issues #3383, #6818).
  *
@@ -30,6 +32,20 @@ final class VmStreamWrapperRegistry
 
     /** @var array<string, list<string|null>> protocol => stack of prior class names (null = removed) */
     private static array $restoreStack = [];
+
+    /**
+     * php-src user_stream_register_wrapper — reject unknown class names (#12534).
+     */
+    public static function requireValidWrapperClass(Frame $frame, string $className): void
+    {
+        $ctx = VmReflection::requireContext($frame);
+        if (!VmReflection::classExists($ctx, $className)) {
+            throw new \TypeError(\sprintf(
+                'stream_wrapper_register(): Argument #2 ($class) must be a valid class name, %s given',
+                $className
+            ));
+        }
+    }
 
     public static function register(string $protocol, string $className): bool
     {
