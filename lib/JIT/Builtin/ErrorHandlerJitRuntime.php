@@ -137,7 +137,7 @@ final class ErrorHandlerJitRuntime
             $context->builder->call(
                 $context->lookupFunction('__value__writeBool'),
                 $restoreApply->getParam(0),
-                $i32->constInt(0, false)
+                $i32->constInt(1, false)
             );
             $context->builder->returnVoid();
             $context->builder->clearInsertionPosition();
