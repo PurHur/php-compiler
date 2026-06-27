@@ -17,12 +17,10 @@ use PHPCompiler\VM\Variable;
 /**
  * VM helpers for posix builtins (php-src ext/posix/posix.c; #7271, #7376, #7177).
  *
- * Libc via FFI when available; no host \\posix_* delegation (M5 bootstrap path).
+ * Read paths use procfs SSOT; write syscalls delegate to *Pure helpers + {@see PosixLibcThinAbi}.
  */
 final class VmPosix
 {
-    private static ?\FFI $ffi = null;
-
     /** Last errno recorded by posix builtins (php-src posix_errno global). */
     private static int $lastError = 0;
 
@@ -125,35 +123,29 @@ final class VmPosix
     public static function mknod(string $path, int $mode, int $major = 0, int $minor = 0): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixMknodPure::mknod($path, $mode, $major, $minor);
+        if (null === $ok) {
             throw new \Error('posix_mknod() is not available in this compiler build');
         }
-        $dev = self::makeDev($mode, $major, $minor);
-        if (0 !== (int) $ffi->mknod($path, $mode, $dev)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixMknodPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function mkfifo(string $path, int $mode): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixMknodPure::mkfifo($path, $mode);
+        if (null === $ok) {
             throw new \Error('posix_mkfifo() is not available in this compiler build');
         }
-        $fifoMode = $mode | PosixConstants::S_IFIFO;
-        if (0 !== (int) $ffi->mkfifo($path, $fifoMode)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixMknodPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function setuid(int $uid): bool
@@ -223,10 +215,9 @@ final class VmPosix
         self::$lastError = 0;
         $cwd = VmGetcwdNative::resolve();
         if (false === $cwd) {
-            $ffi = self::ffi();
-            if (null !== $ffi) {
-                self::$lastError = self::readErrno($ffi);
-            }
+            self::$lastError = PosixLibcThinAbi::available()
+                ? PosixLibcThinAbi::readErrno()
+                : 2;
 
             return false;
         }
@@ -251,7 +242,7 @@ final class VmPosix
 
     public static function ffiAvailable(): bool
     {
-        return null !== self::ffi();
+        return PosixLibcThinAbi::available();
     }
 
     /**
@@ -332,34 +323,26 @@ final class VmPosix
     public static function setrlimit(int $resource, int $softLimit, int $hardLimit): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixRlimitPure::setrlimit($resource, $softLimit, $hardLimit);
+        if (null === $ok) {
             throw new \Error('posix_setrlimit() is not available in this compiler build');
         }
-
-        $rlim = $ffi->new('struct rlimit');
-        $rlim->rlim_cur = self::parseRlimitInput($softLimit);
-        $rlim->rlim_max = self::parseRlimitInput($hardLimit);
-        if (0 !== (int) $ffi->setrlimit($resource, \FFI::addr($rlim))) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixRlimitPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     public static function setsid(): int
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $sid = VmPosixSessionPure::setsid();
+        if (null === $sid) {
             throw new \Error('posix_setsid() is not available in this compiler build');
         }
-
-        $sid = (int) $ffi->setsid();
         if ($sid < 0) {
-            self::$lastError = self::readErrno($ffi);
+            self::$lastError = VmPosixSessionPure::lastErrno();
         }
 
         return $sid;
@@ -394,105 +377,34 @@ final class VmPosix
     public static function setpgid(int $pid, int $pgid): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = VmPosixSessionPure::setpgid($pid, $pgid);
+        if (null === $ok) {
             throw new \Error('posix_setpgid() is not available in this compiler build');
         }
-        if (0 !== (int) $ffi->setpgid($pid, $pgid)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixSessionPure::lastErrno();
         }
 
-        return true;
+        return $ok;
     }
 
     private static function setId(string $fn, int $id): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        $ok = match ($fn) {
+            'setuid' => VmPosixIdentityWritePure::setuid($id),
+            'setgid' => VmPosixIdentityWritePure::setgid($id),
+            'seteuid' => VmPosixIdentityWritePure::seteuid($id),
+            'setegid' => VmPosixIdentityWritePure::setegid($id),
+            default => null,
+        };
+        if (null === $ok) {
             throw new \Error('posix_'.$fn.'() is not available in this compiler build');
         }
-        if (0 !== (int) $ffi->$fn($id)) {
-            self::$lastError = self::readErrno($ffi);
-
-            return false;
+        if (!$ok) {
+            self::$lastError = VmPosixIdentityWritePure::lastErrno();
         }
 
-        return true;
-    }
-
-    private static function readErrno(\FFI $ffi): int
-    {
-        $loc = $ffi->__errno_location();
-
-        return (int) $loc[0];
-    }
-
-    private static function makeDev(int $mode, int $major, int $minor): int
-    {
-        $type = $mode & PosixConstants::S_IFMT;
-        if ($type !== PosixConstants::S_IFCHR && $type !== PosixConstants::S_IFBLK) {
-            return 0;
-        }
-
-        return (($major & 0x00000fff) << 8)
-            | ($minor & 0x000000ff)
-            | (($major & 0xfffff000) << 32)
-            | (($minor & 0xffffff00) << 12);
-    }
-
-    private static function parseRlimitInput(int $value): int
-    {
-        if (PosixConstants::RLIMIT_INFINITY === $value) {
-            return -1;
-        }
-
-        return $value;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\class_exists(\FFI::class, false)) {
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-typedef int pid_t;
-typedef unsigned int mode_t;
-typedef unsigned long long dev_t;
-typedef unsigned int uid_t;
-typedef unsigned int gid_t;
-int mknod(const char *pathname, mode_t mode, dev_t dev);
-int mkfifo(const char *pathname, mode_t mode);
-int setuid(uid_t uid);
-int setgid(gid_t gid);
-int seteuid(uid_t uid);
-int setegid(gid_t gid);
-int *__errno_location(void);
-typedef unsigned long rlim_t;
-struct rlimit {
-    rlim_t rlim_cur;
-    rlim_t rlim_max;
-};
-int setrlimit(int resource, const struct rlimit *rlim);
-pid_t setsid(void);
-int setpgid(pid_t pid, pid_t pgid);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        return null;
+        return $ok;
     }
 }

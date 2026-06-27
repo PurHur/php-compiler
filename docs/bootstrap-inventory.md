@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3411 |
-| Phase A inventory files (M2 ratio SSOT) | 3411 |
+| PHP files on vm.php path | 3414 |
+| Phase A inventory files (M2 ratio SSOT) | 3414 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8993 |
+| Source constructs flagged (warnings) | 8996 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -263,11 +263,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/Module.php` | 0 | 27 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
+| `ext/posix/PosixLibcThinAbi.php` | 0 | 1 |
 | `ext/posix/PosixSessionJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixStrerrorJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
 | `ext/posix/VmPosix.php` | 0 | 16 |
 | `ext/posix/VmPosixCtermidPure.php` | 0 | 1 |
+| `ext/posix/VmPosixIdentityWritePure.php` | 0 | 1 |
+| `ext/posix/VmPosixMknodPure.php` | 0 | 1 |
 | `ext/posix/VmPosixRlimitPure.php` | 0 | 1 |
 | `ext/posix/VmPosixSessionPure.php` | 0 | 1 |
 | `ext/posix/VmPosixStrerrorPure.php` | 0 | 1 |
@@ -4951,6 +4954,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 27)
 - 2 class method(s)
 
+### `ext/posix/PosixLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 14 class method(s)
+
 ### `ext/posix/PosixSessionJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4969,37 +4977,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/VmPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 41)
-- new Error (line 51)
-- new Error (line 61)
-- new Error (line 75)
-- new Error (line 88)
-- new Error (line 130)
-- new Error (line 147)
-- new Error (line 295)
-- new HashTable (line 303)
-- new Variable (line 305)
-- new Error (line 329)
-- new Error (line 337)
-- new Error (line 357)
-- new Error (line 399)
-- new Error (line 415)
-- 36 class method(s)
+- new Error (line 39)
+- new Error (line 49)
+- new Error (line 59)
+- new Error (line 73)
+- new Error (line 86)
+- new Error (line 128)
+- new Error (line 142)
+- new Error (line 286)
+- new HashTable (line 294)
+- new Variable (line 296)
+- new Error (line 320)
+- new Error (line 328)
+- new Error (line 342)
+- new Error (line 382)
+- new Error (line 402)
+- 32 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/posix/VmPosixIdentityWritePure.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/posix/VmPosixMknodPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `ext/posix/VmPosixRlimitPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/posix/VmPosixSessionPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/posix/VmPosixStrerrorPure.php`
 
@@ -5721,24 +5739,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 56)
-- new ClassEntry (line 82)
-- new ClassEntry (line 108)
-- new ClassEntry (line 135)
-- new ClassEntry (line 162)
-- new ClassEntry (line 188)
-- new ClassEntry (line 215)
-- new ClassEntry (line 242)
-- new ClassEntry (line 269)
-- new ClassEntry (line 295)
-- new ClassEntry (line 320)
-- new ClassEntry (line 355)
-- new ClassEntry (line 387)
-- new ClassEntry (line 414)
-- new ClassEntry (line 446)
-- new Variable (line 464)
-- new Variable (line 478)
-- new Variable (line 492)
+- new ClassEntry (line 58)
+- new ClassEntry (line 84)
+- new ClassEntry (line 110)
+- new ClassEntry (line 137)
+- new ClassEntry (line 164)
+- new ClassEntry (line 190)
+- new ClassEntry (line 217)
+- new ClassEntry (line 244)
+- new ClassEntry (line 271)
+- new ClassEntry (line 297)
+- new ClassEntry (line 322)
+- new ClassEntry (line 357)
+- new ClassEntry (line 389)
+- new ClassEntry (line 416)
+- new ClassEntry (line 448)
+- new Variable (line 466)
+- new Variable (line 480)
+- new Variable (line 494)
 - 19 class method(s)
 
 ### `ext/standard/BuiltinRegistry.php`
@@ -11640,13 +11658,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 202)
-- new Variable (line 206)
-- new HashTable (line 212)
-- new Variable (line 214)
-- new Variable (line 804)
-- new Variable (line 811)
-- new Variable (line 818)
+- new HashTable (line 205)
+- new Variable (line 209)
+- new HashTable (line 215)
+- new Variable (line 217)
+- new Variable (line 808)
+- new Variable (line 815)
+- new Variable (line 822)
 - 26 class method(s)
 - 1 closure(s)
 

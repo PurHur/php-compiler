@@ -68,6 +68,32 @@ final class VmPosixRlimitPure
         return $parsed;
     }
 
+    public static function setrlimit(int $resource, int $softLimit, int $hardLimit): ?bool
+    {
+        if (!PosixLibcThinAbi::available()) {
+            return null;
+        }
+
+        $soft = self::encodeRlimitInput($softLimit);
+        $hard = self::encodeRlimitInput($hardLimit);
+
+        return 0 === PosixLibcThinAbi::setrlimit($resource, $soft, $hard);
+    }
+
+    public static function lastErrno(): int
+    {
+        return PosixLibcThinAbi::readErrno();
+    }
+
+    private static function encodeRlimitInput(int $value): int
+    {
+        if (PosixConstants::RLIMIT_INFINITY === $value) {
+            return -1;
+        }
+
+        return $value;
+    }
+
     /**
      * @return list<string>|null
      */

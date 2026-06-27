@@ -51,6 +51,29 @@ final class VmPosixSessionPure
         return $pgrp >= 0 ? $pgrp : null;
     }
 
+    public static function setsid(): ?int
+    {
+        if (!PosixLibcThinAbi::available()) {
+            return null;
+        }
+
+        return (int) PosixLibcThinAbi::setsid();
+    }
+
+    public static function setpgid(int $pid, int $pgid): ?bool
+    {
+        if (!PosixLibcThinAbi::available()) {
+            return null;
+        }
+
+        return 0 === PosixLibcThinAbi::setpgid($pid, $pgid);
+    }
+
+    public static function lastErrno(): int
+    {
+        return PosixLibcThinAbi::readErrno();
+    }
+
     /**
      * @return list<string>|null fields after comm: ppid, pgrp, ...
      */
