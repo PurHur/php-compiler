@@ -165,6 +165,16 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
+    /**
+     * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps language-construct semantics.
+     */
+    public static function supportsExitFunctionForm(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {

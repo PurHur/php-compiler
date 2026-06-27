@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Desugar PHP 8.4+ parenthesized exit/die to callable builtins before nikic/php-parser (#6975).
  *
@@ -20,6 +22,9 @@ final class ExitFunctionDesugar
 
     public static function desugar(string $code): string
     {
+        if (!CompilerVersion::supportsExitFunctionForm()) {
+            return $code;
+        }
         if (!preg_match('/\b(?:exit|die)\s*\(/i', $code)) {
             return $code;
         }

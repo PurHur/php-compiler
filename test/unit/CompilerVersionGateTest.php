@@ -24,6 +24,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsExitFunctionFormFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsExitFunctionForm());
+    }
+
     public function testSupportsTypedTraitConstantsTrueOn83Target(): void
     {
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
