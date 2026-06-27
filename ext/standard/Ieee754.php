@@ -11,6 +11,12 @@ namespace PHPCompiler\ext\standard;
  */
 final class Ieee754
 {
+    /** php-src — IEEE754 negative zero (sign bit set, magnitude zero). */
+    public static function isNegativeZero(float $value): bool
+    {
+        return 0.0 == $value && 0.0 !== \atan2(0.0, $value);
+    }
+
     public static function encodeFloat32(float $value, bool $littleEndian): string
     {
         return self::u32ToBytes(self::float32ToBits($value), $littleEndian);
