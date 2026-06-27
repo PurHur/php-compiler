@@ -827,6 +827,7 @@ class Compiler {
             if ($block instanceof ErrorSuppressBlock) {
                 $new->addOpCode(new OpCode(OpCode::TYPE_BEGIN_SILENCE));
             }
+            $this->applyLogicalShortCircuitPhiPrebind($block, $new);
             $this->compileBlock($new);
             if (!$this->compilingSwitchJumpIfChain) {
                 $this->recordTernaryMergeVarSlots($block, $new);
@@ -847,6 +848,33 @@ class Compiler {
         $child->parents[] = $parent;
 
         return $child;
+    }
+
+    /** Prebind || literal short-circuit arm to sibling CAST_BOOL phi slot (#12745). */
+    private function applyLogicalShortCircuitPhiPrebind(CfgBlock $branchCfg, Block $compiled): void
+    {
+        $assignVar = $this->mergeBranchAssignVarOperand($branchCfg);
+        if (null === $assignVar) {
+            return;
+        }
+        $tail = $this->branchTailExprBeforeJump($branchCfg);
+        if (!$tail instanceof Op\Expr\Assign || !$tail->expr instanceof Operand\Literal) {
+            return;
+        }
+        $mergeCfg = $this->branchJumpMergeTarget($branchCfg);
+        if (null === $mergeCfg) {
+            return;
+        }
+        $phiSlot = $this->ternaryMergePhiRhsSlot($mergeCfg)
+            ?? $this->siblingMergeBranchAssignDestSlot($mergeCfg, $branchCfg);
+        if (null === $phiSlot) {
+            return;
+        }
+        $compiled->forceBindScopeSlot($assignVar, $phiSlot);
+        $root = Block::cfgVarRoot($assignVar);
+        if ($root instanceof Operand\Variable) {
+            $compiled->prebindCfgVarRoot($root, $phiSlot);
+        }
     }
 
     /** Switch/if/loop targets need enclosing Func for JIT visibility (#210, #588). */
@@ -942,11 +970,26 @@ class Compiler {
         if (null === $ifMerge || $ifMerge !== $elseMerge) {
             return false;
         }
+        if ($this->jumpIfArmsUseLogicalShortCircuit($stmt->if, $stmt->else)) {
+            return true;
+        }
         if (\count($ifMerge->parents) < 2) {
             return false;
         }
 
         return $this->mergeCfgBlockUsesTernaryPhi($ifMerge);
+    }
+
+    /** && / || php-cfg arms: one branch ends in bool cast, sibling in literal assign (#10626, #12745). */
+    private function jumpIfArmsUseLogicalShortCircuit(CfgBlock $ifArm, CfgBlock $elseArm): bool
+    {
+        $ifTail = $this->branchTailExprBeforeJump($ifArm);
+        $elseTail = $this->branchTailExprBeforeJump($elseArm);
+        $hasLiteral = ($ifTail instanceof Op\Expr\Assign && $ifTail->expr instanceof Operand\Literal)
+            || ($elseTail instanceof Op\Expr\Assign && $elseTail->expr instanceof Operand\Literal);
+        $hasCast = ($ifTail instanceof Op\Expr\Cast\Bool_) || ($elseTail instanceof Op\Expr\Cast\Bool_);
+
+        return $hasLiteral && $hasCast;
     }
 
     /** Both ?: arms jump to a merge block ending in RETURN (#4280, #8563). */
@@ -1268,16 +1311,32 @@ class Compiler {
                     continue;
                 }
                 $sibling = $this->seen[$parentCfg];
-                for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
-                    $op = $sibling->opCodes[$i];
-                    if (OpCode::TYPE_ASSIGN === $op->type) {
-                        return (int) $op->arg2;
-                    }
-                    if (OpCode::TYPE_JUMP === $op->type) {
-                        break;
-                    }
+                $tailSlot = $this->logicalShortCircuitBranchTailSlot($sibling);
+                if (null !== $tailSlot) {
+                    return $tailSlot;
                 }
             }
+        }
+
+        return null;
+    }
+
+    /** && / || branch tail: ASSIGN dest or CAST_BOOL result slot before JUMP (#10626, #12745). */
+    private function logicalShortCircuitBranchTailSlot(Block $branch): ?int
+    {
+        for ($i = $branch->nOpCodes - 1; $i >= 0; --$i) {
+            $op = $branch->opCodes[$i];
+            if (OpCode::TYPE_JUMP === $op->type) {
+                continue;
+            }
+            if (OpCode::TYPE_ASSIGN === $op->type) {
+                return (int) $op->arg2;
+            }
+            if (OpCode::TYPE_CAST_BOOL === $op->type) {
+                return (int) $op->arg1;
+            }
+
+            break;
         }
 
         return null;
@@ -1318,7 +1377,18 @@ class Compiler {
 
     private function recordTernaryMergeVarSlots(CfgBlock $branchCfg, Block $compiled): void
     {
-        foreach ($this->ternaryMergeTargets($branchCfg) as $mergeCfg) {
+        $mergeTargets = $this->ternaryMergeTargets($branchCfg);
+        $jumpMerge = $this->branchJumpMergeTarget($branchCfg);
+        if (null !== $jumpMerge && !\in_array($jumpMerge, $mergeTargets, true)) {
+            $tail = $this->branchTailExprBeforeJump($branchCfg);
+            if (
+                $tail instanceof Op\Expr\Cast\Bool_
+                || ($tail instanceof Op\Expr\Assign && $tail->expr instanceof Operand\Literal)
+            ) {
+                $mergeTargets[] = $jumpMerge;
+            }
+        }
+        foreach ($mergeTargets as $mergeCfg) {
             if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
                 $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
             }
@@ -1480,18 +1550,28 @@ class Compiler {
                 continue;
             }
             $sibling = $this->seen[$parentCfg];
-            for ($i = $sibling->nOpCodes - 1; $i >= 0; --$i) {
-                $op = $sibling->opCodes[$i];
-                if (OpCode::TYPE_ASSIGN === $op->type) {
-                    return $op->arg2;
-                }
-                if (OpCode::TYPE_JUMP === $op->type) {
-                    break;
-                }
+            $tailSlot = $this->logicalShortCircuitBranchTailSlot($sibling);
+            if (null !== $tailSlot) {
+                return $tailSlot;
             }
         }
 
         return null;
+    }
+
+    /** || short-circuit literal arm must store into sibling CAST_BOOL / recorded phi slot (#12745). */
+    private function resolveLogicalShortCircuitLiteralAssignSlot(Block $branch, Op\Expr\Assign $assign): ?int
+    {
+        if (null === $branch->orig || !$assign->expr instanceof Operand\Literal) {
+            return null;
+        }
+        $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null === $mergeCfg) {
+            return null;
+        }
+
+        return $this->ternaryMergePhiRhsSlot($mergeCfg)
+            ?? $this->siblingMergeBranchAssignDestSlot($mergeCfg, $branch->orig);
     }
 
     private function isMergeBranchAssign(Block $branch, Op\Expr\Assign $assign): bool
@@ -1542,16 +1622,9 @@ class Compiler {
         if ($this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
             return;
         }
-        for ($i = $compiled->nOpCodes - 1; $i >= 0; --$i) {
-            $op = $compiled->opCodes[$i];
-            if (OpCode::TYPE_ASSIGN === $op->type) {
-                $this->ternaryMergePhiRhsSlots[$mergeCfg] = (int) $op->arg2;
-
-                return;
-            }
-            if (OpCode::TYPE_JUMP === $op->type) {
-                break;
-            }
+        $tailSlot = $this->logicalShortCircuitBranchTailSlot($compiled);
+        if (null !== $tailSlot) {
+            $this->ternaryMergePhiRhsSlots[$mergeCfg] = $tailSlot;
         }
     }
 
@@ -7680,6 +7753,9 @@ class Compiler {
                 }
 
                 $mergeAssignSlot = $this->branchMergeAssignSlot($block, $expr);
+                if (null === $mergeAssignSlot) {
+                    $mergeAssignSlot = $this->resolveLogicalShortCircuitLiteralAssignSlot($block, $expr);
+                }
                 if (null !== $block->orig && $this->isMergeBranchAssign($block, $expr)) {
                     $mergeCfg = $this->branchJumpMergeTarget($block->orig);
                     if (null !== $mergeCfg && $this->mergeCfgBlockUsesTernaryPhi($mergeCfg)) {
@@ -7694,7 +7770,7 @@ class Compiler {
                     if ($root instanceof Operand\Variable) {
                         $block->prebindCfgVarRoot($root, $mergeAssignSlot);
                     } else {
-                        $block->bindScopeSlot($expr->var, $mergeAssignSlot);
+                        $block->forceBindScopeSlot($expr->var, $mergeAssignSlot);
                     }
                 }
                 $destSlot = null !== $mergeAssignSlot
