@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\KeySortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -51,7 +51,7 @@ final class krsort_ extends Internal
         }
         JitArrayKey::requireArrayArg($context, $args[0], 'krsort');
         if (1 === $argc) {
-            ArrayBuiltinHelper::krsortByKey($context, $args[0]);
+            KeySortRuntime::krsortByKey($context, $args[0]);
         } else {
             self::jitSortByKeyWithFlags($context, $args[0], self::resolveJitSortFlags($context, $args[1]));
         }
@@ -83,13 +83,13 @@ final class krsort_ extends Internal
             || StdlibConstants::SORT_STRING === $sortType
             || StdlibConstants::SORT_LOCALE_STRING === $sortType
         ) {
-            ArrayBuiltinHelper::krsortByKey($context, $array);
+            KeySortRuntime::krsortByKey($context, $array);
 
             return;
         }
         if (StdlibConstants::SORT_NUMERIC === $sortType || StdlibConstants::SORT_NATURAL === $sortType) {
             throw new \LogicException('krsort() flags are not supported in JIT/AOT in this compiler build');
         }
-        ArrayBuiltinHelper::krsortByKey($context, $array);
+        KeySortRuntime::krsortByKey($context, $array);
     }
 }
