@@ -26,7 +26,39 @@ final class VmFsAccessRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmStatCache::stat', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::getuid', $source);
         $this->assertStringContainsString('VmProcessIdentityNative::getgid', $source);
+        $this->assertStringContainsString('VmProcessIdentityNative::getgroups', $source);
         $this->assertDoesNotMatchRegularExpression('/\$ffi->access/', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->getgroups/', $source);
+        $this->assertDoesNotMatchRegularExpression('/int getgroups\\(/', $source);
+    }
+
+    public function testVmProcessIdentityPureParsesProcGroupsWithoutFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmProcessIdentityPure.php');
+        $this->assertStringContainsString('/proc/self/groups', $source);
+        $this->assertDoesNotMatchRegularExpression('/\\$ffi->getgroups/', $source);
+    }
+
+    public function testAccessChecksMatchZendWithFfiDisabledOnLinux(): void
+    {
+        if ('Linux' !== \PHP_OS_FAMILY) {
+            $this->markTestSkipped('procfs groups probe is Linux-only');
+        }
+
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $path = __FILE__;
+            $this->assertSame(\is_readable($path), VmStatPath::isReadable($path));
+            $this->assertSame(\is_writable($path), VmStatPath::isWritable($path));
+            $this->assertSame(\is_executable($path), VmStatPath::isExecutable($path));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
     }
 
     public function testVmStatPathRoutesThroughPureAccess(): void

@@ -35,6 +35,24 @@ final class VmProcessIdentityNative
         return VmProcessIdentityPure::geteuid();
     }
 
+    public static function getegid(): ?int
+    {
+        return VmProcessIdentityPure::getegid();
+    }
+
+    public static function getppid(): ?int
+    {
+        return VmProcessIdentityPure::getppid();
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    public static function getgroups(): ?array
+    {
+        return VmProcessIdentityPure::getgroups();
+    }
+
     public static function getpid(): ?int
     {
         return VmProcessIdentityPure::getpid();

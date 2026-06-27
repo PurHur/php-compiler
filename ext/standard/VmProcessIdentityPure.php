@@ -12,8 +12,11 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmProcessIdentityPure
 {
-    /** @var array{pid?:int,uid?:int,gid?:int,euid?:int,egid?:int}|null */
+    /** @var array{pid?:int,ppid?:int,uid?:int,gid?:int,euid?:int,egid?:int}|null */
     private static ?array $statusCache = null;
+
+    /** @var list<int>|null|false */
+    private static $groupsCache = null;
 
     public static function available(): bool
     {
@@ -48,6 +51,60 @@ final class VmProcessIdentityPure
         return $status['euid'] ?? null;
     }
 
+    public static function getegid(): ?int
+    {
+        $status = self::loadStatus();
+
+        return $status['egid'] ?? null;
+    }
+
+    public static function getppid(): ?int
+    {
+        $status = self::loadStatus();
+
+        return $status['ppid'] ?? null;
+    }
+
+    /**
+     * Supplementary group IDs — Linux /proc/self/groups (#12394).
+     *
+     * @return list<int>|null
+     */
+    public static function getgroups(): ?array
+    {
+        if (false === self::$groupsCache) {
+            return null;
+        }
+        if (null !== self::$groupsCache) {
+            return self::$groupsCache;
+        }
+
+        self::$groupsCache = false;
+        if ('Linux' !== \PHP_OS_FAMILY) {
+            return null;
+        }
+
+        $raw = self::readProcGroups();
+        if (false === $raw) {
+            $raw = self::readGroupsFromStatus();
+            if (null === $raw) {
+                return null;
+            }
+        }
+
+        $groups = [];
+        foreach (\preg_split('/\s+/', \trim($raw)) ?: [] as $token) {
+            if ('' === $token || !\preg_match('/^\d+$/', $token)) {
+                continue;
+            }
+            $groups[] = (int) $token;
+        }
+
+        self::$groupsCache = $groups;
+
+        return self::$groupsCache;
+    }
+
     public static function getpwuidName(int $uid): ?string
     {
         $raw = self::readPasswd();
@@ -75,7 +132,7 @@ final class VmProcessIdentityPure
     }
 
     /**
-     * @return array{pid:int,uid:int,gid:int,euid:int,egid:int}|null
+     * @return array{pid:int,ppid:int,uid:int,gid:int,euid:int,egid:int}|null
      */
     private static function loadStatus(): ?array
     {
@@ -94,9 +151,10 @@ final class VmProcessIdentityPure
         }
 
         $pid = self::parseIntField($raw, 'Pid');
+        $ppid = self::parseIntField($raw, 'PPid');
         $uidLine = self::parseField($raw, 'Uid');
         $gidLine = self::parseField($raw, 'Gid');
-        if (null === $pid || null === $uidLine || null === $gidLine) {
+        if (null === $pid || null === $ppid || null === $uidLine || null === $gidLine) {
             return null;
         }
 
@@ -108,6 +166,7 @@ final class VmProcessIdentityPure
 
         self::$statusCache = [
             'pid' => $pid,
+            'ppid' => $ppid,
             'uid' => (int) $uids[0],
             'euid' => (int) ($uids[1] ?? $uids[0]),
             'gid' => (int) $gids[0],
@@ -115,6 +174,33 @@ final class VmProcessIdentityPure
         ];
 
         return self::$statusCache;
+    }
+
+    private static function readProcGroups(): string|false
+    {
+        if (!\is_readable('/proc/self/groups')) {
+            return false;
+        }
+        if (VmFsReadNative::available()) {
+            $raw = VmFsReadNative::read('/proc/self/groups');
+            if (false !== $raw && '' !== $raw) {
+                return $raw;
+            }
+        }
+
+        $raw = @\file_get_contents('/proc/self/groups');
+
+        return \is_string($raw) && '' !== $raw ? $raw : false;
+    }
+
+    private static function readGroupsFromStatus(): ?string
+    {
+        $raw = self::readProcStatus();
+        if (false === $raw) {
+            return null;
+        }
+
+        return self::parseField($raw, 'Groups');
     }
 
     private static function readProcStatus(): string|false
