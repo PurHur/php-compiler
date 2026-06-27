@@ -1,5 +1,6 @@
 --TEST--
-stdlib ignore_user_abort() — int operand coerces to bool (#12677, ext/standard/basic_functions.c)
+stdlib ignore_user_abort() int coercion JIT (#12677, ext/standard/basic_functions.c)
+--JIT--
 --FILE--
 <?php
 var_export(ignore_user_abort(0));
