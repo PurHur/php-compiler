@@ -20,6 +20,7 @@ final class BuiltinClasses
         SplFileInfoBuiltin::registerClass($ctx);
         SplFileObjectBuiltin::registerClass($ctx);
         SplFixedArrayBuiltin::registerClass($ctx);
+        IteratorIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
