@@ -200,6 +200,27 @@ final class VmString
     }
 
     /**
+     * Reject embedded NUL in string builtin operands (php-src Z_PARAM_STR no null bytes; #12497).
+     *
+     * @throws \ValueError when the string contains a null byte
+     */
+    public static function rejectNullByteBuiltinStringArg(
+        string $str,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): void {
+        if (str_contains($str, "\0")) {
+            throw new \ValueError(\sprintf(
+                '%s(): Argument #%d ($%s) must not contain any null bytes',
+                $function,
+                $argIndex + 1,
+                $paramName
+            ));
+        }
+    }
+
+    /**
      * Reject empty string builtin operands (php-src Z_PARAM_STR non-empty path guards; #11031).
      *
      * @throws \ValueError when the coerced string is empty

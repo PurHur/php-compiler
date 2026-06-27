@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\ProcessRuntime;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -22,6 +23,8 @@ final class JitEscapeshellarg
             $context->lookupFunction('__compiler_escapeshellarg'),
             $argStr
         );
+        TypeErrorRaise::ensureLinked($context);
+        $context->builder->call($context->lookupFunction('phpc_jit_abort_if_pending_type_error'));
         $strPtr = $context->getTypeFromString('__string__*');
         $failed = $context->builder->icmp(Builder::INT_EQ, $quoted, $strPtr->constNull());
 

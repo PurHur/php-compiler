@@ -28,6 +28,7 @@ final class escapeshellarg extends Internal
             throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.$argc.' given');
         }
         $arg = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'escapeshellarg', 0, 'arg');
+        VmString::rejectNullByteBuiltinStringArg($arg, 'escapeshellarg', 0, 'arg');
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($arg): void {
             $ret->string(VmEscapeshell::escapeshellarg($arg));
         });
@@ -37,6 +38,11 @@ final class escapeshellarg extends Internal
     {
         if (1 !== \count($args)) {
             throw new \ArgumentCountError('escapeshellarg() expects exactly 1 argument, '.\count($args).' given');
+        }
+
+        $lit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
+        if (null !== $lit) {
+            VmString::rejectNullByteBuiltinStringArg($lit, 'escapeshellarg', 0, 'arg');
         }
 
         return JitEscapeshellarg::invoke(
