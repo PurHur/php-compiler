@@ -592,9 +592,12 @@ class Compiler {
                 return;
             }
             if (null !== $refName && '' !== $refName) {
-                $block->returnTypeConstraint = Variable::TYPE_OBJECT;
-                $block->returnClassConstraint = $refName;
-                $block->returnDeclaredTypeLabel = ltrim($refName, '\\');
+                $resolved = $this->resolveTypeHintClassName($refName, $block);
+                if (null !== $resolved && '' !== $resolved) {
+                    $block->returnTypeConstraint = Variable::TYPE_OBJECT;
+                    $block->returnClassConstraint = $resolved;
+                    $block->returnDeclaredTypeLabel = ltrim($refName, '\\');
+                }
 
                 return;
             }
@@ -4380,6 +4383,52 @@ class Compiler {
         return null;
     }
 
+    protected function resolveTypeHintClassName(string $className, Block $block): ?string
+    {
+        $lexical = ltrim($className, '\\');
+        $lc = strtolower($lexical);
+        if ('self' === $lc || 'static' === $lc) {
+            return $this->declaringClassDisplayNameForTypeHint($block);
+        }
+        if ('parent' === $lc) {
+            $declaringLc = $this->declaringClassLcForTypeHint($block);
+
+            return null !== $declaringLc
+                ? ($this->classCompileRegistry->parentDisplayName($declaringLc) ?? $lexical)
+                : $lexical;
+        }
+
+        return $lexical;
+    }
+
+    protected function declaringClassDisplayNameForTypeHint(Block $block): ?string
+    {
+        if (null !== $this->compilingClassDisplayName) {
+            return $this->compilingClassDisplayName;
+        }
+        if (null !== $block->func && null !== $block->func->class) {
+            $name = $this->staticNameFromOperand($block->func->class);
+
+            return null !== $name ? ltrim($name, '\\') : null;
+        }
+
+        return null;
+    }
+
+    protected function declaringClassLcForTypeHint(Block $block): ?string
+    {
+        if (null !== $this->compilingClassLc) {
+            return $this->compilingClassLc;
+        }
+        if (null !== $block->func && null !== $block->func->class) {
+            $name = $this->staticNameFromOperand($block->func->class);
+
+            return null !== $name ? strtolower(ltrim($name, '\\')) : null;
+        }
+
+        return null;
+    }
+
     protected function assertParamDeclaredType(?Op\Type $declared): void
     {
         $this->assertFunctionSignatureNeverType($declared);
@@ -4400,12 +4449,15 @@ class Compiler {
             $className = $this->staticNameFromCfgType($declared);
             if (null !== $className && '' !== $className) {
                 $label = ltrim($className, '\\');
-                if ($variadicElement) {
-                    $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
-                } else {
-                    $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
-                    $block->paramClassConstraints[$slot] = $className;
-                    $block->paramDeclaredTypeLabels[$slot] = $label;
+                $resolved = $this->resolveTypeHintClassName($className, $block);
+                if (null !== $resolved && '' !== $resolved) {
+                    if ($variadicElement) {
+                        $block->paramVariadicElementTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                    } else {
+                        $block->paramTypeConstraints[$slot] = Variable::TYPE_OBJECT;
+                        $block->paramClassConstraints[$slot] = $resolved;
+                        $block->paramDeclaredTypeLabels[$slot] = $label;
+                    }
                 }
             }
 
