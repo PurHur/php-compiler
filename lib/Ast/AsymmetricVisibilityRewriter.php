@@ -47,7 +47,7 @@ final class AsymmetricVisibilityRewriter
             if (!self::isInspectableAsymmetricLine($line, '(set)')) {
                 continue;
             }
-            if (self::lineViolatesMultipleSetModifierRules($line)) {
+            if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line)) {
                 return $lineNum;
             }
             if (self::lineViolatesStaticAsymmetricSetRules($line)) {
@@ -63,7 +63,7 @@ final class AsymmetricVisibilityRewriter
         while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
             $openPos = $m[0][1] + strlen($m[0][0]) - 1;
             $paramsText = self::extractBalancedParenContent($source, $openPos);
-            if (null !== $paramsText && self::paramsViolateMultipleSetModifierRules($paramsText)) {
+            if (null !== $paramsText && self::paramsViolateMultipleSetModifierRulesForReferenceProfile($paramsText)) {
                 $constructLine = substr_count(substr($source, 0, $openPos), "\n") + 1;
                 $relative = self::offsetOfMultipleSetModifierInParams($paramsText);
                 if ($relative >= 0) {
@@ -147,7 +147,6 @@ final class AsymmetricVisibilityRewriter
         }
 
         self::rejectExplicitPublicBeforeSetModifier($source);
-        self::rejectDualReadSetModifiers($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
@@ -198,20 +197,6 @@ final class AsymmetricVisibilityRewriter
      * Duplicate set modifier on the same visibility is a compile fatal (#6774, #11656).
      */
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
-    {
-        self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (self::lineViolatesMultipleSetModifierRules($line)) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-        });
-    }
-
-    /**
-     * Explicit read plus asymmetric set modifier is a compile fatal (#12088, reverts #11868).
-     *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set)` is fatal.
-     */
-    private static function rejectDualReadSetModifiers(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
             if (self::lineViolatesMultipleSetModifierRules($line)) {
@@ -290,10 +275,6 @@ final class AsymmetricVisibilityRewriter
             $line
         )
             || 1 === preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
-                $line
-            )
-            || 1 === preg_match(
                 '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
                 $line
             )
@@ -305,6 +286,30 @@ final class AsymmetricVisibilityRewriter
                 '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
                 $line
             );
+    }
+
+    /**
+     * Zend 8.2 reference profile: any explicit read plus `(set)` is fatal (#12576).
+     *
+     * PHP 8.4 allows distinct read+set pairs such as `public private(set)` (#11868, #12781).
+     */
+    private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
+    {
+        return self::lineViolatesMultipleSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
+    }
+
+    private static function lineHasExplicitReadPlusSetModifier(string $line): bool
+    {
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            $line
+        );
+    }
+
+    private static function paramsViolateMultipleSetModifierRulesForReferenceProfile(string $paramsText): bool
+    {
+        return self::lineViolatesMultipleSetModifierRulesForReferenceProfile($paramsText);
     }
 
     private static function lineViolatesStaticAsymmetricSetRules(string $line): bool
@@ -341,7 +346,7 @@ final class AsymmetricVisibilityRewriter
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
-        ];
+        ]; // third pattern: reference profile + parenthesized dual modifiers
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $paramsText, $m, PREG_OFFSET_CAPTURE)) {
                 return (int) $m[0][1];
