@@ -117,6 +117,8 @@ final class BuiltinParamNames
                 return ['num', 'exp'];
             case 'clearstatcache':
                 return ['clear_realpath_cache', 'filename'];
+            case 'mkdir':
+                return ['directory', 'permissions', 'recursive'];
             case 'touch':
                 return ['filename', 'mtime', 'atime'];
             case 'getenv':
