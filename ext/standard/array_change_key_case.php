@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayChangeKeyCaseRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitIntdiv;
@@ -60,6 +61,6 @@ final class array_change_key_case extends Internal
             $case = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_change_key_case', 2, 'case');
         }
 
-        return ArrayBuiltinHelper::buildChangeKeyCaseArray($context, $args[0], $case);
+        return ArrayChangeKeyCaseRuntime::changeKeyCase($context, $args[0], $case);
     }
 }
