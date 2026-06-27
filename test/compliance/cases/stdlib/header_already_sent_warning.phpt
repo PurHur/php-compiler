@@ -1,5 +1,5 @@
 --TEST--
-stdlib header() after output warns and returns null (#12151, ext/standard/head.c)
+stdlib header() after output warns and returns false (#12151, #12458, ext/standard/head.c)
 --FILE--
 <?php
 $warnings = [];
@@ -17,6 +17,6 @@ if ($warnings) {
     echo str_contains($warnings[0], 'headers already sent by') ? 'warn_ok' : 'warn_bad', "\n";
 }
 --EXPECT--
-xNULL
+xfalse
 warnings=1
 warn_ok

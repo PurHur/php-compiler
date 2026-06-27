@@ -48,7 +48,7 @@ final class header_ extends Internal
         if (VmSapiHeaderGuard::headersAlreadySent($frame)) {
             VmSapiHeaderGuard::warnHeadersAlreadySent($frame);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->null();
+                $frame->returnVar->bool(false);
             }
 
             return;
