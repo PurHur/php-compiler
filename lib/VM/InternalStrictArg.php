@@ -71,7 +71,7 @@ final class InternalStrictArg
             return $var->toBool();
         }
 
-        throw new \TypeError(self::message($function, $argIndex, $paramName, 'bool', $var));
+        throw new \TypeError(self::message($function, $argIndex, $paramName, '?bool', $var));
     }
 
     public static function requireBool(Frame $frame, int $argIndex, string $function, string $paramName): Variable

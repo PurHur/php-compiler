@@ -71,10 +71,13 @@ final class JitExecutionLimits
                 $apply = $zero;
             } else {
                 $apply = $one;
-                $boolVal = JitBoolArg::lower(
+                $boolVal = JitBoolArg::lowerBuiltinTyped(
                     $context,
                     $arg,
-                    'ignore_user_abort(): Argument #1 ($value)'
+                    'ignore_user_abort',
+                    'enable',
+                    1,
+                    '?bool'
                 );
                 $value = $context->builder->zext($boolVal, $i32);
             }
