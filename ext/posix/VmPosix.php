@@ -377,26 +377,12 @@ final class VmPosix
      */
     public static function times(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_times() is not available in this compiler build');
+        $pure = VmPosixTimesPure::times();
+        if (null !== $pure) {
+            return $pure;
         }
 
-        $tms = $ffi->new('struct tms');
-        $ticks = (int) $ffi->times(\FFI::addr($tms));
-        if (-1 === $ticks) {
-            self::$lastError = self::readErrno($ffi);
-
-            throw new \Error('posix_times() failed');
-        }
-
-        return [
-            'ticks' => $ticks,
-            'utime' => (int) $tms->tms_utime,
-            'stime' => (int) $tms->tms_stime,
-            'cutime' => (int) $tms->tms_cutime,
-            'cstime' => (int) $tms->tms_cstime,
-        ];
+        throw new \Error('posix_times() is not available in this compiler build');
     }
 
     /**
@@ -664,14 +650,6 @@ struct passwd *getpwnam(const char *name);
 struct group *getgrnam(const char *name);
 int *__errno_location(void);
 char *ctermid(char *s);
-typedef long clock_t;
-struct tms {
-    clock_t tms_utime;
-    clock_t tms_stime;
-    clock_t tms_cutime;
-    clock_t tms_cstime;
-};
-clock_t times(struct tms *buf);
 typedef unsigned long rlim_t;
 struct rlimit {
     rlim_t rlim_cur;

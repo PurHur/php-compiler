@@ -285,6 +285,7 @@ require_once __DIR__.'/../../../ext/posix/PosixConstants.php';
 require_once __DIR__.'/../../../ext/posix/PosixFunction.php';
 require_once __DIR__.'/../../../ext/posix/PosixTimesJitHelper.php';
 require_once __DIR__.'/../../../ext/posix/VmPosix.php';
+require_once __DIR__.'/../../../ext/posix/VmPosixTimesPure.php';
 require_once __DIR__.'/../../../ext/posix/posix_access.php';
 require_once __DIR__.'/../../../ext/posix/posix_ctermid.php';
 require_once __DIR__.'/../../../ext/posix/posix_errno.php';
