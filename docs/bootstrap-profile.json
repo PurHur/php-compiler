@@ -2330,7 +2330,6 @@
         "lib/JIT/Builtin/BcmathJit.php",
         "lib/JIT/Builtin/Builtin.php",
         "lib/JIT/Builtin/Bz2Runtime.php",
-        "lib/JIT/Builtin/Bz2StandaloneLlvm.php",
         "lib/JIT/Builtin/CallArgv.php",
         "lib/JIT/Builtin/CallUnpackRuntime.php",
         "lib/JIT/Builtin/CastArrayRuntime.php",
@@ -3652,9 +3651,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3422,
+        "inventory_files": 3421,
         "excluded": 0,
-        "eligible": 3422,
+        "eligible": 3421,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
