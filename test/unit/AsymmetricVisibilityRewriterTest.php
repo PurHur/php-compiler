@@ -6,9 +6,17 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\CompilerVersion;
 
 final class AsymmetricVisibilityRewriterTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+    }
+
     public function testRewritePrivateSet(): void
     {
         $source = <<<'PHP'
