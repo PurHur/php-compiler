@@ -10720,10 +10720,11 @@ class Compiler {
         $this->throwCompileError(self::ARRAY_EMPTY_OFFSET_READ_COMPILE_ERROR);
     }
 
-    /** True for `$arr[]` append syntax — php-cfg uses {@see NullOperand}, not PHP null. */
+    /** True for `$arr[]` append syntax — php-cfg uses {@see NullOperand}, not PHP null (#12303). */
     protected function isArrayAppendDim(?Operand $dim): bool
     {
-        return null === $dim || $dim instanceof NullOperand;
+        // Plain null dim means php-cfg lost the index operand (comma-for `$a[$i]` in for-init, #1492).
+        return $dim instanceof NullOperand;
     }
 
     /**
