@@ -21,6 +21,11 @@ final class JitPathArg
 {
     public static function lowerFilename(Context $context, JITVariable $arg, string $function): Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'null'));
+
+            return self::unreachableStringPtr($context);
+        }
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             self::emitTypeErrorAndAbort($context, self::typeErrorMessage($function, 'array'));
 

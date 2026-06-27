@@ -24,8 +24,8 @@ final class rename_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('rename() requires exactly two arguments in this compiler build');
         }
-        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
-        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
+        $from = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
+        $to = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
         $ok = VmFs::rename($from, $to);
         if (!$ok) {
             VmFilestatFailure::warnRenameFailed($frame, $from, $to);
@@ -40,8 +40,8 @@ final class rename_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('rename() requires exactly two arguments in this compiler build');
         }
-        $from = JitStringBuiltinArg::lower($context, $args[0], 'rename', 0, 'from');
-        $to = JitStringBuiltinArg::lower($context, $args[1], 'rename', 1, 'to');
+        $from = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'rename', 0, 'from');
+        $to = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'rename', 1, 'to');
 
         return JitRename::invoke($context, $from, $to);
     }

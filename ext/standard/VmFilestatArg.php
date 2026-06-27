@@ -15,7 +15,7 @@ final class VmFilestatArg
      */
     public static function coerceFilenameArg(Variable $var, string $function): string
     {
-        return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
+        return VmString::coerceTypedStringBuiltinArg($var, $function, 0, 'filename');
     }
 
     /**

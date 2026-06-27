@@ -26,7 +26,7 @@ final class JitPathinfo
     public static function invoke(Context $context, JITVariable $path, ?JITVariable $flags = null): Value
     {
         $literal = $path->compileTimeString ?? null;
-        $pathVal = JitStringBuiltinArg::lower($context, $path, 'pathinfo', 0, 'path');
+        $pathVal = JitStringBuiltinArg::lowerTypedString($context, $path, 'pathinfo', 0, 'path');
         $maskConst = 15;
         if (null !== $flags) {
             $resolved = self::tryResolveFlags($context, $flags);

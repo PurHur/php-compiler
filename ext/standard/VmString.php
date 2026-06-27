@@ -44,6 +44,25 @@ final class VmString
     }
 
     /**
+     * Coerce a typed string builtin operand (php-src IS_STRING; rejects null, #12640).
+     *
+     * @throws \TypeError when the operand is null or cannot be converted like Zend PHP 8.x
+     */
+    public static function coerceTypedStringBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'string'
+    ): string {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'null'));
+        }
+
+        return self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Coerce a string builtin operand (php-src Z_PARAM_STR; rejects array / plain object, #4553).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
@@ -184,7 +203,7 @@ final class VmString
         int $argIndex = 0,
         string $paramName = 'path'
     ): string {
-        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+        $str = self::coerceTypedStringBuiltinArg($var, $function, $argIndex, $paramName);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
                 sprintf(

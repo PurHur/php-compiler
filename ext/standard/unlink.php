@@ -20,7 +20,7 @@ final class unlink extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('unlink() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
         $ok = VmFs::unlink($path);
         if (!$ok) {
             VmFilestatFailure::warnUnlinkFailed($frame, $path);
@@ -35,7 +35,7 @@ final class unlink extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('unlink() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'unlink', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'unlink', 0, 'filename');
 
         return JitUnlink::invoke($context, $path);
     }

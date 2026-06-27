@@ -19,7 +19,7 @@ final class filegroup extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filegroup() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'filegroup', 0, 'filename');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'filegroup', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,7 +37,7 @@ final class filegroup extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('filegroup() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'filegroup', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'filegroup', 0, 'filename');
 
         return JitFilegroup::invoke($context, $path);
     }

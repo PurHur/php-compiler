@@ -19,7 +19,7 @@ final class realpath extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('realpath() requires exactly one argument');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'realpath', 0, 'path');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'realpath', 0, 'path');
         if (null === $frame->returnVar) {
             return;
         }
@@ -39,7 +39,7 @@ final class realpath extends Internal
             throw new \LogicException('realpath() requires exactly one argument');
         }
 
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'realpath', 0, 'path');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'realpath', 0, 'path');
 
         return JitRealpath::resolve($context, $path);
     }
