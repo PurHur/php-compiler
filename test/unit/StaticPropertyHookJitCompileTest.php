@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
@@ -11,7 +12,15 @@ require_once __DIR__.'/../LlvmToolchain.php';
 /** Static property hooks compile through Runtime (#6931, #9520). */
 final class StaticPropertyHookJitCompileTest extends TestCase
 {
-    public function testStaticPropertyHooksCompile(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testStaticPropertyHooksCompile(): void
     {
         $runtime = new Runtime();
         $script = $runtime->parseAndCompile(

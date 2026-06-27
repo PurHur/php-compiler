@@ -6,12 +6,21 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** Static property hooks compile and lower (#6931, PHP 8.4 zend_property_hooks.c). */
 final class StaticPropertyHooksTest extends TestCase
 {
-    public function testDirectClassStaticPropertyHooksLower(): void
+        use PropertyHookTestSkip;
+
+    protected function setUp(): void
+    {
+        $this->skipUnlessPropertyHooksEnabled();
+    }
+
+
+public function testDirectClassStaticPropertyHooksLower(): void
     {
         $src = <<<'PHP'
 <?php

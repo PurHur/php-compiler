@@ -17,6 +17,7 @@ require __DIR__.'/LlvmToolchain.php';
 require __DIR__.'/support/MiniWebAppCgiEnv.php';
 require __DIR__.'/support/CgiCookieJar.php';
 require __DIR__.'/support/SessionsWebCgiEnv.php';
+require __DIR__.'/support/PropertyHookTestSkip.php';
 
 // PHPUnit xml may force relative LD_LIBRARY_PATH=./.llvm; normalize paths only (#98).
 // Do not call isReady() here — PHPLLVM dlopen in the parent poisons bin/jit.php children.

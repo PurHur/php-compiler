@@ -206,6 +206,16 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'asymmetric_double_modifier_reference_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when property hooks enabled (#12574).
+            if (CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'property_hook_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'property_hook')
+                && !str_contains($name, 'property_hook_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;

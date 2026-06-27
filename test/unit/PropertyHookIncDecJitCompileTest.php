@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\Test\Support\PropertyHookTestSkip;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
@@ -17,10 +18,14 @@ require_once __DIR__.'/../LlvmToolchain.php';
  */
 final class PropertyHookIncDecJitCompileTest extends TestCase
 {
-    private string $repoRoot;
+        use PropertyHookTestSkip;
+
+
+private string $repoRoot;
 
     protected function setUp(): void
     {
+        $this->skipUnlessPropertyHooksEnabled();
         $this->repoRoot = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
