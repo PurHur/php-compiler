@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
@@ -61,10 +62,12 @@ final class JitArrayElem
         $context->builder->branchIf($isEmpty, $emptyBb, $workBb);
 
         $context->builder->positionAtEnd($emptyBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeNull'),
-            $resultPtr
+        TryCatchHelper::emitCatchableClassError(
+            $context,
+            'Error',
+            \sprintf('%s(): Argument #1 ($array) must not be empty', $fn)
         );
+        $context->builder->call($context->lookupFunction('abort'));
         $context->builder->branch($doneBb);
 
         $context->builder->positionAtEnd($workBb);

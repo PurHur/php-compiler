@@ -12394,6 +12394,38 @@ class Compiler {
         return (string) $namedAssignDestSlot;
     }
 
+    /** Last TYPE_INIT_ARRAY before the current call — php-cfg dead arg temp vs array literal (#11586). */
+    private function slotForRecentInitArrayCallArg(Block $block): ?string
+    {
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    /** Last TYPE_CLOSURE before the current call — php-cfg dead arg temp vs inline arrow fn (#11586). */
+    private function slotForRecentClosureCallArg(Block $block): ?string
+    {
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
     /** Resolve assign.result slot from emitted TYPE_ASSIGN when cfg temps lack scope bindings (#5644). */
     private function slotForEmittedAssignResultSlot(Block $block, Op\Expr\Assign $assign): ?int
     {
@@ -12810,11 +12842,35 @@ class Compiler {
             return null;
         }
         // php-cfg hoists `$a = [...]` as Array_+Assign before `array_key_exists('k', $a)` (#9456).
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (
+            $this->callArgIsDeadInlineTemporary($callArg)
+            && null !== $cfgCallOp
+            && null !== $block
+            && null !== $block->orig
+        ) {
+            $byIndex = $this->inlineHoistedProducerForCallArgIndex(
+                $cfgCallOp,
+                $argIndex,
+                $producers,
+                $block->orig->children
+            );
+            if (
+                $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
+            ) {
+                return $byIndex;
+            }
+        }
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
             return null;
         }
-        $callArg = $callArgs[$argIndex] ?? null;
         if (null !== $callArg) {
+            $directProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
+            if (null !== $directProducer) {
+                return $directProducer;
+            }
             $booleanProducer = $this->matchBooleanBinaryOpInlineCallArgProducer($producers, $callArg);
             if (null !== $booleanProducer) {
                 return $booleanProducer;
@@ -13734,6 +13790,38 @@ class Compiler {
     }
 
     /**
+     * php-cfg dead call-arg temps that share a result with an inline BitwiseOr/Array_ producer (#11407, #11586).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchDirectResultInlineCallArgProducer(array $producers, Operand $callArg): ?Op\Expr
+    {
+        foreach (array_reverse($producers) as $producer) {
+            if (null === $producer->result) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($producer->result, $callArg)) {
+                continue;
+            }
+            if (
+                $producer instanceof Op\Expr\BinaryOp\BitwiseOr
+                || $producer instanceof Op\Expr\BinaryOp\BitwiseAnd
+                || $producer instanceof Op\Expr\BinaryOp\BitwiseXor
+            ) {
+                return $producer;
+            }
+            if (
+                $producer instanceof Op\Expr\Array_
+                && $this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                return $producer;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg dead temps for `var_export(C::AR[0] === E::X, true)` — Identical feeds arg 0, not ClassConstFetch (#5901, #9660).
      *
      * @param list<Op\Expr> $producers
@@ -14409,6 +14497,24 @@ class Compiler {
                     && $next->expr === $child->result
                 ) {
                     continue;
+                }
+                // ConstFetch chain before sibling BitwiseOr — hoisted operands, not call args (#11407).
+                for ($j = $i + 1; $j < $callIndex; ++$j) {
+                    $scan = $cfgChildren[$j];
+                    if (
+                        $scan instanceof Op\Expr\BinaryOp\BitwiseOr
+                        || $scan instanceof Op\Expr\BinaryOp\BitwiseAnd
+                        || $scan instanceof Op\Expr\BinaryOp\BitwiseXor
+                    ) {
+                        if ($this->cfgExprUsesOperand($scan, $child->result)) {
+                            continue 2;
+                        }
+                        break;
+                    }
+                    if ($scan instanceof Op\Expr\ConstFetch || $scan instanceof Op\Expr\ClassConstFetch) {
+                        continue;
+                    }
+                    break;
                 }
             }
             // php-cfg `var_export(substr(..., -2), true)` — UnaryMinus feeds sibling FuncCall arg, not consumer (#10373).
@@ -18851,6 +18957,25 @@ class Compiler {
                     (int) $argIndex,
                     $namedAssignDestProbe
                 );
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && $this->callArgOperandExpectsArrayProducer($arg)
+            ) {
+                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                if (null !== $initArraySlot) {
+                    $valueSlot = $initArraySlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgOperandIsClosureValue($arg, $block)
+            ) {
+                $closureSlot = $this->slotForRecentClosureCallArg($block);
+                if (null !== $closureSlot) {
+                    $valueSlot = $closureSlot;
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
