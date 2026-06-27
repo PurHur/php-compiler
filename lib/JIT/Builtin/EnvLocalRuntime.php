@@ -28,13 +28,10 @@ final class EnvLocalRuntime
 
     private const REGISTER_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::registerPutenv';
 
-    private const MERGE_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::mergeOverlay';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::LOOKUP_HELPER,
         self::REGISTER_HELPER,
-        self::MERGE_HELPER,
     ];
 
     /** @var list<string> */
@@ -59,6 +56,7 @@ final class EnvLocalRuntime
 
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
+        EnvLocalOverlayTableLlvm::implementSyncOverlayBridge($context);
         self::implementLookupBridge($context);
         self::implementRegisterBridge($context);
         self::registerLinkedRuntime($context);
@@ -67,11 +65,7 @@ final class EnvLocalRuntime
 
     public static function emitMergeOverlay(Context $context, Value $ht): void
     {
-        self::ensureJitHelperCompiled($context);
-        $context->builder->call(
-            self::helperFunction($context, self::MERGE_HELPER),
-            $ht
-        );
+        EnvLocalOverlayTableLlvm::emitMergeOverlay($context, $ht);
     }
 
     private static function implementLookupBridge(Context $context): void
@@ -207,6 +201,10 @@ final class EnvLocalRuntime
         $context->builder->call(
             self::helperFunction($context, self::REGISTER_HELPER),
             $settingStr
+        );
+        $context->builder->call(
+            $context->lookupFunction('__compiler_env_local_sync_overlay'),
+            $settingCstr
         );
         $context->builder->branch($skipBb);
 
