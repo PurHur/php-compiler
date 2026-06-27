@@ -23,11 +23,14 @@ final class VmPosixRlimitRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\FFI', $pure);
     }
 
-    public function testVmPosixFfiCdefDoesNotDeclareGetrlimit(): void
+    public function testVmPosixFfiCdefDoesNotDeclareGetrlimitOrSetrlimit(): void
     {
         $vmPosix = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosix.php');
         $this->assertDoesNotMatchRegularExpression('/int getrlimit\\(/', $vmPosix);
-        $this->assertStringContainsString('int setrlimit(', $vmPosix);
+        $this->assertDoesNotMatchRegularExpression('/int setrlimit\\(/', $vmPosix);
+
+        $rlimitPure = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosixRlimitPure.php');
+        $this->assertStringContainsString('PosixLibcThinAbi::setrlimit', $rlimitPure);
     }
 
     public function testPosixGetrlimitPureReturnsTwentyKeysOnLinux(): void
