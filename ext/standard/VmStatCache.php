@@ -53,6 +53,9 @@ final class VmStatCache
             if ($clearRealpath) {
                 VmRealpathCache::clear();
             }
+            if (\function_exists('clearstatcache')) {
+                @\clearstatcache($clearRealpath);
+            }
 
             return;
         }
@@ -66,6 +69,15 @@ final class VmStatCache
             VmRealpathCache::remove($filename);
             if (false !== $resolved) {
                 VmRealpathCache::remove($resolved);
+            }
+        }
+        if (\function_exists('clearstatcache')) {
+            @\clearstatcache($clearRealpath, $filename);
+            if ($clearRealpath) {
+                $resolved = VmStatNative::realpath($filename);
+                if (false !== $resolved && $resolved !== $filename) {
+                    @\clearstatcache(true, $resolved);
+                }
             }
         }
     }
