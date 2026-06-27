@@ -34,9 +34,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
-    public function testFpowAdvertisedOn84DevProfile(): void
+    public function testFpowWithheldOnReferenceProfileUntilStable84(): void
     {
-        $this->assertTrue(CompilerVersion::supportsFpow());
+        $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
     public function testStreamSupportsAdvertisedOn84DevProfile(): void

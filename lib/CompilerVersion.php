@@ -159,10 +159,11 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4', '>=');
     }
 
-    /** PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045). */
+    /** PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412). */
     public static function supportsFpow(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#11846).
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
