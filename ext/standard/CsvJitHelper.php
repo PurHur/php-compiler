@@ -40,6 +40,23 @@ final class CsvJitHelper
     }
 
     /**
+     * Format one CSV row for fputcsv() JIT/AOT (#12447, ext/standard/file.c).
+     */
+    public static function formatFieldsArgv(
+        HashTable $fields,
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): string {
+        return VmCsv::formatLine(
+            VmFputcsv::coerceFieldList($fields->iterate(true)),
+            $separator,
+            $enclosure,
+            $escape
+        );
+    }
+
+    /**
      * @param list<string|null> $fields
      */
     private static function rowToHashTable(array $fields): HashTable
