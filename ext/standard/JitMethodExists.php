@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -18,6 +19,9 @@ use PHPLLVM\Value;
 /** LLVM lowering for method_exists() (issue #1215, #4360). */
 final class JitMethodExists
 {
+    private const OBJECT_OR_CLASS_TYPE_ERROR =
+        'method_exists(): Argument #1 ($object_or_class) must be of type object|string, %s given';
+
     public static function invoke(Context $context, JITVariable $objectOrClass, JITVariable $methodArg): Value
     {
         $methodLiteral = JitStringArg::compileTimeLiteral($methodArg);
@@ -106,6 +110,7 @@ final class JitMethodExists
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($errBlock);
+        self::emitJitTypeErrorAndAbort($context, self::OBJECT_OR_CLASS_TYPE_ERROR, 'mixed');
         $i1 = $context->getTypeFromString('int1');
         $errResult = $i1->constInt(0, false);
         $context->builder->branch($mergeBlock);
@@ -334,5 +339,13 @@ final class JitMethodExists
         $off = $context->structFieldMap[$structName]['value'];
 
         return $context->builder->structGep($strPtr, $off);
+    }
+
+    private static function emitJitTypeErrorAndAbort(Context $context, string $template, string $given): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitRaise($context, \sprintf($template, $given));
+        $context->builder->call($context->lookupFunction('abort'));
     }
 }
