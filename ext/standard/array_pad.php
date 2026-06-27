@@ -6,14 +6,14 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPadRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * array_pad() for packed list arrays (subset of PHP; LLVM via ArrayBuiltinHelper).
+ * array_pad() for packed list arrays (subset of PHP; JIT via ArrayPadRuntime PHP bridge).
  */
 final class array_pad extends Internal
 {
@@ -53,6 +53,6 @@ final class array_pad extends Internal
         }
         $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_pad', 2, 'length');
 
-        return ArrayBuiltinHelper::pad($context, $args[0], $length, $args[2]);
+        return ArrayPadRuntime::pad($context, $args[0], $length, $args[2]);
     }
 }
