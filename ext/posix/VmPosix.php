@@ -411,24 +411,12 @@ final class VmPosix
      */
     public static function getrlimit(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getrlimit() is not available in this compiler build');
+        $pure = VmPosixRlimitPure::getrlimit();
+        if (null !== $pure) {
+            return $pure;
         }
 
-        $out = [];
-        foreach (self::rlimitResources() as $resource => $name) {
-            $rlim = $ffi->new('struct rlimit');
-            if (0 !== (int) $ffi->getrlimit($resource, \FFI::addr($rlim))) {
-                self::$lastError = self::readErrno($ffi);
-
-                throw new \Error('posix_getrlimit() failed');
-            }
-            $out['soft '.$name] = self::formatRlimitValue((int) $rlim->rlim_cur);
-            $out['hard '.$name] = self::formatRlimitValue((int) $rlim->rlim_max);
-        }
-
-        return $out;
+        throw new \Error('posix_getrlimit() is not available in this compiler build');
     }
 
     public static function setrlimit(int $resource, int $softLimit, int $hardLimit): bool
@@ -555,37 +543,6 @@ final class VmPosix
             | (($minor & 0xffffff00) << 12);
     }
 
-    /**
-     * @return array<int, string>
-     */
-    private static function rlimitResources(): array
-    {
-        return [
-            PosixConstants::RLIMIT_CORE => 'core',
-            PosixConstants::RLIMIT_DATA => 'data',
-            PosixConstants::RLIMIT_STACK => 'stack',
-            PosixConstants::RLIMIT_AS => 'totalmem',
-            PosixConstants::RLIMIT_RSS => 'rss',
-            PosixConstants::RLIMIT_NPROC => 'maxproc',
-            PosixConstants::RLIMIT_MEMLOCK => 'memlock',
-            PosixConstants::RLIMIT_CPU => 'cpu',
-            PosixConstants::RLIMIT_FSIZE => 'filesize',
-            PosixConstants::RLIMIT_NOFILE => 'openfiles',
-        ];
-    }
-
-    /**
-     * @return int|string php-src prints "unlimited" for RLIM_INFINITY
-     */
-    private static function formatRlimitValue(int $raw): int|string
-    {
-        if ($raw < 0 || $raw > \PHP_INT_MAX) {
-            return 'unlimited';
-        }
-
-        return $raw;
-    }
-
     private static function parseRlimitInput(int $value): int
     {
         if (PosixConstants::RLIMIT_INFINITY === $value) {
@@ -655,7 +612,6 @@ struct rlimit {
     rlim_t rlim_cur;
     rlim_t rlim_max;
 };
-int getrlimit(int resource, struct rlimit *rlim);
 int setrlimit(int resource, const struct rlimit *rlim);
 pid_t setsid(void);
 pid_t getsid(pid_t pid);
