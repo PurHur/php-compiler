@@ -66,7 +66,7 @@ final class SplFileInfoConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::__construct()'
@@ -96,7 +96,7 @@ final class SplFileInfoGetPath extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getPath()'
@@ -117,7 +117,7 @@ final class SplFileInfoGetFilename extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getFilename()'
@@ -138,7 +138,7 @@ final class SplFileInfoGetBasename extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getBasename()'
@@ -170,7 +170,7 @@ final class SplFileInfoGetPathname extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::getPathname()'
@@ -191,7 +191,7 @@ final class SplFileInfoToString extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplFileInfoBuiltin::CLASS_LC,
             'SplFileInfo::__toString()'

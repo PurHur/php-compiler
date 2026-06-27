@@ -28,6 +28,42 @@ final class SplIteratorSupport
         return $object;
     }
 
+    /** Accept $this when it is $rootClassLc or a registered subclass (php-src internal inheritance). */
+    public static function receiverIsA(Frame $frame, string $rootClassLc, string $method): ObjectEntry
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \LogicException($method.' called without $this');
+        }
+        $receiver = $frame->calledArgs[0]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException($method.' called on non-object');
+        }
+        $object = $receiver->toObject();
+        if (!self::objectIsA($frame, $object, $rootClassLc)) {
+            throw new \LogicException($method.' called on incompatible object');
+        }
+
+        return $object;
+    }
+
+    private static function objectIsA(Frame $frame, ObjectEntry $object, string $rootClassLc): bool
+    {
+        $entry = $object->class;
+        while (true) {
+            if (strtolower(ltrim($entry->name, '\\')) === $rootClassLc) {
+                return true;
+            }
+            $parentLc = $entry->parentLc;
+            if (null === $parentLc) {
+                return false;
+            }
+            if (null === $frame->vmContext || !isset($frame->vmContext->classes[$parentLc])) {
+                return $parentLc === $rootClassLc;
+            }
+            $entry = $frame->vmContext->classes[$parentLc];
+        }
+    }
+
     public static function setReturnBool(Frame $frame, bool $value): void
     {
         if (null === $frame->returnVar) {
