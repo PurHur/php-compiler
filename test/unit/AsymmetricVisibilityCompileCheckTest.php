@@ -6,12 +6,19 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** PHP 8.4 asymmetric visibility compile-time validation (#6589). */
 final class AsymmetricVisibilityCompileCheckTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+    }
     public function testProtectedPublicSetCompileErrors(): void
     {
         $this->expectCompileError(

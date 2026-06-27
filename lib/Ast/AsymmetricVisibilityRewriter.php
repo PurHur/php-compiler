@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+use PhpParser\Error as ParserError;
+
 /**
  * Rewrite PHP 8.4 asymmetric property visibility for nikic/php-parser 4.x (#3165).
  *
@@ -18,6 +21,9 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
+    /** Zend 8.2 reference profile parse error for T_PRIVATE_SET / (set) visibility (#12508). */
+    public const REFERENCE_PROFILE_REJECT_MESSAGE = 'syntax error, unexpected token ")", expecting amp';
+
     /**
      * @internal Marker embedded in source for PHPCfg to recover set visibility.
      */
@@ -28,6 +34,8 @@ final class AsymmetricVisibilityRewriter
 
     public static function rewrite(string $source): string
     {
+        self::rejectOnReferenceProfileIfNeeded($source);
+
         [$masked, $map] = self::maskLiteralsAndComments($source);
         if (!self::hasAsymmetricVisibilitySyntax($masked)) {
             return $source;
@@ -43,6 +51,37 @@ final class AsymmetricVisibilityRewriter
     {
         return false !== stripos($source, '(set)')
             || false !== stripos($source, '(get)');
+    }
+
+    /** Reject PHP 8.4 asymmetric visibility on Zend 8.2 reference profile (#12508). */
+    public static function rejectOnReferenceProfileIfNeeded(string $source): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            return;
+        }
+        if (!self::hasAsymmetricVisibilitySyntax($source)) {
+            return;
+        }
+
+        $tokens = token_get_all($source);
+        for ($i = 0, $n = \count($tokens); $i < $n; ++$i) {
+            if (!\is_string($tokens[$i]) || '(' !== $tokens[$i]) {
+                continue;
+            }
+            $next = $tokens[$i + 1] ?? null;
+            if (!\is_array($next) || T_STRING !== $next[0]) {
+                continue;
+            }
+            $keyword = strtolower($next[1]);
+            if ('set' !== $keyword && 'get' !== $keyword) {
+                continue;
+            }
+            $line = $next[2] ?? 1;
+            throw new ParserError(
+                self::REFERENCE_PROFILE_REJECT_MESSAGE,
+                ['startLine' => $line, 'endLine' => $line]
+            );
+        }
     }
 
     /**

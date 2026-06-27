@@ -348,6 +348,7 @@ class Runtime {
 
     public function preprocessSourceForParse(string $code, string $filename = 'unknown'): array
     {
+        AsymmetricVisibilityRewriter::rejectOnReferenceProfileIfNeeded($code);
         $sealedPreprocessor = new SealedClassPreprocessor();
         [$code, $permitsByLine] = $sealedPreprocessor->preprocess($code);
         $this->sealedClassAnnotator->setPermitsByLine($permitsByLine);

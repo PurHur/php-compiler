@@ -155,6 +155,9 @@ PHP;
 
     public function testInterfaceAsymmetricVisibilityPropertyCompiles(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

@@ -5,12 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
 final class PropertyHooksTest extends TestCase
 {
+    private function requireAsymmetricVisibility(): void
+    {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
+    }
+
     public function testStripsSetHookAndInjectsMethod(): void
     {
         $src = <<<'PHP'
@@ -395,6 +403,7 @@ PHP;
     /** @covers issue #12203 — `private(set)` decl + get-only hook is a Zend parse error */
     public function testRejectsAsymmetricDeclSetWithGetOnlyHook(): void
     {
+        $this->requireAsymmetricVisibility();
         $src = <<<'PHP'
 <?php
 class C {
@@ -412,6 +421,7 @@ PHP;
     /** @covers issue #12203 — implicit `get; private set;` backing still allowed */
     public function testAllowsAsymmetricDeclSetWithImplicitBackingHooks(): void
     {
+        $this->requireAsymmetricVisibility();
         $src = <<<'PHP'
 <?php
 class C {
@@ -429,6 +439,7 @@ PHP;
     /** @covers issue #9872 — PHP 8.4 `private(set);` inside property hook block */
     public function testLowersHookBlockPrivateSetParenModifier(): void
     {
+        $this->requireAsymmetricVisibility();
         $src = <<<'PHP'
 <?php
 class C {
@@ -648,6 +659,7 @@ PHP;
     /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
     public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
     {
+        $this->requireAsymmetricVisibility();
         $src = <<<'PHP'
 <?php
 class D {

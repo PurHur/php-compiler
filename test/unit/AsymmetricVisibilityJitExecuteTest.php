@@ -23,6 +23,9 @@ final class AsymmetricVisibilityJitExecuteTest extends TestCase
     {
         $this->repoRoot = dirname(__DIR__, 2);
         LlvmToolchain::applyCurrentProcessEnv($this->repoRoot);
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
             $this->markTestSkipped($reason.' — asymmetric visibility JIT execute needs LLVM (#4020)');

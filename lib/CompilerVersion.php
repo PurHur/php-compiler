@@ -212,6 +212,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.4+ asymmetric property visibility private(set)/protected(set) (Zend/zend_language_parser.y, #3165, #12508).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2.
+     */
+    public static function supportsAsymmetricVisibility(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {

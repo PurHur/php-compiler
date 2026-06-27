@@ -826,6 +826,7 @@ function syntaxRowDefinitions(): array
             'notes' => [
                 'Ast\\AsymmetricVisibilityRewriter normalizes private(set) for php-parser 4.x; VM/JIT enforce set visibility with catchable Error (#3165, #4020)',
                 'php-src: Zend/zend_compile.c ZEND_ACC_*_SET; AsymmetricVisibilityGuard + AsymmetricVisibilityJitCompileTest (#4020)',
+                'Reference profile (8.4.0-dev): rejected at preprocess like Zend 8.2 (#12508); enabled on stable 8.4.0+ target',
             ],
             'probe' => 'class D { private(set) string $n = "x"; } $d = new D(); echo $d->n; $d->n = "y";',
         ],

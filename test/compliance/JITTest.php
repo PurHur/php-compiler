@@ -173,6 +173,22 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when asymmetric visibility enabled (#12508).
+            if (CompilerVersion::supportsAsymmetricVisibility()
+                && str_contains($name, 'asymmetric_visibility_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsAsymmetricVisibility()
+                && (str_contains($name, 'asymmetric')
+                    || str_contains($name, 'promoted_private_set')
+                    || str_contains($name, 'promoted_asymmetric_visibility')
+                    || str_contains($name, 'property_hook_private_set')
+                    || str_contains($name, 'property_hook_asymmetric_set')
+                    || str_contains($name, 'reflection_property_asymmetric')
+                    || str_contains($name, 'reflection_property_readable_settable'))
+                && !str_contains($name, 'asymmetric_visibility_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
             if (CompilerVersion::supportsExitFunctionForm()
                 && (str_contains($name, 'exit_named_status_reference_profile')

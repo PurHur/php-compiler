@@ -35,6 +35,9 @@ PHP;
 
     public function testDoesNotRewriteAsymmetricStaticProperty(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
         $src = <<<'PHP'
 <?php
 class C {
