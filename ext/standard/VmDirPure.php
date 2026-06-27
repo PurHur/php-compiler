@@ -20,7 +20,7 @@ final class VmDirPure
     /** @return list<string>|false */
     public static function listSorted(string $path): array|false
     {
-        if (str_contains($path, "\0")) {
+        if ('' === $path || str_contains($path, "\0")) {
             return false;
         }
         if (!self::available()) {
