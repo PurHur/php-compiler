@@ -62,9 +62,10 @@ final class IniJitHelper
 
     private const READONLY_STRING_DEFAULTS = [
         'max_execution_time' => '0',
-        'default_charset' => 'UTF-8',
         'session.save_handler' => 'files',
     ];
+
+    private const CFG_DEFAULT_CHARSET = 'UTF-8';
 
     /** Unset string ini directives return '' — mirror VmIni empty-string key list for JIT compile. */
     private const EMPTY_STRING_INI_KEYS = [
@@ -109,6 +110,8 @@ final class IniJitHelper
     private static string $sessionSavePath = self::CFG_SESSION_SAVE_PATH;
 
     private static string $userAgent = '';
+
+    private static string $defaultCharset = self::CFG_DEFAULT_CHARSET;
 
     private static int $pcreBacktrackLimit = 1_000_000;
 
@@ -203,6 +206,9 @@ final class IniJitHelper
         if ('include_path' === $key) {
             return IncludePathJitHelper::get();
         }
+        if ('default_charset' === $key) {
+            return self::$defaultCharset;
+        }
         if ('user_agent' === $key) {
             return self::$userAgent;
         }
@@ -260,6 +266,9 @@ final class IniJitHelper
         if ('include_path' === $key) {
             return IncludePathJitHelper::push($newValue);
         }
+        if ('default_charset' === $key) {
+            return self::setDefaultCharset($newValue);
+        }
         if ('user_agent' === $key) {
             return self::setUserAgent($newValue);
         }
@@ -312,7 +321,7 @@ final class IniJitHelper
             return self::READONLY_STRING_DEFAULTS['max_execution_time'];
         }
         if ('default_charset' === $key) {
-            return self::READONLY_STRING_DEFAULTS['default_charset'];
+            return self::CFG_DEFAULT_CHARSET;
         }
         if ('cfg_file_path' === $key) {
             $path = VmIniIntrospection::loadedFile();
@@ -373,6 +382,9 @@ final class IniJitHelper
                 break;
             case 'user_agent':
                 self::$userAgent = '';
+                break;
+            case 'default_charset':
+                self::$defaultCharset = self::CFG_DEFAULT_CHARSET;
                 break;
             case 'pcre.backtrack_limit':
                 self::$pcreBacktrackLimit = (int) self::CFG_PCRE_BACKTRACK_LIMIT;
@@ -470,6 +482,14 @@ final class IniJitHelper
     {
         $old = self::$userAgent;
         self::$userAgent = $newValue;
+
+        return $old;
+    }
+
+    private static function setDefaultCharset(string $newValue): string
+    {
+        $old = self::$defaultCharset;
+        self::$defaultCharset = $newValue;
 
         return $old;
     }
