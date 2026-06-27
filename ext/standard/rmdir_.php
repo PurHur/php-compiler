@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -25,6 +26,7 @@ final class rmdir_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('rmdir() requires exactly one argument in this compiler build');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'rmdir', 'directory', 0, $frame);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rmdir', 0, 'directory');
         $ok = VmFs::rmdir($path);
         if (!$ok) {
