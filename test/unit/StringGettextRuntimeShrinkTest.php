@@ -18,10 +18,12 @@ final class StringGettextRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextRuntime.php');
         $this->assertStringContainsString('GettextJitHelper', $runtime);
         $this->assertStringContainsString('VmGettextNative', $runtime);
+        $this->assertStringNotContainsString('StringGettextStandaloneLlvm', $runtime);
         $this->assertStringNotContainsString('phpc_gettext_bound_dir', $runtime);
         $this->assertStringNotContainsString('ensureLibc', $runtime);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringGettextJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringGettextStandaloneLlvm.php');
         $this->assertFileExists(__DIR__.'/../../ext/gettext/GettextJitHelper.php');
     }
 
@@ -40,13 +42,5 @@ final class StringGettextRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('FFI::cdef', $source);
         $this->assertStringNotContainsString('extension_loaded(\'ffi\')', $source);
         $this->assertFileExists(__DIR__.'/../../ext/gettext/VmGettextPure.php');
-    }
-
-    public function testStandaloneLlvmQuarantined(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettextStandaloneLlvm.php');
-        $this->assertStringContainsString('emitPassthroughString', $source);
-        $this->assertStringNotContainsString('ensureLibc', $source);
-        $this->assertStringNotContainsString('phpc_gettext_bound_dir', $source);
     }
 }

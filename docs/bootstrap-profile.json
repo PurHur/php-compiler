@@ -2599,7 +2599,6 @@
         "lib/JIT/Builtin/StringGetrusageRuntime.php",
         "lib/JIT/Builtin/StringGettext.php",
         "lib/JIT/Builtin/StringGettextRuntime.php",
-        "lib/JIT/Builtin/StringGettextStandaloneLlvm.php",
         "lib/JIT/Builtin/StringGettimeofday.php",
         "lib/JIT/Builtin/StringGmgetdate.php",
         "lib/JIT/Builtin/StringGmmktime.php",
@@ -3651,9 +3650,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3421,
+        "inventory_files": 3420,
         "excluded": 0,
-        "eligible": 3421,
+        "eligible": 3420,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -15,9 +14,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859).
+ * JIT/AOT link for __compiler_gettext* via GettextJitHelper PHP (#9859, #12828).
  *
- * Replaces {@see StringGettextJit} LLVM (~775 LOC). SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\gettext\GettextJitHelper}; thin LLVM bridges
+ * forward the ABI. SSOT: {@see \PHPCompiler\ext\gettext\VmGettextNative}.
  * php-src: ext/gettext/gettext.c
  */
 final class StringGettextRuntime
@@ -78,14 +78,13 @@ final class StringGettextRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringGettextStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_gettext');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
