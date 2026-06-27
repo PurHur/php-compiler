@@ -21,4 +21,4 @@ echo restore_error_handler() ? "again\n" : "empty\n";
 b
 a
 restored
-again
+empty
