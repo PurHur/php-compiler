@@ -322,6 +322,12 @@ final class SplDualIteratorStorage
 
     private static function invokeInner(Frame $frame, ObjectEntry $inner, string $method): Variable
     {
+        return self::callInner($frame, $inner, $method);
+    }
+
+    /** @internal Shared by LimitIterator (#12893). */
+    public static function callInner(Frame $frame, ObjectEntry $inner, string $method): Variable
+    {
         return self::vm($frame)->invokeInstanceMethod($inner, $method);
     }
 

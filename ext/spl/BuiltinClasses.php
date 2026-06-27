@@ -23,6 +23,7 @@ final class BuiltinClasses
         DirectoryIteratorBuiltin::registerClass($ctx);
         SplFixedArrayBuiltin::registerClass($ctx);
         IteratorIteratorBuiltin::registerClass($ctx);
+        LimitIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
