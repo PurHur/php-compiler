@@ -78,6 +78,31 @@ PHP;
         self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #12732 — by-ref sort-family builtins must not defer as sibling inline producers. */
+    public function testNatcasesortBeforeArrayValuesImplodeCompilesEagerly(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = ['IMG12', 'img2', 'Img1'];
+natcasesort($a);
+echo implode(',', array_values($a));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'natcasesort_r.php');
+
+        $initNames = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $initNames[] = $block->constants[$op->arg1]->toString();
+            }
+        }
+
+        self::assertContains('natcasesort', $initNames, 'fcall inits='.json_encode($initNames));
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('Img1,img2,IMG12', ob_get_clean());
+    }
+
     /** Issue #9154 — inline arrow callback on array_any when array arg is a named local. */
     public function testArrayAnyInlineClosureUsesSecondArgSlot(): void
     {
