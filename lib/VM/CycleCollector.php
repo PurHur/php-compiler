@@ -68,6 +68,21 @@ final class CycleCollector
         ];
     }
 
+    /**
+     * @return array{runs: int, collected: int, threshold: int, roots: int}
+     *
+     * @see https://github.com/php/php-src/blob/master/ext/standard/php_gc.c PHP_FUNCTION(gc_status) pre-8.4
+     */
+    public static function legacyStatus(Context $ctx): array
+    {
+        return [
+            'runs' => self::$runs,
+            'collected' => self::$totalCollected,
+            'threshold' => self::ROOT_THRESHOLD,
+            'roots' => self::countBufferedRoots($ctx),
+        ];
+    }
+
     /** Release VM allocator caches (php_gc.c gc_mem_caches / zend_mm_gc parity, #9160). */
     public static function memCaches(): int
     {

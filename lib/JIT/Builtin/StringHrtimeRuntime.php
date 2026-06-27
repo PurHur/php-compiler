@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -20,10 +21,13 @@ final class StringHrtimeRuntime
 
     private const NS_FLOAT_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::nsFloat';
 
+    private const NS_INT_HELPER = 'PHPCompiler\\ext\\standard\\HrtimeJitHelper::nsInt';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::PAIR_HELPER,
         self::NS_FLOAT_HELPER,
+        self::NS_INT_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -49,17 +53,29 @@ final class StringHrtimeRuntime
 
         self::ensureJitHelperCompiled($context);
 
-        $doubleTy = $context->getTypeFromString('double');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($doubleTy, false)
-            );
-
-        $entry = $fn->appendBasicBlock('hrtime_ns_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, self::NS_FLOAT_HELPER));
+        if (CompilerVersion::supportsHrtimeAsNumberFloat()) {
+            $doubleTy = $context->getTypeFromString('double');
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction(
+                    $abiName,
+                    $context->context->functionType($doubleTy, false)
+                );
+            $entry = $fn->appendBasicBlock('hrtime_ns_entry');
+            $context->builder->positionAtEnd($entry);
+            $result = $context->builder->call(self::helperFunction($context, self::NS_FLOAT_HELPER));
+        } else {
+            $i64 = $context->getTypeFromString('int64');
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction(
+                    $abiName,
+                    $context->context->functionType($i64, false)
+                );
+            $entry = $fn->appendBasicBlock('hrtime_ns_entry');
+            $context->builder->positionAtEnd($entry);
+            $result = $context->builder->call(self::helperFunction($context, self::NS_INT_HELPER));
+        }
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();

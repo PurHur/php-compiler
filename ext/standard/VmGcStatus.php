@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\VM\HashTable;
@@ -15,13 +16,24 @@ final class VmGcStatus
 {
     public static function statusTable(Context $ctx): HashTable
     {
-        $s = CycleCollector::status($ctx);
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            $s = CycleCollector::status($ctx);
 
-        return GcStatusJitHelper::buildTable(
-            $s['running'],
-            $s['protected'],
-            $s['full'],
-            $s['buffer_size']
+            return GcStatusJitHelper::buildTable(
+                $s['running'],
+                $s['protected'],
+                $s['full'],
+                $s['buffer_size']
+            );
+        }
+
+        $legacy = CycleCollector::legacyStatus($ctx);
+
+        return GcStatusJitHelper::buildLegacyTable(
+            $legacy['runs'],
+            $legacy['collected'],
+            $legacy['threshold'],
+            $legacy['roots']
         );
     }
 

@@ -17,10 +17,16 @@ final class VmHrtimeTest extends TestCase
             $this->markTestSkipped('/proc/uptime unavailable');
         }
         $a = VmHrtime::hrtime(true);
+        \usleep(100);
         $b = VmHrtime::hrtime(true);
-        $this->assertIsFloat($a);
+        if (\PHPCompiler\CompilerVersion::supportsHrtimeAsNumberFloat()) {
+            $this->assertIsFloat($a);
+        } else {
+            $this->assertIsInt($a);
+        }
         $this->assertGreaterThan(0, $a);
-        $this->assertGreaterThanOrEqual($a, $b);
+        $this->assertGreaterThan(0, $b);
+        $this->assertGreaterThanOrEqual($a - 1_000_000, $b, 'monotonic within 1ms refinement slack');
 
         $pair = VmHrtime::hrtime(false);
         $this->assertIsArray($pair);

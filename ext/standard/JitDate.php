@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Block;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DefaultTimezoneRuntime;
 use PHPCompiler\JIT\Builtin\ProcessIdentityJit;
@@ -218,11 +219,19 @@ final class JitDate
         $context->builder->branchIf($isNumber, $numberBb, $pairBb);
 
         $context->builder->positionAtEnd($numberBb);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeDouble'),
-            $slotPtr,
-            $context->builder->call($context->lookupFunction('__compiler_hrtime_ns'))
-        );
+        if (CompilerVersion::supportsHrtimeAsNumberFloat()) {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeDouble'),
+                $slotPtr,
+                $context->builder->call($context->lookupFunction('__compiler_hrtime_ns'))
+            );
+        } else {
+            $context->builder->call(
+                $context->lookupFunction('__value__writeLong'),
+                $slotPtr,
+                $context->builder->call($context->lookupFunction('__compiler_hrtime_ns'))
+            );
+        }
         $context->builder->branch($mergeBb);
 
         $context->builder->positionAtEnd($pairBb);
