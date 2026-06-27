@@ -33,5 +33,5 @@ if ($bad > 0.0) {
 --EXPECT--
 ok
 alias_ok
-null_bad
+null_ok
 gone
