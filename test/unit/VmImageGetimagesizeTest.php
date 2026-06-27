@@ -12,6 +12,8 @@ final class VmImageGetimagesizeTest extends TestCase
 {
     private const PNG_1X1 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
+    private const GIF_1X1 = 'R0lGODdhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==';
+
     public function testPngOneByOneMatchesZendShape(): void
     {
         $png = base64_decode(self::PNG_1X1, true);
@@ -30,5 +32,19 @@ final class VmImageGetimagesizeTest extends TestCase
     public function testInvalidBytesReturnFalse(): void
     {
         self::assertFalse(VmImage::getImageSizeFromBytes('not-an-image'));
+    }
+
+    public function testGifOneByOneBitsAndChannelsMatchZend(): void
+    {
+        $gif = base64_decode(self::GIF_1X1, true);
+        self::assertIsString($gif);
+        $info = VmImage::getImageSizeFromBytes($gif);
+        self::assertIsArray($info);
+        self::assertSame(1, $info[0]);
+        self::assertSame(1, $info[1]);
+        self::assertSame(VmImage::IMAGETYPE_GIF, $info[2]);
+        self::assertSame(1, $info['bits']);
+        self::assertSame(3, $info['channels']);
+        self::assertSame('image/gif', $info['mime']);
     }
 }
