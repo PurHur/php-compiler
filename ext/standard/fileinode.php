@@ -19,7 +19,7 @@ final class fileinode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileinode() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'fileinode', 0, 'filename');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'fileinode', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,7 +37,7 @@ final class fileinode extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('fileinode() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'fileinode', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'fileinode', 0, 'filename');
 
         return JitFileinode::invoke($context, $path);
     }

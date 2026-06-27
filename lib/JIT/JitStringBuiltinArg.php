@@ -98,6 +98,28 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Lower typed string builtin operands (php-src IS_STRING; rejects null, #12640).
+     */
+    public static function lowerTypedString(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        JitNativeString::ensureInsertBlock($context);
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+            return self::unreachableStringPtr($context);
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    /**
      * Lower Z_PARAM_STR operands with __toString coercion when caller is not strict (#11398, ext/standard/string.c).
      */
     public static function lowerCoercible(

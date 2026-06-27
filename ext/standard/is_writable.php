@@ -20,7 +20,7 @@ final class is_writable extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_writable() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_writable', 0, 'filename');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'is_writable', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -32,7 +32,7 @@ final class is_writable extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_writable() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_writable', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'is_writable', 0, 'filename');
 
         return JitStat::pathIsWritable($context, $path);
     }

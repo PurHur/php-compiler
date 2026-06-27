@@ -24,7 +24,7 @@ final class lstat_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('lstat() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'lstat', 0, 'filename');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'lstat', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -42,7 +42,7 @@ final class lstat_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('lstat() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'lstat', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'lstat', 0, 'filename');
 
         return JitStatArray::invoke($context, $path, true);
     }

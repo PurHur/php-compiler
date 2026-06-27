@@ -23,7 +23,7 @@ final class JitFilestatArg
         JITVariable $arg,
         string $function
     ): Value {
-        return JitStringBuiltinArg::lower($context, $arg, $function, 0, 'filename');
+        return JitStringBuiltinArg::lowerTypedString($context, $arg, $function, 0, 'filename');
     }
 
     public static function guardIntOrString(

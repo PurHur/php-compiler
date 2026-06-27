@@ -20,13 +20,13 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'basename', 0, 'path');
+        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'basename', 0, 'path');
         if (null === $frame->returnVar) {
             return;
         }
         $suffix = '';
         if (2 === $argc) {
-            $suffix = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'basename', 1, 'suffix');
+            $suffix = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'basename', 1, 'suffix');
         }
         $frame->returnVar->string(VmString::basename($path, $suffix));
     }
@@ -37,10 +37,10 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'basename', 0, 'path');
+        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'basename', 0, 'path');
         $base = JitPath::basename($context, $path);
         if (2 === $argc) {
-            $suffix = JitStringBuiltinArg::lower($context, $args[1], 'basename', 1, 'suffix');
+            $suffix = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'basename', 1, 'suffix');
 
             return JitPath::stripSuffixIfPresent($context, $base, $suffix);
         }
