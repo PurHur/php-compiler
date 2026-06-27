@@ -10,5 +10,5 @@ try {
     echo get_class($e) . ': ' . $e->getMessage();
 }
 --EXPECTF--
-PHP Warning:  Cannot bind closure to scope of internal class stdClass
+PHP Warning:  Cannot bind closure to scope of internal class stdClass%s
 Error: Value of type null is not callable

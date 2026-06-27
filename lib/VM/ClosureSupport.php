@@ -179,7 +179,8 @@ final class ClosureSupport
                 return null;
             }
         }
-        if (null !== $scopeClass && self::isInternalScopeClass($ctx, $scopeClass)) {
+        // Implicit scope from omitted $newScope + $newThis may be internal (#12562, zend_closures.c).
+        if (null !== $scopeClass && null !== $newScope && self::isInternalScopeClass($ctx, $scopeClass)) {
             self::warnCannotBindInternalScope($ctx, $frame, $scopeClass);
 
             return null;
