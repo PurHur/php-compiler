@@ -39,9 +39,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
-    public function testStreamSupportsAdvertisedOn84DevProfile(): void
+    public function testStreamSupportsWithheldUntil85(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStreamSupports());
+        $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
     public function testPhp84ArraySearchFunctionsAdvertisedOn84DevProfile(): void
@@ -80,10 +80,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['zend_thread_id']));
     }
 
-    public function testVmRegistersStreamSupportsOn84DevProfile(): void
+    public function testVmDoesNotRegisterStreamSupportsUntil85(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['stream_supports']));
+        $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
     }
 
     public function testVmRegistersJsonValidateOn84DevProfile(): void
