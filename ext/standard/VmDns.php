@@ -10,8 +10,8 @@ use PHPCompiler\VM\Variable;
 /**
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
- * VM resolves via /etc/hosts + VmDnsUdpPure UDP transport — no libc res_query/getaddrinfo FFI (#12428).
- * Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
+ * VM resolves via libc getaddrinfo (when FFI available) or /etc/hosts + VmDnsUdpPure UDP
+ * transport (#12483). Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()}
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php → GethostbynamelJitHelper PHP (#9382),
  * CheckdnsrrRuntime.php → CheckdnsrrJitHelper PHP (#9379).
  *
@@ -90,6 +90,11 @@ final class VmDns
     {
         if ('' === $hostname || \strlen($hostname) > 255) {
             return [];
+        }
+
+        $ips = VmDnsGetaddrinfo::resolveIpv4List($hostname);
+        if (null !== $ips && [] !== $ips) {
+            return $ips;
         }
 
         $ips = self::resolveViaEtcHosts($hostname);
@@ -514,7 +519,7 @@ final class VmDns
             }
             for ($i = 1, $n = \count($parts); $i < $n; ++$i) {
                 if (\strtolower($parts[$i]) === $hostname) {
-                    if (!\in_array($ip, $stored, true) && \count($stored) < self::MAX_ADDRS) {
+                    if (\count($stored) < self::MAX_ADDRS) {
                         $stored[] = $ip;
                     }
                     break;
@@ -868,7 +873,7 @@ final class VmDns
             }
             for ($i = 1, $n = \count($parts); $i < $n; ++$i) {
                 if (\strtolower($parts[$i]) === $hostname) {
-                    if (!\in_array($ip, $stored, true) && \count($stored) < self::MAX_ADDRS) {
+                    if (\count($stored) < self::MAX_ADDRS) {
                         $stored[] = $ip;
                     }
                     break;
