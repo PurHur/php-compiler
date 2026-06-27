@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArraySliceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
@@ -78,6 +78,6 @@ final class array_slice extends Internal
             ? JitBoolArg::lower($context, $args[3], 'array_slice() preserve_keys')
             : null;
 
-        return ArrayBuiltinHelper::buildSliceArray($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
+        return ArraySliceRuntime::slice($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
     }
 }
