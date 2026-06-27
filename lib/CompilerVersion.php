@@ -284,6 +284,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.3+ header_list() (ext/standard/head.c, #12546).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 CLI phantom gate.
+     */
+    public static function supportsHeaderList(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964). */
     public static function supportsMbStrPad(): bool
     {

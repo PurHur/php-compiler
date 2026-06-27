@@ -147,6 +147,20 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'class_constants_phantom')) {
                 continue;
             }
+            $usesHeaderList = str_contains($name, 'header_list')
+                || str_contains($name, 'header_remove')
+                || str_contains($name, 'setcookie')
+                || str_contains($name, 'setrawcookie')
+                || str_contains($name, 'session_cookie');
+            if (!CompilerVersion::supportsHeaderList()
+                && $usesHeaderList
+                && !str_contains($name, 'header_list_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHeaderList()
+                && str_contains($name, 'header_list_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesOverrideAttributeClass()
                 && str_contains($name, 'override_class_exists')) {
                 continue;

@@ -96,6 +96,14 @@ class AotTest extends BaseTest
                 && str_contains($name, 'strxfrm')) {
                 continue;
             }
+            $usesHeaderList = str_contains($name, 'header_list')
+                || str_contains($name, 'header_remove')
+                || str_contains($name, 'setcookie')
+                || str_contains($name, 'setrawcookie')
+                || str_contains($name, 'session_cookie');
+            if (!CompilerVersion::supportsHeaderList() && $usesHeaderList) {
+                continue;
+            }
             // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
             yield $name => $case;

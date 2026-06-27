@@ -34,6 +34,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassConstants());
     }
 
+    public function testSupportsHeaderListFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsHeaderList());
+    }
+
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
@@ -104,5 +109,13 @@ final class CompilerVersionGateTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['class_constants']));
+    }
+
+    public function testVmDoesNotRegisterHeaderListOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        $this->assertFalse(isset($ctx->functions['header_list']));
+        $this->assertTrue(isset($ctx->functions['header']));
     }
 }

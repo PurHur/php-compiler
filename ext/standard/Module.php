@@ -477,7 +477,7 @@ class Module extends ModuleAbstract
             new setcookie(),
             new setrawcookie(),
             new header_remove(),
-            new header_list(),
+            ...(CompilerVersion::supportsHeaderList() ? [new header_list()] : []),
             new headers_list(),
             ...(VmHead::registersRequestHeaderFunctions() ? [
                 new getallheaders_(),
