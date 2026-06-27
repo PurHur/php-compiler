@@ -2403,7 +2403,6 @@
         "lib/JIT/Builtin/IconvRuntime.php",
         "lib/JIT/Builtin/InArrayRuntime.php",
         "lib/JIT/Builtin/IncludePathRuntime.php",
-        "lib/JIT/Builtin/IncludePathStandaloneLlvm.php",
         "lib/JIT/Builtin/InetLibcBridge.php",
         "lib/JIT/Builtin/InetRuntime.php",
         "lib/JIT/Builtin/IniGet.php",
@@ -3656,9 +3655,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3426,
+        "inventory_files": 3425,
         "excluded": 0,
-        "eligible": 3426,
+        "eligible": 3425,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

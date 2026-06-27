@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin as JitBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -15,10 +14,10 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245).
+ * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #12801).
  *
- * Standalone LLVM quarantine: {@see IncludePathStandaloneLlvm}
- * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\IncludePathJitHelper}; thin LLVM bridges
+ * forward the ABI. VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
  */
@@ -78,17 +77,13 @@ final class IncludePathRuntime
 
         $savedBlock = self::captureInsertBlock($context);
 
-        if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            IncludePathStandaloneLlvm::implement($context);
-        } else {
-            self::ensureStackHelperCompiled($context);
-            self::implementInitNoop($context);
-            self::implementGetBridge($context);
-            self::implementSetBridge($context);
-            self::implementRestoreBridge($context);
-            self::ensureResolveHelperCompiled($context);
-            self::implementResolveBridge($context);
-        }
+        self::ensureStackHelperCompiled($context);
+        self::implementInitNoop($context);
+        self::implementGetBridge($context);
+        self::implementSetBridge($context);
+        self::implementRestoreBridge($context);
+        self::ensureResolveHelperCompiled($context);
+        self::implementResolveBridge($context);
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $savedBlock);
     }
