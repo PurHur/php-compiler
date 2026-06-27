@@ -9,15 +9,16 @@ use PHPCompiler\ext\standard\VmDnsUdpNative;
 use PHPCompiler\ext\standard\VmDnsUdpPure;
 use PHPUnit\Framework\TestCase;
 
-/** VmDnsUdpPure — UDP DNS without libc socket FFI (#8937). */
+/** VmDnsUdpPure — UDP DNS without libc socket FFI (#8937, #8092). */
 final class VmDnsUdpPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmDnsUdpNativeDelegatesToPureWhenFfiDisabled(): void
+    public function testVmDnsUdpNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
-        $this->assertStringContainsString('VmDnsUdpPure::', $source);
+        $this->assertStringContainsString('VmDnsUdpPure::exchange', $source);
         $this->assertStringContainsString('VmDnsUdpPure::available()', $source);
-        $this->assertStringContainsString('$ffi->socket', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->socket/', $source);
     }
 
     public function testVmDnsUdpPureUsesStreamSocketClientNotLibcFfi(): void

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * UDP DNS exchange without libc socket FFI (#8937, pairs {@see VmDnsUdpNative}).
+ * UDP DNS exchange without libc socket FFI (#8937, pairs {@see VmDnsUdpNative} SSOT #8092).
  *
  * Bootstrap path when FFI is disabled: host stream_socket_client under Zend VM.
  *

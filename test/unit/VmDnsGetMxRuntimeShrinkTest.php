@@ -20,18 +20,16 @@ final class VmDnsGetMxRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('stream_get_contents', $source);
     }
 
-    public function testVmDnsUdpNativeUsesLibcSocketNotHostStreams(): void
+    public function testVmDnsUdpNativeDelegatesToPureWithoutLibcFfi(): void
     {
         $this->assertFileExists(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmDnsUdpNative.php');
-        $this->assertStringContainsString('VmDnsUdpPure::', $source);
-        $this->assertStringContainsString('$ffi->socket', $source);
-        $this->assertStringContainsString('$ffi->send', $source);
-        $this->assertStringContainsString('$ffi->recv', $source);
-        $this->assertStringNotContainsString('stream_socket_client', $source);
+        $this->assertStringContainsString('VmDnsUdpPure::exchange', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/\$ffi->socket/', $source);
     }
 
-    public function testExampleComMxViaFfiWhenAvailable(): void
+    public function testExampleComMxViaPurePath(): void
     {
         $result = VmDns::dnsGetMx('example.com');
         if (false === $result) {
