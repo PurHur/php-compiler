@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\Func\Internal as FuncInternal;
@@ -55,6 +56,13 @@ final class VmReflection
     public static function parseExcludeDeprecatedArg(Frame $frame, string $function): bool
     {
         $argc = \count($frame->calledArgs);
+        if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()) {
+            if ($argc > 0) {
+                throw new \ArgumentCountError("{$function}() expects exactly 0 arguments, {$argc} given");
+            }
+
+            return false;
+        }
         if ($argc > 1) {
             throw new \ArgumentCountError("{$function}() expects at most 1 argument, {$argc} given");
         }
