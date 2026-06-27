@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3336 |
-| Phase A inventory files (M2 ratio SSOT) | 3336 |
+| PHP files on vm.php path | 3338 |
+| Phase A inventory files (M2 ratio SSOT) | 3338 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8843 |
+| Source constructs flagged (warnings) | 8855 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -262,7 +262,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/Module.php` | 0 | 27 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 19 |
+| `ext/posix/VmPosix.php` | 0 | 18 |
+| `ext/posix/VmPosixRlimitPure.php` | 0 | 1 |
 | `ext/posix/VmPosixTimesPure.php` | 0 | 1 |
 | `ext/posix/posix_access.php` | 0 | 3 |
 | `ext/posix/posix_ctermid.php` | 0 | 2 |
@@ -1157,7 +1158,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 7 |
-| `ext/standard/VmPregEngine.php` | 0 | 39 |
+| `ext/standard/VmPregEngine.php` | 0 | 50 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
 | `ext/standard/VmPregMatches.php` | 0 | 12 |
@@ -1223,6 +1224,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamSelectPure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketFailure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketGetName.php` | 0 | 1 |
+| `ext/standard/VmStreamSocketGetNamePure.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairNative.php` | 0 | 1 |
 | `ext/standard/VmStreamSocketPairPure.php` | 0 | 1 |
@@ -4874,25 +4876,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/VmPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 46)
+- new Error (line 41)
+- new Error (line 51)
 - new Error (line 61)
-- new Error (line 76)
-- new Error (line 92)
-- new Error (line 133)
-- new Error (line 203)
-- new Error (line 220)
+- new Error (line 75)
+- new Error (line 88)
+- new Error (line 141)
+- new Error (line 158)
+- new Error (line 323)
+- new HashTable (line 331)
+- new Variable (line 333)
+- new Error (line 357)
+- new Error (line 365)
 - new Error (line 385)
-- new HashTable (line 393)
-- new Variable (line 395)
-- new Error (line 416)
-- new Error (line 425)
-- new Error (line 439)
-- new Error (line 459)
-- new Error (line 475)
-- new Error (line 493)
-- new Error (line 511)
-- new Error (line 527)
-- 38 class method(s)
+- new Error (line 401)
+- new Error (line 419)
+- new Error (line 437)
+- new Error (line 453)
+- 36 class method(s)
+
+### `ext/posix/VmPosixRlimitPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/posix/VmPosixTimesPure.php`
 
@@ -5878,7 +5884,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/IniJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 27 class method(s)
 
 ### `ext/standard/IniParseQuantityJitHelper.php`
 
@@ -9993,16 +9999,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDns.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 133)
-- new Variable (line 135)
-- new HashTable (line 279)
-- new HashTable (line 282)
-- new Variable (line 284)
-- new HashTable (line 416)
-- new Variable (line 433)
-- new Variable (line 440)
-- 40 class method(s)
-- 1 closure(s)
+- new HashTable (line 111)
+- new Variable (line 113)
+- new HashTable (line 254)
+- new HashTable (line 257)
+- new Variable (line 259)
+- new HashTable (line 385)
+- new Variable (line 402)
+- new Variable (line 409)
+- 35 class method(s)
+- 2 closure(s)
 
 ### `ext/standard/VmDnsMx.php`
 
@@ -10519,12 +10525,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 449)
-- new HashTable (line 456)
-- new Variable (line 464)
-- new Variable (line 477)
-- new Variable (line 485)
-- 32 class method(s)
+- new HashTable (line 504)
+- new HashTable (line 511)
+- new Variable (line 519)
+- new Variable (line 532)
+- new Variable (line 540)
+- 36 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
 
@@ -10871,40 +10877,51 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmPregAstEmptyNode (line 168)
 - new VmPregCompileException (line 172)
 - new VmPregAstAltNode (line 189)
-- new VmPregAstEmptyNode (line 199)
-- new VmPregAstConcatNode (line 205)
-- new VmPregAstQuantNode (line 217)
-- new VmPregCompileException (line 272)
-- new VmPregCompileException (line 283)
-- new VmPregCompileException (line 289)
-- new VmPregCompileException (line 304)
-- new VmPregAstAnyNode (line 316)
-- new VmPregAstBolNode (line 321)
-- new VmPregAstEolNode (line 326)
-- new VmPregCompileException (line 332)
-- new VmPregAstCharNode (line 336)
-- new VmPregCompileException (line 354)
-- new VmPregCompileException (line 360)
-- new VmPregCompileException (line 364)
-- new VmPregCompileException (line 369)
-- new VmPregAstGroupNode (line 380)
-- new VmPregCompileException (line 387)
+- new VmPregAstEmptyNode (line 197)
+- new VmPregAstEmptyNode (line 203)
+- new VmPregAstConcatNode (line 209)
+- new VmPregCompileException (line 219)
+- new VmPregCompileException (line 223)
+- new VmPregCompileException (line 249)
+- new VmPregAstQuantNode (line 291)
+- new VmPregCompileException (line 346)
+- new VmPregCompileException (line 357)
+- new VmPregCompileException (line 363)
+- new VmPregCompileException (line 378)
+- new VmPregAstAnyNode (line 390)
+- new VmPregAstBolNode (line 395)
+- new VmPregAstEolNode (line 400)
+- new VmPregCompileException (line 406)
+- new VmPregAstCharNode (line 410)
+- new VmPregCompileException (line 430)
+- new VmPregAstEmptyNode (line 434)
 - new VmPregCompileException (line 439)
-- new VmPregAstClassNode (line 443)
-- new VmPregCompileException (line 453)
-- new VmPregCompileException (line 473)
-- new VmPregAstClassNode (line 479)
-- new VmPregAstClassNode (line 480)
-- new VmPregAstClassNode (line 481)
-- new VmPregAstClassNode (line 482)
-- new VmPregAstClassNode (line 483)
-- new VmPregAstClassNode (line 484)
-- new VmPregAstBolNode (line 485)
-- new VmPregAstEolNode (line 486)
-- new VmPregAstEolNode (line 487)
-- new VmPregAstCharNode (line 488)
-- new VmPregBacktrackLimitException (line 547)
-- 41 class method(s)
+- new VmPregCompileException (line 445)
+- new VmPregCompileException (line 451)
+- new VmPregAstEmptyNode (line 455)
+- new VmPregCompileException (line 457)
+- new VmPregCompileException (line 462)
+- new VmPregAstGroupNode (line 473)
+- new VmPregCompileException (line 498)
+- new VmPregCompileException (line 507)
+- new VmPregCompileException (line 526)
+- new VmPregCompileException (line 534)
+- new VmPregCompileException (line 586)
+- new VmPregAstClassNode (line 590)
+- new VmPregCompileException (line 600)
+- new VmPregCompileException (line 620)
+- new VmPregAstClassNode (line 626)
+- new VmPregAstClassNode (line 627)
+- new VmPregAstClassNode (line 628)
+- new VmPregAstClassNode (line 629)
+- new VmPregAstClassNode (line 630)
+- new VmPregAstClassNode (line 631)
+- new VmPregAstBolNode (line 632)
+- new VmPregAstEolNode (line 633)
+- new VmPregAstEolNode (line 634)
+- new VmPregAstCharNode (line 635)
+- new VmPregBacktrackLimitException (line 694)
+- 48 class method(s)
 
 ### `ext/standard/VmPregFailure.php`
 
@@ -11466,7 +11483,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSocketGetName.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 1 class method(s)
+
+### `ext/standard/VmStreamSocketGetNamePure.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `ext/standard/VmStreamSocketNative.php`
 
@@ -11486,7 +11508,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamSocketPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/VmStreamSupports.php`
 
@@ -16515,9 +16537,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1011)
 - new Variable (line 1018)
 - new Frame (line 1029)
-- new Variable (line 1086)
-- new Variable (line 1112)
-- new Variable (line 1152)
+- new Variable (line 1093)
+- new Variable (line 1119)
+- new Variable (line 1159)
 - 104 class method(s)
 
 ### `lib/BuiltinByRefParams.php`
@@ -16863,77 +16885,77 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10584)
 - new Operand\Temporary (line 10586)
 - new OpCode (line 10633)
-- new CfgVariable (line 15628)
-- new Literal (line 15628)
-- new Variable (line 15660)
-- new Variable (line 15714)
-- new OpCode (line 15738)
-- new OpCode (line 16080)
-- new OpCode (line 16096)
-- new OpCode (line 16104)
-- new OpCode (line 16111)
-- new OpCode (line 16123)
-- new OpCode (line 16140)
-- new OpCode (line 16146)
-- new OpCode (line 16152)
-- new OpCode (line 16157)
-- new OpCode (line 16173)
-- new OpCode (line 16186)
-- new Variable (line 16197)
-- new Operand\Literal (line 16199)
-- new OpCode (line 16202)
-- new OpCode (line 16272)
-- new OpCode (line 16283)
-- new OpCode (line 16296)
-- new OpCode (line 16470)
-- new OpCode (line 16718)
-- new OpCode (line 16724)
-- new OpCode (line 16730)
-- new OpCode (line 16755)
-- new Variable (line 16782)
-- new Temporary (line 16784)
-- new Variable (line 16792)
-- new Temporary (line 16794)
-- new OpCode (line 16842)
-- new Operand\Temporary (line 16862)
-- new Operand\Temporary (line 16868)
-- new Operand\Temporary (line 16874)
-- new Operand\Temporary (line 16880)
-- new Operand\Temporary (line 16889)
-- new Variable (line 17689)
-- new Variable (line 17693)
-- new Variable (line 17701)
-- new Variable (line 17705)
-- new Variable (line 17947)
-- new Operand\Literal (line 18270)
-- new Variable (line 18272)
-- new OpCode (line 18504)
-- new OpCode (line 18684)
-- new OpCode (line 18945)
-- new OpCode (line 19138)
-- new OpCode (line 19148)
+- new CfgVariable (line 15631)
+- new Literal (line 15631)
+- new Variable (line 15663)
+- new Variable (line 15717)
+- new OpCode (line 15741)
+- new OpCode (line 16083)
+- new OpCode (line 16099)
+- new OpCode (line 16107)
+- new OpCode (line 16114)
+- new OpCode (line 16126)
+- new OpCode (line 16143)
+- new OpCode (line 16149)
+- new OpCode (line 16155)
+- new OpCode (line 16160)
+- new OpCode (line 16176)
+- new OpCode (line 16189)
+- new Variable (line 16200)
+- new Operand\Literal (line 16202)
+- new OpCode (line 16205)
+- new OpCode (line 16275)
+- new OpCode (line 16286)
+- new OpCode (line 16299)
+- new OpCode (line 16473)
+- new OpCode (line 16721)
+- new OpCode (line 16727)
+- new OpCode (line 16733)
+- new OpCode (line 16758)
+- new Variable (line 16785)
+- new Temporary (line 16787)
+- new Variable (line 16795)
+- new Temporary (line 16797)
+- new OpCode (line 16845)
+- new Operand\Temporary (line 16865)
+- new Operand\Temporary (line 16871)
+- new Operand\Temporary (line 16877)
+- new Operand\Temporary (line 16883)
+- new Operand\Temporary (line 16892)
+- new Variable (line 17692)
+- new Variable (line 17696)
+- new Variable (line 17704)
+- new Variable (line 17708)
+- new Variable (line 17950)
+- new Operand\Literal (line 18273)
+- new Variable (line 18275)
+- new OpCode (line 18507)
+- new OpCode (line 18687)
+- new OpCode (line 18948)
+- new OpCode (line 19141)
 - new OpCode (line 19151)
-- new Operand\Temporary (line 19183)
-- new OpCode (line 19185)
-- new OpCode (line 19196)
-- new Operand\Temporary (line 19199)
-- new OpCode (line 19201)
-- new OpCode (line 19209)
-- new OpCode (line 19216)
-- new OpCode (line 19224)
+- new OpCode (line 19154)
+- new Operand\Temporary (line 19186)
+- new OpCode (line 19188)
+- new OpCode (line 19199)
+- new Operand\Temporary (line 19202)
+- new OpCode (line 19204)
+- new OpCode (line 19212)
+- new OpCode (line 19219)
 - new OpCode (line 19227)
-- new OpCode (line 19244)
-- new OpCode (line 19271)
-- new OpCode (line 19278)
-- new OpCode (line 19379)
-- new Literal (line 19403)
-- new OpCode (line 19502)
-- new Variable (line 19509)
-- new Temporary (line 19511)
-- new OpCode (line 19514)
-- new CompileFatal (line 19812)
-- new CompileFatal (line 19851)
-- 582 class method(s)
+- new OpCode (line 19230)
+- new OpCode (line 19247)
+- new OpCode (line 19274)
+- new OpCode (line 19281)
+- new OpCode (line 19382)
+- new Literal (line 19406)
+- new OpCode (line 19505)
+- new Variable (line 19512)
+- new Temporary (line 19514)
+- new OpCode (line 19517)
+- new CompileFatal (line 19815)
+- new CompileFatal (line 19854)
+- 583 class method(s)
 - 17 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -17233,7 +17255,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 38 class method(s)
+- 39 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 

@@ -1268,6 +1268,7 @@ require_once __DIR__.'/../../../ext/standard/VmStreamSelect.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSelectGuard.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSelectPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketFailure.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamSocketGetNamePure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketGetName.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamSocketPairNative.php';
