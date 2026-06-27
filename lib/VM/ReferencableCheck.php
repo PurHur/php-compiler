@@ -231,12 +231,11 @@ final class ReferencableCheck
         if (null === $slot) {
             return false;
         }
+        // Assign-result / named CV slots are referenceable even without scope operand names (#12690).
+        if ($caller->block->isNamedVariableSlot($slot)) {
+            return true;
+        }
         if (isset($caller->block->constants[$slot])) {
-            // Named locals may share an initializer constant; still allow by-ref (#5593, #6689, #9700).
-            if ($caller->block->isNamedVariableSlot($slot)) {
-                return true;
-            }
-
             return false;
         }
         $operand = $caller->block->operandForScopeSlot($slot);
