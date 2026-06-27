@@ -56,11 +56,14 @@ final class IniJitHelper
         'short_open_tag' => false,
         'register_argc_argv' => true,
         'zend.enable_gc' => true,
+        'session.use_cookies' => true,
+        'session.use_only_cookies' => true,
     ];
 
     private const READONLY_STRING_DEFAULTS = [
         'max_execution_time' => '0',
         'default_charset' => 'UTF-8',
+        'session.save_handler' => 'files',
     ];
 
     /** Unset string ini directives return '' — mirror VmIni empty-string key list for JIT compile. */

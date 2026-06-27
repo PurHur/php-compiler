@@ -21,12 +21,15 @@ final class VmIni
         'short_open_tag' => false,
         'register_argc_argv' => true,
         'zend.enable_gc' => true,
+        'session.use_cookies' => true,
+        'session.use_only_cookies' => true,
     ];
 
     /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
     private const READONLY_STRING_DEFAULTS = [
         'max_execution_time' => '0',
         'default_charset' => 'UTF-8',
+        'session.save_handler' => 'files',
     ];
 
     /**
