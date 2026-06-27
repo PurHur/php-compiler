@@ -11134,6 +11134,10 @@ class Compiler {
                 if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
                     break;
                 }
+                if ($child instanceof Op\Expr\BinaryOp\Plus) {
+                    // Plus immediately precedes the call — wire TYPE_ARG_SEND to Plus.result (#10490, #12763).
+                    return null;
+                }
                 if ($child instanceof Op\Expr\Array_
                     && $this->operandsReferToSameVariable($child->result, $arg)
                 ) {
@@ -11169,6 +11173,10 @@ class Compiler {
             }
         }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        $lastProducer = $producers[\count($producers) - 1] ?? null;
+        if ($lastProducer instanceof Op\Expr\BinaryOp\Plus) {
+            return null;
+        }
         if ($producer instanceof Op\Expr\Array_) {
             $producerIdx = array_search($producer, $producers, true);
             if (
@@ -13063,6 +13071,14 @@ class Compiler {
             return null;
         }
         if (null !== $callArg) {
+            $arrayUnionPlus = $this->matchArrayUnionPlusInlineCallArgProducer(
+                $producers,
+                $callArg,
+                $argCount
+            );
+            if (null !== $arrayUnionPlus) {
+                return $arrayUnionPlus;
+            }
             $directProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
             if (null !== $directProducer) {
                 return $directProducer;
@@ -14000,6 +14016,46 @@ class Compiler {
         }
 
         return $filtered;
+    }
+
+    /**
+     * php-cfg dead call-arg temps for array union may alias a Plus operand, not Plus.result (#10490, #12763).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchArrayUnionPlusInlineCallArgProducer(
+        array $producers,
+        Operand $callArg,
+        int $argCount
+    ): ?Op\Expr {
+        if ([] === $producers) {
+            return null;
+        }
+        $last = $producers[\count($producers) - 1];
+        if (!$last instanceof Op\Expr\BinaryOp\Plus) {
+            return null;
+        }
+        if ($this->operandsReferToSameVariable($last->result, $callArg)) {
+            return $last;
+        }
+        if (1 !== $argCount || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        foreach ([$last->left, $last->right] as $operand) {
+            if (null !== $operand && $this->operandsReferToSameVariable($operand, $callArg)) {
+                return $last;
+            }
+        }
+        foreach ($producers as $producer) {
+            if (
+                null !== $producer->result
+                && $this->operandsReferToSameVariable($producer->result, $callArg)
+            ) {
+                return $last;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -19242,9 +19298,26 @@ class Compiler {
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && 1 === $this->countDeadArrayInlineCallArgs($cfgCallOp)
             ) {
-                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
-                if (null !== $initArraySlot) {
-                    $valueSlot = $initArraySlot;
+                $producers = null !== $block->orig
+                    ? $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    )
+                    : [];
+                $lastProducer = $producers[\count($producers) - 1] ?? null;
+                $hasArrayUnionPlus = false;
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\BinaryOp\Plus) {
+                        $hasArrayUnionPlus = true;
+                        break;
+                    }
+                }
+                // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
+                if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
+                    $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                    if (null !== $initArraySlot) {
+                        $valueSlot = $initArraySlot;
+                    }
                 }
             }
             if (
