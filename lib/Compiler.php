@@ -949,6 +949,28 @@ class Compiler {
         return $this->mergeCfgBlockUsesTernaryPhi($ifMerge);
     }
 
+    /**
+     * `||` short-circuit: php-cfg puts literal `true` on JumpIf->if and (bool) cast on ->else.
+     * Lower else before if so the cast arm records the phi slot for the literal arm (#12745).
+     */
+    private function jumpIfTargetsLogicalOrShortCircuitLiteralIf(Op\Stmt\JumpIf $stmt): bool
+    {
+        $ifMerge = $this->branchJumpMergeTarget($stmt->if);
+        $elseMerge = $this->branchJumpMergeTarget($stmt->else);
+        if (null === $ifMerge || $ifMerge !== $elseMerge) {
+            return false;
+        }
+        if (!$this->mergeCfgBlockUsesLogicalShortCircuit($ifMerge)) {
+            return false;
+        }
+        $ifTail = $this->branchTailExprBeforeJump($stmt->if);
+        $elseTail = $this->branchTailExprBeforeJump($stmt->else);
+
+        return $ifTail instanceof Op\Expr\Assign
+            && $ifTail->expr instanceof Operand\Literal
+            && $elseTail instanceof Op\Expr\Cast\Bool_;
+    }
+
     /** Both ?: arms jump to a merge block ending in RETURN (#4280, #8563). */
     private function jumpIfTargetsReturnMerge(Op\Stmt\JumpIf $stmt): bool
     {
@@ -1321,6 +1343,73 @@ class Compiler {
         return null;
     }
 
+    /**
+     * Reserve one phi slot for `||` / `&&` short-circuit merge before both arms are lowered (#12745).
+     *
+     * @return int|null slot index stored in {@see $ternaryMergePhiRhsSlots}
+     */
+    private function seedLogicalShortCircuitPhiSlot(CfgBlock $branchCfg, Block $branch, Operand $phiOperand): ?int
+    {
+        $mergeCfg = $this->branchJumpMergeTarget($branchCfg);
+        if (null === $mergeCfg || !$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+            return null;
+        }
+        if ($this->ternaryMergePhiRhsSlots->contains($mergeCfg)) {
+            return $this->ternaryMergePhiRhsSlots[$mergeCfg];
+        }
+        $slot = (int) $branch->getVarSlot($phiOperand, false);
+        $this->ternaryMergePhiRhsSlots[$mergeCfg] = $slot;
+        $root = Block::cfgVarRoot($phiOperand);
+        if (null !== $root) {
+            if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+            }
+            /** @var SplObjectStorage<CfgVariable, int> $map */
+            $map = $this->ternaryMergeVarSlots[$mergeCfg];
+            $map[$root] = $slot;
+        }
+
+        return $slot;
+    }
+
+    /** `||`-only phi slot for dead call-arg temps (do not disturb `&&` merge wiring). */
+    private function logicalShortCircuitOrPhiMergeSlot(Block $branch): ?int
+    {
+        if (null === $branch->orig) {
+            return null;
+        }
+        foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
+            if (!$this->mergeCfgUsesLogicalOrShortCircuit($mergeCfg)) {
+                continue;
+            }
+            $recorded = $this->ternaryMergePhiRhsSlot($mergeCfg);
+            if (null !== $recorded) {
+                return $recorded;
+            }
+        }
+
+        return null;
+    }
+
+    private function mergeCfgUsesLogicalOrShortCircuit(CfgBlock $mergeCfg): bool
+    {
+        if (!$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+            return false;
+        }
+        foreach ($mergeCfg->parents as $parentCfg) {
+            $tail = $this->branchTailExprBeforeJump($parentCfg);
+            if (
+                $tail instanceof Op\Expr\Assign
+                && $tail->expr instanceof Operand\Literal
+                && true === $tail->expr->value
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /** exit($a && $b) ? … — dead call-arg temp must use && phi / parent cast slot (#11592). */
     private function resolveExitLogicalShortCircuitCallArgSlot(Block $block): ?string
     {
@@ -1475,8 +1564,12 @@ class Compiler {
         if (!$this->isMergeBranchAssign($branch, $assign)) {
             return null;
         }
-        if (null === $mergeCfg) {
-            $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        $mergeCfg = $this->branchJumpMergeTarget($branch->orig);
+        if (null !== $mergeCfg && $this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+            $seeded = $this->seedLogicalShortCircuitPhiSlot($branch->orig, $branch, $assign->var);
+            if (null !== $seeded) {
+                return $seeded;
+            }
         }
         if (null !== $mergeCfg) {
             $recordedPhi = $this->ternaryMergePhiRhsSlot($mergeCfg);
@@ -7117,6 +7210,10 @@ class Compiler {
                 // Lower else before if so merge blocks record both branch phi slots (#3790, #5510).
                 $op->block2 = $this->compileCfgBranch($stmt->else, $block);
                 $op->block1 = $this->compileCfgBranch($stmt->if, $block);
+            } elseif ($this->jumpIfTargetsLogicalOrShortCircuitLiteralIf($stmt)) {
+                // `||` literal-true arm must reuse bool-cast phi slot from the long arm (#12745).
+                $op->block2 = $this->compileCfgBranch($stmt->else, $block);
+                $op->block1 = $this->compileCfgBranch($stmt->if, $block);
             } else {
                 $op->block1 = $this->compileCfgBranch($stmt->if, $block);
                 $op->block2 = $this->compileCfgBranch($stmt->else, $block);
@@ -7600,6 +7697,9 @@ class Compiler {
                 $this->throwCompileError('The (unset) cast is no longer supported');
             }
             $line = $expr->getLine();
+            if (null !== $block->orig) {
+                $this->seedLogicalShortCircuitPhiSlot($block->orig, $block, $expr->result);
+            }
             $castResultSlot = $this->compileOperand($expr->result, $block, false);
             $ops = [new OpCode(
                 $this->getOpCodeTypeFromCastOp($expr),
@@ -19052,11 +19152,16 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
-                && \in_array(strtolower($calleeName ?? ''), ['exit', 'die'], true)
+                && null !== $block->orig
             ) {
-                $logicalPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
+                $logicalPhi = $this->logicalShortCircuitOrPhiMergeSlot($block);
                 if (null !== $logicalPhi) {
-                    $valueSlot = $logicalPhi;
+                    $valueSlot = (string) $logicalPhi;
+                } elseif (\in_array(strtolower($calleeName ?? ''), ['exit', 'die'], true)) {
+                    $exitPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
+                    if (null !== $exitPhi) {
+                        $valueSlot = $exitPhi;
+                    }
                 }
             }
             if (

@@ -1,5 +1,5 @@
 <?php
-// Maintainer repro for #12745 — OR guard with !== must enter block when either side mismatches.
+// #12745 — if (A !== x || B !== y) guard must match Zend when both sides mismatch.
 $a = 2;
 $b = 3;
 if (1 !== $a || 1 !== $b) {
