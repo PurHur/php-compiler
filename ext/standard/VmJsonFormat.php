@@ -50,7 +50,7 @@ final class VmJsonFormat
 
             return null;
         }
-        $parser = new VmJsonParser($json, $maxDepth, $assoc);
+        $parser = new VmJsonParser($json, $maxDepth, $assoc, $flags);
         $value = $parser->parseTop();
         if (VmJson::lastError() !== 0) {
             if (VmJsonFlags::throwsOnError($flags)) {
