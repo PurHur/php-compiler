@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\posix;
 
 use PHPCompiler\ext\standard\JitGetcwd;
 use PHPCompiler\ext\standard\JitSleep;
+use PHPCompiler\JIT\Builtin\PosixCtermidRuntime;
 use PHPCompiler\JIT\Builtin\PosixStrerrorRuntime;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringInfo;
@@ -224,6 +225,12 @@ final class JitPosix
     }
 
     public static function ctermid(Context $context): Value
+    {
+        return PosixCtermidRuntime::ctermid($context);
+    }
+
+    /** Standalone AOT libc ctermid LLVM quarantine (#12684). */
+    public static function ctermidStandalone(Context $context): Value
     {
         self::ensureLibcCtermid($context);
         $i8p = $context->getTypeFromString('int8*');
