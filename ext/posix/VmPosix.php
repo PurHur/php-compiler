@@ -377,14 +377,9 @@ final class VmPosix
     public static function getsid(int $pid): int|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getsid() is not available in this compiler build');
-        }
-
-        $sid = (int) $ffi->getsid($pid);
-        if ($sid < 0) {
-            self::$lastError = self::readErrno($ffi);
+        $sid = VmPosixSessionPure::getsid($pid);
+        if (null === $sid) {
+            self::$lastError = 3;
 
             return false;
         }
@@ -395,14 +390,9 @@ final class VmPosix
     public static function getpgid(int $pid): int|false
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_getpgid() is not available in this compiler build');
-        }
-
-        $pgid = (int) $ffi->getpgid($pid);
-        if ($pgid < 0) {
-            self::$lastError = self::readErrno($ffi);
+        $pgid = VmPosixSessionPure::getpgid($pid);
+        if (null === $pgid) {
+            self::$lastError = 3;
 
             return false;
         }
@@ -502,8 +492,6 @@ struct rlimit {
 };
 int setrlimit(int resource, const struct rlimit *rlim);
 pid_t setsid(void);
-pid_t getsid(pid_t pid);
-pid_t getpgid(pid_t pid);
 int setpgid(pid_t pid, pid_t pgid);
 CDEF;
 
