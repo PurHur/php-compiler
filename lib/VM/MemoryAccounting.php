@@ -14,8 +14,8 @@ final class MemoryAccounting
     /** Zend MM page size (zend_alloc.c ZEND_MM_PAGE_SIZE). */
     private const ZEND_MM_PAGE_SIZE = 4096;
 
-    /** Zend MM cache bucket at request start: 14 free pages after engine bootstrap (zend_alloc.c zend_mm_gc; PHP 8.2.31 CLI → 57344). */
-    private const INITIAL_MM_CACHE = 14 * self::ZEND_MM_PAGE_SIZE;
+    /** Zend MM cache bucket at request start: 15 free pages after engine bootstrap (zend_alloc.c zend_mm_gc; PHP 8.2.31 CLI → 61440). */
+    private const INITIAL_MM_CACHE = 15 * self::ZEND_MM_PAGE_SIZE;
 
     private static int $mmCacheRemaining = self::INITIAL_MM_CACHE;
 

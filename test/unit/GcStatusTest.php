@@ -70,8 +70,8 @@ PHP;
 <?php
 $first = gc_mem_caches();
 $second = gc_mem_caches();
-echo 'first=', ($first > 0 ? 'nonzero' : 'zero'), "\n";
-echo 'second=', ($second > 0 ? 'nonzero' : 'zero'), "\n";
+echo 'first=', $first, "\n";
+echo 'second=', $second, "\n";
 PHP;
 
         $rt = new Runtime();

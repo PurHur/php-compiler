@@ -7,5 +7,5 @@ $second = gc_mem_caches();
 echo 'first=', $first, "\n";
 echo 'second=', $second, "\n";
 --EXPECT--
-first=57344
+first=61440
 second=0
