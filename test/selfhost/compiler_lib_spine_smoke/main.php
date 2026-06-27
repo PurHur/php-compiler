@@ -2237,6 +2237,7 @@ require_once __DIR__.'/../../../lib/JIT/BootstrapCompileSmokeM3Emit.php';
 require_once __DIR__.'/../../../lib/JIT/BoundMethodCallableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayChunkRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayCountValuesRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayFilterRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayFlipRuntime.php';
