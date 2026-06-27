@@ -30,6 +30,28 @@ final class ResourceSupport
             && null !== $object->resourceState;
     }
 
+    /** VM Resource wrapper — not a userland class (php-src-strict, #12840). */
+    public static function isHiddenPseudoClassLc(string $classLc): bool
+    {
+        return self::CLASS_LC === strtolower(ltrim($classLc, '\\'));
+    }
+
+    public static function isHiddenPseudoClassEntry(ClassEntry $entry): bool
+    {
+        return self::isHiddenPseudoClassLc($entry->name);
+    }
+
+    /** get_class() operand — Zend rejects legacy resources (#12840). */
+    public static function rejectsGetClassOperand(Variable $var): bool
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $var->type && self::isResourceObject($var->toObject())) {
+            return true;
+        }
+
+        return $var->isVmResource();
+    }
+
     public static function stateFromVariable(Variable $var): ?ResourceState
     {
         $var = $var->resolveIndirect();

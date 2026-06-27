@@ -86,8 +86,46 @@ final class JitGetClass
         self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'mixed'));
 
         $context->builder->positionAtEnd($okBlock);
+        self::emitResourceOperandGuard($context, $arg);
 
         return ReflectionBuiltinHelper::getClassName($context, $arg);
+    }
+
+    private static function emitResourceOperandGuard(Context $context, JITVariable $arg): void
+    {
+        $resourceClassId = self::resourceClassId($context);
+        if (null === $resourceClassId) {
+            return;
+        }
+        $loaded = JitValueBox::valuePtrFromVariable($context, $arg);
+        $obj = $context->builder->call(
+            $context->lookupFunction('__value__readObject'),
+            $loaded
+        );
+        $objMap = $context->structFieldMap['__object__'];
+        $classId = $context->builder->load(
+            $context->builder->structGep($obj, $objMap['class_id'])
+        );
+        $isResource = $context->builder->icmp(
+            Builder::INT_EQ,
+            $classId,
+            $context->getTypeFromString('int64')->constInt($resourceClassId, false)
+        );
+        $continueBlock = BasicBlockHelper::append($context, 'get_class_not_resource');
+        $resourceErrBlock = BasicBlockHelper::append($context, 'get_class_resource_err');
+        $context->builder->branchIf($isResource, $resourceErrBlock, $continueBlock);
+        $context->builder->positionAtEnd($resourceErrBlock);
+        self::emitTypeErrorAndAbort($context, \sprintf(self::TYPE_ERROR, 'resource'));
+        $context->builder->positionAtEnd($continueBlock);
+    }
+
+    private static function resourceClassId(Context $context): ?int
+    {
+        try {
+            return $context->type->object->lookup('Resource');
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     private static function emitTypeErrorAndAbort(Context $context, string $message): void

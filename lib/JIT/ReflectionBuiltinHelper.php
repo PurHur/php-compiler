@@ -42,7 +42,8 @@ final class ReflectionBuiltinHelper
             $entry = $context->runtime->vmContext->classes[$lc] ?? null;
             $exists = null !== $entry
                 && !$entry->isInterface
-                && !$entry->isTrait;
+                && !$entry->isTrait
+                && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry);
         }
         $i1 = $context->getTypeFromString('int1');
 

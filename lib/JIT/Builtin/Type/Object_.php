@@ -4989,6 +4989,9 @@ class Object_ extends Type {
 
     private function emitClassIdInstanceOf(PHPLLVM\Value $classId, string $className): PHPLLVM\Value
     {
+        if (\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassLc($className)) {
+            return $this->context->getTypeFromString('int1')->constInt(0, false);
+        }
         $matchingIds = $this->classIdsInstanceOf($className);
         if ([] === $matchingIds) {
             $expectedId = $this->lookup($className);

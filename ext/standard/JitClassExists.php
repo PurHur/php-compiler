@@ -31,6 +31,9 @@ final class JitClassExists
         }
 
         foreach ($candidates as $lc) {
+            if (\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassLc($lc)) {
+                continue;
+            }
             $candidate = $context->builder->load($context->constantStringFromString($lc));
             $candidateData = self::stringDataPtr($context, $candidate);
             $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);

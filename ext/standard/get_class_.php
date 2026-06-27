@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
+use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -49,6 +50,9 @@ final class get_class_ extends Internal
                     $ret->string($value->toEnumCase()->enumClass->name);
 
                     return;
+                }
+                if (ResourceSupport::rejectsGetClassOperand($value)) {
+                    throw new \TypeError(\sprintf(self::TYPE_ERROR, 'resource'));
                 }
                 if (Variable::TYPE_OBJECT !== $value->type) {
                     throw new \TypeError(\sprintf(self::TYPE_ERROR, self::vmTypeName($value->type)));
