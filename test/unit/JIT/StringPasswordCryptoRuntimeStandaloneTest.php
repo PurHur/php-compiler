@@ -19,7 +19,7 @@ final class StringPasswordCryptoRuntimeStandaloneTest extends TestCase
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/password_crypto.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoJit.php');
-        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCryptoStandaloneLlvm.php');
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('password_crypto.c', $linker);
         $wrapper = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php');

@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -14,8 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for password_hash/verify/crypt/get_info via PasswordJitHelper PHP (#9908).
  *
- * Replaces {@see StringPasswordCryptoStandaloneLlvm} on JIT embed; standalone keeps LLVM
- * until PasswordJitHelper compiles in native standalone nested link (#9908).
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\PasswordJitHelper}; thin LLVM
+ * bridges forward the ABI (#9908, #12869).
  * SSOT: {@see \PHPCompiler\ext\standard\VmPassword}
  * php-src: ext/standard/password.c
  */
@@ -69,13 +68,6 @@ final class PasswordCryptoRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_password_hash');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPasswordCryptoStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
