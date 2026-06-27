@@ -12372,8 +12372,7 @@ class Compiler {
     }
 
     /**
-     * Assign-expression result temps are fine for by-value args; by-ref must bind the CV lvalue (#12690).
-     * array_multisort() assign-in-arg keeps the result temp so sort does not write back to the CV (#12654).
+     * Assign.result temps diverge from the CV after by-ref builtins; bind the lvalue (#12690, #12712, #12713).
      */
     private function resolveNamedAssignCallArgSlot(
         Block $block,
@@ -12382,15 +12381,9 @@ class Compiler {
         int $argIndex,
         ?Operand $argProbe
     ): string {
-        if (
-            null !== $calleeName
-            && 'array_multisort' !== strtolower($calleeName)
-            && $this->callArgRequiresByRef($calleeName, $argIndex, $argProbe, $block)
-        ) {
-            $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $namedAssignDestSlot);
-            if (null !== $lvalue) {
-                return (string) $lvalue;
-            }
+        $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $namedAssignDestSlot);
+        if (null !== $lvalue) {
+            return (string) $lvalue;
         }
 
         return (string) $namedAssignDestSlot;
@@ -16126,11 +16119,35 @@ class Compiler {
                 return $slot;
             }
 
-            return $block->getVarSlot($operand, $isRead);
+            return $this->finalizeOperandSlotForAccess(
+                $block,
+                $block->getVarSlot($operand, $isRead),
+                $isRead
+            );
         } elseif ($operand instanceof Operand\Temporary) {
-            return $block->getVarSlot($operand, $isRead);
+            return $this->finalizeOperandSlotForAccess(
+                $block,
+                $block->getVarSlot($operand, $isRead),
+                $isRead
+            );
         }
         $this->throwCompileLogic("Unknown Operand Type: " . $operand->getType());
+    }
+
+    /**
+     * Assign.result temps diverge from the CV after by-ref builtins; reads must use the lvalue (#12712, #12714).
+     */
+    private function finalizeOperandSlotForAccess(Block $block, int $slot, bool $isRead): int
+    {
+        if (!$isRead) {
+            return $slot;
+        }
+        $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $slot);
+        if (null !== $lvalue) {
+            return $lvalue;
+        }
+
+        return $slot;
     }
 
     private function isDynamicVariableOperand(Operand\Variable $operand): bool
@@ -18414,7 +18431,11 @@ class Compiler {
                             (int) $argIndex,
                             $assignVarProbe
                         )
-                        : (string) $assignedNamedLocal;
+                        : (string) $this->finalizeOperandSlotForAccess(
+                            $block,
+                            $assignedNamedLocal,
+                            true
+                        );
                 }
                 if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
@@ -18959,6 +18980,8 @@ class Compiler {
                     (int) $argIndex,
                     $namedAssignDestProbe
                 );
+            } elseif (null !== $valueSlot && is_numeric($valueSlot)) {
+                $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, (int) $valueSlot, true);
             }
             if (
                 null !== $cfgCallOp
