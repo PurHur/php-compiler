@@ -1,5 +1,5 @@
 --TEST--
-stdlib header_remove() after output warns and returns false (#12461, ext/standard/head.c)
+stdlib header_remove() after output warns and returns null (#12461, #12480, ext/standard/head.c)
 --FILE--
 <?php
 $warnings = [];
@@ -17,6 +17,6 @@ if ($warnings) {
     echo str_contains($warnings[0], 'headers already sent by') ? 'warn_ok' : 'warn_bad', "\n";
 }
 --EXPECT--
-xfalse
+xNULL
 warnings=1
 warn_ok
