@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Builtin\ExecutionLimitsRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -71,15 +70,12 @@ final class JitExecutionLimits
             if (Variable::TYPE_NULL === $arg->type) {
                 $apply = $zero;
             } else {
-                JitInternalStrictArg::requireBuiltinTypedBool(
+                $apply = $one;
+                $boolVal = JitBoolArg::lower(
                     $context,
                     $arg,
-                    'ignore_user_abort',
-                    'value',
-                    1
+                    'ignore_user_abort(): Argument #1 ($value)'
                 );
-                $apply = $one;
-                $boolVal = JitBoolArg::lowerBuiltinTyped($context, $arg, 'ignore_user_abort', 'value', 1);
                 $value = $context->builder->zext($boolVal, $i32);
             }
         }

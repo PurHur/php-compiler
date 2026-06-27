@@ -129,6 +129,25 @@ final class VmMath
     }
 
     /**
+     * ?bool internal params that coerce like Z_PARAM_BOOL (php-src basic_functions.c; #12677).
+     *
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
+     */
+    public static function parseNullableBoolBuiltinArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): ?bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+
+        return self::parseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+    }
+
+    /**
      * Z_PARAM_NUMBER-style coercion for int|float builtins (php-src math.c abs/ceil/floor/round; #5613).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
