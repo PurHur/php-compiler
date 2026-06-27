@@ -527,9 +527,49 @@ final class VmArray
         return $out;
     }
 
+    /**
+     * array_diff_assoc() with one source array — copy keys/values (php-src array.c, #12552).
+     */
+    public static function diffAssocSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_diff_assoc() two-array step — remove entries whose key+value pair exists in $other.
+     */
+    public static function diffAssocTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (self::pairInHashTable($key, $value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
     private static function keyExistsInHashTable(Variable $key, HashTable $table): bool
     {
         return null !== self::valueAtKeyInHashTable($key, $table);
+    }
+
+    private static function pairInHashTable(Variable $key, Variable $value, HashTable $haystack): bool
+    {
+        $stored = self::valueAtKeyInHashTable($key, $haystack);
+        if (null === $stored) {
+            return false;
+        }
+
+        return $value->resolveIndirect()->identicalTo($stored->resolveIndirect());
     }
 
     private static function valueAtKeyInHashTable(Variable $key, HashTable $table): ?Variable
