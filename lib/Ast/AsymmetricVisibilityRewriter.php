@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Ast;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Rewrite PHP 8.4 asymmetric property visibility for nikic/php-parser 4.x (#3165).
  *
@@ -26,8 +28,16 @@ final class AsymmetricVisibilityRewriter
     /** @internal Marker for asymmetric read (get) visibility (#5059). */
     public const GET_MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-get:(public|protected|private)\s*\*\//i';
 
+    public static function containsAsymmetricVisibilitySyntax(string $source): bool
+    {
+        return self::hasAsymmetricVisibilitySyntax($source);
+    }
+
     public static function rewrite(string $source): string
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            return $source;
+        }
         [$masked, $map] = self::maskLiteralsAndComments($source);
         if (!self::hasAsymmetricVisibilitySyntax($masked)) {
             return $source;

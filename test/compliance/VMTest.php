@@ -192,6 +192,19 @@ class VMTest extends BaseTest {
                         && !str_contains($name, 'die_named_message_reference_profile')))) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when asymmetric visibility enabled (#12508).
+            if (CompilerVersion::supportsAsymmetricVisibility()
+                && str_contains($name, 'private_set_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsAsymmetricVisibility()
+                && (str_contains($name, 'asymmetric')
+                    || str_contains($name, 'property_hook_private_set')
+                    || str_contains($name, 'reflection_property_asymmetric')
+                    || str_contains($name, 'promoted_private_set'))
+                && !str_contains($name, 'private_set_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;

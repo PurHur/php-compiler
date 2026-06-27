@@ -21,6 +21,9 @@ final class AsymmetricVisibilityJitCompileTest extends TestCase
 
     protected function setUp(): void
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
         $this->repoRoot = dirname(__DIR__, 2);
         if (!LlvmToolchain::isReady($this->repoRoot)) {
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';

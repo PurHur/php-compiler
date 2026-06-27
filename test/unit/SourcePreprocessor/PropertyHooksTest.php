@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
@@ -648,6 +649,9 @@ PHP;
     /** @covers issue #9729 — promoted asymmetric visibility with defaults end-to-end */
     public function testPromotedAsymmetricVisibilityWithDefaultSurvivesRuntimePreprocess(): void
     {
+        if (!CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility disabled on reference profile (#12508)');
+        }
         $src = <<<'PHP'
 <?php
 class D {
