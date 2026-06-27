@@ -44,6 +44,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
+    }
+
     public function testFpowWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsFpow());
@@ -93,6 +98,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['zend_thread_id']));
+    }
+
+    public function testVmDoesNotRegisterClassUsesRecursiveOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
     }
 
     public function testVmDoesNotRegisterSortingEnumOnReferenceProfile(): void

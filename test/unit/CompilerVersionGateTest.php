@@ -19,6 +19,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    public function testSupportsClassUsesRecursiveFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
+    }
+
     public function testSupportsMbStrPadFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
