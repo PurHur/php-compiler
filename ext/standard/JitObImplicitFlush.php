@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitBoolArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -19,6 +20,7 @@ final class JitObImplicitFlush
             throw new \LogicException('ob_implicit_flush() accepts at most one argument in this compiler build');
         }
         if (isset($args[0])) {
+            JitInternalStrictArg::requireBool($context, $args[0], 'ob_implicit_flush', 'enable', 1);
             $enable = JitBoolArg::lower(
                 $context,
                 $args[0],
