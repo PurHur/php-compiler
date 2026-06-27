@@ -15,7 +15,7 @@ permalink: /development-status.html
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **v1.1.0 theme** | M5 fast-path stability; enum/property hooks; `preg_match` JIT; `spl_autoload*`; php-in-PHP JIT helpers ([#78](https://github.com/PurHur/php-compiler/issues/78)) |
 | **Wave 3** | Language **12/12** · Stdlib **13/13** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **3399** / **3399** |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **3402** / **3402** |
 | **Builtin matrix** | **852** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
@@ -33,7 +33,7 @@ permalink: /development-status.html
 | M5 spine runtime + bootstrap | `fix/spine-aot-jit-blockers` | Native bundle-OK probe; inventory argv spine-lint fallback; gen-0 sidecars refreshed ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | VM driver execute probe | [9493e806d](https://github.com/PurHur/php-compiler/commit/9493e806d) | **~20ms** feedback loop — no full relink on stale SHA; `BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1` for rebuild ([#2201](https://github.com/PurHur/php-compiler/issues/2201)) |
 | M5 presenter | `make north-star5-verify-fast` | Daily PR gate (~1–2 min); `--strict` (~1h) pre-merge only ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
-| Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**3399/3399**); inventory argv spine-lint fallback ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
+| Gen-0 refresh | [a8cffaa0e](https://github.com/PurHur/php-compiler/commit/a8cffaa0e) | Spine runtime probe + gen-0 sidecars (**3402/3402**); inventory argv spine-lint fallback ([#8559](https://github.com/PurHur/php-compiler/issues/8559)) |
 | Parallel compile jobs | [#10347](https://github.com/PurHur/php-compiler/pull/10347) | `PHP_COMPILER_COMPILE_JOBS` for vendor prelink + M3 sidecar warmup |
 | Spine coverage | [#10356](https://github.com/PurHur/php-compiler/pull/10356) | `GeneratorYieldSourceMarker.php` in spine; inventory **3276** Phase A files |
 | v1.1.0 docs sync | [#10369](https://github.com/PurHur/php-compiler/issues/10369) | README, development-status, examples README, capability matrix (**852** builtins) |
@@ -50,7 +50,7 @@ permalink: /development-status.html
 ### Still open (high signal)
 
 - **MCJIT execute** — `bin/jit.php -r` SIGSEGV ([#98](https://github.com/PurHur/php-compiler/issues/98))
-- **Literal spine ratio** — **3399/3399** ✅ (Jun 2026)
+- **Literal spine ratio** — **3402/3402** ✅ (Jun 2026)
 - **Compile-spine stub retirement** — shrink `PHP_COMPILER_SELFHOST_AOT` on M3 allowlist ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
 - **007-ThrowsWeb AOT execute** — invalid POST segfault at runtime (link OK; slice `EXAMPLES_AOT_SMOKE_ONLY=007`)
 - **LLVM 14+ upgrade** — experimental `script/install-llvm14.sh` ([#174](https://github.com/PurHur/php-compiler/issues/174))
@@ -62,7 +62,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0** — `compiler_minimal bundle OK` ✅
-- **Self-host M2** — spine **3399/3399** ✅; native link + lint ✅
+- **Self-host M2** — spine **3402/3402** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed); compile-smoke strict native ✅ ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
 - **Self-host M5** — vendor prelink **3/3** ✅; **`make north-star5-verify-fast`** daily ✅; `--strict` pre-merge; gen-0 refreshed; VM probe ~**20ms**
