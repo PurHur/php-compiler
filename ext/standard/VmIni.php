@@ -193,6 +193,9 @@ final class VmIni
     public static function getCfgVar(string $option): string|false
     {
         $key = strtolower($option);
+        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+            return '';
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }

@@ -289,6 +289,9 @@ final class IniJitHelper
     public static function iniCfgGet(string $option): ?string
     {
         $key = strtolower($option);
+        if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
+            return '';
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
         }
