@@ -34,9 +34,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGetDeclaredExcludeDeprecated());
     }
 
-    public function testSupportsExitFunctionFormTrueOn84DevLine(): void
+    public function testSupportsExitFunctionFormFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsExitFunctionForm());
+        $this->assertFalse(CompilerVersion::supportsExitFunctionForm());
     }
 
     public function testSupportsTypedTraitConstantsTrueOn83Target(): void

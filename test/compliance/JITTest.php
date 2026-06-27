@@ -173,9 +173,10 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'final_global_typed_constant_reject')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413).
+            // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
             if (CompilerVersion::supportsExitFunctionForm()
-                && str_contains($name, 'exit_named_status_reference_profile')) {
+                && (str_contains($name, 'exit_named_status_reference_profile')
+                    || str_contains($name, 'die_named_message_reference_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsExitFunctionForm()
@@ -183,7 +184,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'exit_function_strict_types')
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
-                    || str_contains($name, 'die_named_message'))) {
+                    || (str_contains($name, 'die_named_message')
+                        && !str_contains($name, 'die_named_message_reference_profile')))) {
                 continue;
             }
             if (!CompilerVersion::supportsClassHasFunctions()

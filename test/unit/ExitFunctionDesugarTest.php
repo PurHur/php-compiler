@@ -8,7 +8,7 @@ use PHPCompiler\Ast\ExitFunctionDesugar;
 use PHPCompiler\CompilerVersion;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6975, #12413 */
+/** @covers issue #6975, #12413, #12435 */
 final class ExitFunctionDesugarTest extends TestCase
 {
     public function testTwoArgExitBecomesMarkerWhenEnabled(): void
@@ -59,6 +59,15 @@ final class ExitFunctionDesugarTest extends TestCase
             $this->markTestSkipped('requires PHP 8.2 reference profile');
         }
         $code = '<?php exit(status: 0);';
+        $this->assertSame($code, ExitFunctionDesugar::desugar($code));
+    }
+
+    public function testParenDieMessageUnchangedOnReferenceProfile(): void
+    {
+        if (CompilerVersion::supportsExitFunctionForm()) {
+            $this->markTestSkipped('requires PHP 8.2 reference profile');
+        }
+        $code = '<?php die(message: "bye");';
         $this->assertSame($code, ExitFunctionDesugar::desugar($code));
     }
 }

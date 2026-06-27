@@ -177,13 +177,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414).
+     * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414, #12435).
      *
-     * Enabled on the 8.4 development line; Zend 8.2 reference profile keeps language-construct semantics.
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects named exit/die like Zend 8.2.
      */
     public static function supportsExitFunctionForm(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
