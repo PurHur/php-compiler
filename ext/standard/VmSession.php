@@ -31,6 +31,8 @@ final class VmSession
 
     public const DEFAULT_NAME = 'PHPSESSID';
 
+    public const EMPTY_NAME_WARNING = 'session.name "%s" cannot be numeric or empty';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;

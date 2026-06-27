@@ -194,6 +194,7 @@ final class SessionName
         assert($fn instanceof Value\Function_);
 
         $bbCheckEmpty = $fn->appendBasicBlock('sname_check_empty');
+        $bbEmptyReject = $fn->appendBasicBlock('sname_empty_reject');
         $bbFail = $fn->appendBasicBlock('sname_set_fail');
         $bbCopy = $fn->appendBasicBlock('sname_copy');
         $bbClamp = $fn->appendBasicBlock('sname_clamp_len');
@@ -209,7 +210,11 @@ final class SessionName
             $context->builder->structGep($newStr, $strMap['length'])
         );
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
-        $context->builder->branchIf($isEmpty, $bbFail, $bbCopy);
+        $context->builder->branchIf($isEmpty, $bbEmptyReject, $bbCopy);
+
+        $context->builder->positionAtEnd($bbEmptyReject);
+        self::emitWriteCurrentAsString($context, $outPtr);
+        $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbCopy);
         self::emitWriteCurrentAsString($context, $outPtr);
