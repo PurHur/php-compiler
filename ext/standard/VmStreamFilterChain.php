@@ -178,7 +178,8 @@ final class VmStreamFilterChain
 
         if (0 !== ($readWrite & self::READ)) {
             if ($prepend) {
-                array_unshift(self::$readChains[$streamHandle] ??= [], $filterId);
+                self::$readChains[$streamHandle] ??= [];
+                array_unshift(self::$readChains[$streamHandle], $filterId);
             } else {
                 self::$readChains[$streamHandle] ??= [];
                 self::$readChains[$streamHandle][] = $filterId;
@@ -186,7 +187,8 @@ final class VmStreamFilterChain
         }
         if (0 !== ($readWrite & self::WRITE)) {
             if ($prepend) {
-                array_unshift(self::$writeChains[$streamHandle] ??= [], $filterId);
+                self::$writeChains[$streamHandle] ??= [];
+                array_unshift(self::$writeChains[$streamHandle], $filterId);
             } else {
                 self::$writeChains[$streamHandle] ??= [];
                 self::$writeChains[$streamHandle][] = $filterId;

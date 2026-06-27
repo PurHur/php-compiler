@@ -48,4 +48,19 @@ final class VmStreamFilterChainTest extends TestCase
         $this->assertSame('HI!', VmFs::streamGetContents($handle, -1, 0));
         VmFs::fclose($handle);
     }
+
+    public function testPrependWriteFilterOnEmptyChain(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'w+');
+        $this->assertNotFalse($handle);
+        $filterId = VmStreamFilterChain::prepend(
+            $handle,
+            'string.toupper',
+            VmStreamFilterChain::WRITE
+        );
+        $this->assertNotFalse($filterId);
+        VmFs::fwrite($handle, 'hi');
+        $this->assertSame('HI', VmFs::streamGetContents($handle, -1, 0));
+        VmFs::fclose($handle);
+    }
 }
