@@ -2354,6 +2354,7 @@
         "lib/JIT/Builtin/EmbedObEchoBridge.php",
         "lib/JIT/Builtin/EmbedObOutput.php",
         "lib/JIT/Builtin/EnumCasesRuntime.php",
+        "lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php",
         "lib/JIT/Builtin/EnvLocalRuntime.php",
         "lib/JIT/Builtin/ErrorHandler.php",
         "lib/JIT/Builtin/ErrorHandlerJitRuntime.php",
@@ -2400,6 +2401,7 @@
         "lib/JIT/Builtin/IconvRuntime.php",
         "lib/JIT/Builtin/InArrayRuntime.php",
         "lib/JIT/Builtin/IncludePathRuntime.php",
+        "lib/JIT/Builtin/IncludePathStandaloneLlvm.php",
         "lib/JIT/Builtin/InetLibcBridge.php",
         "lib/JIT/Builtin/InetRuntime.php",
         "lib/JIT/Builtin/IniGet.php",
@@ -2545,7 +2547,6 @@
         "lib/JIT/Builtin/StreamLifecycle.php",
         "lib/JIT/Builtin/StreamLifecycleJit.php",
         "lib/JIT/Builtin/StreamLifecycleRuntime.php",
-        "lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php",
         "lib/JIT/Builtin/StreamMeta.php",
         "lib/JIT/Builtin/StreamMetaJit.php",
         "lib/JIT/Builtin/StreamNotificationRuntime.php",
@@ -3649,9 +3650,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3419,
+        "inventory_files": 3420,
         "excluded": 0,
-        "eligible": 3419,
+        "eligible": 3420,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

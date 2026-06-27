@@ -51,7 +51,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/StreamLifecycleJitHelper.php',
         'lib/JIT/Builtin/StreamLibcHandleRuntime.php',
         'lib/JIT/Builtin/StreamLifecycleRuntime.php',
-        'lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php',
         'lib/VM/WeakRefSupport.php',
         'lib/VM/InterfaceCheck.php',
         'lib/VM/ClassReadonly.php',
