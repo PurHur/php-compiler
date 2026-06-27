@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayIntersectAssocRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -70,6 +70,6 @@ final class array_intersect_assoc extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayIntersectAssoc($context, ...$args);
+        return ArrayIntersectAssocRuntime::intersectAssoc($context, $args[0], ...\array_slice($args, 1));
     }
 }

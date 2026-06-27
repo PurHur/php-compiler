@@ -558,6 +558,36 @@ final class VmArray
     }
 
     /**
+     * array_intersect_assoc() with one source array — copy keys/values (php-src array.c, #12636).
+     */
+    public static function intersectAssocSingleArgumentCopy(HashTable $first): HashTable
+    {
+        return $first->replaceCopy();
+    }
+
+    /**
+     * array_intersect_assoc() two-array step — keep entries whose key+value pair exists in $other.
+     */
+    public static function intersectAssocTwo(HashTable $first, HashTable $other): HashTable
+    {
+        $out = new HashTable();
+        foreach ($first->iterateKeyed(true) as [$key, $value]) {
+            if (!self::pairInHashTable($key, $value, $other)) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            if (Variable::TYPE_INTEGER === $key->type) {
+                $out->addIndex($key->toInt(), $stored);
+            } else {
+                $out->add($key->toString(), $stored);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
      * array_diff_key() with one source array — copy keys/values (php-src array.c, #12553).
      */
     public static function diffKeySingleArgumentCopy(HashTable $first): HashTable
