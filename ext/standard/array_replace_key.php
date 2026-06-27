@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayReplaceKeyRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -24,7 +24,7 @@ use PHPLLVM\Value;
 /**
  * array_replace_key() — replace values for existing keys only (PHP 8.4; ext/standard/array.c, issue #5650).
  *
- * JIT/AOT via {@see ArrayBuiltinHelper::arrayReplaceKey}; enum key guards VM-only (#5650).
+ * JIT/AOT via {@see ArrayReplaceKeyRuntime}; enum key guards VM-only (#5650).
  */
 final class array_replace_key extends Internal
 {
@@ -63,7 +63,7 @@ final class array_replace_key extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayReplaceKey($context, $args[0], $args[1]);
+        return ArrayReplaceKeyRuntime::replaceKey($context, $args[0], $args[1]);
     }
 
     /**
