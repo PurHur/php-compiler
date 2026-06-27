@@ -79,4 +79,44 @@ final class VmFsGlobTest extends TestCase
         $this->assertCount(1, $matches);
         $this->assertSame('subdir', basename($matches[0]));
     }
+
+    /** Issue #12626 — GLOB_BRACE with no matches returns empty array, not false. */
+    public function testVmFsGlobBraceEmptyReturnsArray(): void
+    {
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob('{a,b}.txt', \GLOB_BRACE);
+        $this->assertIsArray($matches);
+        $this->assertSame([], $matches);
+    }
+
+    /** Issue #12626 — GLOB_BRACE expands alternatives. */
+    public function testVmFsGlobBraceExpandsMatches(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_scandir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/{a,b}.php', \GLOB_BRACE);
+        $this->assertIsArray($matches);
+        $this->assertCount(2, $matches);
+        $names = array_map('basename', $matches);
+        sort($names);
+        $this->assertSame(['a.php', 'b.php'], $names);
+    }
+
+    /** Issue #12627 — GLOB_MARK appends slash to directories only. */
+    public function testVmFsGlobMarkAppendsSlashToDirectories(): void
+    {
+        $dir = self::$root.'/test/compliance/cases/stdlib/glob_onlydir_fixture';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*', \GLOB_MARK);
+        $this->assertIsArray($matches);
+        $marked = false;
+        foreach ($matches as $entry) {
+            if (str_ends_with($entry, '/')) {
+                $marked = true;
+                $this->assertStringEndsWith('/subdir/', $entry);
+            }
+        }
+        $this->assertTrue($marked);
+        $files = \PHPCompiler\ext\standard\VmFsGlob::glob($dir.'/*.php', \GLOB_MARK);
+        foreach ($files as $entry) {
+            $this->assertFalse(str_ends_with($entry, '/'));
+        }
+    }
 }
