@@ -33,6 +33,7 @@ final class array_find extends Internal
             return;
         }
         $ht = VmArray::requireArray($frame->calledArgs[0]->resolveIndirect(), 'array_find');
+        VmArray::requireNonEmptyFindArray($ht, 'array_find');
         $callback = $frame->calledArgs[1];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $result = VmArrayValueCallback::invokePredicate($frame, $callback, $value, $key);
