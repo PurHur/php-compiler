@@ -18,6 +18,10 @@ final class HttpLastResponseHeadersJITTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
+        if (!CompilerVersion::supportsHttpLastResponseHeaders()) {
+            return;
+        }
+
         yield 'get_last_response_headers_jit.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/get_last_response_headers_jit.phpt',
             'get_last_response_headers_jit.phpt'

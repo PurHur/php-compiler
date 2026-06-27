@@ -105,6 +105,18 @@ class AotTest extends BaseTest
                 && str_contains($name, 'array_replace_key_phantom')) {
                 continue;
             }
+            $usesHttpLastResponseHeaders = str_contains($name, 'http_get_last_response_headers')
+                || str_contains($name, 'get_last_response_headers')
+                || str_contains($name, 'http_clear_last_response_headers');
+            if (!CompilerVersion::supportsHttpLastResponseHeaders()
+                && $usesHttpLastResponseHeaders
+                && !str_contains($name, 'http_last_response_headers_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHttpLastResponseHeaders()
+                && str_contains($name, 'http_last_response_headers_phantom')) {
+                continue;
+            }
             $usesHeaderList = str_contains($name, 'header_list')
                 || str_contains($name, 'header_remove')
                 || str_contains($name, 'setcookie')

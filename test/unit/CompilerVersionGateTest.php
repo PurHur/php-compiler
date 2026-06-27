@@ -64,6 +64,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsArrayReplaceKey());
     }
 
+    public function testSupportsHttpLastResponseHeadersFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsHttpLastResponseHeaders());
+    }
+
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
@@ -182,5 +187,15 @@ final class CompilerVersionGateTest extends TestCase
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['array_replace_key']));
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
+    }
+
+    public function testVmDoesNotRegisterHttpLastResponseHeadersOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
+        $this->assertTrue(isset($ctx->functions['get_headers']));
     }
 }
