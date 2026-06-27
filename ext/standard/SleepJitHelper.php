@@ -23,6 +23,12 @@ final class SleepJitHelper
     /** @return bool LLVM i1 ABI; bridge zext to i32 for __compiler_time_* */
     public static function timeSleepUntil(float $timestamp): bool
     {
+        if (VmSleepPure::isTimestampInPast($timestamp)) {
+            TriggerErrorJitHelper::warning(VmSleepPure::PAST_TIMESTAMP_WARNING);
+
+            return false;
+        }
+
         return VmSleepPure::timeSleepUntil($timestamp);
     }
 }

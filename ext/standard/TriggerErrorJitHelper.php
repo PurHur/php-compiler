@@ -29,6 +29,11 @@ final class TriggerErrorJitHelper
         self::recordAndMaybePrint(ErrorReporter::E_WARNING, "Undefined array key {$key}");
     }
 
+    public static function warning(string $message): void
+    {
+        self::recordAndMaybePrint(ErrorReporter::E_WARNING, $message);
+    }
+
     /**
      * @return bool LLVM i1 ABI — whether stderr print is allowed (error_reporting / @ silence)
      */
