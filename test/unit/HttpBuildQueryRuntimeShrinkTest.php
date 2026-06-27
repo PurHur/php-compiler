@@ -18,8 +18,10 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHttpBuildQuery.php');
         $this->assertStringContainsString('HttpBuildQueryJitHelper', $source);
         $this->assertStringNotContainsString('hbq_entry', $source);
+        $this->assertStringNotContainsString('StringHttpBuildQueryStandaloneLlvm', $source);
         $this->assertStringNotContainsString('__hashtable__setStringKeyString', $source);
         $this->assertStringNotContainsString('strkey_node', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHttpBuildQueryStandaloneLlvm.php');
     }
 
     public function testHttpBuildQueryJitHelperDelegatesToVmHttpBuildQuery(): void

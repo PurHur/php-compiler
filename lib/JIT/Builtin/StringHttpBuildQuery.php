@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -13,9 +12,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_http_build_query via HttpBuildQueryJitHelper PHP (#9443).
  *
- * JIT embed uses compiled PHP SSOT; AOT standalone keeps {@see StringHttpBuildQueryStandaloneLlvm}
- * until HashTable iteration compiles in native standalone nested link.
- * php-src: ext/standard/http.c — http_build_query
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\HttpBuildQueryJitHelper}; thin LLVM
+ * bridge forwards the ABI. php-src: ext/standard/http.c — http_build_query
  */
 final class StringHttpBuildQuery
 {
@@ -47,13 +45,6 @@ final class StringHttpBuildQuery
     {
         $probe = $context->module->getNamedFunction('__compiler_http_build_query');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringHttpBuildQueryStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
