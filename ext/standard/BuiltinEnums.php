@@ -30,7 +30,9 @@ final class BuiltinEnums
         self::registerResponseCode($ctx);
         self::registerSorting($ctx);
         self::registerSortDirection($ctx);
-        self::registerRoundingMode($ctx);
+        if (CompilerVersion::supportsFpow()) {
+            self::registerRoundingMode($ctx);
+        }
         self::registerParseUrl($ctx);
         self::registerRequestMethod($ctx);
         self::registerInfoView($ctx);
