@@ -19,6 +19,7 @@ final class FilterConstants
         'validate_regexp' => VmFilter::FILTER_VALIDATE_REGEXP,
         'validate_url' => VmFilter::FILTER_VALIDATE_URL,
         'validate_email' => VmFilter::FILTER_VALIDATE_EMAIL,
+        'validate_ip' => VmFilter::FILTER_VALIDATE_IP,
     ];
 
     /** @return list<string> */

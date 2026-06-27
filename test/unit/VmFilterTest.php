@@ -124,6 +124,35 @@ final class VmFilterTest extends TestCase
         $this->assertSame(Variable::TYPE_NULL, $out->type);
     }
 
+    public function testValidateIpReturnsStringForValidIpv4(): void
+    {
+        $v = new Variable();
+        $v->string('127.0.0.1');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_IP);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('127.0.0.1', $out->toString());
+    }
+
+    public function testValidateIpReturnsFalseForInvalidAddress(): void
+    {
+        $v = new Variable();
+        $v->string('not-an-ip');
+        $out = VmFilter::filterVar($v, VmFilter::FILTER_VALIDATE_IP);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testIsValidIpAddressAcceptsIpv6(): void
+    {
+        $this->assertTrue(VmFilter::isValidIpAddress('::1'));
+        $this->assertTrue(VmFilter::isValidIpAddress('[2001:db8::1]'));
+    }
+
+    public function testIsValidIpAddressRejectsInvalidIpv4(): void
+    {
+        $this->assertFalse(VmFilter::isValidIpAddress('999.999.999.999'));
+    }
+
     public function testIsIntegerStringRejectsLeadingZeros(): void
     {
         $this->assertFalse(VmFilter::isIntegerString('0123'));

@@ -355,6 +355,11 @@ class Context {
                 $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
 
                 return $var;
+            case 'filter_validate_ip':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_IP);
+
+                return $var;
             case 'filter_validate_regexp':
                 $var = new Variable(Variable::TYPE_INTEGER);
                 $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
