@@ -4931,6 +4931,7 @@ class Compiler {
                 $result->classConstDeclaredTypes[strtolower($constName)] = $child->declaredType;
             }
             if (!$this->cfgDeclaredTypeIsMixed($child->declaredType)) {
+                $this->rejectTypedClassConstantIfUnsupported($child->name);
                 $this->rejectTypedTraitConstantIfUnsupported($child->name);
                 $this->rejectTypedInterfaceConstantIfUnsupported($child->name);
                 $declared = $this->typeFromClassConstDecl($child);
@@ -5377,6 +5378,29 @@ class Compiler {
         } catch (\TypeError $e) {
             $this->throwCompileError($e->getMessage());
         }
+    }
+
+    /**
+     * Zend 8.2 rejects typed class constants at parse time; enable at 8.3+ on stable target (#12798).
+     */
+    protected function rejectTypedClassConstantIfUnsupported(Operand $nameOp): void
+    {
+        if (CompilerVersion::supportsTypedClassConstants()) {
+            return;
+        }
+        if (null === $this->compilingClassLc) {
+            return;
+        }
+        if (
+            $this->classCompileRegistry->isTrait($this->compilingClassLc)
+            || $this->classCompileRegistry->isInterface($this->compilingClassLc)
+        ) {
+            return;
+        }
+        $constName = $this->staticNameFromOperand($nameOp) ?? 'constant';
+        $this->throwCompileError(
+            sprintf('syntax error, unexpected identifier "%s", expecting "="', $constName)
+        );
     }
 
     /**

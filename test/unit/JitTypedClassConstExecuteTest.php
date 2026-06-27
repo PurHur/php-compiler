@@ -35,6 +35,9 @@ final class JitTypedClassConstExecuteTest extends TestCase
      */
     public function testTypedClassConstMatchesVm(string $fixture): void
     {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+        }
         $jit = realpath($this->repoRoot.'/bin/jit.php');
         $this->assertNotFalse($jit);
         $vm = realpath($this->repoRoot.'/bin/vm.php');

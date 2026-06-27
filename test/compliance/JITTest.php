@@ -223,6 +223,20 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'trait_typed_const_reject')) {
                 continue;
             }
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables typed class constants (#12798).
+            if (CompilerVersion::supportsTypedClassConstants()
+                && str_contains($name, 'typed_class_const_reject')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsTypedClassConstants()
+                && (str_contains($name, 'typed_class_const')
+                    || str_contains($name, 'typed_enum_class_const')
+                    || str_contains($name, 'enum_typed_class_const')
+                    || str_contains($name, 'match_typed_class_const')
+                    || str_contains($name, 'reflection_class_constant_get_type'))
+                && !str_contains($name, 'typed_class_const_reject')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when CompilerVersion 8.4.0+ enables final global typed constants (#10324).
             if (CompilerVersion::supportsFinalGlobalTypedConstants()
                 && str_contains($name, 'final_global_typed_constant_reject')) {

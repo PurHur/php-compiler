@@ -41,6 +41,9 @@ PHP;
 
     public function testBackedEnumTypedClassConst(): void
     {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+        }
         $code = <<<'PHP'
 <?php
 enum E: int {
@@ -82,6 +85,9 @@ PHP;
 
     public function testTypedClassConstWithEnumType(): void
     {
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+        }
         $code = <<<'PHP'
 <?php
 enum Color: string { case Red = 'r'; case Blue = 'b'; }
