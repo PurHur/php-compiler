@@ -73,6 +73,9 @@ final class VmSscanf
                 $inPos += $consumed;
                 ++$outIdx;
                 ++$assigned;
+                // parseScansetMatcher() leaves $fpos on the char after ']'; back up so the
+                // for-loop increment does not skip a following '%' (php-src formatted_io.c).
+                --$fpos;
                 continue;
             }
             $spec = $format[$fpos];
@@ -258,6 +261,7 @@ final class VmSscanf
             if ('[' === $format[$fpos]) {
                 [, $fpos] = self::parseScansetMatcher($format, $fpos, $len);
                 ++$count;
+                --$fpos;
                 continue;
             }
             $spec = $format[$fpos];
