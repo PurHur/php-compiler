@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * tmpfile() without host PHP — anonymous plainfile via mkstemp(3) (#9033, #11397).
+ * tmpfile() without host tmpfile() — anonymous plainfile via VmFsTempnamPure (#9033, #12813).
  *
  * php-src: ext/standard/streams.c — PHP_FUNCTION(tmpfile)
  * main/streams/php_stream_temp.c — unlinked temp path + STDIO fd
@@ -22,15 +22,13 @@ final class VmTmpfilePure
      */
     public static function open(): int|false
     {
-        if (VmPhpFdStream::available()) {
-            $opened = VmFsTempnamNative::mkstempOpen(VmSysGetTempDirNative::resolve(), 'php');
-            if (false !== $opened) {
-                [$fd, $path] = $opened;
-                VmFsTempnamNative::unlinkPath($path);
-                $handle = VmPhpFdStream::adopt($fd, $path, 'r+b');
-                if (false !== $handle) {
-                    return $handle;
-                }
+        $dir = VmSysGetTempDirNative::resolve();
+        $path = VmFsTempnamPure::mkstemp($dir, 'php');
+        if (false !== $path) {
+            $handle = VmFsOpenNative::open($path, 'r+b');
+            VmFsUnlink::unlink($path);
+            if (false !== $handle) {
+                return $handle;
             }
         }
 
