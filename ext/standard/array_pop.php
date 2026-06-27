@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayPopRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitReferencableCheck;
 use PHPCompiler\JIT\JitValueBox;
@@ -36,13 +36,8 @@ final class array_pop extends Internal
             throw new \LogicException('array_pop() argument must be an array in this compiler build');
         }
         $ht = $array->toArray();
-        $popped = $ht->popLast();
+        $popped = ArrayPopJitHelper::pop($ht);
         if (null === $frame->returnVar) {
-            return;
-        }
-        if (null === $popped) {
-            $frame->returnVar->null();
-
             return;
         }
         $frame->returnVar->copyFrom($popped);
@@ -64,6 +59,6 @@ final class array_pop extends Internal
                 $this->jitString($context, $arg, 'array_pop() argument #'.((int) $i + 1));
             }
         }
-        return ArrayBuiltinHelper::popLast($context, $args[0]);
+        return ArrayPopRuntime::pop($context, $args[0]);
     }
 }
