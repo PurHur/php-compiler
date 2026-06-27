@@ -38,7 +38,7 @@ final class disk_total_space extends Internal
                 if (null === $frame->returnVar) {
                     return;
                 }
-                VmFilestatFailure::warnNoSuchFile($frame, 'disk_total_space');
+                // php-src filestat.c — null directory returns false without warning (#12619, #12788).
                 $frame->returnVar->bool(false);
 
                 return;

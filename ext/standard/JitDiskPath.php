@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
@@ -214,29 +213,10 @@ final class JitDiskPath
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $i1 = $context->getTypeFromString('int1');
-        self::emitDiskSpaceWarning($context, $function.'(): No such file or directory');
+        // php-src filestat.c — null directory returns false without warning (#12619, #12788).
         JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
 
         return $ptr;
-    }
-
-    private static function emitDiskSpaceWarning(Context $context, string $message): void
-    {
-        StringTriggerErrorJit::implement($context);
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        $msgPtr = $context->builder->pointerCast($context->constantFromString($message), $i8p);
-        $msgLen = $sizeT->constInt(\strlen($message), false);
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $i8p);
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgPtr,
-            $msgLen,
-            $i32->constInt(\PHPCompiler\VM\ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $i32->constInt(0, false)
-        );
     }
 
     private static function typeErrorMessage(string $function, string $given): string
