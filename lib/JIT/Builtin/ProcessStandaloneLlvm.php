@@ -614,6 +614,18 @@ final class ProcessStandaloneLlvm
         $src = self::stringData($context, $arg);
         $srcLen = self::stringLen($context, $arg);
         $srcLenSizeT = $context->builder->truncOrBitCast($srcLen, $sizeT);
+        $failBb = $fn->appendBasicBlock('esa_fail');
+        $allocBb = $fn->appendBasicBlock('esa_alloc');
+        self::emitRejectShellNullBytes(
+            $context,
+            $fn,
+            $workBb,
+            $src,
+            $srcLenSizeT,
+            'escapeshellarg(): Argument #1 ($arg) must not contain any null bytes',
+            $allocBb
+        );
+        $context->builder->positionAtEnd($allocBb);
         $outCap = $context->builder->add(
             $context->builder->mul($srcLenSizeT, $sizeT->constInt(4, false)),
             $sizeT->constInt(3, false)
@@ -624,7 +636,6 @@ final class ProcessStandaloneLlvm
         $iSlot = $context->builder->alloca($sizeT, 1, 'esa_i');
         $out = $context->builder->call($context->lookupFunction('malloc'), $outCap);
         $outNull = $context->builder->icmp(Builder::INT_EQ, $out, $i8p->constNull());
-        $failBb = $fn->appendBasicBlock('esa_fail');
         $initBb = $fn->appendBasicBlock('esa_init');
         $context->builder->branchIf($outNull, $failBb, $initBb);
 
@@ -731,6 +742,17 @@ final class ProcessStandaloneLlvm
         $context->builder->branchIf($zeroLen, $emptyInBb, $workBb);
 
         $context->builder->positionAtEnd($workBb);
+        $allocBb = $fn->appendBasicBlock('esc_alloc');
+        self::emitRejectShellNullBytes(
+            $context,
+            $fn,
+            $workBb,
+            $str,
+            $lSizeT,
+            'escapeshellcmd(): Argument #1 ($command) must not contain any null bytes',
+            $allocBb
+        );
+        $context->builder->positionAtEnd($allocBb);
         $outCap = $context->builder->add($context->builder->mul($lSizeT, $sizeT->constInt(2, false)), $sizeT->constInt(1, false));
         $outSlot = $context->builder->alloca($i8p, 1, 'esc_out');
         $outLenSlot = $context->builder->alloca($sizeT, 1, 'esc_out_len');
@@ -1214,6 +1236,35 @@ final class ProcessStandaloneLlvm
             $i64->constInt(\strlen($text), false),
             self::literalCstr($context, $text)
         );
+    }
+
+    private static function emitRejectShellNullBytes(
+        Context $context,
+        LlvmFunction $fn,
+        BasicBlock $fromBb,
+        Value $src,
+        Value $srcLenSizeT,
+        string $message,
+        BasicBlock $okBb,
+    ): void {
+        $context->builder->positionAtEnd($fromBb);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $found = $context->builder->call(
+            $context->lookupFunction('memchr'),
+            $src,
+            $i32->constInt(0, false),
+            $srcLenSizeT
+        );
+        $hasNul = $context->builder->icmp(Builder::INT_NE, $found, $i8p->constNull());
+        $nulBb = $fn->appendBasicBlock('shell_nul_reject');
+        $context->builder->branchIf($hasNul, $nulBb, $okBb);
+
+        $context->builder->positionAtEnd($nulBb);
+        TypeErrorRaise::ensureLinked($context);
+        TypeErrorRaise::emitValueError($context, $message);
+        $context->builder->returnValue($strPtr->constNull());
     }
 
     private static function ensureLibc(Context $context): void

@@ -36,6 +36,7 @@ final class ProcessJitHelper
         if (null === $argument) {
             return "''";
         }
+        VmString::rejectNullByteBuiltinStringArg($argument, 'escapeshellarg', 0, 'arg');
 
         return VmEscapeshell::escapeshellarg($argument);
     }
@@ -45,6 +46,7 @@ final class ProcessJitHelper
         if (null === $command) {
             return '';
         }
+        VmString::rejectNullByteBuiltinStringArg($command, 'escapeshellcmd', 0, 'command');
 
         return VmEscapeshell::escapeshellcmd($command);
     }
