@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3392 |
-| Phase A inventory files (M2 ratio SSOT) | 3392 |
+| PHP files on vm.php path | 3391 |
+| Phase A inventory files (M2 ratio SSOT) | 3391 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 8955 |
+| Source constructs flagged (warnings) | 8953 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1044,7 +1044,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDirNative.php` | 0 | 1 |
 | `ext/standard/VmDirPure.php` | 0 | 1 |
 | `ext/standard/VmDns.php` | 0 | 10 |
-| `ext/standard/VmDnsGetaddrinfo.php` | 0 | 1 |
 | `ext/standard/VmDnsMx.php` | 0 | 8 |
 | `ext/standard/VmDnsUdpNative.php` | 0 | 1 |
 | `ext/standard/VmDnsUdpPure.php` | 0 | 1 |
@@ -1101,7 +1100,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmGeneratorArray.php` | 0 | 1 |
 | `ext/standard/VmGetcwdNative.php` | 0 | 1 |
 | `ext/standard/VmGetcwdPure.php` | 0 | 1 |
-| `ext/standard/VmGetopt.php` | 0 | 2 |
+| `ext/standard/VmGetopt.php` | 0 | 1 |
 | `ext/standard/VmGetrusageArg.php` | 0 | 1 |
 | `ext/standard/VmGetrusageNative.php` | 0 | 1 |
 | `ext/standard/VmGetrusagePure.php` | 0 | 1 |
@@ -6762,7 +6761,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFtruncate.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitFuncArgs.php`
 
@@ -10201,21 +10200,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDns.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 116)
-- new Variable (line 118)
-- new HashTable (line 259)
-- new HashTable (line 262)
-- new Variable (line 264)
-- new HashTable (line 408)
-- new Variable (line 425)
-- new Variable (line 432)
-- 36 class method(s)
+- new HashTable (line 128)
+- new Variable (line 130)
+- new HashTable (line 271)
+- new HashTable (line 274)
+- new Variable (line 276)
+- new HashTable (line 420)
+- new Variable (line 437)
+- new Variable (line 444)
+- 37 class method(s)
 - 2 closure(s)
-
-### `ext/standard/VmDnsGetaddrinfo.php`
-
-**Warnings** (review for bootstrap subset):
-- 4 class method(s)
 
 ### `ext/standard/VmDnsMx.php`
 
@@ -10556,7 +10550,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmGetopt.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 16)
 - 2 class method(s)
 
 ### `ext/standard/VmGetrusageArg.php`
@@ -11742,7 +11735,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamWrapperRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/VmString.php`
 
@@ -13636,7 +13629,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 32)
-- new Variable (line 156)
+- new Variable (line 157)
 - 4 class method(s)
 
 ### `ext/standard/getprotobyname.php`
@@ -13942,7 +13935,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ignore_user_abort.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 26)
 - 2 class method(s)
 
 ### `ext/standard/image_type_to_extension.php`
@@ -17471,7 +17464,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 45 class method(s)
+- 47 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -21181,7 +21174,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/IntersectionParamCheck.php`
 
@@ -21231,7 +21224,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitBoolArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/JitClockGettimeArg.php`
 
@@ -24652,7 +24645,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 13 class method(s)
 
 ### `lib/VM/IterableCheck.php`
 

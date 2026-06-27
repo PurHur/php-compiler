@@ -18,8 +18,7 @@ final class VmDnsRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/\\\\checkdnsrr\\s*\\(/', $source);
         $this->assertDoesNotMatchRegularExpression("/function_exists\\('checkdnsrr'\\)/", $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertDoesNotMatchRegularExpression('/\$ffi->res_query/', $source);
-        $this->assertDoesNotMatchRegularExpression('/\$ffi->getaddrinfo/', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/VmDnsGetaddrinfo.php');
     }
 
     public function testVmDnsDoesNotDelegateEtcHostsReadsToHostFile(): void
@@ -40,6 +39,25 @@ final class VmDnsRuntimeShrinkTest extends TestCase
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
             $this->assertFalse(VmDns::checkdnsrr('no-such-phpc-host.invalid.', 'MX'));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_DISABLE_FFI');
+            } else {
+                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
+            }
+        }
+    }
+
+    public function testGethostbynamelLocalhostDuplicateARecordsWithoutFfi(): void
+    {
+        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
+        putenv('PHP_COMPILER_DISABLE_FFI=1');
+        try {
+            $ips = VmDns::gethostbynamel('localhost');
+            $this->assertNotFalse($ips);
+            $this->assertSame(2, $ips->getNumElements());
+            $this->assertSame('127.0.0.1', $ips->find('0')?->toString());
+            $this->assertSame('127.0.0.1', $ips->find('1')?->toString());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');

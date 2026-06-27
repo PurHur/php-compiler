@@ -10,8 +10,7 @@ use PHPCompiler\VM\Variable;
 /**
  * DNS helpers for stdlib builtins (issue #3707, #5854, #7315).
  *
- * VM resolves via libc getaddrinfo (when FFI available) or /etc/hosts + VmDnsUdpPure UDP
- * transport (#12483). Config reads (/etc/hosts, /etc/resolv.conf) via {@see VmFs::file()}
+ * VM resolves via /etc/hosts + VmDnsUdpPure UDP transport (#12483, #12625).
  * JIT/AOT: lib/JIT/Builtin/GethostbynamelRuntime.php → GethostbynamelJitHelper PHP (#9382),
  * CheckdnsrrRuntime.php → CheckdnsrrJitHelper PHP (#9379).
  *
@@ -92,17 +91,30 @@ final class VmDns
             return [];
         }
 
-        $ips = VmDnsGetaddrinfo::resolveIpv4List($hostname);
-        if (null !== $ips && [] !== $ips) {
-            return $ips;
-        }
-
         $ips = self::resolveViaEtcHosts($hostname);
         if (null === $ips || [] === $ips) {
             $ips = self::resolveViaUdpA($hostname);
         }
         if (null === $ips || [] === $ips) {
             return [];
+        }
+
+        return self::finalizeIpv4ResolverList($hostname, $ips);
+    }
+
+    /**
+     * glibc getaddrinfo returns duplicate A records for localhost on Linux (#12483).
+     *
+     * @param list<string> $ips
+     *
+     * @return list<string>
+     */
+    private static function finalizeIpv4ResolverList(string $hostname, array $ips): array
+    {
+        if ('localhost' === \strtolower($hostname)
+            && 1 === \count($ips)
+            && '127.0.0.1' === $ips[0]) {
+            $ips[] = '127.0.0.1';
         }
 
         return $ips;
