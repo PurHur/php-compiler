@@ -15082,7 +15082,26 @@ class Compiler {
             return null;
         }
 
-        return $producerIndex - $firstSibling;
+        $ordinal = $producerIndex - $firstSibling;
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            && property_exists($consumer, 'args')
+            && is_array($consumer->args)
+        ) {
+            $leadingEmbedded = 0;
+            foreach ($consumer->args as $arg) {
+                if ($this->isEmbeddedCallLiteralArg($arg)) {
+                    ++$leadingEmbedded;
+                    continue;
+                }
+                break;
+            }
+
+            return $leadingEmbedded + $ordinal;
+        }
+
+        return $ordinal;
     }
 
     /**
