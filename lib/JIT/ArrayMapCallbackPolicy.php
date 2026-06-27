@@ -55,6 +55,38 @@ final class ArrayMapCallbackPolicy
         return \in_array($type, [VMVariable::TYPE_NULL, VMVariable::TYPE_STRING], true);
     }
 
+    /** Scalar types Zend rejects before callable dispatch (ext/standard/array.c; #12676). */
+    public static function isPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            VMVariable::TYPE_INTEGER,
+            VMVariable::TYPE_BOOLEAN,
+            VMVariable::TYPE_FLOAT,
+            VMVariable::TYPE_ARRAY,
+            VMVariable::TYPE_OBJECT,
+        ], true);
+    }
+
+    /** @see JITVariable type bits for compile-time scalars */
+    public static function isJitPhpSrcInvalidCallbackType(int $type): bool
+    {
+        return \in_array($type, [
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::TYPE_NATIVE_DOUBLE,
+            JITVariable::TYPE_NATIVE_BOOL,
+            JITVariable::TYPE_HASHTABLE,
+            JITVariable::TYPE_OBJECT,
+        ], true) || 0 !== ($type & JITVariable::IS_NATIVE_ARRAY);
+    }
+
+    /**
+     * Zend array_map() invalid callback TypeError (ext/standard/array.c; #12676).
+     */
+    public static function invalidCallbackTypeError(): string
+    {
+        return 'array_map(): Argument #1 ($callback) must be a valid callback or null, no array or string given';
+    }
+
     public static function jitRejectionMessage(): string
     {
         return 'array_map() callback must be '.self::JIT_SUBSET

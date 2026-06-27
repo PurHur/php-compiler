@@ -61,6 +61,16 @@ final class ArrayMapCallbackPolicyTest extends TestCase
         $this->assertFalse(ArrayMapCallbackPolicy::isVmSupportedType(VMVariable::TYPE_ARRAY));
     }
 
+    public function testPhpSrcInvalidCallbackTypes(): void
+    {
+        $this->assertTrue(ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType(VMVariable::TYPE_INTEGER));
+        $this->assertTrue(ArrayMapCallbackPolicy::isJitPhpSrcInvalidCallbackType(JITVariable::TYPE_NATIVE_LONG));
+        $this->assertStringContainsString(
+            'valid callback',
+            ArrayMapCallbackPolicy::invalidCallbackTypeError()
+        );
+    }
+
     public function testRejectionMessagesMentionDeferredKinds(): void
     {
         $this->assertStringContainsString('closures', ArrayMapCallbackPolicy::jitRejectionMessage());
