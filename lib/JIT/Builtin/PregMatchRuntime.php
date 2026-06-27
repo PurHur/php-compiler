@@ -220,6 +220,10 @@ final class PregMatchRuntime
         $context->builder->branchIf($isError, $failBb, $okBb);
 
         $context->builder->positionAtEnd($failBb);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeNull'),
+            $fn->getParam(2)
+        );
         $context->builder->returnValue($negOne);
 
         $context->builder->positionAtEnd($okBb);
