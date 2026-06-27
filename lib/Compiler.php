@@ -12373,6 +12373,7 @@ class Compiler {
 
     /**
      * Assign-expression result temps are fine for by-value args; by-ref must bind the CV lvalue (#12690).
+     * array_multisort() assign-in-arg keeps the result temp so sort does not write back to the CV (#12654).
      */
     private function resolveNamedAssignCallArgSlot(
         Block $block,
@@ -12383,6 +12384,7 @@ class Compiler {
     ): string {
         if (
             null !== $calleeName
+            && 'array_multisort' !== strtolower($calleeName)
             && $this->callArgRequiresByRef($calleeName, $argIndex, $argProbe, $block)
         ) {
             $lvalue = $this->slotForAssignLvalueFromResultSlot($block, $namedAssignDestSlot);
