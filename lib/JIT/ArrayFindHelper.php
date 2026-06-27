@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -48,6 +49,9 @@ final class ArrayFindHelper
         int $mode
     ): Value {
         JitArrayElem::requireArrayArg($context, $array, self::functionNameForMode($mode));
+        if (self::MODE_FIND === $mode || self::MODE_FIND_KEY === $mode) {
+            self::requireNonEmptyFindArray($context, $array, self::functionNameForMode($mode));
+        }
         if (!ArrayFindCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
         }
@@ -559,5 +563,41 @@ final class ArrayFindHelper
             self::MODE_ALL => 'array_all',
             default => 'array_find',
         };
+    }
+
+    private static function requireNonEmptyFindArray(Context $context, Variable $array, string $fn): void
+    {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $message = \sprintf('%s(): Argument #1 ($array) must not be empty', $fn);
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
+            $sizeT = $context->getTypeFromString('size_t');
+            $zero = $sizeT->constInt(0, false);
+            $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
+            $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
+            $ok = BasicBlockHelper::append($context, 'array_find_nonempty_ok');
+            $bad = BasicBlockHelper::append($context, 'array_find_nonempty_bad');
+            $context->builder->branchIf($isEmpty, $bad, $ok);
+            $context->builder->positionAtEnd($bad);
+            TypeErrorRaise::emitValueError($context, $message);
+            $context->builder->call($context->lookupFunction('abort'));
+            $context->builder->positionAtEnd($ok);
+
+            return;
+        }
+
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $map = $context->structFieldMap['__hashtable__'];
+        $num = $context->builder->load($context->builder->structGep($ht, $map['numElements']));
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
+        $ok = BasicBlockHelper::append($context, 'array_find_ht_nonempty_ok');
+        $bad = BasicBlockHelper::append($context, 'array_find_ht_nonempty_bad');
+        $context->builder->branchIf($isEmpty, $bad, $ok);
+        $context->builder->positionAtEnd($bad);
+        TypeErrorRaise::emitValueError($context, $message);
+        $context->builder->call($context->lookupFunction('abort'));
+        $context->builder->positionAtEnd($ok);
     }
 }
