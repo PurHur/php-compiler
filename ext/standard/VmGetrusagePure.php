@@ -31,12 +31,12 @@ final class VmGetrusagePure
             return false;
         }
 
-        // Field map: /proc/[pid]/stat (man 5 proc). utime/stime are clock ticks.
-        $minflt = self::intField($stat, 7);
-        $majflt = self::intField($stat, 9);
-        $utimeTicks = self::intField($stat, 11);
-        $stimeTicks = self::intField($stat, 12);
-        $rssPages = self::intField($stat, 21);
+        // Field map: /proc/[pid]/stat (man 5 proc). $parts[$i] == proc field ($i + 4).
+        $minflt = self::intField($stat, 6);
+        $majflt = self::intField($stat, 8);
+        $utimeTicks = self::intField($stat, 10);
+        $stimeTicks = self::intField($stat, 11);
+        $rssPages = self::intField($stat, 20);
 
         [$utimeSec, $utimeUsec] = self::ticksToTimeval($utimeTicks);
         [$stimeSec, $stimeUsec] = self::ticksToTimeval($stimeTicks);
