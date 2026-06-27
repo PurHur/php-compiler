@@ -11,6 +11,7 @@ use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -31,6 +32,7 @@ final class mkdir_ extends Internal
         if (!isset($frame->calledArgs[0])) {
             throw new \ArgumentCountError('mkdir(): Argument #1 ($directory) not passed');
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'mkdir', 'directory', 0, $frame);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mkdir', 0, 'directory');
         $mode = 0777;
         if (isset($frame->calledArgs[1])) {

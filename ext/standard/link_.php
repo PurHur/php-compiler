@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** link() — VM via VmFs; JIT/AOT via libc linkat(2) (issue #3589). */
@@ -28,6 +29,8 @@ final class link_ extends Internal
                 'link() expects exactly 2 arguments, '.\count($frame->calledArgs).' given'
             );
         }
+        InternalStrictArg::rejectNullString($frame->calledArgs[0], 'link', 'target', 0, $frame);
+        InternalStrictArg::rejectNullString($frame->calledArgs[1], 'link', 'link', 1, $frame);
         $target = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'link', 0, 'target');
         $linkPath = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'link', 1, 'link');
         $ok = VmFs::hardLink($target, $linkPath);
