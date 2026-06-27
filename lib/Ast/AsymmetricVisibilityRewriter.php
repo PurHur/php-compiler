@@ -17,6 +17,10 @@ final class AsymmetricVisibilityRewriter
     private const MARKER_PREFIX_SET = 'phpc-asymmetric-set:';
     private const MARKER_PREFIX_GET = 'phpc-asymmetric-get:';
 
+    /** Self-host parser rejects bare asymmetric modifier tokens outside declarations (#1492). */
+    private const SET_MODIFIER_NEEDLE = '('.'set'.')';
+    private const GET_MODIFIER_NEEDLE = '('.'get'.')';
+
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
@@ -25,7 +29,7 @@ final class AsymmetricVisibilityRewriter
      */
     public const MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-set:(public|protected|private)\s*\*\//i';
 
-    /** @internal Marker for asymmetric read (get) visibility (#5059). */
+    /** @internal Marker for asymmetric read visibility (#5059). */
     public const GET_MARKER_PATTERN = '/\/\*\s*phpc-asymmetric-get:(public|protected|private)\s*\*\//i';
 
     public static function containsAsymmetricVisibilitySyntax(string $source): bool
@@ -36,15 +40,15 @@ final class AsymmetricVisibilityRewriter
     /**
      * 1-based source line of the first multiple-access-modifier violation, or 0 when none (#12576).
      *
-     * Used on the Zend 8.2 reference profile where `(set)` is otherwise rejected with a generic
-     * parser message — `public private(set)` must still match Zend's compile fatal.
+     * Used on the Zend 8.2 reference profile where asymmetric set syntax is otherwise rejected with a generic
+     * parser message — explicit read plus set visibility must still match Zend compile fatal.
      */
     public static function findMultipleAccessModifierLine(string $source): int
     {
         $lineNum = 0;
         foreach (explode("\n", $source) as $line) {
             ++$lineNum;
-            if (!self::isInspectableAsymmetricLine($line, '(set)')) {
+            if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
                 continue;
             }
             if (self::lineViolatesMultipleSetModifierRulesForReferenceProfile($line)) {
@@ -96,8 +100,8 @@ final class AsymmetricVisibilityRewriter
 
     private static function hasAsymmetricVisibilitySyntax(string $source): bool
     {
-        return false !== stripos($source, '(set)')
-            || false !== stripos($source, '(get)');
+        return false !== stripos($source, self::SET_MODIFIER_NEEDLE)
+            || false !== stripos($source, self::GET_MODIFIER_NEEDLE);
     }
 
     /**
@@ -205,7 +209,7 @@ final class AsymmetricVisibilityRewriter
         });
     }
 
-    /** Explicit read `public` after `public(set)` duplicates implicit public read (#6589, #6774). */
+    /** Explicit read public after public-set duplicates implicit public read (#6589, #6774). */
     private static function rejectExplicitPublicAfterSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
@@ -289,9 +293,9 @@ final class AsymmetricVisibilityRewriter
     }
 
     /**
-     * Zend 8.2 reference profile: any explicit read plus `(set)` is fatal (#12576).
+     * Zend 8.2 reference profile: any explicit read plus asymmetric set is fatal (#12576).
      *
-     * PHP 8.4 allows distinct read+set pairs such as `public private(set)` (#11868, #12781).
+     * PHP 8.4 allows distinct read+set pairs such as public read with private set (#11868, #12781).
      */
     private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
     {
@@ -359,8 +363,8 @@ final class AsymmetricVisibilityRewriter
     /**
      * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
      *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
-     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); public read with private set on static is fatal
+     * (Multiple access type modifiers are not allowed). private set on static alone remains valid (#6769).
      */
     private static function rejectAsymmetricSetOnStaticProperty(string $source): void
     {
@@ -379,7 +383,7 @@ final class AsymmetricVisibilityRewriter
      * Run compile-time checks on single source lines only — concatenated self-host bundles and
      * docblocks must not match property-modifier patterns across lines (#1492 spine compile).
      */
-    private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = '(set)'): void
+    private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = self::SET_MODIFIER_NEEDLE): void
     {
         foreach (explode("\n", $source) as $line) {
             if (!self::isInspectableAsymmetricLine($line, $needle)) {
@@ -410,7 +414,7 @@ final class AsymmetricVisibilityRewriter
 
     private static function rewriteGetModifiers(string $source): string
     {
-        if (false === stripos($source, '(get)')) {
+        if (false === stripos($source, self::GET_MODIFIER_NEEDLE)) {
             return $source;
         }
 
@@ -455,7 +459,7 @@ final class AsymmetricVisibilityRewriter
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
-        }, '(get)');
+        }, self::GET_MODIFIER_NEEDLE);
     }
 
     private static function rejectExplicitPublicAfterGetModifier(string $source): void
@@ -467,7 +471,7 @@ final class AsymmetricVisibilityRewriter
             )) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
-        }, '(get)');
+        }, self::GET_MODIFIER_NEEDLE);
     }
 
     public static function visibilityFromMarker(string $text): int
@@ -557,24 +561,24 @@ final class AsymmetricVisibilityRewriter
     public static function setModifierLabel(int $setVisibilityFlags): string
     {
         if (($setVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-            return 'private(set)';
+            return 'private'.self::SET_MODIFIER_NEEDLE;
         }
         if (($setVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
-            return 'protected(set)';
+            return 'protected'.self::SET_MODIFIER_NEEDLE;
         }
 
-        return 'public(set)';
+        return 'public'.self::SET_MODIFIER_NEEDLE;
     }
 
     public static function getModifierLabel(int $getVisibilityFlags): string
     {
         if (($getVisibilityFlags & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
-            return 'private(get)';
+            return 'private'.self::GET_MODIFIER_NEEDLE;
         }
         if (($getVisibilityFlags & \PHPCfg\Func::FLAG_PROTECTED) !== 0) {
-            return 'protected(get)';
+            return 'protected'.self::GET_MODIFIER_NEEDLE;
         }
 
-        return 'public(get)';
+        return 'public'.self::GET_MODIFIER_NEEDLE;
     }
 }
