@@ -36,7 +36,7 @@ final class stream_wrapper_restore extends Internal
             0,
             'protocol'
         );
-        $frame->returnVar->bool(VmStreamWrapperRegistry::restore($protocol));
+        $frame->returnVar->bool(VmStreamWrapperRegistry::restore($protocol, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
