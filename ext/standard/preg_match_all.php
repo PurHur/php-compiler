@@ -28,6 +28,7 @@ final class preg_match_all extends Internal
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_match_all() pattern', 0);
         $subject = VmReflection::stringArg($frame->calledArgs[1], 'preg_match_all() subject', 1);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_match_all', $pattern);
 
         $flags = 0;
         $offset = 0;
@@ -52,8 +53,12 @@ final class preg_match_all extends Internal
 
         if ($hasMatches) {
             $target = $frame->calledArgs[2]->resolveIndirect();
-            $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
-            $target->array($ht);
+            if (false === $result) {
+                $target->null();
+            } else {
+                $ht = VmPregMatches::hostMatchAllToHashTable($hostMatches, $flags);
+                $target->array($ht);
+            }
         }
 
         if (null === $frame->returnVar) {
