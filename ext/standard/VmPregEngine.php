@@ -193,6 +193,10 @@ final class VmPregEngine
     {
         $parts = [];
         while (!$this->atEnd() && '|' !== $this->peek() && ')' !== $this->peek()) {
+            if ($this->tryParseVerb()) {
+                $parts[] = new VmPregAstEmptyNode();
+                continue;
+            }
             $parts[] = $this->parseQuantified();
         }
         if ([] === $parts) {
@@ -204,6 +208,76 @@ final class VmPregEngine
 
         return new VmPregAstConcatNode($parts);
     }
+
+    private function tryParseVerb(): bool
+    {
+        if ($this->peek() !== '(' || ($this->regex[$this->pos + 1] ?? '') !== '*') {
+            return false;
+        }
+        $close = \strpos($this->regex, ')', $this->pos + 2);
+        if (false === $close) {
+            throw new VmPregCompileException();
+        }
+        $verb = \substr($this->regex, $this->pos + 2, $close - $this->pos - 2);
+        if (!self::isRecognizedPcreVerb($verb)) {
+            throw new VmPregCompileException();
+        }
+        self::applyPcreVerb($verb, $this);
+        $this->pos = $close + 1;
+
+        return true;
+    }
+
+    /**
+     * @return bool true when verb is recognized (php-src ext/pcre/php_pcre.c, #12434)
+     */
+    private static function isRecognizedPcreVerb(string $verb): bool
+    {
+        return isset(self::PCRE_VERBS[$verb]);
+    }
+
+    private static function applyPcreVerb(string $verb, self $engine): void
+    {
+        match ($verb) {
+            'UTF', 'UTF8', 'UTF16', 'UTF32' => $engine->utf = true,
+            'UCP' => $engine->utf = true,
+            'ANY', 'ALLANY' => $engine->dotall = true,
+            'CR', 'LF', 'CRLF', 'ANYCRLF', 'BSR_ANYCRLF', 'BSR_UNICODE' => null,
+            'NO_JIT', 'NO_START_OPT', 'NOTEMPTY', 'NOTEMPTY_ATSTART', 'FIRSTLINE', 'FRUSTRATING' => null,
+            'ACCEPT', 'COMMIT', 'PRUNE', 'SKIP', 'THEN' => null,
+            'FAIL' => null,
+            default => throw new VmPregCompileException(),
+        };
+    }
+
+    /** @var array<string, true> */
+    private const PCRE_VERBS = [
+        'ACCEPT' => true,
+        'ALLANY' => true,
+        'ANY' => true,
+        'ANYCRLF' => true,
+        'BSR_ANYCRLF' => true,
+        'BSR_UNICODE' => true,
+        'COMMIT' => true,
+        'CR' => true,
+        'CRLF' => true,
+        'FAIL' => true,
+        'FIRSTLINE' => true,
+        'FRUSTRATING' => true,
+        'LF' => true,
+        'NO_JIT' => true,
+        'NO_START_OPT' => true,
+        'NOTEMPTY' => true,
+        'NOTEMPTY_ATSTART' => true,
+        'PRUNE' => true,
+        'SKIP' => true,
+        'THEN' => true,
+        'UCP' => true,
+        'UTF' => true,
+        'UTF16' => true,
+        'UTF32' => true,
+        'UTF8' => true,
+    ];
 
     private function parseQuantified(): VmPregAstNode
     {
