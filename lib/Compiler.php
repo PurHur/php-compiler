@@ -14385,6 +14385,14 @@ class Compiler {
                 }
                 array_unshift($producers, $child);
                 $prev = $cfgChildren[$i - 1] ?? null;
+                // array_merge(array_keys($src), [...]) — FuncCall producer before trailing sibling Array_ (#12450).
+                if (
+                    ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+                    && $this->isSiblingMultiArgFuncCallProducer($prev, $callOp, $i - 1, $callIndex, $cfgChildren)
+                ) {
+                    array_unshift($producers, $prev);
+                    break;
+                }
                 // array_map(fn(...), [...]) / preg_replace_callback($pat, fn(...), $arr) — Closure/FCC before Array_ (#10651, #10652, #11450).
                 if ($prev instanceof Op\Expr\Closure
                     || $prev instanceof Op\Expr\ArrowFunction
@@ -14846,6 +14854,10 @@ class Compiler {
             ) {
                 continue;
             }
+            // array_merge(array_keys($src), [...]) — sibling inline Array_ between hoisted producers (#12450).
+            if ($mid instanceof Op\Expr\Array_) {
+                continue;
+            }
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 if (2 === $distance && $j === $producerIndex + 1) {
                     continue;
@@ -14911,6 +14923,10 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
                 --$i;
                 continue;
             }
