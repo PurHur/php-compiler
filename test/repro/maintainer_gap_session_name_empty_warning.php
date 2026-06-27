@@ -2,30 +2,20 @@
 
 declare(strict_types=1);
 
-$warnings = [];
-set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-    $warnings[] = $message;
+// Repro for #12563 — session_name('') must Warning and leave PHPSESSID unchanged.
+$warned = false;
+set_error_handler(static function (int $errno, string $errstr) use (&$warned): bool {
+    if (str_contains($errstr, 'session.name "" cannot be numeric or empty')) {
+        $warned = true;
+    }
 
     return true;
 });
-
 session_name('');
+restore_error_handler();
 $name = session_name();
-if ($name !== 'PHPSESSID') {
-    echo "fail: expected PHPSESSID after empty set, got {$name}\n";
-    exit(1);
+if ($warned && 'PHPSESSID' === $name) {
+    echo "ok\n";
+} else {
+    echo 'fail: expected session_name() empty-string Warning'."\n";
 }
-
-$warned = false;
-foreach ($warnings as $message) {
-    if (false !== strpos($message, 'cannot be numeric or empty')) {
-        $warned = true;
-        break;
-    }
-}
-if (!$warned) {
-    echo "fail: expected session_name() empty-string Warning\n";
-    exit(1);
-}
-
-echo "ok\n";

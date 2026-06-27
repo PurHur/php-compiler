@@ -31,6 +31,8 @@ final class VmSession
 
     public const DEFAULT_NAME = 'PHPSESSID';
 
+    public const EMPTY_NAME_WARNING = 'session.name "%s" cannot be numeric or empty';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;
@@ -165,7 +167,7 @@ final class VmSession
 
     public static function rejectedSessionNameMessage(string $name): string
     {
-        return 'session.name "'.$name.'" cannot be numeric or empty';
+        return \sprintf(self::EMPTY_NAME_WARNING, $name);
     }
 
     /**

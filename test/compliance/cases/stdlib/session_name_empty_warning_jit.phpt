@@ -2,22 +2,17 @@
 stdlib session_name('') JIT — Warning and unchanged PHPSESSID (#12563)
 --FILE--
 <?php
-$warnings = [];
-set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
-    $warnings[] = $message;
+$warned = false;
+set_error_handler(static function (int $errno, string $errstr) use (&$warned): bool {
+    if (str_contains($errstr, 'session.name "" cannot be numeric or empty')) {
+        $warned = true;
+    }
     return true;
 });
 session_name('');
-echo session_name() === 'PHPSESSID' ? "name_ok\n" : "name_bad\n";
-$warned = false;
-foreach ($warnings as $message) {
-    if (false !== strpos($message, 'cannot be numeric or empty')) {
-        $warned = true;
-        break;
-    }
-}
-echo $warned ? "warn_ok\n" : "warn_bad\n";
-?>
+restore_error_handler();
+echo $warned ? "warned\n" : "no-warn\n";
+echo session_name() === 'PHPSESSID' ? "phpssid\n" : "bad-name\n";
 --EXPECT--
-name_ok
-warn_ok
+warned
+phpssid
