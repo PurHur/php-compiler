@@ -27,6 +27,11 @@ final class AsymmetricVisibilityRejector
             return $code;
         }
 
+        $multipleLine = AsymmetricVisibilityRewriter::findMultipleAccessModifierLine($code);
+        if ($multipleLine > 0) {
+            throw new CompileFatal($filename, $multipleLine, AsymmetricVisibilityRewriter::MULTIPLE_MODIFIERS_MESSAGE);
+        }
+
         $line = self::lineOfFirstAsymmetricSyntax($code);
         throw new CompileFatal($filename, $line, self::PARSE_MESSAGE);
     }

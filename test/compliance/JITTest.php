@@ -198,7 +198,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'property_hook_private_set')
                     || str_contains($name, 'reflection_property_asymmetric')
                     || str_contains($name, 'promoted_private_set'))
-                && !str_contains($name, 'private_set_reference_profile')) {
+                && !str_contains($name, 'private_set_reference_profile')
+                && !str_contains($name, 'asymmetric_double_modifier_reference_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsClassHasFunctions()

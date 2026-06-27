@@ -33,6 +33,51 @@ final class AsymmetricVisibilityRewriter
         return self::hasAsymmetricVisibilitySyntax($source);
     }
 
+    /**
+     * 1-based source line of the first multiple-access-modifier violation, or 0 when none (#12576).
+     *
+     * Used on the Zend 8.2 reference profile where `(set)` is otherwise rejected with a generic
+     * parser message — `public private(set)` must still match Zend's compile fatal.
+     */
+    public static function findMultipleAccessModifierLine(string $source): int
+    {
+        $lineNum = 0;
+        foreach (explode("\n", $source) as $line) {
+            ++$lineNum;
+            if (!self::isInspectableAsymmetricLine($line, '(set)')) {
+                continue;
+            }
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
+                return $lineNum;
+            }
+            if (self::lineViolatesStaticAsymmetricSetRules($line)) {
+                return $lineNum;
+            }
+        }
+
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return 0;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText && self::paramsViolateMultipleSetModifierRules($paramsText)) {
+                $constructLine = substr_count(substr($source, 0, $openPos), "\n") + 1;
+                $relative = self::offsetOfMultipleSetModifierInParams($paramsText);
+                if ($relative >= 0) {
+                    return $constructLine + substr_count(substr($paramsText, 0, $relative), "\n");
+                }
+
+                return $constructLine;
+            }
+            $offset = $openPos + 1;
+        }
+
+        return 0;
+    }
+
     public static function rewrite(string $source): string
     {
         if (!CompilerVersion::supportsAsymmetricVisibility()) {
@@ -155,10 +200,7 @@ final class AsymmetricVisibilityRewriter
     private static function rejectExplicitPublicBeforeSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-                $line
-            )) {
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
@@ -172,16 +214,7 @@ final class AsymmetricVisibilityRewriter
     private static function rejectDualReadSetModifiers(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
-                $line
-            )) {
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
@@ -191,16 +224,7 @@ final class AsymmetricVisibilityRewriter
     private static function rejectExplicitPublicAfterSetModifier(string $source): void
     {
         self::eachPropertyDeclarationLine($source, static function (string $line): void {
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
-                $line
-            )) {
-                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-            }
-            if (preg_match(
-                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
-                $line
-            )) {
+            if (self::lineViolatesMultipleSetModifierRules($line)) {
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
@@ -249,36 +273,44 @@ final class AsymmetricVisibilityRewriter
 
     private static function rejectDoubleVisibilityInPromotedParams(string $paramsText): void
     {
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
-            $paramsText
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
-            $paramsText
-        )) {
-            throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-        }
-        if (preg_match(
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
-            $paramsText
-        )) {
+        if (self::paramsViolateMultipleSetModifierRules($paramsText)) {
             throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
         }
     }
 
-    /**
-     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
-     *
-     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
-     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
-     */
-    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    private static function paramsViolateMultipleSetModifierRules(string $paramsText): bool
     {
-        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
-            return;
+        return self::lineViolatesMultipleSetModifierRules($paramsText);
+    }
+
+    private static function lineViolatesMultipleSetModifierRules(string $line): bool
+    {
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            $line
+        )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+                $line
+            )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+                $line
+            )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])public\s*\(\s*set\s*\)\s*public\b/i',
+                $line
+            )
+            || 1 === preg_match(
+                '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
+                $line
+            );
+    }
+
+    private static function lineViolatesStaticAsymmetricSetRules(string $line): bool
+    {
+        if (!preg_match('/\bstatic\b/i', $line) || !preg_match('/\(\s*set\s*\)/i', $line)) {
+            return false;
         }
 
         $modifier = '(?:public|protected|private)';
@@ -294,15 +326,46 @@ final class AsymmetricVisibilityRewriter
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$setModifier.'/i',
             '/'.$staticWord.'\s+(?<![a-zA-Z0-9_])'.$modifier.'\s+'.$parenthesizedSet.'/i',
         ];
-
-        self::eachPropertyDeclarationLine($source, static function (string $line) use ($patterns): void {
-            if (!preg_match('/\bstatic\b/i', $line) || !preg_match('/\(\s*set\s*\)/i', $line)) {
-                return;
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $line)) {
+                return true;
             }
-            foreach ($patterns as $pattern) {
-                if (preg_match($pattern, $line)) {
-                    throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
-                }
+        }
+
+        return false;
+    }
+
+    private static function offsetOfMultipleSetModifierInParams(string $paramsText): int
+    {
+        $patterns = [
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $paramsText, $m, PREG_OFFSET_CAPTURE)) {
+                return (int) $m[0][1];
+            }
+        }
+
+        return -1;
+    }
+
+    /**
+     * Static properties do not support asymmetric visibility with an explicit read modifier (#7013).
+     *
+     * php-src: Zend/zend_compile.c — zend_add_member_modifier(); `public private(set) static` is fatal
+     * (`Multiple access type modifiers are not allowed`). `private(set) static` alone remains valid (#6769).
+     */
+    private static function rejectAsymmetricSetOnStaticProperty(string $source): void
+    {
+        if (!preg_match('/\bstatic\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return;
+        }
+
+        self::eachPropertyDeclarationLine($source, static function (string $line): void {
+            if (self::lineViolatesStaticAsymmetricSetRules($line)) {
+                throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
     }
@@ -314,21 +377,30 @@ final class AsymmetricVisibilityRewriter
     private static function eachPropertyDeclarationLine(string $source, callable $fn, string $needle = '(set)'): void
     {
         foreach (explode("\n", $source) as $line) {
-            if (false === stripos($line, $needle)) {
-                continue;
-            }
-            $trimmed = ltrim($line);
-            if ('' === $trimmed) {
-                continue;
-            }
-            if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
-                continue;
-            }
-            if (preg_match('/^\s*[\x27\x22]/', $line)) {
+            if (!self::isInspectableAsymmetricLine($line, $needle)) {
                 continue;
             }
             $fn($line);
         }
+    }
+
+    private static function isInspectableAsymmetricLine(string $line, string $needle): bool
+    {
+        if (false === stripos($line, $needle)) {
+            return false;
+        }
+        $trimmed = ltrim($line);
+        if ('' === $trimmed) {
+            return false;
+        }
+        if (str_starts_with($trimmed, '//') || str_starts_with($trimmed, '*') || str_starts_with($trimmed, '/*')) {
+            return false;
+        }
+        if (preg_match('/^\s*[\x27\x22]/', $line)) {
+            return false;
+        }
+
+        return true;
     }
 
     private static function rewriteGetModifiers(string $source): string
