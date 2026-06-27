@@ -12693,13 +12693,19 @@ class Compiler {
             $leadingNestedRemaining = $this->splitLeadingNestedArrayLiteralChainWithRemainingProducers($producers);
             if (null !== $leadingNestedRemaining) {
                 [$prefixChain, $remaining] = $leadingNestedRemaining;
-                $trailingArgCount = $this->countInlineCallArgProducersInRemaining($remaining);
-                if (1 + $trailingArgCount === $argCount) {
-                    if (0 === $argIndex) {
-                        return $prefixChain[\count($prefixChain) - 1];
-                    }
+                // iterator_to_array(new ArrayObject([...]), false) — lone Array_ is ctor prelude, not arg #0 (#11321, #12325).
+                $inlineNewWithCtorArrayPrelude = 1 === \count($prefixChain)
+                    && ($prefixChain[0] ?? null) instanceof Op\Expr\Array_
+                    && ($remaining[0] ?? null) instanceof Op\Expr\New_;
+                if (!$inlineNewWithCtorArrayPrelude) {
+                    $trailingArgCount = $this->countInlineCallArgProducersInRemaining($remaining);
+                    if (1 + $trailingArgCount === $argCount) {
+                        if (0 === $argIndex) {
+                            return $prefixChain[\count($prefixChain) - 1];
+                        }
 
-                    return $this->inlineCallArgProducerAtRemainingIndex($remaining, $argIndex - 1);
+                        return $this->inlineCallArgProducerAtRemainingIndex($remaining, $argIndex - 1);
+                    }
                 }
             }
             // php-cfg hoists compare/array-dim preludes before trailing literal args (#5901, #9660).
