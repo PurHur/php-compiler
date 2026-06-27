@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\ext\standard\VmStreamSocketNative;
+use PHPCompiler\ext\standard\VmStreamSocketPure;
 use PHPUnit\Framework\TestCase;
 
-/** stream_socket_client must not delegate to host Zend stream wrappers (#8097). */
+/** stream_socket_client must not delegate to host Zend in builtin; Native → Pure SSOT (#8097, #12858). */
 final class VmStreamSocketRuntimeShrinkTest extends TestCase
 {
     public function testStreamSocketClientBuiltinDoesNotCallHostZend(): void
@@ -17,34 +18,35 @@ final class VmStreamSocketRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmStreamSocketNative::client', $source);
     }
 
-    public function testVmStreamSocketNativeUsesLibcSocketNotHostStreams(): void
+    public function testVmStreamSocketNativeDelegatesToPureWithoutFfi(): void
     {
-        $this->assertFileExists(__DIR__.'/../../ext/standard/VmStreamSocketNative.php');
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketNative.php');
-        $this->assertStringContainsString('$ffi->socket', $source);
-        $this->assertStringContainsString('$ffi->connect', $source);
-        $this->assertStringContainsString('VmPhpFdStream::adopt', $source);
+        $this->assertStringContainsString('VmStreamSocketPure::client', $source);
+        $this->assertStringContainsString('VmStreamSocketPure::available()', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('$ffi->socket', $source);
+        $this->assertStringNotContainsString('$ffi->connect', $source);
         $this->assertDoesNotMatchRegularExpression('/@?\\\\stream_socket_client\\s*\\(/', $source);
+    }
+
+    public function testVmStreamSocketPureUsesHostStreamClientNotLibcFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketPure.php');
+        $this->assertStringContainsString('stream_socket_client', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int socket(int domain', $source);
     }
 
     public function testClosedDiscardPortReturnsFalseWithErrno(): void
     {
-        if (!VmStreamSocketNative::available()) {
-            $this->markTestSkipped('libc FFI unavailable');
+        if (!VmStreamSocketPure::available()) {
+            $this->markTestSkipped('host stream_socket_client unavailable');
         }
 
         [$stream, $errno, $errstr, $socketFd] = VmStreamSocketNative::client('tcp://127.0.0.1:9', 1.0, 4);
         $this->assertFalse($stream);
-        $this->assertIsInt($errno);
-        $this->assertIsString($errstr);
+        $this->assertNotSame(0, $errno);
+        $this->assertNotSame('', $errstr);
         $this->assertNull($socketFd);
-    }
-
-    public function testGaiStrerrorUsesLibcFfiNotHostBuiltin(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketNative.php');
-        $this->assertStringContainsString('$ffi->gai_strerror', $source);
-        $this->assertDoesNotMatchRegularExpression('/\\\\gai_strerror\\s*\\(/', $source);
-        $this->assertDoesNotMatchRegularExpression("/function_exists\\('gai_strerror'\\)/", $source);
     }
 }

@@ -8,7 +8,7 @@ use PHPCompiler\ext\sockets\VmSockets;
 use PHPCompiler\VM\Variable;
 
 /**
- * stream_socket_client without libc socket FFI (#8953, pairs {@see VmStreamSocketNative}).
+ * stream_socket_client without libc socket FFI (#8953, #12858; pairs {@see VmStreamSocketNative}).
  *
  * Bootstrap path when FFI is disabled: host stream_socket_client under Zend VM.
  *
