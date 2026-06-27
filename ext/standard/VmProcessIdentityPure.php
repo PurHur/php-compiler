@@ -131,6 +131,60 @@ final class VmProcessIdentityPure
         return null;
     }
 
+    /** Name → uid via /etc/passwd — no libc getpwnam FFI (#12454). */
+    public static function uidForName(string $name): ?int
+    {
+        if ('' === $name) {
+            return null;
+        }
+        $raw = self::readPasswd();
+        if (false === $raw) {
+            return null;
+        }
+
+        foreach (explode("\n", $raw) as $line) {
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            $parts = explode(':', $line);
+            if (\count($parts) < 3) {
+                continue;
+            }
+            if ($parts[0] === $name) {
+                return (int) $parts[2];
+            }
+        }
+
+        return null;
+    }
+
+    /** Name → gid via /etc/group — no libc getgrnam FFI (#12454). */
+    public static function gidForName(string $name): ?int
+    {
+        if ('' === $name) {
+            return null;
+        }
+        $raw = self::readGroup();
+        if (false === $raw) {
+            return null;
+        }
+
+        foreach (explode("\n", $raw) as $line) {
+            if ('' === $line || '#' === $line[0]) {
+                continue;
+            }
+            $parts = explode(':', $line);
+            if (\count($parts) < 3) {
+                continue;
+            }
+            if ($parts[0] === $name) {
+                return (int) $parts[2];
+            }
+        }
+
+        return null;
+    }
+
     /**
      * @return array{pid:int,ppid:int,uid:int,gid:int,euid:int,egid:int}|null
      */
@@ -222,17 +276,27 @@ final class VmProcessIdentityPure
 
     private static function readPasswd(): string|false
     {
-        if (!\is_readable('/etc/passwd')) {
+        return self::readEtcFile('/etc/passwd');
+    }
+
+    private static function readGroup(): string|false
+    {
+        return self::readEtcFile('/etc/group');
+    }
+
+    private static function readEtcFile(string $path): string|false
+    {
+        if (!\is_readable($path)) {
             return false;
         }
         if (VmFsReadNative::available()) {
-            $raw = VmFsReadNative::read('/etc/passwd');
+            $raw = VmFsReadNative::read($path);
             if (false !== $raw && '' !== $raw) {
                 return $raw;
             }
         }
 
-        $raw = @\file_get_contents('/etc/passwd');
+        $raw = @\file_get_contents($path);
 
         return \is_string($raw) && '' !== $raw ? $raw : false;
     }

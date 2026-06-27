@@ -23,19 +23,19 @@ final class VmFsPosixIdentityRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\posix_getgrnam(', $source);
     }
 
-    public function testVmPosixExposesLibcNameLookup(): void
+    public function testVmPosixUsesPurePasswdGroupNameLookup(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosix.php');
-        $this->assertStringContainsString('getpwnam', $source);
-        $this->assertStringContainsString('getgrnam', $source);
-        $this->assertStringContainsString('uidForName', $source);
-        $this->assertStringContainsString('gidForName', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::uidForName', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::gidForName', $source);
+        $this->assertStringNotContainsString('getpwnam', $source);
+        $this->assertStringNotContainsString('getgrnam', $source);
     }
 
-    public function testResolveRootIdentityWhenFfiAvailable(): void
+    public function testResolveRootIdentityWhenPasswdReadable(): void
     {
-        if (!VmPosix::ffiAvailable()) {
-            $this->markTestSkipped('libc FFI unavailable on this host');
+        if (!\is_readable('/etc/passwd')) {
+            $this->markTestSkipped('/etc/passwd not readable');
         }
         $rootUid = VmPosix::uidForName('root');
         $rootGid = VmPosix::gidForName('root');
