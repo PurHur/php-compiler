@@ -13,17 +13,15 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayCombineRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_combine() for two list arrays of equal length (subset of PHP; JIT via ArrayBuiltinHelper).
+ * array_combine() for two list arrays of equal length (subset of PHP; JIT via ArrayCombineRuntime).
  */
 final class array_combine extends Internal
 {
@@ -39,39 +37,12 @@ final class array_combine extends Internal
         $valuesArg = $frame->calledArgs[1];
         VmArray::requireArrayParam($keysArg, 'array_combine', 1, 'keys');
         VmArray::requireArrayParam($valuesArg, 'array_combine', 2, 'values');
-        $keysArg = $keysArg->resolveIndirect();
-        $valuesArg = $valuesArg->resolveIndirect();
-        $keys = [];
-        foreach ($keysArg->toArray()->iterateKeyed(true) as [, $key]) {
-            $keys[] = $key;
-        }
-        $values = [];
-        foreach ($valuesArg->toArray()->iterateKeyed(true) as [, $value]) {
-            $values[] = $value;
-        }
-        if (0 === \count($keys) && 0 === \count($values)) {
-            if (null === $frame->returnVar) {
-                return;
-            }
-            $frame->returnVar->array(new HashTable());
-
-            return;
-        }
-        if (\count($keys) !== \count($values)) {
-            throw new \ValueError(self::LENGTH_MISMATCH_ERROR);
-        }
+        $keysHt = VmArray::requireArrayArgNum($keysArg->resolveIndirect(), 'array_combine', 1);
+        $valuesHt = VmArray::requireArrayArgNum($valuesArg->resolveIndirect(), 'array_combine', 2);
         if (null === $frame->returnVar) {
             return;
         }
-        $ht = new HashTable();
-        $n = \count($keys);
-        for ($i = 0; $i < $n; ++$i) {
-            $stored = new Variable();
-            $stored->copyFrom($values[$i]);
-            // Zend array_combine: duplicate keys keep the last value (ext/standard/array.c).
-            VmArray::storeCombineKey($ht, $keys[$i], $stored, $frame);
-        }
-        $frame->returnVar->array($ht);
+        $frame->returnVar->array(VmArray::combine($keysHt, $valuesHt, $frame));
     }
 
     public Context $context;
@@ -109,7 +80,7 @@ final class array_combine extends Internal
             return JitValueBox::pointer($context, JitValueBox::alloc($context));
         }
 
-        return ArrayBuiltinHelper::combine($context, $args[0], $args[1]);
+        return ArrayCombineRuntime::combine($context, $args[0], $args[1]);
     }
 
     private static function jitArgTypeLabel(JITVariable $arg): string
