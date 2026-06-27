@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayDiffAssocRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -70,6 +70,6 @@ final class array_diff_assoc extends Internal
             }
         }
 
-        return ArrayBuiltinHelper::arrayDiffAssoc($context, ...$args);
+        return ArrayDiffAssocRuntime::diffAssoc($context, $args[0], ...\array_slice($args, 1));
     }
 }
