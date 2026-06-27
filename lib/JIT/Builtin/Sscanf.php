@@ -7,9 +7,10 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT link for __compiler_sscanf* (issue #7330, #9134).
+ * JIT/AOT link for __compiler_sscanf* (issue #7330, #9134, #12467).
  *
- * Two-arg array return uses {@see SscanfJitHelper} PHP; standalone keeps {@see SscanfJit} LLVM.
+ * Array return and by-ref assignment use {@see SscanfJitHelper} PHP on JIT embed;
+ * standalone keeps {@see SscanfJit} LLVM quarantine.
  */
 final class Sscanf
 {
@@ -32,6 +33,7 @@ final class Sscanf
         }
 
         StringSscanfArray::implement($context);
-        SscanfJit::implement($context);
+        StringSscanfByRef::implement($context);
+        SscanfJit::implementVfscanfOnly($context);
     }
 }

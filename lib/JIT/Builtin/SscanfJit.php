@@ -60,6 +60,16 @@ final class SscanfJit
         self::restoreInsertBlock($context, $restore);
     }
 
+    /** JIT embed: only __compiler_vfscanf remains in LLVM until stream path migrates (#12467). */
+    public static function implementVfscanfOnly(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        self::ensureLibc($context);
+        StreamIo::ensureLinked($context);
+        self::implementIfMissing($context, '__compiler_vfscanf', self::emitCompilerVfscanf(...));
+        self::restoreInsertBlock($context, $restore);
+    }
+
     /**
      * @param callable(Context, LlvmFunction): void $emit
      */

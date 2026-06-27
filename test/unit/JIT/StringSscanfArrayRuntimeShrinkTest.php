@@ -23,7 +23,8 @@ final class StringSscanfArrayRuntimeShrinkTest extends TestCase
 
         $router = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/Sscanf.php');
         $this->assertStringContainsString('StringSscanfArray::implement', $router);
-        $this->assertStringContainsString('SscanfJit::implement', $router);
+        $this->assertStringContainsString('StringSscanfByRef::implement', $router);
+        $this->assertStringContainsString('SscanfJit::implementVfscanfOnly', $router);
     }
 
     public function testSscanfJitHelperSemanticsMatchVmSscanf(): void
