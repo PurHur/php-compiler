@@ -29,6 +29,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClockGettime());
     }
 
+    public function testSupportsClassConstantsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassConstants());
+    }
+
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
@@ -93,5 +98,11 @@ final class CompilerVersionGateTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->functions['clock_gettime']));
         $this->assertFalse(isset($ctx->classes['clockinterface']));
+    }
+
+    public function testVmDoesNotRegisterClassConstantsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['class_constants']));
     }
 }

@@ -274,6 +274,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.3+ class_constants() (ext/standard/basic_functions.c, #7309, #12448).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsClassConstants(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.3+ mb_str_pad() (ext/mbstring/mbstring.c, issue #11964). */
     public static function supportsMbStrPad(): bool
     {

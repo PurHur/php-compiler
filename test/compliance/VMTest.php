@@ -138,6 +138,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'clock_gettime_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClassConstants()
+                && str_contains($name, 'class_constants')
+                && !str_contains($name, 'class_constants_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClassConstants()
+                && str_contains($name, 'class_constants_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesOverrideAttributeClass()
                 && str_contains($name, 'override_class_exists')) {
                 continue;
