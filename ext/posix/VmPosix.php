@@ -7,8 +7,10 @@ namespace PHPCompiler\ext\posix;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\ext\standard\VmDate;
+use PHPCompiler\ext\standard\VmFsAccessPure;
 use PHPCompiler\ext\standard\VmGetcwdNative;
 use PHPCompiler\ext\standard\VmProcessIdentityPure;
+use PHPCompiler\ext\standard\VmStatCache;
 use PHPCompiler\ext\standard\VmUnamePure;
 use PHPCompiler\VM\Variable;
 
@@ -167,17 +169,30 @@ final class VmPosix
     public static function access(string $path, int $mode): bool
     {
         self::$lastError = 0;
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            throw new \Error('posix_access() is not available in this compiler build');
-        }
-        if (0 !== (int) $ffi->access($path, $mode)) {
-            self::$lastError = self::readErrno($ffi);
+        if (str_contains($path, "\0")) {
+            self::$lastError = 2;
 
             return false;
         }
 
-        return true;
+        $stat = VmStatCache::stat($path);
+        if (false === $stat) {
+            self::$lastError = 2;
+
+            return false;
+        }
+
+        if (0 === $mode) {
+            return true;
+        }
+
+        if (VmFsAccessPure::access($path, $mode)) {
+            return true;
+        }
+
+        self::$lastError = 13;
+
+        return false;
     }
 
     public static function mknod(string $path, int $mode, int $major = 0, int $minor = 0): bool
