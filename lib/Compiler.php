@@ -14850,6 +14850,20 @@ class Compiler {
                     // Hoisted operand inside sibling inline Array_ / bitmask call arg (#10612, #11304, #11387).
                     continue;
                 }
+                // php-cfg `var_export([NAN, INF], true)` — ConstFetch chain before sibling Array_ (#12824).
+                for ($j = $i + 1; $j < $callIndex; ++$j) {
+                    $scan = $cfgChildren[$j];
+                    if (
+                        $scan instanceof Op\Expr\Array_
+                        && $this->cfgExprUsesOperand($scan, $child->result)
+                    ) {
+                        continue 2;
+                    }
+                    if ($scan instanceof Op\Expr\ConstFetch || $scan instanceof Op\Expr\ClassConstFetch) {
+                        continue;
+                    }
+                    break;
+                }
                 if (
                     $child instanceof Op\Expr\ConstFetch
                     && ($next instanceof Op\Expr\UnaryMinus || $next instanceof Op\Expr\UnaryPlus)
