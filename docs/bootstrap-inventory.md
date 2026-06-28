@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3422 |
-| Phase A inventory files (M2 ratio SSOT) | 3422 |
+| PHP files on vm.php path | 3421 |
+| Phase A inventory files (M2 ratio SSOT) | 3421 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9050 |
+| Source constructs flagged (warnings) | 9049 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2387,7 +2387,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutputJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ObOutputStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObStatusRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/ObStorageGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/Output.php` | 0 | 1 |
@@ -17584,10 +17583,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Compiler/NewWithoutParensCompileCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 30)
-- new CompileError (line 66)
+- new self (line 31)
 - new CompileError (line 79)
-- 5 class method(s)
+- new CompileError (line 92)
+- 6 class method(s)
 
 ### `lib/Compiler/NoDiscardMetadata.php`
 
@@ -18943,18 +18942,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JIT (line 561)
-- 23 class method(s)
+- 31 class method(s)
 - 10 closure(s)
 
 ### `lib/JIT/Builtin/ObOutputRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `lib/JIT/Builtin/ObOutputStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 53 class method(s)
 
 ### `lib/JIT/Builtin/ObStatusRuntime.php`
 
@@ -22396,63 +22390,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 9784)
 - new VM\PropertyHookRefWriteSignal (line 9789)
 - new VM\PropertyHookFiberSuspendSignal (line 9792)
-- new ClassEntry (line 10941)
-- new Variable (line 10942)
-- new VM\ClassProperty (line 10943)
-- new ObjectEntry (line 10946)
-- new Variable (line 10949)
-- new Error (line 11087)
-- new Variable (line 11166)
-- new VM\GeneratorUncaughtThrow (line 11168)
-- new Variable (line 11193)
-- new VM\GeneratorUncaughtThrow (line 11205)
-- new VM\GeneratorUncaughtThrow (line 11275)
-- new Variable (line 11312)
-- new Variable (line 11314)
-- new Variable (line 11318)
-- new Variable (line 11433)
-- new Variable (line 11452)
-- new Variable (line 11602)
-- new Variable (line 11618)
-- new Variable (line 11730)
-- new Variable (line 11796)
-- new Variable (line 11938)
-- new VM\PropertyIsInitializedHandler (line 11947)
-- new Error (line 12008)
-- new VM\EnumFromHandler (line 12033)
-- new CompileError (line 12748)
-- new VM\ClassProperty (line 12859)
-- new Variable (line 13149)
-- new Variable (line 13323)
-- new Variable (line 13325)
-- new VM\ClassProperty (line 13441)
-- new Func\PHP (line 13560)
-- new Variable (line 13636)
-- new Variable (line 13643)
-- new Variable (line 13649)
-- new Variable (line 13686)
-- new Variable (line 13715)
-- new Variable (line 13899)
-- new Variable (line 13945)
-- new VM\ClassProperty (line 14007)
-- new Error (line 14044)
-- new Error (line 14075)
-- new Error (line 14078)
-- new Error (line 14081)
-- new Error (line 14100)
-- new ObjectEntry (line 14104)
-- new Variable (line 14106)
-- new Variable (line 14120)
-- new Error (line 14245)
-- new Error (line 14249)
-- new VM\ObjectEntry (line 14253)
-- new Variable (line 14393)
-- new Variable (line 14411)
-- new NoDiscardMetadata (line 14532)
-- new Variable (line 14689)
-- new Variable (line 14691)
-- new Variable (line 14783)
-- 421 class method(s)
+- new ClassEntry (line 10958)
+- new Variable (line 10959)
+- new VM\ClassProperty (line 10960)
+- new ObjectEntry (line 10963)
+- new Variable (line 10966)
+- new Error (line 11104)
+- new Variable (line 11183)
+- new VM\GeneratorUncaughtThrow (line 11185)
+- new Variable (line 11210)
+- new VM\GeneratorUncaughtThrow (line 11222)
+- new VM\GeneratorUncaughtThrow (line 11292)
+- new Variable (line 11329)
+- new Variable (line 11331)
+- new Variable (line 11335)
+- new Variable (line 11450)
+- new Variable (line 11469)
+- new Variable (line 11619)
+- new Variable (line 11635)
+- new Variable (line 11747)
+- new Variable (line 11813)
+- new Variable (line 11955)
+- new VM\PropertyIsInitializedHandler (line 11964)
+- new Error (line 12025)
+- new VM\EnumFromHandler (line 12050)
+- new CompileError (line 12765)
+- new VM\ClassProperty (line 12876)
+- new Variable (line 13166)
+- new Variable (line 13340)
+- new Variable (line 13342)
+- new VM\ClassProperty (line 13458)
+- new Func\PHP (line 13577)
+- new Variable (line 13653)
+- new Variable (line 13660)
+- new Variable (line 13666)
+- new Variable (line 13703)
+- new Variable (line 13732)
+- new Variable (line 13916)
+- new Variable (line 13962)
+- new VM\ClassProperty (line 14024)
+- new Error (line 14061)
+- new Error (line 14092)
+- new Error (line 14095)
+- new Error (line 14098)
+- new Error (line 14117)
+- new ObjectEntry (line 14121)
+- new Variable (line 14123)
+- new Variable (line 14137)
+- new Error (line 14262)
+- new Error (line 14266)
+- new VM\ObjectEntry (line 14270)
+- new Variable (line 14410)
+- new Variable (line 14428)
+- new NoDiscardMetadata (line 14549)
+- new Variable (line 14706)
+- new Variable (line 14708)
+- new Variable (line 14800)
+- 422 class method(s)
 - 14 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`

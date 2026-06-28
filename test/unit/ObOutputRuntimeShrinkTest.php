@@ -7,16 +7,18 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\ObOutputJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** ObOutputRuntime must route through ObOutputJitHelper PHP, not LLVM buffer globals (#9268). */
+/** ObOutputRuntime routes standalone + embed through ObOutputJitHelper PHP, not LLVM buffer globals (#9268, #12951). */
 final class ObOutputRuntimeShrinkTest extends TestCase
 {
     public function testObOutputRuntimeUsesHelperNotLlvmStack(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputRuntime.php');
         $this->assertStringContainsString('ObOutputJitBridge::implement', $runtime);
-        $this->assertStringContainsString('ObOutputStandaloneLlvm::implement', $runtime);
+        $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $runtime);
         $runtimeLines = \substr_count($runtime, "\n") + 1;
-        $this->assertLessThan(35, $runtimeLines);
+        $this->assertLessThan(25, $runtimeLines);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ObOutputStandaloneLlvm.php');
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
         $this->assertStringContainsString('ObOutputJitHelper', $bridge);
@@ -24,9 +26,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
         $this->assertStringNotContainsString('implementPopBuffer', $bridge);
+        $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
-        $this->assertLessThan(785, $bridgeLines);
-        $this->assertGreaterThan(300, 1087 - $bridgeLines);
+        $this->assertLessThan(800, $bridgeLines);
     }
 
     public function testObOutputJitHelperStackSemantics(): void
