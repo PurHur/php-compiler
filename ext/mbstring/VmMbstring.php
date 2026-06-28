@@ -142,11 +142,17 @@ final class VmMbstring
         return CharsetEngine::convert($from, $to, $source);
     }
 
-    public static function convertCase(string $source, int $mode, string $encoding = 'UTF-8'): string
-    {
+    public static function convertCase(
+        string $source,
+        int $mode,
+        string $encoding = 'UTF-8',
+        string $function = 'mb_convert_case',
+        int $encodingArgIndex = 2
+    ): string {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, $function, $encodingArgIndex);
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
             throw new \LogicException(
-                'mb_convert_case() requires mbstring for encoding '.$encoding.' in this compiler build'
+                $function.'() requires mbstring for encoding '.$encoding.' in this compiler build'
             );
         }
 
@@ -575,12 +581,24 @@ final class VmMbstring
 
     public static function strtolower(string $string, string $encoding = 'UTF-8'): string
     {
-        return self::convertCase($string, MbstringConstants::MB_CASE_LOWER, $encoding);
+        return self::convertCase(
+            $string,
+            MbstringConstants::MB_CASE_LOWER,
+            $encoding,
+            'mb_strtolower',
+            1
+        );
     }
 
     public static function strtoupper(string $string, string $encoding = 'UTF-8'): string
     {
-        return self::convertCase($string, MbstringConstants::MB_CASE_UPPER, $encoding);
+        return self::convertCase(
+            $string,
+            MbstringConstants::MB_CASE_UPPER,
+            $encoding,
+            'mb_strtoupper',
+            1
+        );
     }
 
     public static function coerceStartArg(Variable $var, string $function, int $argIndex = 1): int
