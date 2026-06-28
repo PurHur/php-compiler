@@ -387,6 +387,7 @@ require_once __DIR__.'/../../../ext/spl/SplFileInfoStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplFileObjectBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplFileObjectStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplFixedArrayBuiltin.php';
+require_once __DIR__.'/../../../ext/spl/SplFixedArraySerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplIteratorSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplObjectStorageBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplTempFileObjectBuiltin.php';

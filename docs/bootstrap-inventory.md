@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3439 |
-| Phase A inventory files (M2 ratio SSOT) | 3439 |
+| PHP files on vm.php path | 3440 |
+| Phase A inventory files (M2 ratio SSOT) | 3440 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9196 |
+| Source constructs flagged (warnings) | 9206 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -346,7 +346,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 5 |
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
-| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 28 |
+| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 34 |
+| `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 22 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -1261,7 +1262,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 8 |
-| `ext/standard/VmSerialize.php` | 0 | 36 |
+| `ext/standard/VmSerialize.php` | 0 | 37 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -5654,34 +5655,47 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplFixedArrayBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 40)
-- new SplFixedArrayConstruct (line 48)
-- new SplFixedArrayFromArray (line 65)
-- new SplFixedArrayToArray (line 68)
-- new SplFixedArrayGetIterator (line 71)
-- new SplFixedArrayGetSize (line 74)
-- new SplFixedArraySetSize (line 77)
-- new SplFixedArrayJsonSerialize (line 80)
-- new Variable (line 144)
-- new Variable (line 160)
-- new HashTable (line 182)
-- new Variable (line 186)
-- new HashTable (line 194)
-- new Variable (line 214)
-- new Variable (line 226)
-- new ObjectEntry (line 236)
-- new ObjectEntry (line 252)
+- new ClassEntry (line 41)
+- new SplFixedArrayConstruct (line 49)
+- new SplFixedArrayFromArray (line 66)
+- new SplFixedArrayToArray (line 69)
+- new SplFixedArrayGetIterator (line 72)
+- new SplFixedArrayGetSize (line 75)
+- new SplFixedArraySetSize (line 78)
+- new SplFixedArrayJsonSerialize (line 81)
+- new SplFixedArraySerialize (line 84)
+- new SplFixedArrayUnserialize (line 86)
+- new Variable (line 128)
+- new Variable (line 185)
+- new Variable (line 201)
+- new HashTable (line 223)
+- new Variable (line 227)
+- new HashTable (line 235)
 - new Variable (line 255)
-- new ArgumentCountError (line 389)
-- new ArgumentCountError (line 416)
-- new ArgumentCountError (line 440)
-- new ArgumentCountError (line 469)
-- new ArgumentCountError (line 488)
-- new Variable (line 502)
-- new Variable (line 522)
-- new ArgumentCountError (line 586)
-- new Variable (line 615)
-- 29 class method(s)
+- new Variable (line 267)
+- new ObjectEntry (line 277)
+- new ObjectEntry (line 293)
+- new Variable (line 296)
+- new ArgumentCountError (line 430)
+- new ArgumentCountError (line 457)
+- new ArgumentCountError (line 481)
+- new ArgumentCountError (line 510)
+- new ArgumentCountError (line 529)
+- new Variable (line 543)
+- new Variable (line 563)
+- new ArgumentCountError (line 627)
+- new Variable (line 656)
+- new Variable (line 677)
+- new Variable (line 681)
+- new ArgumentCountError (line 704)
+- 33 class method(s)
+
+### `ext/spl/SplFixedArraySerializeSupport.php`
+
+**Warnings** (review for bootstrap subset):
+- new ObjectEntry (line 79)
+- new Variable (line 88)
+- 5 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
 
@@ -11853,40 +11867,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 45)
-- new VmSerializeRefState (line 80)
-- new Exception (line 149)
-- new Variable (line 165)
-- new Variable (line 175)
-- new Variable (line 185)
-- new VmSerializeRefState (line 285)
-- new Exception (line 405)
-- new ObjectEntry (line 508)
-- new Variable (line 509)
-- new ObjectEntry (line 526)
-- new Variable (line 530)
-- new ObjectEntry (line 542)
-- new Variable (line 550)
-- new ObjectEntry (line 568)
-- new Variable (line 569)
-- new Variable (line 571)
-- new Variable (line 628)
-- new Exception (line 654)
-- new VmSerializeEnumCaseRef (line 704)
-- new VmSerializeEnumCaseRef (line 709)
-- new VmSerializeRefState (line 737)
-- new Variable (line 747)
-- new Variable (line 801)
-- new Variable (line 814)
-- new Variable (line 920)
-- new ObjectEntry (line 950)
-- new Variable (line 954)
-- new Frame (line 973)
-- new Variable (line 976)
-- new Variable (line 997)
-- new Variable (line 1016)
-- new Variable (line 1042)
-- new Exception (line 1065)
+- new Exception (line 46)
+- new VmSerializeRefState (line 84)
+- new Exception (line 153)
+- new Variable (line 169)
+- new Variable (line 179)
+- new Variable (line 189)
+- new Variable (line 199)
+- new VmSerializeRefState (line 299)
+- new Exception (line 419)
+- new ObjectEntry (line 525)
+- new Variable (line 526)
+- new ObjectEntry (line 543)
+- new Variable (line 547)
+- new ObjectEntry (line 559)
+- new Variable (line 567)
+- new ObjectEntry (line 585)
+- new Variable (line 586)
+- new Variable (line 588)
+- new Variable (line 645)
+- new Exception (line 671)
+- new VmSerializeEnumCaseRef (line 721)
+- new VmSerializeEnumCaseRef (line 726)
+- new VmSerializeRefState (line 754)
+- new Variable (line 764)
+- new Variable (line 818)
+- new Variable (line 831)
+- new Variable (line 937)
+- new ObjectEntry (line 967)
+- new Variable (line 971)
+- new Frame (line 990)
+- new Variable (line 993)
+- new Variable (line 1014)
+- new Variable (line 1033)
+- new Variable (line 1059)
+- new Exception (line 1082)
 - 52 class method(s)
 - 1 closure(s)
 
