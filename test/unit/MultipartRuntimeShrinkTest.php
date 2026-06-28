@@ -8,29 +8,9 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\Web\MultipartParserJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** StringMultipart JIT routes through MultipartParser PHP SSOT, LLVM quarantined (#9394). */
+/** Multipart POST uses MultipartParser PHP SSOT via SuperglobalRefreshRuntime (#9394, #13031). */
 final class MultipartRuntimeShrinkTest extends TestCase
 {
-    private const BASELINE_LOC = 1359;
-
-    public function testStringMultipartIsThinRouter(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
-        $this->assertStringContainsString('StringMultipartStandaloneLlvm', $source);
-        $this->assertStringContainsString('shouldLinkStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('emitParseMultipartPost', $source);
-        $this->assertLessThan(80, substr_count($source, "\n") + 1);
-    }
-
-    public function testStandaloneLlvmQuarantined(): void
-    {
-        $loc = substr_count(
-            (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php'),
-            "\n"
-        ) + 1;
-        $this->assertGreaterThan((int) floor(self::BASELINE_LOC * 0.8), $loc);
-    }
-
     public function testMultipartParserJitHelperDelegatesToParser(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/Web/MultipartParserJitHelper.php');
@@ -51,5 +31,11 @@ final class MultipartRuntimeShrinkTest extends TestCase
         );
         $this->assertSame('value', $post->find('field')?->toString());
         $this->assertSame(0, $files->getNumElements());
+    }
+
+    public function testStandaloneMultipartLlvmDeleted(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
     }
 }
