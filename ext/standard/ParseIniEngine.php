@@ -211,10 +211,55 @@ final class ParseIniEngine
                 $out .= $inner[++$i];
                 continue;
             }
+            if ('$' === $ch && $i + 1 < $len && '{' === $inner[$i + 1]) {
+                $expanded = self::expandEnvInterpolation($inner, $i);
+                if (null === $expanded) {
+                    $out .= '$';
+                    continue;
+                }
+                [$value, $nextIndex] = $expanded;
+                $out .= $value;
+                $i = $nextIndex;
+                continue;
+            }
             $out .= $ch;
         }
 
         return $out;
+    }
+
+    /**
+     * php-src ext/standard/ini.c — ${ENV} substitution in double-quoted INI values.
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    private static function expandEnvInterpolation(string $inner, int $start): ?array
+    {
+        if ('$' !== $inner[$start] || $start + 1 >= strlen($inner) || '{' !== $inner[$start + 1]) {
+            return null;
+        }
+        $close = strpos($inner, '}', $start + 2);
+        if (false === $close) {
+            return null;
+        }
+        $token = substr($inner, $start + 2, $close - $start - 2);
+        $fallback = null;
+        $colonFallback = strpos($token, ':-');
+        if (false !== $colonFallback) {
+            $envName = substr($token, 0, $colonFallback);
+            $fallback = substr($token, $colonFallback + 2);
+        } else {
+            $envName = $token;
+        }
+        if ('' === $envName || !preg_match('/^[A-Za-z_][A-Za-z0-9_]*$/', $envName)) {
+            return null;
+        }
+        $resolved = VmEnv::getenv($envName);
+        if (false === $resolved) {
+            $resolved = null !== $fallback ? $fallback : '';
+        }
+
+        return [$resolved, $close];
     }
 
     /**
