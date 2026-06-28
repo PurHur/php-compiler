@@ -32,6 +32,7 @@ final class class_uses_ extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
+        VmClassHas::requireObjectOrClass($frame->calledArgs[0], 'class_uses', 'object_or_class');
         $autoload = true;
         if ($argc >= 2) {
             $autoload = VmMath::parseBoolBuiltinArg(
