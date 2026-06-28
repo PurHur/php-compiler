@@ -42,7 +42,21 @@ final class StringSerialize
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link serialize ABI without nested SerializeJitHelper JIT (#13322). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -50,6 +64,12 @@ final class StringSerialize
         $probe = $context->module->getNamedFunction('__compiler_serialize_value');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStubs($context);
 
             return;
         }
@@ -144,5 +164,35 @@ final class StringSerialize
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Return null __string__* — inventory emit only needs linkable ABI symbols (#13322). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            $firstParam = '__compiler_serialize_hashtable' === $abiName ? $htPtr : $valuePtr;
+            $ft = $context->context->functionType($strPtr, false, $firstParam);
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction($abiName, $ft);
+
+            $entry = $fn->appendBasicBlock('serialize_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($nullStr);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        $context->builder->clearInsertionPosition();
     }
 }
