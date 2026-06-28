@@ -63,6 +63,10 @@ final class IniJitHelper
     private const READONLY_STRING_DEFAULTS = [
         'session.save_handler' => 'files',
         'user_ini.filename' => '.user.ini',
+        'realpath_cache_size' => '4096K',
+        'realpath_cache_ttl' => '120',
+        'post_max_size' => '8M',
+        'upload_max_filesize' => '2M',
     ];
 
     private const CFG_MAX_EXECUTION_TIME = '0';
