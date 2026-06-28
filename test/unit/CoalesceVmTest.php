@@ -267,6 +267,19 @@ echo "y=", var_export($a["k"] ?? null, true), "\n";
         );
     }
 
+    /** Issue #13105: ?: binds below additive/concat; deferred RHS must run on the falsy branch. */
+    public function testElvisOperatorPrecedence(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_elvis_precedence.php'),
+            "ok null ?: 1 + 2\n"
+            . "ok 0 ?: 1 + 2\n"
+            . "ok false ?: 1 + 2\n"
+            . "ok empty string ?: concat\n"
+            . "ok var 0 ?: 1 + 2\n"
+        );
+    }
+
     private function assertVmOutput(string $code, string $expected): void
     {
         $runtime = new Runtime();
