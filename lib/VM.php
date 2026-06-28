@@ -6671,9 +6671,7 @@ restart:
                         unset($this->context->foreachObjectAdvance[$op->arg1]);
                         unset($this->context->objectPropertyIterators[$op->arg1]);
                         unset($this->context->weakMapIterators[$op->arg1]);
-                        $frame->iterators[$op->arg1] = $container;
-                        $this->context->foreachIterators[$op->arg1] = $container;
-                        $container->toArray()->iterReset();
+                        $this->bindArrayForeachIteratorContainer($frame, (int) $op->arg1, $container);
                         break;
                     }
                     if (Variable::TYPE_OBJECT === $container->type) {
@@ -6869,6 +6867,8 @@ restart:
                     }
                     $byRef = (bool) $op->arg3;
                     if ($byRef) {
+                        $this->rebindArrayForeachToLiveContainer($frame, (int) $op->arg2);
+                        $container = $this->resolveForeachContainer($frame, (int) $op->arg2);
                         $frame->scope[$op->arg1]->indirect(
                             $container->toArray()->iterCurrentValue(true)
                         );
@@ -11047,6 +11047,35 @@ restart:
 
         return Variable::TYPE_OBJECT === $container->type
             && null !== $container->toObject()->generatorState;
+    }
+
+    /**
+     * Zend FE_RESET_R: foreach by-value keeps an addRef'd snapshot so mutators (array_pop, etc.)
+     * COW-separate the live variable without truncating iteration (Zend/zend_execute.c, #13138).
+     */
+    private function bindArrayForeachIteratorContainer(Frame $frame, int $slot, Variable $source): void
+    {
+        $source = $source->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $source->type) {
+            throw new \LogicException('Array foreach reset requires an array');
+        }
+        $ht = $source->toArray();
+        $ht->addRef();
+        $iterContainer = new Variable();
+        $iterContainer->array($ht);
+        $frame->iterators[$slot] = $iterContainer;
+        $this->context->foreachIterators[$slot] = $iterContainer;
+        $ht->iterReset();
+    }
+
+    /** Zend FE_RESET_RW: by-reference foreach iterates the live array HashTable. */
+    private function rebindArrayForeachToLiveContainer(Frame $frame, int $slot): void
+    {
+        if (!isset($frame->scope[$slot])) {
+            return;
+        }
+        $frame->iterators[$slot] = $frame->scope[$slot];
+        $this->context->foreachIterators[$slot] = $frame->scope[$slot];
     }
 
     private function resolveForeachContainer(Frame $frame, int $slot): Variable
