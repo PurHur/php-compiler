@@ -1128,11 +1128,30 @@ final class VmArray
      */
     public static function countRecursive(HashTable $ht, ?Frame $frame = null, ?\SplObjectStorage $visited = null): int
     {
+        return self::countRecursiveWalk($ht, $frame, $visited, false);
+    }
+
+    /** count(COUNT_RECURSIVE) for compiled JIT/AOT — warnings via compiler_language_warning (#13274). */
+    public static function countRecursiveForCompiled(HashTable $ht, ?\SplObjectStorage $visited = null): int
+    {
+        return self::countRecursiveWalk($ht, null, $visited, true);
+    }
+
+    private static function countRecursiveWalk(
+        HashTable $ht,
+        ?Frame $frame,
+        ?\SplObjectStorage $visited,
+        bool $compiledWarning
+    ): int {
         if (null === $visited) {
             $visited = new \SplObjectStorage();
         }
         if ($visited->contains($ht)) {
-            self::countRecursiveWarning($frame);
+            if ($compiledWarning) {
+                compiler_language_warning(self::COUNT_RECURSIVE_WARNING);
+            } else {
+                self::countRecursiveWarning($frame);
+            }
 
             return 0;
         }
@@ -1141,7 +1160,7 @@ final class VmArray
             $count = $ht->getNumElements();
             foreach ($ht->iterate(true) as $value) {
                 if (Variable::TYPE_ARRAY === $value->type) {
-                    $count += self::countRecursive($value->toArray(), $frame, $visited);
+                    $count += self::countRecursiveWalk($value->toArray(), $frame, $visited, $compiledWarning);
                 }
             }
 

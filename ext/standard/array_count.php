@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArrayCountRecursiveRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -103,7 +104,7 @@ final class array_count extends Internal
                 || JITVariable::TYPE_VALUE === $args[0]->type
                 || JitValueBox::isValueOperand($args[0])
             ) {
-                return ArrayBuiltinHelper::countRecursive($context, $args[0]);
+                return ArrayCountRecursiveRuntime::countRecursive($context, $args[0]);
             }
             $this->emitCountTypeError($context, $args[0]);
 
