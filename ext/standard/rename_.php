@@ -21,8 +21,19 @@ final class rename_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('rename() requires exactly two arguments in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'rename() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'rename() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($frame->calledArgs[2])) {
+            VmStreamContext::validateOptionalContextArg($frame->calledArgs[2], 'rename', 3);
         }
         $from = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
         $to = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
@@ -37,8 +48,19 @@ final class rename_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('rename() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'rename() expects at least 2 arguments, '.$argc.' given'
+            );
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(
+                'rename() expects at most 3 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($args[2])) {
+            JitStreamContextOptionalArg::validate($context, $args[2], 'rename', 3);
         }
         $from = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'rename', 0, 'from');
         $to = JitStringBuiltinArg::lowerTypedString($context, $args[1], 'rename', 1, 'to');
