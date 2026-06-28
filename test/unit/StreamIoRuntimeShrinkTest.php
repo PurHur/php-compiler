@@ -38,6 +38,7 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamIoJitHelper::freadArgv', $source);
         $this->assertStringContainsString('StreamIoJitHelper::fwriteArgv', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('ensureRuntimeAbiDeclared', $source);
         $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
     }
 

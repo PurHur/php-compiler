@@ -20,6 +20,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StreamIoRuntime
 {
+    private static int $implementDepth = 0;
+
     private const HELPER_PATH = '/ext/standard/StreamIoJitHelper.php';
 
     private const FOPEN = 'PHPCompiler\\ext\\standard\\StreamIoJitHelper::fopenArgv';
@@ -63,12 +65,27 @@ final class StreamIoRuntime
             return;
         }
 
+        if (self::$implementDepth > 0) {
+            return;
+        }
+
+        ++self::$implementDepth;
+        try {
+            self::implementBridges($context);
+        } finally {
+            --self::$implementDepth;
+        }
+    }
+
+    private static function implementBridges(Context $context): void
+    {
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
         } catch (\Throwable) {
         }
 
+        self::ensureRuntimeAbiDeclared($context);
         self::ensureJitHelperCompiled($context);
         self::implementFwriteBridge($context);
         self::implementBinaryStringBridge($context, '__compiler_fopen', self::FOPEN);
@@ -109,7 +126,7 @@ final class StreamIoRuntime
         }
 
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
+        $fn = $probe ?? $context->module->addFunction(
             $abiName,
             $context->context->functionType($i64, false)
         );
@@ -143,7 +160,7 @@ final class StreamIoRuntime
 
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = $context->module->addFunction(
+        $fn = $probe ?? $context->module->addFunction(
             $abiName,
             $context->context->functionType($i64, false, $strPtr, $strPtr)
         );
@@ -190,7 +207,7 @@ final class StreamIoRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = $context->module->addFunction(
+        $fn = $probe ?? $context->module->addFunction(
             $abiName,
             $context->context->functionType($i64, false, $i64, $strPtr, $i64)
         );
@@ -241,7 +258,7 @@ final class StreamIoRuntime
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $params = array_fill(0, $i64ArgCount, $i64);
-        $fn = $context->module->addFunction(
+        $fn = $probe ?? $context->module->addFunction(
             $abiName,
             $context->context->functionType($strPtr, false, ...$params)
         );
@@ -394,6 +411,31 @@ final class StreamIoRuntime
             $context->context->functionType($strPtr, false, $i64, $i64),
             $ret
         );
+    }
+
+    /** Forward-declare stream I/O ABI for nested helper compile (#13000). */
+    private static function ensureRuntimeAbiDeclared(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::declareRuntimeFn($context, '__compiler_fwrite', $i64, false, $i64, $strPtr, $i64);
+        self::declareRuntimeFn($context, '__compiler_fopen', $i64, false, $i64, $strPtr);
+        self::declareRuntimeFn($context, '__compiler_popen', $i64, false, $i64, $strPtr);
+        self::declareRuntimeFn($context, '__compiler_tmpfile', $i64, false);
+        self::declareRuntimeFn($context, '__compiler_fread', $strPtr, false, $i64, $i64);
+    }
+
+    private static function declareRuntimeFn(Context $context, string $name, $ret, bool $vararg, ...$params): LlvmFunction
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe) {
+            return $probe;
+        }
+        $ft = $context->context->functionType($ret, $vararg, ...$params);
+        $fn = $context->module->addFunction($name, $ft);
+        $context->registerFunction($name, $fn);
+
+        return $fn;
     }
 
     private static function implementStub(Context $context, string $name, $ft, Value $ret): void

@@ -100,14 +100,12 @@ final class SuperglobalRefreshRuntime
     private static function useStandaloneLlvmFallback(Context $context): bool
     {
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            // Nested SuperglobalRefreshJitHelper returns VM HashTable handles, not native
-            // __hashtable__* — coerceToHashtablePtr bitcast corrupts sg_* (#12039).
             $phpBridge = getenv('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP');
-            if ('1' === $phpBridge || 'true' === strtolower((string) $phpBridge)) {
-                return false;
+            if ('0' === $phpBridge || 'false' === strtolower((string) $phpBridge)) {
+                return true;
             }
 
-            return true;
+            return false;
         }
 
         foreach (['PHP_COMPILER_SUPERGLOBAL_REFRESH_LLVM', 'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] as $key) {
