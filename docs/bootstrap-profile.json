@@ -2502,7 +2502,6 @@
         "lib/JIT/Builtin/SessionStart.php",
         "lib/JIT/Builtin/SessionStorageGlobals.php",
         "lib/JIT/Builtin/SessionStorageRuntime.php",
-        "lib/JIT/Builtin/SessionStorageStandaloneLlvm.php",
         "lib/JIT/Builtin/SessionUnset.php",
         "lib/JIT/Builtin/SessionWriteClose.php",
         "lib/JIT/Builtin/ShuffleRuntime.php",
@@ -3654,9 +3653,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3424,
+        "inventory_files": 3423,
         "excluded": 0,
-        "eligible": 3424,
+        "eligible": 3423,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

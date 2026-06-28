@@ -7,7 +7,6 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -16,10 +15,10 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for session file I/O via SessionStorageJitHelper PHP (#9495).
+ * JIT/AOT link for session file I/O via SessionStorageJitHelper PHP (#9495, #12938).
  *
- * Standalone AOT keeps libc/file LLVM in {@see SessionStorageStandaloneLlvm}.
- * php-src: ext/session/mod_files.c
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\SessionStorageJitHelper}; thin LLVM
+ * bridges forward the ABI. php-src: ext/session/mod_files.c
  */
 final class SessionStorageRuntime
 {
@@ -68,17 +67,16 @@ final class SessionStorageRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::ensureLinked($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('phpc_session_load_from_disk');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            SessionStorageStandaloneLlvm::implement($context);
 
             return;
         }
