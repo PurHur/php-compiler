@@ -1816,9 +1816,25 @@ class Object_ extends Type {
         $originalLc = strtolower(ltrim($original, '\\'));
 
         if (isset($this->classes[$aliasLc]) || isset($this->classAliasToOriginalLc[$aliasLc])) {
+            $vmContext = $this->context->runtime->vmContext ?? null;
+            if (null !== $vmContext) {
+                $vmContext->errors->triggerError(
+                    \sprintf('Cannot declare class %s, because the name is already in use', $alias),
+                    \PHPCompiler\VM\ErrorReporter::E_WARNING
+                );
+            }
+
             return false;
         }
         if (!isset($this->classes[$originalLc])) {
+            $vmContext = $this->context->runtime->vmContext ?? null;
+            if (null !== $vmContext) {
+                $vmContext->errors->triggerError(
+                    \sprintf('Class "%s" not found', $original),
+                    \PHPCompiler\VM\ErrorReporter::E_WARNING
+                );
+            }
+
             return false;
         }
         while (isset($this->classAliasToOriginalLc[$originalLc])) {
