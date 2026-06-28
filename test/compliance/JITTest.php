@@ -281,6 +281,22 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'typed_class_const_reject')) {
                 continue;
             }
+            // 8.2-target reject gate; skipped when CompilerVersion 8.3+ enables class const `new` (#12940).
+            if (CompilerVersion::supportsClassConstObjectExpressions()) {
+                if (str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_expr')
+                    || (str_contains($name, 'class_const_new_expression') && !str_contains($name, '_run'))
+                    || (str_contains($name, 'class_const_new_object') && !str_contains($name, '_run'))
+                    || (str_contains($name, 'class_const_object') && !str_contains($name, '_run'))
+                    || str_contains($name, 'class_const_object_jit')) {
+                    continue;
+                }
+            }
+            if (!CompilerVersion::supportsClassConstObjectExpressions()
+                && (str_contains($name, 'class_const_new_expression_run')
+                    || str_contains($name, 'class_const_new_object_run'))) {
+                continue;
+            }
             if (!CompilerVersion::supportsTypedClassConstants()
                 && (str_contains($name, 'typed_class_const')
                     || str_contains($name, 'typed_enum_class_const')
