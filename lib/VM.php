@@ -10711,13 +10711,33 @@ restart:
         return null;
     }
 
+    /**
+     * Runtime class scope for self/parent/static inside a bound closure (#3673, #12963).
+     */
+    private function boundClosureScopeClassLc(Frame $frame): ?string
+    {
+        if (null === $frame->block || null === $frame->block->func) {
+            return null;
+        }
+        if ((($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) === 0) {
+            return null;
+        }
+        if (null === $frame->calledClass || '' === $frame->calledClass) {
+            return null;
+        }
+
+        return strtolower($frame->calledClass);
+    }
+
     private function callerClassLc(Frame $frame): ?string
     {
-        $classLc = null;
-        if (null !== $frame->block && null !== $frame->block->func && null !== $frame->block->func->class) {
-            $classLc = strtolower($frame->block->func->class->value);
-        } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
-            $classLc = strtolower($frame->calledClass);
+        $classLc = $this->boundClosureScopeClassLc($frame);
+        if (null === $classLc) {
+            if (null !== $frame->block && null !== $frame->block->func && null !== $frame->block->func->class) {
+                $classLc = strtolower($frame->block->func->class->value);
+            } elseif (null !== $frame->calledClass && '' !== $frame->calledClass) {
+                $classLc = strtolower($frame->calledClass);
+            }
         }
         if (null === $classLc) {
             return null;
@@ -11903,6 +11923,10 @@ restart:
 
     protected function declaringClassLc(Frame $frame, string $scopeKeyword = 'self'): string
     {
+        $boundScope = $this->boundClosureScopeClassLc($frame);
+        if (null !== $boundScope) {
+            return $boundScope;
+        }
         if (null !== $frame->block->func && null !== $frame->block->func->class) {
             return strtolower($frame->block->func->class->value);
         }
@@ -12055,10 +12079,13 @@ restart:
         }
         try {
             [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
-            $parentScopeInstanceCall = ($parentKeywordScope
-                && null !== $frame->block->func
-                && null !== $frame->block->func->class
-                && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC))
+            $hasInstanceScope = null !== $frame->block->func
+                && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
+                && (
+                    null !== $frame->block->func->class
+                    || null !== $this->boundClosureScopeClassLc($frame)
+                );
+            $parentScopeInstanceCall = ($parentKeywordScope && $hasInstanceScope)
                 || $this->isDirectParentScopeInstanceCall($frame, $lcClass);
             if (!$parentScopeInstanceCall) {
                 $this->assertMethodCallableStatically($class, $methodLc);
@@ -12088,13 +12115,7 @@ restart:
             return;
         }
         $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
-        $callerClassLc = null;
-        if (null !== $frame->block->func && null !== $frame->block->func->class) {
-            $callerClassLc = strtolower($frame->block->func->class->value);
-        }
-        if (null === $callerClassLc && null !== $frame->calledClass && '' !== $frame->calledClass) {
-            $callerClassLc = strtolower($frame->calledClass);
-        }
+        $callerClassLc = $this->callerClassLc($frame);
         $parentScopeAllows = false;
         if ($parentKeywordScope) {
             $parentScopeAllows = MethodVisibility::parentScopeAllows(
@@ -12165,10 +12186,14 @@ restart:
 
     protected function resolveCallerThis(Frame $frame): ?Variable
     {
-        if (null === $frame->block->func || null === $frame->block->func->class) {
+        if (null === $frame->block->func) {
             return null;
         }
         if (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC) {
+            return null;
+        }
+        $isClosure = (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
+        if (!$isClosure && null === $frame->block->func->class) {
             return null;
         }
         $idx = $frame->block->slotIndexForVariableName('this');
@@ -12178,6 +12203,12 @@ restart:
         $fromScope = $frame->block->findVariableByRuntimeName('this', $frame);
         if (null !== $fromScope) {
             return $fromScope;
+        }
+        if ($isClosure) {
+            $state = $frame->closureCall ?? $frame->pendingClosureInvoke;
+            if (null !== $state && null !== $state->boundThis) {
+                return $state->boundThis;
+            }
         }
         if (!empty($frame->calledArgs)) {
             $receiver = $frame->calledArgs[0]->resolveIndirect();
