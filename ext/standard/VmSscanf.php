@@ -60,19 +60,29 @@ final class VmSscanf
             if ($fpos >= $fmtLen) {
                 return [$assigned, $inPos];
             }
+            $suppress = false;
+            if ('*' === $format[$fpos]) {
+                $suppress = true;
+                ++$fpos;
+                if ($fpos >= $fmtLen) {
+                    return [$assigned, $inPos];
+                }
+            }
             if ('[' === $format[$fpos]) {
                 [$matcher, $fpos] = self::parseScansetMatcher($format, $fpos, $fmtLen);
-                if ($outIdx >= \count($outVars)) {
+                if (!$suppress && $outIdx >= \count($outVars)) {
                     return [$assigned, $inPos];
                 }
                 [$str, $consumed] = self::scanScansetMatch($input, $inPos, $inLen, $matcher, $width);
                 if (null === $str) {
                     return [$assigned, $inPos];
                 }
-                self::assignString($outVars[$outIdx], $str);
+                if (!$suppress) {
+                    self::assignString($outVars[$outIdx], $str);
+                    ++$outIdx;
+                    ++$assigned;
+                }
                 $inPos += $consumed;
-                ++$outIdx;
-                ++$assigned;
                 // parseScansetMatcher() leaves $fpos on the char after ']'; back up so the
                 // for-loop increment does not skip a following '%' (php-src formatted_io.c).
                 --$fpos;
@@ -86,7 +96,7 @@ final class VmSscanf
                 ++$inPos;
                 continue;
             }
-            if ($outIdx >= \count($outVars)) {
+            if (!$suppress && $outIdx >= \count($outVars)) {
                 return [$assigned, $inPos];
             }
             switch ($spec) {
@@ -96,34 +106,40 @@ final class VmSscanf
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
-                    self::assignInt($outVars[$outIdx], $val);
+                    if (!$suppress) {
+                        self::assignInt($outVars[$outIdx], $val);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'i':
                     [$val, $consumed] = self::scanAutoBaseInt($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
-                    self::assignInt($outVars[$outIdx], $val);
+                    if (!$suppress) {
+                        self::assignInt($outVars[$outIdx], $val);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'u':
                     [$val, $consumed, $asString] = self::scanUnsigned($input, $inPos, $inLen, $width);
                     if (null === $val && null === $asString) {
                         return [$assigned, $inPos];
                     }
-                    if (null !== $asString) {
-                        self::assignString($outVars[$outIdx], $asString);
-                    } else {
-                        self::assignInt($outVars[$outIdx], $val);
+                    if (!$suppress) {
+                        if (null !== $asString) {
+                            self::assignString($outVars[$outIdx], $asString);
+                        } else {
+                            self::assignInt($outVars[$outIdx], $val);
+                        }
+                        ++$outIdx;
+                        ++$assigned;
                     }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'x':
                 case 'X':
@@ -131,50 +147,60 @@ final class VmSscanf
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
-                    self::assignInt($outVars[$outIdx], $val);
+                    if (!$suppress) {
+                        self::assignInt($outVars[$outIdx], $val);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'o':
                     [$val, $consumed] = self::scanOct($input, $inPos, $inLen, $width);
                     if (null === $val) {
                         return [$assigned, $inPos];
                     }
-                    self::assignInt($outVars[$outIdx], $val);
+                    if (!$suppress) {
+                        self::assignInt($outVars[$outIdx], $val);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'c':
                     [$str, $consumed] = self::scanChar($input, $inPos, $inLen, $width);
                     if (null === $str) {
                         return [$assigned, $inPos];
                     }
-                    self::assignString($outVars[$outIdx], $str);
+                    if (!$suppress) {
+                        self::assignString($outVars[$outIdx], $str);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 's':
                     [$str, $consumed] = self::scanString($input, $inPos, $inLen, $width);
                     if (null === $str) {
                         return [$assigned, $inPos];
                     }
-                    self::assignString($outVars[$outIdx], $str);
+                    if (!$suppress) {
+                        self::assignString($outVars[$outIdx], $str);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'f':
                     [$flt, $consumed] = self::scanFloat($input, $inPos, $inLen, $width, true);
                     if (null === $flt) {
                         return [$assigned, $inPos];
                     }
-                    self::assignFloat($outVars[$outIdx], $flt);
+                    if (!$suppress) {
+                        self::assignFloat($outVars[$outIdx], $flt);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 case 'e':
                 case 'E':
@@ -184,10 +210,12 @@ final class VmSscanf
                     if (null === $flt) {
                         return [$assigned, $inPos];
                     }
-                    self::assignFloat($outVars[$outIdx], $flt);
+                    if (!$suppress) {
+                        self::assignFloat($outVars[$outIdx], $flt);
+                        ++$outIdx;
+                        ++$assigned;
+                    }
                     $inPos += $consumed;
-                    ++$outIdx;
-                    ++$assigned;
                     break;
                 default:
                     throw new \ValueError('Bad scan conversion character "'.$spec.'"');
@@ -258,14 +286,24 @@ final class VmSscanf
             if ($fpos >= $len) {
                 break;
             }
+            $suppress = false;
+            if ('*' === $format[$fpos]) {
+                $suppress = true;
+                ++$fpos;
+                if ($fpos >= $len) {
+                    break;
+                }
+            }
             if ('[' === $format[$fpos]) {
                 [, $fpos] = self::parseScansetMatcher($format, $fpos, $len);
-                ++$count;
+                if (!$suppress) {
+                    ++$count;
+                }
                 --$fpos;
                 continue;
             }
             $spec = $format[$fpos];
-            if ('%' !== $spec) {
+            if ('%' !== $spec && !$suppress) {
                 ++$count;
             }
         }
@@ -288,6 +326,12 @@ final class VmSscanf
             $fpos = self::skipOptionalFieldWidth($format, $fpos, $len);
             if ($fpos >= $len) {
                 break;
+            }
+            if ('*' === $format[$fpos]) {
+                ++$fpos;
+                if ($fpos >= $len) {
+                    break;
+                }
             }
             if ('[' === $format[$fpos]) {
                 self::parseScansetMatcher($format, $fpos, $len);
