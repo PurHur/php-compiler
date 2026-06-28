@@ -4629,9 +4629,6 @@
         "lib/JIT/AsymmetricVisibilityGuard.php": [
             "Cannot use PHPCompiler\\Block as Block because the name is already in use on line 7"
         ],
-        "lib/JIT/AttributeNewInstanceHelper.php": [
-            "Cannot use PHPCompiler\\JIT\\Builtin\\ErrorRaise as ErrorRaise because the name is already in use on line 7"
-        ],
         "lib/JIT/BackedEnumFromJit.php": [
             "Cannot use PHPCompiler\\JIT\\Builtin\\TypeErrorRaise as TypeErrorRaise because the name is already in use on line 8"
         ],
