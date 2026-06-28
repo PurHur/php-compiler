@@ -10,12 +10,17 @@ use PHPCompiler\BuiltinParamNames;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ErrorReporter;
 
 /**
  * Whether a call argument may bind to an &-parameter (Zend zend_execute.c ZEND_SEND_REF).
  */
 final class ReferencableCheck
 {
+    private const NON_VARIABLE_BY_REF_NOTICE = 'Only variables should be passed by reference';
+
+    public const NON_VARIABLE_BY_REF_NOTICE_MESSAGE = self::NON_VARIABLE_BY_REF_NOTICE;
+
     /**
      * @param list<Variable> $calledArgs
      */
@@ -98,6 +103,13 @@ final class ReferencableCheck
                     )
                 )
             ) {
+                if (
+                    self::skipsByRefWhenNotArray($fn)
+                    && !self::isArrayOperand($calledArgs[$paramIdx])
+                    && !self::isReferenceable($calledArgs[$paramIdx], $caller)
+                ) {
+                    self::emitNonVariableByRefNotice($caller);
+                }
                 continue;
             }
             if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx] ?? null)) {
@@ -185,6 +197,33 @@ final class ReferencableCheck
     private static function isArrayOperand(Variable $arg): bool
     {
         return Variable::TYPE_ARRAY === $arg->resolveIndirect()->type;
+    }
+
+    private static function emitNonVariableByRefNotice(Frame $caller): void
+    {
+        $ctx = self::resolveVmContext($caller);
+        if (null === $ctx) {
+            return;
+        }
+        $ctx->errors->triggerError(
+            self::NON_VARIABLE_BY_REF_NOTICE,
+            ErrorReporter::E_NOTICE,
+            '' !== $caller->scriptPath ? $caller->scriptPath : null,
+            $ctx,
+            $caller,
+            $caller->callSiteLine
+        );
+    }
+
+    private static function resolveVmContext(Frame $caller): ?Context
+    {
+        for ($frame = $caller; null !== $frame; $frame = $frame->parent) {
+            if (null !== $frame->vmContext) {
+                return $frame->vmContext;
+            }
+        }
+
+        return null;
     }
 
     /** Inline array literal operand — not an lvalue, but allowed for read-only pointer builtins (#10654). */
