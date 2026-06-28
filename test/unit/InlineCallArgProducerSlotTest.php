@@ -2663,6 +2663,61 @@ PHP;
         self::assertStringContainsString("array (\n)", $out);
     }
 
+    /** Issue #11070 — date_sunrise(time(), SUNFUNCS_RET_STRING, …) wires FuncCall + ConstFetch producer slots. */
+    public function testDateSunriseInlineTimeAndSunfuncsConstUsesProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+date_sunrise(time(), SUNFUNCS_RET_STRING, 40.7, -74.0, 90, 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_inline_const.php');
+
+        $timeReturnSlot = null;
+        $constSlot = null;
+        $sunriseSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $sunriseSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+                $timeReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $constSlot) {
+                $constSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sunriseSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($timeReturnSlot);
+        self::assertNotNull($constSlot);
+        self::assertCount(6, $sunriseSends, 'arg sends='.json_encode($sunriseSends));
+        self::assertSame($timeReturnSlot, $sunriseSends[0], 'arg sends='.json_encode($sunriseSends));
+        self::assertSame($constSlot, $sunriseSends[1], 'arg sends='.json_encode($sunriseSends));
+    }
+
+    /** Issue #11070 — date_sunrise inline SUNFUNCS_RET_STRING returns HH:MM string at runtime. */
+    public function testDateSunriseInlineSunfuncsConstStringRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$r = date_sunrise(time(), SUNFUNCS_RET_STRING, 40.7, -74.0, 90, 1);
+echo is_string($r) ? 'string' : gettype($r), "\n";
+echo preg_match('/^\d{2}:\d{2}$/', (string) $r) ? "hhmm\n" : "bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'date_sunrise_inline_const_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("string\nhhmm\n", ob_get_clean());
+    }
+
     /** Issue #12009 — hoisted FuncCall + ConstFetch siblings with embedded middle literal (try body). */
     public function testJsonDecodeInlineStrRepeatJsonThrowOnErrorDepthRuntime(): void
     {

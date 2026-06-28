@@ -15732,11 +15732,7 @@ class Compiler {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
-                if (2 === $distance && $j === $producerIndex + 1) {
-                    continue;
-                }
-
-                return false;
+                continue;
             }
             if (!$this->isSiblingInlineCallProducerExpr($mid)) {
                 return false;
@@ -15829,12 +15825,9 @@ class Compiler {
                 --$i;
                 continue;
             }
-            if ($this->isUnaryInlineSiblingCallArgExpr($child) && $i > 0) {
-                $before = $cfgChildren[$i - 1] ?? null;
-                if ($this->isSiblingInlineCallProducerExpr($before)) {
-                    --$i;
-                    continue;
-                }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                --$i;
+                continue;
             }
             break;
         }
