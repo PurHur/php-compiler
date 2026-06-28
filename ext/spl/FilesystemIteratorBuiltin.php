@@ -162,7 +162,7 @@ final class FilesystemIteratorConstruct extends VmClassMethod
             $frame->calledArgs[1],
             'FilesystemIterator::__construct'
         );
-        $flags = 0;
+        $flags = FilesystemIteratorBuiltin::SKIP_DOTS;
         if ($argCount >= 3) {
             $flags = SplFilesystemArg::requireIntArg(
                 $frame->calledArgs[2],
