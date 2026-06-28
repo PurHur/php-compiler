@@ -38,8 +38,8 @@ final class SplFixedArrayBuiltin
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplFixedArray');
-        foreach (['IteratorAggregate', 'Traversable', 'ArrayAccess', 'Countable', 'JsonSerializable'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
+        foreach (['iteratoraggregate', 'traversable', 'arrayaccess', 'countable', 'jsonserializable'] as $iface) {
+            if (isset($ctx->classes[$iface])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
             }

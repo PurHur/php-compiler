@@ -32,8 +32,8 @@ final class SplDoublyLinkedListBuiltin
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplDoublyLinkedList');
-        foreach (['Iterator', 'Traversable', 'Countable', 'ArrayAccess', 'Serializable'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
+        foreach (['iterator', 'traversable', 'countable', 'arrayaccess', 'serializable'] as $iface) {
+            if (isset($ctx->classes[$iface])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
             }
