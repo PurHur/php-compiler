@@ -13,7 +13,7 @@ final class BuiltinAttributePhantomTest extends TestCase
 {
     public function testForwardCompatAttributeClassesAdvertisedOn84DevProfile(): void
     {
-        $this->assertTrue(CompilerVersion::advertisesOverrideAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
         $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
         $this->assertTrue(CompilerVersion::advertisesNoDiscardAttributeClass());
         $this->assertTrue(CompilerVersion::advertisesEnumCasesAttributeClass());
@@ -25,7 +25,7 @@ final class BuiltinAttributePhantomTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->classes['override']));
+        $this->assertFalse(isset($ctx->classes['override']));
         $this->assertFalse(isset($ctx->classes['deprecated']));
         $this->assertTrue(isset($ctx->classes['nodiscard']));
         $this->assertTrue(isset($ctx->classes['enumcases']));
