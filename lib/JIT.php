@@ -14123,6 +14123,19 @@ class JIT {
 
             return true;
         }
+        if (
+            'coercevariabletostring' === $methodLc
+            && ('phpcompiler\\vm' === $declaringClassLc || 'object' === $declaringClassLc)
+        ) {
+            $proxyName = 'phpcompiler\\vm::coercevariabletostring';
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                $this->context->functionProxies[$proxyName] = new JIT\Call\VmCoerceVariableToString();
+            }
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [$receiverVar];
+
+            return true;
+        }
         if (!JIT\NestedVmVariableMethodLlvm::isNestedVariableMethod($methodLc)) {
             return false;
         }
