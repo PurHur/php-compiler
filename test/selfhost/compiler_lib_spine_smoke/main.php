@@ -2305,7 +2305,6 @@ require_once __DIR__.'/../../../lib/JIT/ArrayFindHelper.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayMapCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/ArrayReduceCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/AsymmetricVisibilityGuard.php';
-require_once __DIR__.'/../../../lib/JIT/AttributeNewInstanceHelper.php';
 require_once __DIR__.'/../../../lib/JIT/BackedEnumDuplicateJitGuard.php';
 require_once __DIR__.'/../../../lib/JIT/BackedEnumFromJit.php';
 require_once __DIR__.'/../../../lib/JIT/BasicBlockHelper.php';

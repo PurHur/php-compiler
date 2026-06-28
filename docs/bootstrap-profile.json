@@ -2304,7 +2304,6 @@
         "lib/JIT/ArrayMapCallbackPolicy.php",
         "lib/JIT/ArrayReduceCallbackPolicy.php",
         "lib/JIT/AsymmetricVisibilityGuard.php",
-        "lib/JIT/AttributeNewInstanceHelper.php",
         "lib/JIT/BackedEnumDuplicateJitGuard.php",
         "lib/JIT/BackedEnumFromJit.php",
         "lib/JIT/BasicBlockHelper.php",

@@ -336,7 +336,6 @@
             "message": "Cannot use PHPCompiler\\JIT\\Builtin\\ErrorRaise as ErrorRaise because the name is already in use on line 7",
             "file_count": 6,
             "examples": [
-                "lib/JIT/AttributeNewInstanceHelper.php",
                 "lib/JIT/ClosureBindHelper.php",
                 "lib/JIT/InstanceOfHelper.php"
             ],
