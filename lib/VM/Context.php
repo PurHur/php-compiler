@@ -527,15 +527,30 @@ class Context {
         $originalLc = strtolower($original);
 
         if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
+            $this->errors->triggerError(
+                \sprintf('Cannot declare class %s, because the name is already in use', $alias),
+                ErrorReporter::E_WARNING
+            );
+
             return false;
         }
 
         if (!isset($this->classes[$originalLc])) {
             if (!$autoload || !$this->autoloadClass($original)) {
+                $this->errors->triggerError(
+                    \sprintf('Class "%s" not found', $original),
+                    ErrorReporter::E_WARNING
+                );
+
                 return false;
             }
         }
         if (!isset($this->classes[$originalLc])) {
+            $this->errors->triggerError(
+                \sprintf('Class "%s" not found', $original),
+                ErrorReporter::E_WARNING
+            );
+
             return false;
         }
 
