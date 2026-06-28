@@ -56,6 +56,9 @@ final class JitStreamContextCreate
 
     private static function loadArrayArg(Context $context, JITVariable $arg, int $position): Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return $context->getTypeFromString('__hashtable__*')->constNull();
+        }
         if (JITVariable::TYPE_HASHTABLE === $arg->type) {
             return $context->helper->loadValue($arg);
         }

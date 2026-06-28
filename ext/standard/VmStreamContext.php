@@ -36,40 +36,47 @@ final class VmStreamContext
         $hostOptions = [];
         if (null !== $optionsVar) {
             $resolved = $optionsVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $resolved->type) {
+            if (Variable::TYPE_NULL === $resolved->type) {
+                // php-src: null options → default empty context (ext/standard/streams.c, #13356)
+            } elseif (Variable::TYPE_ARRAY !== $resolved->type) {
                 throw new \LogicException(
                     'stream_context_create() argument #1 must be an array in this compiler build'
                 );
+            } else {
+                $exported = VmHttpBuildQuery::export($resolved);
+                if (!\is_array($exported)) {
+                    throw new \LogicException(
+                        'stream_context_create() argument #1 must be an array in this compiler build'
+                    );
+                }
+                $hostOptions = $exported;
             }
-            $exported = VmHttpBuildQuery::export($resolved);
-            if (!\is_array($exported)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #1 must be an array in this compiler build'
-                );
-            }
-            $hostOptions = $exported;
         }
 
         $hostParams = [];
         if (null !== $paramsVar) {
             $resolvedParams = $paramsVar->resolveIndirect();
-            if (Variable::TYPE_ARRAY !== $resolvedParams->type) {
+            if (Variable::TYPE_NULL === $resolvedParams->type) {
+                // php-src: null params → omitted (#13356)
+            } elseif (Variable::TYPE_ARRAY !== $resolvedParams->type) {
                 throw new \LogicException(
                     'stream_context_create() argument #2 must be an array in this compiler build'
                 );
+            } else {
+                $exportedParams = VmHttpBuildQuery::export($resolvedParams);
+                if (!\is_array($exportedParams)) {
+                    throw new \LogicException(
+                        'stream_context_create() argument #2 must be an array in this compiler build'
+                    );
+                }
+                $hostParams = $exportedParams;
             }
-            $exportedParams = VmHttpBuildQuery::export($resolvedParams);
-            if (!\is_array($exportedParams)) {
-                throw new \LogicException(
-                    'stream_context_create() argument #2 must be an array in this compiler build'
-                );
-            }
-            $hostParams = $exportedParams;
         }
 
         $id = ++self::$nextId;
 
-        $ht = null !== $optionsVar && Variable::TYPE_ARRAY === $optionsVar->resolveIndirect()->type
+        $optionsType = null !== $optionsVar ? $optionsVar->resolveIndirect()->type : Variable::TYPE_NULL;
+        $ht = Variable::TYPE_ARRAY === $optionsType
             ? $optionsVar->resolveIndirect()->toArray()->duplicate()
             : new HashTable();
         $marker = new Variable(Variable::TYPE_INTEGER);
