@@ -36,6 +36,7 @@ final class VmSplIterators
         }
 
         $entry = new ClassEntry('InternalIterator');
+        $entry->isInternal = true;
         if (isset($ctx->classes['iterator'])) {
             $entry->interfaces[] = 'iterator';
         }

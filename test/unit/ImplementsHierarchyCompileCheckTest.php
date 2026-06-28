@@ -163,4 +163,19 @@ PHP;
         $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
         $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
     }
+
+    /** @covers issue #13327 */
+    public function testClassImplementsInternalIteratorFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class UserInternalIterator implements InternalIterator {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'UserInternalIterator cannot implement InternalIterator - it is not an interface'
+        );
+        $runtime->parseAndCompile($code, 'internaliterator.php');
+    }
 }
