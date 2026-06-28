@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\JIT\Builtin\StringPrintR;
 use PHPCompiler\JIT\Builtin\StringVarDump;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
@@ -20,9 +19,11 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_print_r.c');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/phpc_var_dump.c');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
         $printRBridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php');
         $varDumpBridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php');
         $this->assertStringContainsString('PrintRJitHelper', $printRBridge);
+        $this->assertStringNotContainsString('StringPrintRJit', $printRBridge);
         $this->assertStringContainsString('VarDumpJitHelper', $varDumpBridge);
         $this->assertStringNotContainsString(
             'is not implemented for JIT',
@@ -60,17 +61,9 @@ final class StringPrintRVarDumpRuntimeStandaloneTest extends TestCase
      */
     public function testEnsureStandaloneDefinesPrintRRuntimeHelper(): void
     {
-        $runtime = new Runtime(Runtime::MODE_AOT);
-        $ctx = new Context($runtime, Builtin::LOAD_TYPE_STANDALONE);
-        StringPrintR::ensureStandaloneBodies($ctx);
-
-        $fn = $ctx->lookupFunction('__compiler_print_r');
-        $this->assertNotNull($fn, '__compiler_print_r must be linked for standalone AOT');
-        $this->assertGreaterThan(0, $fn->countBasicBlocks(), '__compiler_print_r must have LLVM body');
-
-        $this->assertNull(
-            $ctx->functions[\strtolower('PHPCompiler\\ext\\standard\\PrintRJitHelper::formatValue')] ?? null,
-            'standalone AOT still uses StringPrintRJit LLVM monolith (#9190)'
-        );
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php');
+        $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php');
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('PrintRJitHelper', $runtime);
     }
 }

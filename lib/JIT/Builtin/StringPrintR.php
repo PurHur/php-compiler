@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190).
+ * JIT/AOT link for __compiler_print_r via PrintRJitHelper PHP (#9190, #13240).
  *
- * JIT/normal modules use compiled {@see PrintRJitHelper}; AOT standalone keeps
- * {@see StringPrintRJit} until native link can host compiled VmPrintR reliably.
+ * Embed and standalone AOT compile the same PHP bridge; no print_r LLVM monolith.
  * php-src: ext/standard/var.c — php_print_r_ex
  */
 final class StringPrintR
@@ -45,12 +43,6 @@ final class StringPrintR
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPrintRJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_print_r');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
