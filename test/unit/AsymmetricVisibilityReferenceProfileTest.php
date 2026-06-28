@@ -10,9 +10,9 @@ use PHPUnit\Framework\TestCase;
 /** Asymmetric visibility reference profile gate (#12508). */
 final class AsymmetricVisibilityReferenceProfileTest extends TestCase
 {
-    public function testSupportsAsymmetricVisibilityTrueOn84DevTarget(): void
+    public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
     }
 
     public function testRewriterNoOpWhenAsymmetricDisabled(): void
