@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\KeySortJitHelper;
+use PHPCompiler\ext\standard\NaturalSortJitHelper;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\ValueSortJitHelper;
 use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
@@ -248,6 +252,25 @@ final class SplArrayStorage
     }
 
     /** php-src spl_array_method_append — push with next numeric index. */
+    /** php-src spl_array_object_sort — in-place sort on backing array (#13141). */
+    public static function sortBacking(
+        ObjectEntry $object,
+        string $kind,
+        int $flags = StdlibConstants::SORT_REGULAR
+    ): void {
+        $table = self::state($object)['table'];
+        match ($kind) {
+            'asort' => ValueSortJitHelper::asortByValue($table, $flags),
+            'arsort' => ValueSortJitHelper::arsortByValue($table, $flags),
+            'ksort' => KeySortJitHelper::ksortByKey($table, $flags),
+            'krsort' => KeySortJitHelper::krsortByKey($table, $flags),
+            'natsort' => NaturalSortJitHelper::natsortByValue($table),
+            'natcasesort' => NaturalSortJitHelper::natcasesortByValue($table),
+            default => throw new \LogicException('Unsupported SPL array sort: '.$kind),
+        };
+        self::rewindIterator($object);
+    }
+
     public static function append(ObjectEntry $object, Variable $value): void
     {
         $resolved = $value->resolveIndirect();
