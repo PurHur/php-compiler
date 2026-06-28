@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3437 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9173 |
+| Source constructs flagged (warnings) | 9176 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -329,7 +329,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
-| `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 10 |
+| `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 13 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 4 |
@@ -5453,8 +5453,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 35)
 - new DirectoryIteratorConstruct (line 44)
-- new ArgumentCountError (line 197)
-- 20 class method(s)
+- new ArgumentCountError (line 211)
+- 22 class method(s)
 
 ### `ext/spl/EmptyIteratorBuiltin.php`
 
@@ -5473,14 +5473,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 55)
 - new FilesystemIteratorConstruct (line 76)
-- new ClassEntry (line 105)
-- new RecursiveDirectoryIteratorConstruct (line 114)
-- new RecursiveDirectoryIteratorHasChildren (line 117)
-- new RecursiveDirectoryIteratorGetChildren (line 120)
-- new ArgumentCountError (line 150)
-- new ArgumentCountError (line 188)
-- new ObjectEntry (line 325)
-- 12 class method(s)
+- new FilesystemIteratorGetFlags (line 79)
+- new FilesystemIteratorSetFlags (line 82)
+- new ClassEntry (line 111)
+- new RecursiveDirectoryIteratorConstruct (line 120)
+- new RecursiveDirectoryIteratorHasChildren (line 123)
+- new RecursiveDirectoryIteratorGetChildren (line 126)
+- new ArgumentCountError (line 156)
+- new ArgumentCountError (line 194)
+- new ObjectEntry (line 331)
+- new ArgumentCountError (line 374)
+- 14 class method(s)
 
 ### `ext/spl/IteratorIteratorBuiltin.php`
 
@@ -12149,11 +12152,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1365)
-- new Error (line 1376)
-- new Error (line 3484)
-- new Error (line 3509)
-- 200 class method(s)
+- new Error (line 1406)
+- new Error (line 1417)
+- new Error (line 3525)
+- new Error (line 3550)
+- 202 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -16793,7 +16796,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/types/JitStrlen.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/types/Module.php`
 
@@ -24834,8 +24837,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 125)
-- new Variable (line 471)
-- 37 class method(s)
+- new Variable (line 492)
+- 38 class method(s)
 
 ### `lib/VM/ExceptionHandlerStack.php`
 
