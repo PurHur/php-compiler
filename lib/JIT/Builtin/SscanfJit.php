@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
@@ -757,6 +758,7 @@ final class SscanfJit
     private static function emitCompilerVfscanf(Context $context, LlvmFunction $fn): void
     {
         StreamIo::ensureLinked($context);
+        StreamReadRuntime::ensureVfscanfAbi($context);
 
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);

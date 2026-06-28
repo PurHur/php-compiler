@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StreamBucket;
+use PHPCompiler\JIT\Builtin\StreamLifecycleRuntime;
 use PHPCompiler\JIT\Builtin\StreamFilter as StreamFilterBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
@@ -17,6 +18,20 @@ final class JitIsResource
     public static function invoke(Context $context, Value $handleLong): Value
     {
         StreamBucket::ensureLinked($context);
+        $restoreBlock = null;
+        try {
+            $restoreBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+        $probe = $context->module->getNamedFunction('__compiler_is_resource');
+        if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            StreamLifecycleRuntime::ensureLinked($context);
+        }
+        if (null !== $restoreBlock) {
+            $context->builder->positionAtEnd($restoreBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');

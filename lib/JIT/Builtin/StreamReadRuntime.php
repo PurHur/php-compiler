@@ -76,15 +76,21 @@ final class StreamReadRuntime
 
     public static function ensureLinked(Context $context): void
     {
-        self::implement($context);
+        self::implement($context, true);
     }
 
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::implement($context, true);
     }
 
-    public static function implement(Context $context): void
+  /** vfscanf LLVM only needs read/seek ABI — skip lifecycle/ob deps during defineBuiltins (#13137). */
+    public static function ensureVfscanfAbi(Context $context): void
+    {
+        self::implement($context, false);
+    }
+
+    public static function implement(Context $context, bool $withLifecycleDeps = true): void
     {
         $probe = $context->module->getNamedFunction('__compiler_flock');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
@@ -100,7 +106,10 @@ final class StreamReadRuntime
         }
 
         StreamFilter::ensureLinked($context);
-        ObOutputRuntime::ensureLinked($context);
+        if ($withLifecycleDeps) {
+            StreamLifecycleRuntime::ensureLinked($context);
+            ObOutputRuntime::ensureLinked($context);
+        }
         self::ensureJitHelperCompiled($context);
         self::implementI32Bridge($context, '__compiler_flock', self::FLOCK, 2);
         self::implementI64Bridge($context, '__compiler_fpassthru', self::FPASSTHRU, 1);
@@ -138,10 +147,12 @@ final class StreamReadRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $params = array_fill(0, $argCount, $i64);
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, ...$params)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, ...$params)
+            );
 
         $entry = $fn->appendBasicBlock('stream_read_i32_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -178,10 +189,12 @@ final class StreamReadRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $params = array_fill(0, $argCount, $i64);
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i64, false, ...$params)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i64, false, ...$params)
+            );
 
         $entry = $fn->appendBasicBlock('stream_read_i64_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -219,10 +232,12 @@ final class StreamReadRuntime
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
         $params = array_fill(0, $i64ArgCount, $i64);
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($strPtr, false, ...$params)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, ...$params)
+            );
 
         $entry = $fn->appendBasicBlock('stream_read_str_bridge_entry');
         $fail = $fn->appendBasicBlock('stream_read_str_bridge_fail');
@@ -265,10 +280,12 @@ final class StreamReadRuntime
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $strPtr = $context->getTypeFromString('__string__*');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($strPtr, false, $i64, $i64, $strPtr)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $i64, $i64, $strPtr)
+            );
 
         $entry = $fn->appendBasicBlock('stream_get_line_bridge_entry');
         $fail = $fn->appendBasicBlock('stream_get_line_bridge_fail');
