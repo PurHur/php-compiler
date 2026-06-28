@@ -7,6 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\ext\posix\posix_access;
 use PHPCompiler\ext\posix\posix_getegid;
 use PHPCompiler\ext\posix\posix_geteuid;
+use PHPCompiler\ext\posix\posix_getgid;
 use PHPCompiler\ext\posix\posix_getgroups;
 use PHPCompiler\ext\posix\posix_uname;
 use PHPCompiler\ext\posix\PosixConstants;
@@ -28,6 +29,20 @@ final class PosixEuidBuiltinTest extends TestCase
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
         $this->assertSame((int) \posix_geteuid(), $frame->returnVar->resolveIndirect()->toInt());
+    }
+
+    public function test_posix_getgid_matches_host(): void
+    {
+        if (!\function_exists('posix_getgid')) {
+            $this->markTestSkipped('host posix_getgid unavailable');
+        }
+
+        $runtime = new Runtime();
+        $fn = new posix_getgid();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $this->assertSame((int) \posix_getgid(), $frame->returnVar->resolveIndirect()->toInt());
     }
 
     public function test_posix_getegid_matches_host(): void
@@ -85,6 +100,7 @@ final class PosixEuidBuiltinTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosix.php');
         $this->assertStringContainsString('VmProcessIdentityPure::geteuid', $source);
+        $this->assertStringContainsString('VmProcessIdentityPure::getgid', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getegid', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getgroups', $source);
         $this->assertStringContainsString('VmProcessIdentityPure::getppid', $source);
@@ -105,6 +121,7 @@ final class PosixEuidBuiltinTest extends TestCase
             $runtime = new Runtime();
             $cases = [
                 [posix_geteuid::class, (int) \posix_geteuid()],
+                [posix_getgid::class, (int) \posix_getgid()],
                 [posix_getegid::class, (int) \posix_getegid()],
             ];
             foreach ($cases as [$class, $expected]) {

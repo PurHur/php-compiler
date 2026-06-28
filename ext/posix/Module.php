@@ -54,6 +54,7 @@ class Module extends ModuleAbstract
             new posix_getpid(),
             new posix_getppid(),
             new posix_geteuid(),
+            new posix_getgid(),
             new posix_getegid(),
             new posix_getgroups(),
             new posix_uname(),

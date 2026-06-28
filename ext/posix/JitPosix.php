@@ -56,6 +56,17 @@ final class JitPosix
             : $context->builder->zExt($raw, $i64);
     }
 
+    public static function getgid(Context $context): Value
+    {
+        self::ensureLibcGid($context);
+        $i64 = $context->getTypeFromString('int64');
+        $raw = $context->builder->call($context->lookupFunction('getgid'));
+
+        return $raw->typeOf() === $i64
+            ? $raw
+            : $context->builder->zExt($raw, $i64);
+    }
+
     public static function getegid(Context $context): Value
     {
         self::ensureLibcEgid($context);
@@ -307,6 +318,18 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('geteuid', $ft);
             $context->registerFunction('geteuid', $fn);
+        }
+    }
+
+    private static function ensureLibcGid(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        try {
+            $context->lookupFunction('getgid');
+        } catch (\Throwable $e) {
+            $ft = $context->context->functionType($i32, false);
+            $fn = $context->module->addFunction('getgid', $ft);
+            $context->registerFunction('getgid', $fn);
         }
     }
 
