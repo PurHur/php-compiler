@@ -71,6 +71,12 @@ final class SplFixedArrayBuiltin
         $entry->methods['getiterator'] = new SplFixedArrayGetIterator();
         $entry->methodVisibility['getiterator'] = $pub;
         $entry->methodNames['getiterator'] = 'getIterator';
+        $entry->methods['getsize'] = new SplFixedArrayGetSize();
+        $entry->methodVisibility['getsize'] = $pub;
+        $entry->methodNames['getsize'] = 'getSize';
+        $entry->methods['setsize'] = new SplFixedArraySetSize();
+        $entry->methodVisibility['setsize'] = $pub;
+        $entry->methodNames['setsize'] = 'setSize';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -78,7 +84,7 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize']);
     }
 
     public static function init(ObjectEntry $object, int $size): void
@@ -92,6 +98,28 @@ final class SplFixedArrayBuiltin
     public static function count(ObjectEntry $object): int
     {
         return self::state($object)['size'];
+    }
+
+    public static function getSize(ObjectEntry $object): int
+    {
+        return self::state($object)['size'];
+    }
+
+    public static function setSize(ObjectEntry $object, int $size): void
+    {
+        if ($size < 0) {
+            throw new \ValueError('SplFixedArray::setSize(): Argument #1 ($size) must be greater than or equal to 0');
+        }
+        $oldSize = self::state($object)['size'];
+        if ($size === $oldSize) {
+            return;
+        }
+        if ($size < $oldSize) {
+            for ($i = $size; $i < $oldSize; ++$i) {
+                unset(self::$store[$object->id]['slots'][$i]);
+            }
+        }
+        self::$store[$object->id]['size'] = $size;
     }
 
     public static function offsetExists(ObjectEntry $object, Variable $offset): bool
@@ -513,5 +541,56 @@ final class SplFixedArrayGetIterator extends VmClassMethod
             throw new \LogicException('SplFixedArray::getIterator() requires VM context');
         }
         SplIteratorSupport::copyReturnFrom($frame, SplFixedArrayBuiltin::createIterator($ctx, $object));
+    }
+}
+
+final class SplFixedArrayGetSize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::getSize()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplFixedArrayBuiltin::getSize($object));
+    }
+}
+
+final class SplFixedArraySetSize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setSize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::setSize()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFixedArray::setSize() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $size = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFixedArray::setSize',
+            0,
+            'size'
+        );
+        SplFixedArrayBuiltin::setSize($object, $size);
     }
 }
