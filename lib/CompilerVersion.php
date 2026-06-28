@@ -175,10 +175,15 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** @deprecated Zend rejects `new` in class constants at compile time (#10391); always false. */
+    /**
+     * PHP 8.3+ object class constants (`public const X = new Class(...)`).
+     *
+     * Enabled on the 8.4.0-dev forward line — version_compare treats -dev as ≥ 8.3 (#12940).
+     * Reference profile reject tests skip when this returns true (see typed_class_const_reject.phpt).
+     */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        return false;
+        return version_compare(self::VERSION, '8.3', '>=');
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */

@@ -5,12 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\CompilerVersion;
 use PHPUnit\Framework\TestCase;
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
 /**
- * Class constants with `new` are rejected at compile time (#10391, Zend/zend_compile.c).
+ * Class constants with `new` compile and execute on PHP 8.3+ (#12940, Zend/zend_compile.c).
  *
  * @group llvm
  */
@@ -25,18 +26,20 @@ final class ClassConstObjectJitCompileTest extends TestCase
             $reason = LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available';
             $this->markTestSkipped($reason.' — class const object JIT compile test needs LLVM');
         }
+        if (!CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions disabled on reference profile');
+        }
     }
 
-    public function testClassConstObjectCompileErrors(): void
+    public function testClassConstObjectCompiles(): void
     {
         $runtime = new Runtime();
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(NewWithoutParensCompileCheck::MESSAGE);
-        $runtime->parseAndCompile(<<<'PHP'
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
 PHP, 'class_const_object.php');
+        $this->assertNotNull($block);
     }
 }
