@@ -24,6 +24,9 @@ final class IniRuntimeShrinkTest extends TestCase
     {
         $this->assertSame('', IniJitHelper::iniGet('auto_prepend_file'));
         $this->assertSame('', IniJitHelper::iniGet('error_log'));
+        $this->assertSame('', IniJitHelper::iniGet('disable_functions'));
+        $this->assertSame('', IniJitHelper::iniGet('open_basedir'));
+        $this->assertSame('.user.ini', IniJitHelper::iniGet('user_ini.filename'));
     }
 
     public function testIniRuntimeUsesJitHelperNotLlvmKeyWalk(): void

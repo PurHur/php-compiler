@@ -28,6 +28,7 @@ final class VmIni
     /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
     private const READONLY_STRING_DEFAULTS = [
         'session.save_handler' => 'files',
+        'user_ini.filename' => '.user.ini',
     ];
 
     /** php-src php.ini compile-time default for max_execution_time (ext/standard/ini.c, #12481). */
@@ -49,6 +50,12 @@ final class VmIni
         'error_log',
         'doc_root',
         'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'open_basedir',
+        'mail.add_x_header',
+        'error_append_string',
+        'error_prepend_string',
     ];
 
     /** @var list<string> */
