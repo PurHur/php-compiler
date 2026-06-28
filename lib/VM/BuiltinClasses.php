@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
@@ -744,31 +745,33 @@ final class BuiltinClasses
         $rf->methodVisibility['createfromfunction'] = $pubStatic;
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
-        $rconst = new ClassEntry('ReflectionConstant');
-        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
-        $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
-        $rconst->constructor = new ReflectionConstantConstruct();
-        $rconst->methods['__construct'] = $rconst->constructor;
-        $rconst->methodVisibility['__construct'] = $pub;
-        $rconst->methods['getname'] = new ReflectionConstantGetName();
-        $rconst->methodVisibility['getname'] = $pub;
-        $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
-        $rconst->methodVisibility['getvalue'] = $pub;
-        $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
-        $rconst->methodVisibility['getattributes'] = $pub;
-        $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
-        $rconst->methodVisibility['gettype'] = $pub;
-        $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
-        $rconst->methodVisibility['isdeprecated'] = $pub;
-        $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
-        $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
-        $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
-        $rconst->methodVisibility['getdeprecatedversion'] = $pub;
-        $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
-        $rconst->methodVisibility['isfinal'] = $pub;
-        $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
-        $rconst->methodVisibility['isenumcase'] = $pub;
-        $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+        if (CompilerVersion::advertisesReflectionConstantClass()) {
+            $rconst = new ClassEntry('ReflectionConstant');
+            $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
+            $rconst->properties[] = new ClassProperty(ReflectionSupport::PROP_CONSTANT_NAME, null, $strProto);
+            $rconst->constructor = new ReflectionConstantConstruct();
+            $rconst->methods['__construct'] = $rconst->constructor;
+            $rconst->methodVisibility['__construct'] = $pub;
+            $rconst->methods['getname'] = new ReflectionConstantGetName();
+            $rconst->methodVisibility['getname'] = $pub;
+            $rconst->methods['getvalue'] = new ReflectionConstantGetValue();
+            $rconst->methodVisibility['getvalue'] = $pub;
+            $rconst->methods['getattributes'] = new ReflectionConstantGetAttributes();
+            $rconst->methodVisibility['getattributes'] = $pub;
+            $rconst->methods['gettype'] = new ReflectionClassConstantGetType();
+            $rconst->methodVisibility['gettype'] = $pub;
+            $rconst->methods['isdeprecated'] = new ReflectionClassConstantIsDeprecated();
+            $rconst->methodVisibility['isdeprecated'] = $pub;
+            $rconst->methods['getdeprecatedmessage'] = new ReflectionClassConstantGetDeprecatedMessage();
+            $rconst->methodVisibility['getdeprecatedmessage'] = $pub;
+            $rconst->methods['getdeprecatedversion'] = new ReflectionClassConstantGetDeprecatedVersion();
+            $rconst->methodVisibility['getdeprecatedversion'] = $pub;
+            $rconst->methods['isfinal'] = new ReflectionClassConstantIsFinal();
+            $rconst->methodVisibility['isfinal'] = $pub;
+            $rconst->methods['isenumcase'] = new ReflectionClassConstantIsEnumCase();
+            $rconst->methodVisibility['isenumcase'] = $pub;
+            $ctx->classes[ReflectionSupport::REFLECTION_CONSTANT] = $rconst;
+        }
 
         $rcc = new ClassEntry('ReflectionClassConstant');
         $rcc->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);

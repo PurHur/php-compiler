@@ -167,6 +167,12 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
+    /** PHP 8.3+ ReflectionConstant class advertisement (ext/reflection/php_reflection.c, #12385). */
+    public static function advertisesReflectionConstantClass(): bool
+    {
+        return self::advertisesBuiltinSince('8.3.0');
+    }
+
     /** PHP 8.4+ #[\DelayedTargetValidation] builtin attribute class advertisement (#11902). */
     public static function advertisesDelayedTargetValidationAttributeClass(): bool
     {
