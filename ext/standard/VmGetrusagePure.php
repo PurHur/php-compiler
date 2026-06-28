@@ -14,6 +14,9 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmGetrusagePure
 {
+    /** Linux RUSAGE_CHILDREN — php-src maps user arg 1 to this value (#13018). */
+    public const RUSAGE_CHILDREN = -1;
+
     public static function available(): bool
     {
         return null !== self::readProcSelfStat();
@@ -24,7 +27,9 @@ final class VmGetrusagePure
      */
     public static function getrusage(int $who = 0): array|false
     {
-        unset($who);
+        if (self::RUSAGE_CHILDREN === $who) {
+            return self::zeroedChildrenUsage();
+        }
 
         $stat = self::readProcSelfStat();
         if (null === $stat) {
@@ -63,6 +68,34 @@ final class VmGetrusagePure
             'ru_utime.tv_sec' => $utimeSec,
             'ru_stime.tv_usec' => $stimeUsec,
             'ru_stime.tv_sec' => $stimeSec,
+        ]);
+    }
+
+    /**
+     * RUSAGE_CHILDREN with no waited children — Zend returns zeroed fields (#13018).
+     *
+     * @return array<string, int>
+     */
+    private static function zeroedChildrenUsage(): array
+    {
+        return self::toPhpArray([
+            'ru_oublock' => 0,
+            'ru_inblock' => 0,
+            'ru_msgsnd' => 0,
+            'ru_msgrcv' => 0,
+            'ru_maxrss' => 0,
+            'ru_ixrss' => 0,
+            'ru_idrss' => 0,
+            'ru_minflt' => 0,
+            'ru_majflt' => 0,
+            'ru_nsignals' => 0,
+            'ru_nvcsw' => 0,
+            'ru_nivcsw' => 0,
+            'ru_nswap' => 0,
+            'ru_utime.tv_usec' => 0,
+            'ru_utime.tv_sec' => 0,
+            'ru_stime.tv_usec' => 0,
+            'ru_stime.tv_sec' => 0,
         ]);
     }
 

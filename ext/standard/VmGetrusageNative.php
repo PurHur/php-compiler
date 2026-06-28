@@ -33,6 +33,6 @@ final class VmGetrusageNative
      */
     public static function getrusage(int $who = 0): array|false
     {
-        return VmGetrusagePure::getrusage($who);
+        return VmGetrusagePure::getrusage(self::normalizeWho($who));
     }
 }

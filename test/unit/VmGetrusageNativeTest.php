@@ -39,6 +39,8 @@ final class VmGetrusageNativeTest extends TestCase
         $children = VmGetrusageNative::getrusage(1);
         $this->assertIsArray($children);
         $this->assertArrayHasKey('ru_maxrss', $children);
+        $this->assertSame(0, $children['ru_maxrss']);
+        $this->assertSame(0, $children['ru_minflt']);
     }
 
     public function testVmProcessGetrusageReturnsHashtable(): void
