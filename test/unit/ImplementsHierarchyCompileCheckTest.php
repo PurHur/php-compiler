@@ -78,6 +78,48 @@ PHP;
         $this->assertSame("ok\n", ob_get_clean());
     }
 
+    /** @covers issue #12972 */
+    public function testClassDuplicateImplementsFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {}
+class C implements I, I {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Class C cannot implement previously implemented interface I');
+        $runtime->parseAndCompile($code, 'duplicate_implements.php');
+    }
+
+    /** @covers issue #12972 */
+    public function testEnumDuplicateImplementsFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface I {}
+enum E implements I, I { case A; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Enum E cannot implement previously implemented interface I');
+        $runtime->parseAndCompile($code, 'enum_duplicate_implements.php');
+    }
+
+    /** @covers issue #12972 */
+    public function testInterfaceDuplicateExtendsFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface A {}
+interface B extends A, A {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Interface B cannot implement previously implemented interface A');
+        $runtime->parseAndCompile($code, 'interface_duplicate_extends.php');
+    }
+
     /** @covers issue #9722 */
     public function testClassImplementsClassAfterRuntimeStatementsFailsAtCompileTime(): void
     {
