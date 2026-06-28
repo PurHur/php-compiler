@@ -76,6 +76,8 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['offsetunset'] = $pub;
         $entry->methods['append'] = new ArrayObjectAppend();
         $entry->methodVisibility['append'] = $pub;
+        $entry->methods['exchangearray'] = new ArrayObjectExchangeArray();
+        $entry->methodVisibility['exchangearray'] = $pub;
 
         $ctx->classes[self::CLASS_LC] = $entry;
     }
@@ -392,6 +394,41 @@ final class ArrayObjectOffsetUnset extends VmClassMethod
             );
         }
         SplArrayStorage::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+final class ArrayObjectExchangeArray extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('exchangeArray');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayObjectBuiltin::CLASS_LC,
+            'ArrayObject::exchangeArray()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayObject::exchangeArray() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $input = SplIteratorSupport::requireArrayArg(
+            $frame->calledArgs[1],
+            'ArrayObject::exchangeArray',
+            1
+        );
+        if (null === $frame->returnVar) {
+            SplArrayStorage::exchangeArray($object, $input);
+
+            return;
+        }
+        $old = SplArrayStorage::exchangeArray($object, $input);
+        $frame->returnVar->array($old);
     }
 }
 

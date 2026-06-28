@@ -129,6 +129,16 @@ final class SplArrayStorage
         return self::state($object)['table']->duplicate();
     }
 
+    /** php-src spl_array_object_exchange_array — replace backing array, return previous (#12964). */
+    public static function exchangeArray(ObjectEntry $object, HashTable $input): HashTable
+    {
+        $old = self::state($object)['table']->duplicate();
+        self::$store[$object->id]['table'] = $input->duplicate();
+        self::$store[$object->id]['pos'] = 0;
+
+        return $old;
+    }
+
     /** php-src spl_array_getIteratorClass — default ArrayIterator (#10639). */
     public static function getIteratorClass(ObjectEntry $object): string
     {
