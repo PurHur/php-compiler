@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -20,7 +21,7 @@ final class CallbackFilterIteratorBuiltin
 {
     public const CLASS_LC = 'callbackfilteriterator';
 
-    /** @var array<int, Variable> */
+    /** @var array<int, array{0: Variable, 1: ?\PHPCompiler\VM\ClosureState}> */
     private static array $callbacks = [];
 
     public static function registerClass(Context $ctx): void
@@ -73,7 +74,7 @@ final class CallbackFilterIteratorBuiltin
 
     public static function setCallback(ObjectEntry $object, Variable $callback): void
     {
-        self::$callbacks[$object->id] = $callback;
+        self::$callbacks[$object->id] = SplIteratorSupport::pinCallback($callback);
     }
 
     public static function callback(ObjectEntry $object): Variable
@@ -82,7 +83,16 @@ final class CallbackFilterIteratorBuiltin
             throw new \LogicException('CallbackFilterIterator callback missing');
         }
 
-        return self::$callbacks[$object->id];
+        return self::$callbacks[$object->id][0];
+    }
+
+    public static function callbackClosure(ObjectEntry $object): ?\PHPCompiler\VM\ClosureState
+    {
+        if (!isset(self::$callbacks[$object->id])) {
+            throw new \LogicException('CallbackFilterIterator callback missing');
+        }
+
+        return self::$callbacks[$object->id][1];
     }
 
     public static function callAccept(Frame $frame, ObjectEntry $object): bool
@@ -95,6 +105,16 @@ final class CallbackFilterIteratorBuiltin
         $key = SplDualIteratorStorage::callInner($frame, $inner, 'key');
         $filter = new Variable();
         $filter->object($object);
+        $closure = self::callbackClosure($object);
+        if (null !== $closure) {
+            return VmClosureCall::invoke(
+                $frame->vmContext,
+                $closure,
+                $current,
+                $key,
+                $filter
+            )->resolveIndirect()->toBool();
+        }
 
         return VmCallable::invoke(
             $frame->vmContext,
