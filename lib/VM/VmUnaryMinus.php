@@ -7,6 +7,7 @@ namespace PHPCompiler\VM;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\OpCode;
+use PHPLLVM\Value as LlvmValue;
 
 /**
  * SSOT for JIT unary - lowering (#5083, zend_operators.c, #9976).
@@ -29,7 +30,10 @@ final class VmUnaryMinus
 
         $value = $context->helper->loadValue($coerced);
         if (Variable::TYPE_NATIVE_DOUBLE === $coerced->type) {
-            if (null === $coerced->compileTimeFloat && $coerced->value->isAConstantFP()) {
+            if (null === $coerced->compileTimeFloat
+                && null !== $coerced->value
+                && LlvmValue::KIND_CONSTANT_FP === $coerced->value->getKind()
+            ) {
                 $lib = $context->llvm->lib;
                 $losesInfo = $lib->FFI->new('bool');
                 $coerced->compileTimeFloat = $lib->LLVMConstRealGetDouble(

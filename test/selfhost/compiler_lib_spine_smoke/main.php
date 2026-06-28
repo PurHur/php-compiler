@@ -988,6 +988,8 @@ require_once __DIR__.'/../../../ext/standard/ObOutputJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ObStatusJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/OutputRewriteVarsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/PackEngine.php';
+require_once __DIR__.'/../../../ext/standard/PackEngineEncode.php';
+require_once __DIR__.'/../../../ext/standard/PackJitEngine.php';
 require_once __DIR__.'/../../../ext/standard/PackJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ParseIniEngine.php';
 require_once __DIR__.'/../../../ext/standard/ParseStrEngine.php';
@@ -2644,7 +2646,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServicesStringRetur
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNl2br.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringOffsetRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPack.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringPackJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStr.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringParseStrJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPasswordCrypto.php';

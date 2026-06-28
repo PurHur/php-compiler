@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * pack() for compiled JIT/AOT modules via PackEngine PHP (#9133, php-in-PHP).
  *
- * SSOT: {@see PackEngine}; VM path uses the same engine via {@see VmPack}.
+ * SSOT: {@see PackJitEngine} (JIT/AOT) and {@see PackEngine} (VM).
  * php-src: ext/standard/pack.c — php_pack()
  */
 final class PackJitHelper
@@ -27,7 +27,7 @@ final class PackJitHelper
      */
     public static function packArgv(string $format, string $packedArgs): string
     {
-        return PackEngine::pack($format, self::unpackArgv($packedArgs));
+        return PackJitEngine::pack($format, self::unpackArgv($packedArgs));
     }
 
     /**

@@ -946,6 +946,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ObStatusJitHelper.php` | 0 | 3 |
 | `ext/standard/OutputRewriteVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/PackEngine.php` | 0 | 1 |
+| `ext/standard/PackEngineEncode.php` | 0 | 1 |
+| `ext/standard/PackJitEngine.php` | 0 | 1 |
 | `ext/standard/PackJitHelper.php` | 0 | 1 |
 | `ext/standard/ParseIniEngine.php` | 0 | 1 |
 | `ext/standard/ParseStrEngine.php` | 0 | 2 |
@@ -2588,7 +2590,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPack.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringPackJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringParseStrJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPasswordCrypto.php` | 0 | 1 |
@@ -9680,6 +9681,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
+
+### `ext/standard/PackEngineEncode.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
+### `ext/standard/PackJitEngine.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/standard/PackJitHelper.php`
 
@@ -20223,12 +20234,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 215)
 - 8 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringPackJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 21 class method(s)
-- 7 closure(s)
 
 ### `lib/JIT/Builtin/StringParseStr.php`
 
