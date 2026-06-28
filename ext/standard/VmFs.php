@@ -20,6 +20,9 @@ final class VmFs
     /** @var array<int, string> stream URI/path at open time (StreamMetaJit phpc_stream_paths parity; #7908) */
     private static array $handlePaths = [];
 
+    /** @var array<int, string> user fopen mode at open time (stream_get_meta_data mode; #13021) */
+    private static array $handleModes = [];
+
     /** @var array<int, int> stream handle => dup(2) socket fd from VmStreamSocketNative (#8202) */
     private static array $handleSocketFds = [];
 
@@ -665,22 +668,25 @@ final class VmFs
                 return false;
             }
 
-            return VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode);
+            return self::finalizeStreamOpen(
+                VmUserStream::open($ctx->runtime->vm, $ctx, $path, $mode),
+                $mode
+            );
         }
         if (VmFsStdio::isStdioUri($path)) {
-            return VmFsStdio::open($path, $mode);
+            return self::finalizeStreamOpen(VmFsStdio::open($path, $mode), $mode);
         }
         if (VmPhpMemoryStream::isSupportedUri($path)) {
-            return VmPhpMemoryStream::open($path, $mode);
+            return self::finalizeStreamOpen(VmPhpMemoryStream::open($path, $mode), $mode);
         }
         if (VmPhpInputOutputStream::isSupportedUri($path)) {
-            return VmPhpInputOutputStream::open($path, $mode);
+            return self::finalizeStreamOpen(VmPhpInputOutputStream::open($path, $mode), $mode);
         }
         if (VmPhpFilterStream::isSupportedUri($path)) {
-            return VmPhpFilterStream::open($path, $mode, $ctx);
+            return self::finalizeStreamOpen(VmPhpFilterStream::open($path, $mode, $ctx), $mode);
         }
         if (VmPhpFdStream::isFdUri($path)) {
-            return VmPhpFdStream::openFromUri($path, $mode);
+            return self::finalizeStreamOpen(VmPhpFdStream::openFromUri($path, $mode), $mode);
         }
         if (\str_starts_with($path, 'php://')) {
             return false;
@@ -689,7 +695,19 @@ final class VmFs
             return false;
         }
 
-        return VmFsOpenNative::open($path, $mode);
+        return self::finalizeStreamOpen(VmFsOpenNative::open($path, $mode), $mode);
+    }
+
+    /**
+     * @return int|false
+     */
+    private static function finalizeStreamOpen(int|false $handle, string $userMode): int|false
+    {
+        if (false !== $handle) {
+            self::registerStreamMode($handle, $userMode);
+        }
+
+        return $handle;
     }
 
     /**
@@ -708,6 +726,7 @@ final class VmFs
             $id = $opened['handle'];
             self::$popenHandles[$id] = true;
             self::$popenNativeFiles[$id] = $opened['file'];
+            self::registerStreamMode($id, $mode);
 
             return $id;
         }
@@ -789,7 +808,7 @@ final class VmFs
         unset(self::$gzNativePlaceholders[$handle]);
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             VmPhpMemoryStream::close($handle);
-            unset(self::$handlePaths[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle]);
 
             return;
         }
@@ -823,7 +842,12 @@ final class VmFs
     /** @return int|false */
     public static function tmpfile()
     {
-        return VmTmpfileNative::open();
+        $handle = VmTmpfileNative::open();
+        if (false !== $handle) {
+            self::registerStreamMode($handle, 'r+b');
+        }
+
+        return $handle;
     }
 
     public static function fread(int $handle, int $length) {
@@ -960,7 +984,7 @@ final class VmFs
             return VmUserStream::close($handle);
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            unset(self::$handlePaths[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle]);
 
             return VmPhpMemoryStream::close($handle);
         }
@@ -978,7 +1002,7 @@ final class VmFs
             return false;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleSocketFds[$handle]);
         if (!self::releaseHostResourceRef($fp)) {
             return true;
         }
@@ -1224,13 +1248,15 @@ final class VmFs
         }
         $uri = self::handleUri($handle);
         $fp = self::lookup($handle);
+        $reportedMode = VmStreamMeta::userFacingMode($uri, self::handleMode($handle));
         if (null !== $fp) {
-            $meta = VmStreamMeta::buildMetaArray($uri, $fp);
+            $meta = VmStreamMeta::buildMetaArray($uri, $fp, null, $reportedMode);
         } else {
             $meta = VmStreamMeta::buildMetaArray(
                 $uri,
                 null,
-                VmStreamMeta::eofForNativeHandle($handle)
+                VmStreamMeta::eofForNativeHandle($handle),
+                $reportedMode
             );
         }
 
@@ -2143,7 +2169,13 @@ final class VmFs
             return null;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleSocketFds[$handle], self::$popenHandles[$handle]);
+        unset(
+            self::$handles[$handle],
+            self::$handlePaths[$handle],
+            self::$handleModes[$handle],
+            self::$handleSocketFds[$handle],
+            self::$popenHandles[$handle]
+        );
         self::releaseHostResourceRef($fp);
         VmPersistentSocket::forgetResource($fp);
 
@@ -2184,6 +2216,24 @@ final class VmFs
     public static function clearStreamPath(int $handle): void
     {
         unset(self::$handlePaths[$handle]);
+    }
+
+    /** Record user fopen mode for stream_get_meta_data() ({@see StreamModeJitHelper}, #13021). */
+    public static function registerStreamMode(int $handle, string $mode): void
+    {
+        if ($handle > 0 && '' !== $mode) {
+            self::$handleModes[$handle] = $mode;
+        }
+    }
+
+    public static function clearStreamMode(int $handle): void
+    {
+        unset(self::$handleModes[$handle]);
+    }
+
+    public static function handleMode(int $handle): ?string
+    {
+        return self::$handleModes[$handle] ?? null;
     }
 
     public static function tempDir(): string

@@ -15,7 +15,7 @@ final class VmStreamMeta
     /**
      * @param resource|null $fp host FILE* for plainfile streams; null for VmPhpMemoryStream et al.
      */
-    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null): array
+    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
@@ -24,6 +24,7 @@ final class VmStreamMeta
 
         $socketType = self::streamTypeForUri($uri);
         $eof = null !== $eofOverride ? $eofOverride : \feof($fp);
+        $reportedMode = null !== $mode ? $mode : self::defaultReportedMode($uri, $isPhpMemory);
 
         return [
             'timed_out' => false,
@@ -31,11 +32,58 @@ final class VmStreamMeta
             'eof' => $eof,
             'unread_bytes' => 0,
             'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
-            'mode' => $isPhpMemory ? 'w+b' : 'r+b',
+            'mode' => $reportedMode,
             'seekable' => true,
             'uri' => $uri,
             'wrapper_type' => $isPhp ? 'PHP' : 'plainfile',
         ];
+    }
+
+    /**
+     * User-facing stream_get_meta_data()['mode'] — php-src php_stream mode normalization (#13021).
+     */
+    public static function userFacingMode(string $uri, ?string $userMode): string
+    {
+        if (null === $userMode || '' === $userMode) {
+            return self::defaultReportedMode($uri, self::isPhpMemoryUri($uri));
+        }
+        if (self::isPhpMemoryUri($uri)) {
+            return self::memoryStreamReportedMode($userMode);
+        }
+
+        return $userMode;
+    }
+
+    private static function isPhpMemoryUri(string $uri): bool
+    {
+        return \str_starts_with($uri, 'php://memory')
+            || \str_starts_with($uri, 'php://temp')
+            || \str_starts_with($uri, 'php://fd/');
+    }
+
+    private static function defaultReportedMode(string $uri, bool $isPhpMemory): string
+    {
+        return $isPhpMemory ? 'w+b' : 'r+b';
+    }
+
+    /**
+     * php-src php_stream_memory metadata mode mapping (main/streams/php_stream_memory.c).
+     */
+    private static function memoryStreamReportedMode(string $userMode): string
+    {
+        $lower = \strtolower(\strtr($userMode, ['t' => '']));
+        $stripped = \strtr($lower, ['b' => '']);
+        if (\str_contains($stripped, 'a')) {
+            return 'a+b';
+        }
+        if (\str_contains($stripped, 'w') || \str_contains($stripped, '+')) {
+            return 'w+b';
+        }
+        if ('r' === $stripped) {
+            return 'rb';
+        }
+
+        return \str_contains($userMode, 'b') ? 'w+b' : 'rb';
     }
 
     /** EOF for VM-native stream handles without host FILE* (php://memory, php://input, user streams). */
