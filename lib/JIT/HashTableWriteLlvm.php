@@ -330,6 +330,14 @@ final class HashTableWriteLlvm
                     $context->helper->loadValue($element)
                 );
                 break;
+            case Variable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyObject'),
+                    $ht,
+                    $keyPtr,
+                    $context->helper->loadValue($element)
+                );
+                break;
             case Variable::TYPE_NULL:
                 $context->builder->call(
                     $context->lookupFunction('__hashtable__setStringKeyNull'),

@@ -27,7 +27,7 @@ final class HttpBuildQueryRuntimeShrinkTest extends TestCase
     public function testHttpBuildQueryJitHelperDelegatesToVmHttpBuildQuery(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HttpBuildQueryJitHelper.php');
-        $this->assertStringContainsString('VmHttpBuildQuery::build', $source);
+        $this->assertStringContainsString('VmHttpBuildQuery::buildFromHashTable', $source);
     }
 
     public function testHttpBuildQueryJitHelperMatchesVmHttpBuildQuery(): void

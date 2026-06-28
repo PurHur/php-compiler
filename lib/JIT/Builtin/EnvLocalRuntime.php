@@ -6,6 +6,7 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Builder;
@@ -84,19 +85,16 @@ final class EnvLocalRuntime
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
+        $null = $i8p->constNull();
         $entry = $fn->appendBasicBlock('el_lookup_entry');
         $context->builder->positionAtEnd($entry);
 
         $nameCstr = $fn->getParam(0);
-        $i8 = $context->getTypeFromString('int8');
         $i64 = $context->getTypeFromString('int64');
-        $strMap = $context->structFieldMap['__string__'];
-        $valMap = $context->structFieldMap['__value__'];
-        $null = $i8p->constNull();
 
-        $nameNull = $context->builder->icmp(Builder::INT_EQ, $nameCstr, $null);
         $missBb = $fn->appendBasicBlock('el_lookup_miss');
         $bodyBb = $fn->appendBasicBlock('el_lookup_body');
+        $nameNull = $context->builder->icmp(Builder::INT_EQ, $nameCstr, $null);
         $context->builder->branchIf($nameNull, $missBb, $bodyBb);
 
         $context->builder->positionAtEnd($bodyBb);
@@ -109,48 +107,24 @@ final class EnvLocalRuntime
             $nameLenI64,
             $nameCstr
         );
-        $overlayBox = $context->builder->call(
+        $overlayRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::LOOKUP_HELPER),
-            $nameStr
+            [$nameStr]
         );
-        $overlayType = $context->builder->load(
-            $context->builder->structGep($overlayBox, $valMap['type'])
-        );
-        $isMiss = $context->builder->icmp(
-            Builder::INT_EQ,
-            $overlayType,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
+        $isMiss = JitNestedHelperCoerce::isHelperResultNull($context, $overlayRaw);
         $hitBb = $fn->appendBasicBlock('el_lookup_hit');
         $context->builder->branchIf($isMiss, $missBb, $hitBb);
 
         $context->builder->positionAtEnd($hitBb);
+        $overlayPtr = JitNestedHelperCoerce::valueBoxPtrFromHelperResult($context, $overlayRaw);
         $valueStr = $context->builder->call(
             $context->lookupFunction('__value__readString'),
-            $overlayBox
+            $overlayPtr
         );
-        $valueLen = $context->builder->load(
-            $context->builder->structGep($valueStr, $strMap['length'])
-        );
-        $valueBytes = $context->builder->structGep($valueStr, $strMap['value']);
-        $bufLen = $context->builder->add($valueLen, $i64->constInt(1, false));
-        $dup = $context->builder->call($context->lookupFunction('malloc'), $bufLen);
-        $dupNull = $context->builder->icmp(Builder::INT_EQ, $dup, $null);
-        $dupFailBb = $fn->appendBasicBlock('el_lookup_dup_fail');
-        $dupOkBb = $fn->appendBasicBlock('el_lookup_dup_ok');
+        $dup = EnvLocalOverlayTableLlvm::dupCstrFromStringStruct($context, $valueStr);
         $doneBb = $fn->appendBasicBlock('el_lookup_done');
-        $context->builder->branchIf($dupNull, $dupFailBb, $dupOkBb);
-
-        $context->builder->positionAtEnd($dupOkBb);
-        $context->intrinsic->memcpy($dup, $valueBytes, $valueLen, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($dup, $valueLen)
-        );
         $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($dupFailBb);
-        $context->builder->branch($missBb);
 
         $context->builder->positionAtEnd($missBb);
         $context->builder->returnValue($null);

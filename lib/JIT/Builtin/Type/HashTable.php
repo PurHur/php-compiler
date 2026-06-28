@@ -98,6 +98,7 @@ class HashTable extends Type
         $this->registerFn('__hashtable__offsetIsSetStringKey', 'int1', ['__hashtable__*', '__string__*']);
         $this->registerFn('__hashtable__setStringKeyString', 'void', ['__hashtable__*', '__string__*', '__string__*']);
         $this->registerFn('__hashtable__setStringKeyHashtable', 'void', ['__hashtable__*', '__string__*', '__hashtable__*']);
+        $this->registerFn('__hashtable__setStringKeyObject', 'void', ['__hashtable__*', '__string__*', '__object__*']);
         $this->registerFn('__hashtable__setStringKeyLong', 'void', ['__hashtable__*', '__string__*', 'int64']);
         $this->registerFn('__hashtable__setStringKeyDouble', 'void', ['__hashtable__*', '__string__*', 'double']);
         $this->registerFn('__hashtable__setStringKeyBool', 'void', ['__hashtable__*', '__string__*', 'int1']);
@@ -175,6 +176,7 @@ class HashTable extends Type
         $this->implementSetStringKeyBool();
         $this->implementSetStringKeyNull();
         $this->implementSetStringKeyHashtable();
+        $this->implementSetStringKeyObject();
         $this->implementOffsetIsSetStringKey();
         $this->implementPeekStringKeyValue();
         $this->implementReadStringKeyValue();
@@ -914,6 +916,117 @@ class HashTable extends Type
         $emptyHead = $fn->appendBasicBlock('strkey_ht_empty_head');
         $tailWalk = $fn->appendBasicBlock('strkey_ht_tail_walk');
         $tailDone = $fn->appendBasicBlock('strkey_ht_tail_done');
+        $this->context->builder->branch($tail);
+
+        $this->context->builder->positionAtEnd($tail);
+        $currentHead = $this->loadStrKeysHead($headSlot);
+        $isEmpty = $this->context->builder->icmp(Builder::INT_EQ, $currentHead, $currentHead->typeOf()->constNull());
+        $this->context->builder->branchIf($isEmpty, $emptyHead, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailWalk);
+        $walkNode = $this->context->builder->phi($currentHead->typeOf());
+        $walkNode->addIncoming($currentHead, $tail);
+        $nextWalk = $this->context->builder->load($this->context->builder->structGep($walkNode, $nodeMap['next']));
+        $atEnd = $this->context->builder->icmp(Builder::INT_EQ, $nextWalk, $nextWalk->typeOf()->constNull());
+        $this->context->builder->branchIf($atEnd, $tailDone, $tailWalk);
+        $walkNode->addIncoming($nextWalk, $tailWalk);
+
+        $this->context->builder->positionAtEnd($tailDone);
+        $this->context->builder->store(
+            $newNode,
+            $this->context->builder->structGep($walkNode, $nodeMap['next'])
+        );
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($emptyHead);
+        $this->context->builder->store($newNode, $headSlot);
+        $this->incrementNumElements($ht);
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($done);
+        $this->context->builder->returnVoid();
+    }
+
+    private function implementSetStringKeyObject(): void
+    {
+        $fn = $this->context->lookupFunction('__hashtable__setStringKeyObject');
+        $block = $fn->appendBasicBlock('main');
+        $this->context->builder->positionAtEnd($block);
+        $ht = $fn->getParam(0);
+        $key = $fn->getParam(1);
+        $child = $fn->getParam(2);
+
+        $htMap = $this->context->structFieldMap['__hashtable__'];
+        $nodeMap = $this->context->structFieldMap['__strkey_node__'];
+        $headSlot = $this->context->builder->structGep($ht, $htMap['strKeys']);
+        $head = $this->context->builder->load($headSlot);
+
+        $done = $fn->appendBasicBlock('strkey_obj_done');
+        $prepend = $fn->appendBasicBlock('strkey_obj_prepend');
+        $loopHead = $fn->appendBasicBlock('strkey_obj_head');
+        $loopBody = $fn->appendBasicBlock('strkey_obj_body');
+        $this->context->builder->branch($loopHead);
+
+        $this->context->builder->positionAtEnd($loopHead);
+        $node = $this->context->builder->phi($head->typeOf());
+        $node->addIncoming($head, $block);
+        $isNull = $this->context->builder->icmp(Builder::INT_EQ, $node, $node->typeOf()->constNull());
+        $this->context->builder->branchIf($isNull, $prepend, $loopBody);
+
+        $this->context->builder->positionAtEnd($loopBody);
+        $nodeKey = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['key']));
+        $cmp = $this->context->builder->call(
+            $this->context->lookupFunction('strcmp'),
+            $this->stringDataPtr($key),
+            $this->stringDataPtr($nodeKey)
+        );
+        $isMatch = $this->context->builder->icmp(Builder::INT_EQ, $cmp, $cmp->typeOf()->constInt(0, false));
+        $update = $fn->appendBasicBlock('strkey_obj_update');
+        $next = $fn->appendBasicBlock('strkey_obj_next');
+        $this->context->builder->branchIf($isMatch, $update, $next);
+
+        $this->context->builder->positionAtEnd($update);
+        $valField = $this->context->builder->structGep($node, $nodeMap['value']);
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            $valField,
+            $child
+        );
+        $this->context->builder->branch($done);
+
+        $this->context->builder->positionAtEnd($next);
+        $nextNode = $this->context->builder->load($this->context->builder->structGep($node, $nodeMap['next']));
+        $this->context->builder->branch($loopHead);
+        $node->addIncoming($nextNode, $next);
+
+        $this->context->builder->positionAtEnd($prepend);
+        $nodeType = $this->context->getTypeFromString('__strkey_node__');
+        $newNode = $this->context->memory->malloc($nodeType);
+        $typeinfo = $this->context->getTypeFromString('int32')->constInt(
+            Refcount::TYPE_INFO_TYPE_STRING | Refcount::TYPE_INFO_REFCOUNTED,
+            false
+        );
+        $ref = $this->context->builder->pointerCast(
+            $newNode,
+            $this->context->getTypeFromString('__ref__virtual*')
+        );
+        $this->context->builder->call($this->context->lookupFunction('__ref__init'), $typeinfo, $ref);
+        $storedKey = $this->context->builder->call($this->context->lookupFunction('__string__separate'), $key);
+        $this->context->builder->store($storedKey, $this->context->builder->structGep($newNode, $nodeMap['key']));
+        $this->context->builder->call(
+            $this->context->lookupFunction('__value__writeObject'),
+            $this->context->builder->structGep($newNode, $nodeMap['value']),
+            $child
+        );
+        $this->context->builder->store(
+            $newNode->typeOf()->constNull(),
+            $this->context->builder->structGep($newNode, $nodeMap['next'])
+        );
+        $tail = $fn->appendBasicBlock('strkey_obj_tail');
+        $emptyHead = $fn->appendBasicBlock('strkey_obj_empty_head');
+        $tailWalk = $fn->appendBasicBlock('strkey_obj_tail_walk');
+        $tailDone = $fn->appendBasicBlock('strkey_obj_tail_done');
         $this->context->builder->branch($tail);
 
         $this->context->builder->positionAtEnd($tail);
