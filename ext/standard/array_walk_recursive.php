@@ -106,11 +106,23 @@ final class array_walk_recursive extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
+        if (null !== $userFn) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
+            }
 
-        return VmArrayWalk::walkArrayRecursiveString(
-            $table,
-            VmInternalCall::resolveStringCallback($callback->toString())
-        );
+            return VmArrayWalk::walkArrayRecursiveUserFunction(
+                $frame->vmContext,
+                $table,
+                $userFn,
+                $userdata
+            );
+        }
+
+        return VmArrayWalk::walkArrayRecursiveString($table, $internal);
     }
 
     private function walkSubjectObject(
@@ -137,12 +149,24 @@ final class array_walk_recursive extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
+        if (null !== $userFn) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException(
+                    'array_walk_recursive() requires VM context in this compiler build'
+                );
+            }
 
-        return VmArrayWalk::walkObjectRecursiveString(
-            $object,
-            $frame,
-            VmInternalCall::resolveStringCallback($callback->toString())
-        );
+            return VmArrayWalk::walkObjectRecursiveUserFunction(
+                $frame->vmContext,
+                $object,
+                $frame,
+                $userFn,
+                $userdata
+            );
+        }
+
+        return VmArrayWalk::walkObjectRecursiveString($object, $frame, $internal);
     }
 
     private static function valueTypeName(Variable $value): string

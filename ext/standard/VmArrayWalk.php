@@ -69,6 +69,37 @@ final class VmArrayWalk
         return true;
     }
 
+    public static function walkArrayRecursiveUserFunction(
+        \PHPCompiler\VM\Context $context,
+        HashTable $table,
+        \PHPCompiler\Func\PHP $userFn,
+        ?Variable $userdata
+    ): bool {
+        foreach ($table->iterateKeyed(false) as [$key, $value]) {
+            if (Variable::TYPE_ARRAY === $value->type) {
+                $value->separateArrayForWrite();
+                if (!self::walkArrayRecursiveUserFunction($context, $value->toArray(), $userFn, $userdata)) {
+                    return false;
+                }
+                continue;
+            }
+            $keyCopy = new Variable();
+            $keyCopy->copyFrom($key);
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmUserCall::invokeDirect($context, $userFn, $value, $keyCopy, $userdataCopy);
+            } else {
+                $result = VmUserCall::invokeDirect($context, $userFn, $value, $keyCopy);
+            }
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     public static function walkObjectRecursiveClosure(
         \PHPCompiler\VM\Context $context,
         ObjectEntry $object,
@@ -122,6 +153,41 @@ final class VmArrayWalk
                 continue;
             }
             $result = VmInternalCall::invoke($fn, $value);
+            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    public static function walkObjectRecursiveUserFunction(
+        \PHPCompiler\VM\Context $context,
+        ObjectEntry $object,
+        Frame $frame,
+        \PHPCompiler\Func\PHP $userFn,
+        ?Variable $userdata
+    ): bool {
+        $vm = $context->runtime->vm();
+        $iterator = new ObjectPropertyIterator($object, $vm, $frame);
+        $iterator->reset();
+        while ($iterator->valid()) {
+            $value = $iterator->currentValue(true);
+            if (Variable::TYPE_ARRAY === $value->type) {
+                $value->separateArrayForWrite();
+                if (!self::walkArrayRecursiveUserFunction($context, $value->toArray(), $userFn, $userdata)) {
+                    return false;
+                }
+                continue;
+            }
+            $keyCopy = $iterator->currentKey();
+            if (null !== $userdata) {
+                $userdataCopy = new Variable();
+                $userdataCopy->copyFrom($userdata);
+                $result = VmUserCall::invokeDirect($context, $userFn, $value, $keyCopy, $userdataCopy);
+            } else {
+                $result = VmUserCall::invokeDirect($context, $userFn, $value, $keyCopy);
+            }
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
