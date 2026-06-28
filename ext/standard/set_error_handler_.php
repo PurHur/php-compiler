@@ -24,13 +24,11 @@ final class set_error_handler_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('set_error_handler() requires one or two arguments');
-        }
+        $this->requireArgCountRange($frame, 'set_error_handler', 1, 2);
         if (null === $frame->vmContext) {
             return;
         }
+        $argc = \count($frame->calledArgs);
         $maskVar = 2 === $argc ? $frame->calledArgs[1] : null;
         $result = VmErrorHandler::set($frame->vmContext, $frame->calledArgs[0], $maskVar);
         if (null !== $frame->returnVar) {
@@ -40,10 +38,10 @@ final class set_error_handler_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('set_error_handler() requires one or two arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'set_error_handler', 1, 2)) {
+            return $context->getTypeFromString('int32')->constInt(0, false);
         }
+        $argc = \count($args);
         if (null !== JitOperandTypeLabel::compileTimeEnumClassName($context, $args[0])) {
             throw new \TypeError(ErrorHandlerCallbackPolicy::invalidCallbackTypeError());
         }

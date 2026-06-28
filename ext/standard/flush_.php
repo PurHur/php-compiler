@@ -25,9 +25,7 @@ final class flush_ extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('flush() takes no arguments');
-        }
+        $this->requireExactArgCount($frame, 'flush', 0);
         OutputBuffer::flush();
     }
 
