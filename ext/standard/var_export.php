@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -40,7 +41,7 @@ final class var_export extends Internal
             }
             $frame->returnVar->string($exported);
         } else {
-            echo $exported;
+            OutputBuffer::append($exported);
         }
     }
 
