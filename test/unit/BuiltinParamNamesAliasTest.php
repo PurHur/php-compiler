@@ -332,7 +332,7 @@ final class BuiltinParamNamesAliasTest extends TestCase
     /** @covers issue #11349 */
     public function testVariadicArrayBuiltinsRejectNamedParameters(): void
     {
-        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive'] as $fn) {
+        foreach (['array_replace', 'array_merge', 'array_replace_recursive', 'array_merge_recursive', 'pack'] as $fn) {
             self::assertTrue(BuiltinParamNames::rejectsNamedParameters($fn), $fn);
         }
         self::assertFalse(BuiltinParamNames::rejectsNamedParameters('array_combine'));

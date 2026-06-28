@@ -332,7 +332,8 @@ final class BuiltinParamNames
             'array_replace',
             'array_merge',
             'array_replace_recursive',
-            'array_merge_recursive' => true,
+            'array_merge_recursive',
+            'pack' => true,
             default => false,
         };
     }
