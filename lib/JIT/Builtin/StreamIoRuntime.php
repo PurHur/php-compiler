@@ -9,12 +9,12 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for stream I/O ABI via StreamIoJitHelper PHP (#10326).
+ * JIT/AOT stream I/O ABI via StreamIoJitHelper PHP (#10326, #12956).
  *
- * Standalone AOT keeps LLVM in {@see StreamIoStandaloneLlvm}.
  * SSOT: {@see \PHPCompiler\ext\standard\StreamIoJitHelper}
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
@@ -326,5 +326,96 @@ final class StreamIoRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    public static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
+    {
+        unset($context);
+        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $key) {
+            $flag = getenv($key);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function implementDeferredStreamIoStubs(Context $context): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $minusOne = $i64->constInt(-1, true);
+        $nullStr = $strPtr->constNull();
+
+        self::implementNullaryI64Stub($context, '__compiler_tmpfile', $minusOne);
+        self::implementFwriteStub($context, '__compiler_fwrite', $minusOne);
+        self::implementBinaryI64Stub($context, '__compiler_fopen', $minusOne);
+        self::implementBinaryI64Stub($context, '__compiler_popen', $minusOne);
+        self::implementBinaryStrStub($context, '__compiler_fread', $nullStr);
+    }
+
+    private static function implementNullaryI64Stub(Context $context, string $name, Value $ret): void
+    {
+        self::implementStub($context, $name, $context->context->functionType($context->getTypeFromString('int64'), false), $ret);
+    }
+
+    private static function implementBinaryI64Stub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($i64, false, $strPtr, $strPtr),
+            $ret
+        );
+    }
+
+    private static function implementFwriteStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($i64, false, $i64, $strPtr, $i64),
+            $ret
+        );
+    }
+
+    private static function implementBinaryStrStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementStub(
+            $context,
+            $name,
+            $context->context->functionType($strPtr, false, $i64, $i64),
+            $ret
+        );
+    }
+
+    private static function implementStub(Context $context, string $name, $ft, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        if (null === $probe) {
+            try {
+                $probe = $context->lookupFunction($name);
+            } catch (\Throwable) {
+                $probe = null;
+            }
+        }
+        $fn = $probe ?? $context->module->addFunction($name, $ft);
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 }

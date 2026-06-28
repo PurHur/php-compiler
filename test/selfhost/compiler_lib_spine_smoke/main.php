@@ -2539,7 +2539,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StreamGlobalsJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamIo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamIoJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamIoRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLibcHandleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycle.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StreamLifecycleJit.php';

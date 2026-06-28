@@ -63,9 +63,8 @@ final class StreamLifecycleRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamLifecycleStandaloneLlvm.php');
     }
 
-    public function testStreamIoStandaloneLlvmRegistersLibcHandles(): void
+    public function testStreamIoStandaloneLlvmDeleted(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
-        $this->assertStringContainsString('StreamLibcHandleRuntime::emitRegisterHandle', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
     }
 }

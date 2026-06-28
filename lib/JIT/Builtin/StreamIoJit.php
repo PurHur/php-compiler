@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream I/O dispatch — embed PHP helper vs standalone LLVM (#5343, #10326).
+ * Stream I/O dispatch — JIT embed + AOT standalone via StreamIoRuntime PHP (#5343, #10326, #12956).
  *
  * php-src: ext/standard/file.c, ext/standard/streamsfuncs.c
  */
@@ -33,14 +33,8 @@ final class StreamIoJit
         self::ensureStreamGlobals($context);
         StreamFilter::ensureLinked($context);
 
-        if (StreamIoStandaloneLlvm::shouldDeferHeavyStreamIoEmitters($context)) {
-            StreamIoStandaloneLlvm::implementDeferredStreamIoStubs($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamIoStandaloneLlvm::implement($context);
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            StreamIoRuntime::implementDeferredStreamIoStubs($context);
 
             return;
         }
@@ -51,7 +45,7 @@ final class StreamIoJit
     /** Stream handle globals for stream_socket_pair() without pulling full I/O emitters (#3437). */
     public static function ensureStreamGlobals(Context $context): void
     {
-        StreamIoStandaloneLlvm::ensureStreamGlobals($context);
+        StreamGlobalsJit::ensureGlobals($context);
     }
 
     private static function allRuntimeFunctionsLinked(Context $context): bool
