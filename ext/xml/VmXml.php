@@ -15,7 +15,7 @@ use PHPCompiler\VM\Context;
  */
 final class VmXml
 {
-    /** @var array<int, true> */
+    /** @var array<int, array{errorCode: int}> */
     private static array $parsers = [];
 
     private static int $nextParserId = 0;
@@ -23,7 +23,7 @@ final class VmXml
     public static function parserCreate(): int
     {
         $id = ++self::$nextParserId;
-        self::$parsers[$id] = true;
+        self::$parsers[$id] = ['errorCode' => 0];
 
         return $id;
     }
@@ -36,6 +36,15 @@ final class VmXml
         unset(self::$parsers[$parser]);
 
         return true;
+    }
+
+    public static function getErrorCode(int $parser): int
+    {
+        if (!isset(self::$parsers[$parser])) {
+            throw new \ValueError('xml_get_error_code(): Argument #1 ($parser) must be a valid XML parser');
+        }
+
+        return self::$parsers[$parser]['errorCode'];
     }
 
     public static function parse(
@@ -55,9 +64,12 @@ final class VmXml
 
         $error = self::validateWellFormed($data);
         if (null === $error) {
+            self::$parsers[$parser]['errorCode'] = 0;
+
             return true;
         }
 
+        self::$parsers[$parser]['errorCode'] = $error['code'];
         \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
 
         return false;
