@@ -163,7 +163,9 @@ final class BuiltinParamNames
             case 'get_browser':
                 return ['browser_name', 'return_array'];
             case 'get_defined_constants':
-                return ['categorize'];
+                return \PHPCompiler\CompilerVersion::supportsGetDefinedConstantsCategory()
+                    ? ['categorize', 'category']
+                    : ['categorize'];
             case 'intdiv':
                 return ['num1', 'num2'];
             case 'atan2':

@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -18,11 +20,43 @@ use PHPLLVM\Value;
 /** LLVM lowering for get_defined_constants() (issue #3135). */
 final class JitGetDefinedConstants
 {
-    public static function invoke(Context $context, ?JITVariable $categorizeArg): Value
+    public static function invoke(Context $context, ?JITVariable $arg0, ?JITVariable $arg1 = null): Value
     {
         if (null === $context->runtime->vmContext) {
             throw new \LogicException('get_defined_constants() requires VM context');
         }
+
+        if (CompilerVersion::supportsGetDefinedConstantsCategory()) {
+            $categoryLiteral = self::compileTimeCategoryLiteral($arg0, $arg1);
+            if (null !== $categoryLiteral) {
+                return self::wrapHashTable(
+                    $context,
+                    self::emitHashTablePtr(
+                        $context,
+                        VmConstants::getDefinedConstantsForCategory(
+                            $context->runtime->vmContext,
+                            $categoryLiteral
+                        )
+                    )
+                );
+            }
+            if (self::hasCategoryArg($arg0, $arg1)) {
+                throw new \LogicException(
+                    'get_defined_constants() category filter requires compile-time string in this compiler build'
+                );
+            }
+        }
+
+        if (null === $arg0) {
+            return self::wrapHashTable(
+                $context,
+                self::emitHashTablePtr(
+                    $context,
+                    VmConstants::getDefinedConstants($context->runtime->vmContext, false)
+                )
+            );
+        }
+
         $flat = self::wrapHashTable(
             $context,
             self::emitHashTablePtr(
@@ -30,9 +64,6 @@ final class JitGetDefinedConstants
                 VmConstants::getDefinedConstants($context->runtime->vmContext, false)
             )
         );
-        if (null === $categorizeArg) {
-            return $flat;
-        }
 
         $categorized = self::wrapHashTable(
             $context,
@@ -41,7 +72,7 @@ final class JitGetDefinedConstants
                 VmConstants::getDefinedConstants($context->runtime->vmContext, true)
             )
         );
-        $categorize = self::resolveCategorizeFlag($context, $categorizeArg);
+        $categorize = self::resolveCategorizeFlag($context, $arg0);
         $tag = 'gdc'.(string) ++self::$seq;
         $useCat = BasicBlockHelper::append($context, 'gdc_cat_'.$tag);
         $useFlat = BasicBlockHelper::append($context, 'gdc_flat_'.$tag);
@@ -63,6 +94,47 @@ final class JitGetDefinedConstants
     }
 
     private static int $seq = 0;
+
+    private static function compileTimeCategoryLiteral(?JITVariable $arg0, ?JITVariable $arg1): ?string
+    {
+        if (null !== $arg1) {
+            return JitStringArg::compileTimeLiteral($arg1);
+        }
+        if (null === $arg0) {
+            return null;
+        }
+        if (JITVariable::TYPE_STRING === $arg0->type) {
+            return JitStringArg::compileTimeLiteral($arg0);
+        }
+        if (JITVariable::TYPE_VALUE === $arg0->type) {
+            $literal = JitStringArg::compileTimeLiteral($arg0);
+            if (null !== $literal) {
+                return $literal;
+            }
+        }
+
+        return null;
+    }
+
+    private static function hasCategoryArg(?JITVariable $arg0, ?JITVariable $arg1): bool
+    {
+        if (null !== $arg1) {
+            return true;
+        }
+        if (null === $arg0) {
+            return false;
+        }
+        if (JITVariable::TYPE_STRING === $arg0->type) {
+            return true;
+        }
+        if (JITVariable::TYPE_VALUE === $arg0->type) {
+            $literal = JitStringArg::compileTimeLiteral($arg0);
+
+            return null === $literal && JITVariable::TYPE_STRING === ($arg0->boxedType ?? 0);
+        }
+
+        return false;
+    }
 
     private static function resolveCategorizeFlag(Context $context, JITVariable $arg): Value
     {

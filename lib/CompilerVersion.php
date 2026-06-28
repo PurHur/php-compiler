@@ -379,6 +379,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ get_defined_constants() optional $category named filter (ext/standard/basic_functions.c, #12947).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects unknown named param like Zend 8.2.
+     */
+    public static function supportsGetDefinedConstantsCategory(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
      * (ext/standard/http.c, issue #12855).
      *

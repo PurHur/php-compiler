@@ -216,6 +216,42 @@ final class VmConstants
         return self::buildFlat($ctx);
     }
 
+    /**
+     * PHP 8.4+ category filter — flat map for one extension category (#12947, basic_functions.c).
+     */
+    public static function getDefinedConstantsForCategory(Context $ctx, string $category): HashTable
+    {
+        $categorized = self::buildCategorized($ctx);
+        foreach ($categorized->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            if (0 !== strcasecmp($key->toString(), $category)) {
+                continue;
+            }
+            $resolved = $valueVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolved->type) {
+                return new HashTable();
+            }
+            $out = new HashTable();
+            foreach ($resolved->toArray()->iterateKeyed(true) as [$constKeyVar, $constVar]) {
+                $copy = new Variable();
+                $copy->copyFrom($constVar);
+                $constKey = $constKeyVar->resolveIndirect();
+                if (Variable::TYPE_STRING === $constKey->type) {
+                    $out->add($constKey->toString(), $copy);
+                } elseif (Variable::TYPE_INTEGER === $constKey->type) {
+                    $out->addIndex($constKey->toInt(), $copy);
+                }
+            }
+
+            return $out;
+        }
+
+        return new HashTable();
+    }
+
     private static function buildFlat(Context $ctx): HashTable
     {
         $result = new HashTable();
