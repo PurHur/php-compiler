@@ -359,6 +359,16 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'property_hook_reference_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when clone-with syntax enabled (#12987).
+            if (CompilerVersion::supportsCloneWithSyntax()
+                && str_contains($name, 'clone_with_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsCloneWithSyntax()
+                && str_contains($name, 'clone_with')
+                && !str_contains($name, 'clone_with_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;
