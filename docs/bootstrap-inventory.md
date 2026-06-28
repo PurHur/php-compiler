@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3451 |
-| Phase A inventory files (M2 ratio SSOT) | 3451 |
+| PHP files on vm.php path | 3450 |
+| Phase A inventory files (M2 ratio SSOT) | 3450 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9301 |
+| Source constructs flagged (warnings) | 9302 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1045,7 +1045,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/TriggerErrorJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnpackJitHelper.php` | 0 | 1 |
-| `ext/standard/UnserializeJitHelper.php` | 0 | 1 |
+| `ext/standard/UnserializeJitHelper.php` | 0 | 3 |
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
@@ -2648,7 +2648,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserialize.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringUnserializeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 3 |
@@ -10331,7 +10330,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/UnserializeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- new Variable (line 24)
+- new HashTable (line 38)
+- 3 class method(s)
 
 ### `ext/standard/UploadTempJitHelper.php`
 
@@ -20689,14 +20690,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUnserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 207)
+- new JIT (line 199)
 - 9 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringUnserializeJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 20 class method(s)
 
 ### `lib/JIT/Builtin/StringUrldecode.php`
 

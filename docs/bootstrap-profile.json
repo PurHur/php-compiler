@@ -2702,7 +2702,6 @@
         "lib/JIT/Builtin/StringUcwords.php",
         "lib/JIT/Builtin/StringUnpack.php",
         "lib/JIT/Builtin/StringUnserialize.php",
-        "lib/JIT/Builtin/StringUnserializeJit.php",
         "lib/JIT/Builtin/StringUrldecode.php",
         "lib/JIT/Builtin/StringUrlencode.php",
         "lib/JIT/Builtin/StringUtf8Latin1.php",
@@ -3681,9 +3680,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3451,
+        "inventory_files": 3450,
         "excluded": 0,
-        "eligible": 3451,
+        "eligible": 3450,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
