@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Call;
 
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable;
 use PHPLLVM\Value;

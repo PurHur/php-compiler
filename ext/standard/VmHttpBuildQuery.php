@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -58,6 +59,113 @@ final class VmHttpBuildQuery
         }
 
         return \implode($argSeparator, $parts);
+    }
+
+    /**
+     * Build query string directly from VM HashTable (nested JIT safe — no mixed PHP array stores).
+     */
+    public static function buildFromHashTable(
+        HashTable $data,
+        string $numericPrefix = '',
+        string $argSeparator = '&',
+        int $encodingType = self::ENCODING_RFC1738
+    ): string {
+        return self::buildHashTableWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null);
+    }
+
+    private static function buildHashTableWithKeyPrefix(
+        HashTable $data,
+        string $numericPrefix,
+        string $argSeparator,
+        int $encodingType,
+        ?string $keyPrefix
+    ): string {
+        $useRaw = self::ENCODING_RFC3986 === $encodingType;
+        $parts = [];
+        foreach ($data->exportKeyValuePairs(true) as [$keyVar, $valVar]) {
+            $encoded = self::encodeHashTableEntry(
+                $keyVar,
+                $valVar,
+                $numericPrefix,
+                $keyPrefix,
+                $useRaw,
+                $argSeparator,
+                $encodingType
+            );
+            if ('' !== $encoded) {
+                $parts[] = $encoded;
+            }
+        }
+
+        return \implode($argSeparator, $parts);
+    }
+
+    private static function encodeHashTableEntry(
+        Variable $keyVar,
+        Variable $valVar,
+        string $numericPrefix,
+        ?string $keyPrefix,
+        bool $useRaw,
+        string $argSeparator,
+        int $encodingType
+    ): string {
+        $key = $keyVar->resolveIndirect();
+        $isIntKey = Variable::TYPE_INTEGER === $key->type;
+        $keyStr = $isIntKey ? (string) $key->toInt() : $key->toString();
+        if (!\is_string($keyStr)) {
+            return '';
+        }
+
+        $value = $valVar->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $value->type) {
+            $childPrefix = self::buildChildKeyPrefix(
+                $keyStr,
+                $isIntKey,
+                $numericPrefix,
+                $keyPrefix,
+                $useRaw
+            );
+
+            return self::buildHashTableWithKeyPrefix(
+                $value->toArray(),
+                '',
+                $argSeparator,
+                $encodingType,
+                $childPrefix
+            );
+        }
+        if (Variable::TYPE_NULL === $value->type) {
+            return '';
+        }
+
+        $scalar = self::variableToScalar($value);
+        if (null === $scalar) {
+            return '';
+        }
+
+        $fullKey = self::buildScalarKey($keyStr, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+        $encodedKey = self::encodeKeyForOutput($fullKey, $isIntKey, $numericPrefix, $keyPrefix, $useRaw);
+        $encodedVal = self::encodeScalarValue($scalar, $useRaw);
+
+        return $encodedKey.'='.$encodedVal;
+    }
+
+    private static function variableToScalar(Variable $v): mixed
+    {
+        switch ($v->type) {
+            case Variable::TYPE_NULL:
+                return null;
+            case Variable::TYPE_INTEGER:
+                return $v->toInt();
+            case Variable::TYPE_FLOAT:
+                return $v->toFloat();
+            case Variable::TYPE_BOOLEAN:
+                return $v->toBool();
+            case Variable::TYPE_STRING:
+                return $v->toString();
+            default:
+                return '';
+        }
     }
 
     /**
