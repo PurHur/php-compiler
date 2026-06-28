@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
  * JIT/AOT link for __compiler_strtr* via Strtr*JitHelper PHP (#9392).
  *
- * JIT embed compiles PHP SSOT helpers; AOT standalone keeps {@see StringStrtrStandaloneLlvm}
- * for array form until HashTable iteration compiles in native standalone nested link.
- * php-src: ext/standard/string.c
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StrtrArrayJitHelper}; thin LLVM
+ * bridge forwards the ABI. php-src: ext/standard/string.c
  */
 final class StringStrtr
 {
@@ -56,14 +56,8 @@ final class StringStrtr
 
         self::ensureTwoStringHelperCompiled($context);
         self::implementTwoStringBridge($context);
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringStrtrStandaloneLlvm::implement($context);
-        } else {
-            self::ensureArrayHelperCompiled($context);
-            self::implementArrayBridge($context);
-        }
-
+        self::ensureArrayHelperCompiled($context);
+        self::implementArrayBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
@@ -126,6 +120,11 @@ final class StringStrtr
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
+        if (self::STRTR_ARRAY === $logical) {
+            self::ensureArrayHelperCompiled($context);
+        } else {
+            self::ensureTwoStringHelperCompiled($context);
+        }
         $lc = \strtolower($logical);
         $fn = $context->functions[$lc] ?? null;
         if (null === $fn) {
@@ -153,6 +152,13 @@ final class StringStrtr
             return;
         }
 
+        HashTableNestedExportLlvm::ensureLinked($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toint');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
         self::compileHelperFile($context, self::ARRAY_HELPER_PATH, 'StrtrArrayJitHelper.php');
         if (!isset($context->functions[\strtolower(self::STRTR_ARRAY)])) {
             throw new \LogicException(self::STRTR_ARRAY.' was not compiled for JIT (#9392)');

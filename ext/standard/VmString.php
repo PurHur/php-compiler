@@ -12,6 +12,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
 use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
@@ -4039,6 +4040,24 @@ final class VmString
     }
 
     /**
+     * strtr() replace_pairs HashTable form — nested JIT safe (numeric pair list, no string-key stores).
+     *
+     * @see php/php-src ext/standard/string.c php_strtr_array()
+     */
+    public static function strtrArrayFromHashTable(string $string, HashTable $replacePairs): string
+    {
+        $tupleList = [];
+        foreach ($replacePairs->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
+            $tupleList[] = [
+                self::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs'),
+                self::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs'),
+            ];
+        }
+
+        return self::strtrArrayFromPairTuples($string, $tupleList);
+    }
+
+    /**
      * strtr() replace_pairs array form — longest-match substitution.
      *
      * @see php/php-src ext/standard/string.c php_strtr_array()
@@ -4093,6 +4112,19 @@ final class VmString
         }
 
         return self::strtrArrayLongestMatch($string, $pairs);
+    }
+
+    /**
+     * @param list<array{0: string, 1: string}> $tupleList
+     */
+    private static function strtrArrayFromPairTuples(string $string, array $tupleList): string
+    {
+        $pairs = [];
+        foreach ($tupleList as [$from, $to]) {
+            $pairs[$from] = $to;
+        }
+
+        return self::strtrArray($string, $pairs);
     }
 
     /**

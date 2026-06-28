@@ -2667,7 +2667,6 @@
         "lib/JIT/Builtin/StringStrtok.php",
         "lib/JIT/Builtin/StringStrtokJit.php",
         "lib/JIT/Builtin/StringStrtr.php",
-        "lib/JIT/Builtin/StringStrtrStandaloneLlvm.php",
         "lib/JIT/Builtin/StringSubstrCompare.php",
         "lib/JIT/Builtin/StringSubstrCompareJit.php",
         "lib/JIT/Builtin/StringSuperglobalName.php",
