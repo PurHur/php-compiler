@@ -18,8 +18,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerExceptions($ctx);
-        self::registerRandomizer($ctx);
-        self::registerMt19937($ctx);
+        RandomizerBuiltin::registerClasses($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
         }
@@ -44,13 +43,4 @@ final class BuiltinClasses
         $ctx->classes['random\\brokenrandomengineerror'] = $brokenEngine;
     }
 
-    private static function registerRandomizer(Context $ctx): void
-    {
-        $ctx->classes['random\\randomizer'] = new ClassEntry('Random\\Randomizer');
-    }
-
-    private static function registerMt19937(Context $ctx): void
-    {
-        $ctx->classes['random\\engine\\mt19937'] = new ClassEntry('Random\\Engine\\Mt19937');
-    }
 }
