@@ -9966,6 +9966,9 @@ restart:
         if (null === $meta || null === $meta->setHookMethodLc || null !== $meta->getHookMethodLc) {
             return null;
         }
+        if (!$this->instancePropertyIsWriteOnlyVirtualHook($object, $propName)) {
+            return null;
+        }
         $className = $object->class->name;
         if ('' !== $meta->declaringClassLc && isset($this->context->classes[$meta->declaringClassLc])) {
             $className = $this->context->classes[$meta->declaringClassLc]->name;
@@ -10098,6 +10101,20 @@ restart:
             ?? null;
 
         return is_array($propMeta) && !empty($propMeta['virtual']);
+    }
+
+    /** Set-only hook with short `set =>` backing or explicit virtual — external reads forbidden (#6484, #12941). */
+    private function instancePropertyIsWriteOnlyVirtualHook(ObjectEntry $object, string $propName): bool
+    {
+        if ($this->instancePropertyIsVirtualHook($object, $propName)) {
+            return true;
+        }
+        $lcClass = strtolower($object->class->name);
+        $propMeta = $this->context->propertyHookRegistry[$lcClass][$propName]
+            ?? $this->context->propertyHookRegistry[$lcClass][strtolower($propName)]
+            ?? null;
+
+        return is_array($propMeta) && !empty($propMeta['setBacking']);
     }
 
     private function raiseVirtualPropertyHookRawAccessError(
