@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
-use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
 /**
@@ -16,7 +15,7 @@ final class BuiltinClasses
     {
         $before = array_keys($ctx->classes);
         self::registerArrayObject($ctx);
-        self::registerSplDoublyLinkedList($ctx);
+        SplDoublyLinkedListBuiltin::registerClass($ctx);
         SplFileInfoBuiltin::registerClass($ctx);
         SplFileObjectBuiltin::registerClass($ctx);
         SplTempFileObjectBuiltin::registerClass($ctx);
@@ -39,21 +38,4 @@ final class BuiltinClasses
         ArrayObjectBuiltin::registerClass($ctx);
     }
 
-    private static function registerSplDoublyLinkedList(Context $ctx): void
-    {
-        $entry = new ClassEntry('SplDoublyLinkedList');
-        if (isset($ctx->classes['iterator'])) {
-            $entry->interfaces[] = 'iterator';
-        }
-        if (isset($ctx->classes['countable'])) {
-            $entry->interfaces[] = 'countable';
-        }
-        if (isset($ctx->classes['arrayaccess'])) {
-            $entry->interfaces[] = 'arrayaccess';
-        }
-        if (isset($ctx->classes['serializable'])) {
-            $entry->interfaces[] = 'serializable';
-        }
-        $ctx->classes['spldoublylinkedlist'] = $entry;
-    }
 }
