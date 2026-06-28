@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitValueBox;
@@ -15,8 +14,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_json_decode via JsonDecodeJitHelper PHP (#9359).
  *
- * JIT/normal modules use compiled {@see JsonDecodeJitHelper}; AOT standalone keeps
- * {@see StringJsonDecodeJit} until native link can host compiled VmJson reliably.
+ * JIT/normal modules use compiled {@see JsonDecodeJitHelper}; standalone AOT uses the same PHP bridge (#13228).
  * php-src: ext/json/php_json.c — php_json_decode_ex
  */
 final class StringJsonDecode
@@ -60,12 +58,6 @@ final class StringJsonDecode
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringJsonDecodeJit::ensureStandaloneBodies($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_json_decode');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
