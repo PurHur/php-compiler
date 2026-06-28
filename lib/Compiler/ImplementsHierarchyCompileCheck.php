@@ -6,6 +6,7 @@ namespace PHPCompiler\Compiler;
 
 use PHPCompiler\VM\DateTimeInterfaceSupport;
 use PHPCompiler\VM\ReservedBuiltinClass;
+use PHPCompiler\VM\TraversableSupport;
 use PHPCfg\AbstractVisitor;
 use PHPCfg\Block;
 use PHPCfg\Op;
@@ -160,6 +161,12 @@ final class ImplementsHierarchyCompileCheck
     {
         foreach ($this->classes as $class) {
             $this->rejectDuplicateImplements('Class', $class['display'], $class['implements']);
+            if (TraversableSupport::rejectsDirectTraversableWithoutIteratorProtocol($class['implements'])) {
+                throw new \CompileError(TraversableSupport::directTraversableForbiddenMessage(
+                    'Class',
+                    $class['display']
+                ));
+            }
             foreach ($class['implements'] as $targetLc) {
                 if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
                     throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
@@ -191,6 +198,12 @@ final class ImplementsHierarchyCompileCheck
 
         foreach ($this->enums as $enum) {
             $this->rejectDuplicateImplements('Enum', $enum['display'], $enum['implements']);
+            if (TraversableSupport::rejectsDirectTraversableWithoutIteratorProtocol($enum['implements'])) {
+                throw new \CompileError(TraversableSupport::directTraversableForbiddenMessage(
+                    'Enum',
+                    $enum['display']
+                ));
+            }
             foreach ($enum['implements'] as $targetLc) {
                 if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
                     throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
