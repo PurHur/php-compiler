@@ -28,10 +28,18 @@ final class NamespaceUndefinedConstantTest extends TestCase
 
     public function testUndefinedFunctionFatalIncludesFileAndLine(): void
     {
-        $script = $this->repoRoot.'/test/repro/maintainer_gap_fatal_line_bundle_offset.php';
-        [, $stderr] = $this->runVmScript($script, 255);
+        $tmp = tempnam(sys_get_temp_dir(), 'phpc_undef_fn_');
+        $this->assertNotFalse($tmp);
+        file_put_contents($tmp, <<<'PHP'
+<?php
+undefined();
+PHP
+        );
+        [, $stderr] = $this->runVmScript($tmp, 255);
+        @unlink($tmp);
         $this->assertStringContainsString('Call to undefined function undefined()', $stderr);
-        $this->assertStringContainsString('maintainer_gap_fatal_line_bundle_offset.php on line 3', $stderr);
+        $this->assertMatchesRegularExpression('/ on line 2$/m', $stderr);
+        $this->assertStringNotContainsString('on line 561', $stderr);
     }
 
     public function testDefinedNamespaceConstantStillResolves(): void
