@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -16,8 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_unserialize via UnserializeJitHelper PHP (#9163).
  *
- * JIT/normal modules use compiled {@see UnserializeJitHelper}; AOT standalone keeps
- * {@see StringUnserializeJit} until native link can host compiled VmUnserializeFormat reliably.
+ * JIT/normal modules and standalone AOT use compiled {@see UnserializeJitHelper} (#13312).
  * php-src: ext/standard/var_unserializer.c
  */
 final class StringUnserialize
@@ -46,12 +44,6 @@ final class StringUnserialize
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringUnserializeJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_unserialize');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

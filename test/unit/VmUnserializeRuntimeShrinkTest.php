@@ -30,7 +30,7 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
             $this->assertDoesNotMatchRegularExpression('/@\\\\unserialize\\s*\\(/', $source, $class);
         }
         $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/UnserializeJitHelper.php');
-        $this->assertStringContainsString('VmUnserializeFormat::decodePayload', $helper);
+        $this->assertStringContainsString('VmUnserializeFormat::decodeToVariableWithContext', $helper);
     }
 
     public function testDecodeScalarsAndArrays(): void
