@@ -25,6 +25,7 @@ final class BuiltinClasses
         SplFixedArrayBuiltin::registerClass($ctx);
         SplObjectStorageBuiltin::registerClass($ctx);
         IteratorIteratorBuiltin::registerClass($ctx);
+        FilterIteratorBuiltin::registerClass($ctx);
         LimitIteratorBuiltin::registerClass($ctx);
         CachingIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
