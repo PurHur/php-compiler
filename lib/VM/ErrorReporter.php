@@ -472,15 +472,33 @@ final class ErrorReporter
                 if ((null === $file || '' === $file) && '' !== $walk->scriptPath) {
                     $file = $walk->scriptPath;
                 }
-                if ($line <= 0 && $walk->callSiteLine > 0) {
-                    $line = $walk->callSiteLine;
-                }
-                if (null !== $file && '' !== $file && $line > 0) {
-                    break;
-                }
                 $walk = $walk->parent;
             }
+            if ($line <= 0) {
+                $walk = $frame;
+                while (null !== $walk) {
+                    if ('' !== $walk->scriptPath) {
+                        $opcodeLine = FatalSite::lineFromOpcodes($walk);
+                        if ($opcodeLine > 0) {
+                            $line = $opcodeLine;
+                            break;
+                        }
+                    }
+                    $walk = $walk->parent;
+                }
+                if ($line <= 0) {
+                    $walk = $frame;
+                    while (null !== $walk) {
+                        if ($walk->callSiteLine > 0) {
+                            $line = $walk->callSiteLine;
+                            break;
+                        }
+                        $walk = $walk->parent;
+                    }
+                }
+            }
         }
+
         return [$file, $line];
     }
 
