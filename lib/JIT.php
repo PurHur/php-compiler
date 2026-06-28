@@ -15109,6 +15109,14 @@ class JIT {
             if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
                 if (
                     0 === $idx
+                    && VM\ReferencableCheck::allowsNonVariableObjectByRef($name)
+                    && self::jitArgIsObject($args[$idx])
+                ) {
+                    JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    continue;
+                }
+                if (
+                    0 === $idx
                     && VM\ReferencableCheck::allowsEphemeralArrayLiteralByRef($name)
                     && JIT\JitReferencableCheck::isEphemeralArrayArg($args[$idx])
                 ) {
@@ -15189,6 +15197,11 @@ class JIT {
         }
 
         return false;
+    }
+
+    private static function jitArgIsObject(JIT\Variable $arg): bool
+    {
+        return JIT\Variable::TYPE_OBJECT === $arg->type;
     }
 
     /**

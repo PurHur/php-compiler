@@ -115,6 +115,15 @@ final class ReferencableCheck
             if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx] ?? null)) {
                 continue;
             }
+            if (
+                0 === $paramIdx
+                && self::allowsNonVariableObjectByRef($fn)
+                && !self::isReferenceable($calledArgs[$paramIdx], $caller)
+                && self::isObjectOperand($calledArgs[$paramIdx])
+            ) {
+                self::emitNonVariableByRefNotice($caller);
+                continue;
+            }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
             self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
         }
@@ -185,6 +194,12 @@ final class ReferencableCheck
         return \in_array(strtolower($fn), self::arraySortMutatorFunctions(), true);
     }
 
+    /** array_walk* accepts object operands — non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
+    public static function allowsNonVariableObjectByRef(string $fn): bool
+    {
+        return \in_array(strtolower($fn), ['array_walk', 'array_walk_recursive'], true);
+    }
+
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
     private static function isArrayOrObjectOperand(Variable $arg): bool
     {
@@ -197,6 +212,11 @@ final class ReferencableCheck
     private static function isArrayOperand(Variable $arg): bool
     {
         return Variable::TYPE_ARRAY === $arg->resolveIndirect()->type;
+    }
+
+    private static function isObjectOperand(Variable $arg): bool
+    {
+        return Variable::TYPE_OBJECT === $arg->resolveIndirect()->type;
     }
 
     private static function emitNonVariableByRefNotice(Frame $caller): void
