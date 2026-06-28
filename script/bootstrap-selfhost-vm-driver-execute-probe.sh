@@ -91,9 +91,9 @@ if [[ "${relink}" == "1" ]]; then
       echo "bootstrap-selfhost-vm-driver-execute-probe: OK ${OUT}"
       exit 0
     fi
-    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe; need full link or BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK=1" >&2
+    echo "bootstrap-selfhost-vm-driver-execute-probe: prelinked seed failed VM probe; falling back to full spine link" >&2
     printf '%s\n' "${probe_out}" >&2
-    exit 1
+    rm -f "${OUT}"
   fi
   # shellcheck source=php-env.sh
   source "$(dirname "$0")/php-env.sh"
