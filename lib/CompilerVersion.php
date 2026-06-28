@@ -312,6 +312,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.4+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.c, #13065, #13284).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsReflectionPropertyAccessProbes(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
     public static function supportsStrPadded(): bool
     {

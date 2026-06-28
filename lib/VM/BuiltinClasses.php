@@ -701,8 +701,6 @@ final class BuiltinClasses
                 'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
                 'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
                 'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
-                'isreadable' => ReflectionPropertyAccessProbe::isReadable(),
-                'iswritable' => ReflectionPropertyAccessProbe::isWritable(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
                 'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
@@ -711,6 +709,12 @@ final class BuiltinClasses
         ) {
             $rp->methods[$name] = $method;
             $rp->methodVisibility[$name] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyAccessProbes()) {
+            $rp->methods['isreadable'] = ReflectionPropertyAccessProbe::isReadable();
+            $rp->methodVisibility['isreadable'] = $pub;
+            $rp->methods['iswritable'] = ReflectionPropertyAccessProbe::isWritable();
+            $rp->methodVisibility['iswritable'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
