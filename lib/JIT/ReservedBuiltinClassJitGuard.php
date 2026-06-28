@@ -14,7 +14,7 @@ use PHPLLVM\Value\Function_;
 /**
  * JIT: reserved internal classes reject userland `new` (#13324).
  *
- * php-src: Zend/zend_closures.c, Zend/zend_generators.c
+ * php-src: Zend/zend_closures.c, Zend/zend_generators.c, ext/curl/interface.c
  */
 final class ReservedBuiltinClassJitGuard
 {
