@@ -5,14 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\ObOutputRuntime;
 use PHPCompiler\JIT\Builtin\ProcessRuntime;
-use PHPCompiler\JIT\Builtin\StreamGlobalsJit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
-use PHPCompiler\JIT\LibcExtern;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -244,8 +243,7 @@ final class JitExec
     /** @return Value int1 — true when all lines were written */
     private static function writeLinesToStdout(Context $context, Value $linesHt): Value
     {
-        StreamGlobalsJit::ensureGlobals($context);
-        LibcExtern::register($context);
+        ObOutputRuntime::ensureLinked($context);
 
         $map = $context->structFieldMap['__hashtable__'];
         $sizeT = $context->getTypeFromString('size_t');
@@ -253,14 +251,11 @@ final class JitExec
         $i1 = $context->getTypeFromString('int1');
         $count = $context->builder->load($context->builder->structGep($linesHt, $map['nextFreeElement']));
         $indexSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
-        $okSlot = BasicBlockHelper::entryAlloca($context, $i1);
         $context->builder->store($sizeT->constInt(0, false), $indexSlot);
-        $context->builder->store($i1->constInt(1, false), $okSlot);
 
-        $stdoutGlobal = $context->module->getNamedGlobal('stdout');
-        $stdoutFp = $context->builder->load($context->builder->pointerCast($stdoutGlobal, $i8p->pointerType(0)));
         $nl = self::literalCstr($context, "\n");
-        $nlLen = $sizeT->constInt(1, false);
+        $echoSubstr = $context->lookupFunction('__phpc_ob_echo_substr');
+        $echoCstr = $context->lookupFunction('__phpc_ob_echo_cstr');
 
         $loopHead = BasicBlockHelper::append($context, 'exec_stdout_head');
         $loopBody = BasicBlockHelper::append($context, 'exec_stdout_body');
@@ -278,26 +273,12 @@ final class JitExec
         $lineData = $context->builder->load($context->builder->structGep($line, $lineMap['value']));
         $lineLen = $context->builder->load($context->builder->structGep($line, $lineMap['length']));
         $lineLenSizeT = $context->builder->truncOrBitCast($lineLen, $sizeT);
-        $writtenLine = $context->builder->call(
-            $context->lookupFunction('fwrite'),
-            $stdoutFp,
+        $context->builder->call(
+            $echoSubstr,
             $context->builder->pointerCast($lineData, $i8p),
-            $lineLenSizeT,
             $lineLenSizeT
         );
-        $writtenNl = $context->builder->call(
-            $context->lookupFunction('fwrite'),
-            $stdoutFp,
-            $nl,
-            $nlLen,
-            $nlLen
-        );
-        $bad = $context->builder->or(
-            $context->builder->icmp(Builder::INT_NE, $writtenLine, $lineLenSizeT),
-            $context->builder->icmp(Builder::INT_NE, $writtenNl, $nlLen)
-        );
-        $stillOk = $context->builder->and($context->builder->load($okSlot), $context->builder->not($bad));
-        $context->builder->store($stillOk, $okSlot);
+        $context->builder->call($echoCstr, $nl);
         $context->builder->store(
             $context->builder->add($index, $sizeT->constInt(1, false)),
             $indexSlot
@@ -306,7 +287,7 @@ final class JitExec
 
         $context->builder->positionAtEnd($loopDone);
 
-        return $context->builder->load($okSlot);
+        return $i1->constInt(1, false);
     }
 
     private static function literalKey(Context $context, string $text): Value
