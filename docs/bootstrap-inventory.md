@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3439 |
-| Phase A inventory files (M2 ratio SSOT) | 3439 |
+| PHP files on vm.php path | 3444 |
+| Phase A inventory files (M2 ratio SSOT) | 3444 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9214 |
+| Source constructs flagged (warnings) | 9247 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -310,8 +310,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_strerror.php` | 0 | 2 |
 | `ext/posix/posix_times.php` | 0 | 2 |
 | `ext/posix/posix_uname.php` | 0 | 4 |
-| `ext/random/BuiltinClasses.php` | 0 | 6 |
+| `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/Module.php` | 0 | 1 |
+| `ext/random/Mt19937Instance.php` | 0 | 1 |
+| `ext/random/RandomizerBuiltin.php` | 0 | 17 |
 | `ext/session/Module.php` | 0 | 18 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
@@ -324,19 +326,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/VmSockets.php` | 0 | 1 |
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 4 |
+| `ext/spl/AppendIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 24 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 25 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 7 |
+| `ext/spl/CallbackFilterIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 13 |
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
-| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 10 |
+| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/Module.php` | 0 | 2 |
+| `ext/spl/ParentIteratorBuiltin.php` | 0 | 5 |
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
@@ -5287,17 +5292,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/random/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new ClassEntry (line 36)
-- new ClassEntry (line 42)
-- new ClassEntry (line 49)
-- new ClassEntry (line 54)
-- 4 class method(s)
+- new ClassEntry (line 29)
+- new ClassEntry (line 35)
+- new ClassEntry (line 41)
+- 2 class method(s)
 
 ### `ext/random/Module.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/random/Mt19937Instance.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
+
+### `ext/random/RandomizerBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new Random\RandomError (line 42)
+- new ClassEntry (line 107)
+- new Mt19937Construct (line 109)
+- new ClassEntry (line 135)
+- new Variable (line 137)
+- new RandomizerConstruct (line 139)
+- new Mt19937Instance (line 244)
+- new Variable (line 335)
+- new Variable (line 344)
+- new Mt19937Instance (line 361)
+- new ObjectEntry (line 372)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 435)
+- new ArgumentCountError (line 467)
+- new ArgumentCountError (line 509)
+- new ArgumentCountError (line 550)
+- 29 class method(s)
 
 ### `ext/session/Module.php`
 
@@ -5388,6 +5417,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 2 closure(s)
 
+### `ext/spl/AppendIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 36)
+- new AppendIteratorConstruct (line 45)
+- new ArgumentCountError (line 193)
+- 17 class method(s)
+
 ### `ext/spl/ArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5461,6 +5498,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 504)
 - 31 class method(s)
 
+### `ext/spl/CallbackFilterIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 38)
+- new CallbackFilterIteratorConstruct (line 47)
+- new CallbackFilterIteratorAccept (line 50)
+- new Variable (line 96)
+- new ArgumentCountError (line 124)
+- 13 class method(s)
+
 ### `ext/spl/DirectoryIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5527,11 +5574,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IteratorIteratorGetInnerIterator (line 53)
 - new ClassEntry (line 99)
 - new RecursiveIteratorIteratorConstruct (line 108)
-- new UnexpectedValueException (line 252)
-- new UnexpectedValueException (line 330)
-- new ArgumentCountError (line 386)
-- new ArgumentCountError (line 418)
-- 37 class method(s)
+- new OutOfBoundsException (line 205)
+- new OutOfBoundsException (line 212)
+- new UnexpectedValueException (line 337)
+- new UnexpectedValueException (line 442)
+- new ArgumentCountError (line 498)
+- new ArgumentCountError (line 530)
+- 51 class method(s)
 
 ### `ext/spl/JitSplClasses.php`
 
@@ -5552,6 +5601,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new spl_classes (line 24)
 - 2 class method(s)
+
+### `ext/spl/ParentIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new ParentIteratorConstruct (line 43)
+- new ParentIteratorAccept (line 46)
+- new ArgumentCountError (line 90)
+- 12 class method(s)
 
 ### `ext/spl/RecursiveArrayIteratorBuiltin.php`
 
@@ -11704,7 +11762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessProcOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 22 class method(s)
 
 ### `ext/standard/VmRandom.php`
 
