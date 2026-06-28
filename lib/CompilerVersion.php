@@ -248,6 +248,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ clone-with syntax (`clone $obj with { }`, `clone($obj, [...])`, `clone ($obj, with: [...])`).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse error (#12987).
+     * php-src: Zend/zend_language_parser.y clone_expr with clause; zend_clones.c.
+     */
+    public static function supportsCloneWithSyntax(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
      * Enabled on the 8.4.0-dev compiler line — version_compare treats -dev below stable 8.4.0 (#12856).
