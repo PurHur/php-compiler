@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** asort()/arsort() JIT routes through ValueSortJitHelper PHP not LLVM (#12771). */
+/** asort()/arsort() JIT routes through ValueSortJitHelper PHP not LLVM (#12771, #13053). */
 final class ValueSortRuntimeShrinkTest extends TestCase
 {
     public function testValueSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ValueSortRuntime.php');
         $this->assertStringContainsString('ValueSortJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::asortByValue', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
 
         $asort = (string) file_get_contents(__DIR__.'/../../ext/standard/asort_.php');
         $arsort = (string) file_get_contents(__DIR__.'/../../ext/standard/arsort_.php');
