@@ -53,7 +53,21 @@ final class StringJsonDecode
     /** Standalone AOT: JSON POST helper for superglobals_refresh.c (#7389). */
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link json_decode ABI without nested JsonDecodeJitHelper JIT (#13245). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -61,6 +75,12 @@ final class StringJsonDecode
         $probe = $context->module->getNamedFunction('__compiler_json_decode');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStubs($context);
 
             return;
         }
@@ -234,5 +254,70 @@ final class StringJsonDecode
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $voidTy = $context->getTypeFromString('void');
+        $i64 = $context->getTypeFromString('int64');
+        $nullStr = $strPtr->constNull();
+        $zero = $i64->constInt(0, false);
+
+        $decodeProbe = $context->module->getNamedFunction('__compiler_json_decode');
+        if (null === $decodeProbe || 0 === $decodeProbe->countBasicBlocks()) {
+            $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
+            $fn = null !== $decodeProbe
+                ? $decodeProbe
+                : $context->module->addFunction('__compiler_json_decode', $ft);
+            $entry = $fn->appendBasicBlock('json_decode_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->call(
+                $context->lookupFunction('__value__writeNull'),
+                $fn->getParam(1)
+            );
+            $context->builder->returnVoid();
+            $context->registerFunction('__compiler_json_decode', $fn);
+        }
+
+        $validateProbe = $context->module->getNamedFunction('__compiler_json_validate');
+        if (null === $validateProbe || 0 === $validateProbe->countBasicBlocks()) {
+            $ft = $context->context->functionType($i64, false, $strPtr, $i64);
+            $fn = null !== $validateProbe
+                ? $validateProbe
+                : $context->module->addFunction('__compiler_json_validate', $ft);
+            $entry = $fn->appendBasicBlock('json_validate_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($zero);
+            $context->registerFunction('__compiler_json_validate', $fn);
+        }
+
+        $errProbe = $context->module->getNamedFunction('__compiler_json_last_error');
+        if (null === $errProbe || 0 === $errProbe->countBasicBlocks()) {
+            $ft = $context->context->functionType($i64, false);
+            $fn = null !== $errProbe
+                ? $errProbe
+                : $context->module->addFunction('__compiler_json_last_error', $ft);
+            $entry = $fn->appendBasicBlock('json_last_error_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($zero);
+            $context->registerFunction('__compiler_json_last_error', $fn);
+        }
+
+        $msgProbe = $context->module->getNamedFunction('__compiler_json_last_error_msg');
+        if (null === $msgProbe || 0 === $msgProbe->countBasicBlocks()) {
+            $ft = $context->context->functionType($strPtr, false);
+            $fn = null !== $msgProbe
+                ? $msgProbe
+                : $context->module->addFunction('__compiler_json_last_error_msg', $ft);
+            $entry = $fn->appendBasicBlock('json_last_error_msg_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($nullStr);
+            $context->registerFunction('__compiler_json_last_error_msg', $fn);
+        }
+
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 }

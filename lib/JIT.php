@@ -14124,6 +14124,19 @@ class JIT {
             return true;
         }
         if (
+            JIT\NestedContextMethodLlvm::isNestedContextMethod($methodLc)
+            && ('phpcompiler\\vm\\context' === $declaringClassLc || 'object' === $declaringClassLc)
+        ) {
+            if (!JIT\NestedContextMethodLlvm::ensureMethod($this->context, $methodLc)) {
+                return false;
+            }
+            $proxyName = 'phpcompiler\\vm\\context::'.$methodLc;
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [$receiverVar];
+
+            return true;
+        }
+        if (
             'coercevariabletostring' === $methodLc
             && ('phpcompiler\\vm' === $declaringClassLc || 'object' === $declaringClassLc)
         ) {

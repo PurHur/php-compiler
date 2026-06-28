@@ -6,7 +6,10 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedContextMethodLlvm;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -21,12 +24,9 @@ final class StringJsonEncode
 
     private const ENCODE_VALUE_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeValue';
 
-    private const ENCODE_ARRAY_HELPER = 'PHPCompiler\\ext\\standard\\JsonEncodeJitHelper::encodeArray';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::ENCODE_VALUE_HELPER,
-        self::ENCODE_ARRAY_HELPER,
     ];
 
     /** @var list<string> */
@@ -42,7 +42,21 @@ final class StringJsonEncode
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link json_encode ABI without nested JsonEncodeJitHelper JIT (#13245). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -54,19 +68,22 @@ final class StringJsonEncode
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStubs($context);
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
-        self::implementBridge($context, '__compiler_json_encode_value', self::ENCODE_VALUE_HELPER, 2);
-        self::implementBridge($context, '__compiler_json_encode_array', self::ENCODE_ARRAY_HELPER, 2);
+        self::emitValueBridge($context);
+        self::emitArrayBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function implementBridge(
-        Context $context,
-        string $abiName,
-        string $helperLogical,
-        int $paramCount
-    ): void {
+    private static function emitValueBridge(Context $context): void
+    {
+        $abiName = '__compiler_json_encode_value';
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -76,19 +93,54 @@ final class StringJsonEncode
 
         $strPtr = $context->getTypeFromString('__string__*');
         $valuePtr = $context->getTypeFromString('__value__*');
-        $htPtr = $context->getTypeFromString('__hashtable__*');
         $i64 = $context->getTypeFromString('int64');
-        $firstParam = '__compiler_json_encode_array' === $abiName ? $htPtr : $valuePtr;
-        $ft = $context->context->functionType($strPtr, false, $firstParam, $i64);
+        $ft = $context->context->functionType($strPtr, false, $valuePtr, $i64);
         $fn = null !== $probe
             ? $probe
             : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('json_encode_bridge_entry');
+        $entry = $fn->appendBasicBlock('json_encode_value_bridge_entry');
         $context->builder->positionAtEnd($entry);
         $result = $context->builder->call(
-            self::helperFunction($context, $helperLogical),
+            self::helperFunction($context, self::ENCODE_VALUE_HELPER),
             $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    /** Box __hashtable__* as __value__* — avoids Variable::array() in nested JIT (#13245). */
+    private static function emitArrayBridge(Context $context): void
+    {
+        $abiName = '__compiler_json_encode_array';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($strPtr, false, $htPtr, $i64);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('json_encode_array_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $valueSlot = JitValueBox::alloc($context);
+        $valuePtr = JitValueBox::pointer($context, $valueSlot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $valuePtr,
+            $fn->getParam(0)
+        );
+        $result = $context->builder->call(
+            self::helperFunction($context, self::ENCODE_VALUE_HELPER),
+            $valuePtr,
             $fn->getParam(1)
         );
         $context->builder->returnValue($result);
@@ -120,6 +172,11 @@ final class StringJsonEncode
             return;
         }
 
+        foreach (['resolveindirect'] as $method) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $method);
+        }
+        NestedContextMethodLlvm::ensureMethod($context, 'runstackframes');
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
@@ -146,5 +203,36 @@ final class StringJsonEncode
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Return null __string__* — inventory emit only needs linkable ABI symbols (#13245). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            $i64 = $context->getTypeFromString('int64');
+            $firstParam = '__compiler_json_encode_array' === $abiName ? $htPtr : $valuePtr;
+            $ft = $context->context->functionType($strPtr, false, $firstParam, $i64);
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction($abiName, $ft);
+
+            $entry = $fn->appendBasicBlock('json_encode_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($nullStr);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        $context->builder->clearInsertionPosition();
     }
 }
