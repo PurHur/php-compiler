@@ -75,9 +75,9 @@ final class VmPregNative
         string $replacement,
         string|array $subject,
         int $limit = -1,
-        int $flags = 0
+        ?int &$count = null
     ): string|array|null|false {
-        return VmPregPure::pregFilter($pattern, $replacement, $subject, $limit, $flags);
+        return VmPregPure::pregFilter($pattern, $replacement, $subject, $limit, $count);
     }
 
     public static function patternWarningMessage(string $pattern): ?string

@@ -46,7 +46,6 @@ final class preg_filter extends Internal
             'subject'
         );
         $limit = -1;
-        $flags = 0;
         if ($argc >= 4) {
             $limitVar = $frame->calledArgs[3]->resolveIndirect();
             if (Variable::TYPE_INTEGER !== $limitVar->type) {
@@ -56,18 +55,11 @@ final class preg_filter extends Internal
             }
             $limit = $limitVar->toInt();
         }
-        if (5 === $argc) {
-            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException(
-                    'preg_filter() flags must be an integer in this compiler build'
-                );
-            }
-            $flags = $flagsVar->toInt();
-        }
+        $hasCount = $argc >= 5;
+        $count = 0;
 
         if (Variable::TYPE_STRING === $subjectVar->type) {
-            $result = VmPreg::pregFilter($pattern, $replacement, $subjectVar->toString(), $limit, $flags);
+            $result = VmPreg::pregFilter($pattern, $replacement, $subjectVar->toString(), $limit, $count);
         } elseif (Variable::TYPE_ARRAY === $subjectVar->type) {
             $host = [];
             foreach ($subjectVar->toArray()->iterateKeyed(true) as [$key, $value]) {
@@ -81,7 +73,11 @@ final class preg_filter extends Internal
                     : $key->toString();
                 $host[$hostKey] = $value->toString();
             }
-            $result = VmPreg::pregFilter($pattern, $replacement, $host, $limit, $flags);
+            $result = VmPreg::pregFilter($pattern, $replacement, $host, $limit, $count);
+        }
+
+        if ($hasCount) {
+            $frame->calledArgs[4]->resolveIndirect()->int($count);
         }
 
         if (false === $result) {
@@ -125,9 +121,6 @@ final class preg_filter extends Internal
         $limit = $argc >= 4
             ? self::lowerLimit($context, $args[3])
             : $context->getTypeFromString('int64')->constInt(-1, false);
-        if (5 === $argc) {
-            self::lowerFlags($context, $args[4]);
-        }
 
         JitPregSubject::requireStringOrArray($context, $args[2], 'preg_filter', 2, 'subject');
 
@@ -148,17 +141,6 @@ final class preg_filter extends Internal
         }
 
         return JitLongArg::lower($context, $arg, 'preg_filter() argument #4 ($limit)');
-    }
-
-    /** @see VmPregNative::pregFilter() — flags accepted for arity parity; not applied yet */
-    private static function lowerFlags(Context $context, JITVariable $arg): Value
-    {
-        $lit = self::compileTimeLimit($arg);
-        if (null !== $lit) {
-            return $context->constantFromInteger($lit, 'int64');
-        }
-
-        return JitLongArg::lower($context, $arg, 'preg_filter() argument #5 ($flags)');
     }
 
     private static function compileTimeLimit(JITVariable $arg): ?int

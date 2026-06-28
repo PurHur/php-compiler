@@ -235,13 +235,13 @@ final class VmPreg
         string $replacement,
         string|array $subject,
         int $limit = -1,
-        int $flags = 0
+        ?int &$count = null
     ) {
         if (strlen($pattern) > self::MAX_PATTERN_BYTES) {
             return false;
         }
 
-        $result = VmPregNative::pregFilter($pattern, $replacement, $subject, $limit, $flags);
+        $result = VmPregNative::pregFilter($pattern, $replacement, $subject, $limit, $count);
         self::syncLastErrorFromNative();
         if (false === $result) {
             return false;

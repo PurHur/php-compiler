@@ -296,9 +296,9 @@ final class VmPregPure
         string $replacement,
         string|array $subject,
         int $limit = -1,
-        int $flags = 0
+        ?int &$count = null
     ): string|array|null|false {
-        unset($flags);
+        $totalCount = 0;
         if (\is_array($subject)) {
             $out = [];
             foreach ($subject as $key => $item) {
@@ -308,22 +308,33 @@ final class VmPregPure
                     );
                 }
                 if (1 === self::pregMatch($pattern, $item)) {
-                    $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit);
+                    $itemCount = 0;
+                    $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $itemCount);
                     if (false === $replaced) {
                         return false;
                     }
+                    $totalCount += $itemCount;
                     $out[$key] = $replaced;
                 }
+            }
+            if (null !== $count) {
+                $count = $totalCount;
             }
 
             return [] === $out ? null : $out;
         }
 
         if (1 !== self::pregMatch($pattern, $subject)) {
+            if (null !== $count) {
+                $count = 0;
+            }
+
             return null;
         }
 
-        return self::pregReplaceString($pattern, $replacement, $subject, $limit);
+        $result = self::pregReplaceString($pattern, $replacement, $subject, $limit, $count);
+
+        return $result;
     }
 
     public static function patternWarningMessage(string $pattern): ?string
