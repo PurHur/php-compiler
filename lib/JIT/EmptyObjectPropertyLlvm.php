@@ -48,11 +48,21 @@ final class EmptyObjectPropertyLlvm
             $class = $containerOp->type->userType ?? '';
             $object = $context->type->object;
             assert($object instanceof Object_);
+            $objPtr = Variable::KIND_VALUE === $container->kind
+                ? $container->value
+                : $context->builder->load($container->value);
+            $hookValue = PropertyHookDispatch::tryEmitPropertyGet(
+                $context,
+                $objPtr,
+                $class,
+                $propName,
+                $context->jitCurrentBlock
+            );
+            if (null !== $hookValue) {
+                return self::compileEmptyFromFetchedValue($context, $hookValue);
+            }
             $resolved = $object->resolvePropertySlot($class, $propName);
             if (null !== $resolved && $object->propertySlotIsTypedValue($resolved[0], $resolved[1])) {
-                $objPtr = Variable::KIND_VALUE === $container->kind
-                    ? $container->value
-                    : $context->builder->load($container->value);
                 $fetched = $object->propertyFetch($objPtr, $class, $propName);
 
                 return self::compileEmptyFromFetchedValue($context, $fetched);

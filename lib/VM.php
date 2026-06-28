@@ -1379,7 +1379,7 @@ class VM {
     }
 
     /**
-     * empty($obj->hooked) — uninitialized backing is empty without get hook; initialized invokes get (#11262).
+     * empty($obj->hooked) — set-only probes backing; get hook always runs when present (#11262, #13055).
      */
     private function emptyHookedProperty(ObjectEntry $object, string $propName, Frame $frame, Variable $dst): bool
     {
@@ -1398,25 +1398,6 @@ class VM {
                 return true;
             }
             $dst->bool(!ext\standard\boolval::isTruthy($backing));
-
-            return true;
-        }
-        if ($this->hookedPropertyIssetProbesUninitializedBackingOnly($object, $propName)) {
-            $dst->bool(true);
-
-            return true;
-        }
-        if ($this->hookedPropertyHasRealSameNameBacking($object, $propName)) {
-            $backing = $this->hookedPropertyBackingValue($object, $propName);
-            if (false === $backing) {
-                return false;
-            }
-            $dst->bool(!ext\standard\boolval::isTruthy($backing));
-
-            return true;
-        }
-        if ($this->hookedPropertyDistinctBackingUnsetForIssetEmpty($object, $propName)) {
-            $dst->bool(true);
 
             return true;
         }
