@@ -62,6 +62,7 @@ final class IniJitHelper
 
     private const READONLY_STRING_DEFAULTS = [
         'session.save_handler' => 'files',
+        'user_ini.filename' => '.user.ini',
     ];
 
     private const CFG_MAX_EXECUTION_TIME = '0';
@@ -75,6 +76,12 @@ final class IniJitHelper
         'error_log',
         'doc_root',
         'user_dir',
+        'disable_functions',
+        'disable_classes',
+        'open_basedir',
+        'mail.add_x_header',
+        'error_append_string',
+        'error_prepend_string',
     ];
 
     private const CFG_DISPLAY_ERRORS = '';
