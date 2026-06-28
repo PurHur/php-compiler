@@ -27,11 +27,13 @@ final class PosixStrerrorRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixStrerrorRuntime.php');
         $this->assertStringContainsString('PosixStrerrorJitHelper', $runtime);
-        $this->assertStringContainsString('strerrorStandalone', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('strerrorStandalone', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $jitPosix = (string) file_get_contents(__DIR__.'/../../ext/posix/JitPosix.php');
         $this->assertStringContainsString('PosixStrerrorRuntime::strerror', $jitPosix);
+        $this->assertStringNotContainsString('strerrorStandalone', $jitPosix);
+        $this->assertStringNotContainsString("lookupFunction('strerror')", $jitPosix);
     }
 
     public function testPosixStrerrorPureMatchesZendOnLinux(): void

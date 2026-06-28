@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\BasicBlockHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -17,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for posix_strerror() via PosixStrerrorJitHelper PHP (#12477).
  *
- * Standalone AOT keeps libc strerror LLVM in {@see \PHPCompiler\ext\posix\JitPosix::strerror()}.
+ * Embed and standalone AOT compile the same PHP bridge; no libc strerror LLVM (#13039).
  * SSOT: {@see \PHPCompiler\ext\posix\VmPosixStrerrorPure}
  */
 final class PosixStrerrorRuntime
@@ -35,10 +34,6 @@ final class PosixStrerrorRuntime
 
     public static function strerror(Context $context, JITVariable $errnoArg): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return \PHPCompiler\ext\posix\JitPosix::strerrorStandalone($context, $errnoArg);
-        }
-
         self::ensureLinked($context);
         $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror() errno');
         $i32 = $context->getTypeFromString('int32');
@@ -90,10 +85,6 @@ final class PosixStrerrorRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_MESSAGE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

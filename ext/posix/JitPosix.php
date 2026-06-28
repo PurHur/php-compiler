@@ -72,62 +72,6 @@ final class JitPosix
         return PosixStrerrorRuntime::strerror($context, $errnoArg);
     }
 
-    /** Standalone AOT libc strerror LLVM quarantine (#12477). */
-    public static function strerrorStandalone(Context $context, JITVariable $errnoArg): Value
-    {
-        self::ensureLibcStrerror($context);
-        $errno = JitLongArg::lower($context, $errnoArg, 'posix_strerror() errno');
-        $i32 = $context->getTypeFromString('int32');
-        $zeroI32 = $i32->constInt(0, false);
-        $errnoI32 = $errno->typeOf() === $i32
-            ? $errno
-            : $context->builder->trunc($errno, $i32);
-
-        $id = (string) (++self::$blockSerial);
-        $negBlock = BasicBlockHelper::append($context, 'posix_strerror_neg_'.$id);
-        $okBlock = BasicBlockHelper::append($context, 'posix_strerror_ok_'.$id);
-        $doneBlock = BasicBlockHelper::append($context, 'posix_strerror_done_'.$id);
-
-        $isNeg = $context->builder->icmp(Builder::INT_SLT, $errnoI32, $zeroI32);
-        $context->builder->branchIf($isNeg, $negBlock, $okBlock);
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $i1 = $context->getTypeFromString('int1');
-
-        $context->builder->positionAtEnd($negBlock);
-        JitValueBox::writeBool($context, $slot, $i1->constInt(0, false));
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($okBlock);
-        $i8p = $context->getTypeFromString('int8*');
-        $msgPtr = $context->builder->call(
-            $context->lookupFunction('strerror'),
-            $errnoI32
-        );
-        $i64 = $context->getTypeFromString('int64');
-        $len = $context->builder->call(
-            $context->lookupFunction('strlen'),
-            $msgPtr
-        );
-        $lenI64 = $context->builder->zExt($len, $i64);
-        $resultStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $msgPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $resultStr
-        );
-        $context->builder->branch($doneBlock);
-
-        $context->builder->positionAtEnd($doneBlock);
-
-        return $ptr;
-    }
-
     public static function getLastError(Context $context): Value
     {
         $i64 = $context->getTypeFromString('int64');
@@ -447,19 +391,6 @@ final class JitPosix
             $ft = $context->context->functionType($i32, false);
             $fn = $context->module->addFunction('getegid', $ft);
             $context->registerFunction('getegid', $fn);
-        }
-    }
-
-    private static function ensureLibcStrerror(Context $context): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $i8p = $context->getTypeFromString('int8*');
-        try {
-            $context->lookupFunction('strerror');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i8p, false, $i32);
-            $fn = $context->module->addFunction('strerror', $ft);
-            $context->registerFunction('strerror', $fn);
         }
     }
 
