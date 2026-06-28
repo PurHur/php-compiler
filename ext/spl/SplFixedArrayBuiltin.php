@@ -77,6 +77,9 @@ final class SplFixedArrayBuiltin
         $entry->methods['setsize'] = new SplFixedArraySetSize();
         $entry->methodVisibility['setsize'] = $pub;
         $entry->methodNames['setsize'] = 'setSize';
+        $entry->methods['jsonserialize'] = new SplFixedArrayJsonSerialize();
+        $entry->methodVisibility['jsonserialize'] = $pub;
+        $entry->methodNames['jsonserialize'] = 'jsonSerialize';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -84,7 +87,7 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize'], $entry->methods['jsonserialize']);
     }
 
     public static function init(ObjectEntry $object, int $size): void
@@ -592,5 +595,25 @@ final class SplFixedArraySetSize extends VmClassMethod
             'size'
         );
         SplFixedArrayBuiltin::setSize($object, $size);
+    }
+}
+
+final class SplFixedArrayJsonSerialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('jsonSerialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::jsonSerialize()'
+        );
+        $result = new Variable(Variable::TYPE_ARRAY);
+        $result->array(SplFixedArrayBuiltin::toArray($object));
+        SplIteratorSupport::copyReturnFrom($frame, $result);
     }
 }
