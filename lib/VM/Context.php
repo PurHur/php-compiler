@@ -544,6 +544,11 @@ class Context {
         }
 
         $entry = $this->classes[$originalLc];
+        if ($entry->isInternal) {
+            throw new \ValueError(
+                'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
+            );
+        }
         $this->classes[$aliasLc] = $entry;
         $this->classAliases[$aliasLc] = $originalLc;
         if ($entry->isEnum) {
