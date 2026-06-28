@@ -507,6 +507,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ RequestParseBodyException (ext/standard/http.c, #13124).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function advertisesRequestParseBodyExceptionClass(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * Whether a builtin removed in $removedIn should appear in function_exists() for the active profile.
      *
      * php-src drops symbols at major boundaries (e.g. convert_cyr_string/strxfrm in 8.0 — #11907).
