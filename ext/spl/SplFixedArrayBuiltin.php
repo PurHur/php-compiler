@@ -68,6 +68,9 @@ final class SplFixedArrayBuiltin
         $entry->methods['toarray'] = new SplFixedArrayToArray();
         $entry->methodVisibility['toarray'] = $pub;
         $entry->methodNames['toarray'] = 'toArray';
+        $entry->methods['getiterator'] = new SplFixedArrayGetIterator();
+        $entry->methodVisibility['getiterator'] = $pub;
+        $entry->methodNames['getiterator'] = 'getIterator';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -75,7 +78,7 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator']);
     }
 
     public static function init(ObjectEntry $object, int $size): void
@@ -207,6 +210,21 @@ final class SplFixedArrayBuiltin
         }
 
         return $object;
+    }
+
+    public static function createIterator(Context $ctx, ObjectEntry $object): Variable
+    {
+        $class = $ctx->classes[ArrayIteratorBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ArrayIterator is not registered in this compiler build');
+        }
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        ArrayIteratorBuiltin::init($entry, self::toArray($object));
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
     }
 
     /** @throws \InvalidArgumentException */
@@ -473,5 +491,27 @@ final class SplFixedArrayToArray extends VmClassMethod
         $result = new Variable(Variable::TYPE_ARRAY);
         $result->array(SplFixedArrayBuiltin::toArray($object));
         SplIteratorSupport::copyReturnFrom($frame, $result);
+    }
+}
+
+final class SplFixedArrayGetIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::getIterator()'
+        );
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('SplFixedArray::getIterator() requires VM context');
+        }
+        SplIteratorSupport::copyReturnFrom($frame, SplFixedArrayBuiltin::createIterator($ctx, $object));
     }
 }
