@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\types;
 
-use PHPCompiler\ext\standard\TriggerErrorJitHelper;
-use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
+use PHPCompiler\ext\standard\JitBuiltinWarning;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringTriggerErrorJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -233,9 +233,13 @@ final class JitStrlen
 
     private static function emitNullStringDeprecation(Context $context): void
     {
-        TriggerErrorJitHelper::recordAndMaybePrint(
-            ErrorReporter::E_DEPRECATED,
-            VmNullStringParamDeprecation::message('strlen', 0, 'string')
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+        StringTriggerErrorJit::implement($context);
+        JitBuiltinWarning::emitDeprecated(
+            $context,
+            'strlen(): Passing null to parameter #1 ($string) of type string is deprecated'
         );
     }
 }

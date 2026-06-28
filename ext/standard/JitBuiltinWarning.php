@@ -13,6 +13,16 @@ final class JitBuiltinWarning
 {
     public static function emit(Context $context, string $message): void
     {
+        self::emitLevel($context, $message, ErrorReporter::E_WARNING);
+    }
+
+    public static function emitDeprecated(Context $context, string $message): void
+    {
+        self::emitLevel($context, $message, ErrorReporter::E_DEPRECATED);
+    }
+
+    private static function emitLevel(Context $context, string $message, int $level): void
+    {
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $i32 = $context->getTypeFromString('int32');
@@ -23,7 +33,7 @@ final class JitBuiltinWarning
             $context->lookupFunction('__compiler_trigger_error'),
             $msgPtr,
             $msgLen,
-            $i32->constInt(ErrorReporter::E_WARNING, false),
+            $i32->constInt($level, false),
             $emptyFile,
             $i32->constInt(0, false)
         );
