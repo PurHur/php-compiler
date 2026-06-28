@@ -69,7 +69,7 @@ final class header_ extends Internal
         }
         ResponseContext::addHeader($line, $replace);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->null();
         }
     }
 

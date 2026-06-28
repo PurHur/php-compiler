@@ -43,7 +43,7 @@ final class header_remove extends Internal
         if (0 === $argc) {
             ResponseContext::removeHeader(null);
             if (null !== $frame->returnVar) {
-                $frame->returnVar->bool(true);
+                $frame->returnVar->null();
             }
 
             return;
@@ -56,7 +56,7 @@ final class header_remove extends Internal
         );
         ResponseContext::removeHeader($name);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
+            $frame->returnVar->null();
         }
     }
 
