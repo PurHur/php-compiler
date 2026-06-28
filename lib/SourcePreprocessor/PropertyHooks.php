@@ -87,6 +87,16 @@ final class PropertyHooks
         return (new self())->locateReferenceProfileHookSyntaxError($code);
     }
 
+    /**
+     * Default initializer + hook block is invalid on every profile (#12995, Zend/zend_compile.c).
+     *
+     * @return array{line: int, message: string}|null
+     */
+    public static function defaultInitializerWithHookBlockSyntaxError(string $code): ?array
+    {
+        return (new self())->locateDefaultInitializerWithHookBlockSyntaxError($code);
+    }
+
     private function locateReferenceProfileHookSyntaxError(string $code): ?array
     {
         $offset = 0;
@@ -118,11 +128,46 @@ final class PropertyHooks
         return null;
     }
 
+    private function locateDefaultInitializerWithHookBlockSyntaxError(string $code): ?array
+    {
+        $offset = 0;
+        $len = strlen($code);
+        while ($offset < $len) {
+            $decl = $this->findNextDeclarable($code, $offset);
+            if (null === $decl) {
+                break;
+            }
+            [$declPos, , ] = $decl;
+            $braceOpen = strpos($code, '{', $declPos);
+            if (false === $braceOpen) {
+                break;
+            }
+            $span = $this->matchingBraceSpan($code, $braceOpen);
+            if (null === $span) {
+                $offset = $braceOpen + 1;
+                continue;
+            }
+            [$bodyStart, $bodyEnd] = $span;
+            $body = substr($code, $bodyStart + 1, $bodyEnd - $bodyStart - 1);
+            $error = $this->locateHookSyntaxErrorInBody($code, $bodyStart + 1, $body, true);
+            if (null !== $error) {
+                return $error;
+            }
+            $offset = $bodyEnd + 1;
+        }
+
+        return null;
+    }
+
     /**
      * @return array{line: int, message: string}|null
      */
-    private function locateHookSyntaxErrorInBody(string $fullCode, int $bodyOffsetInFull, string $body): ?array
-    {
+    private function locateHookSyntaxErrorInBody(
+        string $fullCode,
+        int $bodyOffsetInFull,
+        string $body,
+        bool $defaultInitializerOnly = false
+    ): ?array {
         $offset = 0;
         $len = strlen($body);
         while ($offset < $len) {
@@ -135,6 +180,11 @@ final class PropertyHooks
             $between = substr($body, $afterVar, $hookOpen - $afterVar);
             $hasDefault = str_contains($between, '=');
             $absHookOpen = $bodyOffsetInFull + $hookOpen;
+            if ($defaultInitializerOnly && !$hasDefault) {
+                $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
+                $offset = null === $hookSpan ? $hookOpen + 1 : $hookSpan[1] + 1;
+                continue;
+            }
             if ($hasDefault) {
                 $hookSpan = $this->matchingBraceSpan($body, $hookOpen);
                 if (null === $hookSpan) {

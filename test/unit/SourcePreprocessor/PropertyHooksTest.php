@@ -6,6 +6,7 @@ namespace PHPCompiler\Test\Unit\SourcePreprocessor;
 
 use PHPCompiler\Compiler\CompileFatal;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\PropertyHookSyntaxRejector;
 use PHPCompiler\Runtime;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPCompiler\Test\Support\PropertyHookTestSkip;
@@ -591,8 +592,8 @@ PHP;
         self::assertSame('__phpc_property_set_x', $registry['c']['x']['set'] ?? null);
     }
 
-    /** @covers issue #11594 — inline default initializer before property hook block (PHP 8.4) */
-    public function testDefaultInitializerWithPropertyHooksLowers(): void
+    /** @covers issue #12995 — default initializer + hook block rejected on every profile */
+    public function testDefaultInitializerWithPropertyHooksRejected(): void
     {
         $src = <<<'PHP'
 <?php
@@ -607,15 +608,13 @@ trait T {
     }
 }
 PHP;
-        [$out, $registry] = (new PropertyHooks())->process($src);
-        self::assertStringContainsString("public string \$label = 'default';", $out);
-        self::assertStringContainsString("public string \$label = 'from-trait';", $out);
-        self::assertSame('__phpc_property_get_label', $registry['c']['label']['get'] ?? null);
-        self::assertSame('__phpc_property_get_label', $registry['t']['label']['get'] ?? null);
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
+        PropertyHookSyntaxRejector::reject($src, 'default_initializer.php');
     }
 
-    /** @covers issue #11594 — end-to-end via Runtime preprocess */
-    public function testDefaultInitializerWithPropertyHooksSurvivesRuntimePreprocess(): void
+    /** @covers issue #12995 — end-to-end via Runtime preprocess */
+    public function testDefaultInitializerWithPropertyHooksRejectedByRuntime(): void
     {
         $this->skipUnlessPropertyHooksEnabled();
         $src = <<<'PHP'
@@ -629,10 +628,9 @@ $c = new C();
 echo $c->label;
 PHP;
         $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
-        ob_start();
-        $runtime->run($block);
-        self::assertSame('default', ob_get_clean());
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
+        $runtime->parseAndCompile($src, 'property_hook_default_initializer.php');
     }
 
     /** @covers issue #9729 — promoted ctor defaults must not match property-hook `{` scanner */

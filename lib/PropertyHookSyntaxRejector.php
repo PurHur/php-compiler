@@ -17,6 +17,10 @@ final class PropertyHookSyntaxRejector
 {
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        $defaultWithHook = PropertyHooks::defaultInitializerWithHookBlockSyntaxError($code);
+        if (null !== $defaultWithHook) {
+            throw new CompileFatal($filename, $defaultWithHook['line'], $defaultWithHook['message']);
+        }
         if (CompilerVersion::supportsPropertyHooks()) {
             return $code;
         }

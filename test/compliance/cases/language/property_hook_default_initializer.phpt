@@ -1,5 +1,5 @@
 --TEST--
-Language: property hook with default initializer (#11594, Zend/zend_compile.c PHP 8.4)
+Language: property hook with default initializer must compile-error (#12995, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,5 @@ class C {
 }
 $c = new C();
 echo $c->label, "\n";
---EXPECT--
-default
+--EXPECT_EXIT--
+255

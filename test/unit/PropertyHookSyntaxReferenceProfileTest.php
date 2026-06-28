@@ -17,9 +17,6 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
     {
-        if (CompilerVersion::supportsPropertyHooks()) {
-            $this->markTestSkipped('property hooks enabled on PHP 8.4.0+ target');
-        }
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
         PropertyHookSyntaxRejector::reject(
@@ -43,9 +40,6 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRuntimeRejectsDefaultInitializerHook(): void
     {
-        if (CompilerVersion::supportsPropertyHooks()) {
-            $this->markTestSkipped('property hooks enabled on PHP 8.4.0+ target');
-        }
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
