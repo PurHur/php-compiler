@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayCountRecursiveRuntime;
+use PHPCompiler\JIT\Builtin\ArrayCountRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
@@ -114,15 +115,10 @@ final class array_count extends Internal
             return $context->constantFromInteger($args[0]->nextFreeElement, 'int64');
         }
         if (JITVariable::TYPE_HASHTABLE === $args[0]->type) {
-            return ArrayBuiltinHelper::getNumElements(
-                $context,
-                ArrayBuiltinHelper::loadHashTable($context, $args[0])
-            );
+            return ArrayCountRuntime::numElements($context, $args[0]);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type || JitValueBox::isValueOperand($args[0])) {
-            $ht = ArrayBuiltinHelper::loadHashTable($context, $args[0]);
-
-            return ArrayBuiltinHelper::getNumElements($context, $ht);
+            return ArrayCountRuntime::numElements($context, $args[0]);
         }
         $this->emitCountTypeError($context, $args[0]);
 
