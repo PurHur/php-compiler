@@ -14,7 +14,7 @@ final class PregMatchRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchJit.php');
         $this->assertStringContainsString('PregMatchRuntime', $source);
-        $this->assertStringContainsString('StringPregMatchStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm::implement', $source);
         $this->assertStringNotContainsString('pcre2_match_8', $source);
         $this->assertStringNotContainsString('emitMatchEx', $source);
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
@@ -25,6 +25,11 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PregMatchRuntime.php');
         $this->assertStringContainsString('PregJitHelper', $source);
         $this->assertStringNotContainsString('pcre2_compile', $source);
+
+        $standalone = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
+        $this->assertStringContainsString('implementReplaceCallbackOnly', $standalone);
+        $this->assertStringNotContainsString('public static function implement(', $standalone);
+        $this->assertLessThan(1400, substr_count($standalone, "\n") + 1);
     }
 
     public function testPregJitHelperDelegatesToVmPregNative(): void

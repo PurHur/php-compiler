@@ -9,8 +9,7 @@ use PHPCompiler\JIT\Context;
 /**
  * JIT MCJIT body for __compiler_preg_* — embed PHP helper vs standalone LLVM (#5289, #9542).
  *
- * Delegates to {@see StringPregMatchJit} (dispatch) → {@see PregMatchRuntime} or
- * {@see StringPregMatchStandaloneLlvm}.
+ * Delegates to {@see StringPregMatchJit} → {@see PregMatchRuntime} (+ callback LLVM quarantine).
  *
  * Phase A / M2 spine: bundled in compiler_lib_spine_smoke (not ratio-deferred).
  */
