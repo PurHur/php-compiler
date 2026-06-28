@@ -59,6 +59,7 @@ use PHPCompiler\Compiler\NoDiscardMetadata;
 use PHPCompiler\Compiler\FinalClassConstCheck;
 use PHPCompiler\Compiler\TraitClassConstConflictCheck;
 use PHPCompiler\Compiler\FinalClassExtensionCheck;
+use PHPCompiler\Compiler\ImplementsHierarchyCompileCheck;
 use PHPCompiler\Compiler\FinalMethodOverrideCheck;
 use PHPCompiler\Compiler\InterfaceImplementationCheck;
 use PHPCompiler\Compiler\ParameterMetadata;
@@ -478,6 +479,7 @@ class Compiler {
         InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
+        ImplementsHierarchyCompileCheck::validate($script);
         FinalMethodOverrideCheck::validate($script);
         OverrideValidator::validateScript($script);
         FinalClassConstCheck::validate($script);
