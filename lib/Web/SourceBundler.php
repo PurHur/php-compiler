@@ -79,6 +79,44 @@ final class SourceBundler
         return str_contains($line, self::BUNDLE_FILE_MARKER_PREFIX);
     }
 
+    /**
+     * Reverse-map a 1-based line in a bundled compilation unit to original file + line (#13201).
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    public static function mapBundledLine(string $bundledSource, int $bundleLine): ?array
+    {
+        if ($bundleLine <= 0) {
+            return null;
+        }
+        $lines = preg_split('/\r\n|\n|\r/', $bundledSource) ?: [];
+        $idx = $bundleLine - 1;
+        if ($idx < 0 || $idx >= \count($lines)) {
+            return null;
+        }
+        $currentFile = '';
+        $markerLine1 = 0;
+        for ($i = 0; $i <= $idx; ++$i) {
+            $line = $lines[$i];
+            if (!self::isBundleFileMarker($line)) {
+                continue;
+            }
+            if (preg_match(
+                '/'.preg_quote(self::BUNDLE_FILE_MARKER_PREFIX, '/').'\s+(.+?)\s*\*\//',
+                $line,
+                $m
+            )) {
+                $currentFile = trim($m[1]);
+                $markerLine1 = $i + 1;
+            }
+        }
+        if ('' === $currentFile || $markerLine1 <= 0) {
+            return null;
+        }
+
+        return [$currentFile, max(1, $bundleLine - $markerLine1)];
+    }
+
     private static function bundleFileMarker(string $absolutePath): string
     {
         // Keep this marker grep-friendly and stable: it is used to map parser errors back to the

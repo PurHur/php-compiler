@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\OpCode;
+use PHPCompiler\VM\FatalSite;
 use PHPCompiler\VM\OutputBuffer;
 use PHPCfg\Func;
 use PHPCompiler\VM\SensitiveParamSupport;
@@ -373,36 +374,8 @@ final class VmDebugBacktrace
         if ($frame->callSiteLine > 0) {
             return $frame->callSiteLine;
         }
-        if (null === $frame->block) {
-            return 0;
-        }
-        $block = $frame->block;
-        $pos = $frame->pos;
-        if ($pos >= $block->nOpCodes) {
-            $pos = max(0, $block->nOpCodes - 1);
-        }
-        for ($i = $pos; $i >= 0; --$i) {
-            $op = $block->opCodes[$i] ?? null;
-            if (null === $op) {
-                continue;
-            }
-            if (
-                OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
-                || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type
-            ) {
-                $line = OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
-                    ? (int) ($op->arg2 ?? 0)
-                    : (int) ($op->arg1 ?? 0);
-                if ($line > 0) {
-                    return $line;
-                }
-            }
-            if (null !== $op->sourceLocation && $op->sourceLocation->startLine > 0) {
-                return $op->sourceLocation->startLine;
-            }
-        }
 
-        return 0;
+        return FatalSite::lineFromOpcodes($frame);
     }
 
     private static function formatFlatFrame(int $index, Frame $frame, bool $includeArgs): ?string

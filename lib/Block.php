@@ -196,6 +196,9 @@ class Block {
     /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
     private string $scriptPathOverride = '';
 
+    /** Preprocessed source for bundle line reverse-mapping (#13201). */
+    private ?string $compileSource = null;
+
     /** Operand / cfg-Var roots assigned in this block (not inherited reads, #2059). */
     private \SplObjectStorage $localWrittenVars;
 
@@ -232,6 +235,16 @@ class Block {
     public function setScriptPath(string $path): void
     {
         $this->scriptPathOverride = ScriptStack::normalize($path);
+    }
+
+    public function setCompileSource(?string $source): void
+    {
+        $this->compileSource = $source;
+    }
+
+    public function compileSource(): ?string
+    {
+        return $this->compileSource;
     }
 
     /** Absolute path of the PHP source unit for this block (issue #707). */

@@ -735,6 +735,7 @@ class Runtime {
             $block = $this->compileEmitSmoke($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
             }
 
             return $block;
@@ -831,6 +832,7 @@ class Runtime {
             $block = $this->compile($script);
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
             }
 
             return $block;
@@ -871,6 +873,7 @@ class Runtime {
             \PHPCompiler\JIT\Progress::noteFunction('runtime_parseandcompilefile_compile_done');
             if (null !== $block) {
                 $block->setScriptPath($filename);
+                $block->setCompileSource($code);
             }
 
             return $block;

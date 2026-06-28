@@ -5066,7 +5066,16 @@ restart:
                     }
                     $lcname = $this->context->resolveFunctionCallLc($name);
                     if (null === $lcname) {
-                        throw new \LogicException('Call to undefined function '.strtolower($name).'()');
+                        $catchFrame = $this->dispatchVmError(
+                            'Call to undefined function '.strtolower($name).'()',
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     $frame->call = $this->context->functions[$lcname];
                     $frame->callArgs = [];
