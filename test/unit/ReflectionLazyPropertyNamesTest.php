@@ -4,12 +4,20 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** ReflectionClass::getLazyPropertyNames() — #6606. */
 final class ReflectionLazyPropertyNamesTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsLazyObjectFactories()) {
+            $this->markTestSkipped('Lazy object factories require stable PHP 8.4+ profile (#12375)');
+        }
+    }
+
     public function testMethodExistsAndLazyGhostTraitListsInstanceProperties(): void
     {
         $code = <<<'PHP'

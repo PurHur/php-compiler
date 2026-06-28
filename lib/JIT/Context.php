@@ -11,6 +11,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCfg\Operand;
 use PHPCompiler\AOT\Linker;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPCompiler\Block;
 use PHPCompiler\Module;
@@ -838,10 +839,12 @@ class Context {
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
-        $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
-        $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
-        $this->functionProxies['reflectionclass::createlazyghost'] = new Call\ReflectionClassCreateLazyGhost();
-        $this->functionProxies['reflectionclass::createlazyproxy'] = new Call\ReflectionClassCreateLazyProxy();
+        if (CompilerVersion::supportsLazyObjectFactories()) {
+            $this->functionProxies['reflectionclass::newlazyproxy'] = new Call\ReflectionClassNewLazyProxy();
+            $this->functionProxies['reflectionclass::newlazyghost'] = new Call\ReflectionClassNewLazyGhost();
+            $this->functionProxies['reflectionclass::createlazyghost'] = new Call\ReflectionClassCreateLazyGhost();
+            $this->functionProxies['reflectionclass::createlazyproxy'] = new Call\ReflectionClassCreateLazyProxy();
+        }
         $this->functionProxies['reflectionproperty::__construct'] = new Call\ReflectionPropertyConstruct();
         $this->functionProxies['reflectionproperty::getattributes'] = new Call\ReflectionPropertyGetAttributes();
         $this->functionProxies['reflectionconstant::__construct'] = new Call\ReflectionConstantConstruct();
