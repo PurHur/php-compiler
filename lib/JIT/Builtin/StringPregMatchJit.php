@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * preg_* dispatch — embed PHP helper vs standalone LLVM (#5289, #9542).
+ * preg_* dispatch — embed + standalone AOT via PregMatchRuntime PHP (#5289, #9542, #12982).
  *
  * php-src: ext/pcre/php_pcre.c
  */
@@ -30,12 +30,6 @@ final class StringPregMatchJit
     {
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPregMatchStandaloneLlvm::implement($context);
 
             return;
         }

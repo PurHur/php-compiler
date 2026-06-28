@@ -20,14 +20,18 @@ final class StringPregMatchRuntimeStandaloneTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/AOT/runtime/preg_match.c');
         $jit = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPregMatchJit.php');
         $this->assertStringContainsString('__compiler_preg_match', $jit);
-        $this->assertStringContainsString('StringPregMatchStandaloneLlvm', $jit);
+        $this->assertStringContainsString('PregMatchRuntime', $jit);
+        $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm::implement', $jit);
         $linker = (string) file_get_contents(__DIR__.'/../../../lib/AOT/Linker.php');
         $this->assertStringNotContainsString('preg_match.c', $linker);
         $bridge = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php');
         $this->assertStringContainsString('StringPregMatchJit', $bridge);
         $this->assertStringNotContainsString('preg_match.c', $bridge);
         $standalone = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
-        $this->assertStringContainsString('pcre2_match_8', $standalone);
+        $this->assertStringContainsString('implementReplaceCallbackOnly', $standalone);
+        $this->assertStringNotContainsString('public static function implement(', $standalone);
+        $loc = substr_count($standalone, "\n") + 1;
+        $this->assertLessThan(1400, $loc, 'StringPregMatchStandaloneLlvm quarantine LOC (#12982)');
     }
 
     /**

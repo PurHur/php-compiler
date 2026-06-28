@@ -14,8 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542).
  *
- * Standalone AOT keeps {@see StringPregMatchStandaloneLlvm}. preg_replace_callback
- * still uses a thin LLVM slice from standalone until callback ABI is PHP-hosted.
+ * Standalone AOT preg_* (except preg_replace_callback) uses this PHP bridge (#9542, #12982).
+ * preg_replace_callback still uses a thin LLVM slice from {@see StringPregMatchStandaloneLlvm}.
  * php-src: ext/pcre/php_pcre.c
  */
 final class PregMatchRuntime
