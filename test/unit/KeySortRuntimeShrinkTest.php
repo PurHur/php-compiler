@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** ksort()/krsort() JIT routes through KeySortJitHelper PHP not __hashtable__sortStringKeys LLVM (#12770). */
+/** ksort()/krsort() JIT routes through KeySortJitHelper PHP not __hashtable__sortStringKeys LLVM (#12770, #13050). */
 final class KeySortRuntimeShrinkTest extends TestCase
 {
     public function testKeySortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/KeySortRuntime.php');
         $this->assertStringContainsString('KeySortJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::ksortByKey', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
 
         $ksort = (string) file_get_contents(__DIR__.'/../../ext/standard/ksort_.php');
         $krsort = (string) file_get_contents(__DIR__.'/../../ext/standard/krsort_.php');
