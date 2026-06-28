@@ -7,7 +7,7 @@ namespace PHPCompiler\VM;
 /**
  * Zend reserved internal classes — userland `new` / `implements` guards (#13324, #13327).
  *
- * php-src: Zend/zend_closures.c, Zend/zend_generators.c, ext/spl/php_spl.c
+ * php-src: Zend/zend_closures.c, Zend/zend_generators.c, ext/spl/php_spl.c, ext/curl/interface.c
  */
 final class ReservedBuiltinClass
 {
@@ -15,6 +15,9 @@ final class ReservedBuiltinClass
     private const USER_INSTANTIATION_FORBIDDEN = [
         'closure' => 'Instantiation of class Closure is not allowed',
         'generator' => 'The "Generator" class is reserved for internal use and cannot be manually instantiated',
+        'curlhandle' => 'Cannot directly construct CurlHandle, use curl_init() instead',
+        'curlmultihandle' => 'Cannot directly construct CurlMultiHandle, use curl_multi_init() instead',
+        'curlsharehandle' => 'Cannot directly construct CurlShareHandle, use curl_share_init() instead',
     ];
 
     /** @var array<string, string> lc => display name — compile-time implements guard (#13327) */
