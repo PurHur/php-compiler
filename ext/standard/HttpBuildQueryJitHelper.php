@@ -35,7 +35,7 @@ final class HttpBuildQueryJitHelper
     private static function exportTable(HashTable $ht): array
     {
         $out = [];
-        foreach ($ht->iterateKeyed(true) as [$keyVar, $valVar]) {
+        foreach ($ht->exportKeyValuePairs(true) as [$keyVar, $valVar]) {
             $key = $keyVar->resolveIndirect();
             if (Variable::TYPE_STRING === $key->type) {
                 $out[$key->toString()] = self::exportValue($valVar);

@@ -216,6 +216,38 @@ final class HashTable {
         return new \ArrayIterator($pairs);
     }
 
+    /**
+     * Materialize key/value pairs for JIT/AOT nested helper foreach (#12908).
+     *
+     * Prefer over iterateKeyed() in compiled php-in-PHP helpers — nested JIT lowers array
+     * foreach but not HashTable::iterateKeyed() yet.
+     *
+     * @return list<array{Variable, Variable}>
+     */
+    public function exportKeyValuePairs(bool $resolveIndirect = false): array
+    {
+        $pairs = [];
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if ($bucket->value->isUndefined()) {
+                continue;
+            }
+            $keyVar = new Variable();
+            if (null !== $bucket->key) {
+                $keyVar->string($bucket->key);
+            } else {
+                $keyVar->int($bucket->hash);
+            }
+            $value = $bucket->value;
+            if ($resolveIndirect) {
+                $value = $value->resolveIndirect();
+            }
+            $pairs[] = [$keyVar, $value];
+        }
+
+        return $pairs;
+    }
+
     public function iterReset(): void
     {
         $this->internalPointer = self::INVALID_INDEX;
