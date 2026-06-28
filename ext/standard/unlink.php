@@ -17,8 +17,19 @@ final class unlink extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (1 !== \count($frame->calledArgs)) {
-            throw new \LogicException('unlink() requires exactly one argument in this compiler build');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'unlink() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(
+                'unlink() expects at most 2 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($frame->calledArgs[1])) {
+            VmStreamContext::validateOptionalContextArg($frame->calledArgs[1], 'unlink', 2);
         }
         $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
         $ok = VmFs::unlink($path);
@@ -32,8 +43,19 @@ final class unlink extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (1 !== \count($args)) {
-            throw new \LogicException('unlink() requires exactly one argument in this compiler build');
+        $argc = \count($args);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(
+                'unlink() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(
+                'unlink() expects at most 2 arguments, '.$argc.' given'
+            );
+        }
+        if (isset($args[1])) {
+            JitStreamContextOptionalArg::validate($context, $args[1], 'unlink', 2);
         }
         $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'unlink', 0, 'filename');
 
