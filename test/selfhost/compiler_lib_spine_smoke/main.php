@@ -396,6 +396,7 @@ require_once __DIR__.'/../../../ext/spl/SplFixedArrayBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplFixedArraySerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplIteratorSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplObjectStorageBuiltin.php';
+require_once __DIR__.'/../../../ext/spl/SplQueueSplStackBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplTempFileObjectBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/VmSplIterators.php';
 require_once __DIR__.'/../../../ext/spl/VmSplObserver.php';
