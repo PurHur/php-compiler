@@ -337,7 +337,8 @@ class VMTest extends BaseTest {
             }
             // 8.4-target reject gate; skipped when asymmetric visibility enabled (#12508).
             if (CompilerVersion::supportsAsymmetricVisibility()
-                && str_contains($name, 'private_set_reference_profile')) {
+                && (str_contains($name, 'private_set_reference_profile')
+                    || str_contains($name, 'asymmetric_double_modifier_reference_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsAsymmetricVisibility()
