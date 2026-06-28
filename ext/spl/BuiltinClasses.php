@@ -30,6 +30,7 @@ final class BuiltinClasses
         CallbackFilterIteratorBuiltin::registerClass($ctx);
         ParentIteratorBuiltin::registerClass($ctx);
         AppendIteratorBuiltin::registerClass($ctx);
+        MultipleIteratorBuiltin::registerClass($ctx);
         LimitIteratorBuiltin::registerClass($ctx);
         CachingIteratorBuiltin::registerClass($ctx);
         InfiniteIteratorBuiltin::registerClass($ctx);
