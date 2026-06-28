@@ -31,13 +31,10 @@ final class usort_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('usort() requires exactly two arguments');
         }
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'usort');
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('usort() first argument must be an array in this compiler build');
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'usort');
-        $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);

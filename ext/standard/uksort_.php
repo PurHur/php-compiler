@@ -32,13 +32,10 @@ final class uksort_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('uksort() requires exactly two arguments');
         }
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'uksort');
         $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('uksort() first argument must be an array in this compiler build');
-        }
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'uksort');
-        $ht = $array->toArray();
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
