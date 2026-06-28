@@ -6,8 +6,8 @@ namespace PHPCompiler\Ast;
 
 /**
  * Desugar PHP 8.3+ `clone $obj with { prop: $value, ... }` and PHP 8.4+
- * `clone($obj, ['prop' => $value, ...])` / `clone $obj with ['prop', ...]`
- * before nikic/php-parser (#4513, #9743, #9995).
+ * `clone($obj, ['prop' => $value, ...])` / `clone ($obj, with: [...])` /
+ * `clone $obj with ['prop', ...]` before nikic/php-parser (#4513, #9743, #9995, #12939).
  *
  * Rewrites to an IIFE that clones then assigns properties — matches Zend/zend_compile.c lowering.
  * php-src: Zend/zend_language_parser.y clone_expr / with clause; zend_clones.c.
@@ -64,7 +64,7 @@ final class CloneWithDesugar
     }
 
     /**
-     * PHP 8.4+ `clone($obj, ['prop' => $val])` / `clone($obj, ['prop'])` (#9743).
+     * PHP 8.4+ `clone($obj, ['prop' => $val])` / `clone ($obj, with: [...])` (#9743, #12939).
      *
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      *
@@ -112,6 +112,19 @@ final class CloneWithDesugar
             self::skipForwardIgnorable($tokens, $arrayStart);
             if ($arrayStart >= $c) {
                 continue;
+            }
+
+            if (self::isWithKeyword($tokens, $arrayStart)) {
+                $colonIdx = $arrayStart + 1;
+                self::skipForwardIgnorable($tokens, $colonIdx);
+                if ($colonIdx >= $c || ':' !== $tokens[$colonIdx]) {
+                    continue;
+                }
+                $arrayStart = $colonIdx + 1;
+                self::skipForwardIgnorable($tokens, $arrayStart);
+                if ($arrayStart >= $c) {
+                    continue;
+                }
             }
 
             $arrayEnd = self::scanCloneCallSecondArgEnd($tokens, $arrayStart);
