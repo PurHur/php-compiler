@@ -354,6 +354,12 @@ final class EnvLocalOverlayTableLlvm
 
     private static function dupCstr(Context $context, Value $src): Value
     {
+        return self::dupCstrBytes($context, $src);
+    }
+
+    /** Duplicate a null-terminated C string (php-src env overlay / lookup bridges). */
+    public static function dupCstrBytes(Context $context, Value $src): Value
+    {
         $i8 = $context->getTypeFromString('int8');
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
@@ -370,6 +376,15 @@ final class EnvLocalOverlayTableLlvm
         );
 
         return $dest;
+    }
+
+    /** Duplicate __string__ payload bytes into a malloc'd C string (#12910). */
+    public static function dupCstrFromStringStruct(Context $context, Value $src): Value
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $valueBytes = $context->builder->structGep($src, $strMap['value']);
+
+        return self::dupCstrBytes($context, $valueBytes);
     }
 
     private static function entryPtr(Context $context, Value $index): Value

@@ -1346,9 +1346,15 @@ class Type extends Builtin {
         StringStripTags::ensureLinked($this->context);
         HttpResponseCode::implement($this->context);
         ObOutput::registerExternals($this->context);
-        ObGzhandler::ensureLinked($this->context);
-        ObOutputRuntime::ensureLinked($this->context);
+        if (Builtin::LOAD_TYPE_STANDALONE !== $this->loadType) {
+            ObGzhandler::ensureLinked($this->context);
+            ObOutputRuntime::ensureLinked($this->context);
+        }
         PendingHeadersRuntime::ensureLinked($this->context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            // Remaining runtimes link lazily via Context::defineBuiltins ensureStandaloneBodies (#12910).
+            return;
+        }
         PowIntRuntime::ensureLinked($this->context);
         GethostbynamelRuntime::ensureLinked($this->context);
         GethostbyaddrRuntime::ensureLinked($this->context);
