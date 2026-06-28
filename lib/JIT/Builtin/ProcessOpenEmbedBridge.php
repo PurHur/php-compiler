@@ -11,9 +11,8 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for proc_close/status/terminate via ProcessOpenJitHelper PHP (#9408).
+ * JIT/AOT embed link for proc_open/close/status/terminate via ProcessOpenJitHelper PHP (#9408, #12958).
  *
- * Standalone AOT keeps LLVM in {@see ProcessOpenStandaloneLlvm}.
  * SSOT: {@see \PHPCompiler\ext\standard\ProcessOpenJitHelper}
  * php-src: ext/standard/proc_open.c
  */
@@ -23,6 +22,8 @@ final class ProcessOpenEmbedBridge
 
     private const OPEN_HELPER_PATH = '/ext/standard/ProcessOpenJitHelper.php';
 
+    private const PROC_OPEN = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::procOpenArgv';
+
     private const IS_PROCESS = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::isProcessResourceArgv';
 
     private const PROC_CLOSE = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::procCloseArgv';
@@ -31,15 +32,13 @@ final class ProcessOpenEmbedBridge
 
     private const PROC_TERMINATE = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::procTerminateArgv';
 
-    private const REGISTER_SLOT = 'PHPCompiler\\ext\\standard\\ProcessOpenJitHelper::registerSlotArgv';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
+        self::PROC_OPEN,
         self::IS_PROCESS,
         self::PROC_CLOSE,
         self::PROC_GET_STATUS,
         self::PROC_TERMINATE,
-        self::REGISTER_SLOT,
     ];
 
     /** @var list<string> */
@@ -67,11 +66,11 @@ final class ProcessOpenEmbedBridge
         }
 
         self::ensureJitHelperCompiled($context);
+        self::implementProcOpenBridge($context);
         self::implementI32Bridge($context, '__compiler_is_process_resource', self::IS_PROCESS, 1);
         self::implementI32Bridge($context, '__compiler_proc_close', self::PROC_CLOSE, 1);
         self::implementProcGetStatusBridge($context);
         self::implementProcTerminateBridge($context);
-        ProcessOpenStandaloneLlvm::implementProcOpenOnly($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -81,11 +80,37 @@ final class ProcessOpenEmbedBridge
         }
     }
 
-    public static function registerSlotHelperFunction(Context $context): LlvmFunction
+    private static function implementProcOpenBridge(Context $context): void
     {
-        self::ensureJitHelperCompiled($context);
+        $abiName = '__compiler_proc_open';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-        return self::helperFunction($context, self::REGISTER_SLOT);
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $context->module->addFunction(
+            $abiName,
+            $context->context->functionType($i64, false, $strPtr, $htPtr)
+        );
+
+        $entry = $fn->appendBasicBlock('proc_open_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $raw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::PROC_OPEN),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(
+            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function implementI32Bridge(

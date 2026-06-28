@@ -4,16 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\ProcessOpenJitHelper;
 use PHPCompiler\JIT\Context;
 
 /**
- * Back-compat router for proc_open LLVM (#6904) — embed PHP bridge in {@see ProcessOpenRuntime} (#9408).
+ * Back-compat router for proc_open LLVM (#6904) — ProcessOpenJitHelper PHP bridge (#9408, #12958).
  *
- * @deprecated Prefer {@see ProcessOpenRuntime} and {@see ProcessOpenStandaloneLlvm}.
+ * @deprecated Prefer {@see ProcessOpenRuntime}.
  */
 final class ProcessOpenJit
 {
-    public const PROCESS_HANDLE_BASE = ProcessOpenStandaloneLlvm::PROCESS_HANDLE_BASE;
+    public const PROCESS_HANDLE_BASE = ProcessOpenJitHelper::PROCESS_HANDLE_BASE;
 
     public static function ensureLinked(Context $context): void
     {

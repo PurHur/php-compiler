@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * VM proc_open()/proc_close()/proc_get_status()/proc_terminate() — libc FFI, no host proc_* (#8652, #8889).
  *
- * Mirrors JIT {@see \PHPCompiler\JIT\Builtin\ProcessOpenStandaloneLlvm} and {@see VmProcessExecCaptureNative}.
+ * SSOT for compiled JIT/AOT via {@see ProcessOpenJitHelper}; mirrors {@see VmProcessExecCaptureNative}.
  * php-src: ext/standard/proc_open.c
  */
 final class VmProcessProcOpenNative
