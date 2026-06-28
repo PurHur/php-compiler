@@ -8,19 +8,21 @@ use PHPCompiler\ext\standard\StreamIoJitHelper;
 use PHPCompiler\ext\standard\VmFs;
 use PHPUnit\Framework\TestCase;
 
-/** Stream I/O JIT routes through StreamIoJitHelper PHP not inline LLVM (#10326). */
+/** Stream I/O JIT routes standalone + embed through StreamIoJitHelper PHP (#10326, #12956). */
 final class StreamIoRuntimeShrinkTest extends TestCase
 {
     private const BASELINE_LOC = 1010;
 
-    public function testStreamIoJitDelegatesToRuntimeAndStandalone(): void
+    public function testStreamIoJitDelegatesToRuntimeOnly(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoJit.php');
         $this->assertStringContainsString('StreamIoRuntime::ensureLinked', $source);
-        $this->assertStringContainsString('StreamIoStandaloneLlvm::implement', $source);
+        $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitFwrite', $source);
         $this->assertStringNotContainsString('emitFread', $source);
         $this->assertStringNotContainsString('emitFopen', $source);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
     }
 
     public function testStreamIoJitShrunkAtLeastThirtyPercent(): void
@@ -36,6 +38,7 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StreamIoJitHelper::freadArgv', $source);
         $this->assertStringContainsString('StreamIoJitHelper::fwriteArgv', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringNotContainsString('StreamIoStandaloneLlvm', $source);
     }
 
     public function testStreamIoJitHelperMemoryRoundTrip(): void
@@ -51,14 +54,5 @@ final class StreamIoRuntimeShrinkTest extends TestCase
         $this->assertSame('hello', $data);
 
         VmFs::fclose($handle);
-    }
-
-    public function testStandaloneLlvmQuarantinedSeparately(): void
-    {
-        $loc = substr_count(
-            (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php'),
-            "\n"
-        ) + 1;
-        $this->assertGreaterThan(900, $loc, 'StreamIoStandaloneLlvm retains libc LLVM quarantine (#9247)');
     }
 }

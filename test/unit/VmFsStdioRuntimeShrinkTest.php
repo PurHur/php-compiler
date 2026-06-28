@@ -36,10 +36,12 @@ final class VmFsStdioRuntimeShrinkTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@fopen\\s*\\(/', $source);
     }
 
-    public function testStreamIoJitDefinesStdioHelper(): void
+    public function testStreamIoJitHelperOpensStdioViaVmFs(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamIoStandaloneLlvm.php');
-        $this->assertStringContainsString('__phpc_try_fopen_stdio', $source);
-        $this->assertStringContainsString('php://stdin', $source);
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/StreamIoJitHelper.php');
+        $this->assertStringContainsString('VmFs::fopen', $source);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsStdioPure.php');
+        $this->assertStringContainsString('php://stdin', $pure);
     }
 }
