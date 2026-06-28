@@ -167,11 +167,29 @@ final class StreamMetaJit
         );
         $context->builder->call($setString, $ht, self::literalString($context, 'stream_type'), $streamTypeStr);
 
-        $modeStr = $context->builder->select(
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+        $modeFromRegistry = $context->builder->call(
+            $context->lookupFunction('__phpc_stream_mode'),
+            $handle
+        );
+        $modeMissing = $context->builder->icmp(Builder::INT_EQ, $modeFromRegistry, $nullStr);
+        $fallbackModeBb = $fn->appendBasicBlock('stream_meta_mode_fallback');
+        $modeDoneBb = $fn->appendBasicBlock('stream_meta_mode_done');
+        $context->builder->branchIf($modeMissing, $fallbackModeBb, $modeDoneBb);
+
+        $context->builder->positionAtEnd($fallbackModeBb);
+        $fallbackMode = $context->builder->select(
             $isPhpMemory,
             self::literalString($context, 'w+b'),
             self::literalString($context, 'r+b')
         );
+        $context->builder->branch($modeDoneBb);
+
+        $context->builder->positionAtEnd($modeDoneBb);
+        $modeStr = $context->builder->phi($strPtr);
+        $modeStr->addIncoming($modeFromRegistry, $fillBb);
+        $modeStr->addIncoming($fallbackMode, $fallbackModeBb);
         $context->builder->call($setString, $ht, self::literalString($context, 'mode'), $modeStr);
 
         $pathNull = $context->builder->icmp(Builder::INT_EQ, $pathCstr, $nullPtr);
