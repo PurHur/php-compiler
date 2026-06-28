@@ -11,10 +11,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for stream read ABI via StreamReadJitHelper PHP (#9393).
+ * JIT/AOT link for stream read ABI via StreamReadJitHelper PHP (#9393, #12937).
  *
- * Standalone AOT keeps LLVM in {@see StreamReadStandaloneLlvm}.
- * SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\StreamReadJitHelper}; thin LLVM
+ * bridges forward the ABI. SSOT: {@see \PHPCompiler\ext\standard\StreamReadJitHelper}
  * php-src: ext/standard/flock.c, ext/standard/streams.c
  */
 final class StreamReadRuntime
@@ -78,6 +78,11 @@ final class StreamReadRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_flock');
@@ -93,6 +98,8 @@ final class StreamReadRuntime
         } catch (\Throwable) {
         }
 
+        StreamFilter::ensureLinked($context);
+        ObOutputRuntime::ensureLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementI32Bridge($context, '__compiler_flock', self::FLOCK, 2);
         self::implementI64Bridge($context, '__compiler_fpassthru', self::FPASSTHRU, 1);

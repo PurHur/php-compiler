@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3425 |
-| Phase A inventory files (M2 ratio SSOT) | 3425 |
+| PHP files on vm.php path | 3424 |
+| Phase A inventory files (M2 ratio SSOT) | 3424 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9053 |
+| Source constructs flagged (warnings) | 9052 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2498,7 +2498,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamRead.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamReadJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamReadRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StreamReadStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamResource.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamResourceJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSocketGetNameRuntime.php` | 0 | 3 |
@@ -19583,7 +19582,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamRead.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StreamReadJit.php`
 
@@ -19593,14 +19592,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamReadRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 325)
-- 9 class method(s)
+- new JIT (line 332)
+- 10 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StreamReadStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 19 class method(s)
 
 ### `lib/JIT/Builtin/StreamResource.php`
 

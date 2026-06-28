@@ -8,24 +8,28 @@ use PHPCompiler\ext\standard\StreamReadJitHelper;
 use PHPCompiler\ext\standard\VmPhpMemoryStream;
 use PHPUnit\Framework\TestCase;
 
-/** StreamReadJit embed routes through StreamReadJitHelper PHP not LLVM monolith (#9393). */
+/** StreamReadRuntime embed + standalone route through StreamReadJitHelper PHP (#9393, #12937). */
 final class StreamReadRuntimeShrinkTest extends TestCase
 {
+    public function testStreamReadRuntimeUsesJitHelperNotStandaloneLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadRuntime.php');
+        $this->assertStringContainsString('StreamReadJitHelper', $source);
+        $this->assertStringNotContainsString('StreamReadStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
+        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StreamReadStandaloneLlvm.php');
+    }
+
     public function testStreamReadJitIsThinDispatcher(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadJit.php');
         $this->assertStringContainsString('StreamReadRuntime', $source);
-        $this->assertStringContainsString('StreamReadStandaloneLlvm', $source);
+        $this->assertStringNotContainsString('StreamReadStandaloneLlvm', $source);
         $this->assertStringNotContainsString('emitFlock', $source);
         $this->assertStringNotContainsString('emitFgets', $source);
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
-    }
-
-    public function testStreamReadRuntimeUsesJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StreamReadRuntime.php');
-        $this->assertStringContainsString('StreamReadJitHelper', $source);
-        $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
     }
 
     public function testStreamReadJitHelperDelegatesToVmFs(): void

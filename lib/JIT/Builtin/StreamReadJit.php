@@ -7,9 +7,8 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * Stream read dispatch — embed PHP helper vs standalone LLVM (#9393).
+ * Stream read dispatch — JIT embed and AOT standalone via StreamReadRuntime PHP (#9393, #12937).
  *
- * Replaces inline flock/fgets/fseek/stream_get_contents LLVM in embed JIT.
  * php-src: ext/standard/flock.c, ext/standard/streams.c, ext/standard/file.c
  */
 final class StreamReadJit
@@ -33,12 +32,6 @@ final class StreamReadJit
     {
         if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StreamReadStandaloneLlvm::implement($context);
 
             return;
         }

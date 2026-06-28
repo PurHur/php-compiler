@@ -2552,7 +2552,6 @@
         "lib/JIT/Builtin/StreamRead.php",
         "lib/JIT/Builtin/StreamReadJit.php",
         "lib/JIT/Builtin/StreamReadRuntime.php",
-        "lib/JIT/Builtin/StreamReadStandaloneLlvm.php",
         "lib/JIT/Builtin/StreamResource.php",
         "lib/JIT/Builtin/StreamResourceJit.php",
         "lib/JIT/Builtin/StreamSocketGetNameRuntime.php",
@@ -3655,9 +3654,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3425,
+        "inventory_files": 3424,
         "excluded": 0,
-        "eligible": 3425,
+        "eligible": 3424,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
