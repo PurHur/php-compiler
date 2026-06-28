@@ -196,6 +196,18 @@ final class VmImage
         );
     }
 
+    /**
+     * True when payload bytes were readable but image header parse failed (vs stream open failure).
+     */
+    public static function pathPayloadReadable(string $filename): bool
+    {
+        if (VmDataUri::isDataUri($filename)) {
+            return false !== VmDataUri::decode($filename);
+        }
+
+        return is_file($filename) && is_readable($filename);
+    }
+
     /** @param array<string, string> $imageinfo */
     public static function writeImageInfoVariable(\PHPCompiler\VM\Variable $target, array $imageinfo): void
     {
