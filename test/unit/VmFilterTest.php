@@ -268,6 +268,117 @@ final class VmFilterTest extends TestCase
         $this->assertFalse(VmFilter::isValidUrlSubset('http://'));
     }
 
+    public function testValidateIntMinMaxRange(): void
+    {
+        $value = new Variable();
+        $value->string('5');
+        $options = new Variable();
+        $options->array(self::rangeOptions(10, null));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_INT, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+
+        $value->string('10');
+        $options->array(self::rangeOptions(10, 20));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_INT, $options);
+        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
+        $this->assertSame(10, $out->toInt());
+    }
+
+    public function testValidateFloatMinMaxRange(): void
+    {
+        $value = new Variable();
+        $value->string('1.5');
+        $options = new Variable();
+        $options->array(self::rangeOptions(2.0, null));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_FLOAT, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateEmailUnicodeFlag(): void
+    {
+        $value = new Variable();
+        $value->string('tëst@example.com');
+        $options = new Variable();
+        $options->array(self::flagsOptions(VmFilter::FILTER_FLAG_EMAIL_UNICODE));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_EMAIL, $options);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('tëst@example.com', $out->toString());
+
+        $outAscii = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_EMAIL);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $outAscii->type);
+        $this->assertFalse($outAscii->toBool());
+    }
+
+    public function testValidateUrlPathRequiredFlag(): void
+    {
+        $value = new Variable();
+        $value->string('http://example.com');
+        $options = new Variable();
+        $options->array(self::flagsOptions(VmFilter::FILTER_FLAG_PATH_REQUIRED));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_URL, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+    }
+
+    public function testValidateIpNoPrivRangeFlag(): void
+    {
+        $value = new Variable();
+        $value->string('10.0.0.1');
+        $options = new Variable();
+        $options->array(self::flagsOptions(VmFilter::FILTER_FLAG_NO_PRIV_RANGE));
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_IP, $options);
+        $this->assertSame(Variable::TYPE_BOOLEAN, $out->type);
+        $this->assertFalse($out->toBool());
+
+        $value->string('8.8.8.8');
+        $out = VmFilter::filterVar($value, VmFilter::FILTER_VALIDATE_IP, $options);
+        $this->assertSame(Variable::TYPE_STRING, $out->type);
+        $this->assertSame('8.8.8.8', $out->toString());
+    }
+
+    /** @return \PHPCompiler\VM\HashTable */
+    private static function rangeOptions(int|float|null $min, int|float|null $max): \PHPCompiler\VM\HashTable
+    {
+        $outer = new \PHPCompiler\VM\HashTable();
+        $inner = new \PHPCompiler\VM\HashTable();
+        if (null !== $min) {
+            $minVar = new Variable();
+            if (\is_int($min)) {
+                $minVar->int($min);
+            } else {
+                $minVar->float($min);
+            }
+            $inner->add('min_range', $minVar);
+        }
+        if (null !== $max) {
+            $maxVar = new Variable();
+            if (\is_int($max)) {
+                $maxVar->int($max);
+            } else {
+                $maxVar->float($max);
+            }
+            $inner->add('max_range', $maxVar);
+        }
+        $options = new Variable();
+        $options->array($inner);
+        $outer->add('options', $options);
+
+        return $outer;
+    }
+
+    /** @return \PHPCompiler\VM\HashTable */
+    private static function flagsOptions(int $flags): \PHPCompiler\VM\HashTable
+    {
+        $outer = new \PHPCompiler\VM\HashTable();
+        $flagsVar = new Variable();
+        $flagsVar->int($flags);
+        $outer->add('flags', $flagsVar);
+
+        return $outer;
+    }
+
     /** @return \PHPCompiler\VM\HashTable */
     private static function regexpOptions(string $pattern): \PHPCompiler\VM\HashTable
     {

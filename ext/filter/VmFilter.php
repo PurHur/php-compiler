@@ -105,22 +105,22 @@ final class VmFilter
         $parsed = self::parseFilterArgs($options);
         $nullOnFailure = 0 !== ($parsed['flags'] & self::FILTER_NULL_ON_FAILURE);
         if (self::FILTER_VALIDATE_INT === $filter) {
-            return self::validateInt($value, $nullOnFailure, $parsed['flags']);
+            return self::validateInt($value, $nullOnFailure, $parsed['flags'], $parsed['filterOptions']);
         }
         if (self::FILTER_VALIDATE_BOOLEAN === $filter) {
             return self::validateBoolean($value, $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_FLOAT === $filter) {
-            return self::validateFloat($value, $nullOnFailure);
+            return self::validateFloat($value, $nullOnFailure, $parsed['filterOptions']);
         }
         if (self::FILTER_VALIDATE_REGEXP === $filter) {
             return self::validateRegexp($value, $parsed['filterOptions'], $nullOnFailure);
         }
         if (self::FILTER_VALIDATE_URL === $filter) {
-            return self::validateUrl($value, $nullOnFailure);
+            return self::validateUrl($value, $nullOnFailure, $parsed['flags']);
         }
         if (self::FILTER_VALIDATE_EMAIL === $filter) {
-            return self::validateEmail($value, $nullOnFailure);
+            return self::validateEmail($value, $nullOnFailure, $parsed['flags']);
         }
         if (self::FILTER_VALIDATE_IP === $filter) {
             return self::validateIp($value, $nullOnFailure, $parsed['flags']);
@@ -228,6 +228,62 @@ final class VmFilter
         return ['flags' => $flags, 'filterOptions' => $filterOptions];
     }
 
+    /**
+     * @return array{min: int|float|null, max: int|float|null}
+     */
+    private static function parseRangeOptions(?\PHPCompiler\VM\HashTable $filterOptions, bool $asFloat): array
+    {
+        $min = null;
+        $max = null;
+        if (null === $filterOptions) {
+            return ['min' => null, 'max' => null];
+        }
+        $minVar = $filterOptions->find('min_range');
+        if (null !== $minVar && !$minVar->isUndefined() && Variable::TYPE_NULL !== $minVar->type) {
+            $resolved = $minVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $resolved->type) {
+                $min = $asFloat ? (float) $resolved->toInt() : $resolved->toInt();
+            } elseif (Variable::TYPE_FLOAT === $resolved->type) {
+                $min = $resolved->toFloat();
+            }
+        }
+        $maxVar = $filterOptions->find('max_range');
+        if (null !== $maxVar && !$maxVar->isUndefined() && Variable::TYPE_NULL !== $maxVar->type) {
+            $resolved = $maxVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $resolved->type) {
+                $max = $asFloat ? (float) $resolved->toInt() : $resolved->toInt();
+            } elseif (Variable::TYPE_FLOAT === $resolved->type) {
+                $max = $resolved->toFloat();
+            }
+        }
+
+        return ['min' => $min, 'max' => $max];
+    }
+
+    private static function intInRange(int $value, int|float|null $min, int|float|null $max): bool
+    {
+        if (null !== $min && $value < $min) {
+            return false;
+        }
+        if (null !== $max && $value > $max) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function floatInRange(float $value, ?float $min, ?float $max): bool
+    {
+        if (null !== $min && $value < $min) {
+            return false;
+        }
+        if (null !== $max && $value > $max) {
+            return false;
+        }
+
+        return true;
+    }
+
     private static function validateRegexp(
         Variable $value,
         ?\PHPCompiler\VM\HashTable $filterOptions,
@@ -331,20 +387,31 @@ final class VmFilter
         return $out;
     }
 
-    private static function validateFloat(Variable $value, bool $nullOnFailure = false): Variable
-    {
+    private static function validateFloat(
+        Variable $value,
+        bool $nullOnFailure = false,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        $range = self::parseRangeOptions($filterOptions, true);
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_INTEGER === $value->type) {
+            $f = (float) $value->toInt();
+            if (!self::floatInRange($f, $range['min'], $range['max'])) {
+                return self::failureResult($nullOnFailure);
+            }
             $out = new Variable();
-            $out->float((float) $value->toInt());
+            $out->float($f);
 
             return $out;
         }
         if (Variable::TYPE_FLOAT === $value->type) {
             $f = $value->toFloat();
             if (!is_finite($f)) {
+                return self::failureResult($nullOnFailure);
+            }
+            if (!self::floatInRange($f, $range['min'], $range['max'])) {
                 return self::failureResult($nullOnFailure);
             }
             $out = new Variable();
@@ -356,7 +423,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $parsed = self::parseFloatString($value->toString());
-        if (null === $parsed) {
+        if (null === $parsed || !self::floatInRange($parsed, $range['min'], $range['max'])) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -430,14 +497,23 @@ final class VmFilter
         return is_finite($f) ? $f : null;
     }
 
-    private static function validateInt(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
-    {
+    private static function validateInt(
+        Variable $value,
+        bool $nullOnFailure = false,
+        int $flags = 0,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        $range = self::parseRangeOptions($filterOptions, false);
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
         }
         if (Variable::TYPE_INTEGER === $value->type) {
+            $intVal = $value->toInt();
+            if (!self::intInRange($intVal, $range['min'], $range['max'])) {
+                return self::failureResult($nullOnFailure);
+            }
             $out = new Variable();
-            $out->int($value->toInt());
+            $out->int($intVal);
 
             return $out;
         }
@@ -449,7 +525,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $parsed = self::parseIntFilterString($s, $flags);
-        if (null === $parsed) {
+        if (null === $parsed || !self::intInRange($parsed, $range['min'], $range['max'])) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -478,7 +554,7 @@ final class VmFilter
         return (int) $s;
     }
 
-    private static function validateEmail(Variable $value, bool $nullOnFailure = false): Variable
+    private static function validateEmail(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
@@ -487,7 +563,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if (!self::isValidEmailSubset($s)) {
+        if (!self::isValidEmailSubset($s, $flags)) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -543,11 +619,146 @@ final class VmFilter
         if ($ipv6Only && !$ipv4Only) {
             return $isV6;
         }
+        if (!$isV4 && !$isV6) {
+            return false;
+        }
 
-        return $isV4 || $isV6;
+        $noPriv = 0 !== ($flags & self::FILTER_FLAG_NO_PRIV_RANGE);
+        $noRes = 0 !== ($flags & self::FILTER_FLAG_NO_RES_RANGE);
+        $globalOnly = 0 !== ($flags & self::FILTER_FLAG_GLOBAL_RANGE);
+        if ($noPriv || $noRes || $globalOnly) {
+            $status = self::ipSpecialStatus($packed);
+            if (null !== $status) {
+                if ($noPriv && $status['private']) {
+                    return false;
+                }
+                if ($noRes && $status['reserved']) {
+                    return false;
+                }
+                if ($globalOnly && !$status['global']) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
-    private static function validateUrl(Variable $value, bool $nullOnFailure = false): Variable
+    /**
+     * RFC 6890 special-purpose status (php-src ext/filter/logical_filters.c).
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null null when no special block
+     */
+    private static function ipSpecialStatus(string $packed): ?array
+    {
+        if (4 === \strlen($packed)) {
+            return self::ipv4SpecialStatus(array_values(unpack('C4', $packed)));
+        }
+        if (16 === \strlen($packed)) {
+            return self::ipv6SpecialStatus(array_values(unpack('n8', $packed)));
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<int, int> $ip
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null
+     */
+    private static function ipv4SpecialStatus(array $ip): ?array
+    {
+        $global = false;
+        $reserved = false;
+        $private = false;
+
+        if (0 === $ip[0]) {
+            $reserved = true;
+        } elseif (10 === $ip[0]) {
+            $private = true;
+        } elseif (100 === $ip[0] && $ip[1] >= 64 && $ip[1] <= 127) {
+            // RFC 6598 — Shared Address Space
+        } elseif (127 === $ip[0]) {
+            $reserved = true;
+        } elseif (169 === $ip[0] && 254 === $ip[1]) {
+            $reserved = true;
+        } elseif (172 === $ip[0] && $ip[1] >= 16 && $ip[1] <= 31) {
+            $private = true;
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 0 === $ip[2]) {
+            // RFC 6890 — IETF Protocol Assignments
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && $ip[3] >= 0 && $ip[3] <= 7) {
+            // RFC 6333 — DS-Lite
+        } elseif (192 === $ip[0] && 0 === $ip[1] && 2 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif (192 === $ip[0] && 88 === $ip[1] && 99 === $ip[2]) {
+            $global = true;
+        } elseif (192 === $ip[0] && 168 === $ip[1]) {
+            $private = true;
+        } elseif (198 === $ip[0] && $ip[1] >= 18 && $ip[1] <= 19) {
+            // RFC 2544 — Benchmarking
+        } elseif (198 === $ip[0] && 51 === $ip[1] && 100 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif (203 === $ip[0] && 0 === $ip[1] && 113 === $ip[2]) {
+            // RFC 5737 — Documentation
+        } elseif ($ip[0] >= 240 && $ip[0] <= 255) {
+            $reserved = true;
+        } elseif (255 === $ip[0] && 255 === $ip[1] && 255 === $ip[2] && 255 === $ip[3]) {
+            $reserved = true;
+        } else {
+            return null;
+        }
+
+        return ['global' => $global, 'reserved' => $reserved, 'private' => $private];
+    }
+
+    /**
+     * @param array<int, int> $ip eight 16-bit words
+     *
+     * @return array{global: bool, reserved: bool, private: bool}|null
+     */
+    private static function ipv6SpecialStatus(array $ip): ?array
+    {
+        $global = false;
+        $reserved = false;
+        $private = false;
+
+        if (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0 === $ip[6] && 0 === $ip[7]) {
+            $reserved = true;
+        } elseif (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0 === $ip[6] && 1 === $ip[7]) {
+            $reserved = true;
+        } elseif (0x0064 === $ip[0] && 0xff9b === $ip[1]) {
+            $global = true;
+        } elseif (0 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]
+            && 0 === $ip[4] && 0 === $ip[5] && 0xffff === $ip[6]) {
+            $reserved = true;
+        } elseif (0x0100 === $ip[0] && 0 === $ip[1] && 0 === $ip[2] && 0 === $ip[3]) {
+            // RFC 6666 — Discard-Only
+        } elseif (0x2001 === $ip[0] && 0 === $ip[1]) {
+            // RFC 4380 — TEREDO
+        } elseif (0x2001 === $ip[0] && $ip[1] <= 0x01ff) {
+            // RFC 2928 — IETF Protocol Assignments
+        } elseif (0x2001 === $ip[0] && 0x0002 === $ip[1] && 0 === $ip[2]) {
+            // RFC 5180 — Benchmarking
+        } elseif (0x2001 === $ip[0] && 0x0db8 === $ip[1]) {
+            // RFC 3849 — Documentation
+        } elseif (0x2001 === $ip[0] && $ip[1] >= 0x0010 && $ip[1] <= 0x001f) {
+            // RFC 4843 — ORCHID
+        } elseif (0x2002 === $ip[0]) {
+            // RFC 3056 — 6to4
+        } elseif ($ip[0] >= 0xfc00 && $ip[0] <= 0xfdff) {
+            $private = true;
+        } elseif ($ip[0] >= 0xfe80 && $ip[0] <= 0xfebf) {
+            $reserved = true;
+        } else {
+            return null;
+        }
+
+        return ['global' => $global, 'reserved' => $reserved, 'private' => $private];
+    }
+
+    private static function validateUrl(Variable $value, bool $nullOnFailure = false, int $flags = 0): Variable
     {
         if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
             return self::failureResult($nullOnFailure);
@@ -556,7 +767,7 @@ final class VmFilter
             return self::failureResult($nullOnFailure);
         }
         $s = $value->toString();
-        if (!self::isValidUrlSubset($s)) {
+        if (!self::isValidUrlSubset($s, $flags)) {
             return self::failureResult($nullOnFailure);
         }
         $out = new Variable();
@@ -568,7 +779,7 @@ final class VmFilter
     /**
      * Practical URL subset for FILTER_VALIDATE_URL (php-src ext/filter/logical_filters.c).
      */
-    public static function isValidUrlSubset(string $s): bool
+    public static function isValidUrlSubset(string $s, int $flags = 0): bool
     {
         if ('' === $s) {
             return false;
@@ -586,9 +797,16 @@ final class VmFilter
         $scheme = strtolower($parsed['scheme']);
         $host = $parsed['host'] ?? null;
         if (null === $host || '' === $host) {
-            return \in_array($scheme, ['mailto', 'news', 'file'], true);
+            if (!\in_array($scheme, ['mailto', 'news', 'file'], true)) {
+                return false;
+            }
+        } elseif (\in_array($scheme, ['http', 'https'], true) && !self::isValidUrlHost($host)) {
+            return false;
         }
-        if (\in_array($scheme, ['http', 'https'], true) && !self::isValidUrlHost($host)) {
+        if ((0 !== ($flags & self::FILTER_FLAG_PATH_REQUIRED)) && !isset($parsed['path'])) {
+            return false;
+        }
+        if ((0 !== ($flags & self::FILTER_FLAG_QUERY_REQUIRED)) && !isset($parsed['query'])) {
             return false;
         }
 
@@ -734,7 +952,7 @@ final class VmFilter
     /**
      * Practical email subset: one @, non-empty local/domain, domain has a dot, ASCII only.
      */
-    public static function isValidEmailSubset(string $s): bool
+    public static function isValidEmailSubset(string $s, int $flags = 0): bool
     {
         $len = strlen($s);
         if (0 === $len || $len > 320) {
@@ -752,20 +970,29 @@ final class VmFilter
         if ('' === $local || '' === $domain || !str_contains($domain, '.')) {
             return false;
         }
-        if (!self::isEmailLocalPart($local) || !self::isEmailDomainPart($domain)) {
+        $unicode = 0 !== ($flags & self::FILTER_FLAG_EMAIL_UNICODE);
+        if (!self::isEmailLocalPart($local, $unicode) || !self::isEmailDomainPart($domain, $unicode)) {
             return false;
         }
 
         return true;
     }
 
-    private static function isEmailLocalPart(string $local): bool
+    private static function isEmailLocalPart(string $local, bool $unicode): bool
     {
+        if ($unicode) {
+            return (bool) preg_match('/^[\p{L}\p{N}.!#$%&\'*+\/=?^_`{|}~-]+$/u', $local);
+        }
+
         return self::charsMatch($local, [self::class, 'isEmailLocalChar']);
     }
 
-    private static function isEmailDomainPart(string $domain): bool
+    private static function isEmailDomainPart(string $domain, bool $unicode): bool
     {
+        if ($unicode) {
+            return (bool) preg_match('/^[\p{L}\p{N}.-]+$/u', $domain);
+        }
+
         return self::charsMatch($domain, [self::class, 'isEmailDomainChar']);
     }
 
