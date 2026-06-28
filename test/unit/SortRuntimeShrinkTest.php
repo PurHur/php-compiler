@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** sort()/rsort() JIT routes through SortJitHelper PHP not __hashtable__sortPacked LLVM (#12769). */
+/** sort()/rsort() JIT routes through SortJitHelper PHP not __hashtable__sortPacked LLVM (#12769, #13049). */
 final class SortRuntimeShrinkTest extends TestCase
 {
     public function testSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SortRuntime.php');
         $this->assertStringContainsString('SortJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::sortPacked', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('ArrayBuiltinHelper::isNativeArray', $runtime);
 
         $sort = (string) file_get_contents(__DIR__.'/../../ext/standard/sort_.php');
         $rsort = (string) file_get_contents(__DIR__.'/../../ext/standard/rsort_.php');
