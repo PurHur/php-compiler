@@ -17,6 +17,12 @@ final class NestedVmVariableMethodLlvm
         'tofloat' => Call\VariableToFloat::class,
         'tobool' => Call\VariableToBool::class,
         'toarray' => Call\VariableToArray::class,
+        'null' => Call\VariableWriteNested::class,
+        'int' => Call\VariableWriteNested::class,
+        'bool' => Call\VariableWriteNested::class,
+        'string' => Call\VariableWriteNested::class,
+        'float' => Call\VariableWriteNested::class,
+        'array' => Call\VariableWriteNested::class,
     ];
 
     public static function ensureMethod(Context $context, string $methodLc): bool
@@ -29,7 +35,11 @@ final class NestedVmVariableMethodLlvm
         if ($context->functionIsRegistered($proxyName)) {
             return true;
         }
-        $context->functionProxies[$proxyName] = new $handler();
+        if (Call\VariableWriteNested::class === $handler) {
+            $context->functionProxies[$proxyName] = new Call\VariableWriteNested($methodLc);
+        } else {
+            $context->functionProxies[$proxyName] = new $handler();
+        }
 
         return true;
     }

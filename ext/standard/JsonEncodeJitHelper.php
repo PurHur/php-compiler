@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\Context;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\Web\Superglobals;
 
@@ -24,10 +23,10 @@ final class JsonEncodeJitHelper
         if (null === $vm) {
             throw new \LogicException('json_encode() JIT helper requires active VM (#9267)');
         }
-        $frames = $ctx->runStackFrames();
-        $frame = $frames[0] ?? null;
         try {
-            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, $frame);
+            // Nested JIT cannot lower Context::runStackFrames on :object receivers (#13245).
+            // VmJson::export() uses reflection-based public props when frame is null (php-src parity).
+            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, null);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
 
@@ -39,14 +38,6 @@ final class JsonEncodeJitHelper
         }
 
         return $encoded;
-    }
-
-    public static function encodeArray(HashTable $ht, int $flags): ?string
-    {
-        $var = new Variable();
-        $var->array($ht);
-
-        return self::encodeValue($var, $flags);
     }
 
     private static function requireActiveContext(): Context

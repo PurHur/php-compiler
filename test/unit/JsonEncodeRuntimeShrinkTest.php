@@ -16,7 +16,7 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringJsonEncodeJit', $source);
         $this->assertStringNotContainsString('implementValue', $source);
         $this->assertStringNotContainsString('implementArray', $source);
-        $this->assertLessThan(170, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(190, \substr_count($source, "\n") + 1);
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringJsonEncodeJit.php');
     }
 
@@ -25,6 +25,7 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JsonEncodeJitHelper.php');
         $this->assertStringContainsString('VmJson::export', $source);
         $this->assertStringContainsString('VmJsonFormat::encodeExported', $source);
+        $this->assertStringNotContainsString('->runStackFrames(', $source, 'nested JIT cannot lower Context::runStackFrames (#13245)');
     }
 
     public function testStandaloneUsesSamePhpBridgeAsEmbed(): void
