@@ -15,12 +15,12 @@ final class GethostbyaddrRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrRuntime.php');
         $this->assertStringContainsString('GethostbyaddrJitHelper', $source);
-        $this->assertStringContainsString('GethostbyaddrLibcBridge', $source);
+        $this->assertStringNotContainsString('GethostbyaddrLibcBridge', $source);
         $this->assertStringNotContainsString("lookupFunction('gethostbyaddr')", $source);
         $this->assertStringNotContainsString("lookupFunction('inet_pton')", $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertLessThan(200, substr_count($source, "\n"));
-        $libc = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php');
-        $this->assertStringContainsString("lookupFunction('gethostbyaddr')", $libc);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php');
     }
 
     public function testGethostbyaddrJitHelperDelegatesToVmDns(): void

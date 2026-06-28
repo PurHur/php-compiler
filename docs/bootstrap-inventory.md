@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3439 |
-| Phase A inventory files (M2 ratio SSOT) | 3439 |
+| PHP files on vm.php path | 3438 |
+| Phase A inventory files (M2 ratio SSOT) | 3438 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9205 |
+| Source constructs flagged (warnings) | 9204 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2355,7 +2355,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/GetBrowserRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetClassRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetcwdJit.php` | 0 | 2 |
-| `lib/JIT/Builtin/GethostbyaddrLibcBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/GethostbyaddrRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GethostbynamelRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GetimagesizeJit.php` | 0 | 2 |
@@ -18899,15 +18898,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 41)
 - 2 class method(s)
 
-### `lib/JIT/Builtin/GethostbyaddrLibcBridge.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
-
 ### `lib/JIT/Builtin/GethostbyaddrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 155)
+- new JIT (line 149)
 - 7 class method(s)
 - 1 closure(s)
 
