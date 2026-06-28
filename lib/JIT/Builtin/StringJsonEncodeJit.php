@@ -78,7 +78,7 @@ final class StringJsonEncodeJit
         $context->builder->positionAtEnd($entry);
 
         $i32 = $context->getTypeFromString('int32');
-        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $lastErr = JsonLastErrorGlobal::ensureLastErrorGlobal($context);
         $context->builder->store($i32->constInt(0, false), $lastErr);
 
         $valPtr = $fn->getParam(0);
@@ -590,18 +590,18 @@ final class StringJsonEncodeJit
         $context->builder->branchIf($partialOutput, $bbDoublePartial, $bbDoubleFail);
 
         $context->builder->positionAtEnd($bbDoublePartial);
-        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $lastErr = JsonLastErrorGlobal::ensureLastErrorGlobal($context);
         $context->builder->store(
-            $i32->constInt(StringJsonDecodeJit::errorInfOrNan(), false),
+            $i32->constInt(JsonLastErrorGlobal::errorInfOrNan(), false),
             $lastErr
         );
         $context->builder->store(self::literalString($context, '0'), $resultSlot);
         $context->builder->branch($bbDone);
 
         $context->builder->positionAtEnd($bbDoubleFail);
-        $lastErr = StringJsonDecodeJit::ensureLastErrorGlobal($context);
+        $lastErr = JsonLastErrorGlobal::ensureLastErrorGlobal($context);
         $context->builder->store(
-            $i32->constInt(StringJsonDecodeJit::errorInfOrNan(), false),
+            $i32->constInt(JsonLastErrorGlobal::errorInfOrNan(), false),
             $lastErr
         );
         $context->builder->store($strPtr->constNull(), $resultSlot);

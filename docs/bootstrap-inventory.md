@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3444 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9247 |
+| Source constructs flagged (warnings) | 9249 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -408,6 +408,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ClockGettimeJitHelper.php` | 0 | 1 |
 | `ext/standard/CloneWithJitHelper.php` | 0 | 1 |
 | `ext/standard/ConvertCyrStringJitHelper.php` | 0 | 1 |
+| `ext/standard/ConvertUuJitHelper.php` | 0 | 1 |
 | `ext/standard/CopyJitHelper.php` | 0 | 1 |
 | `ext/standard/CoreExtensionFunctions.php` | 0 | 1 |
 | `ext/standard/CslashesJitHelper.php` | 0 | 1 |
@@ -2391,6 +2392,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/JitHelperAbiBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/JitReturnPending.php` | 0 | 1 |
 | `lib/JIT/Builtin/JitThrow.php` | 0 | 2 |
+| `lib/JIT/Builtin/JsonLastErrorGlobal.php` | 0 | 1 |
 | `lib/JIT/Builtin/KeySortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/LastErrorRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/LateStaticBindingGlobals.php` | 0 | 1 |
@@ -2533,8 +2535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringConvertUu.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringConvertUuJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringConvertUu.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
@@ -2580,7 +2581,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringJsonDecodeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonEncodeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 2 |
@@ -6147,6 +6147,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/ConvertUuJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/CopyJitHelper.php`
 
@@ -19152,6 +19157,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Exception (line 89)
 - 8 class method(s)
 
+### `lib/JIT/Builtin/JsonLastErrorGlobal.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `lib/JIT/Builtin/KeySortRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19981,12 +19991,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringConvertUu.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `lib/JIT/Builtin/StringConvertUuJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- new JIT (line 202)
+- 8 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringCslashes.php`
 
@@ -20247,14 +20254,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringJsonDecode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 226)
+- new JIT (line 218)
 - 10 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringJsonDecodeJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 34 class method(s)
 
 ### `lib/JIT/Builtin/StringJsonEncode.php`
 
