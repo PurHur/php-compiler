@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3438 |
-| Phase A inventory files (M2 ratio SSOT) | 3438 |
+| PHP files on vm.php path | 3439 |
+| Phase A inventory files (M2 ratio SSOT) | 3439 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9178 |
+| Source constructs flagged (warnings) | 9188 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -269,14 +269,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/openssl_x509_read.php` | 0 | 2 |
 | `ext/posix/JitPosix.php` | 0 | 1 |
 | `ext/posix/JitPosixTimes.php` | 0 | 1 |
-| `ext/posix/Module.php` | 0 | 27 |
+| `ext/posix/Module.php` | 0 | 28 |
 | `ext/posix/PosixCtermidJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixFunction.php` | 0 | 3 |
 | `ext/posix/PosixLibcThinAbi.php` | 0 | 1 |
 | `ext/posix/PosixSessionJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixStrerrorJitHelper.php` | 0 | 1 |
 | `ext/posix/PosixTimesJitHelper.php` | 0 | 1 |
-| `ext/posix/VmPosix.php` | 0 | 16 |
+| `ext/posix/VmPosix.php` | 0 | 17 |
 | `ext/posix/VmPosixCtermidPure.php` | 0 | 1 |
 | `ext/posix/VmPosixIdentityWritePure.php` | 0 | 1 |
 | `ext/posix/VmPosixMknodPure.php` | 0 | 1 |
@@ -291,6 +291,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/posix/posix_getcwd.php` | 0 | 2 |
 | `ext/posix/posix_getegid.php` | 0 | 2 |
 | `ext/posix/posix_geteuid.php` | 0 | 2 |
+| `ext/posix/posix_getgid.php` | 0 | 2 |
 | `ext/posix/posix_getgroups.php` | 0 | 5 |
 | `ext/posix/posix_getpgid.php` | 0 | 2 |
 | `ext/posix/posix_getpid.php` | 0 | 2 |
@@ -323,13 +324,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/VmSockets.php` | 0 | 1 |
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 4 |
-| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 21 |
+| `ext/spl/ArrayIteratorBuiltin.php` | 0 | 24 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 25 |
 | `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/CachingIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 13 |
+| `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 4 |
@@ -4987,7 +4989,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/JitPosix.php`
 
 **Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- 27 class method(s)
 
 ### `ext/posix/JitPosixTimes.php`
 
@@ -5001,28 +5003,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new posix_getpid (line 54)
 - new posix_getppid (line 55)
 - new posix_geteuid (line 56)
-- new posix_getegid (line 57)
-- new posix_getgroups (line 58)
-- new posix_uname (line 59)
-- new posix_strerror (line 60)
-- new posix_get_last_error (line 61)
-- new posix_getcwd (line 62)
-- new posix_ctermid (line 63)
-- new posix_errno (line 64)
-- new posix_access (line 65)
-- new posix_mknod (line 66)
-- new posix_mkfifo (line 67)
-- new posix_setuid (line 68)
-- new posix_setgid (line 69)
-- new posix_seteuid (line 70)
-- new posix_setegid (line 71)
-- new posix_times (line 72)
-- new posix_getrlimit (line 73)
-- new posix_setrlimit (line 74)
-- new posix_setsid (line 75)
-- new posix_getsid (line 76)
-- new posix_getpgid (line 77)
-- new posix_setpgid (line 78)
+- new posix_getgid (line 57)
+- new posix_getegid (line 58)
+- new posix_getgroups (line 59)
+- new posix_uname (line 60)
+- new posix_strerror (line 61)
+- new posix_get_last_error (line 62)
+- new posix_getcwd (line 63)
+- new posix_ctermid (line 64)
+- new posix_errno (line 65)
+- new posix_access (line 66)
+- new posix_mknod (line 67)
+- new posix_mkfifo (line 68)
+- new posix_setuid (line 69)
+- new posix_setgid (line 70)
+- new posix_seteuid (line 71)
+- new posix_setegid (line 72)
+- new posix_times (line 73)
+- new posix_getrlimit (line 74)
+- new posix_setrlimit (line 75)
+- new posix_setsid (line 76)
+- new posix_getsid (line 77)
+- new posix_getpgid (line 78)
+- new posix_setpgid (line 79)
 - 2 class method(s)
 
 ### `ext/posix/PosixCtermidJitHelper.php`
@@ -5063,19 +5066,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 39)
 - new Error (line 49)
 - new Error (line 59)
-- new Error (line 73)
-- new Error (line 86)
-- new Error (line 128)
-- new Error (line 142)
-- new Error (line 286)
-- new HashTable (line 294)
-- new Variable (line 296)
-- new Error (line 320)
-- new Error (line 328)
-- new Error (line 342)
-- new Error (line 382)
-- new Error (line 402)
-- 32 class method(s)
+- new Error (line 69)
+- new Error (line 83)
+- new Error (line 96)
+- new Error (line 138)
+- new Error (line 152)
+- new Error (line 296)
+- new HashTable (line 304)
+- new Variable (line 306)
+- new Error (line 330)
+- new Error (line 338)
+- new Error (line 352)
+- new Error (line 392)
+- new Error (line 412)
+- 33 class method(s)
 
 ### `ext/posix/VmPosixCtermidPure.php`
 
@@ -5150,6 +5154,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/posix/posix_geteuid.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 2 class method(s)
+
+### `ext/posix/posix_getgid.php`
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 27)
@@ -5381,27 +5391,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/ArrayIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 30)
-- new ArrayIteratorConstruct (line 41)
-- new ArrayIteratorCurrent (line 44)
-- new ArrayIteratorKey (line 46)
-- new ArrayIteratorNext (line 48)
-- new ArrayIteratorRewind (line 50)
-- new ArrayIteratorValid (line 52)
-- new ArrayIteratorCount (line 54)
-- new ArrayIteratorGetArrayCopy (line 56)
-- new ArrayIteratorAppend (line 58)
-- new ArrayIteratorOffsetGet (line 60)
-- new ArrayIteratorOffsetSet (line 62)
-- new ArrayIteratorOffsetExists (line 64)
-- new ArrayIteratorOffsetUnset (line 66)
-- new HashTable (line 122)
-- new ArgumentCountError (line 289)
-- new ArgumentCountError (line 313)
-- new ArgumentCountError (line 343)
-- new ArgumentCountError (line 367)
-- new ArgumentCountError (line 394)
-- 21 class method(s)
+- new ClassEntry (line 32)
+- new ArrayIteratorConstruct (line 43)
+- new ArrayIteratorCurrent (line 46)
+- new ArrayIteratorKey (line 48)
+- new ArrayIteratorNext (line 50)
+- new ArrayIteratorRewind (line 52)
+- new ArrayIteratorValid (line 54)
+- new ArrayIteratorCount (line 56)
+- new ArrayIteratorGetArrayCopy (line 58)
+- new ArrayIteratorAppend (line 60)
+- new ArrayIteratorOffsetGet (line 62)
+- new ArrayIteratorOffsetSet (line 64)
+- new ArrayIteratorOffsetExists (line 66)
+- new ArrayIteratorOffsetUnset (line 68)
+- new ArrayIteratorSortMethod (line 78)
+- new HashTable (line 135)
+- new ArgumentCountError (line 302)
+- new ArgumentCountError (line 326)
+- new ArgumentCountError (line 356)
+- new ArgumentCountError (line 380)
+- new ArgumentCountError (line 407)
+- new ArgumentCountError (line 437)
+- new ArgumentCountError (line 450)
+- 22 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
 
@@ -5485,6 +5498,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 374)
 - 14 class method(s)
 
+### `ext/spl/GlobIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new GlobIteratorConstruct (line 43)
+- new ArgumentCountError (line 168)
+- 18 class method(s)
+
 ### `ext/spl/IteratorIteratorBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5564,16 +5585,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplArrayStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 186)
-- new Variable (line 194)
-- new Variable (line 204)
-- new Variable (line 210)
-- new Variable (line 254)
-- new Variable (line 273)
-- new Variable (line 279)
-- new Variable (line 285)
-- new Variable (line 291)
-- 29 class method(s)
+- new ObjectEntry (line 190)
+- new Variable (line 198)
+- new Variable (line 208)
+- new Variable (line 214)
+- new Variable (line 277)
+- new Variable (line 296)
+- new Variable (line 302)
+- new Variable (line 308)
+- new Variable (line 314)
+- 30 class method(s)
 
 ### `ext/spl/SplClassConstants.php`
 
