@@ -14000,6 +14000,9 @@ class JIT {
             if ($this->tryInitInventoryArgvRuntimeParseHelperCall($methodLc, $dispatchReceiver)) {
                 return;
             }
+            if ($this->tryInitNestedVmHelperMethodCall($declaringClassLc, $methodLc, $receiverVar)) {
+                return;
+            }
             throw new \LogicException("Call to undefined method {$className}::{$methodLc}()");
         }
         $receiverUserType = $receiverOp->type?->userType;
@@ -14054,6 +14057,42 @@ class JIT {
         }
         $this->context->scope->toCall = $staticProxy;
         $this->context->scope->args = [$splObjectStorageMethod ? $receiverVar : $dispatchReceiver];
+    }
+
+    /** Nested JIT: VM HashTable/Variable helpers for php-in-PHP ext helpers (#12910). */
+    private function tryInitNestedVmHelperMethodCall(
+        string $declaringClassLc,
+        string $methodLc,
+        Variable $receiverVar
+    ): bool {
+        if (!JIT\NestedJitCompileScope::isActive()) {
+            return false;
+        }
+        if ('phpcompiler\\vm\\hashtable' === $declaringClassLc && 'exportkeyvaluepairs' === $methodLc) {
+            JIT\HashTableNestedExportLlvm::ensureLinked($this->context);
+            $proxyName = JIT\HashTableNestedExportLlvm::PROXY_NAME;
+            if (!$this->context->functionIsRegistered($proxyName)) {
+                return false;
+            }
+            $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+            $this->context->scope->args = [$receiverVar];
+
+            return true;
+        }
+        if (!JIT\NestedVmVariableMethodLlvm::isNestedVariableMethod($methodLc)) {
+            return false;
+        }
+        if ('phpcompiler\\vm\\variable' !== $declaringClassLc && 'object' !== $declaringClassLc) {
+            return false;
+        }
+        if (!JIT\NestedVmVariableMethodLlvm::ensureMethod($this->context, $methodLc)) {
+            return false;
+        }
+        $proxyName = 'phpcompiler\\vm\\variable::'.$methodLc;
+        $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
+        $this->context->scope->args = [$receiverVar];
+
+        return true;
     }
 
     /** Lazily register Runtime inventory-argv stubs on helloworld bin/compile.php (#12036). */

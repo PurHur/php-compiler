@@ -6,7 +6,9 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableNestedExportLlvm;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -114,6 +116,13 @@ final class StringHttpBuildQuery
 
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        HashTableNestedExportLlvm::ensureLinked($context);
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'resolveindirect');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tostring');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toint');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tofloat');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'tobool');
+        NestedVmVariableMethodLlvm::ensureMethod($context, 'toarray');
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
             $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'HttpBuildQueryJitHelper.php');
             if (null === $block) {
