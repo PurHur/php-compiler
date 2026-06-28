@@ -2660,7 +2660,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregQuote.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintRJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotPrint.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotemeta.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringRandomBytes.php';
