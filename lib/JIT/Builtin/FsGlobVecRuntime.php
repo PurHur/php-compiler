@@ -10,10 +10,10 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT embed link for glob()/scandir() via FsGlobJitHelper PHP (#11515).
+ * JIT/AOT link for glob()/scandir() via FsGlobJitHelper PHP (#11515, #12909).
  *
- * Standalone AOT keeps libc vec LLVM in {@see FsGlobVecStandaloneLlvm}.
- * php-src: ext/standard/dir.c
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\FsGlobJitHelper}; thin LLVM
+ * bridge forwards the ABI. php-src: ext/standard/dir.c
  */
 final class FsGlobVecRuntime
 {

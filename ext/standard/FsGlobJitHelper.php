@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\VM\HashTable;
 
 /**
- * glob()/scandir() for compiled JIT/AOT embed modules (#11515, php-in-PHP).
+ * glob()/scandir() for compiled JIT/AOT modules (#11515, #12909, php-in-PHP).
  *
  * SSOT: {@see VmFsGlob::glob()}, {@see VmDir::scandir()}, {@see VmFs::stringListToArray()}
  * php-src: ext/standard/dir.c — PHP_FUNCTION(glob), PHP_FUNCTION(scandir)

@@ -2376,7 +2376,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/FilterInputTypeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FputcsvRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FsDirRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FsGlobVecRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FtokRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionExistsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/FunctionStaticRuntime.php';
