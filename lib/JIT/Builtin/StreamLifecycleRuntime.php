@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -219,5 +220,51 @@ final class StreamLifecycleRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    public static function shouldDeferInventoryEmitStubs(Context $context): bool
+    {
+        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+    }
+
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!self::shouldDeferInventoryEmitStubs($context)) {
+            return;
+        }
+        self::implementDeferredStubs($context);
+    }
+
+    public static function implementDeferredStubs(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $zeroI32 = $i32->constInt(0, false);
+
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            self::implementI32ParamStub($context, $name, $zeroI32);
+        }
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementI32ParamStub(Context $context, string $name, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = $probe ?? $context->module->addFunction(
+            $name,
+            $context->context->functionType($i32, false, $i64)
+        );
+        $entry = $fn->appendBasicBlock('stream_lifecycle_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 }

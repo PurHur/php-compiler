@@ -74,8 +74,9 @@ final class SilenceRuntime
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
         self::ensureValueWriters($context);
+        StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($context);
+        self::ensureJitHelperCompiled($context);
         self::implementVoidBridge($context, '__compiler_begin_silence', self::BEGIN_HELPER);
         self::implementVoidBridge($context, '__compiler_end_silence', self::END_HELPER);
         self::implementErrorLevelEnabledBridge($context);
