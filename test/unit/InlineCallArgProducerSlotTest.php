@@ -1523,6 +1523,56 @@ PHP;
         self::assertSame("3\n", ob_get_clean());
     }
 
+    /** Issue #12916 — new LimitIterator(new ArrayIterator([...]), …) must send inner New_ slot to outer ctor. */
+    public function testNestedNewConstructorInlineNewUsesInnerProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+var_export(iterator_to_array(new LimitIterator(new ArrayIterator([1, 2, 3]), 1, 1)));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'limititerator_inline_arrayiterator.php');
+
+        $newSlots = [];
+        $limitSendSlot = null;
+        $newCount = 0;
+        $pendingLimitCtor = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+                ++$newCount;
+                if (2 === $newCount) {
+                    $pendingLimitCtor = true;
+                }
+            }
+            if ($pendingLimitCtor && OpCode::TYPE_ARG_SEND === $op->type && null === $limitSendSlot) {
+                $limitSendSlot = $op->arg1;
+                $pendingLimitCtor = false;
+            }
+        }
+
+        self::assertNotNull($limitSendSlot, 'LimitIterator ctor must emit ARG_SEND');
+        self::assertContains($limitSendSlot, $newSlots, 'LimitIterator arg #0 must send inner ArrayIterator New_ slot');
+    }
+
+    /** Issue #12916 — nested inline new LimitIterator(ArrayIterator) runtime parity. */
+    public function testNestedNewConstructorInlineNewRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+var_export(iterator_to_array(new LimitIterator(new ArrayIterator([1, 2, 3]), 1, 1)));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'limititerator_inline_arrayiterator_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  1 => 2,\n)", ob_get_clean());
+    }
+
     /** Issue #9904 — invokeArgs(new C(), [...]) must send New_ object slot, not sibling Array_ producer. */
     public function testInvokeArgsNewObjectThenArrayUsesDistinctProducerSlots(): void
     {
