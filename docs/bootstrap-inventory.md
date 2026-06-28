@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3454 |
-| Phase A inventory files (M2 ratio SSOT) | 3454 |
+| PHP files on vm.php path | 3456 |
+| Phase A inventory files (M2 ratio SSOT) | 3456 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9328 |
+| Source constructs flagged (warnings) | 9335 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -123,6 +123,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/filter/filter_list.php` | 0 | 1 |
 | `ext/filter/filter_var.php` | 0 | 1 |
 | `ext/gd/BuiltinClasses.php` | 0 | 2 |
+| `ext/gd/GdExtensionPolicy.php` | 0 | 1 |
 | `ext/gd/GdFunction.php` | 0 | 3 |
 | `ext/gd/Module.php` | 0 | 3 |
 | `ext/gettext/GettextFunction.php` | 0 | 2 |
@@ -346,6 +347,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 5 |
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
+| `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 10 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
@@ -2154,6 +2156,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/zip/ZipArchiveOpen.php` | 0 | 2 |
 | `ext/zip/ZipClassMethod.php` | 0 | 1 |
 | `ext/zip/ZipEngine.php` | 0 | 1 |
+| `ext/zip/ZipExtensionPolicy.php` | 0 | 1 |
 | `ext/zstd/JitZstd.php` | 0 | 1 |
 | `ext/zstd/Module.php` | 0 | 4 |
 | `ext/zstd/VmZstdCore.php` | 0 | 1 |
@@ -2660,7 +2663,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVersionCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVfscanf.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringZlibJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
 | `lib/JIT/Builtin/SuperglobalNameRuntime.php` | 0 | 3 |
@@ -4058,8 +4060,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 28)
+- new ClassEntry (line 36)
 - 2 class method(s)
+
+### `ext/gd/GdExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/gd/GdFunction.php`
 
@@ -4071,9 +4078,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/gd/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new imagecreate (line 26)
-- new imagecreatetruecolor (line 27)
-- 2 class method(s)
+- new imagecreate (line 36)
+- new imagecreatetruecolor (line 37)
+- 3 class method(s)
 
 ### `ext/gettext/GettextFunction.php`
 
@@ -5551,14 +5558,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new FilesystemIteratorSetFlags (line 82)
 - new FilesystemIteratorKey (line 85)
 - new FilesystemIteratorCurrent (line 87)
-- new ClassEntry (line 162)
-- new RecursiveDirectoryIteratorConstruct (line 171)
-- new RecursiveDirectoryIteratorHasChildren (line 174)
-- new RecursiveDirectoryIteratorGetChildren (line 177)
-- new ArgumentCountError (line 207)
-- new ArgumentCountError (line 245)
-- new ObjectEntry (line 382)
-- new ArgumentCountError (line 425)
+- new ClassEntry (line 168)
+- new RecursiveDirectoryIteratorConstruct (line 180)
+- new RecursiveDirectoryIteratorHasChildren (line 183)
+- new RecursiveDirectoryIteratorGetChildren (line 186)
+- new ArgumentCountError (line 216)
+- new ArgumentCountError (line 254)
+- new ObjectEntry (line 391)
+- new ArgumentCountError (line 434)
 - 16 class method(s)
 
 ### `ext/spl/FilterIteratorBuiltin.php`
@@ -5603,11 +5610,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new RecursiveIteratorIteratorConstruct (line 108)
 - new OutOfBoundsException (line 205)
 - new OutOfBoundsException (line 212)
-- new UnexpectedValueException (line 337)
-- new UnexpectedValueException (line 442)
-- new ArgumentCountError (line 498)
-- new ArgumentCountError (line 530)
-- 51 class method(s)
+- new UnexpectedValueException (line 343)
+- new UnexpectedValueException (line 448)
+- new ArgumentCountError (line 504)
+- new ArgumentCountError (line 536)
+- 52 class method(s)
 
 ### `ext/spl/JitSplClasses.php`
 
@@ -5688,6 +5695,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 142)
 - new Variable (line 155)
 - 21 class method(s)
+
+### `ext/spl/RecursiveTreeIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 39)
+- new RecursiveTreeIteratorConstruct (line 59)
+- new ArgumentCountError (line 215)
+- new ArgumentCountError (line 413)
+- new ArgumentCountError (line 478)
+- 24 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
@@ -17101,7 +17118,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/zip/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/zip/VmZipArchive.php`
 
@@ -17169,6 +17186,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
+
+### `ext/zip/ZipExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/zstd/JitZstd.php`
 
@@ -20789,11 +20811,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
-### `lib/JIT/Builtin/StringZlibJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 26 class method(s)
-
 ### `lib/JIT/Builtin/StringZstd.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21049,8 +21066,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ZlibRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 245)
-- 6 class method(s)
+- new JIT (line 244)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Call.php`

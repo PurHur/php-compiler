@@ -9,8 +9,7 @@ use PHPCompiler\JIT\Context;
 /**
  * JIT LLVM bodies for gzcompress/gzuncompress/gzdeflate/gzinflate/gzencode/gzdecode (#3194, #6791, #9879).
  *
- * PHP lowering via {@see ZlibRuntime} → {@see \PHPCompiler\ext\standard\ZlibJitHelper}.
- * Standalone AOT keeps {@see StringZlibJit} until nested helper link is reliable.
+ * PHP lowering via {@see ZlibRuntime} → {@see \PHPCompiler\ext\standard\ZlibJitHelper} (#13347).
  */
 final class StringZlib
 {
@@ -23,7 +22,7 @@ final class StringZlib
     public static function ensureStandaloneBodies(Context $context): void
     {
         self::preloadLibz();
-        ZlibRuntime::implement($context);
+        ZlibRuntime::ensureStandaloneBodies($context);
     }
 
     /** MCJIT resolves libz symbols from the host process (issue #3194). */

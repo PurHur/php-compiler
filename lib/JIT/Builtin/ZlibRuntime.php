@@ -13,9 +13,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_gz* via ZlibJitHelper PHP (#9879).
+ * JIT/AOT link for __compiler_gz* via ZlibJitHelper PHP (#9879, #13347).
  *
- * Replaces {@see StringZlibJit} LLVM (~1027 LOC libz). SSOT: {@see \PHPCompiler\ext\standard\VmZlibCore}.
+ * Replaces deleted ~1027 LOC libz LLVM monolith (#13347). SSOT: {@see \PHPCompiler\ext\standard\VmZlibCore}.
  * php-src: ext/zlib/zlib.c
  */
 final class ZlibRuntime
@@ -71,14 +71,13 @@ final class ZlibRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringZlibJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_gzcompress');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
