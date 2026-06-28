@@ -740,7 +740,12 @@ final class VmFs
     public static function pclose(int $handle): int
     {
         if (!isset(self::$popenHandles[$handle])) {
-            return -1;
+            // php-src ext/standard/exec.c — non-popen stream: release handle, return 0 (#13305).
+            if (self::isValidHandle($handle)) {
+                self::fclose($handle);
+            }
+
+            return 0;
         }
         $nativeFile = self::$popenNativeFiles[$handle] ?? null;
         unset(self::$popenHandles[$handle], self::$popenNativeFiles[$handle]);

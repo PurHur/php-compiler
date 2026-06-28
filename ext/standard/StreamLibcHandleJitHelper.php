@@ -100,8 +100,14 @@ final class StreamLibcHandleJitHelper
 
     public static function pclose(int $handle): int
     {
-        if (!isset(self::$fpPtr[$handle]) || !isset(self::$popen[$handle])) {
-            return -1;
+        if (!isset(self::$fpPtr[$handle])) {
+            return 0;
+        }
+        if (!isset(self::$popen[$handle])) {
+            // php-src ext/standard/exec.c — non-popen FILE*: fclose + return 0 (#13305).
+            self::fclose($handle);
+
+            return 0;
         }
         $ffi = self::ffi();
         if (null === $ffi) {

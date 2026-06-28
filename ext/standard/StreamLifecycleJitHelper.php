@@ -76,6 +76,10 @@ final class StreamLifecycleJitHelper
     /** @return int ABI for __compiler_pclose (status or -1) */
     public static function pcloseArgv(int $handle): int
     {
+        if (VmFs::isValidHandle($handle)) {
+            return VmFs::pclose($handle);
+        }
+
         return StreamLibcHandleJitHelper::pclose($handle);
     }
 }
