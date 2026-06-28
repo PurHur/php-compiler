@@ -69,4 +69,13 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseStrRuntime.php', $spine);
         $this->assertStringContainsString('StringParseStrJit.php', $spine);
     }
+
+    public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringContainsString('$early = $fn->appendBasicBlock', $source);
+        $this->assertStringNotContainsString('BasicBlockHelper::append($context, \'parse_str_bridge', $source);
+        $this->assertStringContainsString('JitNestedHelperCoerce::coerceArgForHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
+    }
 }
