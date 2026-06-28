@@ -4,11 +4,48 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\VM\Variable;
 
 /** usort/uasort/uksort and array_u* null callback → TypeError (ext/standard/array.c; #10624, #10799, #10785). */
 final class VmArraySortCallback
 {
+    /**
+     * Reject undefined string callbacks before strcmp/strcasecmp fast-path deferral (#13273).
+     */
+    public static function rejectInvalidStringCallback(
+        Frame $frame,
+        Variable $callback,
+        string $function,
+        int $argNum = 2
+    ): void {
+        $callback = $callback->resolveIndirect();
+        if (Variable::TYPE_STRING !== $callback->type) {
+            return;
+        }
+        $name = $callback->toString();
+        if (UsortCallbackPolicy::isVmSupportedName($name)) {
+            return;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException($function.'() requires VM context in this compiler build');
+        }
+        if (!VmCallable::isCallable($frame->vmContext, $callback)) {
+            throw new \TypeError(self::invalidStringCallbackTypeError($function, $argNum, $name));
+        }
+    }
+
+    public static function invalidStringCallbackTypeError(string $function, int $argNum, string $name): string
+    {
+        return \sprintf(
+            '%s(): Argument #%d ($callback) must be a valid callback, function "%s" not found or invalid function name',
+            $function,
+            $argNum,
+            $name
+        );
+    }
+
     public static function requireCallback(
         Variable $callback,
         string $function,

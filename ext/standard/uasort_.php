@@ -36,6 +36,7 @@ final class uasort_ extends Internal
         $array = $frame->calledArgs[0]->resolveIndirect();
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'uasort');
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'uasort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
