@@ -17,6 +17,8 @@ use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\Builtin\EnumCasesConstruct;
+use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -386,6 +388,8 @@ final class ReflectionSupport
         if ($ctor instanceof Func\Internal) {
             return match ($ctor::class) {
                 DeprecatedConstruct::class => ['message', 'since'],
+                NoDiscardConstruct::class => ['message'],
+                EnumCasesConstruct::class => ['name'],
                 AttributeConstruct::class => ['flags'],
                 default => [],
             };

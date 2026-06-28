@@ -3013,6 +3013,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneGetOffset.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneListAbbreviations.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DeprecatedConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/EnumCases.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/EnumCasesConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ErrorExceptionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ErrorExceptionGetSeverity.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ExceptionConstruct.php';
