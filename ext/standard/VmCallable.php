@@ -102,10 +102,14 @@ final class VmCallable
     public static function arrayVariableToArgEntries(Variable $arrayVar): array
     {
         $entries = [];
-        foreach ($arrayVar->toArray()->iterateKeyed(true) as $pair) {
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
             [$keyVar, $value] = $pair;
-            $copy = new Variable();
-            $copy->copyFrom($value);
+            if (Variable::TYPE_INDIRECT === $value->type) {
+                $copy = $value;
+            } else {
+                $copy = new Variable();
+                $copy->copyFrom($value);
+            }
             $keyResolved = $keyVar->resolveIndirect();
             if (Variable::TYPE_INTEGER === $keyResolved->type) {
                 $entries[] = ['p', $copy];
