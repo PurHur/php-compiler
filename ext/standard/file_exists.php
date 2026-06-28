@@ -18,7 +18,7 @@ final class file_exists extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('file_exists() requires exactly one argument');
         }
-        $path = VmString::coerceTypedStringBuiltinArg(
+        $path = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'file_exists',
             0,
@@ -35,7 +35,7 @@ final class file_exists extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('file_exists() requires exactly one argument');
         }
-        $path = JitPathArg::lowerFilename($context, $args[0], 'file_exists');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'file_exists');
 
         return JitStat::pathExists($context, $path);
     }
