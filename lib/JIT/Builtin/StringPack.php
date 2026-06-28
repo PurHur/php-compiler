@@ -15,10 +15,9 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133).
+ * JIT/AOT link for __compiler_pack via PackJitHelper PHP (#9133, #13062).
  *
- * JIT/normal modules use compiled {@see PackJitHelper}; AOT standalone keeps
- * {@see StringPackJit} until native link can host compiled PackEngine reliably.
+ * JIT and standalone AOT both use compiled {@see PackJitHelper} + {@see PackEngine}.
  * php-src: ext/standard/pack.c
  */
 final class StringPack
@@ -49,12 +48,6 @@ final class StringPack
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringPackJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_pack');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -210,10 +203,11 @@ final class StringPack
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
         $path = $root.self::HELPER_PATH;
-        $enginePath = $root.'/ext/standard/PackEngine.php';
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $enginePath): void {
+        $enginePath = $root.'/ext/standard/PackJitEngine.php';
+        $ieeePath = $root.'/ext/standard/Ieee754.php';
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $enginePath, $ieeePath): void {
             $jit = new JIT($context);
-            foreach ([$enginePath, $path] as $includePath) {
+            foreach ([$ieeePath, $enginePath, $path] as $includePath) {
                 $real = \realpath($includePath) ?: $includePath;
                 if ($context->hasJitIncludedFileCompiled($real)) {
                     continue;

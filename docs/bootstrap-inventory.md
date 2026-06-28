@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3436 |
-| Phase A inventory files (M2 ratio SSOT) | 3436 |
+| PHP files on vm.php path | 3437 |
+| Phase A inventory files (M2 ratio SSOT) | 3437 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9165 |
+| Source constructs flagged (warnings) | 9167 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -946,6 +946,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ObStatusJitHelper.php` | 0 | 3 |
 | `ext/standard/OutputRewriteVarsJitHelper.php` | 0 | 1 |
 | `ext/standard/PackEngine.php` | 0 | 1 |
+| `ext/standard/PackEngineEncode.php` | 0 | 1 |
+| `ext/standard/PackJitEngine.php` | 0 | 1 |
 | `ext/standard/PackJitHelper.php` | 0 | 1 |
 | `ext/standard/ParseIniEngine.php` | 0 | 1 |
 | `ext/standard/ParseStrEngine.php` | 0 | 2 |
@@ -1666,7 +1668,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/header_remove.php` | 0 | 2 |
 | `ext/standard/headers_sent.php` | 0 | 1 |
 | `ext/standard/hebrev.php` | 0 | 1 |
-| `ext/standard/hex2bin.php` | 0 | 4 |
+| `ext/standard/hex2bin.php` | 0 | 6 |
 | `ext/standard/hexdec.php` | 0 | 1 |
 | `ext/standard/highlight_file.php` | 0 | 1 |
 | `ext/standard/highlight_string.php` | 0 | 1 |
@@ -2588,7 +2590,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPack.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringPackJit.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringParseStrJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPasswordCrypto.php` | 0 | 1 |
@@ -9681,6 +9682,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
 
+### `ext/standard/PackEngineEncode.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
+
+### `ext/standard/PackJitEngine.php`
+
+**Warnings** (review for bootstrap subset):
+- 12 class method(s)
+
 ### `ext/standard/PackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10087,7 +10098,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ThrowableManifest.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/TimezoneLocationJitHelper.php`
 
@@ -14251,8 +14262,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 42)
-- new Error (line 62)
+- new ArgumentCountError (line 31)
+- new ArgumentCountError (line 34)
+- new Error (line 50)
+- new Error (line 70)
 - 2 class method(s)
 - 3 closure(s)
 
@@ -17885,7 +17898,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 59 class method(s)
+- 62 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -20220,15 +20233,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringPack.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 215)
+- new JIT (line 209)
 - 8 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringPackJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 21 class method(s)
-- 7 closure(s)
 
 ### `lib/JIT/Builtin/StringParseStr.php`
 
@@ -24413,57 +24420,57 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DateIntervalFormat (line 1033)
 - new DateIntervalCreateFromDateString (line 1035)
 - new ClassEntry (line 1042)
-- new Variable (line 1062)
-- new Variable (line 1063)
-- new ClassEntry (line 1073)
-- new Variable (line 1079)
-- new Variable (line 1080)
-- new Variable (line 1081)
-- new ClassProperty (line 1084)
-- new ClassProperty (line 1085)
-- new ClassProperty (line 1086)
+- new Variable (line 1065)
+- new Variable (line 1066)
+- new ClassEntry (line 1076)
+- new Variable (line 1082)
+- new Variable (line 1083)
+- new Variable (line 1084)
 - new ClassProperty (line 1087)
 - new ClassProperty (line 1088)
-- new ClassProperty (line 1096)
-- new Variable (line 1105)
-- new ClassProperty (line 1107)
-- new ClassProperty (line 1117)
-- new ErrorExceptionConstruct (line 1118)
-- new ExceptionConstruct (line 1120)
-- new ExceptionWakeup (line 1124)
-- new ExceptionGetMessage (line 1128)
-- new ExceptionGetCode (line 1129)
-- new ExceptionGetFile (line 1130)
-- new ExceptionGetLine (line 1131)
-- new ExceptionGetPrevious (line 1132)
-- new ExceptionGetTrace (line 1133)
-- new ExceptionGetTraceAsString (line 1134)
-- new ExceptionToString (line 1135)
-- new ErrorExceptionGetSeverity (line 1142)
-- new ClassEntry (line 1151)
-- new ClassEntry (line 1158)
-- new FiberConstruct (line 1162)
-- new FiberStart (line 1167)
-- new FiberResume (line 1168)
-- new FiberThrow (line 1169)
-- new FiberSuspend (line 1170)
-- new FiberGetCurrent (line 1171)
-- new FiberIsStarted (line 1172)
-- new FiberIsSuspended (line 1173)
-- new FiberIsRunning (line 1174)
-- new FiberIsTerminated (line 1175)
-- new FiberGetReturn (line 1176)
-- new FiberGetTrace (line 1177)
-- new FiberGetTraceAsString (line 1178)
+- new ClassProperty (line 1089)
+- new ClassProperty (line 1090)
+- new ClassProperty (line 1091)
+- new ClassProperty (line 1099)
+- new Variable (line 1108)
+- new ClassProperty (line 1110)
+- new ClassProperty (line 1120)
+- new ErrorExceptionConstruct (line 1121)
+- new ExceptionConstruct (line 1123)
+- new ExceptionWakeup (line 1127)
+- new ExceptionGetMessage (line 1131)
+- new ExceptionGetCode (line 1132)
+- new ExceptionGetFile (line 1133)
+- new ExceptionGetLine (line 1134)
+- new ExceptionGetPrevious (line 1135)
+- new ExceptionGetTrace (line 1136)
+- new ExceptionGetTraceAsString (line 1137)
+- new ExceptionToString (line 1138)
+- new ErrorExceptionGetSeverity (line 1145)
+- new ClassEntry (line 1154)
+- new ClassEntry (line 1161)
+- new FiberConstruct (line 1165)
+- new FiberStart (line 1170)
+- new FiberResume (line 1171)
+- new FiberThrow (line 1172)
+- new FiberSuspend (line 1173)
+- new FiberGetCurrent (line 1174)
+- new FiberIsStarted (line 1175)
+- new FiberIsSuspended (line 1176)
+- new FiberIsRunning (line 1177)
+- new FiberIsTerminated (line 1178)
+- new FiberGetReturn (line 1179)
+- new FiberGetTrace (line 1180)
+- new FiberGetTraceAsString (line 1181)
 - 19 class method(s)
 
 ### `lib/VM/BuiltinExceptionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 252)
-- new Variable (line 256)
-- new ObjectEntry (line 268)
-- new Variable (line 271)
+- new ObjectEntry (line 272)
+- new Variable (line 276)
+- new ObjectEntry (line 288)
+- new Variable (line 291)
 - 22 class method(s)
 
 ### `lib/VM/BuiltinExecute.php`
@@ -25662,10 +25669,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/VmUnaryMinus.php`
 
 **Warnings** (review for bootstrap subset):
-- new OpCode (line 25)
-- new Variable (line 42)
-- new Variable (line 54)
-- new Variable (line 59)
+- new OpCode (line 26)
+- new Variable (line 46)
+- new Variable (line 58)
+- new Variable (line 63)
 - 1 class method(s)
 
 ### `lib/VM/VmUnaryPlus.php`
