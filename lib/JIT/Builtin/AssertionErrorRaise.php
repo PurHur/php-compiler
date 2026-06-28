@@ -30,6 +30,8 @@ final class AssertionErrorRaise
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        self::registerPendingGlobals($context);
+        self::registerDeclarations($context);
         self::implementBodies($context);
     }
 
@@ -50,13 +52,14 @@ final class AssertionErrorRaise
     private static function implementBodies(Context $context): void
     {
         $fn = $context->module->getNamedFunction('__compiler_jit_raise_assertion_error');
-        if (null === $fn || $fn->countBasicBlocks() > 0) {
+        if (null !== $fn && $fn->countBasicBlocks() > 0) {
             self::registerPendingGlobals($context);
 
             return;
         }
 
         self::registerPendingGlobals($context);
+        self::registerDeclarations($context);
         self::implementRaiseFunction($context);
         self::implementPendingHelpers($context);
     }

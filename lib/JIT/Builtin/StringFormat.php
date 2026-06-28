@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
@@ -15,8 +14,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_sprintf/printf/number_format via SprintfJitHelper PHP (#9131).
  *
- * JIT/normal modules use compiled {@see \PHPCompiler\ext\standard\SprintfJitHelper};
- * AOT standalone keeps {@see StringFormatJit} until native link can host compiled helpers reliably.
+ * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\SprintfJitHelper}; thin LLVM bridges forward the ABI.
  * php-src: ext/standard/sprintf.c, ext/standard/number_format.c
  */
 final class StringFormat
@@ -52,12 +50,6 @@ final class StringFormat
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringFormatJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_sprintf');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

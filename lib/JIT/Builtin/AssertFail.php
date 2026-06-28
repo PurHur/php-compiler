@@ -49,7 +49,11 @@ final class AssertFail
             return;
         }
 
-        AssertionErrorRaise::ensureStandaloneBodies($context);
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            AssertionErrorRaise::ensureStandaloneBodies($context);
+        } else {
+            AssertionErrorRaise::ensureLinked($context);
+        }
         self::implementAssertFail($context, $probe);
         $strFn = $context->lookupFunction('__compiler_assert_fail_string');
         self::implementAssertFailString($context, $strFn);

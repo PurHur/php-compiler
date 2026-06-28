@@ -61,7 +61,7 @@ final class FilesystemIteratorBuiltin
             }
         }
 
-        foreach ([
+        SplClassConstants::registerIntConstants($entry, [
             'CURRENT_AS_PATHNAME' => self::CURRENT_AS_PATHNAME,
             'CURRENT_AS_FILEINFO' => self::CURRENT_AS_FILEINFO,
             'CURRENT_AS_SELF' => self::CURRENT_AS_SELF,
@@ -71,11 +71,7 @@ final class FilesystemIteratorBuiltin
             'SKIP_DOTS' => self::SKIP_DOTS,
             'UNIX_PATHS' => self::UNIX_PATHS,
             'FOLLOW_SYMLINKS' => self::FOLLOW_SYMLINKS,
-        ] as $name => $value) {
-            $const = new Variable(Variable::TYPE_INTEGER);
-            $const->int($value);
-            $entry->constants[$name] = $const;
-        }
+        ]);
 
         $entry->constructor = new FilesystemIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;

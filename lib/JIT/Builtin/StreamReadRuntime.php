@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -366,5 +367,109 @@ final class StreamReadRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    public static function shouldDeferInventoryEmitStubs(Context $context): bool
+    {
+        return StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context);
+    }
+
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!self::shouldDeferInventoryEmitStubs($context)) {
+            return;
+        }
+        self::implementDeferredStubs($context);
+    }
+
+    public static function implementDeferredStubs(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $minusOneI64 = $i64->constInt(-1, true);
+        $zeroI32 = $i32->constInt(0, false);
+        $nullStr = $strPtr->constNull();
+
+        self::implementI32BinaryStub($context, '__compiler_flock', $zeroI32);
+        self::implementI64UnaryStub($context, '__compiler_fpassthru', $minusOneI64);
+        self::implementI32BinaryStub($context, '__compiler_ftruncate', $zeroI32);
+        self::implementI64UnaryStub($context, '__compiler_ftell', $minusOneI64);
+        self::implementStrUnaryStub($context, '__compiler_fgetc', $nullStr);
+        self::implementStrBinaryStub($context, '__compiler_fgets', $nullStr);
+        self::implementStrTernaryStub($context, '__compiler_stream_get_line', $nullStr);
+        self::implementI64TernaryStub($context, '__compiler_fseek', $minusOneI64);
+        self::implementStrTernaryStub($context, '__compiler_stream_get_contents', $nullStr);
+        self::implementI64QuaternaryStub($context, '__compiler_stream_copy_to_stream', $minusOneI64);
+        self::implementStrTernaryStub($context, '__compiler_stream_copy_to_string', $nullStr);
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementI32BinaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        self::implementRetStub($context, $name, $context->context->functionType($i32, false, $i64, $i64), $ret);
+    }
+
+    private static function implementI64UnaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        self::implementRetStub($context, $name, $context->context->functionType($i64, false, $i64), $ret);
+    }
+
+    private static function implementI64TernaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        self::implementRetStub($context, $name, $context->context->functionType($i64, false, $i64, $i64, $i64), $ret);
+    }
+
+    private static function implementI64QuaternaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        self::implementRetStub(
+            $context,
+            $name,
+            $context->context->functionType($i64, false, $i64, $i64, $i64, $i64),
+            $ret
+        );
+    }
+
+    private static function implementStrUnaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementRetStub($context, $name, $context->context->functionType($strPtr, false, $i64), $ret);
+    }
+
+    private static function implementStrBinaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementRetStub($context, $name, $context->context->functionType($strPtr, false, $i64, $i64), $ret);
+    }
+
+    private static function implementStrTernaryStub(Context $context, string $name, Value $ret): void
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        self::implementRetStub($context, $name, $context->context->functionType($strPtr, false, $i64, $i64, $i64), $ret);
+    }
+
+    private static function implementRetStub(Context $context, string $name, $ft, Value $ret): void
+    {
+        $probe = $context->module->getNamedFunction($name);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($name, $probe);
+
+            return;
+        }
+        $fn = $probe ?? $context->module->addFunction($name, $ft);
+        $entry = $fn->appendBasicBlock('stream_read_stub_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($ret);
+        $context->registerFunction($name, $fn);
+        $context->builder->clearInsertionPosition();
     }
 }
