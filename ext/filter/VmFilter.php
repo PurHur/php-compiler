@@ -17,28 +17,60 @@ use PHPCompiler\VM\Variable;
  */
 final class VmFilter
 {
-    public const FILTER_VALIDATE_INT = 257;
+    public const FILTER_FLAG_NONE = 0;
+    public const FILTER_REQUIRE_ARRAY = 0x1000000;
+    public const FILTER_REQUIRE_SCALAR = 0x2000000;
+    public const FILTER_FORCE_ARRAY = 0x4000000;
+    public const FILTER_NULL_ON_FAILURE = 0x8000000;
+    public const FILTER_THROW_ON_FAILURE = 0x10000000;
+    public const FILTER_FLAG_ALLOW_OCTAL = 0x0001;
+    public const FILTER_FLAG_ALLOW_HEX = 0x0002;
+    public const FILTER_FLAG_STRIP_LOW = 0x0004;
+    public const FILTER_FLAG_STRIP_HIGH = 0x0008;
+    public const FILTER_FLAG_ENCODE_LOW = 0x0010;
+    public const FILTER_FLAG_ENCODE_HIGH = 0x0020;
+    public const FILTER_FLAG_ENCODE_AMP = 0x0040;
+    public const FILTER_FLAG_NO_ENCODE_QUOTES = 0x0080;
+    public const FILTER_FLAG_EMPTY_STRING_NULL = 0x0100;
+    public const FILTER_FLAG_STRIP_BACKTICK = 0x0200;
+    public const FILTER_FLAG_ALLOW_FRACTION = 0x1000;
+    public const FILTER_FLAG_ALLOW_THOUSAND = 0x2000;
+    public const FILTER_FLAG_ALLOW_SCIENTIFIC = 0x4000;
+    public const FILTER_FLAG_PATH_REQUIRED = 0x010000;
+    public const FILTER_FLAG_QUERY_REQUIRED = 0x080000;
+    public const FILTER_FLAG_IPV4 = 0x00100000;
+    public const FILTER_FLAG_IPV6 = 0x00200000;
+    public const FILTER_FLAG_NO_RES_RANGE = 0x00400000;
+    public const FILTER_FLAG_NO_PRIV_RANGE = 0x00800000;
+    public const FILTER_FLAG_GLOBAL_RANGE = 0x20000000;
+    public const FILTER_FLAG_HOSTNAME = 0x100000;
+    public const FILTER_FLAG_EMAIL_UNICODE = 0x100000;
+    public const FILTER_VALIDATE_INT = 0x0101;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_BOOLEAN */
-    public const FILTER_VALIDATE_BOOLEAN = 258;
+    public const FILTER_VALIDATE_BOOLEAN = 0x0102;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_FLOAT */
-    public const FILTER_VALIDATE_FLOAT = 259;
+    public const FILTER_VALIDATE_FLOAT = 0x0103;
     /** php-src ext/filter/filter_private.h — FILTER_VALIDATE_REGEXP */
-    public const FILTER_VALIDATE_REGEXP = 272;
+    public const FILTER_VALIDATE_REGEXP = 0x0110;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_URL */
-    public const FILTER_VALIDATE_URL = 273;
-    public const FILTER_VALIDATE_EMAIL = 274;
+    public const FILTER_VALIDATE_URL = 0x0111;
+    public const FILTER_VALIDATE_EMAIL = 0x0112;
     /** php-src ext/filter/php_filter.h — FILTER_VALIDATE_IP */
-    public const FILTER_VALIDATE_IP = 275;
-    /** php-src ext/filter/php_filter.h — PHP_FILTER_FLAG_NULL_ON_FAILURE */
-    public const FILTER_NULL_ON_FAILURE = 134217728;
-    /** php-src ext/filter/php_filter.h — FILTER_FLAG_IPV4 */
-    public const FILTER_FLAG_IPV4 = 1048576;
-    /** php-src ext/filter/php_filter.h — FILTER_FLAG_IPV6 */
-    public const FILTER_FLAG_IPV6 = 2097152;
-    /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_OCTAL */
-    public const FILTER_FLAG_ALLOW_OCTAL = 8;
-    /** php-src ext/filter/php_filter.h — FILTER_FLAG_ALLOW_HEX */
-    public const FILTER_FLAG_ALLOW_HEX = 16;
+    public const FILTER_VALIDATE_IP = 0x0113;
+    public const FILTER_VALIDATE_MAC = 0x0114;
+    public const FILTER_VALIDATE_DOMAIN = 0x0115;
+    public const FILTER_DEFAULT = 0x0204;
+    public const FILTER_UNSAFE_RAW = 0x0204;
+    public const FILTER_SANITIZE_STRING = 0x0201;
+    public const FILTER_SANITIZE_ENCODED = 0x0202;
+    public const FILTER_SANITIZE_SPECIAL_CHARS = 0x0203;
+    public const FILTER_SANITIZE_EMAIL = 0x0205;
+    public const FILTER_SANITIZE_URL = 0x0206;
+    public const FILTER_SANITIZE_NUMBER_INT = 0x0207;
+    public const FILTER_SANITIZE_NUMBER_FLOAT = 0x0208;
+    public const FILTER_SANITIZE_FULL_SPECIAL_CHARS = 0x020a;
+    public const FILTER_SANITIZE_ADD_SLASHES = 0x020b;
+    public const FILTER_CALLBACK = 0x0400;
     /** php-src ext/filter/php_filter.h */
     public const INPUT_POST = 0;
 

@@ -36,6 +36,6 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'filter_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111422575', ob_get_clean());
+        self::assertSame('111422577', ob_get_clean());
     }
 }

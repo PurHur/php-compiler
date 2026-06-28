@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\ext\filter\FilterConstants;
 use PHPCompiler\ClassConstVisibility;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Context;
@@ -193,11 +194,6 @@ final class VmConstants
                 'crypt_ext_des',
                 'crypt_md5',
                 'crypt_blowfish',
-                'filter_validate_int',
-                'filter_validate_regexp',
-                'filter_validate_email',
-                'input_get',
-                'input_post',
             ],
             array_keys(DateConstants::CORE_STRING_BY_NAME),
             Context::errorReportingConstantFetchNames(),
@@ -280,17 +276,48 @@ final class VmConstants
         }
         $result->add('Core', self::wrapArray($core));
 
+        $filter = self::extensionConstantBucket(FilterConstants::REGISTERED, $ctx);
+        if ($filter->getNumElements() > 0) {
+            $result->add('filter', self::wrapArray($filter));
+        }
+
         if ([] !== $ctx->constants) {
             $user = new HashTable();
             foreach ($ctx->constants as $name => $value) {
+                if (FilterConstants::isRegisteredName($name)) {
+                    continue;
+                }
                 $copy = new Variable();
                 $copy->copyFrom($value);
                 $user->add($name, $copy);
             }
-            $result->add('user', self::wrapArray($user));
+            if ($user->getNumElements() > 0) {
+                $result->add('user', self::wrapArray($user));
+            }
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<string, int> $registered
+     */
+    private static function extensionConstantBucket(array $registered, Context $ctx): HashTable
+    {
+        $bucket = new HashTable();
+        foreach ($registered as $name => $fallback) {
+            $value = $ctx->constants[$name] ?? FilterConstants::variableForName($name);
+            if (null === $value) {
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int($fallback);
+                $value = $var;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($value);
+            $bucket->add($name, $copy);
+        }
+
+        return $bucket;
     }
 
     /**
