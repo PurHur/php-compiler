@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3455 |
-| Phase A inventory files (M2 ratio SSOT) | 3455 |
+| PHP files on vm.php path | 3454 |
+| Phase A inventory files (M2 ratio SSOT) | 3454 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9334 |
+| Source constructs flagged (warnings) | 9333 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2628,7 +2628,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrGetcsv.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringStrGetcsvJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStripTags.php` | 0 | 3 |
@@ -20185,7 +20184,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFgetcsvJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
@@ -20603,14 +20602,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrGetcsv.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 210)
+- new JIT (line 203)
 - 10 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringStrGetcsvJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 13 class method(s)
 
 ### `lib/JIT/Builtin/StringStreamCsv.php`
 

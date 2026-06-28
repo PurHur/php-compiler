@@ -7,22 +7,29 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\CsvJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** str_getcsv/fgetcsv JIT routes through CsvJitHelper PHP, not StringStrGetcsvJit LLVM (#9444). */
+/** str_getcsv/fgetcsv JIT routes through CsvJitHelper PHP, not StringStrGetcsvJit LLVM (#9444, #13358). */
 final class CsvRuntimeShrinkTest extends TestCase
 {
-    public function testStringStrGetcsvUsesJitHelperForJitPath(): void
+    public function testStringStrGetcsvJitMonolithDeleted(): void
+    {
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringStrGetcsvJit.php');
+    }
+
+    public function testStringStrGetcsvUsesJitHelperForAllLoadTypes(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringStrGetcsv.php');
         $this->assertStringContainsString('CsvJitHelper', $source);
-        $this->assertStringContainsString('StringStrGetcsvJit', $source);
-        $this->assertStringNotContainsString('emitParseLine', $source);
+        $this->assertStringNotContainsString('StringStrGetcsvJit', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
-    public function testStringFgetcsvJitUsesPhpParseOnNonStandalone(): void
+    public function testStringFgetcsvJitUsesPhpParseOnStandalone(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFgetcsvJit.php');
         $this->assertStringContainsString('emitCompilerFgetcsvPhpParse', $source);
         $this->assertStringContainsString('CsvJitHelper::parseLineArgv', $source);
+        $this->assertStringNotContainsString('emitCompilerFgetcsv(', $source);
+        $this->assertStringNotContainsString('__phpc_csv_parse_line', $source);
     }
 
     public function testCsvJitHelperMatchesVmCsvSemantics(): void
@@ -42,5 +49,6 @@ final class CsvRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('CsvJitHelper.php', $spine);
         $this->assertStringContainsString('StringStrGetcsv.php', $spine);
+        $this->assertStringNotContainsString('StringStrGetcsvJit.php', $spine);
     }
 }

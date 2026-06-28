@@ -2682,7 +2682,6 @@
         "lib/JIT/Builtin/StringSscanfArray.php",
         "lib/JIT/Builtin/StringSscanfByRef.php",
         "lib/JIT/Builtin/StringStrGetcsv.php",
-        "lib/JIT/Builtin/StringStrGetcsvJit.php",
         "lib/JIT/Builtin/StringStreamCsv.php",
         "lib/JIT/Builtin/StringStrftime.php",
         "lib/JIT/Builtin/StringStripTags.php",
@@ -3685,9 +3684,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3455,
+        "inventory_files": 3454,
         "excluded": 0,
-        "eligible": 3455,
+        "eligible": 3454,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
