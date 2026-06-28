@@ -54,7 +54,28 @@ final class VmIconv
             return false;
         }
 
-        return CharsetEngine::convert($fromEncoding, $toEncoding, $input);
+        $result = CharsetEngine::convert($fromEncoding, $toEncoding, $input);
+        if (false === $result) {
+            self::triggerIllegalCharacterNotice($frame);
+
+            return false;
+        }
+
+        return $result;
+    }
+
+    private static function triggerIllegalCharacterNotice(?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            'iconv(): Detected an illegal character in input string',
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     private static function triggerUnsupportedEncodingWarning(?Frame $frame, string $fromEncoding, string $toEncoding): void
