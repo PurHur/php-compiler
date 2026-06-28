@@ -777,6 +777,8 @@ class Context {
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             ExceptionBridge::ensureStandaloneBodies($this);
             ErrorBridge::ensureStandaloneBodies($this);
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
             Builtin\AssertFail::ensureStandaloneBodies($this);
             Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
