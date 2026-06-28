@@ -3185,6 +3185,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetAttributes.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetType.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionParameterIsSensitive.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAccessProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyAsymmetricProbe.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionPropertyGetAsymmetricVisibility.php';
