@@ -8092,6 +8092,8 @@ restart:
             return null;
         } catch (ScriptExit $e) {
             throw $e;
+        } catch (\BadMethodCallException $e) {
+            return $this->dispatchVmBadMethodCallException($e, $callerFrame);
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
@@ -8157,6 +8159,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeLogicException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge BadMethodCallException from SPL builtins (#13379, ext/spl/spl_iterators.c). */
+    private function dispatchVmBadMethodCallException(\BadMethodCallException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeBadMethodCallException(
             $this->context,
             $error->getMessage(),
             $file,

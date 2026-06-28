@@ -106,7 +106,8 @@ final class SplCachingIteratorStorage
      *     flags: int,
      *     index: int,
      *     cached: ?Variable,
-     *     cachedKey: ?Variable
+     *     cachedKey: ?Variable,
+     *     fullCache: list<true>
      * }>
      */
     private static array $store = [];
@@ -119,6 +120,7 @@ final class SplCachingIteratorStorage
             'index' => -1,
             'cached' => null,
             'cachedKey' => null,
+            'fullCache' => [],
         ];
     }
 
@@ -144,6 +146,8 @@ final class SplCachingIteratorStorage
         $state['index'] = -1;
         $state['cached'] = null;
         $state['cachedKey'] = null;
+        $state['fullCache'] = [];
+        self::next($frame, $object);
     }
 
     public static function valid(Frame $frame, ObjectEntry $object): bool
@@ -229,7 +233,14 @@ final class SplCachingIteratorStorage
 
     public static function count(ObjectEntry $object): int
     {
-        return max(0, self::state($object)['index'] + 1);
+        $state = self::state($object);
+        if (0 === ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
+            throw new \BadMethodCallException(
+                'CachingIterator does not use a full cache (see CachingIterator::__construct)'
+            );
+        }
+
+        return \count($state['fullCache']);
     }
 
     public static function toString(ObjectEntry $object): string
@@ -257,6 +268,9 @@ final class SplCachingIteratorStorage
         $key = SplDualIteratorStorage::callInner($frame, $state['inner'], 'key');
         $state['cached'] = $current->resolveIndirect();
         $state['cachedKey'] = $key->resolveIndirect();
+        if (0 !== ($state['flags'] & CachingIteratorBuiltin::FULL_CACHE)) {
+            $state['fullCache'][] = true;
+        }
     }
 
     private static function syncInnerPosition(Frame $frame, ObjectEntry $inner, int $wrapperIndex): void
@@ -267,7 +281,7 @@ final class SplCachingIteratorStorage
         }
     }
 
-    /** @return array{inner: ObjectEntry, flags: int, index: int, cached: ?Variable, cachedKey: ?Variable} */
+    /** @return array{inner: ObjectEntry, flags: int, index: int, cached: ?Variable, cachedKey: ?Variable, fullCache: list<true>} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
