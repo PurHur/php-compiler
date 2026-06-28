@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3424 |
-| Phase A inventory files (M2 ratio SSOT) | 3424 |
+| PHP files on vm.php path | 3423 |
+| Phase A inventory files (M2 ratio SSOT) | 3423 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9052 |
+| Source constructs flagged (warnings) | 9051 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2448,7 +2448,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SessionStart.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStorageGlobals.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionStorageRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/SessionStorageStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionUnset.php` | 0 | 1 |
 | `lib/JIT/Builtin/SessionWriteClose.php` | 0 | 1 |
 | `lib/JIT/Builtin/ShuffleRuntime.php` | 0 | 1 |
@@ -19305,14 +19304,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SessionStorageRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 481)
-- 22 class method(s)
+- new JIT (line 479)
+- 23 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/SessionStorageStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 28 class method(s)
 
 ### `lib/JIT/Builtin/SessionUnset.php`
 
