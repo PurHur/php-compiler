@@ -34,17 +34,22 @@ final class AssertFail
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        AssertIniRuntime::ensureGlobals($context);
+        AssertionErrorRaise::registerDeclarations($context);
         self::implementBodies($context);
     }
 
     private static function implementBodies(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__compiler_assert_fail');
-        if (null === $probe || $probe->countBasicBlocks() > 0) {
+        if (null === $probe) {
+            return;
+        }
+        if ($probe->countBasicBlocks() > 0) {
             return;
         }
 
-        AssertionErrorRaise::ensureLinked($context);
+        AssertionErrorRaise::ensureStandaloneBodies($context);
         self::implementAssertFail($context, $probe);
         $strFn = $context->lookupFunction('__compiler_assert_fail_string');
         self::implementAssertFailString($context, $strFn);

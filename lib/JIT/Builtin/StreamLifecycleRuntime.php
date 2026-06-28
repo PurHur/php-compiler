@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -74,6 +76,12 @@ final class StreamLifecycleRuntime
             return;
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            self::implementStandalone($context);
+
+            return;
+        }
+
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
@@ -97,6 +105,73 @@ final class StreamLifecycleRuntime
         }
     }
 
+    private static function implementStandalone(Context $context): void
+    {
+        StreamGlobalsJit::implement($context);
+        self::implementStandaloneIsResource($context);
+        self::implementStandaloneFflush($context);
+        self::implementStandaloneI32RetZero($context, '__compiler_fclose');
+        self::implementStandaloneI32RetZero($context, '__compiler_feof');
+        self::implementStandaloneI32RetZero($context, '__compiler_pclose');
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementStandaloneIsResource(Context $context): void
+    {
+        $abiName = '__compiler_is_resource';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
+
+        $entry = $fn->appendBasicBlock('is_resource_standalone_entry');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementStandaloneFflush(Context $context): void
+    {
+        self::implementStandaloneI32RetZero($context, '__compiler_fflush');
+    }
+
+    private static function implementStandaloneI32RetZero(Context $context, string $abiName): void
+    {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
+        $entry = $fn->appendBasicBlock('stream_lifecycle_standalone_zero');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i32->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementCloseBridge(Context $context, string $abiName, string $helperLogical): void
     {
         $probe = $context->module->getNamedFunction($abiName);
@@ -108,10 +183,12 @@ final class StreamLifecycleRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_lifecycle_close_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -142,10 +219,12 @@ final class StreamLifecycleRuntime
 
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
-        $fn = $context->module->addFunction(
-            $abiName,
-            $context->context->functionType($i32, false, $i64)
-        );
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $i64)
+            );
 
         $entry = $fn->appendBasicBlock('stream_lifecycle_bridge_entry');
         $context->builder->positionAtEnd($entry);

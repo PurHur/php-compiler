@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StreamReadRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -16,6 +17,7 @@ final class JitFtell
     /** @return Value */
     public static function invoke(Context $context, Value $handleLong): Value
     {
+        StreamReadRuntime::ensureLinked($context);
         $pos = $context->builder->call($context->lookupFunction('__compiler_ftell'), $handleLong);
         $i64 = $context->getTypeFromString('int64');
         $failed = $context->builder->icmp(Builder::INT_EQ, $pos, $i64->constInt(-1, true));
