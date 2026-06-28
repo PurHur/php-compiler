@@ -99,6 +99,54 @@ PHP;
         $runtime->parseAndCompile($code, 'readonly_untyped.php');
     }
 
+    /** @covers issue #12973 */
+    public function testUntypedPromotedReadonlyConstructorParamFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public readonly $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property C::$x must have type');
+        $runtime->parseAndCompile($code, 'promoted_readonly_untyped.php');
+    }
+
+    /** @covers issue #12973 */
+    public function testReadonlyClassPromotedUntypedConstructorParamFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+readonly class C {
+    public function __construct(public $x) {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Readonly property C::$x must have type');
+        $runtime->parseAndCompile($code, 'readonly_class_promoted_untyped.php');
+    }
+
+    /** @covers issue #12973 */
+    public function testTypedPromotedReadonlyConstructorParamStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C {
+    public function __construct(public readonly int $x) {}
+}
+echo (new C(1))->x;
+PHP;
+        $block = $runtime->parseAndCompile($code, 'promoted_readonly_typed.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame('1', ob_get_clean());
+    }
+
     /** @covers issue #6862 */
     public function testReadonlyClassStaticPropertyFailsAtCompileTime(): void
     {
