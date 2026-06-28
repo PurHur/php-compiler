@@ -117,20 +117,40 @@ final class RecursiveIteratorIteratorBuiltin
             'CATCH_GET_CHILD' => IteratorIteratorBuiltin::CATCH_GET_CHILD,
         ]);
 
+        foreach ([
+            'getdepth' => RecursiveIteratorIteratorGetDepth::class,
+            'setmaxdepth' => RecursiveIteratorIteratorSetMaxDepth::class,
+            'getmaxdepth' => RecursiveIteratorIteratorGetMaxDepth::class,
+            'getsubiterator' => RecursiveIteratorIteratorGetSubIterator::class,
+            'getinneriterator' => RecursiveIteratorIteratorGetInnerIterator::class,
+            'callhaschildren' => RecursiveIteratorIteratorCallHasChildren::class,
+            'callgetchildren' => RecursiveIteratorIteratorCallGetChildren::class,
+        ] as $lc => $class) {
+            $entry->methods[$lc] = new $class();
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        $entry->methodNames['getdepth'] = 'getDepth';
+        $entry->methodNames['setmaxdepth'] = 'setMaxDepth';
+        $entry->methodNames['getmaxdepth'] = 'getMaxDepth';
+        $entry->methodNames['getsubiterator'] = 'getSubIterator';
+        $entry->methodNames['getinneriterator'] = 'getInnerIterator';
+        $entry->methodNames['callhaschildren'] = 'callHasChildren';
+        $entry->methodNames['callgetchildren'] = 'callGetChildren';
+
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid']);
+        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['getdepth']);
     }
 }
 
 /** @internal */
 final class SplDualIteratorStorage
 {
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>, maxDepth: int}> */
     private static array $store = [];
 
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
@@ -140,6 +160,7 @@ final class SplDualIteratorStorage
             'recursive' => false,
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
             'stack' => [],
+            'maxDepth' => -1,
         ];
     }
 
@@ -150,7 +171,71 @@ final class SplDualIteratorStorage
             'recursive' => true,
             'mode' => $mode,
             'stack' => [],
+            'maxDepth' => -1,
         ];
+    }
+
+    public static function getDepth(ObjectEntry $object): int
+    {
+        $stack = self::state($object)['stack'];
+
+        return max(0, \count($stack) - 1);
+    }
+
+    public static function setMaxDepth(ObjectEntry $object, int $maxDepth): void
+    {
+        self::$store[$object->id]['maxDepth'] = $maxDepth;
+    }
+
+    /** @return int|false */
+    public static function getMaxDepth(ObjectEntry $object): int|false
+    {
+        $maxDepth = self::state($object)['maxDepth'];
+
+        return $maxDepth < 0 ? false : $maxDepth;
+    }
+
+    public static function getSubIterator(ObjectEntry $object, ?int $level): ObjectEntry
+    {
+        $state = self::state($object);
+        if (null === $level) {
+            $level = self::getDepth($object);
+        }
+        if ($level < 0) {
+            throw new \OutOfBoundsException('Level must be a non-negative integer');
+        }
+        if (0 === $level) {
+            return $state['inner'];
+        }
+        $stack = $state['stack'];
+        if ($level >= \count($stack)) {
+            throw new \OutOfBoundsException('Level '.$level.' not found');
+        }
+
+        return $stack[$level];
+    }
+
+    public static function callHasChildren(Frame $frame, ObjectEntry $object): bool
+    {
+        $stack = self::state($object)['stack'];
+        if ([] === $stack) {
+            return false;
+        }
+        $top = $stack[\count($stack) - 1];
+        $result = self::invokeInner($frame, $top, 'hasChildren')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    public static function callGetChildren(Frame $frame, ObjectEntry $object): ObjectEntry
+    {
+        $stack = self::state($object)['stack'];
+        if ([] === $stack) {
+            throw new \RuntimeException('Cannot fetch children on invalid RecursiveIteratorIterator position');
+        }
+        $top = $stack[\count($stack) - 1];
+
+        return self::getChildren($frame, $top);
     }
 
     public static function inner(ObjectEntry $object): ObjectEntry
@@ -272,7 +357,7 @@ final class SplDualIteratorStorage
         return $object;
     }
 
-    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>} */
+    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>, maxDepth: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -299,7 +384,11 @@ final class SplDualIteratorStorage
                 }
                 continue;
             }
-            if (self::shouldRecurse($frame->vmContext, $frame, $top, $state['mode'])) {
+            if (self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $top)) {
+                self::invokeInner($frame, $top, 'next');
+                continue;
+            }
+            if (self::shouldRecurse($frame->vmContext, $frame, $object, $top, $state['mode'])) {
                 $child = self::getChildren($frame, $top);
                 self::invokeInner($frame, $child, 'rewind');
                 $state['stack'][] = $child;
@@ -310,12 +399,35 @@ final class SplDualIteratorStorage
         }
     }
 
-    private static function shouldRecurse(Context $ctx, Frame $frame, ObjectEntry $iterator, int $mode): bool
+    private static function mustSkipForMaxDepth(Context $ctx, Frame $frame, ObjectEntry $wrapper, ObjectEntry $iterator): bool
+    {
+        $wrapperState = self::state($wrapper);
+        if ($wrapperState['maxDepth'] < 0) {
+            return false;
+        }
+        $depth = max(0, \count($wrapperState['stack']) - 1);
+        if ($depth < $wrapperState['maxDepth']) {
+            return false;
+        }
+        if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $ctx)) {
+            return false;
+        }
+        $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    private static function shouldRecurse(Context $ctx, Frame $frame, ObjectEntry $wrapper, ObjectEntry $iterator, int $mode): bool
     {
         if (IteratorIteratorBuiltin::LEAVES_ONLY !== $mode) {
             return false;
         }
         if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $ctx)) {
+            return false;
+        }
+        $wrapperState = self::state($wrapper);
+        $depth = max(0, \count($wrapperState['stack']) - 1);
+        if ($wrapperState['maxDepth'] >= 0 && $depth >= $wrapperState['maxDepth']) {
             return false;
         }
         $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
@@ -579,5 +691,171 @@ final class IteratorIteratorGetInnerIterator extends VmClassMethod
         }
         $inner = SplDualIteratorStorage::inner($object);
         $frame->returnVar->object($inner);
+    }
+}
+
+final class RecursiveIteratorIteratorGetDepth extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getDepth');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getDepth()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplDualIteratorStorage::getDepth($object));
+    }
+}
+
+final class RecursiveIteratorIteratorSetMaxDepth extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setMaxDepth');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::setMaxDepth()'
+        );
+        $maxDepth = -1;
+        if (isset($frame->calledArgs[1])) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $arg->type) {
+                $maxDepth = $arg->toInt();
+            }
+        }
+        SplDualIteratorStorage::setMaxDepth($object, $maxDepth);
+    }
+}
+
+final class RecursiveIteratorIteratorGetMaxDepth extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getMaxDepth');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getMaxDepth()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $maxDepth = SplDualIteratorStorage::getMaxDepth($object);
+        if (false === $maxDepth) {
+            $frame->returnVar->bool(false);
+        } else {
+            $frame->returnVar->int($maxDepth);
+        }
+    }
+}
+
+final class RecursiveIteratorIteratorGetSubIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getSubIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getSubIterator()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $level = null;
+        if (isset($frame->calledArgs[1])) {
+            $arg = $frame->calledArgs[1]->resolveIndirect();
+            if (Variable::TYPE_NULL !== $arg->type) {
+                $level = $arg->toInt();
+            }
+        }
+        $inner = SplDualIteratorStorage::getSubIterator($object, $level);
+        $frame->returnVar->object($inner);
+    }
+}
+
+final class RecursiveIteratorIteratorGetInnerIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getInnerIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::getInnerIterator()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $inner = SplDualIteratorStorage::inner($object);
+        $frame->returnVar->object($inner);
+    }
+}
+
+final class RecursiveIteratorIteratorCallHasChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('callHasChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::callHasChildren()'
+        );
+        SplIteratorSupport::setReturnBool(
+            $frame,
+            SplDualIteratorStorage::callHasChildren($frame, $object)
+        );
+    }
+}
+
+final class RecursiveIteratorIteratorCallGetChildren extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('callGetChildren');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RecursiveIteratorIteratorBuiltin::CLASS_LC,
+            'RecursiveIteratorIterator::callGetChildren()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $child = SplDualIteratorStorage::callGetChildren($frame, $object);
+        $frame->returnVar->object($child);
     }
 }
