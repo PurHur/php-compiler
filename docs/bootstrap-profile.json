@@ -3120,6 +3120,7 @@
         "lib/VM/Builtin/ReflectionFunctionConstruct.php",
         "lib/VM/Builtin/ReflectionFunctionCreateFromCallable.php",
         "lib/VM/Builtin/ReflectionFunctionCreateFromFunction.php",
+        "lib/VM/Builtin/ReflectionFunctionGetClosure.php",
         "lib/VM/Builtin/ReflectionFunctionGetClosureCalledClass.php",
         "lib/VM/Builtin/ReflectionFunctionGetClosureScopeClass.php",
         "lib/VM/Builtin/ReflectionFunctionGetClosureThis.php",
