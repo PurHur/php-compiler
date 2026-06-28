@@ -6908,7 +6908,9 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
-                    $value = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                    $value = $this->context->getVariableFromOp(
+                        $block->getOperand($this->assignRhsSlot($op))
+                    );
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
@@ -6922,7 +6924,7 @@ class JIT {
                         $coalesceTarget = $aliasOp;
                     }
                     $forceCoalesce = null !== $coalesceTarget;
-                    $srcOp = $block->getOperand($op->arg3);
+                    $srcOp = $block->getOperand($this->assignRhsSlot($op));
                     $isNullSource = $value->isNullConstant
                         || Variable::TYPE_NULL === $value->type
                         || ($srcOp instanceof Operand\Literal && null === $srcOp->value);
@@ -10168,6 +10170,19 @@ class JIT {
         }
 
         return $block->getOperand($slot);
+    }
+
+    /** Match/phi merge may leave TYPE_ASSIGN arg3 null; rhs lives in arg1 (#13092). */
+    private function assignRhsSlot(OpCode $op): int
+    {
+        if (null !== $op->arg3) {
+            return (int) $op->arg3;
+        }
+        if (null === $op->arg1) {
+            throw new \LogicException('Missing operand slot for TYPE_ASSIGN rhs');
+        }
+
+        return (int) $op->arg1;
     }
 
     /** AssignOp peephole may leave arg2 null; lvalue lives in arg1 (#13062, #6438). */

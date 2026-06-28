@@ -8038,7 +8038,7 @@ class Compiler {
                 return [new OpCode(
                     $fetchType,
                     $resultSlot,
-                    $this->compileOperand($expr->var, $block, true),
+                    $this->compileArrayDimFetchContainerSlot($expr, $block),
                     $dimSlot
                 )];
             case Op\Expr\ConstFetch::class:
@@ -9218,7 +9218,7 @@ class Compiler {
         $block->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH,
             $this->compileOperand($fetch->result, $block, false),
-            $this->compileOperand($fetch->var, $block, true),
+            $this->compileArrayDimFetchContainerSlot($fetch, $block),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
         ));
     }
@@ -9231,9 +9231,76 @@ class Compiler {
         $block->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
-            $this->compileOperand($fetch->var, $block, true),
+            $this->compileArrayDimFetchContainerSlot($fetch, $block),
             null !== $fetch->dim ? $this->compileOperand($fetch->dim, $block, true) : null
         ));
+    }
+
+    /**
+     * Container slot for array dim fetch/write opcodes.
+     *
+     * PhiResolver may clear {@see Op\Expr\ArrayDimFetch::$var} after param phi merge in large
+     * compilation units (PackEngine.parseFormat, #13092). Recover from typed parameters.
+     */
+    protected function compileArrayDimFetchContainerSlot(Op\Expr\ArrayDimFetch $fetch, Block $block): int
+    {
+        if (null !== $fetch->var) {
+            $slot = $this->compileOperand($fetch->var, $block, true);
+            if (null !== $slot) {
+                return $slot;
+            }
+        }
+
+        $recovered = $this->recoverPhiClearedArrayDimFetchContainer($fetch, $block);
+        if (null !== $recovered) {
+            return $recovered;
+        }
+
+        $this->throwCompileLogic('ArrayDimFetch missing container operand');
+    }
+
+    /**
+     * PhiResolver postprocessor can leave ArrayDimFetch.var null while the container CV remains
+     * a typed parameter (php-cfg/Visitor/PhiResolver.php, #13092).
+     */
+    private function recoverPhiClearedArrayDimFetchContainer(
+        Op\Expr\ArrayDimFetch $fetch,
+        Block $block
+    ): ?int {
+        if (null !== $fetch->var || null === $block->func || [] === $block->func->params) {
+            return null;
+        }
+
+        $preferred = $this->isArrayAppendDim($fetch->dim) ? 'array' : 'string';
+        foreach ($block->func->params as $param) {
+            if (null === $param->result) {
+                continue;
+            }
+            $decl = $this->declNameFromCfgType($param->declaredType ?? null);
+            if ('array' === $preferred) {
+                if ('array' !== $decl && null === $this->genericArraySpecFromCfgType($param->declaredType ?? null)) {
+                    continue;
+                }
+            } elseif ('string' !== $decl) {
+                continue;
+            }
+            $slot = $this->compileOperand($param->result, $block, true);
+            if (null !== $slot) {
+                return $slot;
+            }
+        }
+
+        foreach ($block->func->params as $param) {
+            if (null === $param->result) {
+                continue;
+            }
+            $slot = $this->compileOperand($param->result, $block, true);
+            if (null !== $slot) {
+                return $slot;
+            }
+        }
+
+        return null;
     }
 
     /**
