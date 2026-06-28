@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3444 |
-| Phase A inventory files (M2 ratio SSOT) | 3444 |
+| PHP files on vm.php path | 3445 |
+| Phase A inventory files (M2 ratio SSOT) | 3445 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9249 |
+| Source constructs flagged (warnings) | 9257 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -356,6 +356,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 23 |
+| `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 8 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
 | `ext/spl/VmSplIterators.php` | 0 | 10 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
@@ -5798,6 +5799,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 724)
 - 41 class method(s)
 - 1 closure(s)
+
+### `ext/spl/SplQueueSplStackBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 42)
+- new SplQueueConstruct (line 51)
+- new ClassEntry (line 92)
+- new SplStackConstruct (line 101)
+- new SplStackSetIteratorMode (line 104)
+- new SplStackGetIteratorMode (line 107)
+- new ArgumentCountError (line 172)
+- 13 class method(s)
 
 ### `ext/spl/SplTempFileObjectBuiltin.php`
 
