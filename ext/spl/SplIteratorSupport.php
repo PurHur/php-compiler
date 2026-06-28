@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -86,6 +88,20 @@ final class SplIteratorSupport
             return;
         }
         $frame->returnVar->copyFrom($source->resolveIndirect());
+    }
+
+    /**
+     * Copy a callback for deferred invocation; pin ClosureState when present (#13180).
+     *
+     * @return array{0: Variable, 1: ?ClosureState}
+     */
+    public static function pinCallback(Variable $callback): array
+    {
+        $copy = new Variable();
+        $copy->copyFrom($callback->resolveIndirect());
+        $closure = VmClosureCall::isClosure($copy) ? VmClosureCall::resolve($copy) : null;
+
+        return [$copy, $closure];
     }
 
     public static function requireArrayArg(Variable $var, string $function, int $argIndex): \PHPCompiler\VM\HashTable

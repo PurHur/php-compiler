@@ -5,9 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmCallable;
+use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
@@ -22,7 +24,7 @@ final class RecursiveCallbackFilterIteratorBuiltin
 {
     public const CLASS_LC = 'recursivecallbackfilteriterator';
 
-    /** @var array<int, array{inner: Variable, callback: Variable, ctx: Context}> */
+    /** @var array<int, array{inner: Variable, callback: Variable, callbackClosure: ?ClosureState, ctx: Context}> */
     private static array $store = [];
 
     public static function registerClass(Context $ctx): void
@@ -74,15 +76,17 @@ final class RecursiveCallbackFilterIteratorBuiltin
 
     public static function init(ObjectEntry $object, Variable $inner, Variable $callback, Context $ctx): void
     {
+        [$callbackCopy, $callbackClosure] = SplIteratorSupport::pinCallback($callback);
         self::$store[$object->id] = [
             'inner' => self::copyVar($inner),
-            'callback' => self::copyVar($callback),
+            'callback' => $callbackCopy,
+            'callbackClosure' => $callbackClosure,
             'ctx' => $ctx,
         ];
     }
 
     /**
-     * @return array{inner: Variable, callback: Variable, ctx: Context}
+     * @return array{inner: Variable, callback: Variable, callbackClosure: ?ClosureState, ctx: Context}
      */
     public static function state(ObjectEntry $object): array
     {
@@ -115,6 +119,10 @@ final class RecursiveCallbackFilterIteratorBuiltin
         $filter = new Variable();
         $filter->object($object);
         $callback = self::state($object)['callback'];
+        $closure = self::state($object)['callbackClosure'];
+        if (null !== $closure) {
+            return VmClosureCall::invoke($ctx, $closure, $current, $key, $filter)->resolveIndirect()->toBool();
+        }
 
         return VmCallable::invoke($ctx, $callback, $current, $key, $filter)->resolveIndirect()->toBool();
     }
