@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3423 |
-| Phase A inventory files (M2 ratio SSOT) | 3423 |
+| PHP files on vm.php path | 3424 |
+| Phase A inventory files (M2 ratio SSOT) | 3424 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9099 |
+| Source constructs flagged (warnings) | 9100 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1135,6 +1135,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmGzStreamPure.php` | 0 | 1 |
 | `ext/standard/VmHash.php` | 0 | 5 |
 | `ext/standard/VmHashFile.php` | 0 | 1 |
+| `ext/standard/VmHashHostFallback.php` | 0 | 1 |
 | `ext/standard/VmHashNative.php` | 0 | 2 |
 | `ext/standard/VmHashNonCrypto.php` | 0 | 1 |
 | `ext/standard/VmHashSha3.php` | 0 | 1 |
@@ -1300,6 +1301,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmUnameNative.php` | 0 | 1 |
 | `ext/standard/VmUnamePure.php` | 0 | 1 |
 | `ext/standard/VmUnserializeFormat.php` | 0 | 25 |
+| `ext/standard/VmUrlRewriterOb.php` | 0 | 1 |
 | `ext/standard/VmUserCall.php` | 0 | 7 |
 | `ext/standard/VmUserStream.php` | 0 | 8 |
 | `ext/standard/VmVarDump.php` | 0 | 1 |
@@ -2461,7 +2463,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Sscanf.php` | 0 | 1 |
 | `lib/JIT/Builtin/SscanfAssignApply.php` | 0 | 1 |
 | `lib/JIT/Builtin/SscanfJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StatArrayLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatArrayRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StatCache.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatCacheRuntime.php` | 0 | 3 |
@@ -10822,16 +10823,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 91)
-- new Variable (line 93)
-- new HashTable (line 104)
-- new Variable (line 106)
+- new HashTable (line 113)
+- new Variable (line 115)
+- new HashTable (line 126)
+- new Variable (line 128)
 - 8 class method(s)
 
 ### `ext/standard/VmHashFile.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/VmHashHostFallback.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/VmHashNative.php`
 
@@ -11203,9 +11209,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmObOutput.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 22)
-- new Variable (line 24)
-- new Variable (line 26)
+- new Variable (line 25)
+- new Variable (line 27)
+- new Variable (line 29)
 - 2 class method(s)
 
 ### `ext/standard/VmOutputRewriteVars.php`
@@ -12086,6 +12092,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 605)
 - new HashTable (line 606)
 - 31 class method(s)
+
+### `ext/standard/VmUrlRewriterOb.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/VmUserCall.php`
 
@@ -19246,7 +19257,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/RewriteVarsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 99)
+- new JIT (line 115)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -19427,15 +19438,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 29 class method(s)
 
-### `lib/JIT/Builtin/StatArrayLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
-
 ### `lib/JIT/Builtin/StatArrayRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 174)
+- new JIT (line 168)
 - 8 class method(s)
 - 1 closure(s)
 
