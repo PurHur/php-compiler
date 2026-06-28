@@ -2671,7 +2671,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrptime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrtok.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrtokJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrtr.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrtrStandaloneLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSubstrCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSuperglobalName.php';
