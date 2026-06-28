@@ -61,7 +61,7 @@ final class sort_ extends Internal
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (Variable::TYPE_STRING === $first->type) {
             if (
-                StdlibConstants::SORT_REGULAR === $sortType
+                StdlibConstants::SORT_STRING === $sortType
                 && VmInternalCompare::valuesShareScalarType($values, Variable::TYPE_STRING)
             ) {
                 VmInternalCompare::sortVariableValues(

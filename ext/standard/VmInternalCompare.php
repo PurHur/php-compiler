@@ -340,12 +340,13 @@ final class VmInternalCompare
             );
         }
 
-        return self::compareKeys($a, $b);
+        return self::compareRegularOperands($a, $b, 0 !== $caseFlag);
     }
 
     /** Compare array values for asort/arsort packed lists with SORT_NUMERIC (php-src). */
     public static function compareValuesForSortFlags(Variable $a, Variable $b, int $flags): int
     {
+        $caseFlag = $flags & StdlibConstants::SORT_FLAG_CASE;
         $sortType = $flags & ~StdlibConstants::SORT_FLAG_CASE;
         if (StdlibConstants::SORT_NUMERIC === $sortType) {
             return self::compareNumericOperandsForSort($a, $b);
@@ -367,8 +368,32 @@ final class VmInternalCompare
                 self::coerceForStringSort($b)
             );
         }
+        if (StdlibConstants::SORT_REGULAR === $sortType) {
+            return self::compareRegularOperands($a, $b, 0 !== $caseFlag);
+        }
 
         return self::compareValuesForSort($a, $b);
+    }
+
+    /**
+     * php-src zend_compare for SORT_REGULAR — numeric strings compare numerically (#13028).
+     */
+    public static function compareRegularOperands(Variable $a, Variable $b, bool $caseInsensitive = false): int
+    {
+        $a = $a->resolveIndirect();
+        $b = $b->resolveIndirect();
+        if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
+            $as = $a->toString();
+            $bs = $b->toString();
+            if ('' !== $as && '' !== $bs && \is_numeric($as) && \is_numeric($bs)) {
+                return self::compareNumericOperandsForSort($a, $b);
+            }
+            $cmp = $caseInsensitive ? strcasecmp($as, $bs) : strcmp($as, $bs);
+
+            return $cmp < 0 ? -1 : ($cmp > 0 ? 1 : 0);
+        }
+
+        return Variable::compareSpaceship($a, $b);
     }
 
     /** php-src zend_compare numeric sort — non-numeric strings compare as 0. */
@@ -762,7 +787,7 @@ final class VmInternalCompare
         $a = $a->resolveIndirect();
         $b = $b->resolveIndirect();
         if (Variable::TYPE_STRING === $a->type && Variable::TYPE_STRING === $b->type) {
-            return self::invoke(self::resolveStringCallback('strcmp'), $a, $b);
+            return self::compareRegularOperands($a, $b);
         }
         if (Variable::TYPE_INTEGER === $a->type && Variable::TYPE_INTEGER === $b->type) {
             return $a->toInt() <=> $b->toInt();
