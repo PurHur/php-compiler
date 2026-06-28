@@ -213,6 +213,10 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'override_class_exists')) {
                 continue;
             }
+            if (CompilerVersion::advertisesOverrideAttributeClass()
+                && str_contains($name, 'override_class_phantom')) {
+                continue;
+            }
             // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
             if (!CompilerVersion::supportsOverrideAttribute()
                 && (str_contains($name, 'override_attribute_invalid')
