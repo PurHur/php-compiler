@@ -630,7 +630,7 @@ final class VmArray
             return false;
         }
 
-        return $value->resolveIndirect()->identicalTo($stored->resolveIndirect());
+        return $value->resolveIndirect()->equals($stored->resolveIndirect());
     }
 
     private static function valueAtKeyInHashTable(Variable $key, HashTable $table): ?Variable

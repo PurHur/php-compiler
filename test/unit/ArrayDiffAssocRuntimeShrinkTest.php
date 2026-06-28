@@ -43,4 +43,20 @@ final class ArrayDiffAssocRuntimeShrinkTest extends TestCase
         $this->assertNull($result->find('k'));
         $this->assertSame('keep', $result->find('z')?->toString());
     }
+
+    public function testArrayDiffAssocJitHelperLooseIntBoolValueCompare(): void
+    {
+        $first = new HashTable();
+        $a = new Variable();
+        $a->int(1);
+        $first->addIndex(0, $a);
+
+        $other = new HashTable();
+        $b = new Variable();
+        $b->bool(true);
+        $other->addIndex(0, $b);
+
+        $result = ArrayDiffAssocJitHelper::diffAssocTwo($first, $other);
+        $this->assertNull($result->findIndex(0));
+    }
 }
