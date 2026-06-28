@@ -4012,10 +4012,12 @@ restart:
                             ? $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2)
                             : $this->readRuntimeOperandForConcat($frame, (int) $op->arg2);
                         $right = $this->readRuntimeOperandForConcat($frame, (int) $op->arg3);
-                        $arg1->string(
+                        $result = new Variable();
+                        $result->string(
                             $this->coerceVariableToString($left, $frame)
                             . $this->coerceVariableToString($right, $frame)
                         );
+                        $arg1->copyFrom($result);
                     } catch (\Error $e) {
                         $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
                         if (null !== $catchFrame) {
