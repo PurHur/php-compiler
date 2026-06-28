@@ -115,6 +115,14 @@ final class GeneratorState
         }
     }
 
+    /** Uncaught throw closed the generator without a return (Zend zim_Generator_getReturn, #13027). */
+    public function markClosedByThrow(): void
+    {
+        $this->done = true;
+        $this->frame = null;
+        $this->hasCurrent = false;
+    }
+
     public function wrapObject(): ObjectEntry
     {
         $entry = new ObjectEntry($this->vm->context->classes['generator']);
