@@ -249,7 +249,7 @@ final class BuiltinParamNames
             case 'trim':
             case 'ltrim':
             case 'rtrim':
-                return ['string', 'characters'];
+                return ['string', 'characters', 'mode'];
             case 'mb_trim':
             case 'mb_ltrim':
             case 'mb_rtrim':

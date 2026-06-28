@@ -3178,6 +3178,56 @@ final class VmString
     }
 
     /**
+     * @param list<Variable> $optionalArgs trim/ltrim/rtrim args after $string (0..2 entries)
+     *
+     * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
+     */
+    public static function resolveTrimMaskAndMode(
+        array $optionalArgs,
+        string $function,
+        int $defaultMode
+    ): array {
+        $argc = \count($optionalArgs);
+        if (0 === $argc) {
+            return [self::TRIM_DEFAULT, $defaultMode];
+        }
+        if (1 === $argc) {
+            return self::resolveTrimOptionalArg(
+                $optionalArgs[0],
+                $function,
+                1,
+                'characters',
+                $defaultMode
+            );
+        }
+
+        $mask = self::coerceStringBuiltinArg($optionalArgs[0], $function, 1, 'characters');
+        $modeFromEnum = self::tryStringTrimModeBitmask($optionalArgs[1]);
+        if (null === $modeFromEnum) {
+            $var = $optionalArgs[1]->resolveIndirect();
+            $given = EnumCaseSupport::isEnumCaseVariable($var)
+                ? EnumCaseSupport::typeNameForVariable($var)
+                : match ($var->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOLEAN => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_FLOAT => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_ARRAY => 'array',
+                    Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                    default => 'mixed',
+                };
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #3 ($mode) must be of type StringTrimMode, %s given',
+                $function,
+                $given
+            ));
+        }
+
+        return [$mask, $modeFromEnum];
+    }
+
+    /**
      * @return array{0: string, 1: int} character mask and php_trim_int() mode bitmask
      */
     public static function resolveTrimOptionalArg(
