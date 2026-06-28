@@ -49,7 +49,11 @@ class AssignOp extends Optimizer
                     // We can safely replace it with an assign op
                     $binaryDest = $prior->arg1;
                     $prior->arg1 = $op->arg2;
-                    $prior->arg2 = $op->arg2;
+                    // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
+                    // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
+                    if (null === $prior->arg2 || (int) $prior->arg2 === (int) $binaryDest) {
+                        $prior->arg2 = $op->arg2;
+                    }
                     $assignResult = $block->getOperand($op->arg1);
                     if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
                         // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
