@@ -21,15 +21,15 @@ final class FilesystemIteratorBuiltin
 {
     public const CLASS_LC = 'filesystemiterator';
 
-    public const CURRENT_AS_PATHNAME = 0;
+    public const CURRENT_AS_PATHNAME = 32;
 
     public const CURRENT_AS_FILEINFO = 0;
 
-    public const CURRENT_AS_SELF = 4;
+    public const CURRENT_AS_SELF = 16;
 
     public const KEY_AS_PATHNAME = 0;
 
-    public const KEY_AS_FILENAME = 2;
+    public const KEY_AS_FILENAME = 256;
 
     public const NEW_CURRENT_AND_KEY = 256;
 
@@ -82,6 +82,10 @@ final class FilesystemIteratorBuiltin
         $entry->methods['setflags'] = new FilesystemIteratorSetFlags();
         $entry->methodVisibility['setflags'] = $pub;
         $entry->methodNames['setflags'] = 'setFlags';
+        $entry->methods['key'] = new FilesystemIteratorKey();
+        $entry->methodVisibility['key'] = $pub;
+        $entry->methods['current'] = new FilesystemIteratorCurrent();
+        $entry->methodVisibility['current'] = $pub;
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -91,7 +95,54 @@ final class FilesystemIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['__construct'], $entry->methods['getflags']);
+        return isset(
+            $entry->methods['__construct'],
+            $entry->methods['getflags'],
+            $entry->methods['key'],
+            $entry->methods['current']
+        );
+    }
+}
+
+final class FilesystemIteratorKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            FilesystemIteratorBuiltin::CLASS_LC,
+            'FilesystemIterator::key()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(DirectoryIteratorStorage::filesystemKey($object));
+    }
+}
+
+final class FilesystemIteratorCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            FilesystemIteratorBuiltin::CLASS_LC,
+            'FilesystemIterator::current()'
+        );
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            DirectoryIteratorStorage::filesystemCurrent($frame, $object)
+        );
     }
 }
 

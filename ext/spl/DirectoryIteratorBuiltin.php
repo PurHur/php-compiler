@@ -127,6 +127,50 @@ final class DirectoryIteratorStorage
         return self::state($object)['index'];
     }
 
+    public static function filesystemKey(ObjectEntry $object): string
+    {
+        $state = self::state($object);
+        if (0 !== ($state['flags'] & FilesystemIteratorBuiltin::KEY_AS_FILENAME)) {
+            $filename = $state['filename'];
+            if (false === $filename) {
+                return '';
+            }
+
+            return $filename;
+        }
+
+        return self::pathname($object);
+    }
+
+    public static function filesystemCurrent(Frame $frame, ObjectEntry $object): Variable
+    {
+        $flags = self::state($object)['flags'];
+        $result = new Variable();
+        if (0 !== ($flags & FilesystemIteratorBuiltin::CURRENT_AS_SELF)) {
+            $result->object($object);
+
+            return $result;
+        }
+        if (0 !== ($flags & FilesystemIteratorBuiltin::CURRENT_AS_PATHNAME)) {
+            $result->string(self::pathname($object));
+
+            return $result;
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('FilesystemIterator::current() requires VM context');
+        }
+        $class = $frame->vmContext->classes[SplFileInfoBuiltin::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('SplFileInfo is not registered in this compiler build');
+        }
+        $info = new ObjectEntry($class);
+        $info->constructed = true;
+        SplFileInfoStorage::init($info, self::pathname($object));
+        $result->object($info);
+
+        return $result;
+    }
+
     public static function pathname(ObjectEntry $object): string
     {
         $state = self::state($object);
