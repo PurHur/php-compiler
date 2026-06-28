@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\VM\DateTimeInterfaceSupport;
 use PHPCfg\AbstractVisitor;
 use PHPCfg\Block;
 use PHPCfg\Op;
@@ -159,6 +160,9 @@ final class ImplementsHierarchyCompileCheck
         foreach ($this->classes as $class) {
             $this->rejectDuplicateImplements('Class', $class['display'], $class['implements']);
             foreach ($class['implements'] as $targetLc) {
+                if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
+                    throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
+                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',
@@ -180,6 +184,9 @@ final class ImplementsHierarchyCompileCheck
         foreach ($this->enums as $enum) {
             $this->rejectDuplicateImplements('Enum', $enum['display'], $enum['implements']);
             foreach ($enum['implements'] as $targetLc) {
+                if (DateTimeInterfaceSupport::rejectsUserImplementationLc($targetLc)) {
+                    throw new \CompileError(DateTimeInterfaceSupport::USER_IMPLEMENTATION_FORBIDDEN_MESSAGE);
+                }
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
                         '%s cannot implement %s - it is not an interface',

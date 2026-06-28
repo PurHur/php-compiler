@@ -137,4 +137,30 @@ PHP;
         $this->expectExceptionMessage('B cannot implement A - it is not an interface');
         $runtime->parseAndCompile($code, 'nested.php');
     }
+
+    /** @covers issue #13325 */
+    public function testClassImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class UserDateTime implements DateTimeInterface {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
+        $runtime->parseAndCompile($code, 'datetimeinterface.php');
+    }
+
+    /** @covers issue #13325 */
+    public function testEnumImplementsDateTimeInterfaceFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E implements DateTimeInterface { case A; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage("DateTimeInterface can't be implemented by user classes");
+        $runtime->parseAndCompile($code, 'enum_datetimeinterface.php');
+    }
 }

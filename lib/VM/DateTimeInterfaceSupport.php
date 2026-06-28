@@ -12,6 +12,9 @@ final class DateTimeInterfaceSupport
     public const INTERFACE_NAME = 'DateTimeInterface';
     public const INTERFACE_LC = 'datetimeinterface';
 
+    /** php-src ext/date/php_date.c — internal interface; user classes cannot implement. */
+    public const USER_IMPLEMENTATION_FORBIDDEN_MESSAGE = "DateTimeInterface can't be implemented by user classes";
+
     /** @var array<string, string> constant name (lowercase) => format string (php-src ext/date/php_date.c) */
     private const FORMAT_CONSTANTS = [
         'atom' => 'Y-m-d\\TH:i:sP',
@@ -46,5 +49,10 @@ final class DateTimeInterfaceSupport
     public static function isDateTimeInterfaceLc(string $ifaceLc): bool
     {
         return self::INTERFACE_LC === strtolower(ltrim($ifaceLc, '\\'));
+    }
+
+    public static function rejectsUserImplementationLc(string $ifaceLc): bool
+    {
+        return self::isDateTimeInterfaceLc($ifaceLc);
     }
 }
