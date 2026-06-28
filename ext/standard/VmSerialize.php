@@ -45,6 +45,7 @@ final class VmSerialize
                 throw new \Exception("Serialization of 'Closure' is not allowed");
             }
             $entry = $value->toObject();
+            self::rejectAnonymousClassSerialization($entry);
             $lcClass = strtolower($entry->class->name);
             if (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
                 return DateTimeSupport::encodeZendSerializeWire($entry);
@@ -403,6 +404,7 @@ final class VmSerialize
         if (0 === strcasecmp($entry->class->name, 'Closure')) {
             throw new \Exception("Serialization of 'Closure' is not allowed");
         }
+        self::rejectAnonymousClassSerialization($entry);
         $existing = $state->lookupObjectIndex($entry);
         if (null !== $existing) {
             return 'r:'.$existing.';';
@@ -1054,6 +1056,14 @@ final class VmSerialize
         }
 
         return isset($class->methods['serialize'], $class->methods['unserialize']);
+    }
+
+    /** php-src ext/standard/var.c — reject class@anonymous before __serialize/__sleep. */
+    private static function rejectAnonymousClassSerialization(ObjectEntry $entry): void
+    {
+        if (str_contains($entry->class->name, '@anonymous')) {
+            throw new \Exception("Serialization of 'class@anonymous' is not allowed");
+        }
     }
 
     private static function hasInstanceMethod(ClassEntry $class, string $methodName): bool
