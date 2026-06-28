@@ -68,10 +68,12 @@ final class DirectoryIteratorBuiltin
 /** @internal */
 final class DirectoryIteratorStorage
 {
-    /** @var array<int, array{dirPath: string, handle: int, filename: string|false, index: int}> */
+    /** @var array<int, array{dirPath: string, handle: int, filename: string|false, index: int, flags: int}> */
     private static array $store = [];
 
-    public static function open(ObjectEntry $object, string $path): void
+    public const FLAG_SKIP_DOTS = 4096;
+
+    public static function open(ObjectEntry $object, string $path, int $flags = 0): void
     {
         $handle = VmDir::opendir($path);
         if (false === $handle) {
@@ -84,6 +86,7 @@ final class DirectoryIteratorStorage
             'handle' => $handle,
             'filename' => false,
             'index' => 0,
+            'flags' => $flags,
         ];
         self::rewind($object);
     }
@@ -123,7 +126,13 @@ final class DirectoryIteratorStorage
         return self::joinPath($state['dirPath'], $state['filename']);
     }
 
-    /** @return array{dirPath: string, handle: int, filename: string|false, index: int} */
+    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int} */
+    public static function iteratorState(ObjectEntry $object): array
+    {
+        return self::state($object);
+    }
+
+    /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -136,9 +145,25 @@ final class DirectoryIteratorStorage
     private static function readCurrent(ObjectEntry $object): void
     {
         $state = &self::$store[$object->id];
-        $entry = VmDir::readdir($state['handle']);
-        $state['filename'] = false === $entry ? false : $entry;
+        do {
+            $entry = VmDir::readdir($state['handle']);
+            $state['filename'] = false === $entry ? false : $entry;
+        } while (
+            false !== $state['filename']
+            && self::shouldSkipDots($state)
+            && self::isDotEntry($state['filename'])
+        );
         SplFileInfoStorage::init($object, self::pathname($object));
+    }
+
+    private static function shouldSkipDots(array $state): bool
+    {
+        return 0 !== ($state['flags'] & self::FLAG_SKIP_DOTS);
+    }
+
+    private static function isDotEntry(string $name): bool
+    {
+        return '.' === $name || '..' === $name;
     }
 
     private static function joinPath(string $dir, string $name): string
