@@ -13,7 +13,7 @@ use PHPCfg\Traverser;
 use PHPCfg\Visitor\DeclarationFinder;
 
 /**
- * Compile-time check: implements/extends targets must match Zend hierarchy rules (#12971).
+ * Compile-time check: implements/extends targets must match Zend hierarchy rules (#12971, #12972).
  *
  * php-src: Zend/zend_compile.c — zend_do_implement_interface(), zend_do_inheritance()
  */
@@ -157,6 +157,7 @@ final class ImplementsHierarchyCompileCheck
     private function verify(): void
     {
         foreach ($this->classes as $class) {
+            $this->rejectDuplicateImplements('Class', $class['display'], $class['implements']);
             foreach ($class['implements'] as $targetLc) {
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
@@ -177,6 +178,7 @@ final class ImplementsHierarchyCompileCheck
         }
 
         foreach ($this->enums as $enum) {
+            $this->rejectDuplicateImplements('Enum', $enum['display'], $enum['implements']);
             foreach ($enum['implements'] as $targetLc) {
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
@@ -189,6 +191,7 @@ final class ImplementsHierarchyCompileCheck
         }
 
         foreach ($this->interfaceExtends as $iface) {
+            $this->rejectDuplicateImplements('Interface', $iface['display'], $iface['extends']);
             foreach ($iface['extends'] as $targetLc) {
                 if (isset($this->nonInterfaces[$targetLc])) {
                     throw new \CompileError(sprintf(
@@ -198,6 +201,26 @@ final class ImplementsHierarchyCompileCheck
                     ));
                 }
             }
+        }
+    }
+
+    /**
+     * @param list<string> $targetLcs
+     */
+    private function rejectDuplicateImplements(string $kind, string $subjectDisplay, array $targetLcs): void
+    {
+        $seen = [];
+        foreach ($targetLcs as $targetLc) {
+            if (isset($seen[$targetLc])) {
+                $ifaceDisplay = $this->interfaces[$targetLc] ?? $targetLc;
+                throw new \CompileError(sprintf(
+                    '%s %s cannot implement previously implemented interface %s',
+                    $kind,
+                    $subjectDisplay,
+                    $ifaceDisplay
+                ));
+            }
+            $seen[$targetLc] = true;
         }
     }
 
