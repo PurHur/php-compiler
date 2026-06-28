@@ -413,13 +413,14 @@ final class CompilerVersion
 
     /**
      * PHP 8.4+ http_get_last_response_headers()/get_last_response_headers()/http_clear_last_response_headers()
-     * (ext/standard/http.c, issue #12855).
+     * (ext/standard/http.c, issue #12855, #12948).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Enabled on the 8.4.0-dev forward line via builtinAdvertisementVersion — distinct from
+     * stable-only gates that keep 8.4.0-dev matching Zend 8.2 phantom rejection (#11846).
      */
     public static function supportsHttpLastResponseHeaders(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
