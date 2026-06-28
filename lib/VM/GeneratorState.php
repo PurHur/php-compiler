@@ -59,6 +59,9 @@ final class GeneratorState
 
     public Variable $pendingThrow;
 
+    /** Foreach iteration must observe yielded values before a trailing throw (#13366). */
+    public bool $foreachAdvance = false;
+
     /** Closure binding when this generator was created from a closure (#6567). */
     public ?ClosureState $closureCall = null;
 
