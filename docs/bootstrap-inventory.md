@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3418 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9036 |
+| Source constructs flagged (warnings) | 9040 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2210,7 +2210,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/EnumCaseListRewriter.php` | 0 | 1 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
-| `lib/Func/Internal.php` | 0 | 3 |
+| `lib/Func/Internal.php` | 0 | 7 |
 | `lib/Func/JIT.php` | 0 | 2 |
 | `lib/Func/PHP.php` | 0 | 1 |
 | `lib/GenericArrayTypeSourceRewriter.php` | 0 | 1 |
@@ -15208,8 +15208,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/register_shutdown_function.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 41)
-- new Variable (line 53)
+- new Variable (line 39)
+- new Variable (line 51)
 - 2 class method(s)
 
 ### `ext/standard/rename_.php`
@@ -17706,7 +17706,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Frame (line 33)
 - new ArgumentCountError (line 89)
-- 9 class method(s)
+- new ArgumentCountError (line 97)
+- new ArgumentCountError (line 105)
+- new ArgumentCountError (line 113)
+- new ArgumentCountError (line 116)
+- 17 class method(s)
 
 ### `lib/Func/JIT.php`
 
@@ -24911,7 +24915,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/MemoryAccounting.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 14 class method(s)
 
 ### `lib/VM/NamedArgs.php`
 
