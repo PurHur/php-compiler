@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
+use PHPCompiler\VM\Variable;
 
 final class InlineCallArgProducerSlotTest extends TestCase
 {
@@ -684,6 +685,65 @@ PHP;
         $out = ob_get_clean();
         self::assertStringContainsString('NAN', $out);
         self::assertStringContainsString('INF', $out);
+    }
+
+    /** Issue #12764 — inline array of sprintf(NAN/INF) must wire each hoisted ConstFetch, not a prior sibling FuncCall. */
+    public function testSprintfNanInfInlineArrayUsesConstFetchProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$lines = [
+    sprintf('%F', NAN),
+    sprintf('%G', NAN),
+];
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'sprintf_nan_inf_inline_array.php');
+
+        $ops = $block->opCodes;
+        $nanFetchSlots = [];
+        for ($i = 0, $n = \count($ops); $i < $n; ++$i) {
+            $op = $ops[$i];
+            if (OpCode::TYPE_CONST_FETCH !== $op->type) {
+                continue;
+            }
+            $nameConst = $block->constants[$op->arg2] ?? null;
+            if (null === $nameConst || Variable::TYPE_STRING !== $nameConst->type || 'NAN' !== $nameConst->toString()) {
+                continue;
+            }
+            $nanFetchSlots[] = (int) $op->arg1;
+            $argSends = [];
+            for ($j = $i + 1; $j < $n && \count($argSends) < 2; ++$j) {
+                if (OpCode::TYPE_ARG_SEND === $ops[$j]->type) {
+                    $argSends[] = (int) $ops[$j]->arg1;
+                }
+            }
+            self::assertCount(2, $argSends, 'expected format+value sends after NAN fetch');
+            self::assertSame((int) $op->arg1, $argSends[1], 'NAN fetch slot must feed sprintf value arg');
+        }
+
+        self::assertCount(2, $nanFetchSlots, 'NAN fetch slots='.json_encode($nanFetchSlots));
+    }
+
+    /** Issue #12764 — sprintf(NAN/INF) inside inline array literal matches Zend at runtime. */
+    public function testSprintfNanInfInlineArrayRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_sprintf_nan_case.php');
+        self::assertIsString($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_sprintf_nan_case.php');
+
+        ob_start();
+        try {
+            $runtime->run($block);
+            $out = ob_get_clean();
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            ob_end_clean();
+            self::fail('sprintf NAN/INF inline array repro exited '.$e->status);
+        }
+
+        self::assertSame("ok\n", $out);
     }
 
     /** Issue #10231 — sibling inline Array_ producers map to distinct array_replace arg slots. */
