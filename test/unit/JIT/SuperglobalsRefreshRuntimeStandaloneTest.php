@@ -36,12 +36,13 @@ final class SuperglobalsRefreshRuntimeStandaloneTest extends TestCase
         }
     }
 
-    public function testStandaloneDefaultUsesLlvmRefreshNotPhpBridge(): void
+    public function testStandaloneDefaultUsesPhpBridgeNotLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
         $this->assertStringContainsString('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP', $source);
         $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringContainsString('SuperglobalRefreshStandaloneLlvm::implement', $source);
+        $this->assertStringContainsString("'0' === \$phpBridge", $source);
     }
 
     public function testSuperglobalsRefreshCFileRemoved(): void

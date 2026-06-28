@@ -57,10 +57,10 @@ final class StringMultipart
         }
 
         $phpBridge = getenv('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP');
-        if ('1' === $phpBridge || 'true' === strtolower((string) $phpBridge)) {
-            return false;
+        if ('0' === $phpBridge || 'false' === strtolower((string) $phpBridge)) {
+            return true;
         }
 
-        return true;
+        return false;
     }
 }
