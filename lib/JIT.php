@@ -8262,9 +8262,12 @@ class JIT {
                 case OpCode::TYPE_MUL:
                 case OpCode::TYPE_PLUS:
                 case OpCode::TYPE_MINUS:
+                    if (null === $op->arg3) {
+                        break;
+                    }
                     if ($op->isIncDec && (OpCode::TYPE_PLUS === $op->type || OpCode::TYPE_MINUS === $op->type)) {
                         $this->maybeRefreshIncludeBindingsBeforeUse();
-                        $left = $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, 'inc/dec left'));
+                        $left = $this->context->getVariableFromOp($this->binaryOpLeftOperand($block, $op));
                         $right = $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, 'inc/dec right'));
                         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
                         $literal = JIT\JitStringArg::compileTimeLiteral($left) ?? JIT\JitStringArg::compileTimeLiteral($right);
@@ -8294,12 +8297,15 @@ class JIT {
                 case OpCode::TYPE_SMALLER:
                 case OpCode::TYPE_IDENTICAL:
                 case OpCode::TYPE_NOT_IDENTICAL:
+                    if (null === $op->arg3) {
+                        break;
+                    }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->compileBinaryOp(
                             $op,
-                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->binaryOpLeftOperand($block, $op)),
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
@@ -8308,12 +8314,15 @@ class JIT {
                 case OpCode::TYPE_NOT_EQUAL:
                 case OpCode::TYPE_LOGICAL_XOR:
                 case OpCode::TYPE_SPACESHIP:
+                    if (null === $op->arg3) {
+                        break;
+                    }
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $this->assignOperand(
                         $this->operandAt($block, $op->arg1, opcode_type_name($op->type).' result'),
                         $this->compileBinaryOp(
                             $op,
-                            $this->context->getVariableFromOp($this->operandAt($block, $op->arg2, opcode_type_name($op->type).' left')),
+                            $this->context->getVariableFromOp($this->binaryOpLeftOperand($block, $op)),
                             $this->context->getVariableFromOp($this->operandAt($block, $op->arg3, opcode_type_name($op->type).' right'))
                         )
                     );
@@ -10159,6 +10168,24 @@ class JIT {
         }
 
         return $block->getOperand($slot);
+    }
+
+    /** AssignOp peephole may leave arg2 null; lvalue lives in arg1 (#13062, #6438). */
+    private function binaryOpLeftSlot(OpCode $op): int
+    {
+        if (null !== $op->arg2) {
+            return (int) $op->arg2;
+        }
+        if (null === $op->arg1) {
+            throw new \LogicException('Missing operand slot for '.opcode_type_name($op->type).' left');
+        }
+
+        return (int) $op->arg1;
+    }
+
+    private function binaryOpLeftOperand(Block $block, OpCode $op): Operand
+    {
+        return $this->operandAt($block, $this->binaryOpLeftSlot($op), opcode_type_name($op->type).' left');
     }
 
     private function isVoidCfgFunction(Block $block): bool
@@ -13025,8 +13052,10 @@ class JIT {
     private function compileIncDecOp(Block $block, OpCode $op, bool $increment, bool $prefix): void
     {
         $this->maybeRefreshIncludeBindingsBeforeUse();
-        $readOp = $this->operandAt($block, $op->arg2, 'inc/dec read');
-        $writeOp = $this->operandAt($block, $op->arg3, 'inc/dec write');
+        $readSlot = $op->arg2 ?? $op->arg3;
+        $writeSlot = $op->arg3 ?? $op->arg2;
+        $readOp = $this->operandAt($block, $readSlot, 'inc/dec read');
+        $writeOp = $this->operandAt($block, $writeSlot, 'inc/dec write');
         $resultOp = $this->operandAt($block, $op->arg1, 'inc/dec result');
         $read = $this->context->getVariableFromOpInScopes($readOp);
         $write = $this->context->getVariableFromOpInScopes($writeOp);

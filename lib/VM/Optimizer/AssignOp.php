@@ -49,6 +49,7 @@ class AssignOp extends Optimizer
                     // We can safely replace it with an assign op
                     $binaryDest = $prior->arg1;
                     $prior->arg1 = $op->arg2;
+                    $prior->arg2 = $op->arg2;
                     $assignResult = $block->getOperand($op->arg1);
                     if ((int) $op->arg3 === (int) $binaryDest || empty($assignResult->usages)) {
                         // Binary result was only copied into the assign dest; redirect makes assign dead (#11801).
