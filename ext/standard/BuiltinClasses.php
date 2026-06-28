@@ -15,6 +15,6 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
-        // No ext/standard-only builtin classes today (#10325).
+        DirectoryBuiltin::registerClass($ctx);
     }
 }

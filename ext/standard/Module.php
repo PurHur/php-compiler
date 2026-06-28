@@ -801,6 +801,7 @@ class Module extends ModuleAbstract
             new compact_(),
             new scandir(),
             new opendir(),
+            new dir_(),
             new readdir(),
             new closedir(),
             new rewinddir(),
