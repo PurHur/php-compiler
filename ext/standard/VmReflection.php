@@ -1716,7 +1716,7 @@ final class VmReflection
             return $ctx->classes[$lc] ?? null;
         }
 
-        throw new \LogicException('get_class_methods() argument must be an object or class name string in this compiler build');
+        return null;
     }
 
     /**
