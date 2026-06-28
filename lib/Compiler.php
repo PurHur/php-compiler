@@ -15731,6 +15731,17 @@ class Compiler {
                 $mid instanceof Op\Expr\ConstFetch
                 || $mid instanceof Op\Expr\ClassConstFetch
             ) {
+                // [sprintf('%F', NAN), sprintf('%G', NAN)] — trailing ConstFetch feeds this call (#12764).
+                if (
+                    ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                    && $j === $consumerIndex - 1
+                ) {
+                    $trailingArgIndex = $this->soleNonEmbeddedCallArgIndex($consumer->args)
+                        ?? ($argCount - 1);
+                    if ($targetArgIndex === $trailingArgIndex) {
+                        return false;
+                    }
+                }
                 continue;
             }
             // array_merge(array_keys($src), [...]) — sibling inline Array_ between hoisted producers (#12450).
