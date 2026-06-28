@@ -38,9 +38,7 @@ final class getimagesize extends Internal
         }
         $result = VmImage::getImageSize($filename, $imageinfo);
         if (false === $result) {
-            if (VmImage::pathPayloadReadable($filename)) {
-                VmImage::emitImageReadNotice($frame, 'getimagesize', $filename);
-            } else {
+            if (!VmImage::pathPayloadReadable($filename)) {
                 VmStreamOpenFailure::warnFailedToOpen($frame, 'getimagesize', $filename);
             }
             $frame->returnVar->bool(false);
