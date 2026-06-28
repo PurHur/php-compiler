@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -78,13 +79,12 @@ final class StringHttpBuildQuery
 
         $entry = $fn->appendBasicBlock('http_build_query_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::BUILD_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1),
-            $fn->getParam(2),
-            $fn->getParam(3)
+            [$fn->getParam(0), $fn->getParam(1), $fn->getParam(2), $fn->getParam(3)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }

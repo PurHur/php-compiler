@@ -26,6 +26,8 @@ final class JitIsResource
 
         $bucketBase = $i64->constInt(\PHPCompiler\JIT\Builtin\StreamBucketRuntime::BUCKET_HANDLE_BASE, false);
         $filterBase = $i64->constInt(StreamFilterJitHelper::HANDLE_BASE, false);
+        $trueVal = $context->constantFromBool(true);
+        $falseVal = $context->constantFromBool(false);
         $isBucketRange = $context->builder->icmp(Builder::INT_SGE, $handleLong, $bucketBase);
         $bucketProbe = BasicBlockHelper::append($context, 'is_resource_bucket_probe');
         $filterProbe = BasicBlockHelper::append($context, 'is_resource_filter_probe');
@@ -85,17 +87,16 @@ final class JitIsResource
             $handleLong
         );
         $streamOk = $context->builder->icmp(Builder::INT_EQ, $ret, $oneI32);
+        $streamResult = $context->builder->select($streamOk, $trueVal, $falseVal);
         $streamEnd = $context->builder->getInsertBlock();
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
         $phi = $context->builder->phi($i1, 'is_resource_phi');
-        $trueVal = $context->constantFromBool(true);
-        $falseVal = $context->constantFromBool(false);
         $phi->addIncoming($trueVal, $bucketEnd);
         $phi->addIncoming($trueVal, $brigadeEnd);
         $phi->addIncoming($trueVal, $filterEnd);
-        $phi->addIncoming($context->builder->select($streamOk, $trueVal, $falseVal), $streamEnd);
+        $phi->addIncoming($streamResult, $streamEnd);
 
         return $phi;
     }

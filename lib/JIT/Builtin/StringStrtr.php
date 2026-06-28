@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableNestedExportLlvm;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -109,11 +110,12 @@ final class StringStrtr
 
         $entry = $fn->appendBasicBlock('strtr_array_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(
+        $resultRaw = JitNestedHelperCoerce::callHelper(
+            $context,
             self::helperFunction($context, self::STRTR_ARRAY),
-            $fn->getParam(0),
-            $fn->getParam(1)
+            [$fn->getParam(0), $fn->getParam(1)]
         );
+        $result = JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $resultRaw);
         $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
     }
