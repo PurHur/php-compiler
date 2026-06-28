@@ -9,6 +9,7 @@ use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\AttributeSupport;
 use PHPCompiler\VM\Builtin\DeprecatedConstruct;
+use PHPCompiler\VM\Builtin\EnumCasesConstruct;
 use PHPCompiler\VM\Builtin\NoDiscardConstruct;
 use PHPCompiler\VM\Builtin\OverrideConstruct;
 use PHPCompiler\VM\ClassEntry;
@@ -41,6 +42,9 @@ final class BuiltinAttributes
         }
         if (CompilerVersion::advertisesNoDiscardAttributeClass()) {
             self::registerNoDiscard($ctx);
+        }
+        if (CompilerVersion::advertisesEnumCasesAttributeClass()) {
+            self::registerEnumCases($ctx);
         }
         if (CompilerVersion::advertisesDelayedTargetValidationAttributeClass()) {
             self::registerDelayedTargetValidation($ctx);
@@ -138,6 +142,27 @@ final class BuiltinAttributes
         ];
 
         $ctx->classes[AttributeSupport::CLASS_NODISCARD] = $entry;
+    }
+
+    private static function registerEnumCases(Context $ctx): void
+    {
+        $strProto = new Variable(Variable::TYPE_STRING);
+        $pub = CfgFunc::FLAG_PUBLIC;
+
+        $entry = new ClassEntry('EnumCases');
+        $entry->parentLc = AttributeSupport::CLASS_ATTRIBUTE;
+        $entry->properties[] = new ClassProperty('name', null, $strProto, true);
+        $entry->constructor = new EnumCasesConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+
+        $targets = AttributeSupport::TARGET_CLASS_CONSTANT;
+        $entry->attributeNames = ['Attribute'];
+        $entry->attributeEntries = [
+            new AttributeEntry('Attribute', [['name' => null, 'value' => $targets]]),
+        ];
+
+        $ctx->classes[AttributeSupport::CLASS_ENUM_CASES] = $entry;
     }
 
     private static function registerDelayedTargetValidation(Context $ctx): void

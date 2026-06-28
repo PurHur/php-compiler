@@ -31,6 +31,8 @@ final class AttributeSupport
 
     public const CLASS_COMPILE_TIME = 'compiletime';
 
+    public const CLASS_ENUM_CASES = 'enumcases';
+
     /** Zend ZEND_ATTRIBUTE_TARGET_* flags (zend_attributes.h). */
     public const TARGET_CLASS = 1;
 
