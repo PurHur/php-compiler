@@ -23,7 +23,8 @@ final class SplObjectStorageBuiltin
     /**
      * @var array<int, array{
      *   entries: array<string, Variable>,
-     *   order: list<string>
+     *   order: list<string>,
+     *   pos: int
      * }>
      */
     private static array $store = [];
@@ -52,6 +53,12 @@ final class SplObjectStorageBuiltin
             'attach' => SplObjectStorageAttach::class,
             'contains' => SplObjectStorageContains::class,
             'count' => SplObjectStorageCount::class,
+            'detach' => SplObjectStorageDetach::class,
+            'rewind' => SplObjectStorageRewind::class,
+            'valid' => SplObjectStorageValid::class,
+            'current' => SplObjectStorageCurrent::class,
+            'key' => SplObjectStorageKey::class,
+            'next' => SplObjectStorageNext::class,
             'offsetget' => SplObjectStorageOffsetGet::class,
             'offsetset' => SplObjectStorageOffsetSet::class,
             'offsetexists' => SplObjectStorageOffsetExists::class,
@@ -71,15 +78,20 @@ final class SplObjectStorageBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['offsetset'], $entry->methods['attach']);
+        return isset(
+            $entry->methods['offsetset'],
+            $entry->methods['attach'],
+            $entry->methods['detach'],
+            $entry->methods['rewind']
+        );
     }
 
     public static function init(ObjectEntry $object): void
     {
-        self::$store[$object->id] = ['entries' => [], 'order' => []];
+        self::$store[$object->id] = ['entries' => [], 'order' => [], 'pos' => 0];
     }
 
-    /** @return array{entries: array<string, Variable>, order: list<string>} */
+    /** @return array{entries: array<string, Variable>, order: list<string>, pos: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -141,19 +153,70 @@ final class SplObjectStorageBuiltin
         return self::contains($storage, $object);
     }
 
+    public static function detach(ObjectEntry $storage, Variable $object): void
+    {
+        self::offsetUnset($storage, $object);
+    }
+
     public static function offsetUnset(ObjectEntry $storage, Variable $object): void
     {
         $key = WeakRefSupport::objectKey($object);
         if (!isset(self::state($storage)['entries'][$key])) {
             return;
         }
+        $order = self::$store[$storage->id]['order'];
+        $removedIndex = array_search($key, $order, true);
         unset(self::$store[$storage->id]['entries'][$key]);
         self::$store[$storage->id]['order'] = array_values(
-            array_filter(
-                self::$store[$storage->id]['order'],
-                static fn (string $storedKey): bool => $storedKey !== $key
-            )
+            array_filter($order, static fn (string $storedKey): bool => $storedKey !== $key)
         );
+        if (false !== $removedIndex) {
+            $pos = self::$store[$storage->id]['pos'];
+            if ($removedIndex < $pos) {
+                --self::$store[$storage->id]['pos'];
+            } elseif ($removedIndex === $pos) {
+                self::$store[$storage->id]['pos'] = min($pos, \count(self::$store[$storage->id]['order']));
+            }
+        }
+    }
+
+    public static function rewind(ObjectEntry $storage): void
+    {
+        self::$store[$storage->id]['pos'] = 0;
+    }
+
+    public static function next(ObjectEntry $storage): void
+    {
+        ++self::$store[$storage->id]['pos'];
+    }
+
+    public static function valid(ObjectEntry $storage): bool
+    {
+        $state = self::state($storage);
+
+        return $state['pos'] >= 0 && $state['pos'] < \count($state['order']);
+    }
+
+    public static function current(ObjectEntry $storage): Variable
+    {
+        if (!self::valid($storage)) {
+            throw new \RuntimeException('Called current() on invalid iterator position');
+        }
+        $key = self::state($storage)['order'][self::$store[$storage->id]['pos']];
+        $object = WeakRefSupport::resolveMapKeyVariable($key);
+        if (null === $object) {
+            throw new \LogicException('SplObjectStorage iterator object missing');
+        }
+
+        return $object;
+    }
+
+    public static function key(ObjectEntry $storage): Variable
+    {
+        $out = new Variable();
+        $out->bool(false);
+
+        return $out;
     }
 }
 
@@ -326,6 +389,129 @@ final class SplObjectStorageOffsetExists extends VmClassMethod
         }
         $frame->returnVar->bool(
             SplObjectStorageBuiltin::offsetExists($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+final class SplObjectStorageDetach extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('detach');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::detach()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplObjectStorage::detach() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplObjectStorageBuiltin::detach($object, $frame->calledArgs[1]);
+    }
+}
+
+final class SplObjectStorageRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::rewind()'
+        );
+        SplObjectStorageBuiltin::rewind($object);
+    }
+}
+
+final class SplObjectStorageNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::next()'
+        );
+        SplObjectStorageBuiltin::next($object);
+    }
+}
+
+final class SplObjectStorageValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::valid()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(SplObjectStorageBuiltin::valid($object));
+    }
+}
+
+final class SplObjectStorageCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::current()'
+        );
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplObjectStorageBuiltin::current($object)
+        );
+    }
+}
+
+final class SplObjectStorageKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::key()'
+        );
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplObjectStorageBuiltin::key($object)
         );
     }
 }
