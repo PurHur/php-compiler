@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -14,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for asort()/arsort() via ValueSortJitHelper PHP (#12771).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::asortByValue()} et al.
+ * Embed and standalone AOT compile the same PHP bridge (#13053).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::asortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::arsortCopy()}
  * php-src: ext/standard/array.c — php_array_asort / php_array_arsort
@@ -44,8 +43,7 @@ final class ValueSortRuntime
 
     public static function asortByValue(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::asortByValue($context, $array);
 
             return;
@@ -59,8 +57,7 @@ final class ValueSortRuntime
 
     public static function asortByValueLocale(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::asortByValueLocale($context, $array);
 
             return;
@@ -74,8 +71,7 @@ final class ValueSortRuntime
 
     public static function arsortByValue(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::arsortByValue($context, $array);
 
             return;
@@ -94,10 +90,6 @@ final class ValueSortRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
