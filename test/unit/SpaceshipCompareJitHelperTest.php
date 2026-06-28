@@ -34,8 +34,14 @@ final class SpaceshipCompareJitHelperTest extends TestCase
         $this->assertStringContainsString('CompareJitHelper::objectSpaceship', $source);
         $this->assertStringContainsString('CompareJitHelper::hashtableSpaceship', $source);
         $this->assertStringContainsString('emitObjectCompareSpaceshipBridge', $source);
+        $this->assertStringContainsString('emitHashtableCompareSpaceshipBridge', $source);
+        $this->assertStringNotContainsString('emitObjectCompareSpaceship(', $source);
+        $this->assertStringNotContainsString('emitHashtableCompareSpaceship(', $source);
+        $this->assertStringNotContainsString('__object__prop_count', $source);
         $this->assertStringNotContainsString('JitFloatCompare', $source);
         $this->assertStringNotContainsString('stringIsNumeric', $source);
+        $loc = substr_count($source, "\n") + 1;
+        $this->assertLessThan(950, $loc, 'SpaceshipCompareJit.php LOC after standalone LLVM deletion (#12981)');
     }
 
     public function testCompareJitHelperObjectAndHashtableSemantics(): void
