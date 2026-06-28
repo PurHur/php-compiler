@@ -51,6 +51,7 @@ final class SplObjectStorageBuiltin
         $entry->methodVisibility['__construct'] = $pub;
         foreach ([
             'attach' => SplObjectStorageAttach::class,
+            'addall' => SplObjectStorageAddAll::class,
             'contains' => SplObjectStorageContains::class,
             'count' => SplObjectStorageCount::class,
             'detach' => SplObjectStorageDetach::class,
@@ -77,6 +78,7 @@ final class SplObjectStorageBuiltin
         $entry->methodNames['getinfo'] = 'getInfo';
         $entry->methodNames['setinfo'] = 'setInfo';
         $entry->methodNames['gethash'] = 'getHash';
+        $entry->methodNames['addall'] = 'addAll';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -87,6 +89,7 @@ final class SplObjectStorageBuiltin
         return isset(
             $entry->methods['offsetset'],
             $entry->methods['attach'],
+            $entry->methods['addall'],
             $entry->methods['detach'],
             $entry->methods['rewind'],
             $entry->methods['getinfo']
@@ -106,6 +109,18 @@ final class SplObjectStorageBuiltin
         }
 
         return self::$store[$object->id];
+    }
+
+    public static function addAll(ObjectEntry $storage, ObjectEntry $other): void
+    {
+        $otherState = self::state($other);
+        foreach ($otherState['order'] as $key) {
+            $object = WeakRefSupport::resolveMapKeyVariable($key);
+            if (null === $object) {
+                continue;
+            }
+            self::attach($storage, $object, $otherState['entries'][$key]);
+        }
     }
 
     public static function attach(ObjectEntry $storage, Variable $object, ?Variable $info = null): void
@@ -306,6 +321,58 @@ final class SplObjectStorageAttach extends VmClassMethod
         }
         $info = isset($frame->calledArgs[2]) ? $frame->calledArgs[2] : null;
         SplObjectStorageBuiltin::attach($object, $frame->calledArgs[1], $info);
+    }
+}
+
+final class SplObjectStorageAddAll extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('addAll');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplObjectStorageBuiltin::CLASS_LC,
+            'SplObjectStorage::addAll()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplObjectStorage::addAll() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $otherVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $otherVar->type) {
+            throw new \TypeError(
+                'SplObjectStorage::addAll(): Argument #1 ($storage) must be of type SplObjectStorage, '
+                .self::typeLabel($otherVar).' given'
+            );
+        }
+        $other = $otherVar->toObject();
+        if (strtolower($other->class->name) !== SplObjectStorageBuiltin::CLASS_LC) {
+            throw new \TypeError(
+                'SplObjectStorage::addAll(): Argument #1 ($storage) must be of type SplObjectStorage, '
+                .$other->class->name.' given'
+            );
+        }
+        SplObjectStorageBuiltin::addAll($object, $other);
+    }
+
+    private static function typeLabel(Variable $value): string
+    {
+        return match ($value->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_INT => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => $value->toObject()->class->name,
+            default => 'mixed',
+        };
     }
 }
 
