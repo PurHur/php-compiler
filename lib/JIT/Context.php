@@ -783,7 +783,6 @@ class Context {
             Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            Builtin\Sscanf::ensureStandaloneBodies($this);
             Builtin\StringStripTags::ensureStandaloneBodies($this);
             Builtin\StringStrtr::ensureStandaloneBodies($this);
             Builtin\StringParseStrJit::ensureStandaloneBodies($this);
@@ -795,7 +794,7 @@ class Context {
             Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
-            Builtin\StringFormat::ensureStandaloneBodies($this);
+            Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
