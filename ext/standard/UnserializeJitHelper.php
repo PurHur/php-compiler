@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
+
 /**
  * Lowered into JIT/AOT modules for unserialize() runtime (#9163, php-in-PHP).
  *
@@ -11,31 +16,35 @@ namespace PHPCompiler\ext\standard;
  */
 final class UnserializeJitHelper
 {
-    /**
-     * @return array<mixed>|bool|float|int|null|string
-     */
-    public static function decode(string $payload): mixed
+    public static function decode(string $payload): Variable
     {
-        $decoded = VmUnserializeFormat::decodePayload($payload);
-        if (false === $decoded) {
-            return false;
+        $ctx = self::requireActiveContext();
+        $result = VmUnserializeFormat::decodeToVariableWithContext($ctx, $payload);
+        if (false === $result) {
+            $false = new Variable();
+            $false->bool(false);
+
+            return $false;
         }
 
-        return $decoded;
+        return $result;
     }
 
-    /**
-     * Session wire decode: array payload or empty array on failure (#6086).
-     *
-     * @return array<string, mixed>
-     */
-    public static function decodeSession(string $payload): array
+    /** Session wire decode: key|serialized pairs or empty hashtable on failure (#6086). */
+    public static function decodeSession(string $payload): HashTable
     {
-        $decoded = VmUnserializeFormat::decodePayload($payload);
-        if (!\is_array($decoded)) {
-            return [];
+        $ht = VmSessionSerializer::decodeWireHashTable($payload);
+
+        return $ht ?? new HashTable();
+    }
+
+    private static function requireActiveContext(): Context
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException('unserialize() JIT helper requires active VM context (#9163)');
         }
 
-        return $decoded;
+        return $ctx;
     }
 }

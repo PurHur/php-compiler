@@ -69,7 +69,7 @@ final class RuntimeShrinkCloseoutTest extends TestCase
             'ext/standard/JitSettype.php' => 'JitSettype',
             'ext/standard/VmSerialize.php' => 'resolveEnumCaseVariable',
             'ext/standard/VmUnserializeFormat.php' => 'decodePayload',
-            'lib/JIT/Builtin/StringUnserializeJit.php' => '__compiler_unserialize',
+            'lib/JIT/Builtin/StringUnserialize.php' => 'UnserializeJitHelper',
             'lib/JIT/Builtin/IniRuntime.php' => 'IniJitHelper',
             'lib/JIT/Builtin/IniIntrospectionRuntime.php' => 'IniIntrospectionJitHelper',
             'lib/JIT/Builtin/StringJsonDecode.php' => 'JsonDecodeJitHelper',

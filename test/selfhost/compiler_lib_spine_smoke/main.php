@@ -2703,7 +2703,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringTrimModeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUcwords.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnpack.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserialize.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringUnserializeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrldecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUrlencode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Latin1.php';
