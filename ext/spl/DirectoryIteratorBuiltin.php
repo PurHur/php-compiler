@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmDir;
+use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -50,10 +51,14 @@ final class DirectoryIteratorBuiltin
             'current' => DirectoryIteratorCurrent::class,
             'key' => DirectoryIteratorKey::class,
             'next' => DirectoryIteratorNext::class,
+            'isdot' => DirectoryIteratorIsDot::class,
+            'gettype' => DirectoryIteratorGetType::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['isdot'] = 'isDot';
+        $entry->methodNames['gettype'] = 'getType';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -61,7 +66,13 @@ final class DirectoryIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['valid'], $entry->methods['rewind'], $entry->methods['current']);
+        return isset(
+            $entry->methods['valid'],
+            $entry->methods['rewind'],
+            $entry->methods['current'],
+            $entry->methods['isdot'],
+            $entry->methods['gettype']
+        );
     }
 }
 
@@ -135,6 +146,26 @@ final class DirectoryIteratorStorage
     public static function getFlags(ObjectEntry $object): int
     {
         return self::state($object)['flags'];
+    }
+
+    public static function isDot(ObjectEntry $object): bool
+    {
+        $filename = self::state($object)['filename'];
+        if (false === $filename) {
+            return false;
+        }
+
+        return self::isDotEntry($filename);
+    }
+
+    public static function getType(ObjectEntry $object): string
+    {
+        $type = VmFs::fileType(self::pathname($object));
+        if (false === $type) {
+            return 'unknown';
+        }
+
+        return $type;
     }
 
     public static function setFlags(ObjectEntry $object, int $flags): void
@@ -314,5 +345,44 @@ final class DirectoryIteratorNext extends VmClassMethod
             'DirectoryIterator::next()'
         );
         DirectoryIteratorStorage::next($object);
+    }
+}
+
+final class DirectoryIteratorIsDot extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('isDot');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            DirectoryIteratorBuiltin::CLASS_LC,
+            'DirectoryIterator::isDot()'
+        );
+        SplIteratorSupport::setReturnBool($frame, DirectoryIteratorStorage::isDot($object));
+    }
+}
+
+final class DirectoryIteratorGetType extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getType');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            DirectoryIteratorBuiltin::CLASS_LC,
+            'DirectoryIterator::getType()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(DirectoryIteratorStorage::getType($object));
     }
 }
