@@ -40,7 +40,8 @@ final class touch_ extends Internal
             $atime = self::parseNullableLong($frame->calledArgs[2]->resolveIndirect(), 3, 'atime');
         }
         $ok = VmFs::touch($path, $mtime, $atime);
-        if (!$ok) {
+        // php-src filestat.c php_touch — empty path returns false without E_WARNING (#13343).
+        if (!$ok && '' !== $path) {
             VmFilestatFailure::warnTouchCreateFailed($frame, $path);
         }
         if (null !== $frame->returnVar) {
