@@ -368,6 +368,7 @@ require_once __DIR__.'/../../../ext/spl/RecursiveArrayIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/RecursiveCallbackFilterIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplArraySerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplArrayStorage.php';
+require_once __DIR__.'/../../../ext/spl/SplDoublyLinkedListBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplFileInfoBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplFileInfoStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplFileObjectBuiltin.php';
