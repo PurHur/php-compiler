@@ -289,6 +289,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'dateexception_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesRequestParseBodyExceptionClass()
+                && str_contains($name, 'request_parse_body_exception')
+                && !str_contains($name, 'reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesRequestParseBodyExceptionClass()
+                && str_contains($name, 'request_parse_body_exception_reference_profile')) {
+                continue;
+            }
             if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
                     || !CompilerVersion::advertisesCompileTimeAttributeClass()
                     || !CompilerVersion::advertisesNoDiscardAttributeClass())

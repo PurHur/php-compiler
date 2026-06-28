@@ -187,6 +187,7 @@ final class ThrowableManifest
             'DateError',
             'DateObjectError',
             'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
+            'RequestParseBodyException' => CompilerVersion::advertisesRequestParseBodyExceptionClass(),
             default => true,
         };
     }
