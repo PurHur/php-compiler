@@ -103,13 +103,32 @@ final class ParseIniEngine
             }
 
             if ($processSections && null !== $currentSection) {
-                $result[$currentSection][$key] = $value;
+                self::assignKeyValue($result[$currentSection], $key, $value);
             } else {
-                $result[$key] = $value;
+                self::assignKeyValue($result, $key, $value);
             }
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $target
+     */
+    private static function assignKeyValue(array &$target, string $key, string $value): void
+    {
+        if (str_ends_with($key, '[]')) {
+            $baseKey = substr($key, 0, -2);
+            if (!isset($target[$baseKey]) || !\is_array($target[$baseKey])) {
+                $target[$baseKey] = [$value];
+
+                return;
+            }
+            $target[$baseKey][] = $value;
+
+            return;
+        }
+        $target[$key] = $value;
     }
 
     private static function setSyntaxError(int $line, string $detail): void
