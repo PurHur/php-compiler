@@ -17,7 +17,8 @@ final class SplModuleTest extends TestCase
 
         self::assertTrue(VmReflection::classExists($ctx, 'ArrayObject'));
         self::assertTrue(VmReflection::classExists($ctx, 'SplDoublyLinkedList'));
-        self::assertFalse(VmReflection::classExists($ctx, 'SplQueue'));
+        self::assertTrue(VmReflection::classExists($ctx, 'SplQueue'));
+        self::assertTrue(VmReflection::classExists($ctx, 'SplStack'));
         self::assertTrue(VmReflection::interfaceExists($ctx, 'SplObserver'));
         self::assertTrue(VmReflection::interfaceExists($ctx, 'SplSubject'));
 
@@ -26,10 +27,11 @@ final class SplModuleTest extends TestCase
 echo (int) class_exists('ArrayObject', false);
 echo (int) class_exists('SplDoublyLinkedList', false);
 echo (int) class_exists('SplQueue', false);
+echo (int) class_exists('SplStack', false);
 PHP;
         $block = $runtime->parseAndCompile($code, 'spl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('110', ob_get_clean());
+        self::assertSame('1111', ob_get_clean());
     }
 }

@@ -16,6 +16,7 @@ final class BuiltinClasses
         $before = array_keys($ctx->classes);
         self::registerArrayObject($ctx);
         SplDoublyLinkedListBuiltin::registerClass($ctx);
+        SplQueueSplStackBuiltin::registerClasses($ctx);
         SplFileInfoBuiltin::registerClass($ctx);
         SplFileObjectBuiltin::registerClass($ctx);
         SplTempFileObjectBuiltin::registerClass($ctx);
