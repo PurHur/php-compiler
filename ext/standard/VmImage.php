@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -175,6 +177,23 @@ final class VmImage
         }
 
         return $parsed;
+    }
+
+    /**
+     * php-src ext/standard/image.c php_getimagesize_from_any() — E_NOTICE on read/parse failure.
+     */
+    public static function emitImageReadNotice(Frame $frame, string $function, string $source): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            \sprintf('%s(): Error reading from %s!', $function, $source),
+            ErrorReporter::E_NOTICE,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /** @param array<string, string> $imageinfo */
