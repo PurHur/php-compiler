@@ -136,6 +136,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION,
@@ -152,6 +156,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION,
@@ -168,6 +176,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_MALFORMED_PERIOD_EXCEPTION])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable(
             $ctx,
             self::CLASS_DATE_MALFORMED_PERIOD_EXCEPTION,
@@ -183,6 +195,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_RANGE_ERROR])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable($ctx, self::CLASS_DATE_RANGE_ERROR, $message, $file, $line);
     }
 
@@ -192,6 +208,10 @@ final class BuiltinExceptionSupport
         string $file = '',
         int $line = 0
     ): Variable {
+        if (!isset($ctx->classes[self::CLASS_DATE_OBJECT_ERROR])) {
+            return self::materializeError($ctx, $message, $file, $line);
+        }
+
         return self::materializeThrowable($ctx, self::CLASS_DATE_OBJECT_ERROR, $message, $file, $line);
     }
 

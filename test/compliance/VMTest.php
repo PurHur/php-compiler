@@ -278,6 +278,17 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'nodiscard_class_exists')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesDateExceptionHierarchy()
+                && (str_contains($name, 'dateexception')
+                    || str_contains($name, 'dateerror')
+                    || str_contains($name, 'date_malformed')
+                    || str_contains($name, 'datetimezone_invalid'))) {
+                continue;
+            }
+            if (CompilerVersion::advertisesDateExceptionHierarchy()
+                && str_contains($name, 'dateexception_reference_profile')) {
+                continue;
+            }
             if ((!CompilerVersion::advertisesDelayedTargetValidationAttributeClass()
                     || !CompilerVersion::advertisesCompileTimeAttributeClass()
                     || !CompilerVersion::advertisesNoDiscardAttributeClass())
