@@ -9,7 +9,7 @@ use PHPCompiler\JIT\Context;
 /**
  * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543).
  *
- * Replaces LLVM {@see StringUnpackJit} for JIT modules; standalone keeps StringUnpackJit.
+ * Replaces LLVM {@see StringUnpackJit} for all load types (#9543, #13063).
  * SSOT: {@see \PHPCompiler\ext\standard\UnpackEngine}.
  */
 final class UnpackJitRuntime

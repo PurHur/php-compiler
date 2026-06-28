@@ -20,6 +20,7 @@ final class UnpackJitRuntimeShrinkTest extends TestCase
 
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringUnpack.php');
         $this->assertStringContainsString('UnpackJitHelper', $bridge);
+        $this->assertStringNotContainsString('StringUnpackJit', $bridge);
         $this->assertStringContainsString('VmPack::unpackToHashTable', (string) file_get_contents(__DIR__.'/../../ext/standard/UnpackJitHelper.php'));
         $this->assertStringNotContainsString('emitUnpack', $bridge);
     }
