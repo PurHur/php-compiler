@@ -75,7 +75,7 @@ final class VmSerialize
                 return self::encodeSerializableObject($entry->class->name, $payload);
             }
             if (self::hasInstanceMethod($entry->class, '__sleep')) {
-                return self::encodeSleepObject($ctx, $entry);
+                return self::encodeSleepObject($ctx, $entry, $frame);
             }
 
             return self::encodePlainObjectWire($ctx, $entry, $frame);
@@ -453,7 +453,7 @@ final class VmSerialize
             return self::encodeSerializableObject($entry->class->name, $payload);
         }
         if (self::hasInstanceMethod($entry->class, '__sleep')) {
-            return self::encodeSleepObject($ctx, $entry);
+            return self::encodeSleepObject($ctx, $entry, $frame);
         }
 
         return self::encodePlainObjectWire($ctx, $entry, $frame, $state);
@@ -743,15 +743,55 @@ final class VmSerialize
         return null;
     }
 
-    private static function encodeSleepObject(Context $ctx, ObjectEntry $entry): string
+    private static function encodeSleepObject(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): string
     {
-        $names = self::invokeSleep($ctx, $entry);
+        $names = self::collectSleepPropertyNames($ctx, $entry, $frame);
+        if (null === $names) {
+            return 'N;';
+        }
         $props = [];
         foreach ($names as $name) {
             $props[$name] = $entry->getProperty($name)->resolveIndirect();
         }
 
         return self::encodeObjectPropertyBag($ctx, $entry->class->name, $props);
+    }
+
+    /**
+     * @return list<string>|null null when __sleep() did not return an array (php-src var.c; #13378)
+     */
+    private static function collectSleepPropertyNames(Context $ctx, ObjectEntry $entry, ?Frame $frame = null): ?array
+    {
+        $method = $entry->class->methods['__sleep'] ?? null;
+        if (!$method instanceof PhpFunc) {
+            throw new \LogicException(
+                'Class '.$entry->class->name.'::__sleep() must be a user method in this compiler build'
+            );
+        }
+        $recv = new Variable();
+        $recv->object($entry);
+        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
+        if (Variable::TYPE_ARRAY !== $result->type) {
+            $ctx->errors->triggerError(
+                'serialize(): '.$entry->class->name.'::__sleep() should return an array only containing the names of instance-variables to serialize',
+                ErrorReporter::E_WARNING,
+                null,
+                $ctx,
+                $frame
+            );
+
+            return null;
+        }
+        $names = [];
+        foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
+            $elem = $elem->resolveIndirect();
+            if (Variable::TYPE_STRING !== $elem->type) {
+                throw new \LogicException('__sleep() must return an array of strings');
+            }
+            $names[] = $elem->toString();
+        }
+
+        return $names;
     }
 
     /**
@@ -1059,33 +1099,6 @@ final class VmSerialize
         $method->execute($frame);
 
         return $out;
-    }
-
-    /** @return list<string> */
-    private static function invokeSleep(Context $ctx, ObjectEntry $entry): array
-    {
-        $method = $entry->class->methods['__sleep'] ?? null;
-        if (!$method instanceof PhpFunc) {
-            throw new \LogicException(
-                'Class '.$entry->class->name.'::__sleep() must be a user method in this compiler build'
-            );
-        }
-        $recv = new Variable();
-        $recv->object($entry);
-        $result = $ctx->runtime->vm->invokePhpFunction($method, $recv);
-        if (Variable::TYPE_ARRAY !== $result->type) {
-            throw new \LogicException('__sleep() must return an array');
-        }
-        $names = [];
-        foreach ($result->toArray()->iterateKeyed(true) as [, $elem]) {
-            $elem = $elem->resolveIndirect();
-            if (Variable::TYPE_STRING !== $elem->type) {
-                throw new \LogicException('__sleep() must return an array of strings');
-            }
-            $names[] = $elem->toString();
-        }
-
-        return $names;
     }
 
     private static function invokeLegacySerializableSerialize(Context $ctx, ObjectEntry $entry): string
