@@ -152,8 +152,14 @@ final class RecursiveDirectoryIteratorBuiltin
 
     public static function registerClass(Context $ctx): void
     {
-        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
-            return;
+        if (isset($ctx->classes[self::CLASS_LC])) {
+            $existing = $ctx->classes[self::CLASS_LC];
+            if (!\in_array('RecursiveIterator', $existing->interfaces, true)) {
+                $existing->interfaces[] = 'RecursiveIterator';
+            }
+            if (self::classIsComplete($existing)) {
+                return;
+            }
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
@@ -161,11 +167,14 @@ final class RecursiveDirectoryIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('RecursiveDirectoryIterator');
         $entry->parentLc = FilesystemIteratorBuiltin::CLASS_LC;
-        foreach (['Stringable', 'SeekableIterator', 'Traversable', 'Iterator', 'RecursiveIterator'] as $iface) {
+        foreach (['Stringable', 'SeekableIterator', 'Traversable', 'Iterator'] as $iface) {
             if (isset($ctx->classes[strtolower($iface)])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
             }
+        }
+        if (!\in_array('RecursiveIterator', $entry->interfaces, true)) {
+            $entry->interfaces[] = 'RecursiveIterator';
         }
 
         $entry->constructor = new RecursiveDirectoryIteratorConstruct();

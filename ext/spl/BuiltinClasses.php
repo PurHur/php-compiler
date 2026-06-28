@@ -35,6 +35,7 @@ final class BuiltinClasses
         CachingIteratorBuiltin::registerClass($ctx);
         InfiniteIteratorBuiltin::registerClass($ctx);
         NoRewindIteratorBuiltin::registerClass($ctx);
+        RecursiveTreeIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
         VmSplObserver::register($ctx);
         VmSplRegistry::registerStubs($ctx);
