@@ -1827,7 +1827,9 @@ class Object_ extends Type {
 
         $classId = $this->classes[$originalLc];
         if (isset($this->externalOnlyClassIds[$classId])) {
-            return false;
+            throw new \ValueError(
+                'class_alias(): Argument #1 ($class) must be a user-defined class name, internal class name given'
+            );
         }
 
         $this->classes[$aliasLc] = $classId;
