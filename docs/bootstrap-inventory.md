@@ -20486,12 +20486,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringParseStr.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringParseStrJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 28 class method(s)
+- 26 class method(s)
 
 ### `lib/JIT/Builtin/StringPasswordCrypto.php`
 
