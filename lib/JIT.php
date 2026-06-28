@@ -8082,6 +8082,9 @@ class JIT {
                     break;
                 case OpCode::TYPE_ECHO:
                 case OpCode::TYPE_PRINT:
+                    $this->context->callSiteLine = OpCode::TYPE_ECHO === $op->type
+                        ? (int) ($op->arg2 ?? 0)
+                        : (int) ($op->arg3 ?? 0);
                     if ($this->context->inlineIncludeDepth > 0) {
                         JIT\IncludeHelper::refreshInlineIncludeBindings($this->context);
                     }
