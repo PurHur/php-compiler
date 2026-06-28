@@ -109,4 +109,24 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
         VmGzStream::gzclose($handle);
         @unlink($path);
     }
+
+    public function testGzopenCompressZlibDataUri(): void
+    {
+        if (!VmGzStreamNative::available()) {
+            $this->markTestSkipped('VmZlib backend unavailable on this host');
+        }
+
+        $handle = VmGzStream::gzopen('compress.zlib://data:text/plain,hello', 'r');
+        $this->assertNotFalse($handle);
+        $this->assertSame('hello', VmGzStream::gzread($handle, 10));
+        VmGzStream::gzclose($handle);
+
+        $gz = \gzencode('world', 9);
+        $this->assertNotFalse($gz);
+        $b64 = \base64_encode($gz);
+        $handle = VmGzStream::gzopen('compress.zlib://data:application/octet-stream;base64,'.$b64, 'r');
+        $this->assertNotFalse($handle);
+        $this->assertSame('world', VmGzStream::gzread($handle, 10));
+        VmGzStream::gzclose($handle);
+    }
 }
