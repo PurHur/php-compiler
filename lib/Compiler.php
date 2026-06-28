@@ -9300,7 +9300,106 @@ class Compiler {
             }
         }
 
+        if ($this->isArrayAppendDim($fetch->dim) || null === $fetch->dim) {
+            $emptyInit = $this->recoverEmptyArrayInitLocalOperand($block->func);
+            if (null !== $emptyInit) {
+                $slot = $this->compileOperand($emptyInit, $block, true);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
+        }
+
+        if (null !== $fetch->dim) {
+            $dimRoot = Block::cfgVarRoot($fetch->dim);
+            $dimName = null !== $dimRoot ? Block::resolveVariableName($dimRoot) : null;
+            $call = 'currentArg' === $dimName
+                ? $this->findFuncCallFirstArgOperand($block->func, 'count')
+                : $this->findFuncCallFirstArgOperand($block->func, 'strlen');
+            if (null !== $call) {
+                $slot = $this->compileOperand($call, $block, true);
+                if (null !== $slot) {
+                    return $slot;
+                }
+            }
+        }
+
         return null;
+    }
+
+    private function recoverEmptyArrayInitLocalOperand(CfgFunc $func): ?Operand
+    {
+        if (null === $func->cfg) {
+            return null;
+        }
+        $emptyInits = [];
+        $walk = function ($node) use (&$walk, &$emptyInits): void {
+            if ($node instanceof CfgBlock) {
+                $children = $node->children;
+                foreach ($children as $i => $child) {
+                    if (
+                        $child instanceof Op\Expr\Assign
+                        && $i > 0
+                        && $children[$i - 1] instanceof Op\Expr\Array_
+                    ) {
+                        $arr = $children[$i - 1];
+                        if ([] === $arr->keys && [] === $arr->values && $arr->result === $child->expr) {
+                            $emptyInits[] = $child->var;
+                        }
+                    }
+                    $walk($child);
+                }
+            }
+            if ($node instanceof Op\Stmt\JumpIf) {
+                $walk($node->if);
+                $walk($node->else);
+            }
+            if ($node instanceof Op\Stmt\Loop) {
+                $walk($node->loop);
+            }
+            if ($node instanceof Op\Stmt\Foreach_) {
+                $walk($node->loop);
+            }
+        };
+        $walk($func->cfg);
+
+        return 1 === count($emptyInits) ? $emptyInits[0] : null;
+    }
+
+    private function findFuncCallFirstArgOperand(CfgFunc $func, string $name): ?Operand
+    {
+        $found = null;
+        $walk = function ($node) use (&$walk, $name, &$found): void {
+            if (null !== $found) {
+                return;
+            }
+            if ($node instanceof Op\Expr\FuncCall) {
+                $fn = $node->name;
+                if ($fn instanceof Literal && $name === $fn->value && isset($node->args[0])) {
+                    $found = $node->args[0];
+
+                    return;
+                }
+            }
+            if ($node instanceof CfgBlock) {
+                foreach ($node->children as $child) {
+                    $walk($child);
+                }
+            }
+            if ($node instanceof Op\Stmt\JumpIf) {
+                $walk($node->if);
+                $walk($node->else);
+            }
+            if ($node instanceof Op\Stmt\Loop) {
+                $walk($node->loop);
+            }
+            if ($node instanceof Op\Stmt\Foreach_) {
+                $walk($node->loop);
+            }
+        };
+        $walk($func->cfg);
+
+        return $found;
     }
 
     /**
@@ -9358,7 +9457,7 @@ class Compiler {
         $fetchBlock->addOpCode(new OpCode(
             OpCode::TYPE_ARRAY_DIM_FETCH,
             $this->compileOperand($expr->result, $fetchBlock, false),
-            $this->compileOperand($expr->var, $fetchBlock, true),
+            $this->compileArrayDimFetchContainerSlot($expr, $fetchBlock),
             $dimSlot
         ));
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);

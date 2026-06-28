@@ -6908,9 +6908,8 @@ class JIT {
                     }
                     break;
                 case OpCode::TYPE_ASSIGN:
-                    $value = $this->context->getVariableFromOp(
-                        $block->getOperand($this->assignRhsSlot($op))
-                    );
+                    $rhsSlot = $this->assignRhsSlot($op);
+                    $value = $this->context->getVariableFromOp($block->getOperand($rhsSlot));
                     $destOp = $block->getOperand($op->arg1);
                     $aliasOp = $block->getOperand($op->arg2);
                     if (null !== $this->context->ternarySharedReturnSlot && $this->isTernaryBranchMergeAssign($block, $op)) {
@@ -6924,7 +6923,7 @@ class JIT {
                         $coalesceTarget = $aliasOp;
                     }
                     $forceCoalesce = null !== $coalesceTarget;
-                    $srcOp = $block->getOperand($this->assignRhsSlot($op));
+                    $srcOp = $block->getOperand($rhsSlot);
                     $isNullSource = $value->isNullConstant
                         || Variable::TYPE_NULL === $value->type
                         || ($srcOp instanceof Operand\Literal && null === $srcOp->value);
@@ -6991,10 +6990,10 @@ class JIT {
                     }
                     if (
                         $this->context->hasVariableOp($aliasOp)
-                        && $this->context->hasVariableOp($block->getOperand($op->arg3))
+                        && $this->context->hasVariableOp($block->getOperand($rhsSlot))
                     ) {
                         $aliasVar = $this->context->getVariableFromOp($aliasOp);
-                        $srcVar = $this->context->getVariableFromOp($block->getOperand($op->arg3));
+                        $srcVar = $this->context->getVariableFromOp($block->getOperand($rhsSlot));
                         if ($aliasVar === $srcVar) {
                             if ([] !== $destOp->usages || $forceAssign) {
                                 $this->assignOperand($destOp, $value, $forceAssign);
@@ -7015,14 +7014,14 @@ class JIT {
                             $this->assignOperand($destOp, $value, $destUsed || $forceAssign);
                         }
                     }
-                    $srcOp = $block->getOperand($op->arg3);
-                    if ($op->arg2 !== $op->arg3 && $block->assignTempSlotIsDead((int) $op->arg3)) {
+                    $srcOp = $block->getOperand($rhsSlot);
+                    if ($op->arg2 !== $rhsSlot && $block->assignTempSlotIsDead($rhsSlot)) {
                         $this->jitClearAssignTempOperand($srcOp);
                     }
                     if (
                         !$needsNamedStorageAssign
                         && $op->arg1 !== $op->arg2
-                        && $op->arg1 !== $op->arg3
+                        && $op->arg1 !== $rhsSlot
                         && $block->assignTempSlotIsDead((int) $op->arg1)
                     ) {
                         $this->jitClearAssignTempOperand($destOp);
@@ -7038,7 +7037,7 @@ class JIT {
                         $destVar = $this->context->getVariableFromOp($destOperand);
                         $this->foldCompileTimeStringFromAssign(
                             $block,
-                            (int) $op->arg3,
+                            $rhsSlot,
                             $destVar,
                             $value
                         );
@@ -10173,18 +10172,6 @@ class JIT {
     }
 
     /** Match/phi merge may leave TYPE_ASSIGN arg3 null; rhs lives in arg1 (#13092). */
-    private function assignRhsSlot(OpCode $op): int
-    {
-        if (null !== $op->arg3) {
-            return (int) $op->arg3;
-        }
-        if (null === $op->arg1) {
-            throw new \LogicException('Missing operand slot for TYPE_ASSIGN rhs');
-        }
-
-        return (int) $op->arg1;
-    }
-
     /** AssignOp peephole may leave arg2 null; lvalue lives in arg1 (#13062, #6438). */
     private function binaryOpLeftSlot(OpCode $op): int
     {
@@ -10201,6 +10188,19 @@ class JIT {
     private function binaryOpLeftOperand(Block $block, OpCode $op): Operand
     {
         return $this->operandAt($block, $this->binaryOpLeftSlot($op), opcode_type_name($op->type).' left');
+    }
+
+    /** Match/ternary merge may omit arg3; phi RHS lives in arg2 (#9159, #13092). */
+    private function assignRhsSlot(OpCode $op): int
+    {
+        if (null !== $op->arg3) {
+            return (int) $op->arg3;
+        }
+        if (null === $op->arg2) {
+            throw new \LogicException('Missing operand slot for TYPE_ASSIGN value');
+        }
+
+        return (int) $op->arg2;
     }
 
     private function isVoidCfgFunction(Block $block): bool
