@@ -2598,7 +2598,6 @@
         "lib/JIT/Builtin/StringFilterIp.php",
         "lib/JIT/Builtin/StringFilterUrl.php",
         "lib/JIT/Builtin/StringFormat.php",
-        "lib/JIT/Builtin/StringFormatJit.php",
         "lib/JIT/Builtin/StringFsDir.php",
         "lib/JIT/Builtin/StringFsDirJit.php",
         "lib/JIT/Builtin/StringFsGlob.php",

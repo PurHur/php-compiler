@@ -9,19 +9,21 @@ use PHPCompiler\ext\standard\VmNumberFormat;
 use PHPCompiler\ext\standard\VmSprintf;
 use PHPUnit\Framework\TestCase;
 
-/** sprintf/printf/number_format JIT routes through SprintfJitHelper PHP not StringFormatJit LLVM (#9131). */
+/** sprintf/printf/number_format JIT routes through SprintfJitHelper PHP not StringFormatJit LLVM (#9131, #13146). */
 final class StringFormatRuntimeShrinkTest extends TestCase
 {
-    public function testStringFormatUsesSprintfJitHelperNotLlvmMonolithOnEmbed(): void
+    public function testStringFormatUsesSprintfJitHelperNotLlvmMonolith(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFormat.php');
         $this->assertStringContainsString('SprintfJitHelper', $source);
-        $this->assertStringContainsString('StringFormatJit::implement', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringContainsString('PackArgvSerialize::ensureLinked', $source);
+        $this->assertStringNotContainsString('StringFormatJit', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertStringNotContainsString('emitCompilerSprintf', $source);
         $this->assertStringNotContainsString('__phpc_fmt_append_spec_snprintf', $source);
         $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringFormatJit.php');
     }
 
     public function testSprintfJitHelperMatchesVmSprintf(): void
