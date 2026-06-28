@@ -112,20 +112,6 @@ final class JitPosix
         return PosixSessionRuntime::getpgid($context, $pidArg);
     }
 
-    /** Standalone AOT libc getpgid LLVM quarantine (#12685). */
-    public static function getpgidStandalone(Context $context, JITVariable $pidArg): Value
-    {
-        self::ensureLibcPidLookup($context, 'getpgid');
-        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getpgid', 1, 'pid');
-        $i32 = $context->getTypeFromString('int32');
-        $raw = $context->builder->call(
-            $context->lookupFunction('getpgid'),
-            $context->builder->trunc($pid, $i32)
-        );
-
-        return self::boxedPidOrFalse($context, $raw, 'posix_getpgid');
-    }
-
     /** posix_setsid() — create session (php-src ext/posix/posix.c; #9218 JIT). */
     public static function setsid(Context $context): Value
     {
@@ -146,20 +132,6 @@ final class JitPosix
     public static function getsid(Context $context, JITVariable $pidArg): Value
     {
         return PosixSessionRuntime::getsid($context, $pidArg);
-    }
-
-    /** Standalone AOT libc getsid LLVM quarantine (#12685). */
-    public static function getsidStandalone(Context $context, JITVariable $pidArg): Value
-    {
-        self::ensureLibcPidLookup($context, 'getsid');
-        $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getsid', 1, 'pid');
-        $i32 = $context->getTypeFromString('int32');
-        $raw = $context->builder->call(
-            $context->lookupFunction('getsid'),
-            $context->builder->trunc($pid, $i32)
-        );
-
-        return self::boxedPidOrFalse($context, $raw, 'posix_getsid');
     }
 
     /** posix_setpgid() — set process group (php-src ext/posix/posix.c; #6505 JIT). */
@@ -309,18 +281,6 @@ final class JitPosix
     }
 
     private static function ensureLibcSetId(Context $context, string $name): void
-    {
-        $i32 = $context->getTypeFromString('int32');
-        try {
-            $context->lookupFunction($name);
-        } catch (\Throwable) {
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction($name, $ft);
-            $context->registerFunction($name, $fn);
-        }
-    }
-
-    private static function ensureLibcPidLookup(Context $context, string $name): void
     {
         $i32 = $context->getTypeFromString('int32');
         try {
