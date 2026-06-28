@@ -9,26 +9,20 @@ use PHPCompiler\ext\standard\VmEscapeshell;
 use PHPCompiler\ext\standard\VmShellExecNative;
 use PHPUnit\Framework\TestCase;
 
-/** ProcessRuntime embed routes through ProcessJitHelper PHP not libc LLVM (#9337). */
+/** ProcessRuntime routes standalone + embed through ProcessJitHelper PHP not libc LLVM (#9337, #12950). */
 final class ProcessRuntimeShrinkTest extends TestCase
 {
     public function testProcessRuntimeIsThinRouter(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessRuntime.php');
-        $this->assertStringContainsString('ProcessStandaloneLlvm::implement', $runtime);
         $this->assertStringContainsString('ProcessJitHelper', $runtime);
+        $this->assertStringNotContainsString('ProcessStandaloneLlvm', $runtime);
         $this->assertStringNotContainsString('emitShellExec', $runtime);
         $this->assertStringNotContainsString('emitEscapeshellarg', $runtime);
         $this->assertStringNotContainsString('ensureLibc', $runtime);
         $this->assertLessThan(290, \substr_count($runtime, "\n") + 1);
-    }
 
-    public function testStandaloneLlvmQuarantinesLibcProcessHelpers(): void
-    {
-        $llvm = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
-        $this->assertStringContainsString('emitShellExec', $llvm);
-        $this->assertStringContainsString('popen', $llvm);
-        $this->assertStringNotContainsString('NestedJitCompileScope', $llvm);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
     }
 
     public function testProcessJitHelperDelegatesToVmSsot(): void

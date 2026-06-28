@@ -5,16 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT process helpers — embed PHP bridge + standalone LLVM quarantine (#9337).
+ * JIT/AOT process helpers via ProcessJitHelper PHP (#9337, #12950).
  *
- * SSOT: {@see \PHPCompiler\ext\standard\ProcessJitHelper}
+ * JIT embed and AOT standalone compile thin LLVM bridges; SSOT {@see \PHPCompiler\ext\standard\ProcessJitHelper}.
  * php-src: ext/standard/exec.c — shell_exec, escapeshellarg, escapeshellcmd
  */
 final class ProcessRuntime
@@ -56,12 +55,6 @@ final class ProcessRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ProcessStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_shell_exec');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -208,7 +201,7 @@ final class ProcessRuntime
         $resultRaw = JitNestedHelperCoerce::callHelper(
             $context,
             self::helperFunction($context, self::PHPC_RUN_COMMAND),
-            [$fn->getParam(0), $env]
+            [$fn->getParam(0), $fn->getParam(1)]
         );
         $failed = JitNestedHelperCoerce::isHelperResultNull($context, $resultRaw);
         $failBb = $fn->appendBasicBlock('phpc_run_command_fail');
