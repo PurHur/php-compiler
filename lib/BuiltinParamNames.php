@@ -72,6 +72,8 @@ final class BuiltinParamNames
             case 'uasort':
             case 'uksort':
                 return ['array', 'callback'];
+            case 'shuffle':
+                return ['array'];
             case 'array_push':
             case 'array_pop':
             case 'array_shift':
