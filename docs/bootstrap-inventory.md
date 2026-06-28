@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3453 |
-| Phase A inventory files (M2 ratio SSOT) | 3453 |
+| PHP files on vm.php path | 3451 |
+| Phase A inventory files (M2 ratio SSOT) | 3451 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9303 |
+| Source constructs flagged (warnings) | 9301 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2618,8 +2618,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringSerializeDoubleJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringSerializeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
@@ -20517,19 +20515,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 136)
+- new JIT (line 128)
 - 7 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringSerializeDoubleJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
-
-### `lib/JIT/Builtin/StringSerializeJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 7 class method(s)
 
 ### `lib/JIT/Builtin/StringSimilarText.php`
 
