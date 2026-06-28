@@ -315,6 +315,32 @@ final class ErrorReporter
         $this->writeCliStderr(self::E_WARNING, $message, $file, $line);
     }
 
+    /**
+     * Zend E_DEPRECATED from engine/builtins (zend_errors.c; #13139).
+     *
+     * Records {@see error_get_last()} even when {@see beginSilence()} (@) cleared error_reporting.
+     */
+    public function internalDeprecated(
+        string $message,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null,
+        int $line = 0
+    ): void {
+        [$file, $line] = $this->resolveDisplayLocation($frame, $file, $line);
+        if (0 !== ($this->errorReporting & self::E_DEPRECATED)
+            || [] !== $this->handlerStack) {
+            if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, $line)) {
+                return;
+            }
+        }
+        $this->recordLastError(self::E_DEPRECATED, $message, $file, $line);
+        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
+            return;
+        }
+        $this->writeCliStderr(self::E_DEPRECATED, $message, $file, $line);
+    }
+
     public function deprecatedDynamicProperty(
         string $className,
         string $propertyName,
@@ -322,22 +348,17 @@ final class ErrorReporter
         ?Context $context = null,
         ?Frame $frame = null
     ): void {
-        $message = sprintf(
-            'Creation of dynamic property %s::$%s is deprecated',
-            $className,
-            $propertyName
+        $this->internalDeprecated(
+            sprintf(
+                'Creation of dynamic property %s::$%s is deprecated',
+                $className,
+                $propertyName
+            ),
+            $context,
+            $frame,
+            $file,
+            0
         );
-        if (0 !== ($this->errorReporting & self::E_DEPRECATED)
-            || [] !== $this->handlerStack) {
-            if ($this->dispatchUserHandler($context, $frame, self::E_DEPRECATED, $message, $file, 0)) {
-                return;
-            }
-        }
-        $this->recordLastError(self::E_DEPRECATED, $message, $file, 0);
-        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
-            return;
-        }
-        $this->writeCliStderr(self::E_DEPRECATED, $message, $file, 0);
     }
 
     public function triggerError(
