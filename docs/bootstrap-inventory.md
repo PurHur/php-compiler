@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3446 |
-| Phase A inventory files (M2 ratio SSOT) | 3446 |
+| PHP files on vm.php path | 3450 |
+| Phase A inventory files (M2 ratio SSOT) | 3450 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9277 |
+| Source constructs flagged (warnings) | 9281 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -366,6 +366,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayChangeKeyCaseJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayChunkJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCombineJitHelper.php` | 0 | 1 |
+| `ext/standard/ArrayCountJitHelper.php` | 0 | 1 |
+| `ext/standard/ArrayCountRecursiveJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCountValuesJitHelper.php` | 0 | 4 |
 | `ext/standard/ArrayDiffAssocJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayDiffJitHelper.php` | 0 | 1 |
@@ -2273,6 +2275,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayChunkRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCombineRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayCountRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCountValuesRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayDiffAssocRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayDiffKeyRuntime.php` | 0 | 3 |
@@ -4678,8 +4682,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1082)
-- new ArgumentCountError (line 1090)
+- new ArgumentCountError (line 1084)
+- new ArgumentCountError (line 1092)
 - 94 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -5877,6 +5881,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/ArrayCombineJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/ArrayCountJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/ArrayCountRecursiveJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -10382,19 +10396,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 1072)
 - new HashTable (line 1078)
 - new Variable (line 1080)
-- new HashTable (line 1179)
-- new Variable (line 1190)
-- new HashTable (line 1230)
-- new Variable (line 1241)
-- new Variable (line 1254)
-- new HashTable (line 1294)
-- new Variable (line 1303)
-- new Variable (line 1384)
-- new Variable (line 1485)
-- new Variable (line 1487)
-- new HashTable (line 1500)
-- new Variable (line 1503)
-- 79 class method(s)
+- new HashTable (line 1198)
+- new Variable (line 1209)
+- new HashTable (line 1249)
+- new Variable (line 1260)
+- new Variable (line 1273)
+- new HashTable (line 1313)
+- new Variable (line 1322)
+- new Variable (line 1403)
+- new Variable (line 1504)
+- new Variable (line 1506)
+- new HashTable (line 1519)
+- new Variable (line 1522)
+- 81 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
@@ -10430,9 +10444,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmArraySortCallback.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 61)
-- new Variable (line 63)
-- 6 class method(s)
+- new Variable (line 98)
+- new Variable (line 100)
+- 8 class method(s)
 
 ### `ext/standard/VmArrayUserSetOps.php`
 
@@ -11921,16 +11935,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 2461)
 - new Error (line 2481)
 - new Error (line 2485)
-- new Variable (line 2526)
-- new Variable (line 2532)
-- new Variable (line 2538)
-- new Variable (line 2578)
-- new Variable (line 2583)
-- new Variable (line 2612)
-- new Variable (line 2622)
-- new Variable (line 2628)
-- new Variable (line 2650)
-- 128 class method(s)
+- new Variable (line 2547)
+- new Variable (line 2553)
+- new Variable (line 2559)
+- new Variable (line 2599)
+- new Variable (line 2604)
+- new Variable (line 2633)
+- new Variable (line 2643)
+- new Variable (line 2649)
+- new Variable (line 2671)
+- 129 class method(s)
 
 ### `ext/standard/VmRound.php`
 
@@ -16602,9 +16616,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/uasort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 50)
-- new HashTable (line 74)
+- new Variable (line 49)
+- new Variable (line 51)
+- new HashTable (line 75)
 - 2 class method(s)
 
 ### `ext/standard/ucfirst.php`
@@ -16621,9 +16635,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/uksort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 48)
-- new Variable (line 50)
-- new HashTable (line 74)
+- new Variable (line 49)
+- new Variable (line 51)
+- new HashTable (line 75)
 - 2 class method(s)
 
 ### `ext/standard/umask_.php`
@@ -16688,7 +16702,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/usort_.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 47)
+- new Variable (line 48)
 - 2 class method(s)
 
 ### `ext/standard/utf8_decode.php`
@@ -18458,6 +18472,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/ArrayCountRuntime.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
