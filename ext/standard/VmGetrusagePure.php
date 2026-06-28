@@ -46,23 +46,23 @@ final class VmGetrusagePure
         $maxrssKb = (int) max(0, (int) (($rssPages * $pageSize) / 1024));
 
         return self::toPhpArray([
-            'ru_utime.tv_sec' => $utimeSec,
-            'ru_utime.tv_usec' => $utimeUsec,
-            'ru_stime.tv_sec' => $stimeSec,
-            'ru_stime.tv_usec' => $stimeUsec,
+            'ru_oublock' => 0,
+            'ru_inblock' => 0,
+            'ru_msgsnd' => 0,
+            'ru_msgrcv' => 0,
             'ru_maxrss' => $maxrssKb,
             'ru_ixrss' => 0,
             'ru_idrss' => 0,
             'ru_minflt' => $minflt,
             'ru_majflt' => $majflt,
-            'ru_nswap' => 0,
-            'ru_inblock' => 0,
-            'ru_oublock' => 0,
-            'ru_msgsnd' => 0,
-            'ru_msgrcv' => 0,
             'ru_nsignals' => 0,
             'ru_nvcsw' => 0,
             'ru_nivcsw' => 0,
+            'ru_nswap' => 0,
+            'ru_utime.tv_usec' => $utimeUsec,
+            'ru_utime.tv_sec' => $utimeSec,
+            'ru_stime.tv_usec' => $stimeUsec,
+            'ru_stime.tv_sec' => $stimeSec,
         ]);
     }
 
