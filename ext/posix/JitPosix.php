@@ -158,38 +158,6 @@ final class JitPosix
         return PosixCtermidRuntime::ctermid($context);
     }
 
-    /** Standalone AOT libc ctermid LLVM quarantine (#12684). */
-    public static function ctermidStandalone(Context $context): Value
-    {
-        self::ensureLibcCtermid($context);
-        $i8p = $context->getTypeFromString('int8*');
-        $msgPtr = $context->builder->call(
-            $context->lookupFunction('ctermid'),
-            $i8p->constNull()
-        );
-
-        $slot = JitValueBox::alloc($context);
-        $ptr = JitValueBox::pointer($context, $slot);
-        $i64 = $context->getTypeFromString('int64');
-        $len = $context->builder->call(
-            $context->lookupFunction('strlen'),
-            $msgPtr
-        );
-        $lenI64 = $context->builder->zExt($len, $i64);
-        $resultStr = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $lenI64,
-            $msgPtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__value__writeString'),
-            $ptr,
-            $resultStr
-        );
-
-        return $ptr;
-    }
-
     /** posix_uname() — hashtable of utsname fields or false (#6123 JIT phase). */
     public static function uname(Context $context): Value
     {
@@ -354,15 +322,4 @@ final class JitPosix
         }
     }
 
-    private static function ensureLibcCtermid(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        try {
-            $context->lookupFunction('ctermid');
-        } catch (\Throwable $e) {
-            $ft = $context->context->functionType($i8p, false, $i8p);
-            $fn = $context->module->addFunction('ctermid', $ft);
-            $context->registerFunction('ctermid', $fn);
-        }
-    }
 }
