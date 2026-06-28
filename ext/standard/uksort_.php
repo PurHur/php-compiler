@@ -36,6 +36,7 @@ final class uksort_ extends Internal
         $array = $frame->calledArgs[0]->resolveIndirect();
         $callback = $frame->calledArgs[1]->resolveIndirect();
         VmArraySortCallback::requireCallback($callback, 'uksort');
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, 'uksort');
         if ($ht->getNumElements() < 2) {
             if (null !== $frame->returnVar) {
                 $frame->returnVar->bool(true);
