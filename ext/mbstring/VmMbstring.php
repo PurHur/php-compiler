@@ -8,6 +8,7 @@ use PHPCompiler\ext\iconv\CharsetEngine;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -1980,5 +1981,71 @@ final class VmMbstring
         }
 
         return $out;
+    }
+
+    /**
+     * mb_split() — multibyte regex split (php-src ext/mbstring/php_mbregex.c; #13367).
+     *
+     * UTF-8 / ASCII via PCRE u-flag; Onig-specific patterns may differ from Zend.
+     *
+     * @return array<int, string>|false
+     */
+    public static function split(string $pattern, string $string, int $limit = -1): array|false
+    {
+        if (!self::checkEncoding($string, 'UTF-8')) {
+            return false;
+        }
+
+        $regex = self::mbSplitRegex($pattern);
+        if (null === $regex) {
+            return false;
+        }
+
+        @preg_match($regex, '');
+        if (PREG_NO_ERROR !== preg_last_error()) {
+            return false;
+        }
+
+        $parts = preg_split($regex, $string, $limit > 0 ? $limit : -1);
+        if (false === $parts) {
+            return false;
+        }
+
+        return $parts;
+    }
+
+    public static function mbSplitRegexCompileError(string $pattern): ?string
+    {
+        $regex = self::mbSplitRegex($pattern);
+        if (null === $regex) {
+            return 'invalid pattern delimiter';
+        }
+        @preg_match($regex, '');
+
+        return PREG_NO_ERROR === preg_last_error() ? null : preg_last_error_msg();
+    }
+
+    public static function warnMbSplitRegexFailure(Frame $frame, string $pattern): void
+    {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $detail = self::mbSplitRegexCompileError($pattern) ?? 'invalid pattern';
+        $frame->vmContext->errors->triggerErrorWithHandlerFirst(
+            'mb_split(): mbregex compile err: '.$detail,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
+    }
+
+    private static function mbSplitRegex(string $pattern): ?string
+    {
+        if ('' === $pattern) {
+            return null;
+        }
+
+        return '#'.$pattern.'#u';
     }
 }
