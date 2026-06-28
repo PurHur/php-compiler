@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\VM\ObStackLimits;
-
 /**
  * Output-buffer stack for compiled JIT/AOT modules (#9268, php-in-PHP).
  *
@@ -15,6 +13,12 @@ use PHPCompiler\VM\ObStackLimits;
  */
 final class ObOutputJitHelper
 {
+    /** Nested JIT compile cannot resolve cross-unit class constants (#12974). */
+    private const BUF_SIZE = 65536;
+
+    /** Mirror {@see \PHPCompiler\VM\ObStackLimits} MAX_DEPTH. */
+    private const MAX_DEPTH = 8;
+
     private const HANDLER_GZHANDLER = 'gzhandler';
 
     /** @var list<array{content: string, handler: ?string}> */
@@ -71,7 +75,7 @@ final class ObOutputJitHelper
             return 1;
         }
         $idx = \count(self::$stack) - 1;
-        $cap = ObStackLimits::BUF_SIZE - 1;
+        $cap = self::BUF_SIZE - 1;
         $used = \strlen(self::$stack[$idx]['content']);
         if ($used >= $cap) {
             return 0;
@@ -210,7 +214,7 @@ final class ObOutputJitHelper
 
     private static function pushLevel(?string $handler): void
     {
-        if (\count(self::$stack) >= ObStackLimits::MAX_DEPTH) {
+        if (\count(self::$stack) >= self::MAX_DEPTH) {
             return;
         }
         self::$stack[] = ['content' => '', 'handler' => $handler];
