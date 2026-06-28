@@ -786,6 +786,7 @@ class Context {
             Builtin\StringStripTags::ensureStandaloneBodies($this);
             Builtin\StringStrtr::ensureStandaloneBodies($this);
             Builtin\StringParseStrJit::ensureStandaloneBodies($this);
+            Builtin\StringJsonEncode::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
             Builtin\StringGetenv::ensureStandaloneBodies($this);
@@ -796,6 +797,9 @@ class Context {
             // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
             // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
             Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
             Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
             Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
             Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);

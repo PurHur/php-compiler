@@ -23,10 +23,10 @@ final class JsonEncodeJitHelper
         if (null === $vm) {
             throw new \LogicException('json_encode() JIT helper requires active VM (#9267)');
         }
+        $frames = $ctx->runStackFrames();
+        $frame = $frames[0] ?? null;
         try {
-            // Nested JIT cannot lower Context::runStackFrames on :object receivers (#13245).
-            // VmJson::export() uses reflection-based public props when frame is null (php-src parity).
-            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, null);
+            $exported = VmJson::export($value->resolveIndirect(), $ctx, $vm, $frame);
         } catch (VmJsonExportException $e) {
             VmJson::setLastError($e->errorCode);
 

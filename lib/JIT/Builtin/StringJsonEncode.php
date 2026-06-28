@@ -7,7 +7,9 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\NestedContextMethodLlvm;
 use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\NestedVmVariableMethodLlvm;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -40,7 +42,21 @@ final class StringJsonEncode
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link json_encode ABI without nested JsonEncodeJitHelper JIT (#13245). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStubs($context);
     }
 
     public static function implement(Context $context): void
@@ -48,6 +64,12 @@ final class StringJsonEncode
         $probe = $context->module->getNamedFunction('__compiler_json_encode_value');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStubs($context);
 
             return;
         }
@@ -150,6 +172,11 @@ final class StringJsonEncode
             return;
         }
 
+        foreach (['resolveindirect'] as $method) {
+            NestedVmVariableMethodLlvm::ensureMethod($context, $method);
+        }
+        NestedContextMethodLlvm::ensureMethod($context, 'runstackframes');
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
@@ -176,5 +203,36 @@ final class StringJsonEncode
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Return null __string__* — inventory emit only needs linkable ABI symbols (#13245). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $strPtr = $context->getTypeFromString('__string__*');
+        $nullStr = $strPtr->constNull();
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $htPtr = $context->getTypeFromString('__hashtable__*');
+            $i64 = $context->getTypeFromString('int64');
+            $firstParam = '__compiler_json_encode_array' === $abiName ? $htPtr : $valuePtr;
+            $ft = $context->context->functionType($strPtr, false, $firstParam, $i64);
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction($abiName, $ft);
+
+            $entry = $fn->appendBasicBlock('json_encode_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($nullStr);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        $context->builder->clearInsertionPosition();
     }
 }

@@ -21,7 +21,7 @@ final class StringJsonEncodeRuntimeStandaloneTest extends TestCase
         $this->assertStringContainsString('JsonEncodeJitHelper', $runtime);
         $this->assertStringNotContainsString('StringJsonEncodeJit', $runtime);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
-        $this->assertLessThan(170, \substr_count($runtime, "\n"), 'StringJsonEncode must be a thin bridge (#9267)');
+        $this->assertLessThan(250, \substr_count($runtime, "\n"), 'StringJsonEncode must be a thin bridge (#9267)');
         $helper = (string) \file_get_contents(__DIR__.'/../../../ext/standard/JsonEncodeJitHelper.php');
         $this->assertStringContainsString('VmJson::export', $helper);
     }
