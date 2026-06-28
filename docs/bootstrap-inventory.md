@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3423 |
-| Phase A inventory files (M2 ratio SSOT) | 3423 |
+| PHP files on vm.php path | 3422 |
+| Phase A inventory files (M2 ratio SSOT) | 3422 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9051 |
+| Source constructs flagged (warnings) | 9050 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2417,7 +2417,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/ProcessStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/Rand.php` | 0 | 2 |
 | `lib/JIT/Builtin/ReadonlyRaise.php` | 0 | 4 |
@@ -9536,7 +9535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseIniEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/ParseStrEngine.php`
 
@@ -19122,14 +19121,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProcessRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 259)
+- new JIT (line 252)
 - 9 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/ProcessStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 35 class method(s)
 
 ### `lib/JIT/Builtin/ProgressNoteRuntime.php`
 

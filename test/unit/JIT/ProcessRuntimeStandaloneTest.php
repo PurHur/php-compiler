@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #5348: process helpers LLVM replaces phpc_process.c.
+ * Issue #5348 / #12950: process helpers LLVM replaces phpc_process.c; standalone uses ProcessJitHelper bridges.
  */
 final class ProcessRuntimeStandaloneTest extends TestCase
 {
@@ -20,10 +20,10 @@ final class ProcessRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_process.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ProcessRuntime.php');
         $this->assertStringContainsString('__compiler_shell_exec', $runtime);
-        $this->assertStringContainsString('ProcessStandaloneLlvm::implement', $runtime);
+        $this->assertStringContainsString('ProcessJitHelper', $runtime);
+        $this->assertStringNotContainsString('ProcessStandaloneLlvm', $runtime);
         $this->assertStringNotContainsString('emitShellExec', $runtime);
-        $standalone = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
-        $this->assertStringContainsString('emitShellExec', $standalone);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/ProcessStandaloneLlvm.php');
     }
 
     /**
