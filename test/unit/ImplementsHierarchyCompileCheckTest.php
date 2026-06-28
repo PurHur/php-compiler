@@ -178,4 +178,56 @@ PHP;
         );
         $runtime->parseAndCompile($code, 'internaliterator.php');
     }
+
+    /** @covers issue #13326 */
+    public function testClassImplementsTraversableDirectlyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class DirectTraversable implements Traversable {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Class DirectTraversable must implement interface Traversable as part of either Iterator or IteratorAggregate'
+        );
+        $runtime->parseAndCompile($code, 'traversable_direct.php');
+    }
+
+    /** @covers issue #13326 */
+    public function testEnumImplementsTraversableDirectlyFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E implements Traversable { case A; }
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage(
+            'Enum E must implement interface Traversable as part of either Iterator or IteratorAggregate'
+        );
+        $runtime->parseAndCompile($code, 'enum_traversable_direct.php');
+    }
+
+    /** @covers issue #13326 */
+    public function testClassImplementsIteratorAndTraversableCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C implements Iterator, Traversable {
+    public function current() { return null; }
+    public function key() { return null; }
+    public function next() {}
+    public function rewind() {}
+    public function valid() { return false; }
+}
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'iterator_traversable.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
