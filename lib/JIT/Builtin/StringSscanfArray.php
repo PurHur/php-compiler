@@ -14,8 +14,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_sscanf_array via SscanfJitHelper PHP (#9134).
  *
- * JIT embed uses compiled {@see SscanfJitHelper}; AOT standalone keeps
- * {@see SscanfJit} LLVM until native link can host compiled VmSscanf reliably.
+ * JIT embed and standalone AOT compile {@see SscanfJitHelper}; thin LLVM bridge forwards the ABI.
  * php-src: ext/standard/sscanf.c — PHP_FUNCTION(sscanf) array return branch
  */
 final class StringSscanfArray

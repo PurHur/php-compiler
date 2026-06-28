@@ -2532,7 +2532,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/SpaceshipRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SplAutoloadOutput.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/Sscanf.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfAssignApply.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/SscanfJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StatArrayLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StatArrayRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StatCache.php';

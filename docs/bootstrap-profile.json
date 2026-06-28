@@ -2531,7 +2531,6 @@
         "lib/JIT/Builtin/SplAutoloadOutput.php",
         "lib/JIT/Builtin/Sscanf.php",
         "lib/JIT/Builtin/SscanfAssignApply.php",
-        "lib/JIT/Builtin/SscanfJit.php",
         "lib/JIT/Builtin/StatArrayRuntime.php",
         "lib/JIT/Builtin/StatCache.php",
         "lib/JIT/Builtin/StatCacheRuntime.php",
