@@ -27,8 +27,9 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
         $this->assertStringNotContainsString('implementPopBuffer', $bridge);
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
+        $this->assertStringContainsString('ensureEchoAbiDeclared', $bridge);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
-        $this->assertLessThan(800, $bridgeLines);
+        $this->assertLessThan(820, $bridgeLines, 'ObOutputJitBridge LOC (#12999 echo ABI forward declare)');
         // #12974: list-spread destructuring in foreach breaks self-host parseAndCompile.
         $this->assertDoesNotMatchRegularExpression(
             '/as\s+\$[a-zA-Z_]+\s*=>\s*\[\$[a-zA-Z_]+,\s*\$[a-zA-Z_]+,\s*\.\.\.\$/',
