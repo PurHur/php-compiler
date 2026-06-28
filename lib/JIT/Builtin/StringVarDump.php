@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195).
+ * JIT/AOT link for __compiler_var_dump via VarDumpJitHelper PHP (#9195, #13241).
  *
- * JIT/normal modules use compiled {@see VarDumpJitHelper}; AOT standalone keeps
- * {@see StringVarDumpJit} until native link can host compiled VmVarDump reliably.
+ * Embed and standalone AOT compile the same PHP bridge; no var_dump LLVM monolith.
  * php-src: ext/standard/var.c — php_var_dump_ex
  */
 final class StringVarDump
@@ -45,12 +43,6 @@ final class StringVarDump
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringVarDumpJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_var_dump');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
