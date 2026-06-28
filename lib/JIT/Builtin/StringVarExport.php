@@ -5,16 +5,14 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189).
+ * JIT/AOT link for __compiler_var_export via VarExportJitHelper PHP (#9189, #13349).
  *
- * JIT/normal modules use compiled {@see VarExportJitHelper}; AOT standalone keeps
- * {@see StringVarExportJit} until native link can host compiled VmVarExport reliably.
+ * Embed and standalone AOT compile {@see VarExportJitHelper}; thin LLVM bridges forward the ABI.
  * php-src: ext/standard/var.c — php_var_export_ex
  */
 final class StringVarExport
@@ -45,12 +43,6 @@ final class StringVarExport
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringVarExportJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_var_export');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

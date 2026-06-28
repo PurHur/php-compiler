@@ -2712,7 +2712,6 @@
         "lib/JIT/Builtin/StringUtf8Runtime.php",
         "lib/JIT/Builtin/StringVarDump.php",
         "lib/JIT/Builtin/StringVarExport.php",
-        "lib/JIT/Builtin/StringVarExportJit.php",
         "lib/JIT/Builtin/StringVersionCompare.php",
         "lib/JIT/Builtin/StringVersionCompareJit.php",
         "lib/JIT/Builtin/StringVfscanf.php",
@@ -3686,9 +3685,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3456,
+        "inventory_files": 3455,
         "excluded": 0,
-        "eligible": 3456,
+        "eligible": 3455,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
