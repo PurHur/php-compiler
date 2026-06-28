@@ -6,12 +6,17 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for stream read/position/lock helpers (#5343 phase 4). */
+/** JIT/AOT stream read/position/lock helpers via StreamReadRuntime PHP (#5343, #12937). */
 final class StreamRead
 {
     public static function ensureLinked(Context $context): void
     {
         StreamReadJit::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        StreamReadRuntime::ensureStandaloneBodies($context);
     }
 
     public static function implement(Context $context): void
