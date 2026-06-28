@@ -17,7 +17,7 @@ final class StrtrArrayJitHelper
     public static function strtrArray(string $subject, HashTable $replacePairs): string
     {
         $pairs = [];
-        foreach ($replacePairs->iterateKeyed(true) as [$keyVar, $valueVar]) {
+        foreach ($replacePairs->exportKeyValuePairs(true) as [$keyVar, $valueVar]) {
             $pairs[VmString::coerceStringBuiltinArg($keyVar, 'strtr', 1, 'replace_pairs')] =
                 VmString::coerceStringBuiltinArg($valueVar, 'strtr', 1, 'replace_pairs');
         }

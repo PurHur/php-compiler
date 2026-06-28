@@ -360,6 +360,7 @@
         "ext/spl/EmptyIteratorBuiltin.php",
         "ext/spl/IteratorIteratorBuiltin.php",
         "ext/spl/JitSplClasses.php",
+        "ext/spl/LimitIteratorBuiltin.php",
         "ext/spl/Module.php",
         "ext/spl/RecursiveArrayIteratorBuiltin.php",
         "ext/spl/RecursiveCallbackFilterIteratorBuiltin.php",
@@ -371,6 +372,7 @@
         "ext/spl/SplFileObjectStorage.php",
         "ext/spl/SplFixedArrayBuiltin.php",
         "ext/spl/SplIteratorSupport.php",
+        "ext/spl/SplTempFileObjectBuiltin.php",
         "ext/spl/VmSplIterators.php",
         "ext/spl/VmSplObserver.php",
         "ext/spl/VmSplRegistry.php",
@@ -3643,9 +3645,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3413,
+        "inventory_files": 3415,
         "excluded": 0,
-        "eligible": 3413,
+        "eligible": 3415,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
