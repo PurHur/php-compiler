@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\Attributes\Group;
 use PHPUnit\Framework\TestCase;
@@ -12,6 +13,13 @@ use PHPUnit\Framework\TestCase;
 #[Group('LazyObject')]
 final class LazyObjectTest extends TestCase
 {
+    protected function setUp(): void
+    {
+        if (!CompilerVersion::supportsLazyObjectFactories()) {
+            $this->markTestSkipped('Lazy object factories require stable PHP 8.4+ profile (#12375)');
+        }
+    }
+
     public function testNewLazyProxyDefersConstructor(): void
     {
         $runtime = new Runtime();

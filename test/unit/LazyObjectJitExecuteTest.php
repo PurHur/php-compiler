@@ -19,6 +19,9 @@ final class LazyObjectJitExecuteTest extends TestCase
 
     protected function setUp(): void
     {
+        if (!CompilerVersion::supportsLazyObjectFactories()) {
+            $this->markTestSkipped('Lazy object factories require stable PHP 8.4+ profile (#12375)');
+        }
         $this->repoRoot = dirname(__DIR__, 2);
         LlvmToolchain::applyCurrentProcessEnv($this->repoRoot);
         if (!LlvmToolchain::isReady($this->repoRoot)) {

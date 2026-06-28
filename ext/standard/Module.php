@@ -738,8 +738,10 @@ class Module extends ModuleAbstract
             new get_debug_backtrace(),
             new class_exists_(),
             new class_alias(),
-            new create_lazy_ghost(),
-            new create_lazy_proxy(),
+            ...(CompilerVersion::supportsLazyObjectFactories() ? [
+                new create_lazy_ghost(),
+                new create_lazy_proxy(),
+            ] : []),
             new enum_exists_(),
             new unitenum_exists_(),
             new interface_exists_(),

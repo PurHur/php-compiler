@@ -217,6 +217,21 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'override_class_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsLazyObjectFactories()
+                && (str_contains($name, 'create_lazy_ghost')
+                    || str_contains($name, 'create_lazy_proxy')
+                    || str_contains($name, 'lazy_ghost_create')
+                    || str_contains($name, 'lazy_ghost_trait')
+                    || str_contains($name, 'reflection_lazy_property')
+                    || str_contains($name, 'reflection_property_set_raw_without_lazy')
+                    || str_contains($name, 'reflection_property_skip_lazy'))
+                && !str_contains($name, 'lazy_object_factories_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsLazyObjectFactories()
+                && str_contains($name, 'lazy_object_factories_phantom')) {
+                continue;
+            }
             // 8.2 reference profile: #[\Override] parent validation off (#11559, #12201).
             if (!CompilerVersion::supportsOverrideAttribute()
                 && (str_contains($name, 'override_attribute_invalid')
