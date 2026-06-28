@@ -74,6 +74,13 @@ final class PendingHeadersJitBridge
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureHashtableHelpers($context);
+            self::implementDeferredInventoryStubs($context);
+
+            return;
+        }
+
         $restore = self::captureInsertBlock($context);
         self::ensureHashtableHelpers($context);
         HttpResponseRuntime::ensureLinked($context);
@@ -369,6 +376,97 @@ final class PendingHeadersJitBridge
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Inventory emit only needs linkable ABI symbols — skip nested STDOUT JIT (#13301). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i32 = $context->getTypeFromString('int32');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $zero = $i32->constInt(0, false);
+
+        foreach (self::ABI_FUNCTIONS as $abiName) {
+            $probe = $context->module->getNamedFunction($abiName);
+            if (null !== $probe && $probe->countBasicBlocks() > 0) {
+                $context->registerFunction($abiName, $probe);
+                continue;
+            }
+
+            if ('__phpc_headers_sent' === $abiName) {
+                $ft = $context->context->functionType($i32, false);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_sent_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($zero);
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_list' === $abiName) {
+                $ft = $context->context->functionType($htPtr, false);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_list_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($context->builder->call($context->lookupFunction('__hashtable__alloc')));
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_add' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr, $i32);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_add_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_pending_header_remove' === $abiName) {
+                $ft = $context->context->functionType($voidTy, false, $strPtr);
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_rem_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            if ('__phpc_setcookie_add' === $abiName) {
+                $i64 = $context->getTypeFromString('int64');
+                $ft = $context->context->functionType(
+                    $voidTy,
+                    false,
+                    $strPtr,
+                    $strPtr,
+                    $i64,
+                    $strPtr,
+                    $strPtr,
+                    $i32,
+                    $i32,
+                    $strPtr,
+                    $i32
+                );
+                $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+                $entry = $fn->appendBasicBlock('ph_sc_inv_stub');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+                $context->registerFunction($abiName, $fn);
+                continue;
+            }
+
+            $ft = $context->context->functionType($voidTy, false);
+            $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
+            $entry = $fn->appendBasicBlock('ph_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->registerFunction($abiName, $fn);
+        }
+
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock

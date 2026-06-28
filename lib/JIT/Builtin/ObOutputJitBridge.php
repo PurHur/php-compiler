@@ -98,6 +98,13 @@ final class ObOutputJitBridge
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureExtraGlobals($context);
+            self::implementDeferredInventoryStubs($context);
+
+            return;
+        }
+
         $restore = self::captureInsertBlock($context);
         self::ensureExtraGlobals($context);
         self::ensureLibc($context);
@@ -609,6 +616,68 @@ final class ObOutputJitBridge
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    /** Inventory emit only needs linkable ABI symbols — skip nested STDOUT JIT (#13301). */
+    private static function implementDeferredInventoryStubs(Context $context): void
+    {
+        self::ensureEchoAbiDeclared($context);
+
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $zero32 = $i32->constInt(0, false);
+        $zero64 = $i64->constInt(0, false);
+
+        $voidNames = [
+            '__phpc_ob_start',
+            '__phpc_ob_start_with_gzhandler',
+            '__phpc_ob_append_bytes',
+            '__phpc_ob_echo_cstr',
+            '__phpc_ob_echo_char',
+            '__phpc_ob_echo_ll',
+            '__phpc_ob_echo_double',
+            '__phpc_ob_echo_substr',
+            '__phpc_ob_end_all',
+            '__phpc_flush',
+            '__phpc_shutdown_mark_registered',
+            '__phpc_ob_implicit_flush',
+        ];
+        foreach ($voidNames as $name) {
+            self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn): void {
+                $entry = $fn->appendBasicBlock('ob_inv_void');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnVoid();
+            });
+        }
+
+        foreach (
+            [
+                '__phpc_ob_get_level',
+                '__phpc_ob_get_contents',
+                '__phpc_ob_get_length',
+                '__phpc_ob_end_clean',
+                '__phpc_ob_get_clean',
+                '__phpc_ob_end_flush',
+                '__phpc_ob_get_flush',
+                '__phpc_ob_flush',
+                '__phpc_ob_clean',
+            ] as $name
+        ) {
+            self::implementIfMissing($context, $name, static function (Context $context, LlvmFunction $fn) use ($zero32): void {
+                $entry = $fn->appendBasicBlock('ob_inv_i32');
+                $context->builder->positionAtEnd($entry);
+                $context->builder->returnValue($zero32);
+            });
+        }
+
+        self::implementIfMissing($context, '__phpc_ob_buffer_used_at', static function (Context $context, LlvmFunction $fn) use ($zero64): void {
+            $entry = $fn->appendBasicBlock('ob_inv_i64');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($zero64);
+        });
+
+        self::registerLinkedRuntime($context);
+        $context->builder->clearInsertionPosition();
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock
