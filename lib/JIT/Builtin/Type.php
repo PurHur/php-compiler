@@ -1374,6 +1374,7 @@ class Type extends Builtin {
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
         StringNetInterfacesJit::ensureLinked($this->context);
+        StringGetenv::ensureLinked($this->context);
         StringGetenvAll::ensureLinked($this->context);
         ListUnpackRuntime::ensureLinked($this->context);
         StringInfo::ensureLinked($this->context);

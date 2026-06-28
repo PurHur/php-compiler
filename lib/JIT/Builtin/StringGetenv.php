@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -16,7 +15,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_getenv via GetenvJitHelper PHP overlay (#9092, #8992).
  *
- * PHP overlay via compiled helper; no libc getenv on miss.
+ * Embed and standalone AOT compile the same PHP bridge; no libc getenv LLVM (#13194).
  * php-src: ext/standard/basic_functions.c — zif_getenv
  */
 final class StringGetenv
@@ -26,6 +25,8 @@ final class StringGetenv
     private const GETENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::getenv';
 
     private const PUTENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv';
+
+    private const ABI_NAME = '__compiler_getenv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -40,20 +41,34 @@ final class StringGetenv
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
+            return;
+        }
         self::implement($context);
+    }
+
+    /** Inventory argv emit: link getenv ABI without nested GetenvJitHelper JIT during defineBuiltins (#13194). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStub($context);
     }
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_getenv');
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_getenv', $probe);
+            $context->registerFunction(self::ABI_NAME, $probe);
 
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringGetenvLibcBridge::implement($context);
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStub($context);
 
             return;
         }
@@ -65,9 +80,7 @@ final class StringGetenv
 
     public static function ensurePutenvLinked(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringGetenvLibcBridge::ensureLinked($context);
-
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             return;
         }
         self::ensureJitHelperCompiled($context);
@@ -115,9 +128,57 @@ final class StringGetenv
         }
     }
 
+    private static function implementDeferredInventoryStub(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_NAME, $probe);
+
+            return;
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $voidTy = $context->getTypeFromString('void');
+        $ft = $context->context->functionType($voidTy, false, $strPtr, $i8, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(self::ABI_NAME, $ft);
+
+        $entry = $fn->appendBasicBlock('getenv_inv_stub');
+        $context->builder->positionAtEnd($entry);
+
+        $out = $fn->getParam(2);
+        $valMap = $context->structFieldMap['__value__'];
+        $zero = $i64->constInt(0, false);
+        $context->builder->store(
+            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false),
+            $context->builder->structGep($out, $valMap['type'])
+        );
+        $valueField = $context->builder->structGep($out, $valMap['value']);
+        $firstByte = $context->builder->inBoundsGEP(
+            $valueField,
+            $context->getTypeFromString('int32')->constInt(0, false),
+            $zero
+        );
+        $context->builder->store($i8->constInt(0, false), $firstByte);
+        $context->builder->returnVoid();
+        $context->registerFunction(self::ABI_NAME, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
     private static function implementGetenvBridge(Context $context): void
     {
-        $fn = $context->lookupFunction('__compiler_getenv');
+        $probe = $context->module->getNamedFunction(self::ABI_NAME);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_NAME, $probe);
+
+            return;
+        }
+
+        $fn = $context->lookupFunction(self::ABI_NAME);
         $entry = $fn->appendBasicBlock('getenv_bridge_entry');
         $context->builder->positionAtEnd($entry);
 
@@ -168,6 +229,6 @@ final class StringGetenv
 
         $context->builder->positionAtEnd($done);
         $context->builder->returnVoid();
-        $context->registerFunction('__compiler_getenv', $fn);
+        $context->registerFunction(self::ABI_NAME, $fn);
     }
 }

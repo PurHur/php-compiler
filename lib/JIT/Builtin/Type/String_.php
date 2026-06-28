@@ -294,8 +294,6 @@ class String_ extends Type {
         \PHPCompiler\JIT\Builtin\StringUnserialize::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHttpBuildQuery::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringParseStr::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGetenv::implement($this->context);
-        \PHPCompiler\JIT\Builtin\StringGetenvAll::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniSet::implement($this->context);
         \PHPCompiler\JIT\Builtin\IniGet::implement($this->context);
         \PHPCompiler\JIT\Builtin\ErrorReporting::implement($this->context);
