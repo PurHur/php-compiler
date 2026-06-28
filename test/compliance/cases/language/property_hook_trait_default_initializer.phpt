@@ -1,5 +1,5 @@
 --TEST--
-Language: trait property hook with default initializer (#11594, Zend/zend_compile.c PHP 8.4)
+Language: trait property hook with default initializer must compile-error (#12995, Zend/zend_compile.c)
 --FILE--
 <?php
 trait T {
@@ -12,5 +12,5 @@ class C {
 }
 $c = new C();
 echo $c->label, "\n";
---EXPECT--
-from-trait
+--EXPECT_EXIT--
+255
