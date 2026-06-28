@@ -18,6 +18,7 @@ use PHPCompiler\Func;
 use PHPCompiler\ext\standard\VmEval;
 use PHPCompiler\ext\standard\VmForwardStaticCall;
 use PHPCompiler\ext\standard\VmIteratorWalk;
+use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\ext\spl\ArrayObjectBuiltin;
 use PHPCompiler\ext\spl\SplArrayStorage;
 use PHPCompiler\VM\ForeachIterator;
@@ -2833,6 +2834,9 @@ class VM {
         if ('' !== $frame->scriptPath) {
             $this->context->scriptStack->push($frame->scriptPath);
             $this->context->recordIncludedFile($frame->scriptPath);
+            if ('-' !== $frame->scriptPath) {
+                VmString::realpath($frame->scriptPath);
+            }
         }
     }
 
