@@ -393,15 +393,42 @@ final class VmProcessProcOpenNative
         $signaled = $lowByte > 0 && !$stopped;
         $signals = self::termsigStopsigFromWaitStatus($statusVal);
 
+        return self::buildProcStatusArray(
+            $slot['command'],
+            $slot['pid'],
+            $running,
+            $signaled,
+            $stopped,
+            $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
+            $signals['termsig'],
+            $signals['stopsig'],
+        );
+    }
+
+    /**
+     * php-src ext/standard/exec.c — PHP_FUNCTION(proc_get_status) array insertion order (#13210).
+     *
+     * @return array<string, mixed>
+     */
+    public static function buildProcStatusArray(
+        string $command,
+        int $pid,
+        bool $running,
+        bool $signaled,
+        bool $stopped,
+        int $exitcode,
+        int $termsig,
+        int $stopsig,
+    ): array {
         return [
-            'command' => $slot['command'],
-            'pid' => $slot['pid'],
+            'command' => $command,
+            'pid' => $pid,
             'running' => $running,
-            'exitcode' => $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
             'signaled' => $signaled,
             'stopped' => $stopped,
-            'termsig' => $signals['termsig'],
-            'stopsig' => $signals['stopsig'],
+            'exitcode' => $exitcode,
+            'termsig' => $termsig,
+            'stopsig' => $stopsig,
         ];
     }
 

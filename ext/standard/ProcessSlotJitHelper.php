@@ -127,16 +127,16 @@ final class ProcessSlotJitHelper
         $signaled = $lowByte > 0 && !$stopped;
         $signals = VmProcessProcOpenNative::termsigStopsigFromWaitStatus($statusVal);
 
-        return [
-            'command' => $entry['command'],
-            'pid' => $entry['pid'],
-            'running' => $running,
-            'exitcode' => $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
-            'signaled' => $signaled,
-            'stopped' => $stopped,
-            'termsig' => $signals['termsig'],
-            'stopsig' => $signals['stopsig'],
-        ];
+        return VmProcessProcOpenNative::buildProcStatusArray(
+            $entry['command'],
+            $entry['pid'],
+            $running,
+            $signaled,
+            $stopped,
+            $running ? -1 : ($exited ? (($statusVal >> 8) & 0xff) : -1),
+            $signals['termsig'],
+            $signals['stopsig'],
+        );
     }
 
     public static function terminate(int $slot, int $signal = 15): bool
