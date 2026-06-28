@@ -45,8 +45,10 @@ final class ParseIniEngine
         $currentSection = null;
         $sectionData = [];
 
-        foreach (self::splitLines($ini) as $lineNo => $line) {
-            $line = self::trimWs($line);
+        $lines = self::splitLines($ini);
+        $lineCount = \count($lines);
+        for ($lineNo = 0; $lineNo < $lineCount; ++$lineNo) {
+            $line = self::trimWs($lines[$lineNo]);
             if ('' === $line) {
                 continue;
             }
@@ -93,7 +95,7 @@ final class ParseIniEngine
                 return false;
             }
             $rawValue = substr($line, $eq + 1);
-            $value = self::parseValue($rawValue);
+            $value = self::parseValueFromLines($lines, $lineNo, $rawValue);
             if (false === $value) {
                 if (null === self::$lastSyntaxError) {
                     self::setSyntaxError($lineNo + 1, "unexpected '='");
@@ -163,6 +165,54 @@ final class ParseIniEngine
         }
 
         return self::trimWs($inner);
+    }
+
+    /**
+     * @param list<string> $lines
+     *
+     * @return string|false
+     */
+    private static function parseValueFromLines(array $lines, int &$lineNo, string $raw): string|false
+    {
+        $raw = self::trimWs($raw);
+        if ('' === $raw) {
+            return '';
+        }
+        if ('"' === $raw[0] && !self::doubleQuotedIsComplete($raw)) {
+            $combined = $raw;
+            $lineCount = \count($lines);
+            while (!self::doubleQuotedIsComplete($combined)) {
+                ++$lineNo;
+                if ($lineNo >= $lineCount) {
+                    return false;
+                }
+                $combined .= "\n".$lines[$lineNo];
+            }
+
+            return self::parseDoubleQuoted(self::trimWs($combined));
+        }
+
+        return self::parseValue($raw);
+    }
+
+    private static function doubleQuotedIsComplete(string $raw): bool
+    {
+        $raw = self::trimWs($raw);
+        if ('"' !== $raw[0]) {
+            return true;
+        }
+        $len = strlen($raw);
+        for ($i = 1; $i < $len; ++$i) {
+            if ('\\' === $raw[$i]) {
+                ++$i;
+                continue;
+            }
+            if ('"' === $raw[$i]) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
