@@ -18,6 +18,8 @@ final class MbstringState
     private const MODE_LONG = 2;
     private const MODE_ENTITY = 3;
 
+    private static string $internalEncoding = 'UTF-8';
+
     private static string $httpOutput = 'UTF-8';
 
     /** @var list<string> */
@@ -26,6 +28,18 @@ final class MbstringState
     private static int $substituteMode = self::MODE_CHAR;
 
     private static int $substituteCodepoint = 63;
+
+    public static function internalEncoding(): string
+    {
+        return self::$internalEncoding;
+    }
+
+    public static function setInternalEncoding(string $canonical): bool
+    {
+        self::$internalEncoding = $canonical;
+
+        return true;
+    }
 
     public static function httpOutput(?string $encoding = null): string|bool
     {
