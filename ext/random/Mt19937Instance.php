@@ -164,4 +164,61 @@ final class Mt19937Instance
     {
         return $u & 0x7FFFFFFF;
     }
+
+    /**
+     * php-src ext/random/engine_mt19937.c — __serialize payload at index 1.
+     *
+     * @return array<int, string|int>
+     */
+    public function exportSerializedState(): array
+    {
+        $out = [];
+        for ($i = 0; $i < self::MT_N; ++$i) {
+            $out[$i] = self::stateWordToWireHex($this->state[$i] ?? 0);
+        }
+        $out[624] = $this->count;
+        $out[625] = $this->mode;
+
+        return $out;
+    }
+
+    /**
+     * @param array<int|string, string|int> $data
+     */
+    public function restoreFromSerializedState(array $data): void
+    {
+        $this->state = [];
+        for ($i = 0; $i < self::MT_N; ++$i) {
+            $hex = $data[$i] ?? '00000000';
+            $this->state[$i] = self::wireHexToStateWord((string) $hex);
+        }
+        $this->count = (int) ($data[624] ?? self::MT_N);
+        $this->mode = (int) ($data[625] ?? self::MT_RAND_MT19937);
+    }
+
+    /** php-src engine_mt19937.c — little-endian word as memory-order hex pairs. */
+    private static function stateWordToWireHex(int $word): string
+    {
+        $word &= 0xFFFFFFFF;
+
+        return \sprintf(
+            '%02x%02x%02x%02x',
+            $word & 0xFF,
+            ($word >> 8) & 0xFF,
+            ($word >> 16) & 0xFF,
+            ($word >> 24) & 0xFF
+        );
+    }
+
+    private static function wireHexToStateWord(string $hex): int
+    {
+        $hex = \str_pad($hex, 8, '0', STR_PAD_LEFT);
+
+        return (
+            \hexdec(\substr($hex, 0, 2))
+            | (\hexdec(\substr($hex, 2, 2)) << 8)
+            | (\hexdec(\substr($hex, 4, 2)) << 16)
+            | (\hexdec(\substr($hex, 6, 2)) << 24)
+        ) & 0xFFFFFFFF;
+    }
 }

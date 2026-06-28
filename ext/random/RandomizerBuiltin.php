@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\random;
 
+use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
@@ -28,11 +29,17 @@ final class RandomEngineStorage
 
     public static function mt19937(ObjectEntry $object): Mt19937Instance
     {
-        if (!isset(self::$mt19937[$object->id])) {
+        $engine = self::tryMt19937($object);
+        if (null === $engine) {
             throw new \LogicException('Random engine state missing');
         }
 
-        return self::$mt19937[$object->id];
+        return $engine;
+    }
+
+    public static function tryMt19937(ObjectEntry $object): ?Mt19937Instance
+    {
+        return self::$mt19937[$object->id] ?? null;
     }
 
     public static function engineObject(ObjectEntry $randomizer): ObjectEntry
@@ -284,8 +291,17 @@ final class Mt19937Serialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        RandomizerBuiltin::receiverMt19937($frame, 'Random\\Engine\\Mt19937::__serialize()');
-        throw new \LogicException('Random\\Engine\\Mt19937::__serialize() not implemented in this compiler build');
+        $object = RandomizerBuiltin::receiverMt19937($frame, 'Random\\Engine\\Mt19937::__serialize()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $engine = RandomEngineStorage::mt19937($object);
+        $payload = [
+            0 => [],
+            1 => $engine->exportSerializedState(),
+        ];
+        $frame->returnVar->copyFrom(VmJson::import($payload));
     }
 }
 
@@ -298,8 +314,43 @@ final class Mt19937Unserialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        RandomizerBuiltin::receiverMt19937($frame, 'Random\\Engine\\Mt19937::__unserialize()');
-        throw new \LogicException('Random\\Engine\\Mt19937::__unserialize() not implemented in this compiler build');
+        $object = RandomizerBuiltin::receiverMt19937($frame, 'Random\\Engine\\Mt19937::__unserialize()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'Random\\Engine\\Mt19937::__unserialize() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'Random\\Engine\\Mt19937::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+
+        $stateVar = null;
+        foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $key->type) {
+                throw new \TypeError('Random\\Engine\\Mt19937::__unserialize(): invalid array key');
+            }
+            if (1 === $key->toInt()) {
+                $stateVar = $valueVar->resolveIndirect();
+            }
+        }
+        if (null === $stateVar || Variable::TYPE_ARRAY !== $stateVar->type) {
+            throw new \TypeError('Random\\Engine\\Mt19937::__unserialize(): invalid serialized state');
+        }
+
+        $statePayload = VmJson::export($stateVar);
+
+        $engine = RandomEngineStorage::tryMt19937($object) ?? new Mt19937Instance();
+        RandomEngineStorage::attachMt19937($object, $engine);
+        if (!\is_array($statePayload)) {
+            throw new \TypeError('Random\\Engine\\Mt19937::__unserialize(): invalid serialized state');
+        }
+        $engine->restoreFromSerializedState($statePayload);
+        $object->constructed = true;
     }
 }
 

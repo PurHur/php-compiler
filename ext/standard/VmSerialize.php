@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal as FuncInternal;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM\BackedEnum;
+use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
@@ -476,7 +477,7 @@ final class VmSerialize
             return null;
         }
         $declaredLen = (int) $m[1];
-        $className = stripcslashes($m[2]);
+        $className = self::unescapeSerializedClassName($m[2]);
         if (\strlen($className) !== $declaredLen) {
             return null;
         }
@@ -490,6 +491,14 @@ final class VmSerialize
     }
 
     /**
+     * Unescape O:/C: class names without stripping namespace separators (php-src var.c; #13296).
+     */
+    private static function unescapeSerializedClassName(string $wire): string
+    {
+        return str_replace(['\\\\', '\\"'], ['\\', '"'], $wire);
+    }
+
+    /**
      * @return array{0: string, 1: string}|null
      */
     public static function parseSerializableObjectPayload(string $payload): ?array
@@ -498,7 +507,7 @@ final class VmSerialize
             return null;
         }
         $declaredLen = (int) $m[1];
-        $className = stripcslashes($m[2]);
+        $className = self::unescapeSerializedClassName($m[2]);
         if (\strlen($className) !== $declaredLen) {
             return null;
         }
@@ -517,15 +526,20 @@ final class VmSerialize
         array $data
     ): Variable {
         $method = $class->methods['__unserialize'] ?? null;
+        $entry = new ObjectEntry($class);
+        $recv = new Variable();
+        $recv->object($entry);
+        $dataVar = VmJson::import($data);
+        if ($method instanceof VmClassMethod) {
+            self::invokeBuiltinClassMethod($ctx, $method, $entry, $dataVar);
+
+            return $recv;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$class->name.'::__unserialize() must be a user method in this compiler build'
             );
         }
-        $entry = new ObjectEntry($class);
-        $recv = new Variable();
-        $recv->object($entry);
-        $dataVar = VmJson::import($data);
         $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv, $dataVar);
 
         return $recv;
@@ -1006,6 +1020,14 @@ final class VmSerialize
     private static function invokeSerialize(Context $ctx, ObjectEntry $entry): Variable
     {
         $method = $entry->class->methods['__serialize'] ?? null;
+        if ($method instanceof VmClassMethod) {
+            $result = self::invokeBuiltinClassMethod($ctx, $method, $entry);
+            if (Variable::TYPE_ARRAY !== $result->type) {
+                self::throwSerializeMustReturnArray($entry->class->name);
+            }
+
+            return $result;
+        }
         if (!$method instanceof PhpFunc) {
             throw new \LogicException(
                 'Class '.$entry->class->name.'::__serialize() must be a user method in this compiler build'
@@ -1019,6 +1041,24 @@ final class VmSerialize
         }
 
         return $result;
+    }
+
+    private static function invokeBuiltinClassMethod(
+        Context $ctx,
+        VmClassMethod $method,
+        ObjectEntry $entry,
+        Variable ...$extraArgs
+    ): Variable {
+        $recv = new Variable();
+        $recv->object($entry);
+        $frame = $method->getFrame($ctx, null);
+        $frame->vmContext = $ctx;
+        $frame->calledArgs = [$recv, ...$extraArgs];
+        $out = new Variable();
+        $frame->returnVar = $out;
+        $method->execute($frame);
+
+        return $out;
     }
 
     /** @return list<string> */
