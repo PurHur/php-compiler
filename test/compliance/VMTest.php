@@ -22,12 +22,12 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }
-            if (!CompilerVersion::supportsFpow()
+            if (!CompilerVersion::supportsRoundingModeEnum()
                 && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
                 && !str_contains($name, 'rounding_mode_reference_profile')) {
                 continue;
             }
-            if (CompilerVersion::supportsFpow()
+            if (CompilerVersion::supportsRoundingModeEnum()
                 && str_contains($name, 'rounding_mode_reference_profile')) {
                 continue;
             }

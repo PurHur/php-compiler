@@ -32,7 +32,7 @@ final class BuiltinEnums
             self::registerSorting($ctx);
             self::registerSortDirection($ctx);
         }
-        if (CompilerVersion::supportsFpow()) {
+        if (CompilerVersion::supportsRoundingModeEnum()) {
             self::registerRoundingMode($ctx);
         }
         self::registerParseUrl($ctx);
