@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3416 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9033 |
+| Source constructs flagged (warnings) | 9034 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1239,7 +1239,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 8 |
-| `ext/standard/VmSerialize.php` | 0 | 35 |
+| `ext/standard/VmSerialize.php` | 0 | 36 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -11603,39 +11603,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Exception (line 45)
-- new VmSerializeRefState (line 79)
-- new Exception (line 148)
-- new Variable (line 164)
-- new Variable (line 174)
-- new Variable (line 184)
-- new VmSerializeRefState (line 284)
-- new Exception (line 404)
-- new ObjectEntry (line 506)
-- new Variable (line 507)
-- new ObjectEntry (line 524)
-- new Variable (line 528)
-- new ObjectEntry (line 540)
-- new Variable (line 548)
-- new ObjectEntry (line 566)
-- new Variable (line 567)
+- new VmSerializeRefState (line 80)
+- new Exception (line 149)
+- new Variable (line 165)
+- new Variable (line 175)
+- new Variable (line 185)
+- new VmSerializeRefState (line 285)
+- new Exception (line 405)
+- new ObjectEntry (line 508)
+- new Variable (line 509)
+- new ObjectEntry (line 526)
+- new Variable (line 530)
+- new ObjectEntry (line 542)
+- new Variable (line 550)
+- new ObjectEntry (line 568)
 - new Variable (line 569)
-- new Variable (line 626)
-- new Exception (line 652)
-- new VmSerializeEnumCaseRef (line 702)
-- new VmSerializeEnumCaseRef (line 707)
-- new VmSerializeRefState (line 735)
-- new Variable (line 745)
-- new Variable (line 799)
-- new Variable (line 812)
-- new Variable (line 918)
-- new ObjectEntry (line 948)
-- new Variable (line 952)
-- new Frame (line 971)
-- new Variable (line 974)
-- new Variable (line 995)
-- new Variable (line 1014)
-- new Variable (line 1040)
-- 51 class method(s)
+- new Variable (line 571)
+- new Variable (line 628)
+- new Exception (line 654)
+- new VmSerializeEnumCaseRef (line 704)
+- new VmSerializeEnumCaseRef (line 709)
+- new VmSerializeRefState (line 737)
+- new Variable (line 747)
+- new Variable (line 801)
+- new Variable (line 814)
+- new Variable (line 920)
+- new ObjectEntry (line 950)
+- new Variable (line 954)
+- new Frame (line 973)
+- new Variable (line 976)
+- new Variable (line 997)
+- new Variable (line 1016)
+- new Variable (line 1042)
+- new Exception (line 1065)
+- 52 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
