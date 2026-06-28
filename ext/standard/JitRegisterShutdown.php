@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Call\ClosureWithCaptures;
 use PHPCompiler\JIT\Call\Native;
 use PHPCompiler\JIT\ClosureHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\ExceptionBridge;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -20,7 +21,12 @@ final class JitRegisterShutdown
     public static function invoke(Context $context, JITVariable ...$args): Value
     {
         if ([] === $args) {
-            throw new \LogicException('register_shutdown_function() requires at least one argument');
+            ExceptionBridge::emitArgumentCountError(
+                $context,
+                'register_shutdown_function() expects at least 1 argument, 0 given'
+            );
+
+            return $context->getTypeFromString('int32')->constInt(0, false);
         }
         $call = self::resolveCallback($context, $args[0]);
         if (null === $call) {

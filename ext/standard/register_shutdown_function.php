@@ -27,10 +27,8 @@ final class register_shutdown_function extends Internal
 
     public function execute(Frame $frame): void
     {
+        $this->requireAtLeastArgCount($frame, 'register_shutdown_function', 1);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1) {
-            throw new \LogicException('register_shutdown_function() requires at least one argument');
-        }
         $callable = $frame->calledArgs[0];
         if (EnumCaseSupport::isEnumCaseVariable($callable)) {
             throw new \TypeError(ShutdownCallbackPolicy::invalidCallbackTypeError());

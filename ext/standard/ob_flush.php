@@ -26,9 +26,7 @@ final class ob_flush extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('ob_flush() takes no arguments');
-        }
+        $this->requireExactArgCount($frame, 'ob_flush', 0);
         if (0 === OutputBuffer::getLevel()) {
             self::emitNoBufferNotice($frame);
             if (null !== $frame->returnVar) {
