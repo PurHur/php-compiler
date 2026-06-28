@@ -21,6 +21,7 @@ final class BuiltinClasses
         SplFileObjectBuiltin::registerClass($ctx);
         SplTempFileObjectBuiltin::registerClass($ctx);
         DirectoryIteratorBuiltin::registerClass($ctx);
+        FilesystemIteratorBuiltin::registerClass($ctx);
         SplFixedArrayBuiltin::registerClass($ctx);
         SplObjectStorageBuiltin::registerClass($ctx);
         IteratorIteratorBuiltin::registerClass($ctx);
