@@ -8161,7 +8161,7 @@ class Compiler {
                         $line > 0 ? $line : null
                     )
                 ];
-                foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+                foreach ($this->compileCallArgSends($expr->args, $block, $className, $expr) as $send) {
                     $return[] = $send;
                 }
                 $return[] = $this->compileFuncCallExecOpcode(
@@ -8897,7 +8897,7 @@ class Compiler {
                 $line > 0 ? $line : null
             ),
         ];
-        foreach ($this->compileCallArgSends($expr->args, $block) as $send) {
+        foreach ($this->compileCallArgSends($expr->args, $block, $className, $expr) as $send) {
             $return[] = $send;
         }
         $return[] = $this->compileFuncCallExecOpcode(
@@ -13321,6 +13321,16 @@ class Compiler {
             }
 
             return null;
+        }
+        // new LimitIterator(new ArrayIterator([...]), …) — inner-ctor Array_ prelude + inline New_ feeds outer arg #0 (#12916).
+        if (
+            0 === $argIndex
+            && $producerCount >= 2
+            && $argCount > $producerCount
+            && ($producers[0] ?? null) instanceof Op\Expr\Array_
+            && ($producers[1] ?? null) instanceof Op\Expr\New_
+        ) {
+            return $producers[1];
         }
         if ($argCount < $producerCount) {
             // array_fill_keys([[[1]]], 1) — all Array_ preludes belong to the sole hoisted arg (#10848).
