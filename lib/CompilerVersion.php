@@ -497,6 +497,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ DateException / DateError hierarchy (ext/date/php_date.h, #7276, #7277, #13118).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function advertisesDateExceptionHierarchy(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * Whether a builtin removed in $removedIn should appear in function_exists() for the active profile.
      *
      * php-src drops symbols at major boundaries (e.g. convert_cyr_string/strxfrm in 8.0 — #11907).

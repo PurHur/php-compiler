@@ -1044,6 +1044,9 @@ final class BuiltinClasses
         $ctx->classes[ThrowableManifest::LC_THROWABLE] = $throwable;
 
         foreach (ThrowableManifest::registrationOrder() as $className) {
+            if (!ThrowableManifest::isAdvertised($className)) {
+                continue;
+            }
             self::registerThrowableClass(
                 $ctx,
                 $className,

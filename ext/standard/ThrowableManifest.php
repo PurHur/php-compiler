@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+
 /**
  * Single source of truth for VM/JIT Throwable class hierarchy (#6736).
  *
@@ -172,6 +174,21 @@ final class ThrowableManifest
     public static function registrationOrder(): array
     {
         return array_keys(self::PARENTS);
+    }
+
+    /** Whether a Throwable class should be registered for the active version profile (#13118, #13124). */
+    public static function isAdvertised(string $className): bool
+    {
+        return match ($className) {
+            'DateException',
+            'DateInvalidTimeZoneException',
+            'DateMalformedIntervalException',
+            'DateMalformedPeriodException',
+            'DateError',
+            'DateObjectError',
+            'DateRangeError' => CompilerVersion::advertisesDateExceptionHierarchy(),
+            default => true,
+        };
     }
 
     public static function lcKey(string $className): string
