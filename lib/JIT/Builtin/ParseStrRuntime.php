@@ -4,10 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
@@ -54,7 +53,12 @@ final class ParseStrRuntime
         } catch (\Throwable) {
         }
 
-        self::ensureJitHelperCompiled($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#9295'
+        );
         self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
         self::registerLinkedRuntime($context);
 
@@ -98,8 +102,9 @@ final class ParseStrRuntime
     private static function implementParseBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('parse_str_bridge_entry');
-        $early = BasicBlockHelper::append($context, 'parse_str_bridge_early');
-        $work = BasicBlockHelper::append($context, 'parse_str_bridge_work');
+        // Append on $fn directly — defineBuiltins() has no insert block yet (#1492 inventory argv).
+        $early = $fn->appendBasicBlock('parse_str_bridge_early');
+        $work = $fn->appendBasicBlock('parse_str_bridge_work');
         $context->builder->positionAtEnd($entry);
 
         $dest = $fn->getParam(0);
@@ -112,55 +117,19 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $context->builder->call(
-            self::helperFunction($context, self::PARSE_INTO_HELPER),
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_INTO_HELPER, '#9295');
+        $destArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
             $dest,
-            $encoded
+            $helperFn->getParam(0)->typeOf()
         );
+        $encodedArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $encoded,
+            $helperFn->getParam(1)->typeOf()
+        );
+        $context->builder->call($helperFn, $destArg, $encodedArg);
         $context->builder->returnVoid();
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after ParseStrJitHelper compile (#9295)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ParseStrJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ParseStrJitHelper.php parseAndCompile failed (#9295)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#9295)');
-            }
-        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
