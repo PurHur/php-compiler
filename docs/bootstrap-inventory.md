@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3427 |
-| Phase A inventory files (M2 ratio SSOT) | 3427 |
+| PHP files on vm.php path | 3428 |
+| Phase A inventory files (M2 ratio SSOT) | 3428 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9119 |
+| Source constructs flagged (warnings) | 9130 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -316,7 +316,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_import_stream.php` | 0 | 4 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 21 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 25 |
-| `ext/spl/BuiltinClasses.php` | 0 | 2 |
+| `ext/spl/BuiltinClasses.php` | 0 | 1 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
 | `ext/spl/FilesystemIteratorBuiltin.php` | 0 | 11 |
@@ -328,11 +328,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 10 |
+| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 9 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 5 |
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
-| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 20 |
+| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 23 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 14 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -5366,8 +5367,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 44)
-- 3 class method(s)
+- 2 class method(s)
 
 ### `ext/spl/DirectoryIteratorBuiltin.php`
 
@@ -5494,6 +5494,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 291)
 - 29 class method(s)
 
+### `ext/spl/SplDoublyLinkedListBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 34)
+- new SplDoublyLinkedListConstruct (line 42)
+- new Variable (line 82)
+- new Variable (line 94)
+- new Variable (line 107)
+- new Variable (line 115)
+- new ArgumentCountError (line 159)
+- new ArgumentCountError (line 219)
+- 15 class method(s)
+
 ### `ext/spl/SplFileInfoBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
@@ -5528,22 +5541,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SplFixedArrayConstruct (line 48)
 - new SplFixedArrayFromArray (line 65)
 - new SplFixedArrayToArray (line 68)
-- new Variable (line 110)
-- new Variable (line 126)
-- new HashTable (line 148)
-- new Variable (line 152)
-- new HashTable (line 160)
-- new Variable (line 180)
-- new Variable (line 192)
-- new ObjectEntry (line 202)
-- new ArgumentCountError (line 340)
-- new ArgumentCountError (line 367)
-- new ArgumentCountError (line 391)
-- new ArgumentCountError (line 420)
-- new ArgumentCountError (line 439)
-- new Variable (line 453)
-- new Variable (line 473)
-- 22 class method(s)
+- new SplFixedArrayGetIterator (line 71)
+- new Variable (line 113)
+- new Variable (line 129)
+- new HashTable (line 151)
+- new Variable (line 155)
+- new HashTable (line 163)
+- new Variable (line 183)
+- new Variable (line 195)
+- new ObjectEntry (line 205)
+- new ObjectEntry (line 221)
+- new Variable (line 224)
+- new ArgumentCountError (line 358)
+- new ArgumentCountError (line 385)
+- new ArgumentCountError (line 409)
+- new ArgumentCountError (line 438)
+- new ArgumentCountError (line 457)
+- new Variable (line 471)
+- new Variable (line 491)
+- 24 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
 
@@ -17912,74 +17928,74 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Literal (line 7800)
 - new Variable (line 8101)
 - new Variable (line 8215)
-- new VM\Variable (line 8272)
-- new OpCode (line 8350)
-- new Variable (line 8789)
-- new Variable (line 8850)
-- new JIT\Call\ClosureWithBinding (line 8879)
-- new JIT\Call\RuntimeVariableFunction (line 8934)
-- new Variable (line 9046)
-- new VM\Variable (line 9226)
-- new VM (line 9232)
-- new VM\Variable (line 9245)
-- new Variable (line 9445)
-- new Type (line 9452)
-- new Variable (line 9473)
-- new Type (line 9481)
-- new Variable (line 9497)
-- new Type (line 9505)
-- new Variable (line 9601)
-- new Variable (line 9622)
-- new Variable (line 10582)
-- new CompileError (line 11296)
-- new CompileError (line 11400)
-- new Variable (line 11445)
-- new Variable (line 11653)
-- new Variable (line 11738)
-- new Variable (line 11759)
-- new Variable (line 11769)
-- new Variable (line 11921)
-- new Variable (line 11939)
-- new Variable (line 11972)
-- new Variable (line 12612)
-- new Variable (line 12632)
-- new Variable (line 12702)
-- new VM\Variable (line 13043)
-- new Variable (line 13077)
-- new Variable (line 13128)
-- new Variable (line 13144)
-- new Variable (line 13163)
-- new Variable (line 13170)
-- new OpCode (line 13190)
-- new Variable (line 13191)
-- new Variable (line 13361)
-- new Variable (line 13399)
-- new OpCode (line 13413)
-- new Variable (line 13414)
-- new Variable (line 13473)
-- new OpCode (line 13494)
-- new Variable (line 13495)
-- new Variable (line 13592)
-- new Variable (line 13614)
-- new Variable (line 13682)
-- new Operand\Literal (line 13691)
-- new Variable (line 13706)
-- new Variable (line 13840)
-- new VM\PropertyIsInitializedHandler (line 13871)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13911)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13965)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14026)
-- new Variable (line 15200)
-- new VM (line 15244)
-- new VM\Variable (line 15251)
-- new Operand\Literal (line 15265)
-- new Operand\Literal (line 15269)
-- new Operand\Literal (line 15273)
-- new Variable (line 15277)
-- new Variable (line 15301)
-- new Variable (line 15313)
-- new Variable (line 15746)
-- 339 class method(s)
+- new VM\Variable (line 8275)
+- new OpCode (line 8359)
+- new Variable (line 8798)
+- new Variable (line 8859)
+- new JIT\Call\ClosureWithBinding (line 8888)
+- new JIT\Call\RuntimeVariableFunction (line 8943)
+- new Variable (line 9055)
+- new VM\Variable (line 9235)
+- new VM (line 9241)
+- new VM\Variable (line 9254)
+- new Variable (line 9454)
+- new Type (line 9461)
+- new Variable (line 9482)
+- new Type (line 9490)
+- new Variable (line 9506)
+- new Type (line 9514)
+- new Variable (line 9610)
+- new Variable (line 9631)
+- new Variable (line 10609)
+- new CompileError (line 11323)
+- new CompileError (line 11427)
+- new Variable (line 11472)
+- new Variable (line 11680)
+- new Variable (line 11765)
+- new Variable (line 11786)
+- new Variable (line 11796)
+- new Variable (line 11948)
+- new Variable (line 11966)
+- new Variable (line 11999)
+- new Variable (line 12639)
+- new Variable (line 12659)
+- new Variable (line 12729)
+- new VM\Variable (line 13072)
+- new Variable (line 13106)
+- new Variable (line 13157)
+- new Variable (line 13173)
+- new Variable (line 13192)
+- new Variable (line 13199)
+- new OpCode (line 13219)
+- new Variable (line 13220)
+- new Variable (line 13390)
+- new Variable (line 13428)
+- new OpCode (line 13442)
+- new Variable (line 13443)
+- new Variable (line 13502)
+- new OpCode (line 13523)
+- new Variable (line 13524)
+- new Variable (line 13621)
+- new Variable (line 13643)
+- new Variable (line 13711)
+- new Operand\Literal (line 13720)
+- new Variable (line 13735)
+- new Variable (line 13869)
+- new VM\PropertyIsInitializedHandler (line 13900)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13940)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 13994)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14055)
+- new Variable (line 15229)
+- new VM (line 15273)
+- new VM\Variable (line 15280)
+- new Operand\Literal (line 15294)
+- new Operand\Literal (line 15298)
+- new Operand\Literal (line 15302)
+- new Variable (line 15306)
+- new Variable (line 15330)
+- new Variable (line 15342)
+- new Variable (line 15775)
+- 341 class method(s)
 - 7 closure(s)
 
 ### `lib/JIT/Analyzer.php`
