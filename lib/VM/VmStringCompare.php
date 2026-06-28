@@ -41,11 +41,37 @@ final class VmStringCompare
                 $i1 = $context->getTypeFromString('int1');
 
                 return $context->builder->xor($same, $i1->constInt(1, false));
+            case OpCode::TYPE_SMALLER:
+            case OpCode::TYPE_GREATER:
+            case OpCode::TYPE_SMALLER_OR_EQUAL:
+            case OpCode::TYPE_GREATER_OR_EQUAL:
+                return self::orderedCompare($context, $opcode->type, $leftStr, $rightStr);
             default:
                 throw new \LogicException(
                     'String/string comparison opcode not implemented for JIT: '.opcode_type_name($opcode->type)
                 );
         }
+    }
+
+    private static function orderedCompare(
+        Context $context,
+        int $opcodeType,
+        Value $leftStr,
+        Value $rightStr
+    ): Value {
+        $cmp = self::strcmp($context, $leftStr, $rightStr);
+        $i64 = $context->getTypeFromString('int64');
+        $zero = $i64->constInt(0, false);
+
+        return match ($opcodeType) {
+            OpCode::TYPE_SMALLER => $context->builder->icmp(Builder::INT_SLT, $cmp, $zero),
+            OpCode::TYPE_GREATER => $context->builder->icmp(Builder::INT_SGT, $cmp, $zero),
+            OpCode::TYPE_SMALLER_OR_EQUAL => $context->builder->icmp(Builder::INT_SLE, $cmp, $zero),
+            OpCode::TYPE_GREATER_OR_EQUAL => $context->builder->icmp(Builder::INT_SGE, $cmp, $zero),
+            default => throw new \LogicException(
+                'String/string ordering opcode not implemented for JIT: '.opcode_type_name($opcodeType)
+            ),
+        };
     }
 
     /** True when $haystack ends with the same bytes as $suffix (inventory argv absolute paths — #3046). */
