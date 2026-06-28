@@ -14755,7 +14755,7 @@ final class ArrayBuiltinHelper
         return $dest;
     }
 
-    private static function entriesIdentical(Context $context, Value $leftEntry, Value $rightEntry): Value
+    private static function entriesLooseEqual(Context $context, Value $leftEntry, Value $rightEntry): Value
     {
         $left = new Variable(
             $context,
@@ -14770,7 +14770,7 @@ final class ArrayBuiltinHelper
             $rightEntry
         );
 
-        return JitValueCompare::identicalValueToValue($context, $left, $right);
+        return JitValueCompare::looseEqualValueToValue($context, $left, $right);
     }
 
     /**
@@ -14800,7 +14800,7 @@ final class ArrayBuiltinHelper
         $context->builder->positionAtEnd($compare);
         $otherEntry = self::listEntryAt($context, $haystack, $idx);
         $context->builder->store(
-            self::entriesIdentical($context, $valEntry, $otherEntry),
+            self::entriesLooseEqual($context, $valEntry, $otherEntry),
             $resultSlot
         );
         $context->builder->branch($done);
@@ -14844,7 +14844,7 @@ final class ArrayBuiltinHelper
             $keyStr
         );
         $context->builder->store(
-            self::entriesIdentical($context, $valEntry, $otherEntry),
+            self::entriesLooseEqual($context, $valEntry, $otherEntry),
             $resultSlot
         );
         $context->builder->branch($done);

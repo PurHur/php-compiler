@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * array_diff_assoc() — diff with strict key+value equality (php-src ext/standard/array.c, #3129).
+ * array_diff_assoc() — diff with key match and loose value equality (php-src ext/standard/array.c, #3129).
  */
 final class array_diff_assoc extends Internal
 {

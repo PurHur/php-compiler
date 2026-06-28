@@ -160,7 +160,7 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $keyCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
+        $dataCompare = self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 1], 'array_diff_uassoc', $argc);
         $first = VmArray::requireArrayParam($frame->calledArgs[0], 'array_diff_uassoc', 1, 'array');
         $others = self::collectOtherArrays($frame, 'array_diff_uassoc', 1, $argc - 1);
         if (null === $frame->returnVar) {
@@ -168,7 +168,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (self::uassocPairInAnyOther($key, $value, $others, $keyCompare)) {
+            if (self::exactPairInAnyOther($key, $value, $others, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -191,7 +191,7 @@ final class VmArrayUserSetOps
                 $argc
             );
         }
-        $keyCompare = self::resolveCompareCallback(
+        $dataCompare = self::resolveCompareCallback(
             $frame,
             $frame->calledArgs[$argc - 1],
             'array_intersect_uassoc',
@@ -204,7 +204,7 @@ final class VmArrayUserSetOps
         }
         $out = new HashTable();
         foreach ($first->iterateKeyed(true) as [$key, $value]) {
-            if (!self::uassocPairInAllOthers($key, $value, $others, $keyCompare)) {
+            if (!self::exactPairInAllOthers($key, $value, $others, $dataCompare)) {
                 continue;
             }
             self::appendToOutput($out, $key, $value);
@@ -390,59 +390,6 @@ final class VmArrayUserSetOps
     ): bool {
         foreach ($others as $haystack) {
             if (!self::pairInAnyOther($key, $value, [$haystack], $keyCompare, $dataCompare)) {
-                return false;
-            }
-        }
-
-        return [] !== $others;
-    }
-
-    /**
-     * @param list<HashTable> $others
-     * @param callable        $keyCompare
-     */
-    private static function uassocPairInAnyOther(
-        Variable $key,
-        Variable $value,
-        array $others,
-        callable $keyCompare
-    ): bool {
-        foreach ($others as $haystack) {
-            foreach ($haystack->iterateKeyed(true) as [$otherKey, $otherValue]) {
-                if (0 !== $keyCompare($key, $otherKey)) {
-                    continue;
-                }
-                if ($value->resolveIndirect()->identicalTo($otherValue->resolveIndirect())) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param list<HashTable> $others
-     * @param callable        $keyCompare
-     */
-    private static function uassocPairInAllOthers(
-        Variable $key,
-        Variable $value,
-        array $others,
-        callable $keyCompare
-    ): bool {
-        foreach ($others as $haystack) {
-            $matched = false;
-            foreach ($haystack->iterateKeyed(true) as [$otherKey, $otherValue]) {
-                if (0 !== $keyCompare($key, $otherKey)) {
-                    continue;
-                }
-                if ($value->resolveIndirect()->identicalTo($otherValue->resolveIndirect())) {
-                    $matched = true;
-                    break;
-                }
-            }
-            if (!$matched) {
                 return false;
             }
         }
