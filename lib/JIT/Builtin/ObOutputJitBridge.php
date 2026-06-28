@@ -555,6 +555,8 @@ final class ObOutputJitBridge
             return;
         }
 
+        self::ensureEchoAbiDeclared($context);
+
         $runtime = $context->runtime;
         $path = \dirname(__DIR__, 3).self::HELPER_PATH;
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
@@ -769,6 +771,23 @@ final class ObOutputJitBridge
         );
         $context->builder->branch($done);
         $context->builder->positionAtEnd($done);
+    }
+
+  /** Forward-declare echo ABI so nested ObOutputJitHelper compile can lower `echo` (#12999). */
+    private static function ensureEchoAbiDeclared(Context $context): void
+    {
+        $voidTy = $context->getTypeFromString('void');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8 = $context->getTypeFromString('int8');
+        $i64 = $context->getTypeFromString('int64');
+        $doubleTy = $context->getTypeFromString('double');
+        $sizeT = $context->getTypeFromString('size_t');
+
+        self::echoFn($context, '__phpc_ob_echo_cstr', $voidTy, false, $i8p);
+        self::echoFn($context, '__phpc_ob_echo_char', $voidTy, false, $i8);
+        self::echoFn($context, '__phpc_ob_echo_substr', $voidTy, false, $i8p, $sizeT);
+        self::echoFn($context, '__phpc_ob_echo_ll', $voidTy, false, $i64);
+        self::echoFn($context, '__phpc_ob_echo_double', $voidTy, false, $doubleTy);
     }
 
     private static function echoFn(Context $context, string $name, $ret, bool $vararg, ...$params): LlvmFunction
