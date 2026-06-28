@@ -54,9 +54,36 @@ final class VmArrayColumnArg
         if (Variable::TYPE_INTEGER === $var->type) {
             return $var->toInt();
         }
-        throw new \LogicException(
-            $function.'() '.$paramName.' must be a string or integer in this compiler build'
-        );
+        throw new \TypeError(self::strIntNullTypeError(
+            $function,
+            $argIndex,
+            $paramName,
+            self::vmTypeName($var->type)
+        ));
+    }
+
+    public static function vmTypeName(int $type): string
+    {
+        switch ($type) {
+            case Variable::TYPE_INTEGER:
+                return 'int';
+            case Variable::TYPE_FLOAT:
+                return 'float';
+            case Variable::TYPE_BOOLEAN:
+                return 'bool';
+            case Variable::TYPE_STRING:
+                return 'string';
+            case Variable::TYPE_NULL:
+                return 'null';
+            case Variable::TYPE_ARRAY:
+                return 'array';
+            case Variable::TYPE_OBJECT:
+                return 'object';
+            case Variable::TYPE_ENUM_CASE:
+                return 'object';
+            default:
+                return 'mixed';
+        }
     }
 
     public static function strIntNullTypeError(
