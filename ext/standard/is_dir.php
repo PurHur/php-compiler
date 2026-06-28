@@ -20,7 +20,7 @@ final class is_dir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_dir() requires exactly one argument');
         }
-        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'is_dir', 0, 'filename');
+        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_dir', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -32,7 +32,7 @@ final class is_dir extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_dir() requires exactly one argument');
         }
-        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'is_dir', 0, 'filename');
+        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_dir', 0, 'filename');
 
         return JitStat::pathIsDir($context, $path);
     }

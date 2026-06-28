@@ -11,13 +11,13 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_STR filename (php-src ext/standard/filestat.c — null is TypeError, #12765).
+     * Z_PARAM_PATH filename — null coerces to "" (php-src filestat.c; #13354, same as touch()).
      *
-     * @throws \TypeError
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     public static function coerceFilenameArg(Variable $var, string $function): string
     {
-        return VmString::coerceTypedStringBuiltinArg($var, $function, 0, 'filename');
+        return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
     }
 
     /**
