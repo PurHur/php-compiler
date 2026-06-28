@@ -157,8 +157,8 @@ final class CompilerVersion
     /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
     public static function advertisesNoDiscardAttributeClass(): bool
     {
-        // Forward 8.4.0-dev profile advertises via builtinAdvertisementVersion() (#13056).
-        return self::advertisesBuiltinSince('8.4.0');
+        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13117).
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
