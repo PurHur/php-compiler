@@ -243,6 +243,12 @@ final class SplDualIteratorStorage
         return self::state($object)['inner'];
     }
 
+    /** @return list<ObjectEntry> Active iterator stack for recursive wrappers (#13223). */
+    public static function iteratorStack(ObjectEntry $object): array
+    {
+        return self::state($object)['stack'];
+    }
+
     public static function rewindSimple(Frame $frame, ObjectEntry $object): void
     {
         self::invokeInner($frame, self::inner($object), 'rewind');
