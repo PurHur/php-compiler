@@ -35,6 +35,18 @@ PHP;
         $this->assertNotNull($plus->arg3);
     }
 
+    /** Issue #13106: AssignOp peephole must not clobber concat operands on simple assign RHS. */
+    public function testSimpleAssignConcatRhs(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_assign_concat_rhs.php'),
+            "ok literal concat assign\n"
+            . "ok func concat assign\n"
+            . "ok pid concat assign\n"
+            . "ok int concat assign\n"
+        );
+    }
+
     public function testNestedJitCompileCompoundAssignHelper(): void
     {
         $code = <<<'PHP'
@@ -107,5 +119,19 @@ PHP;
         }
 
         return null;
+    }
+
+    private function assertVmOutput(string $code, string $expected): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'test.php');
+        ob_start();
+        try {
+            $runtime->run($block);
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            // exit() in compiled code
+        }
+        $actual = ob_get_clean();
+        $this->assertSame($expected, $actual, 'VM stdout');
     }
 }
