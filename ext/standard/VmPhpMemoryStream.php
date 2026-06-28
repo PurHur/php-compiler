@@ -313,6 +313,9 @@ final class VmPhpMemoryStream
         if ('' === $line && self::eof($handle)) {
             return false;
         }
+        if ($state->position >= \strlen($state->buffer)) {
+            $state->atEof = true;
+        }
 
         return $line;
     }
