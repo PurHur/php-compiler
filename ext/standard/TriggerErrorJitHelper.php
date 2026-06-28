@@ -34,6 +34,11 @@ final class TriggerErrorJitHelper
         self::recordAndMaybePrint(ErrorReporter::E_WARNING, $message);
     }
 
+    public static function nonVariableByRef(): void
+    {
+        self::recordAndMaybePrint(ErrorReporter::E_NOTICE, 'Only variables should be passed by reference');
+    }
+
     /**
      * @return bool LLVM i1 ABI — whether stderr print is allowed (error_reporting / @ silence)
      */

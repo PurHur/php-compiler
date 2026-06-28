@@ -93,6 +93,7 @@ class VM {
 
             $frame = $block->getFrame($this->context);
             $this->seedScriptPath($frame);
+            $frame->vmContext = $this->context;
             $this->context->executionLimits->begin();
             $this->context->push($frame);
 

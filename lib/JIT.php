@@ -15096,6 +15096,9 @@ class JIT {
                 VM\ReferencableCheck::skipsByRefWhenNotArray($name)
                 && !self::jitArgLooksLikeArray($args[$idx])
             ) {
+                if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
+                    JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                }
                 continue;
             }
             $namedLocalSlot = $block->slotForOperand($operand);
