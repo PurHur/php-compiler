@@ -19,6 +19,18 @@ final class CachingIteratorBuiltin
 {
     public const CLASS_LC = 'cachingiterator';
 
+    /** php-src CIT_CALL_TOSTRING */
+    public const CALL_TOSTRING = 0x00000001;
+
+    /** php-src CIT_TOSTRING_USE_KEY */
+    public const TOSTRING_USE_KEY = 0x00000002;
+
+    /** php-src CIT_TOSTRING_USE_CURRENT */
+    public const TOSTRING_USE_CURRENT = 0x00000004;
+
+    /** php-src CIT_TOSTRING_USE_INNER */
+    public const TOSTRING_USE_INNER = 0x00000008;
+
     /** php-src CIT_FULL_CACHE */
     public const FULL_CACHE = 0x00000100;
 
@@ -41,6 +53,14 @@ final class CachingIteratorBuiltin
                 $entry->interfaces[] = $iface;
             }
         }
+
+        SplClassConstants::registerIntConstants($entry, [
+            'CALL_TOSTRING' => self::CALL_TOSTRING,
+            'TOSTRING_USE_KEY' => self::TOSTRING_USE_KEY,
+            'TOSTRING_USE_CURRENT' => self::TOSTRING_USE_CURRENT,
+            'TOSTRING_USE_INNER' => self::TOSTRING_USE_INNER,
+            'FULL_CACHE' => self::FULL_CACHE,
+        ]);
 
         $entry->constructor = new CachingIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
