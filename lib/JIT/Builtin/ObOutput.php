@@ -77,7 +77,15 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
         ObOutputRuntime::ensureLinked($context);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        }
         $context->builder->call($context->lookupFunction('__phpc_ob_end_all'));
     }
 }
