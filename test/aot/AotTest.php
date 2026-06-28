@@ -58,6 +58,15 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsHex2binStrict()
+                && str_contains($name, 'hex2bin_strict')
+                && !str_contains($name, 'hex2bin_strict_arity_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsHex2binStrict()
+                && str_contains($name, 'hex2bin_strict_arity_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsFpow()
                 && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))) {
                 continue;

@@ -4,10 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\ErrorReporter;
@@ -24,8 +27,13 @@ final class hex2bin extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hex2bin() requires one or two arguments');
+        if ($argc < 1) {
+            throw new \ArgumentCountError('hex2bin() expects at least 1 argument, 0 given');
+        }
+        if ($argc > 2 || (2 === $argc && !CompilerVersion::supportsHex2binStrict())) {
+            throw new \ArgumentCountError(
+                \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
+            );
         }
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'hex2bin', 0, 'string');
         $strict = false;
@@ -84,8 +92,25 @@ final class hex2bin extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('hex2bin() requires one or two arguments');
+        if ($argc < 1) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                'hex2bin() expects at least 1 argument, 0 given'
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
+        }
+        if ($argc > 2 || (2 === $argc && !CompilerVersion::supportsHex2binStrict())) {
+            TypeErrorRaise::ensureLinked($context);
+            TypeErrorRaise::emitArgumentCountError(
+                $context,
+                \sprintf('hex2bin() expects exactly 1 argument, %d given', $argc)
+            );
+            $slot = JitValueBox::alloc($context);
+
+            return JitValueBox::pointer($context, $slot);
         }
         $strict = null;
         if (2 === $argc) {

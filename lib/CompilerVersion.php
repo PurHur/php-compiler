@@ -161,6 +161,16 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
+    /**
+     * PHP 8.3+ hex2bin() optional $strict parameter (ext/standard/string.c, #13116).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 ArgumentCountError gate.
+     */
+    public static function supportsHex2binStrict(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ #[\EnumCases] builtin attribute class advertisement (Zend/zend_attributes.c, #13057). */
     public static function advertisesEnumCasesAttributeClass(): bool
     {
