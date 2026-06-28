@@ -56,13 +56,24 @@ final class StringOffsetRuntime
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
             self::implementStandaloneNormalizeBridge($context);
         } else {
             self::ensureJitHelperCompiled($context);
             self::implementEmbedNormalizeBridge($context);
         }
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitIncDecError(Context $context): void
