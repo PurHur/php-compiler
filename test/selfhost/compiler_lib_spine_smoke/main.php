@@ -2684,7 +2684,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringSocketAtmark.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSscanfArray.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringSscanfByRef.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsv.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrGetcsvJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStreamCsv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrftime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStripTags.php';
