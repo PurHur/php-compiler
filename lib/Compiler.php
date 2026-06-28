@@ -16036,6 +16036,46 @@ class Compiler {
         return null !== $slot ? (string) $slot : null;
     }
 
+    /**
+     * strlen(($q = pack(...))) — php-cfg dead arg temp vs assign.result (#11365, ext/standard/pack.c).
+     */
+    private function resolveAdjacentAssignExprCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        if (!$prev instanceof Op\Expr\Assign) {
+            return null;
+        }
+        if (null === $prev->result) {
+            return null;
+        }
+        $slot = $block->slotForOperand($prev->result);
+        if (null === $slot) {
+            $slot = $this->slotForEmittedAssignResultSlot($block, $prev);
+        }
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
     private function isAdjacentNestedFuncCallProducer(
         Op\Expr $producer,
         Op $consumer,
@@ -19177,6 +19217,9 @@ class Compiler {
                 }
                 if (null === $valueSlot && null !== $cfgCallOp) {
                     $valueSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $cfgCallOp, (int) $argIndex);
+                }
+                if (null === $valueSlot && null !== $cfgCallOp) {
+                    $valueSlot = $this->resolveAdjacentAssignExprCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 }
                 $closureSlot = $this->resolveInlineClosureCallArgSlot($arg, $block, $cfgCallOp, $calleeName);
                 if (null === $closureSlot && null !== $cfgCallOp) {
