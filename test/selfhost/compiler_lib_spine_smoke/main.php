@@ -2714,7 +2714,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Latin1.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringUtf8Runtime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarDump.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExport.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringVarExportJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVersionCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVersionCompareJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringVfscanf.php';
