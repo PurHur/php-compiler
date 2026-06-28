@@ -2919,7 +2919,7 @@ class VM {
                 return $catchFrame;
             }
             $gen->frame = null;
-            $gen->markReturned(null);
+            $gen->markClosedWithoutReturn();
             throw new VM\GeneratorUncaughtThrow($thrown);
         }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
@@ -11251,7 +11251,7 @@ restart:
             return;
         }
         $gen->frame = null;
-        $gen->markReturned(null);
+        $gen->markClosedWithoutReturn();
         throw new VM\GeneratorUncaughtThrow($thrown);
     }
 
@@ -11321,7 +11321,7 @@ restart:
                     return $this->advanceGeneratorIteration($gen);
                 }
                 $gen->frame = null;
-                $gen->markReturned(null);
+                $gen->markClosedWithoutReturn();
                 throw new VM\GeneratorUncaughtThrow($thrown);
             }
         } finally {

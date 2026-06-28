@@ -115,6 +115,14 @@ final class GeneratorState
         }
     }
 
+    /** Close after uncaught throw — done but not returned (Zend getReturn guard, #13027). */
+    public function markClosedWithoutReturn(): void
+    {
+        $this->done = true;
+        $this->frame = null;
+        $this->hasCurrent = false;
+    }
+
     public function wrapObject(): ObjectEntry
     {
         $entry = new ObjectEntry($this->vm->context->classes['generator']);
