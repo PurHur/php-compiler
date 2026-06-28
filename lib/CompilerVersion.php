@@ -256,12 +256,13 @@ final class CompilerVersion
     /**
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects hook syntax like Zend 8.2 (#12574).
+     * Enabled on the 8.4.0-dev compiler line — version_compare treats -dev below stable 8.4.0 (#12941).
+     * Reference-profile rejection tests skip when this returns true (#12574).
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::VERSION, '8.4', '>=');
     }
 
     /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
