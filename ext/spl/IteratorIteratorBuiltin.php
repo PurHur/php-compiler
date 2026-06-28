@@ -22,6 +22,12 @@ final class IteratorIteratorBuiltin
 
     public const LEAVES_ONLY = 0;
 
+    public const SELF_FIRST = 1;
+
+    public const CHILD_FIRST = 2;
+
+    public const CATCH_GET_CHILD = 16;
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
@@ -103,6 +109,13 @@ final class RecursiveIteratorIteratorBuiltin
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
         IteratorIteratorBuiltin::registerIteratorMethods($entry, $pub, RecursiveIteratorIteratorRewind::class);
+
+        SplClassConstants::registerIntConstants($entry, [
+            'LEAVES_ONLY' => IteratorIteratorBuiltin::LEAVES_ONLY,
+            'SELF_FIRST' => IteratorIteratorBuiltin::SELF_FIRST,
+            'CHILD_FIRST' => IteratorIteratorBuiltin::CHILD_FIRST,
+            'CATCH_GET_CHILD' => IteratorIteratorBuiltin::CATCH_GET_CHILD,
+        ]);
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
