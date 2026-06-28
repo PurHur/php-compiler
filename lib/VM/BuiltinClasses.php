@@ -212,6 +212,7 @@ use PHPCompiler\VM\Builtin\ReflectionPropertyGetType;
 use PHPCompiler\VM\Builtin\ReflectionPropertyGetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertySetValue;
 use PHPCompiler\VM\Builtin\ReflectionPropertyAsymmetricProbe;
+use PHPCompiler\VM\Builtin\ReflectionPropertyAccessProbe;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsAbstract;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsPrivate;
 use PHPCompiler\VM\Builtin\ReflectionPropertyIsProtected;
@@ -699,6 +700,8 @@ final class BuiltinClasses
                 'isprotectedget' => ReflectionPropertyAsymmetricProbe::isProtectedGet(),
                 'ispublicget' => ReflectionPropertyAsymmetricProbe::isPublicGet(),
                 'getasymmetricvisibility' => new ReflectionPropertyGetAsymmetricVisibility(),
+                'isreadable' => ReflectionPropertyAccessProbe::isReadable(),
+                'iswritable' => ReflectionPropertyAccessProbe::isWritable(),
                 'getreadabletype' => new ReflectionPropertyGetReadableType(),
                 'getsettabletype' => new ReflectionPropertyGetSettableType(),
                 'hasdefaultvalue' => new ReflectionPropertyHasDefaultValue(),
