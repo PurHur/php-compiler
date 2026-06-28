@@ -544,7 +544,7 @@ final class VmSscanf
         } elseif ('+' === $input[$pos]) {
             ++$pos;
         }
-        $value = 0;
+        $digits = '';
         $any = false;
         $digitsRead = 0;
         while ($pos < $len && $input[$pos] >= '0' && $input[$pos] <= '9') {
@@ -552,18 +552,49 @@ final class VmSscanf
                 break;
             }
             $any = true;
-            $value = $value * 10 + (ord($input[$pos]) - 48);
+            $digits .= $input[$pos];
             ++$pos;
             ++$digitsRead;
         }
         if (!$any) {
             return [null, 0];
         }
-        if ($negative) {
-            $value = -$value;
+
+        return [self::saturateDecimalInt($digits, $negative), $pos - $orig];
+    }
+
+    /**
+     * Clamp scanned decimal digits to [PHP_INT_MIN, PHP_INT_MAX] (php-src formatted_io.c overflow).
+     */
+    private static function saturateDecimalInt(string $digits, bool $negative): int
+    {
+        $limit = $negative
+            ? self::incrementDecimalString((string) PHP_INT_MAX)
+            : (string) PHP_INT_MAX;
+        $len = strlen($digits);
+        $limitLen = strlen($limit);
+        if ($len > $limitLen || ($len === $limitLen && $digits > $limit)) {
+            return $negative ? PHP_INT_MIN : PHP_INT_MAX;
+        }
+        $value = (int) $digits;
+
+        return $negative ? -$value : $value;
+    }
+
+    private static function incrementDecimalString(string $digits): string
+    {
+        $carry = 1;
+        $out = '';
+        for ($i = strlen($digits) - 1; $i >= 0; --$i) {
+            $sum = (int) $digits[$i] + $carry;
+            $out = (string) ($sum % 10).$out;
+            $carry = intdiv($sum, 10);
+        }
+        if ($carry > 0) {
+            $out = (string) $carry.$out;
         }
 
-        return [$value, $pos - $orig];
+        return $out;
     }
 
     /**
