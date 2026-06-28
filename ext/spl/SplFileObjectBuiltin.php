@@ -51,6 +51,12 @@ final class SplFileObjectBuiltin
         foreach ([
             'fgets' => SplFileObjectFgets::class,
             'fwrite' => SplFileObjectFwrite::class,
+            'rewind' => SplFileObjectRewind::class,
+            'next' => SplFileObjectNext::class,
+            'valid' => SplFileObjectValid::class,
+            'key' => SplFileObjectKey::class,
+            'current' => SplFileObjectCurrent::class,
+            'eof' => SplFileObjectEof::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -62,7 +68,14 @@ final class SplFileObjectBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['fgets'], $entry->methods['fwrite']);
+        return isset(
+            $entry->methods['fgets'],
+            $entry->methods['fwrite'],
+            $entry->methods['rewind'],
+            $entry->methods['valid'],
+            $entry->methods['current'],
+            $entry->methods['eof']
+        );
     }
 }
 
@@ -152,13 +165,139 @@ final class SplFileObjectFgets extends VmClassMethod
                 throw new \ValueError(self::LENGTH_ERROR);
             }
         }
-        $line = VmFs::fgets(SplFileObjectStorage::handle($object), $length);
+        $line = SplFileObjectStorage::fgets($object, $length);
         if (false === $line) {
             $frame->returnVar->bool(false);
 
             return;
         }
         $frame->returnVar->string($line);
+    }
+}
+
+final class SplFileObjectRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::rewind()'
+        );
+        SplFileObjectStorage::rewind($object);
+    }
+}
+
+final class SplFileObjectNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::next()'
+        );
+        SplFileObjectStorage::next($object);
+    }
+}
+
+final class SplFileObjectValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::valid()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::valid($object));
+    }
+}
+
+final class SplFileObjectKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::key()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplFileObjectStorage::key($object));
+    }
+}
+
+final class SplFileObjectCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::current()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $line = SplFileObjectStorage::current($object);
+        if (false === $line) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($line);
+    }
+}
+
+final class SplFileObjectEof extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('eof');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::eof()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::eof($object));
     }
 }
 
