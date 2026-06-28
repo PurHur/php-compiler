@@ -2600,7 +2600,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterInt.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterIp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFilterUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormat.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringFormatJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDir.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsDirJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringFsGlob.php';

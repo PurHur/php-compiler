@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\DateIntervalFormatRuntime;
-use PHPCompiler\JIT\Builtin\StringFormatJit;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
@@ -30,7 +29,6 @@ final class JitDateIntervalFormat
     public static function invoke(Context $context, JITVariable $intervalArg, JITVariable $formatArg): Value
     {
         DateIntervalFormatRuntime::ensureLinked($context);
-        StringFormatJit::implement($context);
 
         $format = JitStringBuiltinArg::lower(
             $context,
