@@ -5794,6 +5794,15 @@ restart:
                         break;
                     }
                     $class = $this->context->classes[$lcname];
+                    $reservedMsg = VM\ReservedBuiltinClass::userInstantiationErrorMessage($lcname);
+                    if (null !== $reservedMsg) {
+                        $catchFrame = $this->dispatchVmError($reservedMsg, $frame);
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+                        break;
+                    }
                     if ($class->isEnum || $class->isAbstract) {
                         $msg = $class->isEnum
                             ? "Cannot instantiate enum {$class->name}"
@@ -14161,6 +14170,7 @@ restart:
      */
     public function instantiateFromNewCallable(ClassEntry $class, Frame $frame, Variable ...$ctorArgs): ObjectEntry
     {
+        VM\ReservedBuiltinClass::assertUserInstantiable($class);
         if ($class->isEnum) {
             throw new \Error("Cannot instantiate enum {$class->name}");
         }
@@ -14335,6 +14345,7 @@ restart:
                     throw new \Error($this->classNotFoundMessage($name));
                 }
                 $class = $this->context->classes[$lcname];
+                VM\ReservedBuiltinClass::assertUserInstantiable($class);
                 if ($class->isEnum) {
                     throw new \Error("Cannot instantiate enum {$class->name}");
                 }

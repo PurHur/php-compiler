@@ -9498,6 +9498,12 @@ class JIT {
                         } else {
                             $classId = $this->context->type->object->resolveClassId($classOp);
                             $resolvedName = $this->context->type->object->classNameForId($classId);
+                            JIT\ReservedBuiltinClassJitGuard::emitBeforeAllocate(
+                                $this->context->type->object,
+                                $this,
+                                $block,
+                                $classId
+                            );
                             if (!$this->context->type->object->hasUserDeclaredClass($resolvedName)) {
                                 \PHPCompiler\ext\standard\JitSplAutoload::dispatchLiteral(
                                     $this->context,
