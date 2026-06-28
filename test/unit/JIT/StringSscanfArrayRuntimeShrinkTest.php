@@ -6,7 +6,7 @@ namespace PHPCompiler\JIT;
 
 use PHPUnit\Framework\TestCase;
 
-/** sscanf() array-return JIT routes through SscanfJitHelper PHP (#9134). */
+/** sscanf() array-return JIT routes through SscanfJitHelper PHP (#9134, #13149). */
 final class StringSscanfArrayRuntimeShrinkTest extends TestCase
 {
     public function testSscanfJitHelperDelegatesToVmSscanf(): void
@@ -24,7 +24,9 @@ final class StringSscanfArrayRuntimeShrinkTest extends TestCase
         $router = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/Sscanf.php');
         $this->assertStringContainsString('StringSscanfArray::implement', $router);
         $this->assertStringContainsString('StringSscanfByRef::implement', $router);
-        $this->assertStringContainsString('SscanfJit::implementVfscanfOnly', $router);
+        $this->assertStringContainsString('StringVfscanf::implement', $router);
+        $this->assertStringNotContainsString('SscanfJit::', $router);
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/SscanfJit.php');
     }
 
     public function testSscanfJitHelperSemanticsMatchVmSscanf(): void

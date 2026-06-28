@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3436 |
-| Phase A inventory files (M2 ratio SSOT) | 3436 |
+| PHP files on vm.php path | 3435 |
+| Phase A inventory files (M2 ratio SSOT) | 3435 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 9167 |
@@ -2477,7 +2477,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/SplAutoloadOutput.php` | 0 | 3 |
 | `lib/JIT/Builtin/Sscanf.php` | 0 | 1 |
 | `lib/JIT/Builtin/SscanfAssignApply.php` | 0 | 1 |
-| `lib/JIT/Builtin/SscanfJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatArrayRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StatCache.php` | 0 | 1 |
 | `lib/JIT/Builtin/StatCacheRuntime.php` | 0 | 3 |
@@ -19580,11 +19579,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
-
-### `lib/JIT/Builtin/SscanfJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 29 class method(s)
 
 ### `lib/JIT/Builtin/StatArrayRuntime.php`
 
