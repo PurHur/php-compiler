@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3453 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9299 |
+| Source constructs flagged (warnings) | 9303 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -313,7 +313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/Module.php` | 0 | 1 |
 | `ext/random/Mt19937Instance.php` | 0 | 1 |
-| `ext/random/RandomizerBuiltin.php` | 0 | 17 |
+| `ext/random/RandomizerBuiltin.php` | 0 | 19 |
 | `ext/session/Module.php` | 0 | 18 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
@@ -1275,7 +1275,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 8 |
-| `ext/standard/VmSerialize.php` | 0 | 37 |
+| `ext/standard/VmSerialize.php` | 0 | 39 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -5314,28 +5314,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/random/Mt19937Instance.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 16 class method(s)
 
 ### `ext/random/RandomizerBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new Random\RandomError (line 42)
-- new ClassEntry (line 107)
-- new Mt19937Construct (line 109)
-- new ClassEntry (line 135)
-- new Variable (line 137)
-- new RandomizerConstruct (line 139)
-- new Mt19937Instance (line 244)
-- new Variable (line 335)
-- new Variable (line 344)
-- new Mt19937Instance (line 361)
-- new ObjectEntry (line 372)
-- new ArgumentCountError (line 409)
-- new ArgumentCountError (line 435)
-- new ArgumentCountError (line 467)
-- new ArgumentCountError (line 509)
-- new ArgumentCountError (line 550)
-- 29 class method(s)
+- new Random\RandomError (line 49)
+- new ClassEntry (line 114)
+- new Mt19937Construct (line 116)
+- new ClassEntry (line 142)
+- new Variable (line 144)
+- new RandomizerConstruct (line 146)
+- new Mt19937Instance (line 251)
+- new ArgumentCountError (line 319)
+- new Mt19937Instance (line 347)
+- new Variable (line 386)
+- new Variable (line 395)
+- new Mt19937Instance (line 412)
+- new ObjectEntry (line 423)
+- new ArgumentCountError (line 460)
+- new ArgumentCountError (line 486)
+- new ArgumentCountError (line 518)
+- new ArgumentCountError (line 560)
+- new ArgumentCountError (line 601)
+- 30 class method(s)
 
 ### `ext/session/Module.php`
 
@@ -12006,42 +12008,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 46)
-- new VmSerializeRefState (line 84)
-- new Exception (line 153)
-- new Variable (line 169)
-- new Variable (line 179)
-- new Variable (line 189)
-- new Variable (line 199)
-- new VmSerializeRefState (line 299)
-- new Exception (line 419)
-- new ObjectEntry (line 525)
-- new Variable (line 526)
-- new ObjectEntry (line 543)
-- new Variable (line 547)
-- new ObjectEntry (line 559)
-- new Variable (line 567)
-- new ObjectEntry (line 585)
-- new Variable (line 586)
-- new Variable (line 588)
-- new Variable (line 645)
-- new Exception (line 671)
-- new VmSerializeEnumCaseRef (line 721)
-- new VmSerializeEnumCaseRef (line 726)
-- new VmSerializeRefState (line 754)
-- new Variable (line 764)
-- new Variable (line 818)
-- new Variable (line 831)
-- new Variable (line 937)
-- new ObjectEntry (line 967)
-- new Variable (line 971)
-- new Frame (line 990)
-- new Variable (line 993)
-- new Variable (line 1014)
-- new Variable (line 1033)
-- new Variable (line 1059)
-- new Exception (line 1082)
-- 52 class method(s)
+- new Exception (line 47)
+- new VmSerializeRefState (line 85)
+- new Exception (line 154)
+- new Variable (line 170)
+- new Variable (line 180)
+- new Variable (line 190)
+- new Variable (line 200)
+- new VmSerializeRefState (line 300)
+- new Exception (line 420)
+- new ObjectEntry (line 529)
+- new Variable (line 530)
+- new ObjectEntry (line 557)
+- new Variable (line 561)
+- new ObjectEntry (line 573)
+- new Variable (line 581)
+- new ObjectEntry (line 599)
+- new Variable (line 600)
+- new Variable (line 602)
+- new Variable (line 659)
+- new Exception (line 685)
+- new VmSerializeEnumCaseRef (line 735)
+- new VmSerializeEnumCaseRef (line 740)
+- new VmSerializeRefState (line 768)
+- new Variable (line 778)
+- new Variable (line 832)
+- new Variable (line 845)
+- new Variable (line 951)
+- new ObjectEntry (line 981)
+- new Variable (line 985)
+- new Frame (line 1004)
+- new Variable (line 1007)
+- new Variable (line 1036)
+- new Variable (line 1052)
+- new Variable (line 1057)
+- new Variable (line 1073)
+- new Variable (line 1099)
+- new Exception (line 1122)
+- 54 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
