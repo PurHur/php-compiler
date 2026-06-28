@@ -54,9 +54,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClockGettime());
     }
 
-    public function testSupportsGcStatusPhp84SchemaTrueOn84DevForwardProfile(): void
+    public function testSupportsGcStatusPhp84SchemaFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsGcStatusPhp84Schema());
+        $this->assertFalse(CompilerVersion::supportsGcStatusPhp84Schema());
+    }
+
+    public function testSupportsReflectionPropertyAccessProbesFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyAccessProbes());
     }
 
     public function testSupportsHrtimeAsNumberFloatFalseOnReferenceProfile(): void
@@ -212,6 +217,15 @@ final class CompilerVersionGateTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->functions['header_list']));
         $this->assertTrue(isset($ctx->functions['header']));
+    }
+
+    public function testVmDoesNotRegisterReflectionPropertyAccessProbesOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $rp = $runtime->vmContext->classes['reflectionproperty'] ?? null;
+        $this->assertNotNull($rp);
+        $this->assertFalse(isset($rp->methods['isreadable']));
+        $this->assertFalse(isset($rp->methods['iswritable']));
     }
 
     public function testVmDoesNotRegisterArrayReplaceKeyOnReferenceProfile(): void
