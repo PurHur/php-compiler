@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\VM\MemoryAccounting;
 use PHPUnit\Framework\TestCase;
 
 /** gc_status() / gc_mem_caches() VM introspection (#3280, #12780, #12790). */
@@ -89,6 +90,7 @@ PHP;
 
     public function testGcMemCachesReturnsNonZeroOnFirstCall(): void
     {
+        $expected = MemoryAccounting::initialMmCache();
         $code = <<<'PHP'
 <?php
 $first = gc_mem_caches();
@@ -103,7 +105,7 @@ PHP;
         $rt->run($block);
         $output = ob_get_clean();
 
-        $this->assertStringContainsString('first=61440', $output);
+        $this->assertStringContainsString('first='.$expected, $output);
         $this->assertStringContainsString('second=0', $output);
     }
 

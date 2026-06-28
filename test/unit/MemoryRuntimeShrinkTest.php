@@ -33,7 +33,8 @@ final class MemoryRuntimeShrinkTest extends TestCase
     public function testMemoryJitHelperGcMemCachesReturnsInt(): void
     {
         MemoryAccounting::beginRequest();
-        $this->assertSame(61440, MemoryJitHelper::gcMemCaches());
+        $expected = MemoryAccounting::initialMmCache();
+        $this->assertSame($expected, MemoryJitHelper::gcMemCaches());
         $this->assertSame(0, MemoryJitHelper::gcMemCaches());
     }
 
