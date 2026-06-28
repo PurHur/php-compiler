@@ -10,10 +10,16 @@ use PHPCompiler\Runtime;
 /**
  * zip extension module entry (php-src ext/zip/php_zip.c; issue #5869).
  *
- * ZipArchive open/extract in ext/zip PHP (issues #3337, #6414); v1 skeleton enables class_exists() and inventory.
+ * ZipArchive parity tracked in #3337; register under {@see standard} so
+ * extension_loaded('zip') stays false until libzip ships (#11676).
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
