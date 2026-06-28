@@ -1315,6 +1315,12 @@ final class VmMbstring
         return $b0;
     }
 
+    /** UTF-8 single-character decode for mbstring helpers (#13099). */
+    public static function utf8CharToCodepoint(string $char): int
+    {
+        return self::decodeUtf8Char($char);
+    }
+
     private static function assertTrimEncoding(string $encoding): void
     {
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {

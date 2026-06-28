@@ -62,6 +62,7 @@ class Module extends ModuleAbstract
             new mb_substitute_character(),
             new mb_preferred_mime_name(),
             new mb_encoding_aliases(),
+            new mb_convert_kana(),
         ];
     }
 }
