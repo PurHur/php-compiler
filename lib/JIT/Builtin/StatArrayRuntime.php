@@ -12,9 +12,9 @@ use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __phpc_stat via StatArrayJitHelper PHP (#9585).
+ * JIT/AOT link for __phpc_stat via StatArrayJitHelper PHP (#9585, #13006).
  *
- * Replaces {@see StringFsDirJit::emitStat} glibc struct stat LLVM walk.
+ * Embed and standalone AOT compile the same PHP bridge; no glibc struct-stat LLVM.
  * SSOT: {@see \PHPCompiler\ext\standard\VmFs::statInfo()}
  * php-src: ext/standard/filestat.c — php_stat()
  */
@@ -41,12 +41,6 @@ final class StatArrayRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StatArrayLlvm::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__phpc_stat');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
