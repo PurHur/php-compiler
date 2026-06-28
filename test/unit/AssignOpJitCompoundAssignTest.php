@@ -47,6 +47,19 @@ PHP;
         );
     }
 
+    /** Issue #13114: bitwise simple assign must not warn on literal RHS operand slots. */
+    public function testSimpleAssignBitwiseRhsNoWarning(): void
+    {
+        $this->assertVmOutput(
+            file_get_contents(__DIR__ . '/../repro/maintainer_gap_bitwise_assign_rhs.php'),
+            "ok or\n"
+            . "ok xor\n"
+            . "ok and\n"
+            . "ok shift left\n"
+            . "ok shift right\n"
+        );
+    }
+
     public function testNestedJitCompileCompoundAssignHelper(): void
     {
         $code = <<<'PHP'

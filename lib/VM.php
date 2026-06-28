@@ -3939,8 +3939,10 @@ restart:
                 case OpCode::TYPE_SHIFT_LEFT:
                 case OpCode::TYPE_SHIFT_RIGHT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $arg2 = $frame->scope[$op->arg2];
-                    $arg3 = $frame->scope[$op->arg3];
+                    $readArg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
+                    $readArg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
+                    $arg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $frame->scope[$op->arg2];
+                    $arg3 = $readArg3;
                     $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
                     if (null !== $catchFrame) {
                         $frame = $catchFrame;
@@ -3967,6 +3969,7 @@ restart:
                         }
                         break;
                     }
+                    $this->markScopeSlotInitializedIfNamedLocal($frame, (int) $op->arg1);
                     break;
 
                 case OpCode::TYPE_UNARY_MINUS:
