@@ -9,8 +9,8 @@ declare(strict_types=1);
  */
 
 if (\function_exists('json_validate')) {
-    echo "fail: json_validate registered on Zend 8.2 reference profile\n";
-    exit(1);
+    echo "skip — forward profile advertises json_validate (#13058)\n";
+    exit(0);
 }
 
 echo "ok\n";

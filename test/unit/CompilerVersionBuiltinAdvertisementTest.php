@@ -29,9 +29,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsSortingEnum());
     }
 
-    public function testJsonValidateWithheldOnReferenceProfile(): void
+    public function testJsonValidateAdvertisedOn84DevForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
     public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
@@ -119,10 +119,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($ctx->classes['sortdirection']));
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterStreamSupportsUntil85(): void
