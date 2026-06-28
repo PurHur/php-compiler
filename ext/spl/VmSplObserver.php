@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\VM\BuiltinClasses;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 
@@ -22,23 +23,31 @@ final class VmSplObserver
 
     private static function registerSplObserver(Context $ctx): void
     {
-        if (isset($ctx->classes['splobserver'])) {
-            return;
+        $lc = 'splobserver';
+        if (!isset($ctx->classes[$lc])) {
+            $entry = new ClassEntry('SplObserver');
+            $entry->isInterface = true;
+            $ctx->classes[$lc] = $entry;
         }
-
-        $entry = new ClassEntry('SplObserver');
+        $entry = $ctx->classes[$lc];
         $entry->isInterface = true;
-        $ctx->classes['splobserver'] = $entry;
+        if (!isset($entry->abstractMethods['update'])) {
+            BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['update']);
+        }
     }
 
     private static function registerSplSubject(Context $ctx): void
     {
-        if (isset($ctx->classes['splsubject'])) {
-            return;
+        $lc = 'splsubject';
+        if (!isset($ctx->classes[$lc])) {
+            $entry = new ClassEntry('SplSubject');
+            $entry->isInterface = true;
+            $ctx->classes[$lc] = $entry;
         }
-
-        $entry = new ClassEntry('SplSubject');
+        $entry = $ctx->classes[$lc];
         $entry->isInterface = true;
-        $ctx->classes['splsubject'] = $entry;
+        if (!isset($entry->abstractMethods['attach'])) {
+            BuiltinClasses::registerBuiltinInterfaceMethods($entry, ['attach', 'detach', 'notify']);
+        }
     }
 }

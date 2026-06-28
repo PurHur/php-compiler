@@ -2002,9 +2002,18 @@ final class VmReflection
      */
     public static function collectClassMethodsForReflection(ClassEntry $entry, Context $ctx, int $filter = 0): array
     {
+        $chain = $entry->isInterface
+            ? array_reverse(self::interfaceDeclarationChain($entry, $ctx))
+            : array_reverse(self::classHierarchyChain($entry, $ctx));
         $byLc = [];
-        foreach (array_reverse(self::classHierarchyChain($entry, $ctx)) as $class) {
-            foreach ($class->methods as $methodLc => $_func) {
+        foreach ($chain as $class) {
+            $methodLcs = array_keys($class->methods);
+            foreach (array_keys($class->abstractMethods) as $abstractLc) {
+                if (!in_array($abstractLc, $methodLcs, true)) {
+                    $methodLcs[] = $abstractLc;
+                }
+            }
+            foreach ($methodLcs as $methodLc) {
                 $vis = $class->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
                 if (!self::matchesReflectionVisibilityFilter($vis, $filter)) {
                     continue;
