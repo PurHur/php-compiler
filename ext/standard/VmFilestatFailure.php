@@ -24,7 +24,17 @@ final class VmFilestatFailure
 
     public static function warnChmodFailed(Frame $frame, string $path): void
     {
-        self::triggerWarningWithHandlerFirst($frame, 'chmod(): No such file or directory');
+        if (null === $frame->vmContext) {
+            return;
+        }
+        // php-src filestat.c php_chmod — message only on stderr in phpt harness (#11655, #11408).
+        $frame->vmContext->errors->triggerErrorWithHandlerFirst(
+            'chmod(): No such file or directory',
+            ErrorReporter::E_WARNING,
+            null,
+            $frame->vmContext,
+            null
+        );
     }
 
     public static function warnUnlinkFailed(Frame $frame, string $path): void
