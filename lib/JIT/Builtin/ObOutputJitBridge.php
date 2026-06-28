@@ -198,7 +198,8 @@ final class ObOutputJitBridge
             $context->builder->positionAtEnd($work);
             $raw = JitNestedHelperCoerce::callHelper(
                 $context,
-                self::helperFunction($context, $helperLogical)
+                self::helperFunction($context, $helperLogical),
+                []
             );
             $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
             $nullBb = $fn->appendBasicBlock('ob_val_null');
@@ -490,8 +491,11 @@ final class ObOutputJitBridge
                     $i8p,
                     $i32,
                 ],
-            ] as $name => [$ret, $vararg, ...$params]
+            ] as $name => $sig
         ) {
+            $ret = $sig[0];
+            $vararg = $sig[1];
+            $params = array_slice($sig, 2);
             self::ensureExternal($context, $name, $context->context->functionType($ret, $vararg, ...$params));
         }
     }

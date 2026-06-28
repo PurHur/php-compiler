@@ -29,6 +29,14 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ObOutputStandaloneLlvm', $bridge);
         $bridgeLines = \substr_count($bridge, "\n") + 1;
         $this->assertLessThan(800, $bridgeLines);
+        // #12974: list-spread destructuring in foreach breaks self-host parseAndCompile.
+        $this->assertDoesNotMatchRegularExpression(
+            '/as\s+\$[a-zA-Z_]+\s*=>\s*\[\$[a-zA-Z_]+,\s*\$[a-zA-Z_]+,\s*\.\.\.\$/',
+            $bridge
+        );
+        $helper = (string) file_get_contents(__DIR__.'/../../ext/standard/ObOutputJitHelper.php');
+        $this->assertStringNotContainsString('use PHPCompiler\VM\ObStackLimits', $helper);
+        $this->assertStringNotContainsString('ObStackLimits::BUF_SIZE', $helper);
     }
 
     public function testObOutputJitHelperStackSemantics(): void
