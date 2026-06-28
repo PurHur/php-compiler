@@ -313,7 +313,7 @@ final class ExceptionSupport
 
     public static function throwSiteLine(Frame $frame): int
     {
-        return 0;
+        return FatalSite::lineFromOpcodes($frame);
     }
 
     /**
@@ -323,24 +323,7 @@ final class ExceptionSupport
      */
     public static function userFatalSite(Frame $frame): array
     {
-        $file = self::throwSiteFile($frame);
-        if ($frame->returnSiteLine > 0) {
-            return [$file, $frame->returnSiteLine];
-        }
-        $line = $frame->callSiteLine;
-        if ($line <= 0) {
-            for ($f = $frame->parent; null !== $f; $f = $f->parent) {
-                if ($f->returnSiteLine > 0) {
-                    return [$file, $f->returnSiteLine];
-                }
-                if ($f->callSiteLine > 0) {
-                    $line = $f->callSiteLine;
-                    break;
-                }
-            }
-        }
-
-        return [$file, $line];
+        return FatalSite::userSite($frame);
     }
 
     /**
@@ -380,8 +363,8 @@ final class ExceptionSupport
             if ('' !== $file && $ref->hasProperty('file')) {
                 $ref->getProperty('file')->setValue($native, $file);
             }
-            if ($line > 0 && $ref->hasProperty('line')) {
-                $ref->getProperty('line')->setValue($native, $line);
+            if ($ref->hasProperty('line')) {
+                $ref->getProperty('line')->setValue($native, max(0, $line));
             }
         } catch (\ReflectionException) {
         }
@@ -577,8 +560,12 @@ final class ExceptionSupport
         }
         $file = self::readOptionalStringProperty($entry, self::PROP_FILE);
         $line = self::readOptionalIntProperty($entry, self::PROP_LINE);
-        if (null !== $file || (null !== $line && $line > 0)) {
+        if (null !== $file || null !== $line) {
             self::applyNativeLocation($native, $file ?? '', $line ?? 0);
+        }
+        // VM Error without a stamped line must not leak native PHP ctor site (#13201).
+        if (null === $line || $line <= 0) {
+            self::applyNativeLocation($native, $file ?? $native->getFile(), 0);
         }
         $prevVar = $entry->getProperty(self::PROP_PREVIOUS)->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $prevVar->type) {

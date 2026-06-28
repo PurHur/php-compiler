@@ -372,4 +372,25 @@ final class SourceBundlerTest extends TestCase
             $bundled
         );
     }
+
+    public function testMapBundledLineResolvesOriginalFileAndLine(): void
+    {
+        $tmp = sys_get_temp_dir().'/phpc_bundle_map_'.uniqid('', true);
+        mkdir($tmp);
+        $helper = $tmp.'/helper.php';
+        $entry = $tmp.'/main.php';
+        file_put_contents($helper, "<?php\nfunction helper_fn() {}\n");
+        file_put_contents($entry, "<?php\nrequire 'helper.php';\nhelper_fn();\n");
+        try {
+            [$bundled] = SourceBundler::bundleForAot($entry, [$helper], null);
+            $mapped = SourceBundler::mapBundledLine($bundled, 14);
+            $this->assertNotNull($mapped);
+            $this->assertSame(realpath($entry), $mapped[0]);
+            $this->assertSame(3, $mapped[1]);
+        } finally {
+            @unlink($helper);
+            @unlink($entry);
+            @rmdir($tmp);
+        }
+    }
 }

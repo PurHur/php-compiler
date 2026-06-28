@@ -7994,11 +7994,14 @@ class Compiler {
                     }
                 }
 
-                return [new OpCode(
+                $op = new OpCode(
                     OpCode::TYPE_EMPTY,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileUnaryExprReadOperand($expr, $block)
-                )];
+                );
+                $this->assignSourceMetadata($op, $expr);
+
+                return [$op];
             case Op\Expr\Eval_::class:
                 return [new OpCode(
                     $this->getOpCodeTypeFromUnaryOp($expr),
@@ -8046,12 +8049,15 @@ class Compiler {
                 if (!is_null($expr->nsName)) {
                     $nsName = $this->compileOperand($expr->nsName, $block, true);
                 }
-                return [new OpCode(
+                $op = new OpCode(
                     OpCode::TYPE_CONST_FETCH,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->name, $block, true),
                     $nsName
-                )];
+                );
+                $this->assignSourceMetadata($op, $expr);
+
+                return [$op];
             case Op\Expr\ClassConstFetch::class:
                 return $this->compileClassConstFetch($expr, $block);
             case Op\Expr\StaticPropertyFetch::class:
@@ -20611,7 +20617,15 @@ class Compiler {
                 $return[] = $send;
             }
         }
-        $return[] = new OpCode(OpCode::TYPE_FUNCCALL_INIT, $callName);
+        $init = new OpCode(
+            OpCode::TYPE_FUNCCALL_INIT,
+            $callName,
+            $startLine > 0 ? $startLine : null
+        );
+        if (null !== $cfgCallOp) {
+            $this->assignSourceMetadata($init, $cfgCallOp);
+        }
+        $return[] = $init;
         foreach ($argSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;

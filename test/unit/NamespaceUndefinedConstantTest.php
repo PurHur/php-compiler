@@ -22,6 +22,16 @@ final class NamespaceUndefinedConstantTest extends TestCase
         [, $stderr] = $this->runVmScript($script, 255);
         $this->assertStringContainsString('Undefined constant "N\\UNDEF_CONST"', $stderr);
         $this->assertStringNotContainsString('N\\UNDEF_CONST\\UNDEF_CONST', $stderr);
+        $this->assertStringContainsString('maintainer_gap_ns_undefined_const_empty.php on line 3', $stderr);
+        $this->assertStringNotContainsString('on line 561', $stderr);
+    }
+
+    public function testUndefinedFunctionFatalIncludesFileAndLine(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer_gap_fatal_line_bundle_offset.php';
+        [, $stderr] = $this->runVmScript($script, 255);
+        $this->assertStringContainsString('Call to undefined function undefined()', $stderr);
+        $this->assertStringContainsString('maintainer_gap_fatal_line_bundle_offset.php on line 3', $stderr);
     }
 
     public function testDefinedNamespaceConstantStillResolves(): void
