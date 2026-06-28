@@ -8,7 +8,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * proc_close/status/terminate/is_process_resource for compiled JIT/AOT embed (#9408).
+ * proc_open/close/status/terminate/is_process_resource for compiled JIT/AOT (#9408, #12958).
  *
  * SSOT: {@see ProcessSlotJitHelper}, {@see VmProcessProcOpenNative}
  * php-src: ext/standard/proc_open.c
@@ -18,6 +18,35 @@ final class ProcessOpenJitHelper
     public const PROCESS_HANDLE_BASE = 0x20000000;
 
     private const MAX_SLOTS = 64;
+
+    /** @var array<int, array{0: string, 1?: string}> */
+    private const DEFAULT_PIPE_DESCRIPTOR = [
+        0 => ['pipe', 'w'],
+        1 => ['pipe', 'r'],
+        2 => ['pipe', 'r'],
+    ];
+
+    /** @return int ABI for __compiler_proc_open (handle or -1) */
+    public static function procOpenArgv(?string $command, ?HashTable $pipesHt): int
+    {
+        if (null === $command || '' === $command || null === $pipesHt) {
+            return -1;
+        }
+
+        $result = VmProcessProcOpenNative::open($command, self::DEFAULT_PIPE_DESCRIPTOR);
+        if (false === $result) {
+            return -1;
+        }
+
+        [$handle, $pipeHandles] = $result;
+        foreach ($pipeHandles as $fd => $streamHandle) {
+            $slot = new Variable();
+            $slot->int($streamHandle);
+            $pipesHt->addIndex($fd, $slot);
+        }
+
+        return $handle;
+    }
 
     /** @return 0|1 ABI for __compiler_is_process_resource */
     public static function isProcessResourceArgv(int $handle): int

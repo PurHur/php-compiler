@@ -7,8 +7,7 @@ namespace PHPCompiler\ext\standard;
 /**
  * Process slot table for compiled JIT/AOT embed modules (#9408, php-in-PHP).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\ProcessOpenStandaloneLlvm} phpc_process_* globals
- * for proc_close/status/terminate without duplicating LLVM emitters.
+ * Fallback slot table when handles use {@see ProcessOpenJitHelper::PROCESS_HANDLE_BASE}.
  * php-src: ext/standard/proc_open.c
  */
 final class ProcessSlotJitHelper

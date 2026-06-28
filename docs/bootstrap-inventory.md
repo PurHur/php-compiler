@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3420 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9048 |
+| Source constructs flagged (warnings) | 9067 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -315,7 +315,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 4 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 21 |
-| `ext/spl/ArrayObjectBuiltin.php` | 0 | 23 |
+| `ext/spl/ArrayObjectBuiltin.php` | 0 | 25 |
 | `ext/spl/BuiltinClasses.php` | 0 | 2 |
 | `ext/spl/DirectoryIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/EmptyIteratorBuiltin.php` | 0 | 8 |
@@ -333,6 +333,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
 | `ext/spl/SplFixedArrayBuiltin.php` | 0 | 9 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
+| `ext/spl/SplObjectStorageBuiltin.php` | 0 | 14 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
 | `ext/spl/VmSplIterators.php` | 0 | 10 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
@@ -951,7 +952,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PrintRJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessIdentityJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessJitHelper.php` | 0 | 10 |
-| `ext/standard/ProcessOpenJitHelper.php` | 0 | 3 |
+| `ext/standard/ProcessOpenJitHelper.php` | 0 | 4 |
 | `ext/standard/ProcessSlotJitHelper.php` | 0 | 1 |
 | `ext/standard/ProgressJitHelper.php` | 0 | 1 |
 | `ext/standard/QuotPrintJitHelper.php` | 0 | 1 |
@@ -1150,7 +1151,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmHttpFetchNative.php` | 0 | 1 |
 | `ext/standard/VmHttpFetchPure.php` | 0 | 1 |
 | `ext/standard/VmHttpHeaders.php` | 0 | 3 |
-| `ext/standard/VmHttpLastResponseHeaders.php` | 0 | 1 |
+| `ext/standard/VmHttpLastResponseHeaders.php` | 0 | 4 |
 | `ext/standard/VmHttpResponse.php` | 0 | 2 |
 | `ext/standard/VmHttpTlsNative.php` | 0 | 1 |
 | `ext/standard/VmImage.php` | 0 | 6 |
@@ -2414,7 +2415,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ProcessOpenEmbedBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProcessOpenJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessOpenRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ProcessRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ProgressNoteRuntime.php` | 0 | 4 |
 | `lib/JIT/Builtin/Rand.php` | 0 | 2 |
@@ -5343,20 +5343,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArrayObjectOffsetExists (line 73)
 - new ArrayObjectOffsetUnset (line 75)
 - new ArrayObjectAppend (line 77)
-- new HashTable (line 98)
-- new ArgumentCountError (line 200)
-- new ArgumentCountError (line 259)
-- new ArgumentCountError (line 308)
-- new ArgumentCountError (line 338)
-- new ArgumentCountError (line 362)
-- new ArgumentCountError (line 389)
-- new ArgumentCountError (line 413)
-- 14 class method(s)
+- new ArrayObjectExchangeArray (line 79)
+- new HashTable (line 100)
+- new ArgumentCountError (line 202)
+- new ArgumentCountError (line 261)
+- new ArgumentCountError (line 310)
+- new ArgumentCountError (line 340)
+- new ArgumentCountError (line 364)
+- new ArgumentCountError (line 391)
+- new ArgumentCountError (line 415)
+- new ArgumentCountError (line 450)
+- 15 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 42)
+- new ClassEntry (line 43)
 - 3 class method(s)
 
 ### `ext/spl/DirectoryIteratorBuiltin.php`
@@ -5458,16 +5460,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplArrayStorage.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 176)
-- new Variable (line 184)
+- new ObjectEntry (line 186)
 - new Variable (line 194)
-- new Variable (line 200)
-- new Variable (line 244)
-- new Variable (line 263)
-- new Variable (line 269)
-- new Variable (line 275)
-- new Variable (line 281)
-- 28 class method(s)
+- new Variable (line 204)
+- new Variable (line 210)
+- new Variable (line 254)
+- new Variable (line 273)
+- new Variable (line 279)
+- new Variable (line 285)
+- new Variable (line 291)
+- 29 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
 
@@ -5513,6 +5515,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/spl/SplObjectStorageBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 40)
+- new SplObjectStorageConstruct (line 48)
+- new Variable (line 100)
+- new Variable (line 103)
+- new UnexpectedValueException (line 126)
+- new Variable (line 128)
+- new ArgumentCountError (line 193)
+- new ArgumentCountError (line 218)
+- new ArgumentCountError (line 268)
+- new ArgumentCountError (line 295)
+- new ArgumentCountError (line 319)
+- new ArgumentCountError (line 348)
+- 19 class method(s)
+- 1 closure(s)
 
 ### `ext/spl/SplTempFileObjectBuiltin.php`
 
@@ -9623,9 +9643,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ProcessOpenJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 66)
-- new Variable (line 68)
-- 7 class method(s)
+- new Variable (line 43)
+- new HashTable (line 95)
+- new Variable (line 97)
+- 8 class method(s)
 
 ### `ext/standard/ProcessSlotJitHelper.php`
 
@@ -10152,14 +10173,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmCallable.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 107)
-- new Variable (line 141)
-- new Variable (line 268)
-- new Variable (line 270)
-- new Variable (line 396)
-- new Variable (line 402)
-- new Variable (line 414)
-- new Variable (line 416)
+- new Variable (line 110)
+- new Variable (line 145)
+- new Variable (line 272)
+- new Variable (line 274)
+- new Variable (line 400)
+- new Variable (line 406)
+- new Variable (line 418)
+- new Variable (line 420)
 - 20 class method(s)
 
 ### `ext/standard/VmCallableInvoke.php`
@@ -10881,7 +10902,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHttpLastResponseHeaders.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new HashTable (line 69)
+- new Variable (line 71)
+- new Variable (line 77)
+- 5 class method(s)
 
 ### `ext/standard/VmHttpResponse.php`
 
@@ -11758,14 +11782,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSscanf.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 205)
-- new Variable (line 209)
-- new HashTable (line 215)
-- new Variable (line 217)
-- new Variable (line 808)
-- new Variable (line 815)
-- new Variable (line 822)
-- 26 class method(s)
+- new HashTable (line 233)
+- new Variable (line 237)
+- new HashTable (line 243)
+- new Variable (line 245)
+- new Variable (line 883)
+- new Variable (line 890)
+- new Variable (line 897)
+- 28 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmStatCache.php`
@@ -19092,7 +19116,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ProcessOpenEmbedBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 216)
+- new JIT (line 241)
 - 8 class method(s)
 - 1 closure(s)
 
@@ -19105,11 +19129,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `lib/JIT/Builtin/ProcessOpenStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 43 class method(s)
 
 ### `lib/JIT/Builtin/ProcessRuntime.php`
 
@@ -22384,63 +22403,63 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 9784)
 - new VM\PropertyHookRefWriteSignal (line 9789)
 - new VM\PropertyHookFiberSuspendSignal (line 9792)
-- new ClassEntry (line 10958)
-- new Variable (line 10959)
-- new VM\ClassProperty (line 10960)
-- new ObjectEntry (line 10963)
-- new Variable (line 10966)
-- new Error (line 11104)
-- new Variable (line 11183)
-- new VM\GeneratorUncaughtThrow (line 11185)
-- new Variable (line 11210)
-- new VM\GeneratorUncaughtThrow (line 11222)
-- new VM\GeneratorUncaughtThrow (line 11292)
-- new Variable (line 11329)
-- new Variable (line 11331)
-- new Variable (line 11335)
-- new Variable (line 11450)
-- new Variable (line 11469)
-- new Variable (line 11619)
-- new Variable (line 11635)
-- new Variable (line 11747)
-- new Variable (line 11813)
-- new Variable (line 11955)
-- new VM\PropertyIsInitializedHandler (line 11964)
-- new Error (line 12025)
-- new VM\EnumFromHandler (line 12050)
-- new CompileError (line 12765)
-- new VM\ClassProperty (line 12876)
-- new Variable (line 13166)
-- new Variable (line 13340)
-- new Variable (line 13342)
-- new VM\ClassProperty (line 13458)
-- new Func\PHP (line 13577)
-- new Variable (line 13653)
-- new Variable (line 13660)
-- new Variable (line 13666)
-- new Variable (line 13703)
-- new Variable (line 13732)
-- new Variable (line 13916)
-- new Variable (line 13962)
-- new VM\ClassProperty (line 14024)
-- new Error (line 14061)
+- new ClassEntry (line 10978)
+- new Variable (line 10979)
+- new VM\ClassProperty (line 10980)
+- new ObjectEntry (line 10983)
+- new Variable (line 10986)
+- new Error (line 11124)
+- new Variable (line 11203)
+- new VM\GeneratorUncaughtThrow (line 11205)
+- new Variable (line 11230)
+- new VM\GeneratorUncaughtThrow (line 11242)
+- new VM\GeneratorUncaughtThrow (line 11312)
+- new Variable (line 11349)
+- new Variable (line 11351)
+- new Variable (line 11355)
+- new Variable (line 11470)
+- new Variable (line 11489)
+- new Variable (line 11639)
+- new Variable (line 11655)
+- new Variable (line 11767)
+- new Variable (line 11833)
+- new Variable (line 11979)
+- new VM\PropertyIsInitializedHandler (line 11988)
+- new Error (line 12049)
+- new VM\EnumFromHandler (line 12074)
+- new CompileError (line 12796)
+- new VM\ClassProperty (line 12907)
+- new Variable (line 13197)
+- new Variable (line 13371)
+- new Variable (line 13373)
+- new VM\ClassProperty (line 13489)
+- new Func\PHP (line 13608)
+- new Variable (line 13684)
+- new Variable (line 13691)
+- new Variable (line 13697)
+- new Variable (line 13734)
+- new Variable (line 13763)
+- new Variable (line 13947)
+- new Variable (line 13993)
+- new VM\ClassProperty (line 14055)
 - new Error (line 14092)
-- new Error (line 14095)
-- new Error (line 14098)
-- new Error (line 14117)
-- new ObjectEntry (line 14121)
-- new Variable (line 14123)
-- new Variable (line 14137)
-- new Error (line 14262)
-- new Error (line 14266)
-- new VM\ObjectEntry (line 14270)
-- new Variable (line 14410)
-- new Variable (line 14428)
-- new NoDiscardMetadata (line 14549)
-- new Variable (line 14706)
-- new Variable (line 14708)
-- new Variable (line 14800)
-- 422 class method(s)
+- new Error (line 14123)
+- new Error (line 14126)
+- new Error (line 14129)
+- new Error (line 14148)
+- new ObjectEntry (line 14152)
+- new Variable (line 14154)
+- new Variable (line 14168)
+- new Error (line 14293)
+- new Error (line 14297)
+- new VM\ObjectEntry (line 14301)
+- new Variable (line 14441)
+- new Variable (line 14459)
+- new NoDiscardMetadata (line 14580)
+- new Variable (line 14737)
+- new Variable (line 14739)
+- new Variable (line 14831)
+- 423 class method(s)
 - 14 closure(s)
 
 ### `lib/VM/AbstractPropertyHookCheck.php`
