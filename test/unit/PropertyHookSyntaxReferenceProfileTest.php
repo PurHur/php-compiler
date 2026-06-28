@@ -10,9 +10,9 @@ use PHPUnit\Framework\TestCase;
 /** Property-hook syntax reference profile gate (#12574). */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
-    public function testSupportsPropertyHooksTrueOn84DevTarget(): void
+    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
