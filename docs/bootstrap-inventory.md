@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3422 |
-| Phase A inventory files (M2 ratio SSOT) | 3422 |
+| PHP files on vm.php path | 3425 |
+| Phase A inventory files (M2 ratio SSOT) | 3425 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9099 |
+| Source constructs flagged (warnings) | 9105 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -991,6 +991,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamIoJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLibcHandleJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLifecycleJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamModeJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamNotificationJitHelper.php` | 0 | 5 |
 | `ext/standard/StreamPathJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamReadJitHelper.php` | 0 | 1 |
@@ -1049,7 +1050,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmCliProcessTitleNative.php` | 0 | 1 |
 | `ext/standard/VmCliProcessTitlePure.php` | 0 | 1 |
 | `ext/standard/VmClockGettime.php` | 0 | 4 |
-| `ext/standard/VmClosureCall.php` | 0 | 4 |
+| `ext/standard/VmClosureCall.php` | 0 | 5 |
 | `ext/standard/VmConnection.php` | 0 | 2 |
 | `ext/standard/VmConstants.php` | 0 | 18 |
 | `ext/standard/VmConvertCyrString.php` | 0 | 1 |
@@ -1316,6 +1317,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmZlibArg.php` | 0 | 1 |
 | `ext/standard/VmZlibCore.php` | 0 | 1 |
 | `ext/standard/WeakRefRegistryJitHelper.php` | 0 | 1 |
+| `ext/standard/ZendSort.php` | 0 | 1 |
 | `ext/standard/ZlibEncodeJitHelper.php` | 0 | 1 |
 | `ext/standard/ZlibJitHelper.php` | 0 | 1 |
 | `ext/standard/abs.php` | 0 | 1 |
@@ -2494,6 +2496,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamLifecycleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamMeta.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamMetaJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamModeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamNotificationRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamPathRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamRead.php` | 0 | 1 |
@@ -9570,7 +9573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseIniEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/ParseStrEngine.php`
 
@@ -9870,6 +9873,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/StreamModeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/StreamNotificationJitHelper.php`
 
@@ -10276,7 +10284,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 48)
 - new Variable (line 73)
 - new Variable (line 75)
-- 9 class method(s)
+- 10 class method(s)
+- 3 closure(s)
 
 ### `ext/standard/VmConnection.php`
 
@@ -10607,21 +10616,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 51)
-- new Variable (line 53)
-- new HashTable (line 68)
-- new Variable (line 70)
-- new HashTable (line 208)
-- new Variable (line 215)
-- new Variable (line 220)
-- new HashTable (line 1267)
-- new Variable (line 1269)
-- new HashTable (line 2080)
-- new Variable (line 2083)
-- new Variable (line 2089)
-- new Variable (line 2095)
-- new Variable (line 2101)
-- 115 class method(s)
+- new HashTable (line 54)
+- new Variable (line 56)
+- new HashTable (line 71)
+- new Variable (line 73)
+- new HashTable (line 211)
+- new Variable (line 218)
+- new Variable (line 223)
+- new HashTable (line 1293)
+- new Variable (line 1295)
+- new HashTable (line 2106)
+- new Variable (line 2109)
+- new Variable (line 2115)
+- new Variable (line 2121)
+- new Variable (line 2127)
+- 119 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -11018,10 +11027,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInternalCompare.php`
 
 **Warnings** (review for bootstrap subset):
-- new Frame (line 419)
-- new Variable (line 421)
-- new Variable (line 442)
-- 43 class method(s)
+- new Frame (line 444)
+- new Variable (line 446)
+- new Variable (line 467)
+- 44 class method(s)
 
 ### `ext/standard/VmIptc.php`
 
@@ -11897,7 +11906,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamMeta.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 15 class method(s)
 
 ### `ext/standard/VmStreamNotification.php`
 
@@ -12182,6 +12191,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
+
+### `ext/standard/ZendSort.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `ext/standard/ZlibEncodeJitHelper.php`
 
@@ -19614,6 +19628,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 14 class method(s)
 
+### `lib/JIT/Builtin/StreamModeRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 139)
+- 8 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StreamNotificationRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -24796,9 +24817,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new GeneratorKey (line 96)
 - new GeneratorValid (line 98)
 - new GeneratorNext (line 100)
-- new ObjectEntry (line 120)
-- new Exception (line 130)
-- 4 class method(s)
+- new ObjectEntry (line 128)
+- new Exception (line 138)
+- 5 class method(s)
 
 ### `lib/VM/GeneratorYieldFromJitHelper.php`
 
