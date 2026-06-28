@@ -32,26 +32,19 @@ final class VmGzStreamPure
             return false;
         }
 
+        $innerPath = self::stripCompressZlibWrapper($filename);
+
         $buffer = '';
         $pos = 0;
         if (!$parsed['writing']) {
-            if (!self::isReadableRegularFile($filename)) {
-                return false;
-            }
-            $raw = VmFsReadNative::read($filename);
-            if (false === $raw) {
-                return false;
-            }
-            if ('' === $raw) {
+            $raw = self::loadReadPayload($innerPath);
+            if (false === $raw || '' === $raw) {
                 return false;
             }
             $decoded = VmZlib::gzdecode($raw);
-            if (false === $decoded) {
-                return false;
-            }
-            $buffer = $decoded;
-        } elseif ($parsed['append'] && self::isReadableRegularFile($filename)) {
-            $raw = VmFsReadNative::read($filename);
+            $buffer = false !== $decoded ? $decoded : $raw;
+        } elseif ($parsed['append'] && self::isReadableRegularFile($innerPath)) {
+            $raw = self::loadReadPayload($innerPath);
             if (false !== $raw && '' !== $raw) {
                 $decoded = VmZlib::gzdecode($raw);
                 if (false !== $decoded) {
@@ -60,13 +53,13 @@ final class VmGzStreamPure
             }
         }
 
-        $id = VmFs::adoptGzNativePlaceholder('compress.zlib://'.$filename);
+        $id = VmFs::adoptGzNativePlaceholder('compress.zlib://'.$innerPath);
         if (false === $id) {
             return false;
         }
 
         self::$streams[$id] = [
-            'path' => $filename,
+            'path' => $innerPath,
             'writing' => $parsed['writing'],
             'append' => $parsed['append'],
             'level' => $parsed['level'],
@@ -191,6 +184,31 @@ final class VmGzStreamPure
             'append' => $append,
             'level' => $level,
         ];
+    }
+
+    private static function stripCompressZlibWrapper(string $path): string
+    {
+        $prefix = 'compress.zlib://';
+        if (str_starts_with($path, $prefix)) {
+            return substr($path, \strlen($prefix));
+        }
+
+        return $path;
+    }
+
+    private static function loadReadPayload(string $path): string|false
+    {
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        if (VmDataUri::isDataUri($path)) {
+            return VmDataUri::decode($path);
+        }
+        if (!self::isReadableRegularFile($path)) {
+            return false;
+        }
+
+        return VmFsReadNative::read($path);
     }
 
     private static function isReadableRegularFile(string $path): bool
