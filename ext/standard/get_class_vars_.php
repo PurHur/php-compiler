@@ -34,12 +34,7 @@ final class get_class_vars_ extends Internal
             return;
         }
         $ctx = VmReflection::requireContext($frame);
-        $entry = VmReflection::resolveClassEntry($ctx, $className);
-        if (null === $entry) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
+        $entry = VmReflection::fetchClassEntryForGetClassVars($ctx, $className);
         $frame->returnVar->copyFrom(VmReflection::getClassVarsArray($entry));
     }
 

@@ -2489,6 +2489,27 @@ final class VmReflection
     }
 
     /**
+     * get_class_vars() — resolve class/interface/trait/enum or reject invalid operand (#13271).
+     *
+     * php-src: ext/standard/class.c — PHP_FUNCTION(get_class_vars) / zend_fetch_class()
+     */
+    public static function fetchClassEntryForGetClassVars(Context $ctx, string $className): ClassEntry
+    {
+        $classLc = strtolower(self::normalizeGlobalIntrospectionName($className));
+        if (!isset($ctx->classes[$classLc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$classLc])) {
+            throw new \TypeError(\sprintf(
+                'get_class_vars(): Argument #1 ($class) must be a valid class name, %s given',
+                $className
+            ));
+        }
+
+        return $ctx->classes[$classLc];
+    }
+
+    /**
      * Class constants visible on $entry (child overrides parent), php-src ReflectionClass::getConstants (#6950).
      *
      * @return list<array{name: string, declaring: ClassEntry, constLc: string}>
