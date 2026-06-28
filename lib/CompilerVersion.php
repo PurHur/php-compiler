@@ -388,12 +388,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780).
      *
-     * Enabled on the 8.4.0-dev forward line — version_compare treats -dev below stable 8.4.0 (#12993).
-     * Legacy runs/collected/threshold/roots guarded in gc_status_reference_profile_82.phpt (runtime skip).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps legacy runs/collected/threshold/roots (#12993, #13293).
      */
     public static function supportsGcStatusPhp84Schema(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
