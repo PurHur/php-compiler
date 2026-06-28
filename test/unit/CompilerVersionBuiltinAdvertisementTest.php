@@ -54,6 +54,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testRoundingModeEnumAdvertisedOn84DevForwardProfile(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
+    }
+
     public function testReadonlyBuiltinWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsReadonlyBuiltin());
