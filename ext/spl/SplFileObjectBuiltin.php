@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmCsv;
+use PHPCompiler\ext\standard\VmCsvArg;
 use PHPCompiler\ext\standard\VmFs;
+use PHPCompiler\ext\standard\VmFputcsv;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmStreamPath;
 use PHPCompiler\ext\standard\VmString;
@@ -12,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
 /**
@@ -57,10 +61,16 @@ final class SplFileObjectBuiltin
             'key' => SplFileObjectKey::class,
             'current' => SplFileObjectCurrent::class,
             'eof' => SplFileObjectEof::class,
+            'fgetcsv' => SplFileObjectFgetcsv::class,
+            'fputcsv' => SplFileObjectFputcsv::class,
+            'setcsvcontrol' => SplFileObjectSetCsvControl::class,
+            'getcsvcontrol' => SplFileObjectGetCsvControl::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['setcsvcontrol'] = 'setCsvControl';
+        $entry->methodNames['getcsvcontrol'] = 'getCsvControl';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -74,7 +84,9 @@ final class SplFileObjectBuiltin
             $entry->methods['rewind'],
             $entry->methods['valid'],
             $entry->methods['current'],
-            $entry->methods['eof']
+            $entry->methods['eof'],
+            $entry->methods['fgetcsv'],
+            $entry->methods['fputcsv'],
         );
     }
 }
@@ -346,5 +358,226 @@ final class SplFileObjectFwrite extends VmClassMethod
             return;
         }
         $frame->returnVar->int($written);
+    }
+}
+
+final class SplFileObjectFgetcsv extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fgetcsv');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fgetcsv()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        [$separator, $enclosure, $escape] = SplFileObjectStorage::getCsvControl($object);
+        if (isset($frame->calledArgs[1])) {
+            $separator = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'SplFileObject::fgetcsv',
+                0,
+                'separator'
+            );
+        }
+        if (isset($frame->calledArgs[2])) {
+            $enclosure = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'SplFileObject::fgetcsv',
+                1,
+                'enclosure'
+            );
+        }
+        if (isset($frame->calledArgs[3])) {
+            $escape = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[3],
+                'SplFileObject::fgetcsv',
+                2,
+                'escape'
+            );
+        }
+        VmCsvArg::validateFgetcsvOptions($separator, $enclosure, $escape);
+        $row = VmFs::fgetcsv(
+            SplFileObjectStorage::handle($object),
+            null,
+            $separator,
+            $enclosure,
+            $escape
+        );
+        if (false === $row) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->array(VmFs::csvRowToArray($row));
+    }
+}
+
+final class SplFileObjectFputcsv extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fputcsv');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fputcsv()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::fputcsv() expects at least 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $fieldsVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $fieldsVar->type) {
+            throw new \TypeError(
+                'SplFileObject::fputcsv(): Argument #1 ($fields) must be of type array, '
+                .match ($fieldsVar->type) {
+                    Variable::TYPE_NULL => 'null',
+                    Variable::TYPE_BOOL => 'bool',
+                    Variable::TYPE_INTEGER => 'int',
+                    Variable::TYPE_DOUBLE => 'float',
+                    Variable::TYPE_STRING => 'string',
+                    Variable::TYPE_OBJECT => 'object',
+                    default => 'mixed',
+                }.' given'
+            );
+        }
+        [$separator, $enclosure, $escape] = SplFileObjectStorage::getCsvControl($object);
+        if (isset($frame->calledArgs[2])) {
+            $separator = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'SplFileObject::fputcsv',
+                1,
+                'separator'
+            );
+        }
+        if (isset($frame->calledArgs[3])) {
+            $enclosure = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[3],
+                'SplFileObject::fputcsv',
+                2,
+                'enclosure'
+            );
+        }
+        if (isset($frame->calledArgs[4])) {
+            $escape = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[4],
+                'SplFileObject::fputcsv',
+                3,
+                'escape'
+            );
+        }
+        VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
+        $eol = "\n";
+        if (isset($frame->calledArgs[5])) {
+            $eol = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[5],
+                'SplFileObject::fputcsv',
+                4,
+                'eol'
+            );
+        }
+        $fields = VmFputcsv::coerceFieldList($fieldsVar->toArray()->iterate(true));
+        $handle = SplFileObjectStorage::handle($object);
+        if ("\n" === $eol) {
+            $written = VmFs::fputcsv($handle, $fields, $separator, $enclosure, $escape);
+        } else {
+            $line = VmCsv::formatLine($fields, $separator, $enclosure, $escape).$eol;
+            $written = VmFs::fwrite($handle, $line);
+        }
+        if (false === $written) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->int($written);
+    }
+}
+
+final class SplFileObjectSetCsvControl extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setCsvControl');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::setCsvControl()'
+        );
+        [$separator, $enclosure, $escape] = SplFileObjectStorage::getCsvControl($object);
+        if (isset($frame->calledArgs[1])) {
+            $separator = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[1],
+                'SplFileObject::setCsvControl',
+                0,
+                'separator'
+            );
+        }
+        if (isset($frame->calledArgs[2])) {
+            $enclosure = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[2],
+                'SplFileObject::setCsvControl',
+                1,
+                'enclosure'
+            );
+        }
+        if (isset($frame->calledArgs[3])) {
+            $escape = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[3],
+                'SplFileObject::setCsvControl',
+                2,
+                'escape'
+            );
+        }
+        VmCsvArg::validateFputcsvOptions($separator, $enclosure, $escape);
+        SplFileObjectStorage::setCsvControl($object, $separator, $enclosure, $escape);
+    }
+}
+
+final class SplFileObjectGetCsvControl extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCsvControl');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::getCsvControl()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        [$separator, $enclosure, $escape] = SplFileObjectStorage::getCsvControl($object);
+        $frame->returnVar->newArray();
+        $ht = $frame->returnVar->toArray();
+        foreach ([$separator, $enclosure, $escape] as $value) {
+            $cell = new Variable();
+            $cell->string($value);
+            $ht->append($cell);
+        }
     }
 }

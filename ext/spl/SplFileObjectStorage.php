@@ -12,7 +12,7 @@ final class SplFileObjectStorage
 {
     public const FLAG_READ_AHEAD = 2;
 
-    /** @var array<int, array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int}> */
+    /** @var array<int, array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string}> */
     private static array $state = [];
 
     public static function setHandle(ObjectEntry $object, int $handle): void
@@ -23,6 +23,9 @@ final class SplFileObjectStorage
             'lineNum' => 0,
             'flags' => 0,
             'maxLineLen' => 0,
+            'separator' => ',',
+            'enclosure' => '"',
+            'escape' => '\\',
         ];
     }
 
@@ -97,6 +100,26 @@ final class SplFileObjectStorage
         return VmFs::feof(self::state($object)['handle']);
     }
 
+    /** @return array{0: string, 1: string, 2: string} */
+    public static function getCsvControl(ObjectEntry $object): array
+    {
+        $state = self::state($object);
+
+        return [$state['separator'], $state['enclosure'], $state['escape']];
+    }
+
+    public static function setCsvControl(
+        ObjectEntry $object,
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): void {
+        $state = &self::$state[$object->id];
+        $state['separator'] = $separator;
+        $state['enclosure'] = $enclosure;
+        $state['escape'] = $escape;
+    }
+
     /** @return string|false */
     public static function fgets(ObjectEntry $object, ?int $length = null)
     {
@@ -158,13 +181,13 @@ final class SplFileObjectStorage
         $state['currentLine'] = null;
     }
 
-    /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int} $state */
+    /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} $state */
     private static function hasFlag(array $state, int $flag): bool
     {
         return 0 !== ($state['flags'] & $flag);
     }
 
-    /** @return array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int} */
+    /** @return array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$state[$object->id])) {
