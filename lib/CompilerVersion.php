@@ -347,14 +347,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #12422, #13157).
+     * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #13238).
      *
-     * Enabled on the 8.4.0-dev forward line via builtinAdvertisementVersion — phantom
-     * compliance skips when this returns true (#11819).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsStreamSupports(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

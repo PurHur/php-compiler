@@ -64,9 +64,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsReadonlyBuiltin());
     }
 
-    public function testStreamSupportsAdvertisedOnForwardProfile(): void
+    public function testStreamSupportsWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStreamSupports());
+        $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
     public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
@@ -125,10 +125,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
-    public function testVmRegistersStreamSupportsOnForwardProfile(): void
+    public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['stream_supports']));
+        $this->assertFalse(isset($runtime->vmContext->functions['stream_supports']));
     }
 
     public function testVmDoesNotRegisterReadonlyBuiltinOnReferenceProfile(): void
