@@ -16,6 +16,37 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
+/** @internal */
+final class VmNullStringParamDeprecation
+{
+    public static function message(string $function, int $argIndex, string $paramName): string
+    {
+        return sprintf(
+            '%s(): Passing null to parameter #%d ($%s) of type string is deprecated',
+            $function,
+            $argIndex + 1,
+            $paramName
+        );
+    }
+
+    public static function emit(?Frame $frame, string $function, int $argIndex, string $paramName): void
+    {
+        $vm = VM::running();
+        if (null === $vm) {
+            return;
+        }
+        if (null === $frame) {
+            $frames = $vm->context->runStackFrames();
+            $frame = [] !== $frames ? $frames[0] : null;
+        }
+        $vm->context->errors->internalDeprecated(
+            self::message($function, $argIndex, $paramName),
+            $vm->context,
+            $frame
+        );
+    }
+}
+
 final class VmString
 {
     public const TRIM_DEFAULT = " \t\n\r\0\x0B";
@@ -75,6 +106,11 @@ final class VmString
         string $paramName = 'string'
     ): string {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
@@ -113,6 +149,11 @@ final class VmString
         string $paramName = 'string'
     ): string {
         $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            VmNullStringParamDeprecation::emit(null, $function, $argIndex, $paramName);
+
+            return '';
+        }
         if (Variable::TYPE_ARRAY === $var->type) {
             throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }

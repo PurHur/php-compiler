@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\types;
 
+use PHPCompiler\ext\standard\TriggerErrorJitHelper;
+use PHPCompiler\ext\standard\VmNullStringParamDeprecation;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -28,6 +31,7 @@ final class JitStrlen
 
                 return $context->getTypeFromString('int64')->constInt(0, false);
             }
+            self::emitNullStringDeprecation($context);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -143,6 +147,7 @@ final class JitStrlen
             $coerceFromNullBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
             $context->builder->branchIf($isNull, $coerceFromNullBlock, $okBlock);
             $context->builder->positionAtEnd($coerceFromNullBlock);
+            self::emitNullStringDeprecation($context);
 
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
@@ -224,5 +229,13 @@ final class JitStrlen
     private static function unreachableStringPtr(Context $context): Value
     {
         return $context->getTypeFromString('__string__*')->constNull();
+    }
+
+    private static function emitNullStringDeprecation(Context $context): void
+    {
+        TriggerErrorJitHelper::recordAndMaybePrint(
+            ErrorReporter::E_DEPRECATED,
+            VmNullStringParamDeprecation::message('strlen', 0, 'string')
+        );
     }
 }
