@@ -138,6 +138,7 @@ use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromFunction;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureCalledClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureScopeClass;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetClosureThis;
@@ -727,6 +728,7 @@ final class BuiltinClasses
                 'isuserdefined' => new ReflectionFunctionIsUserDefined(),
                 'getextensionname' => new ReflectionFunctionGetExtensionName(),
                 'getclosurethis' => new ReflectionFunctionGetClosureThis(),
+                'getclosure' => new ReflectionFunctionGetClosure(),
                 'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),
                 'getclosurecalledclass' => new ReflectionFunctionGetClosureCalledClass(),
                 'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),

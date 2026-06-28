@@ -3122,6 +3122,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionCreateFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionCreateFromFunction.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetClosureCalledClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetClosureScopeClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionGetClosureThis.php';
