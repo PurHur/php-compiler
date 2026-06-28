@@ -76,6 +76,33 @@ final class VmClosureCall
         $copyB->duplicateFrom($b);
         $result = self::invoke($context, $closure, $copyA, $copyB);
 
+        return self::coerceUserSortCallbackResult($result);
+    }
+
+    /** php-src php_usort_compare — bool true→1, false→-1; int/float sign-normalized (#13029). */
+    public static function coerceUserSortCallbackResult(Variable $result): int
+    {
+        $result = $result->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN === $result->type) {
+            return $result->toBool() ? 1 : -1;
+        }
+        if (Variable::TYPE_INTEGER === $result->type) {
+            $value = $result->toInt();
+
+            return $value > 0 ? 1 : ($value < 0 ? -1 : 0);
+        }
+        if (Variable::TYPE_FLOAT === $result->type) {
+            $value = $result->toFloat();
+            if ($value > 0.0) {
+                return 1;
+            }
+            if ($value < 0.0) {
+                return -1;
+            }
+
+            return 0;
+        }
+
         return $result->toInt();
     }
 
@@ -86,16 +113,8 @@ final class VmClosureCall
      */
     public static function sortVariableValues(Context $context, array &$values, ClosureState $closure): void
     {
-        $n = \count($values);
-        for ($i = 1; $i < $n; ++$i) {
-            $j = $i;
-            while ($j > 0 && self::invokeTwo($context, $closure, $values[$j - 1], $values[$j]) > 0) {
-                $tmp = $values[$j - 1];
-                $values[$j - 1] = $values[$j];
-                $values[$j] = $tmp;
-                --$j;
-            }
-        }
+        $cmp = static fn (Variable $a, Variable $b): int => self::invokeTwo($context, $closure, $a, $b);
+        ZendSort::sort($values, $cmp);
     }
 
     /**
@@ -105,16 +124,8 @@ final class VmClosureCall
      */
     public static function sortKeyedPairsByKey(Context $context, array &$pairs, ClosureState $closure): void
     {
-        $n = \count($pairs);
-        for ($i = 1; $i < $n; ++$i) {
-            $j = $i;
-            while ($j > 0 && self::invokeTwo($context, $closure, $pairs[$j - 1][0], $pairs[$j][0]) > 0) {
-                $tmp = $pairs[$j - 1];
-                $pairs[$j - 1] = $pairs[$j];
-                $pairs[$j] = $tmp;
-                --$j;
-            }
-        }
+        $cmp = static fn (array $a, array $b): int => self::invokeTwo($context, $closure, $a[0], $b[0]);
+        ZendSort::sort($pairs, $cmp);
     }
 
     /**
@@ -124,15 +135,7 @@ final class VmClosureCall
      */
     public static function sortKeyedPairsByValue(Context $context, array &$pairs, ClosureState $closure): void
     {
-        $n = \count($pairs);
-        for ($i = 1; $i < $n; ++$i) {
-            $j = $i;
-            while ($j > 0 && self::invokeTwo($context, $closure, $pairs[$j - 1][1], $pairs[$j][1]) > 0) {
-                $tmp = $pairs[$j - 1];
-                $pairs[$j - 1] = $pairs[$j];
-                $pairs[$j] = $tmp;
-                --$j;
-            }
-        }
+        $cmp = static fn (array $a, array $b): int => self::invokeTwo($context, $closure, $a[1], $b[1]);
+        ZendSort::sort($pairs, $cmp);
     }
 }
