@@ -371,11 +371,13 @@ final class VmMbstring
             $string = self::substr($string, $from, null, $encoding);
         }
 
-        if ($width < 0) {
-            throw new \ValueError('mb_strimwidth(): Argument #3 ($width) is out of range');
-        }
-
         $totalWidth = self::strwidth($string, $encoding);
+        if ($width < 0) {
+            $width = $totalWidth + $width;
+            if ($width < 0) {
+                throw new \ValueError('mb_strimwidth(): Argument #3 ($width) is out of range');
+            }
+        }
         if ($totalWidth <= $width) {
             return $string;
         }
