@@ -369,14 +369,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13058).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365).
      *
-     * Enabled on the 8.4.0-dev forward line via builtinAdvertisementVersion — phantom
-     * compliance skips when this returns true (#12363).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsJsonValidate(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
