@@ -2609,7 +2609,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringFunctionExists.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetdate.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenv.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenvAll.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetenvLibcBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusage.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGetrusageRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringGettext.php';
