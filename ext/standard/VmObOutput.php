@@ -18,6 +18,9 @@ final class VmObOutput
         if ('ob_gzhandler' === $handlerName) {
             return VmObGzhandler::flushBuffer($content, $ctx);
         }
+        if (VmUrlRewriterOb::HANDLER_NAME === $handlerName) {
+            return VmUrlRewriterOb::applyHandler($content);
+        }
 
         $callback = new Variable();
         $callback->string($handlerName);
