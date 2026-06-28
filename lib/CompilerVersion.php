@@ -346,10 +346,15 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.5+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #12422). */
+    /**
+     * PHP 8.3+ stream_supports() / STREAM_SUPPORT_* (ext/standard/streams.c, issue #11819, #12422, #13157).
+     *
+     * Enabled on the 8.4.0-dev forward line via builtinAdvertisementVersion — phantom
+     * compliance skips when this returns true (#11819).
+     */
     public static function supportsStreamSupports(): bool
     {
-        return self::advertisesBuiltinSince('8.5.0');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
