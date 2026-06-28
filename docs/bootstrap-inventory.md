@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3426 |
-| Phase A inventory files (M2 ratio SSOT) | 3426 |
+| PHP files on vm.php path | 3425 |
+| Phase A inventory files (M2 ratio SSOT) | 3425 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9054 |
+| Source constructs flagged (warnings) | 9053 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2320,7 +2320,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/FputcsvRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/FsDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FsGlobVecRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/FtokRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionExistsRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/FunctionStaticRuntime.php` | 0 | 1 |
@@ -6895,7 +6894,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFsGlob.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/JitFseek.php`
 
@@ -9539,7 +9538,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseIniEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/ParseStrEngine.php`
 
@@ -10903,12 +10902,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmImage.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 184)
-- new Variable (line 186)
-- new HashTable (line 198)
-- new Variable (line 203)
-- new Variable (line 216)
-- 21 class method(s)
+- new HashTable (line 215)
+- new Variable (line 217)
+- new HashTable (line 229)
+- new Variable (line 234)
+- new Variable (line 247)
+- 23 class method(s)
 
 ### `ext/standard/VmIncludePath.php`
 
@@ -18552,11 +18551,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 69)
 - 3 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/FsGlobVecStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 15 class method(s)
 
 ### `lib/JIT/Builtin/FtokRuntime.php`
 
