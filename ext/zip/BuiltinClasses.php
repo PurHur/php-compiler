@@ -13,6 +13,10 @@ final class BuiltinClasses
 {
     public static function register(Context $ctx): void
     {
+        if (!ZipExtensionPolicy::advertisesExtension()) {
+            return;
+        }
+
         $before = array_keys($ctx->classes);
         VmZipArchive::registerClass($ctx);
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
