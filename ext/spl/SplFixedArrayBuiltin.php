@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmArray;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
@@ -32,6 +34,7 @@ final class SplFixedArrayBuiltin
         }
 
         $pub = CfgFunc::FLAG_PUBLIC;
+        $pubStatic = $pub | CfgFunc::FLAG_STATIC;
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplFixedArray');
@@ -59,6 +62,12 @@ final class SplFixedArrayBuiltin
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        $entry->methods['fromarray'] = new SplFixedArrayFromArray();
+        $entry->methodVisibility['fromarray'] = $pubStatic;
+        $entry->methodNames['fromarray'] = 'fromArray';
+        $entry->methods['toarray'] = new SplFixedArrayToArray();
+        $entry->methodVisibility['toarray'] = $pub;
+        $entry->methodNames['toarray'] = 'toArray';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -66,7 +75,7 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray']);
     }
 
     public static function init(ObjectEntry $object, int $size): void
@@ -126,6 +135,106 @@ final class SplFixedArrayBuiltin
             throw new \RuntimeException(self::RANGE_ERROR);
         }
         unset(self::$store[$object->id]['slots'][$index]);
+    }
+
+    /**
+     * @return array<int, Variable>
+     */
+    public static function toArray(ObjectEntry $object): HashTable
+    {
+        $state = self::state($object);
+        $size = $state['size'];
+        if (0 === $size) {
+            return new HashTable();
+        }
+        $values = [];
+        for ($i = 0; $i < $size; ++$i) {
+            $slot = new Variable();
+            if (isset($state['slots'][$i])) {
+                $slot->copyFrom($state['slots'][$i]);
+            } else {
+                $slot->null();
+            }
+            $values[] = $slot;
+        }
+        $ht = new HashTable();
+        $ht->assignPackedList($values);
+
+        return $ht;
+    }
+
+    public static function fromArray(Context $ctx, HashTable $data, bool $saveIndexes): ObjectEntry
+    {
+        $num = $data->getNumElements();
+        $size = 0;
+        /** @var array<int, Variable> $indexedValues */
+        $indexedValues = [];
+
+        if ($num > 0 && $saveIndexes) {
+            $maxIndex = 0;
+            foreach ($data->iterateKeyed(true) as [$keyVar, $valueVar]) {
+                $index = self::coercePositiveArrayKey($keyVar);
+                if ($index > $maxIndex) {
+                    $maxIndex = $index;
+                }
+                $copy = new Variable();
+                $copy->copyFrom($valueVar->resolveIndirect());
+                $indexedValues[$index] = $copy;
+            }
+            $size = $maxIndex + 1;
+            if ($size <= 0) {
+                throw new \InvalidArgumentException('integer overflow detected');
+            }
+        } elseif ($num > 0) {
+            $size = $num;
+            $i = 0;
+            foreach ($data->iterateKeyed(true) as [, $valueVar]) {
+                $copy = new Variable();
+                $copy->copyFrom($valueVar->resolveIndirect());
+                $indexedValues[$i++] = $copy;
+            }
+        }
+
+        $class = $ctx->classes[self::CLASS_LC] ?? null;
+        if (null === $class) {
+            throw new \LogicException('SplFixedArray is not registered in this compiler build');
+        }
+        $object = new ObjectEntry($class);
+        $object->constructed = true;
+        self::init($object, $size);
+        foreach ($indexedValues as $index => $var) {
+            self::$store[$object->id]['slots'][$index] = $var;
+        }
+
+        return $object;
+    }
+
+    /** @throws \InvalidArgumentException */
+    private static function coercePositiveArrayKey(Variable $keyVar): int
+    {
+        $key = $keyVar->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $key->type) {
+            $index = $key->toInt();
+            if ($index < 0) {
+                throw new \InvalidArgumentException('array must contain only positive integer keys');
+            }
+
+            return $index;
+        }
+        if (Variable::TYPE_STRING === $key->type) {
+            $s = $key->toString();
+            if (!preg_match('/^\d+$/', $s)) {
+                throw new \InvalidArgumentException('array must contain only positive integer keys');
+            }
+            $index = (int) $s;
+            if ((string) $index !== $s) {
+                throw new \InvalidArgumentException('array must contain only positive integer keys');
+            }
+
+            return $index;
+        }
+
+        throw new \InvalidArgumentException('array must contain only positive integer keys');
     }
 
     /** @return array{size: int, slots: array<int, Variable>} */
@@ -314,5 +423,55 @@ final class SplFixedArrayOffsetUnset extends VmClassMethod
             );
         }
         SplFixedArrayBuiltin::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+final class SplFixedArrayFromArray extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fromArray');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        if (\count($frame->calledArgs) < 1) {
+            throw new \ArgumentCountError(
+                'SplFixedArray::fromArray() expects at least 1 argument, 0 given'
+            );
+        }
+        $ctx = $frame->vmContext;
+        if (null === $ctx) {
+            throw new \LogicException('SplFixedArray::fromArray() requires VM context');
+        }
+        $data = VmArray::requireArrayParam($frame->calledArgs[0], 'SplFixedArray::fromArray', 1, 'array');
+        $saveIndexes = true;
+        if (isset($frame->calledArgs[1])) {
+            $saveIndexes = $frame->calledArgs[1]->resolveIndirect()->toBool();
+        }
+        $object = SplFixedArrayBuiltin::fromArray($ctx, $data, $saveIndexes);
+        $result = new Variable(Variable::TYPE_OBJECT);
+        $result->object($object);
+        SplIteratorSupport::copyReturnFrom($frame, $result);
+    }
+}
+
+final class SplFixedArrayToArray extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('toArray');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::toArray()'
+        );
+        $result = new Variable(Variable::TYPE_ARRAY);
+        $result->array(SplFixedArrayBuiltin::toArray($object));
+        SplIteratorSupport::copyReturnFrom($frame, $result);
     }
 }
