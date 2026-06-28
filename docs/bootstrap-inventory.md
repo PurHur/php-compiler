@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3452 |
-| Phase A inventory files (M2 ratio SSOT) | 3452 |
+| PHP files on vm.php path | 3451 |
+| Phase A inventory files (M2 ratio SSOT) | 3451 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9296 |
+| Source constructs flagged (warnings) | 9301 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -313,7 +313,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/BuiltinClasses.php` | 0 | 4 |
 | `ext/random/Module.php` | 0 | 1 |
 | `ext/random/Mt19937Instance.php` | 0 | 1 |
-| `ext/random/RandomizerBuiltin.php` | 0 | 17 |
+| `ext/random/RandomizerBuiltin.php` | 0 | 19 |
 | `ext/session/Module.php` | 0 | 18 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
@@ -1275,7 +1275,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmSapiHeaderGuard.php` | 0 | 1 |
 | `ext/standard/VmScalarType.php` | 0 | 6 |
 | `ext/standard/VmScope.php` | 0 | 8 |
-| `ext/standard/VmSerialize.php` | 0 | 37 |
+| `ext/standard/VmSerialize.php` | 0 | 39 |
 | `ext/standard/VmSerializeFormat.php` | 0 | 1 |
 | `ext/standard/VmSession.php` | 0 | 10 |
 | `ext/standard/VmSessionSerializer.php` | 0 | 5 |
@@ -2135,8 +2135,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/types/is_type.php` | 0 | 1 |
 | `ext/types/strlen.php` | 0 | 1 |
 | `ext/xml/BuiltinClasses.php` | 0 | 1 |
-| `ext/xml/Module.php` | 0 | 4 |
+| `ext/xml/Module.php` | 0 | 5 |
 | `ext/xml/VmXml.php` | 0 | 1 |
+| `ext/xml/xml_get_error_code.php` | 0 | 2 |
 | `ext/xml/xml_parse.php` | 0 | 2 |
 | `ext/xml/xml_parser_create.php` | 0 | 1 |
 | `ext/xml/xml_parser_free.php` | 0 | 2 |
@@ -2617,8 +2618,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringSerializeDoubleJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringSerializeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSocketAtmark.php` | 0 | 1 |
@@ -4287,7 +4286,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/iconv/VmIconv.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/iconv/iconv.php`
 
@@ -5313,28 +5312,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/random/Mt19937Instance.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 16 class method(s)
 
 ### `ext/random/RandomizerBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new Random\RandomError (line 42)
-- new ClassEntry (line 107)
-- new Mt19937Construct (line 109)
-- new ClassEntry (line 135)
-- new Variable (line 137)
-- new RandomizerConstruct (line 139)
-- new Mt19937Instance (line 244)
-- new Variable (line 335)
-- new Variable (line 344)
-- new Mt19937Instance (line 361)
-- new ObjectEntry (line 372)
-- new ArgumentCountError (line 409)
-- new ArgumentCountError (line 435)
-- new ArgumentCountError (line 467)
-- new ArgumentCountError (line 509)
-- new ArgumentCountError (line 550)
-- 29 class method(s)
+- new Random\RandomError (line 49)
+- new ClassEntry (line 114)
+- new Mt19937Construct (line 116)
+- new ClassEntry (line 142)
+- new Variable (line 144)
+- new RandomizerConstruct (line 146)
+- new Mt19937Instance (line 251)
+- new ArgumentCountError (line 319)
+- new Mt19937Instance (line 347)
+- new Variable (line 386)
+- new Variable (line 395)
+- new Mt19937Instance (line 412)
+- new ObjectEntry (line 423)
+- new ArgumentCountError (line 460)
+- new ArgumentCountError (line 486)
+- new ArgumentCountError (line 518)
+- new ArgumentCountError (line 560)
+- new ArgumentCountError (line 601)
+- 30 class method(s)
 
 ### `ext/session/Module.php`
 
@@ -12005,42 +12006,44 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 46)
-- new VmSerializeRefState (line 84)
-- new Exception (line 153)
-- new Variable (line 169)
-- new Variable (line 179)
-- new Variable (line 189)
-- new Variable (line 199)
-- new VmSerializeRefState (line 299)
-- new Exception (line 419)
-- new ObjectEntry (line 525)
-- new Variable (line 526)
-- new ObjectEntry (line 543)
-- new Variable (line 547)
-- new ObjectEntry (line 559)
-- new Variable (line 567)
-- new ObjectEntry (line 585)
-- new Variable (line 586)
-- new Variable (line 588)
-- new Variable (line 645)
-- new Exception (line 671)
-- new VmSerializeEnumCaseRef (line 721)
-- new VmSerializeEnumCaseRef (line 726)
-- new VmSerializeRefState (line 754)
-- new Variable (line 764)
-- new Variable (line 818)
-- new Variable (line 831)
-- new Variable (line 937)
-- new ObjectEntry (line 967)
-- new Variable (line 971)
-- new Frame (line 990)
-- new Variable (line 993)
-- new Variable (line 1014)
-- new Variable (line 1033)
-- new Variable (line 1059)
-- new Exception (line 1082)
-- 52 class method(s)
+- new Exception (line 47)
+- new VmSerializeRefState (line 85)
+- new Exception (line 154)
+- new Variable (line 170)
+- new Variable (line 180)
+- new Variable (line 190)
+- new Variable (line 200)
+- new VmSerializeRefState (line 300)
+- new Exception (line 420)
+- new ObjectEntry (line 529)
+- new Variable (line 530)
+- new ObjectEntry (line 557)
+- new Variable (line 561)
+- new ObjectEntry (line 573)
+- new Variable (line 581)
+- new ObjectEntry (line 599)
+- new Variable (line 600)
+- new Variable (line 602)
+- new Variable (line 659)
+- new Exception (line 685)
+- new VmSerializeEnumCaseRef (line 735)
+- new VmSerializeEnumCaseRef (line 740)
+- new VmSerializeRefState (line 768)
+- new Variable (line 778)
+- new Variable (line 832)
+- new Variable (line 845)
+- new Variable (line 951)
+- new ObjectEntry (line 981)
+- new Variable (line 985)
+- new Frame (line 1004)
+- new Variable (line 1007)
+- new Variable (line 1036)
+- new Variable (line 1052)
+- new Variable (line 1057)
+- new Variable (line 1073)
+- new Variable (line 1099)
+- new Exception (line 1122)
+- 54 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmSerializeFormat.php`
@@ -17035,12 +17038,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new xml_parser_create (line 26)
 - new xml_parse (line 27)
 - new xml_parser_free (line 28)
+- new xml_get_error_code (line 29)
 - 2 class method(s)
 
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
+
+### `ext/xml/xml_get_error_code.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 2 class method(s)
 
 ### `ext/xml/xml_parse.php`
 
@@ -18117,7 +18127,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 62 class method(s)
+- 63 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -19384,9 +19394,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObOutputJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 567)
-- 32 class method(s)
-- 10 closure(s)
+- new JIT (line 574)
+- 33 class method(s)
+- 13 closure(s)
 
 ### `lib/JIT/Builtin/ObOutputRuntime.php`
 
@@ -19463,8 +19473,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PendingHeadersJitBridge.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 338)
-- 14 class method(s)
+- new JIT (line 345)
+- 15 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/PendingHeadersRuntime.php`
@@ -20505,19 +20515,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSerialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 136)
+- new JIT (line 128)
 - 7 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringSerializeDoubleJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
-
-### `lib/JIT/Builtin/StringSerializeJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 7 class method(s)
 
 ### `lib/JIT/Builtin/StringSimilarText.php`
 
@@ -24481,186 +24481,186 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ReflectionPropertySetRawValueWithoutLazyInitialization (line 695)
 - new ReflectionPropertySkipLazyInitialization (line 696)
 - new ReflectionPropertyGetAsymmetricVisibility (line 703)
-- new ReflectionPropertyGetReadableType (line 706)
-- new ReflectionPropertyGetSettableType (line 707)
-- new ReflectionPropertyHasDefaultValue (line 708)
-- new ReflectionPropertyIsDefaultValueAvailable (line 709)
-- new ClassEntry (line 717)
-- new ClassProperty (line 718)
-- new ReflectionFunctionConstruct (line 719)
-- new ReflectionFunctionGetName (line 724)
-- new ReflectionFunctionGetParameters (line 725)
-- new ReflectionFunctionGetNumberOfParameters (line 726)
-- new ReflectionFunctionGetReturnType (line 727)
-- new ReflectionFunctionHasReturnType (line 728)
-- new ReflectionFunctionIsAnonymous (line 729)
-- new ReflectionFunctionIsClosure (line 730)
-- new ReflectionFunctionIsInternal (line 731)
-- new ReflectionFunctionIsUserDefined (line 732)
-- new ReflectionFunctionGetExtensionName (line 733)
-- new ReflectionFunctionGetClosureThis (line 734)
-- new ReflectionFunctionGetClosure (line 735)
-- new ReflectionFunctionGetClosureScopeClass (line 736)
-- new ReflectionFunctionGetClosureCalledClass (line 737)
-- new ReflectionFunctionGetClosureUsedVariables (line 738)
-- new ReflectionFunctionInvoke (line 739)
-- new ReflectionFunctionCreateFromCallable (line 745)
-- new ReflectionFunctionCreateFromFunction (line 747)
-- new ClassEntry (line 752)
-- new ClassProperty (line 753)
-- new ClassProperty (line 754)
-- new ReflectionConstantConstruct (line 755)
-- new ReflectionConstantGetName (line 758)
-- new ReflectionConstantGetValue (line 760)
-- new ReflectionConstantGetAttributes (line 762)
-- new ReflectionClassConstantGetType (line 764)
-- new ReflectionClassConstantIsDeprecated (line 766)
-- new ReflectionClassConstantGetDeprecatedMessage (line 768)
-- new ReflectionClassConstantGetDeprecatedVersion (line 770)
-- new ReflectionClassConstantIsFinal (line 772)
-- new ReflectionClassConstantIsEnumCase (line 774)
-- new ClassEntry (line 779)
-- new ClassProperty (line 780)
-- new ClassProperty (line 781)
-- new ReflectionConstantConstruct (line 782)
-- new ReflectionConstantGetName (line 785)
-- new ReflectionConstantGetValue (line 787)
-- new ReflectionConstantGetAttributes (line 789)
-- new ReflectionClassConstantGetType (line 791)
-- new ReflectionClassConstantIsDeprecated (line 793)
-- new ReflectionClassConstantGetDeprecatedMessage (line 795)
-- new ReflectionClassConstantGetDeprecatedVersion (line 797)
-- new ReflectionClassConstantIsFinal (line 799)
-- new ReflectionClassConstantIsEnumCase (line 801)
-- new ClassEntry (line 807)
-- new ClassProperty (line 808)
-- new ReflectionEnumConstruct (line 809)
-- new ReflectionEnumGetName (line 812)
-- new ReflectionEnumIsBacked (line 814)
-- new ReflectionEnumGetCases (line 816)
-- new ReflectionEnumGetCase (line 818)
-- new ReflectionEnumHasCase (line 820)
-- new ReflectionClassGetTraitNames (line 822)
-- new ClassEntry (line 826)
-- new ClassProperty (line 827)
-- new ClassProperty (line 828)
-- new ReflectionEnumUnitCaseConstruct (line 829)
-- new ReflectionEnumUnitCaseGetAttributes (line 832)
-- new ReflectionEnumUnitCaseGetName (line 834)
-- new ReflectionEnumUnitCaseGetValue (line 836)
-- new ReflectionEnumUnitCaseIsBacked (line 838)
-- new ClassEntry (line 842)
-- new ClassProperty (line 844)
-- new ClassProperty (line 845)
-- new ReflectionEnumBackedCaseConstruct (line 846)
-- new ReflectionEnumBackedCaseGetBackingValue (line 849)
-- new ReflectionEnumBackedCaseIsBacked (line 851)
-- new ClassEntry (line 855)
-- new ReflectionTypeAllowsNull (line 857)
-- new ReflectionTypeToString (line 859)
-- new ReflectionNamedTypeGetName (line 872)
-- new ReflectionNamedTypeIsBuiltin (line 873)
-- new Variable (line 897)
-- new ClassEntry (line 898)
-- new ClassProperty (line 899)
-- new ReflectionFiberGetExecutingFiber (line 900)
-- new ClassEntry (line 918)
-- new ClassProperty (line 920)
-- new ClassProperty (line 921)
-- new ClassProperty (line 922)
-- new ClassProperty (line 923)
+- new ReflectionPropertyGetReadableType (line 704)
+- new ReflectionPropertyGetSettableType (line 705)
+- new ReflectionPropertyHasDefaultValue (line 706)
+- new ReflectionPropertyIsDefaultValueAvailable (line 707)
+- new ClassEntry (line 721)
+- new ClassProperty (line 722)
+- new ReflectionFunctionConstruct (line 723)
+- new ReflectionFunctionGetName (line 728)
+- new ReflectionFunctionGetParameters (line 729)
+- new ReflectionFunctionGetNumberOfParameters (line 730)
+- new ReflectionFunctionGetReturnType (line 731)
+- new ReflectionFunctionHasReturnType (line 732)
+- new ReflectionFunctionIsAnonymous (line 733)
+- new ReflectionFunctionIsClosure (line 734)
+- new ReflectionFunctionIsInternal (line 735)
+- new ReflectionFunctionIsUserDefined (line 736)
+- new ReflectionFunctionGetExtensionName (line 737)
+- new ReflectionFunctionGetClosureThis (line 738)
+- new ReflectionFunctionGetClosure (line 739)
+- new ReflectionFunctionGetClosureScopeClass (line 740)
+- new ReflectionFunctionGetClosureCalledClass (line 741)
+- new ReflectionFunctionGetClosureUsedVariables (line 742)
+- new ReflectionFunctionInvoke (line 743)
+- new ReflectionFunctionCreateFromCallable (line 749)
+- new ReflectionFunctionCreateFromFunction (line 751)
+- new ClassEntry (line 756)
+- new ClassProperty (line 757)
+- new ClassProperty (line 758)
+- new ReflectionConstantConstruct (line 759)
+- new ReflectionConstantGetName (line 762)
+- new ReflectionConstantGetValue (line 764)
+- new ReflectionConstantGetAttributes (line 766)
+- new ReflectionClassConstantGetType (line 768)
+- new ReflectionClassConstantIsDeprecated (line 770)
+- new ReflectionClassConstantGetDeprecatedMessage (line 772)
+- new ReflectionClassConstantGetDeprecatedVersion (line 774)
+- new ReflectionClassConstantIsFinal (line 776)
+- new ReflectionClassConstantIsEnumCase (line 778)
+- new ClassEntry (line 783)
+- new ClassProperty (line 784)
+- new ClassProperty (line 785)
+- new ReflectionConstantConstruct (line 786)
+- new ReflectionConstantGetName (line 789)
+- new ReflectionConstantGetValue (line 791)
+- new ReflectionConstantGetAttributes (line 793)
+- new ReflectionClassConstantGetType (line 795)
+- new ReflectionClassConstantIsDeprecated (line 797)
+- new ReflectionClassConstantGetDeprecatedMessage (line 799)
+- new ReflectionClassConstantGetDeprecatedVersion (line 801)
+- new ReflectionClassConstantIsFinal (line 803)
+- new ReflectionClassConstantIsEnumCase (line 805)
+- new ClassEntry (line 811)
+- new ClassProperty (line 812)
+- new ReflectionEnumConstruct (line 813)
+- new ReflectionEnumGetName (line 816)
+- new ReflectionEnumIsBacked (line 818)
+- new ReflectionEnumGetCases (line 820)
+- new ReflectionEnumGetCase (line 822)
+- new ReflectionEnumHasCase (line 824)
+- new ReflectionClassGetTraitNames (line 826)
+- new ClassEntry (line 830)
+- new ClassProperty (line 831)
+- new ClassProperty (line 832)
+- new ReflectionEnumUnitCaseConstruct (line 833)
+- new ReflectionEnumUnitCaseGetAttributes (line 836)
+- new ReflectionEnumUnitCaseGetName (line 838)
+- new ReflectionEnumUnitCaseGetValue (line 840)
+- new ReflectionEnumUnitCaseIsBacked (line 842)
+- new ClassEntry (line 846)
+- new ClassProperty (line 848)
+- new ClassProperty (line 849)
+- new ReflectionEnumBackedCaseConstruct (line 850)
+- new ReflectionEnumBackedCaseGetBackingValue (line 853)
+- new ReflectionEnumBackedCaseIsBacked (line 855)
+- new ClassEntry (line 859)
+- new ReflectionTypeAllowsNull (line 861)
+- new ReflectionTypeToString (line 863)
+- new ReflectionNamedTypeGetName (line 876)
+- new ReflectionNamedTypeIsBuiltin (line 877)
+- new Variable (line 901)
+- new ClassEntry (line 902)
+- new ClassProperty (line 903)
+- new ReflectionFiberGetExecutingFiber (line 904)
+- new ClassEntry (line 922)
 - new ClassProperty (line 924)
-- new Variable (line 936)
-- new Variable (line 937)
-- new ClassEntry (line 941)
-- new ClassProperty (line 943)
-- new DateTimeZoneConstruct (line 944)
-- new DateTimeZoneGetName (line 947)
-- new DateTimeZoneGetOffset (line 949)
-- new DateTimeZoneGetLocation (line 951)
-- new DateTimeZoneListAbbreviations (line 953)
-- new DateTimeFormat (line 958)
-- new DateTimeGetTimestamp (line 959)
-- new DateTimeGetMicrosecond (line 960)
-- new DateTimeModify (line 961)
-- new DateTimeDiff (line 962)
-- new DateTimeSetDate (line 963)
-- new DateTimeSetTime (line 964)
-- new DateTimeSetMicrosecond (line 965)
-- new DateTimeSetTimezone (line 966)
-- new ClassEntry (line 969)
-- new ClassProperty (line 971)
-- new ClassProperty (line 972)
-- new ClassProperty (line 973)
-- new DateTimeConstruct (line 974)
-- new DateTimeCreateFromFormat (line 981)
-- new DateTimeCreateFromImmutable (line 983)
-- new DateTimeCreateFromInterface (line 985)
-- new DateTimeCreateFromTimestamp (line 987)
-- new DateTimeGetLastErrors (line 989)
-- new ClassEntry (line 993)
-- new ClassProperty (line 995)
-- new ClassProperty (line 996)
-- new ClassProperty (line 997)
-- new DateTimeImmutableConstruct (line 998)
-- new DateTimeImmutableCreateFromFormat (line 1005)
-- new DateTimeImmutableCreateFromMutable (line 1007)
-- new DateTimeImmutableCreateFromInterface (line 1009)
-- new DateTimeImmutableCreateFromTimestamp (line 1011)
-- new DateTimeGetLastErrors (line 1013)
-- new Variable (line 1017)
-- new Variable (line 1018)
-- new ClassEntry (line 1020)
-- new ClassProperty (line 1022)
-- new ClassProperty (line 1024)
-- new ClassProperty (line 1025)
+- new ClassProperty (line 925)
+- new ClassProperty (line 926)
+- new ClassProperty (line 927)
+- new ClassProperty (line 928)
+- new Variable (line 940)
+- new Variable (line 941)
+- new ClassEntry (line 945)
+- new ClassProperty (line 947)
+- new DateTimeZoneConstruct (line 948)
+- new DateTimeZoneGetName (line 951)
+- new DateTimeZoneGetOffset (line 953)
+- new DateTimeZoneGetLocation (line 955)
+- new DateTimeZoneListAbbreviations (line 957)
+- new DateTimeFormat (line 962)
+- new DateTimeGetTimestamp (line 963)
+- new DateTimeGetMicrosecond (line 964)
+- new DateTimeModify (line 965)
+- new DateTimeDiff (line 966)
+- new DateTimeSetDate (line 967)
+- new DateTimeSetTime (line 968)
+- new DateTimeSetMicrosecond (line 969)
+- new DateTimeSetTimezone (line 970)
+- new ClassEntry (line 973)
+- new ClassProperty (line 975)
+- new ClassProperty (line 976)
+- new ClassProperty (line 977)
+- new DateTimeConstruct (line 978)
+- new DateTimeCreateFromFormat (line 985)
+- new DateTimeCreateFromImmutable (line 987)
+- new DateTimeCreateFromInterface (line 989)
+- new DateTimeCreateFromTimestamp (line 991)
+- new DateTimeGetLastErrors (line 993)
+- new ClassEntry (line 997)
+- new ClassProperty (line 999)
+- new ClassProperty (line 1000)
+- new ClassProperty (line 1001)
+- new DateTimeImmutableConstruct (line 1002)
+- new DateTimeImmutableCreateFromFormat (line 1009)
+- new DateTimeImmutableCreateFromMutable (line 1011)
+- new DateTimeImmutableCreateFromInterface (line 1013)
+- new DateTimeImmutableCreateFromTimestamp (line 1015)
+- new DateTimeGetLastErrors (line 1017)
+- new Variable (line 1021)
+- new Variable (line 1022)
+- new ClassEntry (line 1024)
 - new ClassProperty (line 1026)
-- new DateIntervalConstruct (line 1030)
-- new DateIntervalFormat (line 1033)
-- new DateIntervalCreateFromDateString (line 1035)
-- new ClassEntry (line 1042)
-- new Variable (line 1065)
-- new Variable (line 1066)
-- new ClassEntry (line 1076)
-- new Variable (line 1082)
-- new Variable (line 1083)
-- new Variable (line 1084)
-- new ClassProperty (line 1087)
-- new ClassProperty (line 1088)
-- new ClassProperty (line 1089)
-- new ClassProperty (line 1090)
+- new ClassProperty (line 1028)
+- new ClassProperty (line 1029)
+- new ClassProperty (line 1030)
+- new DateIntervalConstruct (line 1034)
+- new DateIntervalFormat (line 1037)
+- new DateIntervalCreateFromDateString (line 1039)
+- new ClassEntry (line 1046)
+- new Variable (line 1069)
+- new Variable (line 1070)
+- new ClassEntry (line 1080)
+- new Variable (line 1086)
+- new Variable (line 1087)
+- new Variable (line 1088)
 - new ClassProperty (line 1091)
-- new ClassProperty (line 1099)
-- new Variable (line 1108)
-- new ClassProperty (line 1110)
-- new ClassProperty (line 1120)
-- new ErrorExceptionConstruct (line 1121)
-- new ExceptionConstruct (line 1123)
-- new ExceptionWakeup (line 1127)
-- new ExceptionGetMessage (line 1131)
-- new ExceptionGetCode (line 1132)
-- new ExceptionGetFile (line 1133)
-- new ExceptionGetLine (line 1134)
-- new ExceptionGetPrevious (line 1135)
-- new ExceptionGetTrace (line 1136)
-- new ExceptionGetTraceAsString (line 1137)
-- new ExceptionToString (line 1138)
-- new ErrorExceptionGetSeverity (line 1145)
-- new ClassEntry (line 1154)
-- new ClassEntry (line 1161)
-- new FiberConstruct (line 1165)
-- new FiberStart (line 1170)
-- new FiberResume (line 1171)
-- new FiberThrow (line 1172)
-- new FiberSuspend (line 1173)
-- new FiberGetCurrent (line 1174)
-- new FiberIsStarted (line 1175)
-- new FiberIsSuspended (line 1176)
-- new FiberIsRunning (line 1177)
-- new FiberIsTerminated (line 1178)
-- new FiberGetReturn (line 1179)
-- new FiberGetTrace (line 1180)
-- new FiberGetTraceAsString (line 1181)
+- new ClassProperty (line 1092)
+- new ClassProperty (line 1093)
+- new ClassProperty (line 1094)
+- new ClassProperty (line 1095)
+- new ClassProperty (line 1103)
+- new Variable (line 1112)
+- new ClassProperty (line 1114)
+- new ClassProperty (line 1124)
+- new ErrorExceptionConstruct (line 1125)
+- new ExceptionConstruct (line 1127)
+- new ExceptionWakeup (line 1131)
+- new ExceptionGetMessage (line 1135)
+- new ExceptionGetCode (line 1136)
+- new ExceptionGetFile (line 1137)
+- new ExceptionGetLine (line 1138)
+- new ExceptionGetPrevious (line 1139)
+- new ExceptionGetTrace (line 1140)
+- new ExceptionGetTraceAsString (line 1141)
+- new ExceptionToString (line 1142)
+- new ErrorExceptionGetSeverity (line 1149)
+- new ClassEntry (line 1158)
+- new ClassEntry (line 1165)
+- new FiberConstruct (line 1169)
+- new FiberStart (line 1174)
+- new FiberResume (line 1175)
+- new FiberThrow (line 1176)
+- new FiberSuspend (line 1177)
+- new FiberGetCurrent (line 1178)
+- new FiberIsStarted (line 1179)
+- new FiberIsSuspended (line 1180)
+- new FiberIsRunning (line 1181)
+- new FiberIsTerminated (line 1182)
+- new FiberGetReturn (line 1183)
+- new FiberGetTrace (line 1184)
+- new FiberGetTraceAsString (line 1185)
 - 19 class method(s)
 
 ### `lib/VM/BuiltinExceptionSupport.php`

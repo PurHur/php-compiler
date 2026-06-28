@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -13,8 +12,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_serialize_* via SerializeJitHelper PHP (#9180).
  *
- * JIT/normal modules use compiled {@see SerializeJitHelper}; AOT standalone keeps
- * {@see StringSerializeJit} until native link can host compiled VmSerialize reliably.
+ * JIT/normal modules and standalone AOT use compiled {@see SerializeJitHelper} (#13311).
  * php-src: ext/standard/var.c — php_var_serialize
  */
 final class StringSerialize
@@ -49,12 +47,6 @@ final class StringSerialize
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringSerializeJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_serialize_value');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

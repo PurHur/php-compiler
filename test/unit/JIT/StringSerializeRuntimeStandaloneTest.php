@@ -7,7 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #9180: serialize() LLVM helpers route through SerializeJitHelper PHP.
+ * Issue #9180 / #13311: serialize() LLVM helpers route through SerializeJitHelper PHP.
  *
  * @group aot-lint
  */
@@ -17,11 +17,11 @@ final class StringSerializeRuntimeStandaloneTest extends TestCase
     {
         $runtime = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php');
         $this->assertStringContainsString('SerializeJitHelper', $runtime);
-        $this->assertStringContainsString('StringSerializeJit', $runtime);
-        $this->assertLessThan(160, \substr_count($runtime, "\n"), 'StringSerialize must be a thin bridge (#9180)');
+        $this->assertStringNotContainsString('StringSerializeJit', $runtime);
+        $this->assertLessThan(160, \substr_count($runtime, "\n"), 'StringSerialize must be a thin bridge (#13311)');
 
-        $jitMonolith = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeJit.php');
-        $this->assertGreaterThan(300, \substr_count($jitMonolith, "\n"), 'StringSerializeJit retains standalone LLVM');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeJit.php');
+        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeDoubleJit.php');
 
         $helper = (string) \file_get_contents(__DIR__.'/../../../ext/standard/SerializeJitHelper.php');
         $this->assertStringContainsString('VmSerialize::serializeValue', $helper);
