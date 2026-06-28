@@ -12,7 +12,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for posix_ctermid() via PosixCtermidJitHelper PHP (#12684).
  *
- * Standalone AOT keeps libc ctermid LLVM in {@see \PHPCompiler\ext\posix\JitPosix::ctermidStandalone()}.
+ * Embed and standalone AOT compile the same PHP bridge; no libc ctermid LLVM (#13041).
  * SSOT: {@see \PHPCompiler\ext\posix\VmPosixCtermidPure}
  */
 final class PosixCtermidRuntime
@@ -30,10 +30,6 @@ final class PosixCtermidRuntime
 
     public static function ctermid(Context $context): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return \PHPCompiler\ext\posix\JitPosix::ctermidStandalone($context);
-        }
-
         self::ensureLinked($context);
         $msgStr = $context->builder->call(
             $context->lookupFunction(self::ABI_PATH)
@@ -56,10 +52,6 @@ final class PosixCtermidRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_PATH);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

@@ -28,11 +28,13 @@ final class PosixCtermidRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixCtermidRuntime.php');
         $this->assertStringContainsString('PosixCtermidJitHelper', $runtime);
-        $this->assertStringContainsString('ctermidStandalone', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ctermidStandalone', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $jitPosix = (string) file_get_contents(__DIR__.'/../../ext/posix/JitPosix.php');
         $this->assertStringContainsString('PosixCtermidRuntime::ctermid', $jitPosix);
+        $this->assertStringNotContainsString('ctermidStandalone', $jitPosix);
+        $this->assertStringNotContainsString("lookupFunction('ctermid')", $jitPosix);
     }
 
     public function testPosixCtermidPureMatchesZendOnLinux(): void
