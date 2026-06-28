@@ -2799,6 +2799,7 @@ require_once __DIR__.'/../../../lib/JIT/Call/VariableToBool.php';
 require_once __DIR__.'/../../../lib/JIT/Call/VariableToFloat.php';
 require_once __DIR__.'/../../../lib/JIT/Call/VariableToInt.php';
 require_once __DIR__.'/../../../lib/JIT/Call/VariableToString.php';
+require_once __DIR__.'/../../../lib/JIT/Call/VmCoerceVariableToString.php';
 require_once __DIR__.'/../../../lib/JIT/Call/SplObjectStorageMethod.php';
 require_once __DIR__.'/../../../lib/JIT/Call/Vararg.php';
 require_once __DIR__.'/../../../lib/JIT/Call/WeakMapMethod.php';
