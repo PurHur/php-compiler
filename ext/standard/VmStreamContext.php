@@ -148,6 +148,26 @@ final class VmStreamContext
         return $resolved;
     }
 
+    /** Optional stream-context parameter on copy/rename/unlink (ext/standard/file.c). */
+    public static function validateOptionalContextArg(
+        Variable $var,
+        string $functionName,
+        int $argNum
+    ): void {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return;
+        }
+        if (!self::isRepresentation($resolved)) {
+            throw new \TypeError(\sprintf(
+                '%s(): Argument #%d ($context) must be of type resource or null, %s given',
+                $functionName,
+                $argNum,
+                VmStreamArg::debugTypeName($resolved)
+            ));
+        }
+    }
+
     public static function requireOptionsArray(
         Variable $var,
         string $functionName,
