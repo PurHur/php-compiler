@@ -248,6 +248,7 @@
         "ext/mbstring/mb_preferred_mime_name.php",
         "ext/mbstring/mb_rtrim.php",
         "ext/mbstring/mb_scrub.php",
+        "ext/mbstring/mb_split.php",
         "ext/mbstring/mb_str_pad.php",
         "ext/mbstring/mb_strcut.php",
         "ext/mbstring/mb_strimwidth.php",
@@ -467,6 +468,7 @@
         "ext/standard/DefineJitHelper.php",
         "ext/standard/DeployPathJitHelper.php",
         "ext/standard/DirHandleJitHelper.php",
+        "ext/standard/DirectoryBuiltin.php",
         "ext/standard/EmbedObJitHelper.php",
         "ext/standard/EnvLocalJitHelper.php",
         "ext/standard/ErrorHandlerJitHelper.php",
@@ -1562,6 +1564,7 @@
         "ext/standard/defined_.php",
         "ext/standard/deg2rad.php",
         "ext/standard/die_.php",
+        "ext/standard/dir_.php",
         "ext/standard/dirname.php",
         "ext/standard/disk_free_space.php",
         "ext/standard/disk_total_space.php",
@@ -3684,9 +3687,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3454,
+        "inventory_files": 3457,
         "excluded": 0,
-        "eligible": 3454,
+        "eligible": 3457,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
