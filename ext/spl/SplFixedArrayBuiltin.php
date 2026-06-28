@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\spl;
 
 use PHPCompiler\ext\standard\VmArray;
+use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
@@ -80,6 +81,10 @@ final class SplFixedArrayBuiltin
         $entry->methods['jsonserialize'] = new SplFixedArrayJsonSerialize();
         $entry->methodVisibility['jsonserialize'] = $pub;
         $entry->methodNames['jsonserialize'] = 'jsonSerialize';
+        $entry->methods['__serialize'] = new SplFixedArraySerialize();
+        $entry->methodVisibility['__serialize'] = $pub;
+        $entry->methods['__unserialize'] = new SplFixedArrayUnserialize();
+        $entry->methodVisibility['__unserialize'] = $pub;
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -87,7 +92,43 @@ final class SplFixedArrayBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize'], $entry->methods['jsonserialize']);
+        return isset($entry->methods['count'], $entry->methods['offsetexists'], $entry->methods['fromarray'], $entry->methods['getiterator'], $entry->methods['getsize'], $entry->methods['jsonserialize'], $entry->methods['__serialize']);
+    }
+
+    public static function hasState(ObjectEntry $object): bool
+    {
+        return isset(self::$store[$object->id]);
+    }
+
+    /**
+     * @param array<int, mixed> $exported
+     */
+    public static function restoreExportedState(ObjectEntry $object, array $exported): void
+    {
+        $maxIndex = -1;
+        foreach ($exported as $key => $raw) {
+            if (!\is_int($key)) {
+                throw new \TypeError('SplFixedArray::__unserialize(): invalid array key');
+            }
+            if ($key < 0) {
+                throw new \TypeError('SplFixedArray::__unserialize(): invalid array key');
+            }
+            if ($key > $maxIndex) {
+                $maxIndex = $key;
+            }
+        }
+        $size = $maxIndex + 1;
+        if (!self::hasState($object)) {
+            self::init($object, $size);
+        } else {
+            self::setSize($object, $size);
+        }
+        self::$store[$object->id]['slots'] = [];
+        foreach ($exported as $index => $raw) {
+            $slot = new Variable();
+            $slot->copyFrom(VmJson::import($raw));
+            self::$store[$object->id]['slots'][(int) $index] = $slot;
+        }
     }
 
     public static function init(ObjectEntry $object, int $size): void
@@ -615,5 +656,70 @@ final class SplFixedArrayJsonSerialize extends VmClassMethod
         $result = new Variable(Variable::TYPE_ARRAY);
         $result->array(SplFixedArrayBuiltin::toArray($object));
         SplIteratorSupport::copyReturnFrom($frame, $result);
+    }
+}
+
+final class SplFixedArraySerialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__serialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::__serialize()'
+        );
+        $exported = SplFixedArraySerializeSupport::exportElements($object);
+        $result = new Variable(Variable::TYPE_ARRAY);
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach ($exported as $index => $value) {
+            $slot = new Variable();
+            $slot->copyFrom(VmJson::import($value));
+            $ht->assignIndex((int) $index, $slot);
+        }
+        SplIteratorSupport::copyReturnFrom($frame, $result);
+    }
+}
+
+final class SplFixedArrayUnserialize extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__unserialize');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            SplFixedArrayBuiltin::CLASS_LC,
+            'SplFixedArray::__unserialize()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFixedArray::__unserialize() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'SplFixedArray::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+        $exported = [];
+        foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $key->type) {
+                throw new \TypeError('SplFixedArray::__unserialize(): invalid array key');
+            }
+            $exported[$key->toInt()] = VmJson::export($valueVar->resolveIndirect());
+        }
+        SplFixedArrayBuiltin::restoreExportedState($object, $exported);
     }
 }

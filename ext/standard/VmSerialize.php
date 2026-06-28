@@ -12,6 +12,7 @@ use PHPCompiler\VM\BackedEnum;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
+use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -55,6 +56,9 @@ final class VmSerialize
             }
             if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
                 return SplArraySerializeSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+                return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
             }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
@@ -179,6 +183,16 @@ final class VmSerialize
             }
             if (\is_array($data) && SplArraySerializeSupport::isSplArrayClass($lcClass)) {
                 $restored = SplArraySerializeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+                $restored = SplFixedArraySerializeSupport::restoreFromZendSerialize($ctx, $data);
                 if (null === $restored) {
                     return false;
                 }
@@ -420,6 +434,9 @@ final class VmSerialize
         }
         if (SplArraySerializeSupport::isSplArrayClass($lcClass)) {
             return SplArraySerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
+            return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
         }
         if (self::hasInstanceMethod($entry->class, '__serialize')) {
             $magicData = self::invokeSerialize($ctx, $entry);
