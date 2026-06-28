@@ -16,13 +16,17 @@ final class PosixSessionRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PosixSessionRuntime.php');
         $this->assertStringContainsString('PosixSessionJitHelper', $runtime);
-        $this->assertStringContainsString('getsidStandalone', $runtime);
-        $this->assertStringContainsString('getpgidStandalone', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('getsidStandalone', $runtime);
+        $this->assertStringNotContainsString('getpgidStandalone', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $jitPosix = (string) file_get_contents(__DIR__.'/../../ext/posix/JitPosix.php');
         $this->assertStringContainsString('PosixSessionRuntime::getsid', $jitPosix);
         $this->assertStringContainsString('PosixSessionRuntime::getpgid', $jitPosix);
+        $this->assertStringNotContainsString('getsidStandalone', $jitPosix);
+        $this->assertStringNotContainsString('getpgidStandalone', $jitPosix);
+        $this->assertStringNotContainsString("lookupFunction('getsid')", $jitPosix);
+        $this->assertStringNotContainsString("lookupFunction('getpgid')", $jitPosix);
         $this->assertMatchesRegularExpression(
             '/public static function getsid\(Context \$context, JITVariable \$pidArg\): Value\s*\{\s*return PosixSessionRuntime::getsid/',
             $jitPosix

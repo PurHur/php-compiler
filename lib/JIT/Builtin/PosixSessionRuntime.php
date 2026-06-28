@@ -13,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for posix_getsid()/posix_getpgid() via PosixSessionJitHelper PHP (#12685).
  *
- * Standalone AOT keeps libc getsid/getpgid LLVM in {@see \PHPCompiler\ext\posix\JitPosix}.
+ * Embed and standalone AOT compile the same PHP bridge; no libc getsid/getpgid LLVM (#13040).
  * SSOT: {@see \PHPCompiler\ext\posix\VmPosixSessionPure}
  */
 final class PosixSessionRuntime
@@ -36,10 +36,6 @@ final class PosixSessionRuntime
 
     public static function getsid(Context $context, JITVariable $pidArg): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return \PHPCompiler\ext\posix\JitPosix::getsidStandalone($context, $pidArg);
-        }
-
         self::ensureLinked($context);
         $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getsid', 1, 'pid');
         $i64 = $context->getTypeFromString('int64');
@@ -56,10 +52,6 @@ final class PosixSessionRuntime
 
     public static function getpgid(Context $context, JITVariable $pidArg): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return \PHPCompiler\ext\posix\JitPosix::getpgidStandalone($context, $pidArg);
-        }
-
         self::ensureLinked($context);
         $pid = JitSleep::zParamLong($context, $pidArg, 'posix_getpgid', 1, 'pid');
         $i64 = $context->getTypeFromString('int64');
@@ -81,10 +73,6 @@ final class PosixSessionRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_GETSID);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
