@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -14,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for ksort()/krsort() via KeySortJitHelper PHP (#12770).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::ksortByKey()} et al.
+ * Embed and standalone AOT compile the same PHP bridge (#13050).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::ksortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::krsortCopy()}
  * php-src: ext/standard/array.c — php_array_ksort / php_array_krsort
@@ -44,8 +43,7 @@ final class KeySortRuntime
 
     public static function ksortByKey(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::ksortByKey($context, $array);
 
             return;
@@ -59,8 +57,7 @@ final class KeySortRuntime
 
     public static function ksortByKeyLocale(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::ksortByKeyLocale($context, $array);
 
             return;
@@ -74,8 +71,7 @@ final class KeySortRuntime
 
     public static function krsortByKey(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::krsortByKey($context, $array);
 
             return;
@@ -94,10 +90,6 @@ final class KeySortRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
