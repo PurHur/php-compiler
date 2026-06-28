@@ -2410,7 +2410,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/GcToggleRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetBrowserRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetClassRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetcwdJit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrLibcBridge.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbyaddrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GethostbynamelRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/GetimagesizeJit.php';
