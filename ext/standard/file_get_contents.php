@@ -101,6 +101,9 @@ final class file_get_contents extends Internal
             $length,
             $frame->vmContext
         );
+        if (VmHttpLastResponseHeaders::isHttpUrl($filename)) {
+            VmHttpLastResponseHeaders::bindResponseHeaderToCaller($frame);
+        }
         if (false === $data) {
             VmStreamOpenFailure::warnFailedToOpen($frame, 'file_get_contents', $filename);
             $frame->returnVar->bool(false);
