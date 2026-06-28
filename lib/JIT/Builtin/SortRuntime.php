@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -14,7 +13,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for sort()/rsort() via SortJitHelper PHP (#12769).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::sortPacked()} et al.
+ * Embed and standalone AOT compile the same PHP bridge (#13049).
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::sortPackedInPlace()} /
  * {@see \PHPCompiler\ext\standard\VmArray::sortPackedReverseInPlace()}
  * php-src: ext/standard/array.c — php_array_sort
@@ -54,8 +53,7 @@ final class SortRuntime
 
     public static function sortPacked(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::sortPacked($context, $array);
 
             return;
@@ -69,8 +67,7 @@ final class SortRuntime
 
     public static function sortPackedLocale(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::sortPackedLocale($context, $array);
 
             return;
@@ -84,8 +81,7 @@ final class SortRuntime
 
     public static function sortPackedNatural(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::sortPackedNatural($context, $array);
 
             return;
@@ -99,8 +95,7 @@ final class SortRuntime
 
     public static function sortPackedNaturalCase(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::sortPackedNaturalCase($context, $array);
 
             return;
@@ -114,8 +109,7 @@ final class SortRuntime
 
     public static function sortPackedReverse(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::sortPackedReverse($context, $array);
 
             return;
@@ -134,10 +128,6 @@ final class SortRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
