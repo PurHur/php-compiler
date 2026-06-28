@@ -26,6 +26,9 @@ final class BuiltinClasses
         SplObjectStorageBuiltin::registerClass($ctx);
         IteratorIteratorBuiltin::registerClass($ctx);
         FilterIteratorBuiltin::registerClass($ctx);
+        CallbackFilterIteratorBuiltin::registerClass($ctx);
+        ParentIteratorBuiltin::registerClass($ctx);
+        AppendIteratorBuiltin::registerClass($ctx);
         LimitIteratorBuiltin::registerClass($ctx);
         CachingIteratorBuiltin::registerClass($ctx);
         VmSplIterators::register($ctx);
