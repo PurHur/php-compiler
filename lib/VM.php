@@ -2909,6 +2909,19 @@ class VM {
             $pendingBeforeThrow = new Variable();
             $pendingBeforeThrow->copyFrom($this->context->pendingException);
         }
+        $gen = $this->findGeneratorState($frame);
+        if (null !== $gen) {
+            $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+            if (null !== $catchFrame) {
+                $catchFrame->generatorState = $gen;
+                $gen->frame = $catchFrame;
+
+                return $catchFrame;
+            }
+            $gen->frame = null;
+            $gen->markReturned(null);
+            throw new VM\GeneratorUncaughtThrow($thrown);
+        }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
             if ($this->context->isolatedDestructorInvoke) {
