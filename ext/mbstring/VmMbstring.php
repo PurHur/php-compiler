@@ -87,6 +87,14 @@ final class VmMbstring
         return $var->toString();
     }
 
+    /** php-src mbfl_name2encoding — mbstring metadata builtins (#13100). */
+    public static function coerceMbEncodingNameArg(Variable $var, string $function, int $argIndex = 0): string
+    {
+        $name = self::coerceEncodingString($var, $function, $argIndex);
+
+        return MbstringEncodingRegistry::assertValid($name, $function, $argIndex);
+    }
+
     public static function validateMode(int $mode, string $function, int $argIndex = 1): int
     {
         if ($mode < MbstringConstants::MB_CASE_UPPER || $mode > MbstringConstants::MB_CASE_TITLE) {

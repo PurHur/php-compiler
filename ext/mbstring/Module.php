@@ -57,6 +57,11 @@ class Module extends ModuleAbstract
             new mb_decode_numericentity(),
             new mb_encode_mimeheader(),
             new mb_decode_mimeheader(),
+            new mb_http_output(),
+            new mb_detect_order(),
+            new mb_substitute_character(),
+            new mb_preferred_mime_name(),
+            new mb_encoding_aliases(),
         ];
     }
 }
