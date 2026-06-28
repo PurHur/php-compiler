@@ -106,15 +106,19 @@ final class ValueEchoRuntime
         self::registerLinkedRuntime($context);
         if (null !== $restoreBlock) {
             BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
-        } else {
-            $context->builder->clearInsertionPosition();
         }
     }
 
     public static function emitValue(Context $context, Value $valuePtr): void
     {
+        $restoreBlock = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureLinked($context);
         ObOutputRuntime::ensureLinked($context);
+        if (null !== $restoreBlock) {
+            BasicBlockHelper::restoreInsertBlock($context, $restoreBlock);
+        } else {
+            BasicBlockHelper::ensureOpenInsertBlock($context, 'echo_value_emit_cont');
+        }
 
         $tag = 'ev'.(string) ++self::$seq;
         $map = $context->structFieldMap['__value__'];

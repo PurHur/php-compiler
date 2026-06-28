@@ -22,8 +22,10 @@ final class NestedVmHashTableExportRuntimeTest extends TestCase
         NestedJitCompileScope::run($ctx, static function () use ($ctx): void {
             HashTableNestedExportLlvm::ensureLinked($ctx);
             NestedVmVariableMethodLlvm::ensureMethod($ctx, 'resolveindirect');
+            NestedVmVariableMethodLlvm::ensureMethod($ctx, 'null');
         });
         $this->assertTrue($ctx->functionIsRegistered(HashTableNestedExportLlvm::PROXY_NAME));
         $this->assertTrue($ctx->functionIsRegistered('phpcompiler\\vm\\variable::resolveindirect'));
+        $this->assertTrue($ctx->functionIsRegistered('phpcompiler\\vm\\variable::null'));
     }
 }
