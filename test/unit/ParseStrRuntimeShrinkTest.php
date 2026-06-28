@@ -41,13 +41,18 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('cookiePairDecode', $source);
     }
 
-    public function testStringParseStrRoutesJitEmbedThroughParseStrRuntime(): void
+    public function testStringParseStrRoutesAllLoadTypesThroughParseStrRuntime(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
         $this->assertStringContainsString('ParseStrRuntime::implement', $source);
         $this->assertStringContainsString('StringParseStrJit::ensureSubhelpers', $source);
-        $this->assertStringContainsString('StringParseStrJit::implement', $source);
+        $this->assertStringNotContainsString('StringParseStrJit::implement', $source);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
         $this->assertLessThan(35, \substr_count($source, "\n") + 1);
+
+        $jit = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStrJit.php');
+        $this->assertStringNotContainsString('emitCompilerParseStr', $jit);
+        $this->assertStringNotContainsString('function implement(', $jit);
     }
 
     public function testParseStrJitHelperDelegatesToParseStrEngine(): void

@@ -33,10 +33,10 @@ final class StringParseStrJit
     /** Standalone AOT: bracket/delimited-pair helpers for superglobals_refresh.c (#7302). */
     public static function ensureStandaloneBodies(Context $context): void
     {
-        self::implement($context);
+        self::ensureSubhelpers($context);
     }
 
-    /** Superglobals/multipart LLVM helpers only — main entry is {@see ParseStrRuntime} (#9295). */
+    /** Superglobals/multipart LLVM helpers only — main entry is {@see ParseStrRuntime} (#9295, #13360). */
     public static function ensureSubhelpers(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
@@ -52,26 +52,6 @@ final class StringParseStrJit
         self::implementIfMissing($context, '__phpc_parse_str_ensure_child', self::emitEnsureChild(...));
         self::implementIfMissing($context, '__phpc_parse_str_set_nested_value', self::emitSetNestedValue(...));
         self::implementIfMissing($context, '__phpc_parse_str_parse_delimited_pairs', self::emitParseDelimitedPairs(...));
-
-        self::restoreInsertBlock($context, $restore);
-    }
-
-    public static function implement(Context $context): void
-    {
-        $restore = self::captureInsertBlock($context);
-        self::ensureLibc($context);
-        self::ensureHashtableHelpers($context);
-
-        $probe = $context->module->getNamedFunction('__compiler_parse_str');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_parse_str', $probe);
-            self::restoreInsertBlock($context, $restore);
-
-            return;
-        }
-
-        self::ensureSubhelpers($context);
-        self::implementIfMissing($context, '__compiler_parse_str', self::emitCompilerParseStr(...));
 
         self::restoreInsertBlock($context, $restore);
     }
@@ -1012,40 +992,6 @@ final class StringParseStrJit
 
         $context->builder->positionAtEnd($loopDone);
         $context->builder->call($context->lookupFunction('free'), $copy);
-        $context->builder->returnVoid();
-    }
-
-    private static function emitCompilerParseStr(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('entry');
-        $context->builder->positionAtEnd($entry);
-
-        $dest = $fn->getParam(0);
-        $encoded = $fn->getParam(1);
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $strMap = $context->structFieldMap['__string__'];
-        $i8p = $context->getTypeFromString('int8*');
-
-        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
-        $early = $fn->appendBasicBlock('cps_early');
-        $work = $fn->appendBasicBlock('cps_work');
-        $context->builder->branchIf($nullDest, $early, $work);
-
-        $context->builder->positionAtEnd($early);
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($work);
-        $data = $context->builder->structGep($encoded, $strMap['value']);
-        $body = $context->builder->pointerCast($data, $i8p);
-        $amp = $context->getTypeFromString('int8')->constInt(38, false);
-        $zeroI32 = $context->getTypeFromString('int32')->constInt(0, false);
-        $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
-            $dest,
-            $body,
-            $amp,
-            $zeroI32
-        );
         $context->builder->returnVoid();
     }
 

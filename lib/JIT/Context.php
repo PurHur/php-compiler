@@ -786,7 +786,7 @@ class Context {
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
             Builtin\StringStripTags::ensureStandaloneBodies($this);
             Builtin\StringStrtr::ensureStandaloneBodies($this);
-            Builtin\StringParseStrJit::ensureStandaloneBodies($this);
+            Builtin\StringParseStr::ensureStandaloneBodies($this);
             Builtin\StringJsonEncode::ensureStandaloneBodies($this);
             Builtin\StringJsonDecode::ensureStandaloneBodies($this);
             Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
