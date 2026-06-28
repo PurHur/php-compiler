@@ -2631,7 +2631,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringHttpBuildQuery.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringIdate.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringInfo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecode.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecodeJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/JsonLastErrorGlobal.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncodeJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringLocaltime.php';
