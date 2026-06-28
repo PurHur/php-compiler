@@ -132,6 +132,20 @@ final class DirectoryIteratorStorage
         return self::state($object);
     }
 
+    public static function getFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    public static function setFlags(ObjectEntry $object, int $flags): void
+    {
+        if (!isset(self::$store[$object->id])) {
+            throw new \LogicException('DirectoryIterator object state missing');
+        }
+        self::$store[$object->id]['flags'] = $flags;
+        self::rewind($object);
+    }
+
     /** @return array{dirPath: string, handle: int, filename: string|false, index: int, flags: int} */
     private static function state(ObjectEntry $object): array
     {

@@ -76,6 +76,12 @@ final class FilesystemIteratorBuiltin
         $entry->constructor = new FilesystemIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['getflags'] = new FilesystemIteratorGetFlags();
+        $entry->methodVisibility['getflags'] = $pub;
+        $entry->methodNames['getflags'] = 'getFlags';
+        $entry->methods['setflags'] = new FilesystemIteratorSetFlags();
+        $entry->methodVisibility['setflags'] = $pub;
+        $entry->methodNames['setflags'] = 'setFlags';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -85,7 +91,7 @@ final class FilesystemIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['__construct']);
+        return isset($entry->methods['__construct'], $entry->methods['getflags']);
     }
 }
 
@@ -326,5 +332,56 @@ final class RecursiveDirectoryIteratorGetChildren extends VmClassMethod
         $child->constructed = true;
         DirectoryIteratorStorage::open($child, $path, $flags);
         $frame->returnVar->object($child);
+    }
+}
+
+final class FilesystemIteratorGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            FilesystemIteratorBuiltin::CLASS_LC,
+            'FilesystemIterator::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(DirectoryIteratorStorage::getFlags($object));
+    }
+}
+
+final class FilesystemIteratorSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            FilesystemIteratorBuiltin::CLASS_LC,
+            'FilesystemIterator::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'FilesystemIterator::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = SplFilesystemArg::requireIntArg(
+            $frame->calledArgs[1],
+            'FilesystemIterator::setFlags',
+            1,
+            'flags'
+        );
+        DirectoryIteratorStorage::setFlags($object, $flags);
     }
 }
