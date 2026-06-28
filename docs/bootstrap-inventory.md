@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3425 |
-| Phase A inventory files (M2 ratio SSOT) | 3425 |
+| PHP files on vm.php path | 3426 |
+| Phase A inventory files (M2 ratio SSOT) | 3426 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9096 |
+| Source constructs flagged (warnings) | 9103 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -376,7 +376,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/AssertOptionsJitHelper.php` | 0 | 1 |
 | `ext/standard/AttributeRegistryArgsJitHelper.php` | 0 | 6 |
 | `ext/standard/AttributeRegistryJitHelper.php` | 0 | 1 |
-| `ext/standard/BuiltinAttributes.php` | 0 | 17 |
+| `ext/standard/BuiltinAttributes.php` | 0 | 22 |
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
 | `ext/standard/BuiltinEnums.php` | 0 | 19 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
@@ -2954,6 +2954,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/DateTimeZoneListAbbreviations.php` | 0 | 1 |
 | `lib/VM/Builtin/DeprecatedConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/EnumCases.php` | 0 | 1 |
+| `lib/VM/Builtin/EnumCasesConstruct.php` | 0 | 2 |
 | `lib/VM/Builtin/ErrorExceptionConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ErrorExceptionGetSeverity.php` | 0 | 1 |
 | `lib/VM/Builtin/ExceptionConstruct.php` | 0 | 1 |
@@ -5810,23 +5811,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinAttributes.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 100)
-- new ClassEntry (line 103)
-- new ClassProperty (line 105)
-- new ClassProperty (line 106)
-- new DeprecatedConstruct (line 107)
-- new AttributeEntry (line 116)
-- new Variable (line 124)
-- new ClassEntry (line 127)
-- new ClassProperty (line 129)
-- new NoDiscardConstruct (line 130)
-- new AttributeEntry (line 137)
-- new ClassEntry (line 170)
-- new AttributeEntry (line 174)
-- new ClassEntry (line 188)
-- new OverrideConstruct (line 190)
-- new AttributeEntry (line 196)
-- 11 class method(s)
+- new Variable (line 104)
+- new ClassEntry (line 107)
+- new ClassProperty (line 109)
+- new ClassProperty (line 110)
+- new DeprecatedConstruct (line 111)
+- new AttributeEntry (line 120)
+- new Variable (line 128)
+- new ClassEntry (line 131)
+- new ClassProperty (line 133)
+- new NoDiscardConstruct (line 134)
+- new AttributeEntry (line 141)
+- new Variable (line 149)
+- new ClassEntry (line 152)
+- new ClassProperty (line 154)
+- new EnumCasesConstruct (line 155)
+- new AttributeEntry (line 162)
+- new ClassEntry (line 195)
+- new AttributeEntry (line 199)
+- new ClassEntry (line 213)
+- new OverrideConstruct (line 215)
+- new AttributeEntry (line 221)
+- 12 class method(s)
 
 ### `ext/standard/BuiltinClasses.php`
 
@@ -17770,7 +17776,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 57 class method(s)
+- 58 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -22560,12 +22566,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/AttributeSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 61)
-- new ClassEntry (line 64)
-- new ClassProperty (line 65)
-- new AttributeConstruct (line 66)
-- new Variable (line 83)
-- new AttributeEntry (line 91)
+- new Variable (line 63)
+- new ClassEntry (line 66)
+- new ClassProperty (line 67)
+- new AttributeConstruct (line 68)
+- new Variable (line 85)
+- new AttributeEntry (line 93)
 - 2 class method(s)
 
 ### `lib/VM/BackedEnum.php`
@@ -22783,6 +22789,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/EnumCases.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `lib/VM/Builtin/EnumCasesConstruct.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ErrorExceptionConstruct.php`
@@ -25187,34 +25199,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReflectionSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ReflectionException (line 141)
-- new AttributeEntry (line 151)
-- new Variable (line 170)
-- new ObjectEntry (line 177)
-- new Variable (line 182)
-- new Variable (line 195)
-- new Variable (line 199)
-- new Variable (line 202)
-- new Variable (line 223)
-- new Variable (line 259)
-- new Variable (line 270)
-- new Error (line 296)
-- new Error (line 300)
-- new ObjectEntry (line 302)
-- new Variable (line 303)
-- new Variable (line 314)
-- new Error (line 332)
-- new Error (line 336)
-- new Variable (line 340)
-- new Error (line 346)
-- new Variable (line 426)
-- new AttributeEntry (line 1058)
-- new Variable (line 1246)
-- new ObjectEntry (line 1360)
-- new ObjectEntry (line 1439)
-- new Variable (line 1519)
-- new ObjectEntry (line 1624)
-- new Variable (line 1701)
+- new ReflectionException (line 143)
+- new AttributeEntry (line 153)
+- new Variable (line 172)
+- new ObjectEntry (line 179)
+- new Variable (line 184)
+- new Variable (line 197)
+- new Variable (line 201)
+- new Variable (line 204)
+- new Variable (line 225)
+- new Variable (line 261)
+- new Variable (line 272)
+- new Error (line 298)
+- new Error (line 302)
+- new ObjectEntry (line 304)
+- new Variable (line 305)
+- new Variable (line 316)
+- new Error (line 334)
+- new Error (line 338)
+- new Variable (line 342)
+- new Error (line 348)
+- new Variable (line 430)
+- new AttributeEntry (line 1062)
+- new Variable (line 1250)
+- new ObjectEntry (line 1364)
+- new ObjectEntry (line 1443)
+- new Variable (line 1523)
+- new ObjectEntry (line 1628)
+- new Variable (line 1705)
 - 94 class method(s)
 
 ### `lib/VM/ReflectionTypeSupport.php`
