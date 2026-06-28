@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ShuffleRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -30,11 +29,8 @@ final class shuffle_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('shuffle() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('shuffle() argument must be an array in this compiler build');
-        }
-        VmArray::shufflePacked($array->toArray());
+        $ht = VmArray::requireArray($frame->calledArgs[0], 'shuffle');
+        VmArray::shufflePacked($ht);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
@@ -45,6 +41,7 @@ final class shuffle_ extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('shuffle() requires exactly one argument');
         }
+        JitArrayElem::requireArrayArg($context, $args[0], 'shuffle');
         ShuffleRuntime::shufflePacked($context, $args[0]);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
