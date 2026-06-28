@@ -49,6 +49,16 @@ final class VmPosix
         throw new \Error('posix_geteuid() is not available in this compiler build');
     }
 
+    public static function getgid(): int
+    {
+        $gid = VmProcessIdentityPure::getgid();
+        if (null !== $gid) {
+            return $gid;
+        }
+
+        throw new \Error('posix_getgid() is not available in this compiler build');
+    }
+
     public static function getegid(): int
     {
         $egid = VmProcessIdentityPure::getegid();
