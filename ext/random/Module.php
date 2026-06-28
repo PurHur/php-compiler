@@ -10,7 +10,7 @@ use PHPCompiler\Runtime;
 /**
  * random extension module entry (php-src ext/random/random.c; issue #7102).
  *
- * Randomizer behavior tracked in #3722; v1 skeleton enables class_exists() and inventory.
+ * Randomizer OOP API — Random\Randomizer + Random\Engine\Mt19937 (#13191, #3722).
  */
 class Module extends ModuleAbstract
 {
