@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3428 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9130 |
+| Source constructs flagged (warnings) | 9144 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -328,12 +328,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 10 |
-| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 9 |
+| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 18 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 5 |
 | `ext/spl/SplFileObjectStorage.php` | 0 | 1 |
-| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 23 |
+| `ext/spl/SplFixedArrayBuiltin.php` | 0 | 28 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 1 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 14 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
@@ -5499,13 +5499,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 34)
 - new SplDoublyLinkedListConstruct (line 42)
-- new Variable (line 82)
-- new Variable (line 94)
-- new Variable (line 107)
+- new Variable (line 90)
+- new Variable (line 102)
 - new Variable (line 115)
-- new ArgumentCountError (line 159)
-- new ArgumentCountError (line 219)
-- 15 class method(s)
+- new Variable (line 123)
+- new OutOfRangeException (line 146)
+- new Variable (line 148)
+- new OutOfRangeException (line 159)
+- new Variable (line 161)
+- new OutOfRangeException (line 171)
+- new ArgumentCountError (line 240)
+- new ArgumentCountError (line 300)
+- new ArgumentCountError (line 345)
+- new ArgumentCountError (line 372)
+- new ArgumentCountError (line 396)
+- new ArgumentCountError (line 425)
+- 24 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
 
@@ -5542,24 +5551,29 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SplFixedArrayFromArray (line 65)
 - new SplFixedArrayToArray (line 68)
 - new SplFixedArrayGetIterator (line 71)
-- new Variable (line 113)
-- new Variable (line 129)
-- new HashTable (line 151)
-- new Variable (line 155)
-- new HashTable (line 163)
-- new Variable (line 183)
-- new Variable (line 195)
-- new ObjectEntry (line 205)
-- new ObjectEntry (line 221)
-- new Variable (line 224)
-- new ArgumentCountError (line 358)
-- new ArgumentCountError (line 385)
-- new ArgumentCountError (line 409)
-- new ArgumentCountError (line 438)
-- new ArgumentCountError (line 457)
-- new Variable (line 471)
-- new Variable (line 491)
-- 24 class method(s)
+- new SplFixedArrayGetSize (line 74)
+- new SplFixedArraySetSize (line 77)
+- new SplFixedArrayJsonSerialize (line 80)
+- new Variable (line 144)
+- new Variable (line 160)
+- new HashTable (line 182)
+- new Variable (line 186)
+- new HashTable (line 194)
+- new Variable (line 214)
+- new Variable (line 226)
+- new ObjectEntry (line 236)
+- new ObjectEntry (line 252)
+- new Variable (line 255)
+- new ArgumentCountError (line 389)
+- new ArgumentCountError (line 416)
+- new ArgumentCountError (line 440)
+- new ArgumentCountError (line 469)
+- new ArgumentCountError (line 488)
+- new Variable (line 502)
+- new Variable (line 522)
+- new ArgumentCountError (line 586)
+- new Variable (line 615)
+- 29 class method(s)
 
 ### `ext/spl/SplIteratorSupport.php`
 
