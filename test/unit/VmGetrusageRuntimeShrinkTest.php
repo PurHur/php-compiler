@@ -46,6 +46,14 @@ final class VmGetrusageRuntimeShrinkTest extends TestCase
         $this->assertArrayNotHasKey(0, $usage);
     }
 
+    public function testGetrusageChildrenZeroedWithoutWaitedChildren(): void
+    {
+        $children = VmGetrusagePure::getrusage(VmGetrusagePure::RUSAGE_CHILDREN);
+        $this->assertIsArray($children);
+        $this->assertSame(0, $children['ru_maxrss']);
+        $this->assertSame(0, $children['ru_utime.tv_sec']);
+    }
+
     public function testGetrusageWorksWithFfiDisabled(): void
     {
         if (!VmGetrusagePure::available()) {
