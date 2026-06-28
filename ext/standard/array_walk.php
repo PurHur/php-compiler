@@ -107,7 +107,30 @@ final class array_walk extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
-        $fn = VmInternalCall::resolveStringCallback($callback->toString());
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
+        if (null !== $userFn) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException('array_walk() requires VM context in this compiler build');
+            }
+            foreach ($src->iterateKeyed(false) as [$key, $value]) {
+                $keyCopy = new Variable();
+                $keyCopy->copyFrom($key);
+                $result = VmArrayWalkCallback::invokeWalkCallback(
+                    $frame,
+                    null,
+                    $userFn,
+                    $value,
+                    $keyCopy,
+                    $userdata
+                );
+                if (VmArrayWalkCallback::callbackFailed($result)) {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+        $fn = $internal;
         $out = new HashTable();
         foreach ($src->iterateKeyed(true) as [$key, $value]) {
             $result = VmInternalCall::invoke($fn, $value);
@@ -147,18 +170,30 @@ final class array_walk extends Internal
         if (!ArrayMapCallbackPolicy::isVmSupportedType($callback->type)) {
             throw new \LogicException(ArrayMapCallbackPolicy::vmRejectionMessage());
         }
-        $fn = VmInternalCall::resolveStringCallback($callback->toString());
+        [$internal, $userFn] = VmArrayWalkCallback::resolveString($frame, $callback->toString());
         $vm = $frame->vmContext->runtime->vm();
         $iterator = new \PHPCompiler\VM\ObjectPropertyIterator($object, $vm, $frame);
         $iterator->reset();
         while ($iterator->valid()) {
             $propName = $iterator->currentKey()->toString();
             $value = $iterator->currentValue(true);
-            $result = VmInternalCall::invoke($fn, $value);
-            if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
+            $keyCopy = $iterator->currentKey();
+            if (null !== $userFn) {
+                $result = VmArrayWalkCallback::invokeWalkCallback(
+                    $frame,
+                    null,
+                    $userFn,
+                    $value,
+                    $keyCopy,
+                    $userdata
+                );
+            } else {
+                $result = VmInternalCall::invoke($internal, $value);
+            }
+            if (VmArrayWalkCallback::callbackFailed($result)) {
                 return false;
             }
-            if (Variable::TYPE_NULL !== $result->type) {
+            if (null === $userFn && Variable::TYPE_NULL !== $result->type) {
                 $object->getProperty($propName)->copyFrom($result);
             }
         }

@@ -75,4 +75,12 @@ final class VmUserCall
 
         return $context->runtime->vm->invokePhpFunction($func, ...$copies);
     }
+
+    /**
+     * Invoke without copying arguments (array_walk &$value; issue #13319).
+     */
+    public static function invokeDirect(Context $context, Func\PHP $func, Variable ...$args): Variable
+    {
+        return $context->runtime->vm->invokePhpFunction($func, ...$args);
+    }
 }
