@@ -18,7 +18,7 @@ final class StringSerializeRuntimeStandaloneTest extends TestCase
         $runtime = (string) \file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StringSerialize.php');
         $this->assertStringContainsString('SerializeJitHelper', $runtime);
         $this->assertStringNotContainsString('StringSerializeJit', $runtime);
-        $this->assertLessThan(160, \substr_count($runtime, "\n"), 'StringSerialize must be a thin bridge (#13311)');
+        $this->assertLessThan(210, \substr_count($runtime, "\n"), 'StringSerialize must be a thin bridge (#13311, #13322 inventory defer)');
 
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeJit.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/StringSerializeDoubleJit.php');
