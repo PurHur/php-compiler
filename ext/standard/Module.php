@@ -49,6 +49,7 @@ class Module extends ModuleAbstract
         BuiltinAttributes::register($runtime->vmContext);
         BuiltinEnums::register($runtime->vmContext);
         BuiltinClasses::register($runtime->vmContext);
+        VmStdStreamConstants::register($runtime->vmContext);
         foreach ([
             'LOCK_SH' => 1,
             'LOCK_EX' => 2,
