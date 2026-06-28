@@ -82,11 +82,11 @@ final class Ieee754
             if (0 === $frac) {
                 return $sign ? -0.0 : 0.0;
             }
-            $value = ($frac / 8388608.0) * 2.0 ** -126;
+            $value = ($frac / 8388608.0) * self::pow2(-126);
 
             return $sign ? -$value : $value;
         }
-        $value = (1.0 + $frac / 8388608.0) * 2.0 ** ($exp - 127);
+        $value = (1.0 + $frac / 8388608.0) * self::pow2($exp - 127);
 
         return $sign ? -$value : $value;
     }
@@ -145,11 +145,11 @@ final class Ieee754
             if (0.0 === $frac) {
                 return $sign ? -0.0 : 0.0;
             }
-            $value = ($frac / 4503599627370496.0) * 2.0 ** -1022;
+            $value = ($frac / 4503599627370496.0) * self::pow2(-1022);
 
             return $sign ? -$value : $value;
         }
-        $value = (1.0 + $frac / 4503599627370496.0) * 2.0 ** ($exp - 1023);
+        $value = (1.0 + $frac / 4503599627370496.0) * self::pow2($exp - 1023);
 
         return $sign ? -$value : $value;
     }
@@ -212,7 +212,7 @@ final class Ieee754
             return [0.0, 0];
         }
         $exp = (int) floor(log($abs, 2.0));
-        $mantissa = $abs / (2.0 ** $exp);
+        $mantissa = $abs / self::pow2($exp);
         while ($mantissa >= 1.0) {
             $mantissa /= 2.0;
             ++$exp;
@@ -223,5 +223,26 @@ final class Ieee754
         }
 
         return [$mantissa, $exp];
+    }
+
+    /** Integer power-of-two for nested JIT (avoids pow() lowering). */
+    private static function pow2(int $exp): float
+    {
+        if (0 === $exp) {
+            return 1.0;
+        }
+        $value = 1.0;
+        if ($exp > 0) {
+            for ($i = 0; $i < $exp; ++$i) {
+                $value *= 2.0;
+            }
+
+            return $value;
+        }
+        for ($i = 0; $i > $exp; --$i) {
+            $value /= 2.0;
+        }
+
+        return $value;
     }
 }

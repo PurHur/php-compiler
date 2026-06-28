@@ -15235,6 +15235,14 @@ class JIT {
                     $owned
                 );
                 break;
+            case Variable::TYPE_HASHTABLE:
+                $this->context->refcount->addref($native);
+                $this->context->builder->call(
+                    $this->context->lookupFunction('__value__writeHashtable'),
+                    JIT\JitValueBox::pointer($this->context, $slot),
+                    $native
+                );
+                break;
             default:
                 throw new \LogicException(
                     'By-reference call argument requires a boxed lvalue, got '

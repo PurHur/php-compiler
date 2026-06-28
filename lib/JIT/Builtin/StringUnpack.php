@@ -14,8 +14,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_unpack via UnpackJitHelper PHP (#9543).
  *
- * JIT/normal modules use compiled {@see UnpackJitHelper}; AOT standalone keeps
- * {@see StringUnpackJit} until native link can host compiled UnpackEngine reliably.
+ * JIT/normal modules use compiled {@see UnpackJitHelper}; standalone uses the same
+ * PHP bridge once UnpackEngine nested JIT is stable (#13063).
  * php-src: ext/standard/pack.c — php_unpack()
  */
 final class StringUnpack
@@ -50,12 +50,6 @@ final class StringUnpack
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            StringUnpackJit::implement($context);
-
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__compiler_unpack');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

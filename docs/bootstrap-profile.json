@@ -2677,7 +2677,6 @@
         "lib/JIT/Builtin/StringTrimModeJit.php",
         "lib/JIT/Builtin/StringUcwords.php",
         "lib/JIT/Builtin/StringUnpack.php",
-        "lib/JIT/Builtin/StringUnpackJit.php",
         "lib/JIT/Builtin/StringUnserialize.php",
         "lib/JIT/Builtin/StringUnserializeJit.php",
         "lib/JIT/Builtin/StringUrldecode.php",
