@@ -48,10 +48,18 @@ final class SplDoublyLinkedListBuiltin
             'shift' => SplDoublyLinkedListShift::class,
             'unshift' => SplDoublyLinkedListUnshift::class,
             'count' => SplDoublyLinkedListCount::class,
+            'offsetget' => SplDoublyLinkedListOffsetGet::class,
+            'offsetset' => SplDoublyLinkedListOffsetSet::class,
+            'offsetexists' => SplDoublyLinkedListOffsetExists::class,
+            'offsetunset' => SplDoublyLinkedListOffsetUnset::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
+        $entry->methodNames['offsetget'] = 'offsetGet';
+        $entry->methodNames['offsetset'] = 'offsetSet';
+        $entry->methodNames['offsetexists'] = 'offsetExists';
+        $entry->methodNames['offsetunset'] = 'offsetUnset';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -59,7 +67,7 @@ final class SplDoublyLinkedListBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['push'], $entry->methods['pop']);
+        return isset($entry->methods['push'], $entry->methods['pop'], $entry->methods['offsetget']);
     }
 
     public static function init(ObjectEntry $object): void
@@ -120,6 +128,79 @@ final class SplDoublyLinkedListBuiltin
     public static function count(ObjectEntry $object): int
     {
         return \count(self::state($object));
+    }
+
+    public static function offsetExists(ObjectEntry $object, Variable $offset): bool
+    {
+        $index = self::coerceIndex($offset, 'offsetExists', true);
+        $count = \count(self::state($object));
+
+        return $index >= 0 && $index < $count;
+    }
+
+    public static function offsetGet(ObjectEntry $object, Variable $offset): Variable
+    {
+        $index = self::coerceIndex($offset, 'offsetGet', false);
+        $state = self::state($object);
+        if ($index < 0 || $index >= \count($state)) {
+            throw new \OutOfRangeException('SplDoublyLinkedList::offsetGet(): Argument #1 ($index) is out of range');
+        }
+        $result = new Variable();
+        $result->copyFrom($state[$index]);
+
+        return $result;
+    }
+
+    public static function offsetSet(ObjectEntry $object, Variable $offset, Variable $value): void
+    {
+        $index = self::coerceIndex($offset, 'offsetSet', true);
+        $count = \count(self::state($object));
+        if ($index < 0 || $index >= $count) {
+            throw new \OutOfRangeException('SplDoublyLinkedList::offsetSet(): Argument #1 ($index) is out of range');
+        }
+        $copy = new Variable();
+        $copy->copyFrom($value->resolveIndirect());
+        self::$store[$object->id][$index] = $copy;
+    }
+
+    public static function offsetUnset(ObjectEntry $object, Variable $offset): void
+    {
+        $index = self::coerceIndex($offset, 'offsetUnset', false);
+        $count = \count(self::state($object));
+        if ($index < 0 || $index >= $count) {
+            throw new \OutOfRangeException('SplDoublyLinkedList::offsetUnset(): Argument #1 ($index) is out of range');
+        }
+        \array_splice(self::$store[$object->id], $index, 1);
+    }
+
+    private static function coerceIndex(Variable $offset, string $method, bool $nullable): int
+    {
+        $resolved = $offset->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            if (!$nullable) {
+                throw new \TypeError(
+                    'SplDoublyLinkedList::'.$method.'(): Argument #1 ($index) must be of type int, null given'
+                );
+            }
+
+            return 0;
+        }
+        if (Variable::TYPE_INTEGER !== $resolved->type) {
+            $typeName = match ($resolved->type) {
+                Variable::TYPE_BOOL => 'bool',
+                Variable::TYPE_DOUBLE => 'float',
+                Variable::TYPE_STRING => 'string',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => 'object',
+                default => 'mixed',
+            };
+            $expected = $nullable ? '?int' : 'int';
+            throw new \TypeError(
+                'SplDoublyLinkedList::'.$method.'(): Argument #1 ($index) must be of type '.$expected.', '.$typeName.' given'
+            );
+        }
+
+        return $resolved->toInt();
     }
 }
 
@@ -243,5 +324,109 @@ final class SplDoublyLinkedListCount extends VmClassMethod
             return;
         }
         $frame->returnVar->int(SplDoublyLinkedListBuiltin::count($object));
+    }
+}
+
+final class SplDoublyLinkedListOffsetGet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetGet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::offsetGet()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::offsetGet() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplIteratorSupport::copyReturnFrom(
+            $frame,
+            SplDoublyLinkedListBuiltin::offsetGet($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+final class SplDoublyLinkedListOffsetSet extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetSet');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::offsetSet()'
+        );
+        if (\count($frame->calledArgs) < 3) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::offsetSet() expects exactly 2 arguments, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplDoublyLinkedListBuiltin::offsetSet($object, $frame->calledArgs[1], $frame->calledArgs[2]);
+    }
+}
+
+final class SplDoublyLinkedListOffsetExists extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetExists');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::offsetExists()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::offsetExists() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(
+            SplDoublyLinkedListBuiltin::offsetExists($object, $frame->calledArgs[1])
+        );
+    }
+}
+
+final class SplDoublyLinkedListOffsetUnset extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('offsetUnset');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::offsetUnset()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::offsetUnset() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        SplDoublyLinkedListBuiltin::offsetUnset($object, $frame->calledArgs[1]);
     }
 }
