@@ -27,7 +27,10 @@ final class opendir extends Internal
         }
         $handle = VmDir::opendir($path);
         if (false === $handle) {
-            VmFilestatFailure::warnOpendirFailed($frame, $path);
+            // php-src dir.c php_opendir — empty path returns false without E_WARNING (#13344).
+            if ('' !== $path) {
+                VmFilestatFailure::warnOpendirFailed($frame, $path);
+            }
             $frame->returnVar->bool(false);
 
             return;
