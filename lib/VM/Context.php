@@ -351,71 +351,10 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
 
                 return $var;
-            case 'filter_validate_int':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_INT);
-
-                return $var;
-            case 'filter_validate_email':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_EMAIL);
-
-                return $var;
-            case 'filter_validate_ip':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_IP);
-
-                return $var;
-            case 'filter_validate_regexp':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_VALIDATE_REGEXP);
-
-                return $var;
-            case 'filter_null_on_failure':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_NULL_ON_FAILURE);
-
-                return $var;
-            case 'filter_flag_allow_octal':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_FLAG_ALLOW_OCTAL);
-
-                return $var;
-            case 'filter_flag_allow_hex':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::FILTER_FLAG_ALLOW_HEX);
-
-                return $var;
-            case 'input_get':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_GET);
-
-                return $var;
-            case 'input_post':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_POST);
-
-                return $var;
-            case 'input_cookie':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_COOKIE);
-
-                return $var;
-            case 'input_env':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_ENV);
-
-                return $var;
-            case 'input_server':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SERVER);
-
-                return $var;
-            case 'input_session':
-                $var = new Variable(Variable::TYPE_INTEGER);
-                $var->int(\PHPCompiler\ext\filter\VmFilter::INPUT_SESSION);
-
-                return $var;
+        }
+        $filterVar = \PHPCompiler\ext\filter\FilterConstants::variableForName($name);
+        if (null !== $filterVar) {
+            return $filterVar;
         }
         $stdlibInt = \PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[strtolower($name)] ?? null;
         if (null !== $stdlibInt) {
