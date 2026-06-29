@@ -856,7 +856,6 @@ class Context {
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
         Builtin\ObOutputRuntime::ensureLinked($this);
         Builtin\StringTriggerError::ensureStandaloneBodies($this);
-        Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
         Builtin\StringRandomBytes::implement($this);
         Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
         Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
@@ -938,7 +937,7 @@ class Context {
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isUserScriptAot()) {
             Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
-            Builtin\SuperglobalRefreshRuntime::ensureUserScriptMainStub($this);
+            Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefresh($this);
         }
 
         // add main function
@@ -962,19 +961,23 @@ class Context {
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_init'));
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isUserScriptAot()) {
-                $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\SessionModuleName::emitResetForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+                if (!$this->isUserScriptAot()) {
+                    $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\SessionModuleName::emitResetForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
+                }
                 $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('__superglobals__refresh')));
-                $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
-                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
-                $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
-                $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
-                $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
-                $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
+                if (!$this->isUserScriptAot()) {
+                    $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
+                    $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
+                    $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
+                    $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_return_pending')));
+                    $emitInStandaloneMain(fn () => ErrorBridge::emitClearForStandaloneMain($this));
+                    $emitInStandaloneMain(fn () => ExceptionBridge::emitClearForStandaloneMain($this));
+                }
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_php'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType

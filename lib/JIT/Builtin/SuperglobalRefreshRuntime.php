@@ -66,26 +66,14 @@ final class SuperglobalRefreshRuntime
         self::implement($context);
     }
 
-    /** User-script standalone main(): no-op refresh without nested JIT (#13571). */
-    public static function ensureUserScriptMainStub(Context $context): void
+    /** User-script standalone: native LLVM refresh without nested JIT during init (#13571, #13717). */
+    public static function ensureUserScriptRefresh(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        $probe = $context->module->getNamedFunction('__superglobals__refresh');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__superglobals__refresh', $probe);
-
-            return;
-        }
-        $voidTy = $context->getTypeFromString('void');
-        $ft = $context->context->functionType($voidTy, false);
-        $fn = $context->module->addFunction('__superglobals__refresh', $ft);
-        $entry = $fn->appendBasicBlock('sg_refresh_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnVoid();
-        $context->builder->clearInsertionPosition();
-        $context->registerFunction('__superglobals__refresh', $fn);
+        StringHtmlspecialchars::ensureStandaloneBodies($context);
+        SuperglobalRefreshUserScriptLlvm::implement($context);
     }
 
     public static function implement(Context $context): void

@@ -19,8 +19,9 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
         $this->assertStringContainsString('ensureMinimalUserStandaloneBodies', $source);
-        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
-        $this->assertStringContainsString('ensureUserScriptMainStubs', $source);
+        $this->assertStringContainsString('ensureUserScriptRefresh', $source);
+        $refresh = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Builtin/SuperglobalRefreshRuntime.php');
+        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $refresh);
         $this->assertStringContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
     }
 
