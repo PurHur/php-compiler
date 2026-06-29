@@ -3948,6 +3948,9 @@ class Compiler {
         }
         $classLc = strtolower(ltrim($className, '\\'));
         $this->compiledClassStaticProperties[$classLc] = $this->compiledClassStaticProperties[$classLc] ?? [];
+        if (null !== $parentLc) {
+            $this->inheritCompileTimeClassConstsFromParent($classLc, $parentLc);
+        }
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
         $this->currentClassStaticPropertyCompile = $classLc;
         $return->block1 = $this->compileClassBody(
@@ -4076,6 +4079,45 @@ class Compiler {
             if (isset($this->compileTimeClassConstVisibility[$ifaceLc][$constLc])) {
                 $this->compileTimeClassConstVisibility[$classLc][$constLc]
                     = $this->compileTimeClassConstVisibility[$ifaceLc][$constLc];
+            }
+        }
+    }
+
+    /**
+     * Copy public/protected parent class constants for compile-time {@code self::} folding (#13532, zend_constants.c).
+     */
+    protected function inheritCompileTimeClassConstsFromParent(string $classLc, string $parentLc): void
+    {
+        if (!isset($this->compileTimeClassConsts[$parentLc])) {
+            return;
+        }
+        if (!isset($this->compileTimeClassConsts[$classLc])) {
+            $this->compileTimeClassConsts[$classLc] = [];
+        }
+        if (!isset($this->compileTimeClassConstVisibility[$classLc])) {
+            $this->compileTimeClassConstVisibility[$classLc] = [];
+        }
+        if (!isset($this->compileTimeClassConstDeprecated[$classLc])) {
+            $this->compileTimeClassConstDeprecated[$classLc] = [];
+        }
+        foreach ($this->compileTimeClassConsts[$parentLc] as $constLc => $value) {
+            if (isset($this->compileTimeClassConsts[$classLc][$constLc])) {
+                continue;
+            }
+            $vis = $this->compileTimeClassConstVisibility[$parentLc][$constLc] ?? CfgFunc::FLAG_PUBLIC;
+            if (($vis & CfgFunc::FLAG_PRIVATE) !== 0) {
+                continue;
+            }
+            $stored = new Variable();
+            $stored->copyFrom($value);
+            $this->compileTimeClassConsts[$classLc][$constLc] = $stored;
+            $this->compileTimeClassConstVisibility[$classLc][$constLc] = $vis;
+            if (isset($this->compileTimeClassConstDeprecated[$parentLc][$constLc])) {
+                $this->compileTimeClassConstDeprecated[$classLc][$constLc]
+                    = $this->compileTimeClassConstDeprecated[$parentLc][$constLc];
+            }
+            if (isset($this->compileTimeEnumCaseConstNames[$parentLc][$constLc])) {
+                $this->compileTimeEnumCaseConstNames[$classLc][$constLc] = true;
             }
         }
     }
