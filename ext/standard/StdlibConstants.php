@@ -131,6 +131,10 @@ final class StdlibConstants
     public const PREG_BAD_UTF8_OFFSET_ERROR = 5;
     public const PREG_JIT_STACKLIMIT_ERROR = 6;
 
+    /** http_build_query() encoding_type (ext/standard/http.c, main/php_variables.h). */
+    public const PHP_QUERY_RFC1738 = VmHttpBuildQuery::ENCODING_RFC1738;
+    public const PHP_QUERY_RFC3986 = VmHttpBuildQuery::ENCODING_RFC3986;
+
     /** password_hash() algorithms — user-visible string ids (ext/standard/password.c). */
     public const PASSWORD_BCRYPT = '2y';
 
@@ -360,6 +364,8 @@ final class StdlibConstants
         'preg_bad_utf8_error' => self::PREG_BAD_UTF8_ERROR,
         'preg_bad_utf8_offset_error' => self::PREG_BAD_UTF8_OFFSET_ERROR,
         'preg_jit_stacklimit_error' => self::PREG_JIT_STACKLIMIT_ERROR,
+        'php_query_rfc1738' => self::PHP_QUERY_RFC1738,
+        'php_query_rfc3986' => self::PHP_QUERY_RFC3986,
         'log_emerg' => self::LOG_EMERG,
         'log_alert' => self::LOG_ALERT,
         'log_crit' => self::LOG_CRIT,

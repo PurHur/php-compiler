@@ -13511,8 +13511,16 @@ class Compiler {
                     ) {
                         return $trailingUnaryProducer;
                     }
-
-                    return $byIndex;
+                    if (
+                        $byIndex instanceof Op\Expr\Array_
+                        && null !== $callArg
+                        && !$this->callArgOperandExpectsArrayProducer($callArg)
+                    ) {
+                        $byIndex = null;
+                    }
+                    if (null !== $byIndex) {
+                        return $byIndex;
+                    }
                 }
             }
             foreach ($producers as $producer) {
@@ -13560,14 +13568,25 @@ class Compiler {
                     return $trailingUnaryProducer;
                 }
                 if (
-                    $byIndex instanceof Op\Expr\FuncCall
-                    || $byIndex instanceof Op\Expr\NsFuncCall
-                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
-                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
-                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
-                    || $byIndex instanceof Op\Expr\ConstFetch
-                    || $byIndex instanceof Op\Expr\ClassConstFetch
-                    || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
+                    $byIndex instanceof Op\Expr\Array_
+                    && null !== $callArg
+                    && !$this->callArgOperandExpectsArrayProducer($callArg)
+                ) {
+                    // Nested inline array consumed multiple Array_ slots — do not wire trailing int arg (#12008, #13697).
+                    $byIndex = null;
+                }
+                if (
+                    null !== $byIndex
+                    && (
+                        $byIndex instanceof Op\Expr\FuncCall
+                        || $byIndex instanceof Op\Expr\NsFuncCall
+                        || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
+                        || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
+                        || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
+                        || $byIndex instanceof Op\Expr\ConstFetch
+                        || $byIndex instanceof Op\Expr\ClassConstFetch
+                        || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
+                    )
                 ) {
                     return $byIndex;
                 }
