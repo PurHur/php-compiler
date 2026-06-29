@@ -15,8 +15,8 @@ final class BuiltinAttributePhantomTest extends TestCase
     {
         $this->assertFalse(CompilerVersion::advertisesOverrideAttributeClass());
         $this->assertFalse(CompilerVersion::advertisesDeprecatedAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesNoDiscardAttributeClass());
-        $this->assertTrue(CompilerVersion::advertisesEnumCasesAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesNoDiscardAttributeClass());
+        $this->assertFalse(CompilerVersion::advertisesEnumCasesAttributeClass());
         $this->assertFalse(CompilerVersion::advertisesDelayedTargetValidationAttributeClass());
         $this->assertFalse(CompilerVersion::advertisesCompileTimeAttributeClass());
     }
@@ -27,8 +27,8 @@ final class BuiltinAttributePhantomTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->classes['override']));
         $this->assertFalse(isset($ctx->classes['deprecated']));
-        $this->assertTrue(isset($ctx->classes['nodiscard']));
-        $this->assertTrue(isset($ctx->classes['enumcases']));
+        $this->assertFalse(isset($ctx->classes['nodiscard']));
+        $this->assertFalse(isset($ctx->classes['enumcases']));
         $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
         $this->assertFalse(isset($ctx->classes['compiletime']));
     }
