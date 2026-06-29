@@ -257,6 +257,14 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ Random\IntervalBoundary unit enum (ext/random/random.stub.php; #11551).
+     */
+    public static function supportsRandomIntervalBoundary(): bool
+    {
+        return self::advertisesBuiltinSince('8.3.0');
+    }
+
+    /**
      * PHP 8.4+ get_declared_* optional $exclude_deprecated (ext/standard/basic_functions.c, #12403).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects any argument like Zend 8.2.
