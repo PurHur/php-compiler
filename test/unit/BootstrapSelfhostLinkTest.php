@@ -90,6 +90,7 @@ final class BootstrapSelfhostLinkTest extends TestCase
         $this->assertStringContainsString('bootstrap_gen0_seed_prelinked_m3_sidecars', $body);
         $this->assertStringContainsString('bootstrap_inventory_argv_driver_minimal_smoke', $body);
         $this->assertStringContainsString('bootstrap_inventory_argv_driver_m4_smoke', $body);
+        $this->assertStringContainsString('bootstrap_inventory_bin_compile_m4_sidecar_recover', $body);
         $this->assertStringContainsString('prelinked gen-0 inventory driver (#12486)', $body);
         $this->assertStringContainsString('prelinked gen-0 fallback — #12486', $body);
         $this->assertStringContainsString('*/bin/compile.php) return 1', $body);

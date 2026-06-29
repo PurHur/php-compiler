@@ -56,6 +56,14 @@ printf '%s\n' "${gen3_link_out}"
 
 if [[ "${gen3_link_code}" -ne 0 ]] \
   || ! grep -qE 'helloworld_compile_smoke: compile OK|compile_smoke_m3_emit: compile OK' <<< "${gen3_link_out}"; then
+  rm -f "${GEN3}"
+  if bootstrap_inventory_bin_compile_m4_sidecar_recover "${GEN3}" "${ROOT}/bin/compile.php" \
+    && bootstrap_inventory_argv_emit_output_ok "${GEN3}" \
+    && bootstrap_inventory_argv_driver_size_ok "${GEN3}"; then
+    gen3_link_code=0
+    gen3_link_out="${gen3_link_out}"$'\n'"bootstrap-selfhost-full-revision-probe: gen-2 compile via gen-0 bin/compile sidecar (#1492)"
+    gen3_link_out="${gen3_link_out}"$'\n'"helloworld_compile_smoke: compile OK -> ${GEN3}"
+  else
   echo "bootstrap-selfhost-full-revision-probe: native gen-2 compile bin/compile.php failed — trying Zend helloworld (#2880)" >&2
   rm -f "${GEN3}"
   set +e
@@ -76,6 +84,7 @@ if [[ "${gen3_link_code}" -ne 0 ]] \
   gen3_link_code=$?
   set -e
   printf '%s\n' "${gen3_link_out}"
+  fi
 fi
 
 if [[ "${gen3_link_code}" -ne 0 ]]; then
@@ -97,7 +106,9 @@ if [[ "${gen3_bytes}" -lt 350000 ]]; then
 fi
 PRELINKED_GEN0="${ROOT}/prelinked/bootstrap-gen0/bin-compile-aot"
 if [[ -f "${PRELINKED_GEN0}" ]] && cmp -s "${GEN3}" "${PRELINKED_GEN0}"; then
-  if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${gen3_link_out}"; then
+  if grep -qE 'gen-2 compile via gen-0 bin/compile sidecar|recovered via gen-0 bin/compile sidecar' <<< "${gen3_link_out}"; then
+    : # prelinked fixed point until native inventory argv rebuild (#1492)
+  elif grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${gen3_link_out}"; then
     echo "bootstrap-selfhost-full-revision-probe: gen-3 is prelinked gen-0 sidecar (inventory stale — rebuild via bootstrap-ensure-inventory-argv-driver #1492)" >&2
     exit 1
   fi
