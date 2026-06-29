@@ -2155,6 +2155,45 @@ PHP;
         self::assertSame('0644', $out);
     }
 
+    /** Issue #13636 — substr(sprintf('%o', fileperms($path)), -N) nested int builtin arg slot + runtime. */
+    public function testSubstrNestedSprintfFilepermsUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$tmp = tempnam(sys_get_temp_dir(), 'phpc');
+chmod($tmp, 0644);
+echo substr(sprintf('%o', fileperms($tmp)), -4);
+unlink($tmp);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'nested_substr_sprintf_fileperms.php');
+
+        $substrInitIndex = null;
+        $sprintfInitIndex = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $idx => $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (4 === $fcallOrdinal) {
+                    $sprintfInitIndex = $idx;
+                }
+                if (5 === $fcallOrdinal) {
+                    $substrInitIndex = $idx;
+                }
+            }
+        }
+
+        self::assertNotNull($substrInitIndex);
+        self::assertNotNull($sprintfInitIndex);
+        self::assertLessThan($substrInitIndex, $sprintfInitIndex, 'nested sprintf must INIT before outer substr');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('0644', $out);
+    }
+
     /** Issue #13662 — str_contains($last['message'], $fn . '():') must not mis-wire call args. */
     public function testStrContainsArrayDimFetchAndInlineConcatCallArgSlots(): void
     {
