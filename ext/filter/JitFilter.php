@@ -9,6 +9,7 @@ use PHPCompiler\JIT\Builtin\StringFilterBoolean;
 use PHPCompiler\JIT\Builtin\StringFilterEmail;
 use PHPCompiler\JIT\Builtin\StringFilterInt;
 use PHPCompiler\JIT\Builtin\StringFilterIp;
+use PHPCompiler\JIT\Builtin\StringFilterSanitize;
 use PHPCompiler\JIT\Builtin\StringFilterUrl;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
@@ -967,6 +968,225 @@ final class JitFilter
         $phi = $context->builder->phi($ptr->typeOf());
         $phi->addIncoming($stringResult, $stringTail);
         $phi->addIncoming($ptr, $numericTail);
+
+        return $phi;
+    }
+
+    /** Sanitizing filters via FilterSanitizeJitHelper SSOT (#11419). */
+    public static function sanitize(Context $context, JITVariable $value, Value $filterVal, ?Value $flagsVal = null): Value
+    {
+        StringFilterSanitize::ensureLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $flags = $flagsVal ?? $i64->constInt(0, false);
+        $falseVal = $context->constantFromBool(false);
+
+        if (JITVariable::TYPE_VALUE === $value->type) {
+            return self::boxValueSanitize($context, $value, $filterVal, $flags);
+        }
+
+        $str = self::jitScalarToString($context, $value);
+        if (null === $str) {
+            $slot = JitValueBox::alloc($context);
+            $ptr = JitValueBox::pointer($context, $slot);
+            JitValueBox::writeBool($context, $slot, $falseVal);
+
+            return $ptr;
+        }
+
+        $sanitized = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_sanitize_string'),
+            $filterVal,
+            $str,
+            $flags
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $sanitized
+        );
+
+        return $ptr;
+    }
+
+    private static function jitScalarToString(Context $context, JITVariable $value): ?Value
+    {
+        if (JITVariable::TYPE_STRING === $value->type) {
+            return $context->helper->loadValue($value);
+        }
+        if (JITVariable::TYPE_NULL === $value->type) {
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+        if (JITVariable::TYPE_NATIVE_LONG === $value->type) {
+            return $context->builder->call(
+                $context->lookupFunction('sprintf'),
+                $context->builder->load($context->constantStringFromString('%ld')),
+                $context->helper->loadValue($value)
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $value->type) {
+            return $context->builder->call(
+                $context->lookupFunction('sprintf'),
+                $context->builder->load($context->constantStringFromString('%F')),
+                $context->helper->loadValue($value)
+            );
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL === $value->type) {
+            $id = (string) (++self::$blockSerial);
+            $trueBlock = BasicBlockHelper::append($context, 'fvs_bool_true_'.$id);
+            $falseBlock = BasicBlockHelper::append($context, 'fvs_bool_false_'.$id);
+            $doneBlock = BasicBlockHelper::append($context, 'fvs_bool_done_'.$id);
+            $isTrue = $context->helper->loadValue($value);
+            $context->builder->branchIf($isTrue, $trueBlock, $falseBlock);
+            $context->builder->positionAtEnd($trueBlock);
+            $one = $context->builder->load($context->constantStringFromString('1'));
+            $trueTail = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($falseBlock);
+            $zero = $context->builder->load($context->constantStringFromString(''));
+            $falseTail = $context->builder->getInsertBlock();
+            $context->builder->branch($doneBlock);
+            $context->builder->positionAtEnd($doneBlock);
+            $phi = $context->builder->phi($one->typeOf());
+            $phi->addIncoming($one, $trueTail);
+            $phi->addIncoming($zero, $falseTail);
+
+            return $phi;
+        }
+
+        return null;
+    }
+
+    public static function isSanitizeFilterId(Context $context, Value $filterVal): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        $ids = [
+            VmFilter::FILTER_SANITIZE_STRING,
+            VmFilter::FILTER_SANITIZE_ENCODED,
+            VmFilter::FILTER_SANITIZE_SPECIAL_CHARS,
+            VmFilter::FILTER_SANITIZE_FULL_SPECIAL_CHARS,
+            VmFilter::FILTER_SANITIZE_EMAIL,
+            VmFilter::FILTER_SANITIZE_URL,
+            VmFilter::FILTER_SANITIZE_NUMBER_INT,
+            VmFilter::FILTER_SANITIZE_NUMBER_FLOAT,
+            VmFilter::FILTER_SANITIZE_ADD_SLASHES,
+            VmFilter::FILTER_UNSAFE_RAW,
+            VmFilter::FILTER_DEFAULT,
+        ];
+        $match = $context->constantFromBool(false);
+        foreach ($ids as $id) {
+            $isId = $context->builder->icmp(
+                Builder::INT_EQ,
+                $filterVal,
+                $i64->constInt($id, false)
+            );
+            $match = $context->builder->or($match, $isId);
+        }
+
+        return $match;
+    }
+
+    private static function boxValueSanitize(
+        Context $context,
+        JITVariable $arg,
+        Value $filterVal,
+        Value $flags
+    ): Value {
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $strVal = $context->builder->call($context->lookupFunction('__value__readString'), $valuePtr);
+        $strPtrTy = $context->getTypeFromString('__string__*');
+        $hasString = $context->builder->icmp(Builder::INT_NE, $strVal, $strPtrTy->constNull());
+
+        $id = (string) (++self::$blockSerial);
+        $stringBlock = BasicBlockHelper::append($context, 'fvs_box_string_'.$id);
+        $failBlock = BasicBlockHelper::append($context, 'fvs_box_fail_'.$id);
+        $doneBlock = BasicBlockHelper::append($context, 'fvs_box_done_'.$id);
+        $context->builder->branchIf($hasString, $stringBlock, $failBlock);
+
+        $context->builder->positionAtEnd($stringBlock);
+        $strVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $strVal);
+        $stringResult = self::sanitize($context, $strVar, $filterVal, $flags);
+        $stringTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($failBlock);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $isLong = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_LONG, false)
+        );
+        $isDouble = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_DOUBLE, false)
+        );
+        $isBool = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NATIVE_BOOL, false)
+        );
+        $isNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $typeByte,
+            $i8->constInt(JITVariable::TYPE_NULL, false)
+        );
+        $isScalar = $context->builder->or(
+            $context->builder->or($isLong, $isDouble),
+            $context->builder->or($isBool, $isNull)
+        );
+        $scalarOkBlock = BasicBlockHelper::append($context, 'fvs_box_scalar_ok_'.$id);
+        $hardFailBlock = BasicBlockHelper::append($context, 'fvs_box_hard_fail_'.$id);
+        $context->builder->branchIf($isScalar, $scalarOkBlock, $hardFailBlock);
+
+        $context->builder->positionAtEnd($scalarOkBlock);
+        $longVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $dblVal = $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr);
+        $boolVal = $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr);
+        $longVar = new JITVariable($context, JITVariable::TYPE_NATIVE_LONG, JITVariable::KIND_VALUE, $longVal);
+        $dblVar = new JITVariable($context, JITVariable::TYPE_NATIVE_DOUBLE, JITVariable::KIND_VALUE, $dblVal);
+        $boolVar = new JITVariable($context, JITVariable::TYPE_NATIVE_BOOL, JITVariable::KIND_VALUE, $boolVal);
+        $nullVar = new JITVariable($context, JITVariable::TYPE_NULL, JITVariable::KIND_VALUE, $valuePtr);
+        $longStr = self::jitScalarToString($context, $longVar);
+        $dblStr = self::jitScalarToString($context, $dblVar);
+        $boolStr = self::jitScalarToString($context, $boolVar);
+        $nullStr = self::jitScalarToString($context, $nullVar);
+        $coerced = $context->builder->select($isLong, $longStr, $dblStr);
+        $coerced = $context->builder->select($isBool, $boolStr, $coerced);
+        $coerced = $context->builder->select($isNull, $nullStr, $coerced);
+        $sanitized = $context->builder->call(
+            $context->lookupFunction('__compiler_filter_sanitize_string'),
+            $filterVal,
+            $coerced,
+            $flags
+        );
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeString'),
+            $ptr,
+            $sanitized
+        );
+        $scalarTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($hardFailBlock);
+        $failSlot = JitValueBox::alloc($context);
+        $failPtr = JitValueBox::pointer($context, $failSlot);
+        JitValueBox::writeBool($context, $failSlot, $context->constantFromBool(false));
+        $hardFailTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($failPtr->typeOf());
+        $phi->addIncoming($stringResult, $stringTail);
+        $phi->addIncoming($ptr, $scalarTail);
+        $phi->addIncoming($failPtr, $hardFailTail);
 
         return $phi;
     }

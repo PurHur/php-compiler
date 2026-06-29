@@ -128,6 +128,8 @@ final class filter_var extends Internal
         $urlBlock = BasicBlockHelper::append($context, 'filter_var_url');
         $urlOtherBlock = BasicBlockHelper::append($context, 'filter_var_url_other');
         $ipBlock = BasicBlockHelper::append($context, 'filter_var_ip');
+        $sanitizeCheckBlock = BasicBlockHelper::append($context, 'filter_var_sanitize_check');
+        $sanitizeBlock = BasicBlockHelper::append($context, 'filter_var_sanitize');
         $failBlock = BasicBlockHelper::append($context, 'filter_var_fail');
         $doneBlock = BasicBlockHelper::append($context, 'filter_var_done');
         $context->builder->branchIf($isInt, $intBlock, $otherBlock);
@@ -186,7 +188,11 @@ final class filter_var extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($urlOtherBlock);
-        $context->builder->branchIf($isIp, $ipBlock, $failBlock);
+        $context->builder->branchIf($isIp, $ipBlock, $sanitizeCheckBlock);
+
+        $context->builder->positionAtEnd($sanitizeCheckBlock);
+        $isSanitize = JitFilter::isSanitizeFilterId($context, $filterVal);
+        $context->builder->branchIf($isSanitize, $sanitizeBlock, $failBlock);
 
         $context->builder->positionAtEnd($ipBlock);
         $ipResult = JitFilter::validateIp($context, $value);
@@ -194,6 +200,12 @@ final class filter_var extends Internal
             $ipResult = JitFilter::applyNullOnFailure($context, $ipResult, $nullOnFailure);
         }
         $ipTail = $context->builder->getInsertBlock();
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($sanitizeBlock);
+        $flags = JitFilter::loadFilterFlags($context, $optionsArg);
+        $sanitizeResult = JitFilter::sanitize($context, $value, $filterVal, $flags);
+        $sanitizeTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -209,6 +221,7 @@ final class filter_var extends Internal
         $phi->addIncoming($emailResult, $emailTail);
         $phi->addIncoming($urlResult, $urlTail);
         $phi->addIncoming($ipResult, $ipTail);
+        $phi->addIncoming($sanitizeResult, $sanitizeTail);
         $phi->addIncoming($falseResult, $failTail);
 
         return $phi;

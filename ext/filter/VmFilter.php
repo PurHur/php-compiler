@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\filter;
 
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmInetPure;
 use PHPCompiler\ext\standard\VmPregNative;
 use PHPCompiler\ext\standard\VmString;
@@ -86,6 +87,11 @@ final class VmFilter
 
     public static function isSupportedFilter(int $filter): bool
     {
+        return self::isValidateFilter($filter) || self::isSanitizeFilter($filter);
+    }
+
+    public static function isValidateFilter(int $filter): bool
+    {
         return self::FILTER_VALIDATE_INT === $filter
             || self::FILTER_VALIDATE_BOOLEAN === $filter
             || self::FILTER_VALIDATE_FLOAT === $filter
@@ -93,6 +99,21 @@ final class VmFilter
             || self::FILTER_VALIDATE_URL === $filter
             || self::FILTER_VALIDATE_EMAIL === $filter
             || self::FILTER_VALIDATE_IP === $filter;
+    }
+
+    public static function isSanitizeFilter(int $filter): bool
+    {
+        return self::FILTER_SANITIZE_STRING === $filter
+            || self::FILTER_SANITIZE_ENCODED === $filter
+            || self::FILTER_SANITIZE_SPECIAL_CHARS === $filter
+            || self::FILTER_SANITIZE_FULL_SPECIAL_CHARS === $filter
+            || self::FILTER_SANITIZE_EMAIL === $filter
+            || self::FILTER_SANITIZE_URL === $filter
+            || self::FILTER_SANITIZE_NUMBER_INT === $filter
+            || self::FILTER_SANITIZE_NUMBER_FLOAT === $filter
+            || self::FILTER_SANITIZE_ADD_SLASHES === $filter
+            || self::FILTER_UNSAFE_RAW === $filter
+            || self::FILTER_DEFAULT === $filter;
     }
 
     public static function unknownFilterWarningMessage(int $filter): string
@@ -125,8 +146,202 @@ final class VmFilter
         if (self::FILTER_VALIDATE_IP === $filter) {
             return self::validateIp($value, $nullOnFailure, $parsed['flags']);
         }
+        if (self::isSanitizeFilter($filter)) {
+            return self::sanitize($value, $filter, $parsed['flags'], $parsed['filterOptions']);
+        }
 
         return self::failureResult(false);
+    }
+
+    /**
+     * Sanitizing filters (php-src ext/filter/sanitizing_filters.c; #11419).
+     */
+    public static function sanitize(
+        Variable $value,
+        int $filter,
+        int $flags = 0,
+        ?\PHPCompiler\VM\HashTable $filterOptions = null
+    ): Variable {
+        if (self::FILTER_CALLBACK === $filter) {
+            throw new \ValueError('filter_var(): Option must be a valid callback');
+        }
+        $subject = self::coerceFilterScalarString($value);
+        if (null === $subject) {
+            return self::failureResult(false);
+        }
+
+        $sanitized = match ($filter) {
+            self::FILTER_SANITIZE_STRING => self::sanitizeString($subject, $flags),
+            self::FILTER_SANITIZE_ENCODED => rawurlencode($subject),
+            self::FILTER_SANITIZE_SPECIAL_CHARS => self::sanitizeSpecialChars($subject, $flags),
+            self::FILTER_SANITIZE_FULL_SPECIAL_CHARS => VmString::htmlspecialchars(
+                $subject,
+                StdlibConstants::ENT_QUOTES | StdlibConstants::ENT_SUBSTITUTE,
+                'UTF-8',
+                true
+            ),
+            self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
+            self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
+            self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject),
+            self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            default => null,
+        };
+        if (null === $sanitized) {
+            return self::failureResult(false);
+        }
+
+        return self::stringResult($sanitized);
+    }
+
+    /**
+     * JIT/AOT bridge — returns sanitized string or empty string when input is not scalar.
+     */
+    public static function sanitizeStringForJit(int $filter, string $subject, int $flags = 0): string
+    {
+        if (!self::isSanitizeFilter($filter)) {
+            return '';
+        }
+
+        return match ($filter) {
+            self::FILTER_SANITIZE_STRING => self::sanitizeString($subject, $flags),
+            self::FILTER_SANITIZE_ENCODED => rawurlencode($subject),
+            self::FILTER_SANITIZE_SPECIAL_CHARS => self::sanitizeSpecialChars($subject, $flags),
+            self::FILTER_SANITIZE_FULL_SPECIAL_CHARS => VmString::htmlspecialchars(
+                $subject,
+                StdlibConstants::ENT_QUOTES | StdlibConstants::ENT_SUBSTITUTE,
+                'UTF-8',
+                true
+            ),
+            self::FILTER_SANITIZE_EMAIL => self::sanitizeEmail($subject),
+            self::FILTER_SANITIZE_URL => self::sanitizeUrl($subject),
+            self::FILTER_SANITIZE_NUMBER_INT => self::sanitizeNumberInt($subject),
+            self::FILTER_SANITIZE_NUMBER_FLOAT => self::sanitizeNumberFloat($subject),
+            self::FILTER_SANITIZE_ADD_SLASHES => VmString::addslashes($subject),
+            self::FILTER_UNSAFE_RAW, self::FILTER_DEFAULT => $subject,
+            default => '',
+        };
+    }
+
+    private static function coerceFilterScalarString(Variable $value): ?string
+    {
+        if ($value->isUndefined() || Variable::TYPE_NULL === $value->type) {
+            return '';
+        }
+        if (Variable::TYPE_STRING === $value->type) {
+            return $value->toString();
+        }
+        if (Variable::TYPE_INTEGER === $value->type) {
+            return (string) $value->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $value->type) {
+            return (string) $value->toFloat();
+        }
+        if (Variable::TYPE_BOOLEAN === $value->type) {
+            return $value->toBool() ? '1' : '';
+        }
+
+        return null;
+    }
+
+    private static function stringResult(string $s): Variable
+    {
+        $out = new Variable();
+        $out->string($s);
+
+        return $out;
+    }
+
+    /** php-src php_filter_sanitize_string — strip_tags + optional flag stripping. */
+    private static function sanitizeString(string $subject, int $flags): string
+    {
+        $out = VmString::stripTags($subject);
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_LOW)) {
+            $out = self::stripCharsBelow($out, 32);
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_HIGH)) {
+            $out = self::stripCharsAbove($out, 127);
+        }
+        if (0 !== ($flags & self::FILTER_FLAG_STRIP_BACKTICK)) {
+            $out = str_replace('`', '', $out);
+        }
+
+        return $out;
+    }
+
+    /** php-src php_filter_sanitize_special_chars — numeric entities for <>&"' */
+    private static function sanitizeSpecialChars(string $subject, int $flags): string
+    {
+        $encodeQuotes = 0 === ($flags & self::FILTER_FLAG_NO_ENCODE_QUOTES);
+        $out = '';
+        $len = strlen($subject);
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $subject[$i];
+            if ('<' === $ch || '>' === $ch || '&' === $ch || ('"' === $ch && $encodeQuotes) || ("'" === $ch && $encodeQuotes)) {
+                $out .= '&#'.ord($ch).';';
+                continue;
+            }
+            $out .= $ch;
+        }
+
+        return $out;
+    }
+
+    private static function sanitizeNumberInt(string $subject): string
+    {
+        return preg_replace('/[^0-9+-]+/', '', $subject) ?? '';
+    }
+
+    private static function sanitizeNumberFloat(string $subject): string
+    {
+        return preg_replace('/[^0-9+-]+/', '', $subject) ?? '';
+    }
+
+    /** php-src php_filter_sanitize_email allow-list. */
+    private static function sanitizeEmail(string $subject): string
+    {
+        return preg_replace(
+            '/[^0-9a-zA-Z!#$%&\'*+\/=?^_`{|}~@.-]+/',
+            '',
+            $subject
+        ) ?? '';
+    }
+
+    /** php-src php_filter_sanitize_url allow-list. */
+    private static function sanitizeUrl(string $subject): string
+    {
+        return preg_replace(
+            '/[^-a-zA-Z0-9+&@#\/%?=~_|!:,.;]+/',
+            '',
+            $subject
+        ) ?? '';
+    }
+
+    private static function stripCharsBelow(string $s, int $threshold): string
+    {
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if (ord($s[$i]) >= $threshold) {
+                $out .= $s[$i];
+            }
+        }
+
+        return $out;
+    }
+
+    private static function stripCharsAbove(string $s, int $threshold): string
+    {
+        $out = '';
+        $len = strlen($s);
+        for ($i = 0; $i < $len; ++$i) {
+            if (ord($s[$i]) <= $threshold) {
+                $out .= $s[$i];
+            }
+        }
+
+        return $out;
     }
 
     public static function resolveInputType(Variable $var, string $fn): int
