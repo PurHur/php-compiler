@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * gettimeofday() — wall-clock array or float (VM VmDate; JIT/AOT StringGettimeofday LLVM, #6110/#3208).
+ * gettimeofday() — wall-clock array or float (VM VmDate; JIT GettimeofdayJitHelper PHP, #13764).
  */
 final class gettimeofday extends Internal
 {
