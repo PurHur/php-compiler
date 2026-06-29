@@ -5,19 +5,18 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin as JitBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\BasicBlock;
-use PHPLLVM\Builder;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245, #12801, #12882).
+ * JIT/AOT link for include_path builtins via IncludePathJitHelper PHP (#9245).
  *
- * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\IncludePathJitHelper}; thin LLVM bridges
- * forward the ABI. VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
+ * Standalone LLVM quarantine: {@see IncludePathStandaloneLlvm}
+ * VM SSOT: {@see \PHPCompiler\ext\standard\VmIncludePath} / {@see \PHPCompiler\ext\standard\VmFs}
  * php-src: ext/standard/basic_functions.c — php_get_include_path / php_set_include_path
  * php-src: ext/standard/streams.c — php_stream_resolve_include_path
  */
@@ -77,13 +76,17 @@ final class IncludePathRuntime
 
         $savedBlock = self::captureInsertBlock($context);
 
-        self::ensureStackHelperCompiled($context);
-        self::implementInitNoop($context);
-        self::implementGetBridge($context);
-        self::implementSetBridge($context);
-        self::implementRestoreBridge($context);
-        self::ensureResolveHelperCompiled($context);
-        self::implementResolveBridge($context);
+        if (JitBuiltin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            IncludePathStandaloneLlvm::implement($context);
+        } else {
+            self::ensureStackHelperCompiled($context);
+            self::implementInitNoop($context);
+            self::implementGetBridge($context);
+            self::implementSetBridge($context);
+            self::implementRestoreBridge($context);
+            self::ensureResolveHelperCompiled($context);
+            self::implementResolveBridge($context);
+        }
         self::registerLinkedRuntime($context);
         self::restoreInsertBlock($context, $savedBlock);
     }
@@ -164,26 +167,6 @@ final class IncludePathRuntime
 
         $entry = $fn->appendBasicBlock('include_path_set_bridge');
         $context->builder->positionAtEnd($entry);
-        $i64 = $context->getTypeFromString('int64');
-        $newLen = $context->builder->call(
-            $context->lookupFunction('__string__strlen'),
-            $fn->getParam(0)
-        );
-        $emptyBlock = BasicBlockHelper::append($context, 'include_path_set_empty');
-        $pushBlock = BasicBlockHelper::append($context, 'include_path_set_push');
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $i64->constInt(0, false));
-        $context->builder->branchIf($isEmpty, $emptyBlock, $pushBlock);
-
-        $context->builder->positionAtEnd($emptyBlock);
-        $i32 = $context->getTypeFromString('int32');
-        $context->builder->call(
-            $context->lookupFunction('__value__writeBool'),
-            $fn->getParam(1),
-            $i32->constInt(0, false)
-        );
-        $context->builder->returnVoid();
-
-        $context->builder->positionAtEnd($pushBlock);
         $oldStrRaw = JitNestedHelperCoerce::callHelper(
             $context,
             self::stackHelperFunction($context, self::PUSH_HELPER),

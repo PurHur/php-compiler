@@ -371,6 +371,9 @@ class Context {
      */
     private function shouldSkipStandaloneMainEnvProbeGate(): bool
     {
+        if ($this->isUserScriptAot()) {
+            return true;
+        }
         if ($this->isBootstrapNonSpineSelfhostEntry()) {
             return true;
         }
@@ -776,47 +779,11 @@ class Context {
         Builtin\ReflectionNative::registerDeclarations($this);
         Builtin\AttributeRegistry::registerDeclarations($this);
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-            ExceptionBridge::ensureStandaloneBodies($this);
-            ErrorBridge::ensureStandaloneBodies($this);
-            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\AssertFail::ensureStandaloneBodies($this);
-            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
-            Builtin\JitReturnPending::ensureStandaloneBodies($this);
-            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-            Builtin\StringSoundex::ensureStandaloneBodies($this);
-            Builtin\StringMetaphone::ensureStandaloneBodies($this);
-            Builtin\StringStripTags::ensureStandaloneBodies($this);
-            Builtin\StringStrtr::ensureStandaloneBodies($this);
-            Builtin\StringParseStr::ensureStandaloneBodies($this);
-            Builtin\StringJsonEncode::ensureStandaloneBodies($this);
-            Builtin\StringJsonDecode::ensureStandaloneBodies($this);
-            Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringGetenv::ensureStandaloneBodies($this);
-            Builtin\StringGetenvAll::ensureStandaloneBodies($this);
-            Builtin\StringTriggerError::ensureStandaloneBodies($this);
-            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
-            Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
-            // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
-            // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
-            Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
-            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
-            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
-            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
-            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
-            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
-            Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
-            Builtin\DefineRuntime::ensureStandaloneBodies($this);
-            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
-            Builtin\SuperglobalNameRuntime::ensureLinked($this);
-            \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
-            Builtin\TokenGetAll::ensureStandaloneBodies($this);
-            Builtin\Highlight::ensureStandaloneBodies($this);
-            Builtin\Hebrev::ensureStandaloneBodies($this);
-            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+            if ($this->isUserScriptAot()) {
+                $this->ensureMinimalUserStandaloneBodies();
+            } else {
+                $this->ensureFullStandaloneBodies();
+            }
         }
 
         $this->functionProxies['is_null'] = new Builtin\IsNullFn();
@@ -868,6 +835,81 @@ class Context {
         ClosureBindHelper::registerJitMethods($this);
     }
 
+    private function isUserScriptAot(): bool
+    {
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** examples/000–009 user-script AOT: thin LLVM bridges only — no nested-JIT stdlib during init (#13571). */
+    private function ensureMinimalUserStandaloneBodies(): void
+    {
+        ExceptionBridge::ensureStandaloneBodies($this);
+        ErrorBridge::ensureStandaloneBodies($this);
+        Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\AssertFail::ensureStandaloneBodies($this);
+        Builtin\JitReturnPending::ensureStandaloneBodies($this);
+        Builtin\ObOutputRuntime::ensureLinked($this);
+        Builtin\StringTriggerError::ensureStandaloneBodies($this);
+        Builtin\StringRandomBytes::implement($this);
+        Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
+        Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+        Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+        Builtin\DefineRuntime::ensureStandaloneBodies($this);
+        Builtin\SuperglobalNameRuntime::ensureLinked($this);
+    }
+
+    private function ensureFullStandaloneBodies(): void
+    {
+        ExceptionBridge::ensureStandaloneBodies($this);
+        ErrorBridge::ensureStandaloneBodies($this);
+        Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\AssertFail::ensureStandaloneBodies($this);
+        Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
+        Builtin\JitReturnPending::ensureStandaloneBodies($this);
+        Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+        Builtin\StringSoundex::ensureStandaloneBodies($this);
+        Builtin\StringMetaphone::ensureStandaloneBodies($this);
+        Builtin\StringStripTags::ensureStandaloneBodies($this);
+        Builtin\StringStrtr::ensureStandaloneBodies($this);
+        Builtin\StringParseStr::ensureStandaloneBodies($this);
+        Builtin\StringJsonEncode::ensureStandaloneBodies($this);
+        Builtin\StringJsonDecode::ensureStandaloneBodies($this);
+        Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringGetenv::ensureStandaloneBodies($this);
+        Builtin\StringGetenvAll::ensureStandaloneBodies($this);
+        Builtin\StringTriggerError::ensureStandaloneBodies($this);
+        Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
+        Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
+        // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
+        // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
+        Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
+        Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
+        Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+        Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
+        Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+        Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+        Builtin\DefineRuntime::ensureStandaloneBodies($this);
+        Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+        Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
+        Builtin\TokenGetAll::ensureStandaloneBodies($this);
+        Builtin\Highlight::ensureStandaloneBodies($this);
+        Builtin\Hebrev::ensureStandaloneBodies($this);
+        Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+    }
+
     public function compileToFile(string $file) {
         // `-o` is a file path, not a directory. When a directory slips through, LLVM/ld
         // errors are confusing and (in some environments) can be misinterpreted as success.
@@ -893,6 +935,11 @@ class Context {
             ));
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isUserScriptAot()) {
+            Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+            Builtin\SuperglobalRefreshRuntime::ensureUserScriptMainStub($this);
+        }
+
         // add main function
         if (!is_null($this->main)) {
             $i32 = $this->context->int32Type();
@@ -914,7 +961,7 @@ class Context {
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_before_init'));
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isUserScriptAot()) {
                 $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
@@ -936,14 +983,16 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isUserScriptAot()) {
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
                 $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
             }
-            // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
-            $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
+            if (!$this->isUserScriptAot()) {
+                // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
+                $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
+            }
             $emitInStandaloneMain(fn () => $this->builder->call($this->shutdownFunc));
             $emitInStandaloneMain(fn () => $this->builder->returnValue($i32->constInt(0, false)));
         }

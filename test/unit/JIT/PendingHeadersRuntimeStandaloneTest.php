@@ -22,8 +22,8 @@ final class PendingHeadersRuntimeStandaloneTest extends TestCase
         $this->assertStringNotContainsString('phpc_pending_headers.c', $linker);
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersRuntime.php');
         $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
-        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
-        $this->assertFileDoesNotExist(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
+        $this->assertStringContainsString('PendingHeadersStandaloneLlvm::implement', $runtime);
+        $this->assertFileExists(__DIR__.'/../../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 
     public function testEnsureLinkedDefinesPendingHeadersForStandalone(): void

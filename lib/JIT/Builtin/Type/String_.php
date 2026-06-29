@@ -275,6 +275,10 @@ class String_ extends Type {
         $this->implementRealloc();
         $this->implementSeparate();
         $this->implementStrlen();
+        if (\PHPCompiler\JIT\Builtin::LOAD_TYPE_STANDALONE === $this->context->loadType) {
+            // User-script standalone AOT: defer nested-JIT stdlib helpers until ensureStandaloneBodies (#13571).
+            return;
+        }
         \PHPCompiler\JIT\Builtin\StringBitwiseNot::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialchars::implement($this->context);
         \PHPCompiler\JIT\Builtin\StringHtmlspecialcharsDecode::implement($this->context);

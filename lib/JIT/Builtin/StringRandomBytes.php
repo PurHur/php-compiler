@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Value\Function_ as LlvmFunction;
@@ -32,6 +33,12 @@ final class StringRandomBytes
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        if (self::shouldUseUserScriptThinStub($context)) {
+            self::implementUserScriptThinStub($context, $probe);
 
             return;
         }
@@ -99,5 +106,41 @@ final class StringRandomBytes
                 throw new \LogicException($lc.' was not compiled for JIT (#9149)');
             }
         }
+    }
+
+    private static function shouldUseUserScriptThinStub(Context $context): bool
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return false;
+        }
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function implementUserScriptThinStub(Context $context, ?LlvmFunction $probe): void
+    {
+        $abiName = '__compiler_random_bytes';
+        $i64 = $context->getTypeFromString('int64');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $i64)
+            );
+        if ($fn->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $fn);
+
+            return;
+        }
+        $entry = $fn->appendBasicBlock('rb_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($strPtr->constNull());
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
     }
 }

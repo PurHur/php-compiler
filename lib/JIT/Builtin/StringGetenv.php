@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -73,6 +74,12 @@ final class StringGetenv
             return;
         }
 
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StringGetenvLibcBridge::implement($context);
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementGetenvBridge($context);
         $context->builder->clearInsertionPosition();
@@ -81,6 +88,11 @@ final class StringGetenv
     public static function ensurePutenvLinked(Context $context): void
     {
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            StringGetenvLibcBridge::ensureLinked($context);
+
             return;
         }
         self::ensureJitHelperCompiled($context);

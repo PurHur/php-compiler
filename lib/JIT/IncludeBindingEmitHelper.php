@@ -8,6 +8,7 @@ use PHPCfg\Operand;
 use PHPLLVM\BasicBlock;
 use PHPCompiler\Block;
 use PHPCompiler\ext\standard\IncludeBindingJitHelper;
+use PHPCompiler\JIT;
 
 /**
  * LLVM emission for include local-binding materialize/restore (#10063, php-in-PHP).
@@ -136,7 +137,7 @@ final class IncludeBindingEmitHelper
 
     public static function emitCalleeLocalBinding(
         Context $context,
-        \PHPCompiler\JIT $jit,
+        JIT $jit,
         Operand $calleeOp,
         Variable $callerVar
     ): void {
