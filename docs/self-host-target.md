@@ -35,7 +35,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-------|-------|--------|
 | **Bootstrap driver** | Prelinked gen-0 refreshed via honest inventory argv emit; native `build/bin-compile-aot-inventory` for M4/M5 | Compiled `bin/compile.php` only |
 | **Bundle size** | **2643** literal Phase A inventory in spine smoke | Full vm.php closure |
-| **Inventory coverage** | **3463** / **3463** ✅ | Full closure |
+| **Inventory coverage** | **3469** / **3469** ✅ | Full closure |
 | **HelloWorld** | Strict probe **emit_path=native** ✅ | Native compile for arbitrary PHP |
 | **Bootstrap loop (M4)** | `make bootstrap-loop-probe` full ladder ✅ — gen-1→gen-2, gen-2→gen-3 full spine, full-revision argv | Native full revision rebuild |
 | **Vendor** | **3/3** vendor `object_ok`; committed `.o` cold boot without `vendor/` ✅; `make north-star5-verify-fast` daily; `--strict` pre-merge ✅ | No Zend `vendor/autoload.php` at bootstrap |
@@ -68,7 +68,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 |-----------|----------------|--------|-----|
 | **M0** | AOT can link a **small** honest `lib/` subset | ✅ | 100% |
 | **M1** | Bundle is **compiler-shaped** (lint + compile-smoke) | ✅ | 100% |
-| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **3463** / **3463** | **100%** |
+| **M2** | Spine grows toward full `bin/vm.php` inventory | ✅ **3469** / **3469** | **100%** |
 | **M3** | Self-host binary **compiles external PHP** (HelloWorld) without Zend emit | ✅ strict **native** + inventory argv | **~85%** |
 | **M4** | Self-host binary **rebuilds** the next compiler tree | ✅ full `bootstrap-loop-probe` ladder | **~90%** |
 | **M5** | Full self-host; Zend retired from loop | ✅ `north-star5-verify-fast` daily + `--strict` pre-merge; `BOOTSTRAP_M5_NO_ZEND=1` empty `build/` ([#3053](https://github.com/PurHur/php-compiler/issues/3053)) | **~90%** |
@@ -79,7 +79,7 @@ That is **M5**. Everything below is the honest path from today’s bootstrap to 
 
 | Indicator | Formula | Jun 2026 |
 |-----------|---------|----------|
-| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **3463 / 3463** (`php script/bootstrap-spine-count.php`) |
+| **M2 spine progress** | `require_once` units in `compiler_lib_spine_smoke` ÷ Phase A inventory file count | **3469 / 3469** (`php script/bootstrap-spine-count.php`) |
 | **Public “Self-host” row** | Same M2 ratio until M3–M5 gates add weight ([`development-status.md`](pages/development-status.md)) | **~97%** |
 | **M5 vendor prelink** | `object_ok` packages ÷ 3 | **3 / 3** (cfg, types, llvm) |
 | **Composite (internal)** | Milestone weights in table above (M0–M1 = 100%, M2 = spine %, M3–M5 = gate %) | **~90%** |
