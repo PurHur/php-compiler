@@ -48,7 +48,7 @@ final class socket_import_stream extends Internal
 
         BuiltinExecute::writeReturn(
             $frame,
-            static fn (Variable $ret) => $ret->assign($wrapped)
+            static fn (Variable $ret) => $ret->copyFrom($wrapped)
         );
     }
 
