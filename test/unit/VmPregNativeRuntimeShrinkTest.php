@@ -35,6 +35,7 @@ final class VmPregNativeRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PregJitHelper.php');
         $this->assertStringContainsString('VmPregNative::pregMatch', $source);
+        $this->assertStringContainsString('VmPregNative::pregReplaceCallbackJit', $source);
     }
 
     public function testProbeMatchesZendViaPurePath(): void

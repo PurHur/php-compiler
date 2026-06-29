@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3495 |
-| Phase A inventory files (M2 ratio SSOT) | 3495 |
+| PHP files on vm.php path | 3497 |
+| Phase A inventory files (M2 ratio SSOT) | 3497 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9477 |
+| Source constructs flagged (warnings) | 9481 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -400,6 +400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayIntersectJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayIntersectKeyJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayIsListJitHelper.php` | 0 | 1 |
+| `ext/standard/ArrayKeyExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayKeysJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayMapJitHelper.php` | 0 | 4 |
 | `ext/standard/ArrayMergeJitHelper.php` | 0 | 1 |
@@ -1001,10 +1002,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PhpUserFilterBuiltin.php` | 0 | 9 |
 | `ext/standard/PhpinfoJitHelper.php` | 0 | 1 |
 | `ext/standard/PowIntJitHelper.php` | 0 | 1 |
+| `ext/standard/PregCallbackInvokeJitHelper.php` | 0 | 1 |
 | `ext/standard/PregEmptyPatternReplace.php` | 0 | 1 |
 | `ext/standard/PregEmptyPatternReplaceJitHelper.php` | 0 | 1 |
 | `ext/standard/PregExpandJitHelper.php` | 0 | 1 |
-| `ext/standard/PregJitHelper.php` | 0 | 1 |
+| `ext/standard/PregJitHelper.php` | 0 | 2 |
 | `ext/standard/PregReplacementExpand.php` | 0 | 1 |
 | `ext/standard/PrintRJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessIdentityJitHelper.php` | 0 | 1 |
@@ -1084,7 +1086,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VarExportJitHelper.php` | 0 | 1 |
 | `ext/standard/VersionCompareJitHelper.php` | 0 | 1 |
 | `ext/standard/VfscanfJitHelper.php` | 0 | 2 |
-| `ext/standard/VmArray.php` | 0 | 51 |
+| `ext/standard/VmArray.php` | 0 | 53 |
 | `ext/standard/VmArrayAssocSetOps.php` | 0 | 2 |
 | `ext/standard/VmArrayColumnArg.php` | 0 | 1 |
 | `ext/standard/VmArrayFilterCallback.php` | 0 | 3 |
@@ -2328,6 +2330,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayIntersectKeyRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayIntersectRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayIsListRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayKeyExistsRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayMapRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php` | 0 | 4 |
@@ -2652,7 +2655,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringPosixTimes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPregMatch.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPregMatchJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringPregQuote.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPrintR.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 2 |
@@ -6167,6 +6169,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/ArrayIsListJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/ArrayKeyExistsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -10184,6 +10191,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/standard/PregCallbackInvokeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/PregEmptyPatternReplace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10202,7 +10214,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PregJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
+- 1 closure(s)
 
 ### `ext/standard/PregReplacementExpand.php`
 
@@ -10675,31 +10688,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 604)
 - new Variable (line 609)
 - new Error (line 771)
-- new Variable (line 833)
-- new Variable (line 839)
-- new HashTable (line 861)
-- new HashTable (line 866)
-- new Variable (line 869)
-- new HashTable (line 882)
-- new Variable (line 884)
-- new Variable (line 1011)
-- new Variable (line 1061)
-- new Variable (line 1072)
-- new HashTable (line 1078)
-- new Variable (line 1080)
-- new HashTable (line 1198)
-- new Variable (line 1209)
-- new HashTable (line 1249)
-- new Variable (line 1260)
-- new Variable (line 1273)
-- new HashTable (line 1313)
-- new Variable (line 1322)
-- new Variable (line 1403)
-- new Variable (line 1504)
-- new Variable (line 1506)
-- new HashTable (line 1519)
-- new Variable (line 1522)
-- 81 class method(s)
+- new Variable (line 812)
+- new Variable (line 818)
+- new Variable (line 855)
+- new Variable (line 861)
+- new HashTable (line 883)
+- new HashTable (line 888)
+- new Variable (line 891)
+- new HashTable (line 904)
+- new Variable (line 906)
+- new Variable (line 1033)
+- new Variable (line 1083)
+- new Variable (line 1094)
+- new HashTable (line 1100)
+- new Variable (line 1102)
+- new HashTable (line 1220)
+- new Variable (line 1231)
+- new HashTable (line 1271)
+- new Variable (line 1282)
+- new Variable (line 1295)
+- new HashTable (line 1335)
+- new Variable (line 1344)
+- new Variable (line 1425)
+- new Variable (line 1526)
+- new Variable (line 1528)
+- new HashTable (line 1541)
+- new Variable (line 1544)
+- 82 class method(s)
 - 3 closure(s)
 
 ### `ext/standard/VmArrayAssocSetOps.php`
@@ -11071,13 +11086,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 128)
 - new Variable (line 130)
-- new HashTable (line 271)
-- new HashTable (line 274)
-- new Variable (line 276)
-- new HashTable (line 441)
-- new Variable (line 458)
-- new Variable (line 465)
-- 38 class method(s)
+- new HashTable (line 363)
+- new HashTable (line 366)
+- new Variable (line 368)
+- new HashTable (line 533)
+- new Variable (line 550)
+- new Variable (line 557)
+- 41 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmDnsMx.php`
@@ -12055,7 +12070,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmPregPattern.php`
 
@@ -13043,8 +13058,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_key_exists.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 151)
-- 6 class method(s)
+- new self (line 89)
+- 4 class method(s)
 
 ### `ext/standard/array_key_first.php`
 
@@ -18059,77 +18074,77 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11019)
 - new Operand\Temporary (line 11021)
 - new OpCode (line 11068)
-- new CfgVariable (line 17774)
-- new Literal (line 17774)
-- new Variable (line 17806)
-- new Variable (line 17860)
-- new OpCode (line 17884)
-- new OpCode (line 18272)
-- new OpCode (line 18288)
-- new OpCode (line 18296)
-- new OpCode (line 18303)
-- new OpCode (line 18315)
-- new OpCode (line 18332)
-- new OpCode (line 18338)
-- new OpCode (line 18344)
-- new OpCode (line 18349)
-- new OpCode (line 18365)
-- new OpCode (line 18378)
-- new Variable (line 18389)
-- new Operand\Literal (line 18391)
-- new OpCode (line 18394)
-- new OpCode (line 18464)
-- new OpCode (line 18475)
-- new OpCode (line 18488)
-- new OpCode (line 18662)
-- new OpCode (line 18910)
-- new OpCode (line 18916)
-- new OpCode (line 18922)
+- new CfgVariable (line 17799)
+- new Literal (line 17799)
+- new Variable (line 17831)
+- new Variable (line 17885)
+- new OpCode (line 17909)
+- new OpCode (line 18297)
+- new OpCode (line 18313)
+- new OpCode (line 18321)
+- new OpCode (line 18328)
+- new OpCode (line 18340)
+- new OpCode (line 18357)
+- new OpCode (line 18363)
+- new OpCode (line 18369)
+- new OpCode (line 18374)
+- new OpCode (line 18390)
+- new OpCode (line 18403)
+- new Variable (line 18414)
+- new Operand\Literal (line 18416)
+- new OpCode (line 18419)
+- new OpCode (line 18489)
+- new OpCode (line 18500)
+- new OpCode (line 18513)
+- new OpCode (line 18687)
+- new OpCode (line 18935)
+- new OpCode (line 18941)
 - new OpCode (line 18947)
-- new Variable (line 18974)
-- new Temporary (line 18976)
-- new Variable (line 18984)
-- new Temporary (line 18986)
-- new OpCode (line 19034)
-- new Operand\Temporary (line 19054)
-- new Operand\Temporary (line 19060)
-- new Operand\Temporary (line 19066)
-- new Operand\Temporary (line 19072)
-- new Operand\Temporary (line 19081)
-- new Variable (line 20163)
-- new Variable (line 20167)
-- new Variable (line 20175)
-- new Variable (line 20179)
-- new Variable (line 20421)
-- new Operand\Literal (line 20934)
-- new Variable (line 20936)
-- new OpCode (line 21364)
-- new OpCode (line 21556)
-- new OpCode (line 21837)
-- new OpCode (line 22038)
-- new OpCode (line 22048)
-- new OpCode (line 22051)
-- new Operand\Temporary (line 22083)
-- new OpCode (line 22085)
-- new OpCode (line 22096)
-- new Operand\Temporary (line 22099)
-- new OpCode (line 22101)
-- new OpCode (line 22109)
-- new OpCode (line 22116)
-- new OpCode (line 22124)
-- new OpCode (line 22127)
+- new OpCode (line 18972)
+- new Variable (line 18999)
+- new Temporary (line 19001)
+- new Variable (line 19009)
+- new Temporary (line 19011)
+- new OpCode (line 19059)
+- new Operand\Temporary (line 19079)
+- new Operand\Temporary (line 19085)
+- new Operand\Temporary (line 19091)
+- new Operand\Temporary (line 19097)
+- new Operand\Temporary (line 19106)
+- new Variable (line 20188)
+- new Variable (line 20192)
+- new Variable (line 20200)
+- new Variable (line 20204)
+- new Variable (line 20446)
+- new Operand\Literal (line 20962)
+- new Variable (line 20964)
+- new OpCode (line 21399)
+- new OpCode (line 21591)
+- new OpCode (line 21872)
+- new OpCode (line 22073)
+- new OpCode (line 22083)
+- new OpCode (line 22086)
+- new Operand\Temporary (line 22118)
+- new OpCode (line 22120)
+- new OpCode (line 22131)
+- new Operand\Temporary (line 22134)
+- new OpCode (line 22136)
 - new OpCode (line 22144)
-- new OpCode (line 22172)
+- new OpCode (line 22151)
+- new OpCode (line 22159)
+- new OpCode (line 22162)
 - new OpCode (line 22179)
-- new OpCode (line 22316)
-- new Literal (line 22348)
-- new OpCode (line 22447)
-- new Variable (line 22454)
-- new Temporary (line 22456)
-- new OpCode (line 22459)
-- new CompileFatal (line 22757)
-- new CompileFatal (line 22976)
-- 639 class method(s)
+- new OpCode (line 22207)
+- new OpCode (line 22214)
+- new OpCode (line 22408)
+- new Literal (line 22440)
+- new OpCode (line 22539)
+- new Variable (line 22546)
+- new Temporary (line 22548)
+- new OpCode (line 22551)
+- new CompileFatal (line 22849)
+- new CompileFatal (line 23068)
+- 642 class method(s)
 - 19 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -18916,6 +18931,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/ArrayKeyExistsRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/ArrayKeysRuntime.php`
 
@@ -19866,9 +19886,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/PregMatchRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 372)
-- 12 class method(s)
-- 1 closure(s)
+- new JIT (line 499)
+- 15 class method(s)
+- 2 closure(s)
 
 ### `lib/JIT/Builtin/ProcessIdentityJit.php`
 
@@ -20836,12 +20856,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
-
-### `lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 24 class method(s)
-- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringPregQuote.php`
 

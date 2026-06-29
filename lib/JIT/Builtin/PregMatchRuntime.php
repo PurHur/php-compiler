@@ -5,17 +5,21 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
+use PHPLLVM\LLVMAbstract\Builder as LLVMBuilderImpl;
+use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
+use llvm\LLVMValueRef_ptr;
 
 /**
  * JIT/AOT embed link for __compiler_preg_* via PregJitHelper PHP (#9542).
  *
- * Standalone AOT preg_* (except preg_replace_callback) uses this PHP bridge (#9542, #12982).
- * preg_replace_callback still uses a thin LLVM slice from {@see StringPregMatchStandaloneLlvm}.
+ * Standalone AOT preg_* routes through PregMatchRuntime + PregJitHelper PHP (#9542, #12982, #13736).
+ * preg_replace_callback uses PHP match loop + thin LLVM callback invoke (#13736).
  * php-src: ext/pcre/php_pcre.c
  */
 final class PregMatchRuntime
@@ -40,6 +44,10 @@ final class PregMatchRuntime
 
     private const REPLACE_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceArgv';
 
+    private const REPLACE_CALLBACK_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::replaceCallbackArgv';
+
+    private const INVOKE_CALLBACK_HELPER = 'PHPCompiler\\ext\\standard\\PregCallbackInvokeJitHelper::invoke';
+
     private const SPLIT_HELPER = 'PHPCompiler\\ext\\standard\\PregJitHelper::splitArgv';
 
     /** @var list<string> */
@@ -53,6 +61,7 @@ final class PregMatchRuntime
         self::MATCH_ALL_EX_HELPER,
         self::TAKE_MATCH_ALL_EX_HT,
         self::REPLACE_HELPER,
+        self::REPLACE_CALLBACK_HELPER,
         self::SPLIT_HELPER,
     ];
 
@@ -90,6 +99,7 @@ final class PregMatchRuntime
         }
 
         self::ensureRuntimeHelpers($context);
+        self::ensureInvokeCallbackHelperLinked($context);
         self::ensureJitHelperCompiled($context);
         self::implementLastErrorBridge($context);
         self::implementLastErrorMsgBridge($context);
@@ -98,8 +108,8 @@ final class PregMatchRuntime
         self::implementMatchExBridge($context, '__compiler_preg_match_ex', self::MATCH_EX_HELPER, self::TAKE_MATCH_EX_HT);
         self::implementMatchExBridge($context, '__compiler_preg_match_all_ex', self::MATCH_ALL_EX_HELPER, self::TAKE_MATCH_ALL_EX_HT);
         self::implementReplaceBridge($context);
+        self::implementReplaceCallbackBridge($context);
         self::implementSplitBridge($context);
-        StringPregMatchStandaloneLlvm::implementReplaceCallbackOnly($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -292,6 +302,122 @@ final class PregMatchRuntime
         $context->registerFunction($abiName, $fn);
     }
 
+    private static function implementReplaceCallbackBridge(Context $context): void
+    {
+        $abiName = '__compiler_preg_replace_callback';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $i64 = $context->getTypeFromString('int64');
+        $cbFnTy = $context->context->functionType($valuePtr, false, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr, $cbFnTy->pointerType(0))
+            );
+        $entry = $fn->appendBasicBlock('preg_replace_callback_entry');
+        $failBb = $fn->appendBasicBlock('preg_replace_callback_fail');
+        $okBb = $fn->appendBasicBlock('preg_replace_callback_ok');
+        $context->builder->positionAtEnd($entry);
+        $raw = $context->builder->call(
+            self::helperFunction($context, self::REPLACE_CALLBACK_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            JitNestedHelperCoerce::ptrToI64($context, $fn->getParam(2))
+        );
+        $isNull = JitNestedHelperCoerce::isHelperResultNull($context, $raw);
+        $context->builder->branchIf($isNull, $failBb, $okBb);
+
+        $context->builder->positionAtEnd($failBb);
+        $context->builder->returnValue($strPtr->constNull());
+
+        $context->builder->positionAtEnd($okBb);
+        $context->builder->returnValue(JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function ensureInvokeCallbackHelperLinked(Context $context): void
+    {
+        $lc = \strtolower(self::INVOKE_CALLBACK_HELPER);
+        if (isset($context->functions[$lc])) {
+            return;
+        }
+
+        $i64 = $context->getTypeFromString('int64');
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i8 = $context->getTypeFromString('int8');
+        $valueMap = $context->structFieldMap['__value__'];
+        $cbFnTy = $context->context->functionType($valuePtr, false, $valuePtr);
+        $cbPtrTy = $cbFnTy->pointerType(0);
+
+        $fn = $context->module->addFunction(
+            $lc,
+            $context->context->functionType($strPtr, false, $i64, $htPtr)
+        );
+        $entry = $fn->appendBasicBlock('preg_invoke_callback_entry');
+        $context->builder->positionAtEnd($entry);
+
+        $cbAddr = $fn->getParam(0);
+        $matches = $fn->getParam(1);
+        $argSlot = BasicBlockHelper::entryAlloca($context, $context->getTypeFromString('__value__'));
+        $context->builder->store(
+            $i8->constInt(\PHPCompiler\JIT\Variable::TYPE_NULL, false),
+            $context->builder->structGep($argSlot, $valueMap['type'])
+        );
+        $argPtr = $context->builder->pointerCast($argSlot, $valuePtr);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeHashtable'),
+            $argPtr,
+            $matches
+        );
+        $fnPtr = $context->builder->intToPtr($cbAddr, $cbPtrTy);
+        $cbResult = self::emitIndirectCall($context, $cbFnTy, $fnPtr, $argPtr);
+        $replStr = $context->builder->call(
+            $context->lookupFunction('__value__readString'),
+            $cbResult
+        );
+        $context->builder->returnValue($replStr);
+        $context->registerFunction($lc, $fn);
+
+        $root = \dirname(__DIR__, 3);
+        $invokePath = $root.'/ext/standard/PregCallbackInvokeJitHelper.php';
+        $real = \realpath($invokePath) ?: $invokePath;
+        $context->markJitIncludedFileCompiled($real);
+    }
+
+    private static function emitIndirectCall(Context $context, $fnTy, Value $fnPtr, Value ...$args): Value
+    {
+        $b = $context->builder;
+        if (!$b instanceof LLVMBuilderImpl) {
+            throw new \LogicException('LLVM builder required for preg callback indirect call (#13736)');
+        }
+        $valueWrapper = $b->llvm->lib->makeArray(
+            LLVMValueRef_ptr::class,
+            array_map(static fn (Value $value) => $value->value, $args)
+        );
+
+        return $b->llvm->factory->value(
+            $context->context,
+            $b->llvm->lib->LLVMBuildCall2(
+                $b->builder,
+                $fnTy->type,
+                $fnPtr->value,
+                $valueWrapper,
+                \count($args),
+                ''
+            )
+        );
+    }
+
     private static function implementSplitBridge(Context $context): void
     {
         $abiName = '__compiler_preg_split';
@@ -366,6 +492,7 @@ final class PregMatchRuntime
             $root.'/ext/standard/VmPregNative.php',
             $root.'/ext/standard/VmPregMatches.php',
             $root.'/ext/standard/VmPreg.php',
+            $root.'/ext/standard/PregCallbackInvokeJitHelper.php',
             $root.self::HELPER_PATH,
         ];
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {

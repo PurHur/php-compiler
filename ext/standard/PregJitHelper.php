@@ -113,4 +113,21 @@ final class PregJitHelper
 
         return VmPreg::splitPartsToHashTable($parts, $flags);
     }
+
+    public static function replaceCallbackArgv(string $pattern, string $subject, int $callbackFnAddr): ?string
+    {
+        if (0 === $callbackFnAddr) {
+            return null;
+        }
+
+        return VmPregNative::pregReplaceCallbackJit(
+            $pattern,
+            $subject,
+            static function (array $matches) use ($callbackFnAddr): string {
+                $ht = VmPregMatches::hostMatchesToHashTable($matches, 0);
+
+                return PregCallbackInvokeJitHelper::invoke($callbackFnAddr, $ht);
+            }
+        );
+    }
 }
