@@ -2789,4 +2789,28 @@ PHP;
         $runtime->run($block);
         self::assertSame("ok\n", ob_get_clean());
     }
+
+    /** Issue #13423 — preg_split(..., -1, PREG_SPLIT_*) nested in check() wires limit/flags slots. */
+    public function testPregSplitNegativeLimitWithFlagsNestedCallArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+check(
+    'b',
+    preg_split('/( )/', 'a b c', -1, PREG_SPLIT_DELIM_CAPTURE),
+    ['a', ' ', 'b', ' ', 'c']
+);
+check('a', preg_split('/ /', 'a b c', -1), ['a', 'b', 'c']);
+function check(string $label, mixed $got, mixed $expected): void
+{
+    if ($got !== $expected) {
+        throw new \LogicException('mismatch: '.$label);
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_split_nested_limit_flags.php');
+        $runtime->run($block);
+        $this->addToAssertionCount(1);
+    }
 }

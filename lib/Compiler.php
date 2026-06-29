@@ -13942,6 +13942,24 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        // preg_split(..., -1, PREG_SPLIT_*) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423).
+        if ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3)) {
+            $unaryProducer = null;
+            $constProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                    $unaryProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                    $constProducer = $producer;
+                }
+            }
+            if (2 === $argIndex) {
+                return $unaryProducer;
+            }
+            if (3 === $argIndex) {
+                return $constProducer;
+            }
+        }
         if (null !== $cfgCallOp && null !== $block && null !== $block->orig) {
             $leadingProducer = $producers[0] ?? null;
             if ($leadingProducer instanceof Op\Expr\FuncCall || $leadingProducer instanceof Op\Expr\NsFuncCall) {
