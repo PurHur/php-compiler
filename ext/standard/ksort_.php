@@ -37,6 +37,13 @@ final class ksort_ extends Internal
         if (2 === $argc) {
             $flags = VmInternalCompare::resolveFrameSortFlags($frame, 'ksort');
         }
+        if ($ht->getNumElements() < 2) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
         $array->array(VmArray::ksortCopy($ht, $flags));
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
