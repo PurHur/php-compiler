@@ -8,7 +8,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * php-src-strict guards: non-php-src builtins must not register (#13580).
+ * php-src-strict guards: non-php-src builtins must not register (#13580, #13581).
  */
 final class StdlibParityBuiltinGuardTest extends TestCase
 {
@@ -35,6 +35,29 @@ PHP;
 
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'array_is_assoc_exists.php');
+        ob_start();
+        $runtime->run($block);
+        $output = (string) ob_get_clean();
+
+        $this->assertSame('false', trim($output));
+    }
+
+    public function testStrPaddedSourceRemovedFromStdlib(): void
+    {
+        $module = (string) file_get_contents($this->repoRoot.'/ext/standard/Module.php');
+        $this->assertStringNotContainsString('new str_padded()', $module);
+        $this->assertFileDoesNotExist($this->repoRoot.'/ext/standard/str_padded.php');
+    }
+
+    public function testVmFunctionExistsStrPaddedFalse(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(function_exists('str_padded'));
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'str_padded_exists.php');
         ob_start();
         $runtime->run($block);
         $output = (string) ob_get_clean();

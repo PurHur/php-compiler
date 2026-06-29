@@ -2349,7 +2349,7 @@ final class VmString
     }
 
     /**
-     * str_padded() — UTF-8 codepoint padding (php-src ext/mbstring/mbstring.c mb_str_pad; issue #7044).
+     * Internal UTF-8 codepoint padding helper (mb_str_pad semantics; not a php-src userland builtin — #13581).
      */
     public static function strPadded(string $input, int $padLength, string $padString = ' ', int $padType = 1): string
     {

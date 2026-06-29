@@ -327,12 +327,6 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.4+ str_padded() multibyte-safe padding (ext/standard/string.c; issue #7044). */
-    public static function supportsStrPadded(): bool
-    {
-        return self::advertisesBuiltinSince('8.4.0');
-    }
-
     /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989). */
     public static function supportsClassHasFunctions(): bool
     {
