@@ -22097,6 +22097,86 @@ class Compiler {
                     }
                 }
             }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'preg_split' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && ((int) $argIndex === 2 || (int) $argIndex === 3)
+            ) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $unaryProducer = null;
+                $constProducer = null;
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                        $unaryProducer = $producer;
+                    } elseif ($producer instanceof Op\Expr\ConstFetch) {
+                        $constProducer = $producer;
+                    }
+                }
+                $targetProducer = 2 === (int) $argIndex ? $unaryProducer : $constProducer;
+                if ($targetProducer instanceof Op\Expr) {
+                    $folded = null;
+                    if ($targetProducer instanceof Op\Expr\ConstFetch) {
+                        $folded = $this->tryFoldGlobalConstFetch($targetProducer);
+                    } elseif (
+                        $targetProducer instanceof Op\Expr\UnaryMinus
+                        || $targetProducer instanceof Op\Expr\UnaryPlus
+                    ) {
+                        $folded = $this->tryFoldUnaryLiteralDefault($targetProducer);
+                    }
+                    if (null !== $folded) {
+                        $valueSlot = (string) $block->registerConstant(
+                            new Operand\Temporary(),
+                            $folded
+                        );
+                    } else {
+                        $slot = $block->slotForOperand($targetProducer->result);
+                        if (null === $slot) {
+                            foreach ($this->compileExpr($targetProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $slot = $block->slotForOperand($targetProducer->result);
+                        }
+                        if (null !== $slot) {
+                            $valueSlot = (string) $slot;
+                        }
+                    }
+                }
+            } elseif (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'explode' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 2 === (int) $argIndex
+            ) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                foreach ($producers as $producer) {
+                    if (!$producer instanceof Op\Expr\UnaryMinus && !$producer instanceof Op\Expr\UnaryPlus) {
+                        continue;
+                    }
+                    $folded = $this->tryFoldUnaryLiteralDefault($producer);
+                    if (null !== $folded) {
+                        $valueSlot = (string) $block->registerConstant(new Operand\Temporary(), $folded);
+                        break;
+                    }
+                    $slot = $block->slotForOperand($producer->result);
+                    if (null === $slot) {
+                        foreach ($this->compileExpr($producer, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $slot = $block->slotForOperand($producer->result);
+                    }
+                    if (null !== $slot) {
+                        $valueSlot = (string) $slot;
+                    }
+                    break;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
