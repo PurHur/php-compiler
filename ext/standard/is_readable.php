@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -20,7 +19,7 @@ final class is_readable extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_readable() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'is_readable', 0, 'filename');
+        $path = VmString::stringBuiltinArgForFrame($frame, 0, 'is_readable', 0, 'filename');
         if (null === $frame->returnVar) {
             return;
         }
@@ -32,7 +31,7 @@ final class is_readable extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_readable() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'is_readable', 0, 'filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'is_readable');
 
         return JitStat::pathIsReadable($context, $path);
     }
