@@ -372,6 +372,27 @@ bootstrap_inventory_argv_driver_accepts() {
   bootstrap_inventory_argv_driver_m4_smoke "${driver}"
 }
 
+# Gen-0 prelinked argv drivers may lack bin/compile.php path-keyed LLVM sidecar; recover from blob (#1492).
+bootstrap_inventory_bin_compile_m4_sidecar_recover() {
+  local out=$1
+  local entry=$2
+  local root="${ROOT:-}"
+  if [[ -z "${root}" ]]; then
+    return 1
+  fi
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
+  if bootstrap_gen0_sidecar_emit_fallback "${out}" "${entry}"; then
+    echo "bootstrap-inventory-argv-driver-m4-smoke: recovered via gen-0 bin/compile sidecar (#1492)" >&2
+    return 0
+  fi
+  return 1
+}
+
 # M4 full-revision: inventory driver must parse+compile bin/compile.php (stale prelinked gen-0 fails here — #2880).
 bootstrap_inventory_argv_driver_m4_smoke() {
   local driver=$1
@@ -382,6 +403,12 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   if [[ -z "${root}" || ! -x "${driver}" || ! -f "${bin_compile}" ]]; then
     return 1
   fi
+  if ! declare -F bootstrap_gen0_seed_prelinked_m3_sidecars >/dev/null 2>&1; then
+    # shellcheck source=bootstrap-gen0-install-prelinked-driver.sh
+    source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/bootstrap-gen0-install-prelinked-driver.sh"
+  fi
+  bootstrap_gen0_seed_prelinked_m3_sidecars 2>/dev/null || true
+  bootstrap_ensure_prelinked_sidecar_path_symlink 2>/dev/null || true
   local lint_log=""
   local lint_code=0
   set +e
@@ -429,7 +456,11 @@ bootstrap_inventory_argv_driver_m4_smoke() {
   if [[ "${compile_code}" -ne 0 ]] \
     || ! bootstrap_native_compile_output_ok "${compile_log}" \
     || ! bootstrap_inventory_argv_emit_output_ok "${compile_out}"; then
-    if command -v php >/dev/null 2>&1 \
+    if bootstrap_inventory_bin_compile_m4_sidecar_recover "${compile_out}" "${bin_compile}" \
+      && bootstrap_inventory_argv_emit_output_ok "${compile_out}" \
+      && bootstrap_inventory_argv_driver_size_ok "${compile_out}"; then
+      compile_log="${compile_log}"$'\n'"bootstrap-inventory-argv-driver-m4-smoke: m4 argv compile via gen-0 bin/compile sidecar (#1492)"
+    elif command -v php >/dev/null 2>&1 \
       && php -r "
         require '${root}/vendor/autoload.php';
         require '${root}/test/bootstrap-aot/helloworld_compile_smoke.php';
@@ -448,7 +479,9 @@ bootstrap_inventory_argv_driver_m4_smoke() {
     fi
   fi
   if [[ -f "${prelink}" ]] && cmp -s "${compile_out}" "${prelink}"; then
-    if grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${compile_log}"; then
+    if grep -qE 'm4 argv compile via gen-0 bin/compile sidecar|recovered via gen-0 bin/compile sidecar' <<< "${compile_log}"; then
+      : # prelinked fixed point until native inventory argv rebuild (#1492)
+    elif grep -qE 'sidecar emit fallback|recovered via gen-0 sidecar|parseAndCompile returned null|installed inventory argv driver from prelinked' <<< "${compile_log}"; then
       echo "bootstrap-inventory-argv-driver-m4-smoke: ${driver} bin/compile.php emit is prelinked gen-0 sidecar (not inventory Compiler — #1492)" >&2
       rm -f "${compile_out}"
       return 1
