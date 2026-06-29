@@ -13,7 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\ArraySpliceRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitIntdiv;
@@ -91,7 +91,7 @@ final class array_splice extends Internal
         }
         $replacement = 4 === $argc ? $args[3] : null;
 
-        return ArrayBuiltinHelper::buildSpliceArray(
+        return ArraySpliceRuntime::splice(
             $context,
             $args[0],
             $offset,
