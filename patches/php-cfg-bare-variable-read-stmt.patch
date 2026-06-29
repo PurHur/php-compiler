@@ -1,0 +1,39 @@
+--- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
++++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
+@@ -231,7 +231,15 @@
+ 
+     protected function parseStmt_Expression(Stmt\Expression $node)
+     {
+-        return $this->parseExprNode($node->expr);
++        if ($node->expr instanceof Node\Expr\Variable) {
++            $attrs = $this->mapAttributes($node);
++            $this->block->children[] = new Op\Expr\UnaryPlus(
++                $this->readVariable($this->parseExprNode($node->expr)),
++                $attrs
++            );
++
++            return;
++        }
++        $this->parseExprNode($node->expr);
+     }
+ 
+     protected function parseStmt_Class(Stmt\Class_ $node)
+@@ -1415,8 +1423,15 @@
+         $block->addParent($this->block);
+         $this->block = $block;
+         $result = $this->parseExprNode($expr->expr);
+-        // Evaluate reads inside the suppress region (issue #3546; Zend ZEND_COMPILE_SILENCE).
+-        $result = $this->readVariable($result);
++        // Bare variable reads need a real fetch op for ZEND_CHECK_UNDEFINED_VAR (#13587).
++        if ($expr->expr instanceof Node\Expr\Variable) {
++            $this->block->children[] = new Op\Expr\UnaryPlus(
++                $this->readVariable($result),
++                $attrs
++            );
++        } else {
++            // Evaluate reads inside the suppress region (issue #3546; Zend ZEND_COMPILE_SILENCE).
++            $result = $this->readVariable($result);
++        }
+         $end = new Block();
+         $this->block->children[] = new Jump($end, $attrs);
+         $end->addParent($this->block);
