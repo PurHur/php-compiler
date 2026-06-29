@@ -96,6 +96,9 @@ final class ReferencableCheck
                 if (Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type) {
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
+                } elseif (!self::isReferenceable($calledArgs[$paramIdx], $caller)) {
+                    // #13435: shuffle/sort* on non-lvalue (e.g. new stdClass()) — E_NOTICE then TypeError.
+                    self::emitNonVariableByRefNotice($caller);
                 }
                 continue;
             }
