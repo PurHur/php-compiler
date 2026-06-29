@@ -16,5 +16,6 @@ final class BuiltinClasses
     public static function register(Context $ctx): void
     {
         DirectoryBuiltin::registerClass($ctx);
+        PhpUserFilterBuiltin::registerClass($ctx);
     }
 }

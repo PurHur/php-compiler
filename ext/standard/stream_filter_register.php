@@ -40,6 +40,22 @@ final class stream_filter_register extends Internal
         if (null === $frame->returnVar) {
             return;
         }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('stream_filter_register() requires VM context in this compiler build');
+        }
+        PhpUserFilterBuiltin::registerClass($frame->vmContext);
+        if (!PhpUserFilterBuiltin::isSubclassOf($frame->vmContext, $className)) {
+            $frame->vmContext->errors->triggerError(
+                \sprintf('stream_filter_register(): class "%s" must extend php_user_filter', $className),
+                \PHPCompiler\VM\ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         $frame->returnVar->bool(VmStreamFilters::register($filterName, $className));
     }
 
