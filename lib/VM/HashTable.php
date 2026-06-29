@@ -47,6 +47,7 @@ final class HashTable {
         $this->flags = self::FLAG_UNINITIALIZED;
         $this->indexes = MaskedArray::allocate(self::MIN_SIZE);
         $this->buckets = MaskedArray::allocate(self::MIN_SIZE);
+        HashTableRegistry::register($this);
     }
 
     public function addRef(): void {
@@ -55,6 +56,30 @@ final class HashTable {
 
     public function delRef(): void {
         $this->refcount->delRef();
+        if (0 === $this->refcount->refcount && !$this->isDestroyed() && !CycleCollector::isGcProtected()) {
+            HashTableRegistry::release($this);
+        }
+    }
+
+    public function isDestroyed(): bool
+    {
+        return self::DESTROYED === ($this->flags & self::FLAG_CONSISTENCY);
+    }
+
+    /** Break bucket edges after cycle collection (#13400). */
+    public function destroyForGc(): void
+    {
+        if ($this->isDestroyed()) {
+            return;
+        }
+        $this->flags = ($this->flags & ~self::FLAG_CONSISTENCY) | self::IS_DESTROYING;
+        for ($i = 0; $i < $this->numUsed; ++$i) {
+            $bucket = $this->buckets->read($i);
+            if (!$bucket->value->isUndefined()) {
+                $bucket->value->reset();
+            }
+        }
+        $this->flags = ($this->flags & ~self::FLAG_CONSISTENCY) | self::DESTROYED;
     }
 
     public function needsSeparate(): bool {

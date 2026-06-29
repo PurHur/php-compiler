@@ -23,6 +23,7 @@ use PHPTypes\State;
 use PHPCompiler\VM\Optimizer;
 use PHPCompiler\VM\Context as VMContext;
 use PHPCompiler\VM\ObjectRegistry;
+use PHPCompiler\VM\HashTableRegistry;
 use PHPCompiler\JIT\Context as JITContext;
 use PHPCompiler\Ast\AsymmetricVisibilityRewriter;
 use PHPCompiler\Ast\DnfParenTypeRewriter;
@@ -106,6 +107,7 @@ class Runtime {
 
     public function __construct(int $mode = self::MODE_NORMAL) {
         ObjectRegistry::reset();
+        HashTableRegistry::reset();
         ext\standard\ModuleRegistry::reset();
         self::clearLastParseFailure();
         ext\standard\VmIniIntrospection::seedHostIniEnvFromZend();
