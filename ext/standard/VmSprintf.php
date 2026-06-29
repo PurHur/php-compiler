@@ -348,9 +348,29 @@ final class VmSprintf
                 return '';
             case Variable::TYPE_OBJECT:
                 return VmString::coerceOperand($var);
+            case Variable::TYPE_ARRAY:
+                self::warnArrayToString($frame);
+
+                return 'Array';
             default:
                 throw new \LogicException('sprintf() %s requires a scalar value in this compiler build');
         }
+    }
+
+    private static function warnArrayToString(?Frame $frame): void
+    {
+        if (null !== $frame?->vmContext) {
+            $frame->vmContext->errors->languageWarning(
+                'Array to string conversion',
+                null,
+                0,
+                $frame->vmContext,
+                $frame
+            );
+
+            return;
+        }
+        @\trigger_error('Array to string conversion', \E_WARNING);
     }
 
     private static function argToInt(Variable $var, ?Frame $frame = null): int

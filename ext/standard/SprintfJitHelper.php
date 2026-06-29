@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -49,6 +50,8 @@ final class SprintfJitHelper
                 $var->bool($scalar);
             } elseif (\is_string($scalar)) {
                 $var->string($scalar);
+            } elseif ($scalar instanceof PackedArgvArrayMarker) {
+                $var->array(new HashTable());
             } else {
                 $var->null();
             }

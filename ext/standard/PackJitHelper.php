@@ -22,6 +22,16 @@ final class PackJitHelper
 
     private const TAG_STRING = 4;
 
+    private const TAG_ARRAY = 5;
+
+    /** Internal marker decoded from {@see self::TAG_ARRAY} argv slots (#13598). */
+    public static function packedArrayMarker(): PackedArgvArrayMarker
+    {
+        static $marker = null;
+
+        return $marker ??= new PackedArgvArrayMarker();
+    }
+
     /**
      * @param string $packedArgs length-prefixed argv blob from LLVM bridge
      */
@@ -87,6 +97,9 @@ final class PackJitHelper
                     $args[] = \substr($packed, $pos, $sl);
                     $pos += $sl;
                     break;
+                case self::TAG_ARRAY:
+                    $args[] = self::packedArrayMarker();
+                    break;
                 default:
                     break 2;
             }
@@ -94,4 +107,9 @@ final class PackJitHelper
 
         return $args;
     }
+}
+
+/** @internal argv blob marker for array operands in sprintf JIT bridge (#13598). */
+final class PackedArgvArrayMarker
+{
 }
