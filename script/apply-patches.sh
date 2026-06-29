@@ -217,6 +217,9 @@ patch_already_applied() {
     php-cfg-phi-resolver-null.patch)
       grep -q 'null === \$phi->result' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
       ;;
+    php-cfg-phi-resolver-skip-forwarded.patch)
+      grep -q 'forwarded by an earlier resolvePhi pass' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
+      ;;
     php-cfg-magic-constants.patch)
       grep -q 'traitStack' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/MagicStringResolver.php" 2>/dev/null
       ;;
@@ -5819,6 +5822,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-goto-scope.patch"
   apply_php_cfg_process_assertions_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
+  apply_patch "$PATCH_DIR/php-cfg-phi-resolver-skip-forwarded.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-constants.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-script-const.patch"
   apply_patch "$PATCH_DIR/php-cfg-magic-line.patch"
