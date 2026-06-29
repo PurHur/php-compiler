@@ -13322,6 +13322,10 @@ class Compiler {
             if (null !== $booleanProducer) {
                 return $booleanProducer;
             }
+            $chainedConcat = $this->matchChainedConcatInlineCallArgProducer($producers, $callArgs, $argIndex);
+            if (null !== $chainedConcat) {
+                return $chainedConcat;
+            }
         }
         if ($this->callArgIsNewExpression($callArg)) {
             foreach ($producers as $producer) {
@@ -14937,6 +14941,55 @@ class Compiler {
             $inner = $producers[$i - 1];
             $outer = $producers[$i];
             if (!$this->operandsReferToSameVariable($inner->result, $outer->expr)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * php-cfg hoists chained Concat before inline call args — wire final result slot (#13458, zend_operators.c).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchChainedConcatInlineCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        if (!$this->producersAreChainedConcatProducers($producers)) {
+            return null;
+        }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+        if (null === $soleHoisted || $argIndex !== $soleHoisted) {
+            return null;
+        }
+
+        return $producers[\count($producers) - 1];
+    }
+
+    /**
+     * @param list<Op\Expr> $producers
+     */
+    private function producersAreChainedConcatProducers(array $producers): bool
+    {
+        if (\count($producers) < 2) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\BinaryOp\Concat) {
+                return false;
+            }
+        }
+        for ($i = 1, $n = \count($producers); $i < $n; ++$i) {
+            $inner = $producers[$i - 1];
+            $outer = $producers[$i];
+            if (
+                null === $outer->left
+                || !$this->operandsReferToSameVariable($inner->result, $outer->left)
+            ) {
                 return false;
             }
         }

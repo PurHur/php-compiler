@@ -2034,6 +2034,57 @@ PHP;
         self::assertStringContainsString("''", $out);
     }
 
+    /** Issue #13458 — chained inline concat path args must wire final Concat slot, not first. */
+    public function testFopenChainedInlineConcatPathUsesFinalConcatSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+fopen('/tmp/maint_' . 99 . '/sub/file.txt', 'r');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'fopen_chained_concat_path.php');
+
+        $concatSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+
+        self::assertCount(2, $concatSlots, 'concat slots='.json_encode($concatSlots));
+        self::assertSame($concatSlots[\count($concatSlots) - 1], $sendSlots[0] ?? null, 'arg sends='.json_encode($sendSlots));
+
+        $runtimeWarn = new Runtime();
+        $warnBlock = $runtimeWarn->parseAndCompile(<<<'PHP'
+<?php
+@fopen('/tmp/maint_' . 99 . '/sub/file.txt', 'r');
+PHP, 'fopen_chained_concat_path_warn.php');
+        ob_start();
+        $runtimeWarn->run($warnBlock);
+        ob_get_clean();
+        $err = error_get_last();
+        self::assertNotNull($err);
+        self::assertStringContainsString('/tmp/maint_99/sub/file.txt', $err['message'] ?? '');
+    }
+
+    /**
+     * @param list<int|string> $concatSlots
+     * @param list<int|string> $sendSlots
+     */
+    private function collectOpCodesFromBlock(Block $block, array &$concatSlots, array &$sendSlots): void
+    {
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONCAT === $op->type) {
+                $concatSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        foreach ($block->blocks as $child) {
+            if ($child instanceof Block) {
+                $this->collectOpCodesFromBlock($child, $concatSlots, $sendSlots);
+            }
+        }
+    }
+
     /** Issue #10453 — hoisted PASSWORD_BCRYPT ConstFetch maps to arg #2 when trailing Array_ options literal. */
     public function testPasswordHashConstFetchAndArrayOptionSlots(): void
     {
