@@ -13904,6 +13904,21 @@ class Compiler {
                     return (0 === $argIndex) ? $producers[$dimIdx] : $producers[$concatIdx];
                 }
             }
+            // array_merge(array_keys($src), ['b']) — FuncCall + sibling Array_ (#12450, #13704).
+            if (2 === $producerCount && 2 === $argCount) {
+                $funcIdx = null;
+                $arrayIdx = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                        $funcIdx = $pi;
+                    } elseif ($producer instanceof Op\Expr\Array_) {
+                        $arrayIdx = $pi;
+                    }
+                }
+                if (null !== $funcIdx && null !== $arrayIdx && $funcIdx !== $arrayIdx) {
+                    return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+                }
+            }
             // filter_var('x', FILTER_*, ['options' => ['regexp' => '/a/']]) — ConstFetch + nested Array_ (#12007).
             $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
             if (null !== $leadingConstNested) {
@@ -14173,6 +14188,7 @@ class Compiler {
                 if (
                     $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
                     && !($producers[0] instanceof Op\Expr\Array_)
+                    && $this->operandsReferToSameVariable($producers[0]->result, $callArgs[$argIndex] ?? null)
                 ) {
                     return $producers[0];
                 }
@@ -14181,6 +14197,7 @@ class Compiler {
                     ($producers[0] instanceof Op\Expr\FuncCall || $producers[0] instanceof Op\Expr\NsFuncCall)
                     && null !== ($callArgs[0] ?? null)
                     && !$this->operandsReferToSameVariable($producers[0]->result, $callArgs[0])
+                    && $this->operandsReferToSameVariable($producers[0]->result, $callArgs[$argIndex] ?? null)
                 ) {
                     return $producers[0];
                 }
@@ -14375,6 +14392,25 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        // array_merge(array_keys($src), ['b']) — FuncCall + trailing sibling Array_ (#12450, #13704).
+        if (
+            \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)
+            && 2 === \count($callArgs)
+            && 2 === \count($producers)
+        ) {
+            $funcIdx = null;
+            $arrayIdx = null;
+            foreach ($producers as $pi => $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcIdx = $pi;
+                } elseif ($producer instanceof Op\Expr\Array_) {
+                    $arrayIdx = $pi;
+                }
+            }
+            if (null !== $funcIdx && null !== $arrayIdx && $funcIdx !== $arrayIdx) {
+                return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+            }
+        }
         // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
         if (
             ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3))
@@ -14432,6 +14468,13 @@ class Compiler {
         }
         foreach ($producers as $producer) {
             if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
+                if (
+                    \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)
+                    && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                    && $argIndex > 0
+                ) {
+                    continue;
+                }
                 return $producer;
             }
         }
@@ -14655,7 +14698,14 @@ class Compiler {
         }
         // check('label', explode(..., -1), ['expect']) — lone hoisted FuncCall + trailing Array_ prelude (#13423, #13424).
         $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
-        if (null !== $soleHoisted && $argIndex === $soleHoisted) {
+        if (
+            null !== $soleHoisted
+            && $argIndex === $soleHoisted
+            && !(
+                \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)
+                && \count($callArgs) >= 2
+            )
+        ) {
             foreach ($producers as $producer) {
                 if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                     return $producer;
@@ -16963,6 +17013,46 @@ class Compiler {
     /**
      * strtotime('next Monday', strtotime('...')) — adjacent nested FuncCall feeds trailing arg (#10838).
      */
+    /**
+     * array_merge(array_keys($src), ['b']) — trailing inline Array_ must not reuse nested FuncCall slot (#13704).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function resolveArrayMergeTrailingInlineArrayCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg,
+        array &$pendingSends
+    ): ?string {
+        if (1 !== $argIndex || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if (null === $block->slotForOperand($producer->result)) {
+                foreach ($this->compileExpr($producer, $block) as $op) {
+                    $pendingSends[] = $op;
+                }
+            }
+            $slot = $block->slotForOperand($producer->result);
+
+            return null !== $slot ? (string) $slot : null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+        if ($this->isEmbeddedCallLiteralArg($callArg)) {
+            return (string) $this->compileOperand($callArg, $block, true);
+        }
+
+        return null;
+    }
+
     private function resolveAdjacentNestedFuncCallArgSlot(
         Block $block,
         Op $cfgCallOp,
@@ -20413,6 +20503,20 @@ class Compiler {
                             ) {
                                 $matched = null;
                             }
+                            if (
+                                ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
+                                && (int) $argIndex > 0
+                                && null !== $calleeName
+                                && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
+                            ) {
+                                $matched = null;
+                                foreach ($producers as $producer) {
+                                    if ($producer instanceof Op\Expr\Array_) {
+                                        $matched = $producer;
+                                        break;
+                                    }
+                                }
+                            }
                         }
                         if ($matched instanceof Op\Expr) {
                             if (null === $block->slotForOperand($matched->result)) {
@@ -20544,6 +20648,20 @@ class Compiler {
                                 && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
                             ) {
                                 $matched = null;
+                            }
+                            if (
+                                ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
+                                && (int) $argIndex > 0
+                                && null !== $calleeName
+                                && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
+                            ) {
+                                $matched = null;
+                                foreach ($producers as $producer) {
+                                    if ($producer instanceof Op\Expr\Array_) {
+                                        $matched = $producer;
+                                        break;
+                                    }
+                                }
                             }
                         }
                         if ($matched instanceof Op\Expr) {
@@ -21173,6 +21291,23 @@ class Compiler {
                 $nestedSubjectSlot = $this->slotForNestedSubjectExecBeforeLiteralPreludeCall($block);
                 if (null !== $nestedSubjectSlot) {
                     $valueSlot = $nestedSubjectSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && (int) $argIndex > 0
+                && null !== $calleeName
+                && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
+            ) {
+                $mergeTrailingSlot = $this->resolveArrayMergeTrailingInlineArrayCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $arg,
+                    $sends
+                );
+                if (null !== $mergeTrailingSlot) {
+                    $valueSlot = $mergeTrailingSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
