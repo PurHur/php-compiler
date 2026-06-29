@@ -741,6 +741,8 @@ class Module extends ModuleAbstract
             ...(CompilerVersion::supportsLazyObjectFactories() ? [
                 new create_lazy_ghost(),
                 new create_lazy_proxy(),
+                new class_has_lazy_object_initializer(),
+                new class_has_lazy_object_uninitializer(),
             ] : []),
             new enum_exists_(),
             new unitenum_exists_(),
