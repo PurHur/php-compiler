@@ -7901,12 +7901,15 @@ class Compiler {
                     $block->registerNamedAssignDest($varRoot, (int) $resultSlot);
                 }
 
-                return [new OpCode(
+                $assignOp = new OpCode(
                     OpCode::TYPE_ASSIGN,
                     $resultSlot,
                     $destSlot,
                     $rhsSlot
-                )];
+                );
+                $this->assignSourceMetadata($assignOp, $expr);
+
+                return [$assignOp];
             case Op\Expr\Exit_::class:
                 $exitExpr = null !== $expr->expr
                     ? $this->compileOperand($expr->expr, $block, true)

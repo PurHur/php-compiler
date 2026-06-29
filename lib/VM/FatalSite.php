@@ -50,7 +50,8 @@ final class FatalSite
             return 0;
         }
         $block = $frame->block;
-        $pos = $frame->pos;
+        // pos points at the next opcode; warnings during the current opcode use pos-1 (#13436).
+        $pos = $frame->pos > 0 ? $frame->pos - 1 : 0;
         if ($pos >= $block->nOpCodes) {
             $pos = max(0, $block->nOpCodes - 1);
         }
