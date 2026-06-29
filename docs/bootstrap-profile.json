@@ -2505,7 +2505,6 @@
         "lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php",
         "lib/JIT/Builtin/ObGzhandler.php",
         "lib/JIT/Builtin/ObGzhandlerJitRuntime.php",
-        "lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php",
         "lib/JIT/Builtin/ObOutput.php",
         "lib/JIT/Builtin/ObOutputJitBridge.php",
         "lib/JIT/Builtin/ObOutputRuntime.php",
@@ -3716,9 +3715,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3486,
+        "inventory_files": 3485,
         "excluded": 0,
-        "eligible": 3486,
+        "eligible": 3485,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

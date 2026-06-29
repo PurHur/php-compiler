@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\VM\ObStackLimits;
@@ -63,13 +62,6 @@ final class ObGzhandlerJitRuntime
     {
         $probe = $context->module->getNamedFunction('__compiler_ob_gzhandler');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            ObGzhandlerStandaloneLlvm::implement($context);
             self::registerLinkedRuntime($context);
 
             return;
