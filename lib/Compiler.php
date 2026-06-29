@@ -22286,6 +22286,59 @@ class Compiler {
         return false;
     }
 
+    /**
+     * Hoisted inline nested FuncCall producers compile into $argSends — emit them before outer INIT (#13636).
+     *
+     * @param list<OpCode> $argSends
+     *
+     * @return array{0: list<OpCode>, 1: list<OpCode>}
+     */
+    private function partitionNestedInlineCallArgProducerOps(array $argSends): array
+    {
+        $nested = [];
+        $outer = [];
+        $count = \count($argSends);
+        for ($i = 0; $i < $count; ++$i) {
+            $op = $argSends[$i];
+            if (!$this->isInlineCallArgProducerInitOpcode($op)) {
+                $outer[] = $op;
+                continue;
+            }
+            $depth = 1;
+            $chunk = [$op];
+            ++$i;
+            while ($i < $count && $depth > 0) {
+                $inner = $argSends[$i];
+                $chunk[] = $inner;
+                if ($this->isInlineCallArgProducerInitOpcode($inner)) {
+                    ++$depth;
+                } elseif ($this->isInlineCallArgProducerExecOpcode($inner)) {
+                    --$depth;
+                }
+                ++$i;
+            }
+            --$i;
+            foreach ($chunk as $nestedOp) {
+                $nested[] = $nestedOp;
+            }
+        }
+
+        return [$nested, $outer];
+    }
+
+    private function isInlineCallArgProducerInitOpcode(OpCode $op): bool
+    {
+        return OpCode::TYPE_FUNCCALL_INIT === $op->type
+            || OpCode::TYPE_STATICCALL_INIT === $op->type
+            || OpCode::TYPE_METHODCALL_INIT === $op->type;
+    }
+
+    private function isInlineCallArgProducerExecOpcode(OpCode $op): bool
+    {
+        return OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type
+            || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type;
+    }
+
     protected function compileFuncCall(
         ?int $name,
         array $args,
@@ -22307,11 +22360,15 @@ class Compiler {
         $this->lowerEmbeddedCoalesceCallArgs($args, $block);
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
+        [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $return = [];
-        foreach ($argSends as $send) {
+        foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
                 $return[] = $send;
             }
+        }
+        foreach ($nestedProducerOps as $op) {
+            $return[] = $op;
         }
         $init = new OpCode(
             OpCode::TYPE_FUNCCALL_INIT,
@@ -22322,7 +22379,7 @@ class Compiler {
             $this->assignSourceMetadata($init, $cfgCallOp);
         }
         $return[] = $init;
-        foreach ($argSends as $send) {
+        foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN !== $send->type) {
                 $return[] = $send;
             }
