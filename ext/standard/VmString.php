@@ -1350,7 +1350,7 @@ final class VmString
 
     public static function strpbrk(string $str, string $mask) {
         if ('' === $mask) {
-            throw new \ValueError('strpbrk(): Argument #2 ($characters) must not be empty');
+            throw new \ValueError('strpbrk(): Argument #2 ($characters) must be a non-empty string');
         }
         $slen = self::byteLength($str);
         $mlen = self::byteLength($mask);
