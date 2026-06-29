@@ -18752,7 +18752,7 @@ class Compiler {
     ): ?int {
         $unaryRoot = $this->unwrapOperandChain($arg);
         if (!$unaryRoot instanceof Op\Expr\UnaryMinus && !$unaryRoot instanceof Op\Expr\UnaryPlus) {
-            $unaryRoot = $this->unaryLiteralProducerForHoistedCallArg($cfgCallOp, $argIndex, $block);
+            $unaryRoot = $this->unaryLiteralProducerForHoistedCallArg($cfgCallOp, $argIndex, $block, $arg);
         }
         if (!$unaryRoot instanceof Op\Expr\UnaryMinus && !$unaryRoot instanceof Op\Expr\UnaryPlus) {
             return null;
@@ -18776,9 +18776,10 @@ class Compiler {
     private function unaryLiteralProducerForHoistedCallArg(
         ?Op $callOp,
         int $argIndex,
-        Block $block
+        Block $block,
+        Operand $arg
     ): Op\Expr\UnaryMinus|Op\Expr\UnaryPlus|null {
-        if (null === $callOp || 0 !== $argIndex || null === $block->orig) {
+        if (null === $callOp || null === $block->orig) {
             return null;
         }
         $callIndex = null;
@@ -18791,10 +18792,18 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
+        $callArg = \is_array($callOp->args ?? null) ? ($callOp->args[$argIndex] ?? $arg) : $arg;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
             if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
-                return $child;
+                if (
+                    null !== $child->result
+                    && $this->operandsReferToSameVariable($child->result, $callArg)
+                ) {
+                    return $child;
+                }
+
+                return null;
             }
             if ($child instanceof Op\Expr\BinaryOp\Concat) {
                 continue;
