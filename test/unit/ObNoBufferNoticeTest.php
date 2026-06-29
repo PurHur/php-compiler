@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ob_end_flush()/ob_end_clean() no-buffer E_NOTICE on stderr with display_errors=0 (#10677).
+ * ob_end_flush()/ob_end_clean() no-buffer E_NOTICE suppressed when display_errors=0 (#13486).
  */
 final class ObNoBufferNoticeTest extends TestCase
 {
@@ -20,26 +20,12 @@ ob_flush();
 ob_get_flush();
 PHP;
 
-    public function testVmStderrNoticeWithDisplayErrorsOff(): void
+    public function testVmNoStderrNoticeWithDisplayErrorsOff(): void
     {
         $stderr = $this->runVmCaptureStderr(self::CODE);
-        $this->assertStringContainsString(
-            'ob_end_flush(): Failed to delete and flush buffer. No buffer to delete or flush',
-            $stderr
-        );
-        $this->assertStringContainsString(
-            'ob_end_clean(): Failed to delete buffer. No buffer to delete',
-            $stderr
-        );
-        $this->assertStringContainsString(
-            'ob_flush(): Failed to flush buffer. No buffer to flush',
-            $stderr
-        );
-        $this->assertStringContainsString(
-            'ob_get_flush(): Failed to delete and flush buffer. No buffer to delete or flush',
-            $stderr
-        );
-        $this->assertStringContainsString('PHP Notice:', $stderr);
+        $this->assertStringNotContainsString('ob_end_clean(): Failed to delete buffer', $stderr);
+        $this->assertStringNotContainsString('ob_end_flush(): Failed to delete and flush buffer', $stderr);
+        $this->assertStringNotContainsString('PHP Notice:', $stderr);
     }
 
     private function runVmCaptureStderr(string $code): string

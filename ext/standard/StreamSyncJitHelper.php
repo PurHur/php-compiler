@@ -29,7 +29,7 @@ final class StreamSyncJitHelper
             ? self::FDATASYNC_UNSYNCABLE_WARNING
             : self::FSYNC_UNSYNCABLE_WARNING;
         ErrorLastJitHelper::record(ErrorReporter::E_WARNING, $message, '', 0);
-        if (ErrorSilenceJitHelper::isErrorLevelEnabled(ErrorReporter::E_WARNING)) {
+        if (ErrorSilenceJitHelper::shouldDisplayCliError(ErrorReporter::E_WARNING)) {
             TriggerErrorJitHelper::stderrPrintCliError(ErrorReporter::E_WARNING, $message, '', 0);
         }
     }

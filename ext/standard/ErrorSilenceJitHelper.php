@@ -20,6 +20,8 @@ final class ErrorSilenceJitHelper
 
     private static int $savedErrorReporting = 0;
 
+    private static bool $displayErrors = false;
+
     public static function beginSilence(): void
     {
         if (0 === self::$silenceDepth) {
@@ -43,6 +45,21 @@ final class ErrorSilenceJitHelper
     public static function isErrorLevelEnabled(int $level): bool
     {
         return 0 !== (self::$errorReporting & $level);
+    }
+
+    public static function getDisplayErrors(): bool
+    {
+        return self::$displayErrors;
+    }
+
+    public static function setDisplayErrors(bool $display): void
+    {
+        self::$displayErrors = $display;
+    }
+
+    public static function shouldDisplayCliError(int $level): bool
+    {
+        return self::$displayErrors && self::isErrorLevelEnabled($level);
     }
 
     public static function getErrorReporting(): int
