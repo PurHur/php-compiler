@@ -1898,6 +1898,43 @@ PHP;
         self::assertStringNotContainsString("3 =>", $out);
     }
 
+    /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
+    public function testArrayMergeSiblingInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_merge([1], [2]));
+echo "\n";
+var_export(array_merge(['a' => 1], ['a' => 2]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_inline_literal.php');
+
+        $mergeSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $mergeSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mergeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $mergeSends);
+        self::assertNotSame($mergeSends[0], $mergeSends[1]);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 1,\n  1 => 2,", $out);
+        self::assertStringContainsString("'a' => 2,", $out);
+    }
+
     /** Issue #11373 — in_array('md5', hash_algos(), true) nested producer runtime parity with Zend. */
     public function testInArrayNestedHashAlgosRuntime(): void
     {
