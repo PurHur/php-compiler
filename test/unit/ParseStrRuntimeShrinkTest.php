@@ -7,9 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * parse_str() LLVM micro-runtime shrink guard (#6308 phase 2).
- *
- * Runtime superglobals still link __phpc_parse_str_* until ParseStrEngine is native-callable from AOT.
+ * parse_str() LLVM micro-runtime shrink guard (#6308 phase 2, #13429).
  */
 final class ParseStrRuntimeShrinkTest extends TestCase
 {
@@ -44,15 +42,12 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     public function testStringParseStrRoutesAllLoadTypesThroughParseStrRuntime(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStr.php');
-        $this->assertStringContainsString('ParseStrRuntime::implement', $source);
-        $this->assertStringContainsString('StringParseStrJit::ensureSubhelpers', $source);
-        $this->assertStringNotContainsString('StringParseStrJit::implement', $source);
+        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $source);
+        $this->assertStringNotContainsString('StringParseStrJit', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertLessThan(35, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(45, \substr_count($source, "\n") + 1);
 
-        $jit = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringParseStrJit.php');
-        $this->assertStringNotContainsString('emitCompilerParseStr', $jit);
-        $this->assertStringNotContainsString('function implement(', $jit);
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringParseStrJit.php');
     }
 
     public function testParseStrJitHelperDelegatesToParseStrEngine(): void
@@ -67,7 +62,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $spine = (string) file_get_contents($this->repoRoot.'/test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('ParseStrJitHelper.php', $spine);
         $this->assertStringContainsString('ParseStrRuntime.php', $spine);
-        $this->assertStringContainsString('StringParseStrJit.php', $spine);
+        $this->assertStringContainsString('StringParseStr.php', $spine);
+        $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
     }
 
     public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void

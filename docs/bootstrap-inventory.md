@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3462 |
-| Phase A inventory files (M2 ratio SSOT) | 3462 |
+| PHP files on vm.php path | 3461 |
+| Phase A inventory files (M2 ratio SSOT) | 3461 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9364 |
+| Source constructs flagged (warnings) | 9363 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2615,7 +2615,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringParseStrJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPasswordCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPhpinfoRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPosixTimes.php` | 0 | 1 |
@@ -20553,11 +20552,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
-
-### `lib/JIT/Builtin/StringParseStrJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 26 class method(s)
 
 ### `lib/JIT/Builtin/StringPasswordCrypto.php`
 

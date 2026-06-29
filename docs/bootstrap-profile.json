@@ -2669,7 +2669,6 @@
         "lib/JIT/Builtin/StringOffsetRuntime.php",
         "lib/JIT/Builtin/StringPack.php",
         "lib/JIT/Builtin/StringParseStr.php",
-        "lib/JIT/Builtin/StringParseStrJit.php",
         "lib/JIT/Builtin/StringPasswordCrypto.php",
         "lib/JIT/Builtin/StringPhpinfoRuntime.php",
         "lib/JIT/Builtin/StringPosixTimes.php",
@@ -3692,9 +3691,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3462,
+        "inventory_files": 3461,
         "excluded": 0,
-        "eligible": 3462,
+        "eligible": 3461,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
