@@ -3508,6 +3508,17 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
+require_once __DIR__.'/../../../ext/calendar/VmJewishFrenchCalendar.php';
+require_once __DIR__.'/../../../ext/calendar/frenchtojd.php';
+require_once __DIR__.'/../../../ext/calendar/jdtofrench.php';
+require_once __DIR__.'/../../../ext/calendar/jdtojewish.php';
+require_once __DIR__.'/../../../ext/calendar/jewishtojd.php';
+require_once __DIR__.'/../../../ext/calendar/juliantojd.php';
+require_once __DIR__.'/../../../ext/standard/ArrayIsListJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ArraySpliceJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/PhpUserFilterBuiltin.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayIsListRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArraySpliceRuntime.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
