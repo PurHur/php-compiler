@@ -2654,7 +2654,6 @@
         "lib/JIT/Builtin/StringGetdate.php",
         "lib/JIT/Builtin/StringGetenv.php",
         "lib/JIT/Builtin/StringGetenvAll.php",
-        "lib/JIT/Builtin/StringGetenvLibcBridge.php",
         "lib/JIT/Builtin/StringGetrusage.php",
         "lib/JIT/Builtin/StringGetrusageRuntime.php",
         "lib/JIT/Builtin/StringGettext.php",
@@ -3717,9 +3716,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3487,
+        "inventory_files": 3486,
         "excluded": 0,
-        "eligible": 3487,
+        "eligible": 3486,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
