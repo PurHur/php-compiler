@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3460 |
-| Phase A inventory files (M2 ratio SSOT) | 3460 |
+| PHP files on vm.php path | 3461 |
+| Phase A inventory files (M2 ratio SSOT) | 3461 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9363 |
+| Source constructs flagged (warnings) | 9368 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -965,6 +965,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/NaturalSortJitHelper.php` | 0 | 3 |
 | `ext/standard/NetInterfacesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesJitHelper.php` | 0 | 1 |
+| `ext/standard/NetworkServicesNameLookupJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerServerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObOutputJitHelper.php` | 0 | 1 |
@@ -2561,7 +2562,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringErrorLog.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilterBoolean.php` | 0 | 2 |
@@ -2608,7 +2609,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringNaturalCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetInterfacesJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetworkServices.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringNetworkServicesJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringNetworkServicesNameLookup.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetworkServicesStringReturn.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
@@ -6286,9 +6287,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/CsvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 64)
-- new Variable (line 66)
-- 4 class method(s)
+- new HashTable (line 85)
+- new Variable (line 87)
+- 5 class method(s)
 
 ### `ext/standard/DateConstants.php`
 
@@ -9924,6 +9925,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/NetworkServicesJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/NetworkServicesNameLookupJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
@@ -17844,76 +17850,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10954)
 - new Operand\Temporary (line 10956)
 - new OpCode (line 11003)
-- new CfgVariable (line 16625)
-- new Literal (line 16625)
-- new Variable (line 16657)
-- new Variable (line 16711)
-- new OpCode (line 16735)
-- new OpCode (line 17123)
-- new OpCode (line 17139)
-- new OpCode (line 17147)
-- new OpCode (line 17154)
-- new OpCode (line 17166)
-- new OpCode (line 17183)
-- new OpCode (line 17189)
-- new OpCode (line 17195)
-- new OpCode (line 17200)
-- new OpCode (line 17216)
-- new OpCode (line 17229)
-- new Variable (line 17240)
-- new Operand\Literal (line 17242)
-- new OpCode (line 17245)
-- new OpCode (line 17315)
-- new OpCode (line 17326)
-- new OpCode (line 17339)
-- new OpCode (line 17513)
-- new OpCode (line 17761)
-- new OpCode (line 17767)
-- new OpCode (line 17773)
-- new OpCode (line 17798)
-- new Variable (line 17825)
-- new Temporary (line 17827)
-- new Variable (line 17835)
-- new Temporary (line 17837)
-- new OpCode (line 17885)
-- new Operand\Temporary (line 17905)
-- new Operand\Temporary (line 17911)
-- new Operand\Temporary (line 17917)
+- new CfgVariable (line 16643)
+- new Literal (line 16643)
+- new Variable (line 16675)
+- new Variable (line 16729)
+- new OpCode (line 16753)
+- new OpCode (line 17141)
+- new OpCode (line 17157)
+- new OpCode (line 17165)
+- new OpCode (line 17172)
+- new OpCode (line 17184)
+- new OpCode (line 17201)
+- new OpCode (line 17207)
+- new OpCode (line 17213)
+- new OpCode (line 17218)
+- new OpCode (line 17234)
+- new OpCode (line 17247)
+- new Variable (line 17258)
+- new Operand\Literal (line 17260)
+- new OpCode (line 17263)
+- new OpCode (line 17333)
+- new OpCode (line 17344)
+- new OpCode (line 17357)
+- new OpCode (line 17531)
+- new OpCode (line 17779)
+- new OpCode (line 17785)
+- new OpCode (line 17791)
+- new OpCode (line 17816)
+- new Variable (line 17843)
+- new Temporary (line 17845)
+- new Variable (line 17853)
+- new Temporary (line 17855)
+- new OpCode (line 17903)
 - new Operand\Temporary (line 17923)
-- new Operand\Temporary (line 17932)
-- new Variable (line 18846)
-- new Variable (line 18850)
-- new Variable (line 18858)
-- new Variable (line 18862)
-- new Variable (line 19104)
-- new Operand\Literal (line 19472)
-- new Variable (line 19474)
-- new OpCode (line 19794)
-- new OpCode (line 19986)
-- new OpCode (line 20267)
-- new OpCode (line 20468)
-- new OpCode (line 20478)
-- new OpCode (line 20481)
-- new Operand\Temporary (line 20513)
-- new OpCode (line 20515)
-- new OpCode (line 20526)
-- new Operand\Temporary (line 20529)
-- new OpCode (line 20531)
-- new OpCode (line 20539)
-- new OpCode (line 20546)
-- new OpCode (line 20554)
+- new Operand\Temporary (line 17929)
+- new Operand\Temporary (line 17935)
+- new Operand\Temporary (line 17941)
+- new Operand\Temporary (line 17950)
+- new Variable (line 18864)
+- new Variable (line 18868)
+- new Variable (line 18876)
+- new Variable (line 18880)
+- new Variable (line 19122)
+- new Operand\Literal (line 19490)
+- new Variable (line 19492)
+- new OpCode (line 19812)
+- new OpCode (line 20004)
+- new OpCode (line 20285)
+- new OpCode (line 20486)
+- new OpCode (line 20496)
+- new OpCode (line 20499)
+- new Operand\Temporary (line 20531)
+- new OpCode (line 20533)
+- new OpCode (line 20544)
+- new Operand\Temporary (line 20547)
+- new OpCode (line 20549)
 - new OpCode (line 20557)
-- new OpCode (line 20574)
-- new OpCode (line 20601)
-- new OpCode (line 20608)
-- new OpCode (line 20709)
-- new Literal (line 20741)
-- new OpCode (line 20840)
-- new Variable (line 20847)
-- new Temporary (line 20849)
-- new OpCode (line 20852)
-- new CompileFatal (line 21150)
-- new CompileFatal (line 21369)
+- new OpCode (line 20564)
+- new OpCode (line 20572)
+- new OpCode (line 20575)
+- new OpCode (line 20592)
+- new OpCode (line 20619)
+- new OpCode (line 20626)
+- new OpCode (line 20727)
+- new Literal (line 20759)
+- new OpCode (line 20858)
+- new Variable (line 20865)
+- new Temporary (line 20867)
+- new OpCode (line 20870)
+- new CompileFatal (line 21168)
+- new CompileFatal (line 21387)
 - 621 class method(s)
 - 19 closure(s)
 
@@ -20238,7 +20244,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringFgetcsvJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- new JIT (line 149)
+- 5 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringFileGetContents.php`
 
@@ -20513,10 +20521,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
-### `lib/JIT/Builtin/StringNetworkServicesJit.php`
+### `lib/JIT/Builtin/StringNetworkServicesNameLookup.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- new JIT (line 195)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringNetworkServicesStringReturn.php`
 
