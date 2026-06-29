@@ -603,7 +603,6 @@ class Module extends ModuleAbstract
             new stream_context_get_options(),
             ...(CompilerVersion::supportsStreamContextSetOptions() ? [new stream_context_set_options()] : []),
             new stream_context_set_params(),
-            new stream_notification_callback(),
             new stream_socket_client(),
             new stream_socket_server(),
             new stream_socket_pair(),
