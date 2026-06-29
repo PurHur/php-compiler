@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Undefined variable E_WARNING includes Zend " on line N" suffix (#13390). */
+/** Undefined variable E_WARNING includes Zend " on line N" suffix (#13390, #13469). */
 final class UndefinedVariableWarningLineTest extends TestCase
 {
     private string $repoRoot;
@@ -43,6 +43,16 @@ PHP
         @unlink($tmp);
         $this->assertMatchesRegularExpression('/ on line 4$/m', $stderr);
         $this->assertStringNotContainsString('on line 6', $stderr);
+    }
+
+    public function testBinaryExprUndefinedVariableWarningIncludesLineSuffix(): void
+    {
+        $script = $this->repoRoot.'/test/repro/maintainer-probe/batch3_undefined_var_arith.php';
+        [, $stderr] = $this->runVmScript($script, 0);
+        $this->assertMatchesRegularExpression(
+            '/Undefined variable \$missing in .+batch3_undefined_var_arith\.php on line 5\s*$/m',
+            $stderr
+        );
     }
 
     /**

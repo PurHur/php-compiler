@@ -7716,6 +7716,7 @@ class Compiler {
             if ($this->isIncDecBinaryOp($expr)) {
                 $opcode->isIncDec = true;
             }
+            $this->assignSourceMetadata($opcode, $expr);
 
             return [$opcode];
         } elseif ($expr instanceof Op\Expr\Cast) {
