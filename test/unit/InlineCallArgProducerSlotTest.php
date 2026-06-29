@@ -1020,6 +1020,21 @@ PHP;
         self::assertSame("array (\n  'a' => NULL,\n)\n", ob_get_clean());
     }
 
+    /** Issue #10230 — array_merge_recursive nested sibling inline literals use outer Array_ roots. */
+    public function testArrayMergeRecursiveNestedSiblingInlineLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_merge_recursive(['a' => ['x' => 1]], ['a' => ['y' => 2]]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_recursive_nested_sibling_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  'a' => array (\n    'x' => 1,\n    'y' => 2,\n  ),\n)\n", ob_get_clean());
+    }
+
     /** Issue #10809 — inline assoc literal + negative offset + preserve_keys must wire array to arg #0. */
     public function testArraySliceInlineAssocNegativeOffsetPreserveKeysCompile(): void
     {
