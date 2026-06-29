@@ -109,6 +109,22 @@ final class PosixLibcThinAbi
         return (int) $ffi->setpgid($pid, $pgid);
     }
 
+    /**
+     * times(2) system tick counter since boot — read-only thin ABI (#13524).
+     */
+    public static function systemClockTicks(): ?int
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return null;
+        }
+
+        $tms = $ffi->new('struct tms');
+        $ticks = (int) $ffi->times(\FFI::addr($tms));
+
+        return $ticks >= 0 ? $ticks : null;
+    }
+
     private static function setId(string $fn, int $id): int
     {
         $ffi = self::ffi();
@@ -157,6 +173,14 @@ struct rlimit {
 int setrlimit(int resource, const struct rlimit *rlim);
 pid_t setsid(void);
 int setpgid(pid_t pid, pid_t pgid);
+typedef long clock_t;
+struct tms {
+    clock_t tms_utime;
+    clock_t tms_stime;
+    clock_t tms_cutime;
+    clock_t tms_cstime;
+};
+clock_t times(struct tms *buf);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

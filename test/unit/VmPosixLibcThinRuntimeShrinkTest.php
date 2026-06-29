@@ -38,6 +38,8 @@ final class VmPosixLibcThinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('pid_t setsid(', $abi);
         $this->assertStringContainsString('int setpgid(', $abi);
         $this->assertStringContainsString('int setuid(', $abi);
+        $this->assertStringContainsString('clock_t times(', $abi);
+        $this->assertStringContainsString('systemClockTicks', $abi);
     }
 
     public function testPureHelpersDelegateToThinAbiNotVmPosixFfi(): void
