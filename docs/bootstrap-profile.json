@@ -1006,6 +1006,7 @@
         "ext/standard/NaturalSortJitHelper.php",
         "ext/standard/NetInterfacesJitHelper.php",
         "ext/standard/NetworkServicesJitHelper.php",
+        "ext/standard/NetworkServicesNameLookupJitHelper.php",
         "ext/standard/ObGzhandlerJitHelper.php",
         "ext/standard/ObGzhandlerServerJitHelper.php",
         "ext/standard/ObOutputJitHelper.php",
@@ -2662,7 +2663,7 @@
         "lib/JIT/Builtin/StringNaturalCompareJit.php",
         "lib/JIT/Builtin/StringNetInterfacesJit.php",
         "lib/JIT/Builtin/StringNetworkServices.php",
-        "lib/JIT/Builtin/StringNetworkServicesJit.php",
+        "lib/JIT/Builtin/StringNetworkServicesNameLookup.php",
         "lib/JIT/Builtin/StringNetworkServicesStringReturn.php",
         "lib/JIT/Builtin/StringNl2br.php",
         "lib/JIT/Builtin/StringOffsetRuntime.php",
@@ -3690,9 +3691,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3460,
+        "inventory_files": 3461,
         "excluded": 0,
-        "eligible": 3460,
+        "eligible": 3461,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

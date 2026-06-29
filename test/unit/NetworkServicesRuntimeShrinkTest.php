@@ -33,12 +33,22 @@ final class NetworkServicesRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ns_proto_num_match_', $stringReturn);
     }
 
-    public function testNameLookupJitShrunkToValueOutOnly(): void
+    public function testNameLookupUsesNetworkServicesNameLookupJitHelper(): void
     {
-        $jit = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
-        $this->assertStringContainsString('emitGetprotobyname', $jit);
-        $this->assertStringNotContainsString('emitGetprotobynumber', $jit);
-        $this->assertStringNotContainsString('emitGetservbyport', $jit);
+        $nameLookup = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesNameLookup.php');
+        $this->assertStringContainsString('NetworkServicesNameLookupJitHelper', $nameLookup);
+        $this->assertStringContainsString('getprotobynameLookup', $nameLookup);
+        $this->assertStringContainsString('getservbynameLookup', $nameLookup);
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesJit.php');
+        $this->assertFileExists($this->repoRoot.'/ext/standard/NetworkServicesNameLookupJitHelper.php');
+    }
+
+    public function testNameLookupJitShrunkToPhpBridge(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringNetworkServicesNameLookup.php');
+        $this->assertStringNotContainsString('strcasecmp', $source);
+        $this->assertStringNotContainsString('buildJitTables', $source);
+        $this->assertStringNotContainsString('ns_proto_name_match_', $source);
     }
 
     public function testDeadVmNetworkHostDelegationRemoved(): void

@@ -8,9 +8,10 @@ use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
 
 /**
- * JIT/AOT link for network service lookups (#5333, #9777).
+ * JIT/AOT link for network service lookups (#5333, #9777, #13441).
  *
- * String-return lookups use NetworkServicesJitHelper PHP; name/port lookups keep LLVM tables until AOT is_int parity (#9777 follow-up).
+ * String-return and port lookups use NetworkServicesJitHelper PHP;
+ * name lookups use NetworkServicesNameLookupJitHelper PHP.
  */
 final class StringNetworkServices
 {
@@ -22,7 +23,7 @@ final class StringNetworkServices
     public static function implement(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
-        StringNetworkServicesJit::implement($context);
+        StringNetworkServicesNameLookup::implement($context);
         self::restoreInsertBlock($context, $restore);
     }
 
