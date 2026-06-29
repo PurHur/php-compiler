@@ -7,6 +7,9 @@ allow:\runtime::__destruct
 allow:\runtime::compile
 allow:\runtime::compileemitsmoke
 allow:\runtime::createjit
+allow:\runtime::detectfilestricttypes
+allow:\runtime::emitparseandcompilenulldiagnostic
+allow:\runtime::formatparseandcompilenulldetail
 allow:\runtime::initcompiler
 allow:\runtime::initparsepipeline
 allow:\runtime::initvmcontext
@@ -22,6 +25,8 @@ allow:\runtime::parseandcompileemitsmoke
 allow:\runtime::peeklastparsefailure
 allow:\runtime::preparesourceforparser
 allow:\runtime::preprocesssourceforparse
+allow:\runtime::recordlastparsefailure
+allow:\runtime::resetparsernameresolverstate
 allow:\runtime::rewritesourcebeforeparser
 allow:\runtime::standalone
 allow:slotforoperand
