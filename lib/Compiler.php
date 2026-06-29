@@ -13351,7 +13351,9 @@ class Compiler {
                 $block->orig->children
             );
             if (
-                $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
+                $byIndex instanceof Op\Expr\FuncCall
+                || $byIndex instanceof Op\Expr\NsFuncCall
+                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
                 || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
                 || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
             ) {
@@ -13791,6 +13793,7 @@ class Compiler {
                     (null === $callArg || !$this->operandsReferToSameVariable($paired->result, $callArg))
                     && $argCount > 1
                     && !$this->callArgsAreDistinctInlineTemporaries($callArgs)
+                    && !$this->callArgIsDeadInlineTemporary($callArg)
                 ) {
                     return null;
                 }
@@ -14019,8 +14022,11 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
-        // preg_split(..., -1, PREG_SPLIT_*) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423).
-        if ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3)) {
+        // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
+        if (
+            ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3))
+            || ('explode' === $inlineFuncName && 2 === $argIndex)
+        ) {
             $unaryProducer = null;
             $constProducer = null;
             foreach ($producers as $producer) {
@@ -14293,6 +14299,15 @@ class Compiler {
             }
 
             return null;
+        }
+        // check('label', explode(..., -1), ['expect']) — lone hoisted FuncCall + trailing Array_ prelude (#13423, #13424).
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+        if (null !== $soleHoisted && $argIndex === $soleHoisted) {
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    return $producer;
+                }
+            }
         }
         if (\count($producers) !== \count($nonEmbeddedArgIndices)) {
             return null;
@@ -15458,6 +15473,13 @@ class Compiler {
                         array_unshift($producers, $prev);
                     }
                 }
+                if (
+                    ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
+                    && $this->isNestedCallArgProducerForConsumer($prev, $callOp, $i - 1, $callIndex, $cfgChildren)
+                ) {
+                    array_unshift($producers, $child);
+                    continue;
+                }
                 break;
             }
             // echo floor(-2.5) . ' ' . ceil(-2.5) — inner Concat does not feed outer FuncCall args (#13494).
@@ -15605,6 +15627,28 @@ class Compiler {
     ): bool {
         if ($this->isAdjacentNestedFuncCallProducer($producer, $consumer, $producerIndex, $consumerIndex)) {
             return true;
+        }
+        if ($producerIndex + 2 === $consumerIndex) {
+            $mid = $cfgChildren[$producerIndex + 1] ?? null;
+            if (
+                $mid instanceof Op\Expr\Array_
+                && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+                && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                && property_exists($consumer, 'args')
+                && is_array($consumer->args)
+                && \count($consumer->args) >= 2
+            ) {
+                $nonEmbedded = 0;
+                foreach ($consumer->args as $arg) {
+                    if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
+                        ++$nonEmbedded;
+                    }
+                }
+                // check('label', explode(..., -1), ['expect']) — FuncCall + hoisted Array_ (#13423, #13424).
+                if ($nonEmbedded >= 2) {
+                    return true;
+                }
+            }
         }
         if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
             $producer,
