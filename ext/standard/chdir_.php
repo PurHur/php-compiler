@@ -27,10 +27,14 @@ final class chdir_ extends Internal
         }
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'chdir', 'directory', 0, $frame);
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'chdir', 0, 'directory');
+        $ok = VmFs::chdir($path);
+        if (!$ok) {
+            VmFilestatFailure::warnChdirFailed($frame, $path);
+        }
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmFs::chdir($path));
+        $frame->returnVar->bool($ok);
     }
 
     public function call(Context $context, JITVariable ...$args): Value
