@@ -11568,6 +11568,17 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        $arrayMapMatch = $this->matchArrayMapSiblingInlineArrayProducer(
+            $producers,
+            $callOp->args ?? [],
+            $argIndex,
+            $this->resolveInlineCallArgFuncName($callOp),
+            $callOp,
+            $block
+        );
+        if ($arrayMapMatch instanceof Op\Expr\Array_) {
+            return $arrayMapMatch;
+        }
         if ($this->producersIncludeInlineArrayUnionPlus($producers)) {
             // Array union — Plus.result is the call arg, not a hoisted Array_ (#10490, #13787).
             return null;
@@ -11703,6 +11714,17 @@ class Compiler {
             }
 
             return $unassigned[\count($unassigned) - 1];
+        }
+        $arrayMapMatch = $this->matchArrayMapSiblingInlineArrayProducer(
+            $producers,
+            $callOp->args,
+            $argIndex,
+            $this->resolveInlineCallArgFuncName($callOp),
+            $callOp,
+            $block
+        );
+        if ($arrayMapMatch instanceof Op\Expr\Array_) {
+            return $arrayMapMatch;
         }
         // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
         $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
@@ -12306,18 +12328,28 @@ class Compiler {
                 }
             }
             if ($arrayProducerCount >= 2 || $funcCallProducerCount >= 2 || null !== $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers)) {
-                $matched = null;
-                if (
-                    $this->callIncludesNamedParameter($callOp)
-                    && isset($callOp->args[$argIndex])
-                    && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex])
-                ) {
-                    $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
-                        $producers,
-                        $callOp,
-                        $argIndex,
-                        $block
-                    );
+                $matched = $this->matchArrayMapSiblingInlineArrayProducer(
+                    $producers,
+                    $callOp->args ?? [],
+                    $argIndex,
+                    $this->resolveInlineCallArgFuncName($callOp),
+                    $callOp,
+                    $block
+                );
+                if (!$matched instanceof Op\Expr) {
+                    $matched = null;
+                    if (
+                        $this->callIncludesNamedParameter($callOp)
+                        && isset($callOp->args[$argIndex])
+                        && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex])
+                    ) {
+                        $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                            $producers,
+                            $callOp,
+                            $argIndex,
+                            $block
+                        );
+                    }
                 }
                 if (!$matched instanceof Op\Expr) {
                     $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
@@ -13647,6 +13679,17 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
+        $arrayMapMatch = $this->matchArrayMapSiblingInlineArrayProducer(
+            $producers,
+            $callArgs,
+            $argIndex,
+            $inlineFuncName,
+            $cfgCallOp,
+            $block
+        );
+        if ($arrayMapMatch instanceof Op\Expr\Array_) {
+            return $arrayMapMatch;
+        }
         $producerCount = count($producers);
         $argCount = count($callArgs);
         if (0 === $producerCount) {
@@ -14748,14 +14791,16 @@ class Compiler {
 
             return null;
         }
-        // array_map(fn, [...], [...]) — php-cfg omits ArrowFunction from hoisted producers (#10094).
-        if (
-            'array_map' === $inlineFuncName
-            && $this->producersAreNestedArrayLiteralChain($producers)
-            && $argIndex >= 1
-            && $argIndex - 1 < \count($producers)
-        ) {
-            return $producers[$argIndex - 1];
+        $arrayMapMatch = $this->matchArrayMapSiblingInlineArrayProducer(
+            $producers,
+            $callArgs,
+            $argIndex,
+            $inlineFuncName,
+            $cfgCallOp,
+            $block
+        );
+        if ($arrayMapMatch instanceof Op\Expr\Array_) {
+            return $arrayMapMatch;
         }
         // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
         if (
@@ -15559,6 +15604,90 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * array_map(null, [...], [...]) — sibling inline Array_ args map by arg index, not last hoist (#10094, #13812).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchArrayMapSiblingInlineArrayProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex,
+        ?string $inlineFuncName,
+        ?Op $cfgCallOp = null,
+        ?Block $block = null
+    ): ?Op\Expr\Array_ {
+        if ('array_map' !== $inlineFuncName || $argIndex < 1) {
+            return null;
+        }
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+        ));
+        if (\count($arrayProducers) < 2 && null !== $cfgCallOp && null !== $block && null !== $block->orig) {
+            $arrayProducers = $this->siblingFlatInlineArrayProducersBeforeCfgOp(
+                $block->orig->children,
+                $cfgCallOp
+            );
+        }
+        if (\count($arrayProducers) < 2) {
+            return null;
+        }
+        $arrayOrdinal = $argIndex - 1;
+        if ($arrayOrdinal < 0 || $arrayOrdinal >= \count($arrayProducers)) {
+            return null;
+        }
+        $candidate = $arrayProducers[$arrayOrdinal];
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg) {
+            return null;
+        }
+        if ($this->callArgIsDeadInlineTemporary($callArg) && $this->callArgOperandExpectsArrayProducer($callArg)) {
+            return $candidate;
+        }
+        if ($this->operandsReferToSameVariable($candidate->result, $callArg)) {
+            return $candidate;
+        }
+
+        return null;
+    }
+
+    /**
+     * Consecutive sibling Expr_Array hoists immediately before a call (not nested wrappers).
+     *
+     * @return list<Op\Expr\Array_>
+     */
+    private function siblingFlatInlineArrayProducersBeforeCfgOp(array $cfgChildren, Op $callOp): array
+    {
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return [];
+        }
+        $arrays = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i];
+            if (!$child instanceof Op\Expr\Array_) {
+                break;
+            }
+            if (
+                [] !== $arrays
+                && $this->cfgExprUsesOperand($arrays[0], $child->result)
+            ) {
+                break;
+            }
+            array_unshift($arrays, $child);
+        }
+
+        return $arrays;
     }
 
     /**
