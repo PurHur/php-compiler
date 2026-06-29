@@ -288,7 +288,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_NOTICE, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_NOTICE)) {
+        if (!$this->shouldDisplayCliError(self::E_NOTICE)) {
             return;
         }
         $this->writeCliStderr(self::E_NOTICE, $message, $file, $line);
@@ -309,7 +309,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_WARNING)) {
+        if (!$this->shouldDisplayCliError(self::E_WARNING)) {
             return;
         }
         $this->writeCliStderr(self::E_WARNING, $message, $file, $line);
@@ -335,7 +335,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_DEPRECATED, $message, $file, $line);
-        if (0 === ($this->errorReporting & self::E_DEPRECATED)) {
+        if (!$this->shouldDisplayCliError(self::E_DEPRECATED)) {
             return;
         }
         $this->writeCliStderr(self::E_DEPRECATED, $message, $file, $line);
@@ -381,7 +381,11 @@ final class ErrorReporter
             }
         }
         $this->recordLastError($level, $message, $file, $line);
-        if (0 === ($this->errorReporting & $level)) {
+        if (!$this->shouldDisplayCliError($level)) {
+            if (self::E_USER_ERROR === $level) {
+                throw new \LogicException(rtrim($this->formatCliError($level, $message, $file, $line)));
+            }
+
             return;
         }
         $formatted = $this->formatCliError($level, $message, $file, $line);
@@ -409,10 +413,15 @@ final class ErrorReporter
 
             return;
         }
-        if (0 === ($this->errorReporting & $level)) {
+        if (!$this->shouldDisplayCliError($level)) {
             return;
         }
         $this->writeCliStderr($level, $message, $file, $line);
+    }
+
+    private function shouldDisplayCliError(int $level): bool
+    {
+        return $this->displayErrors && 0 !== ($this->errorReporting & $level);
     }
 
     /**
@@ -441,8 +450,8 @@ final class ErrorReporter
     }
 
     /**
-     * php-src CLI: diagnostics go to stderr when error_reporting includes the level,
-     * independent of display_errors (issue #10677; matches JIT __compiler_trigger_error).
+     * php-src CLI: diagnostics go to stderr when display_errors and error_reporting include the level
+     * (ext/standard/output.c / main/main.c php_error_cb; issue #13486).
      */
     public static function writeCliStderrLine(int $level, string $message, ?string $file, int $line): void
     {

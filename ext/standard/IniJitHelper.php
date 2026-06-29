@@ -389,6 +389,7 @@ final class IniJitHelper
             case 'display_errors':
                 self::$displayErrorsLocalValue = null;
                 self::$displayErrors = VmIni::parseBoolIni(self::CFG_DISPLAY_ERRORS);
+                ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
                 break;
             case 'memory_limit':
                 self::$memoryLimit = self::CFG_MEMORY_LIMIT;
@@ -443,6 +444,7 @@ final class IniJitHelper
         $old = self::displayErrorsIniString();
         self::$displayErrorsLocalValue = $newValue;
         self::$displayErrors = VmIni::parseBoolIni($newValue);
+        ErrorSilenceJitHelper::setDisplayErrors(self::$displayErrors);
 
         return $old;
     }

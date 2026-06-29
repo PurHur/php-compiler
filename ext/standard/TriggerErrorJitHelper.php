@@ -44,7 +44,7 @@ final class TriggerErrorJitHelper
      */
     public static function shouldPrintTrigger(int $level): bool
     {
-        return ErrorSilenceJitHelper::isErrorLevelEnabled($level);
+        return ErrorSilenceJitHelper::shouldDisplayCliError($level);
     }
 
     public static function recordTriggerError(int $level, string $message, string $file, int $line): void
@@ -73,13 +73,13 @@ final class TriggerErrorJitHelper
         }
         ErrorLastJitHelper::record($level, $message, $file, $line);
 
-        return ErrorSilenceJitHelper::isErrorLevelEnabled($level);
+        return ErrorSilenceJitHelper::shouldDisplayCliError($level);
     }
 
     private static function recordAndMaybePrint(int $level, string $message): void
     {
         ErrorLastJitHelper::record($level, $message, '', 0);
-        if (!ErrorSilenceJitHelper::isErrorLevelEnabled($level)) {
+        if (!ErrorSilenceJitHelper::shouldDisplayCliError($level)) {
             return;
         }
         self::stderrPrintCliError($level, $message, '', 0);
