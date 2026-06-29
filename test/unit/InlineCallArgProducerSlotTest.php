@@ -2884,4 +2884,61 @@ PHP;
         $runtime->run($block);
         $this->addToAssertionCount(1);
     }
+
+    /** Issue #13617 — filter_var(nested subject, FILTER_*) inside nested array literal rows. */
+    public function testFilterVarNestedSubjectInLabeledArrayLiteralSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$checks = [
+  ['label1', filter_var('127.0.0.1', FILTER_VALIDATE_IP), '127.0.0.1'],
+  ['label2', filter_var(sprintf('%s', '127.0.0.1'), FILTER_VALIDATE_IP), '127.0.0.1'],
+];
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_subject_labeled_array.php');
+
+        $constSlots = [];
+        $sprintfReturnSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && \count($sendSlots) >= 4 && null === $sprintfReturnSlot) {
+                $sprintfReturnSlot = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $constSlots);
+        self::assertCount(6, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($sprintfReturnSlot, $sendSlots[4], 'nested subject must use sprintf return slot');
+        self::assertSame($constSlots[1], $sendSlots[5], 'filter constant must use second ConstFetch slot');
+    }
+
+    /** Issue #13617 — filter_var(nested subject, FILTER_*) runtime parity in labeled array rows. */
+    public function testFilterVarNestedSubjectInLabeledArrayLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$checks = [
+  ['label1', filter_var('127.0.0.1', FILTER_VALIDATE_IP), '127.0.0.1'],
+  ['label2', filter_var(sprintf('%s', '127.0.0.1'), FILTER_VALIDATE_IP), '127.0.0.1'],
+];
+foreach ($checks as [$label, $got, $want]) {
+    if ($got !== $want) {
+        throw new \LogicException('mismatch: '.$label);
+    }
+}
+echo "ok\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'filter_var_nested_subject_labeled_array_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
 }
