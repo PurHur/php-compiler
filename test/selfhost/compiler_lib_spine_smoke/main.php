@@ -1167,6 +1167,7 @@ require_once __DIR__.'/../../../ext/standard/VmCsvArg.php';
 require_once __DIR__.'/../../../ext/standard/VmDataUri.php';
 require_once __DIR__.'/../../../ext/standard/VmDataStream.php';
 require_once __DIR__.'/../../../ext/standard/VmDate.php';
+require_once __DIR__.'/../../../ext/standard/VmDatePure.php';
 require_once __DIR__.'/../../../ext/standard/VmDateInterval.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunFunc.php';
 require_once __DIR__.'/../../../ext/standard/VmDateSunNative.php';
