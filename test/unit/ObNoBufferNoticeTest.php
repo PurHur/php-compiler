@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * ob_end_flush()/ob_end_clean() no-buffer E_NOTICE suppressed when display_errors=0 (#13486).
+ * ob_end_flush()/ob_end_clean() no-buffer E_NOTICE on stderr via php_error_cb (#13486, #13542).
  */
 final class ObNoBufferNoticeTest extends TestCase
 {
@@ -20,12 +20,12 @@ ob_flush();
 ob_get_flush();
 PHP;
 
-    public function testVmNoStderrNoticeWithDisplayErrorsOff(): void
+    public function testVmStderrNoticeMatchesZendWithDisplayErrorsOff(): void
     {
         $stderr = $this->runVmCaptureStderr(self::CODE);
-        $this->assertStringNotContainsString('ob_end_clean(): Failed to delete buffer', $stderr);
-        $this->assertStringNotContainsString('ob_end_flush(): Failed to delete and flush buffer', $stderr);
-        $this->assertStringNotContainsString('PHP Notice:', $stderr);
+        $this->assertStringContainsString('ob_end_clean(): Failed to delete buffer', $stderr);
+        $this->assertStringContainsString('ob_end_flush(): Failed to delete and flush buffer', $stderr);
+        $this->assertStringContainsString('PHP Notice:', $stderr);
     }
 
     private function runVmCaptureStderr(string $code): string

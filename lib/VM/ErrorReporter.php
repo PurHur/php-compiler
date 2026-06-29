@@ -288,7 +288,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_NOTICE, $message, $file, $line);
-        if (!$this->shouldDisplayCliError(self::E_NOTICE)) {
+        if (!$this->shouldWriteCliStderr(self::E_NOTICE)) {
             return;
         }
         $this->writeCliStderr(self::E_NOTICE, $message, $file, $line);
@@ -309,7 +309,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
-        if (!$this->shouldDisplayCliError(self::E_WARNING)) {
+        if (!$this->shouldWriteCliStderr(self::E_WARNING)) {
             return;
         }
         $this->writeCliStderr(self::E_WARNING, $message, $file, $line);
@@ -335,7 +335,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError(self::E_DEPRECATED, $message, $file, $line);
-        if (!$this->shouldDisplayCliError(self::E_DEPRECATED)) {
+        if (!$this->shouldWriteCliStderr(self::E_DEPRECATED)) {
             return;
         }
         $this->writeCliStderr(self::E_DEPRECATED, $message, $file, $line);
@@ -381,7 +381,7 @@ final class ErrorReporter
             }
         }
         $this->recordLastError($level, $message, $file, $line);
-        if (!$this->shouldDisplayCliError($level)) {
+        if (!$this->shouldWriteCliStderr($level)) {
             if (self::E_USER_ERROR === $level) {
                 throw new \LogicException(rtrim($this->formatCliError($level, $message, $file, $line)));
             }
@@ -413,15 +413,19 @@ final class ErrorReporter
 
             return;
         }
-        if (!$this->shouldDisplayCliError($level)) {
+        if (!$this->shouldWriteCliStderr($level)) {
             return;
         }
         $this->writeCliStderr($level, $message, $file, $line);
     }
 
-    private function shouldDisplayCliError(int $level): bool
+    /**
+     * php-src CLI php_error_cb: stderr when error_reporting includes the level
+     * (main/main.c; issues #13486, #13542). display_errors gates extra stdout copy only.
+     */
+    private function shouldWriteCliStderr(int $level): bool
     {
-        return $this->displayErrors && 0 !== ($this->errorReporting & $level);
+        return 0 !== ($this->errorReporting & $level);
     }
 
     /**
