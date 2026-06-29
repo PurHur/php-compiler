@@ -12982,27 +12982,46 @@ class Compiler {
     }
 
     /**
-     * FUNCCALL_EXEC_RETURN + CONST_FETCH immediately before FUNCCALL_INIT — nested subject (#13617).
+     * FUNCCALL_EXEC_RETURN immediately before hoisted ConstFetch prelude — nested subject (#13617).
+     *
+     * compileCallArgSends runs before FUNCCALL_INIT is appended, so the tail is often CONST_FETCH
+     * with the nested call's EXEC_RETURN one slot earlier (filter_var(sprintf(...), FILTER_*)).
      */
     private function slotForNestedSubjectExecBeforeLiteralPreludeCall(Block $block): ?string
     {
         $ops = $block->opCodes;
         $n = \count($ops);
-        for ($i = $n - 1; $i >= 2; --$i) {
-            if (OpCode::TYPE_FUNCCALL_INIT !== $ops[$i]->type) {
-                continue;
+        if ($n < 2) {
+            return null;
+        }
+        $execIndex = null;
+        $tail = $ops[$n - 1];
+        if (
+            OpCode::TYPE_CONST_FETCH === $tail->type
+            || OpCode::TYPE_CLASS_CONST_FETCH === $tail->type
+        ) {
+            $execIndex = $n - 2;
+        } elseif (OpCode::TYPE_FUNCCALL_INIT === $tail->type) {
+            if ($n < 3) {
+                return null;
             }
-            if (OpCode::TYPE_CONST_FETCH !== $ops[$i - 1]->type) {
-                continue;
+            $beforeInit = $ops[$n - 2];
+            if (
+                OpCode::TYPE_CONST_FETCH !== $beforeInit->type
+                && OpCode::TYPE_CLASS_CONST_FETCH !== $beforeInit->type
+            ) {
+                return null;
             }
-            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $ops[$i - 2]->type) {
-                continue;
-            }
-
-            return (string) $ops[$i - 2]->arg1;
+            $execIndex = $n - 3;
+        } else {
+            return null;
+        }
+        $exec = $ops[$execIndex] ?? null;
+        if (null === $exec || OpCode::TYPE_FUNCCALL_EXEC_RETURN !== $exec->type) {
+            return null;
         }
 
-        return null;
+        return (string) $exec->arg1;
     }
 
     /**
@@ -13038,6 +13057,12 @@ class Compiler {
                 continue;
             }
             if ($this->isNestedCallArgProducerForConsumer(
+                $producer,
+                $cfgCallOp,
+                $producerIndex,
+                $consumerIndex,
+                $block->orig->children
+            ) || $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
                 $producer,
                 $cfgCallOp,
                 $producerIndex,
@@ -21123,6 +21148,17 @@ class Compiler {
                         break;
                     }
                 }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 0 === $argIndex
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && 'filter_var' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            ) {
+                $nestedSubjectSlot = $this->slotForNestedSubjectExecBeforeLiteralPreludeCall($block);
+                if (null !== $nestedSubjectSlot) {
+                    $valueSlot = $nestedSubjectSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
