@@ -521,12 +521,89 @@ final class VmInfo
 
     private static function creditsSectionHtml(int $flags): string
     {
-        if (!self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
+        $sections = '';
+        if (self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
+            $sections .= self::creditsGeneralSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_QA)) {
+            $sections .= self::creditsQaSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_SAPI)) {
+            $sections .= self::creditsSapiSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_MODULES)) {
+            $sections .= self::creditsModulesSectionHtml();
+        }
+        if (self::creditsFlagSelected($flags, self::CREDITS_DOCS)) {
+            $sections .= self::creditsDocsSectionHtml();
+        }
+        if ('' === $sections) {
             return '';
         }
+        if (self::creditsFlagSelected($flags, self::CREDITS_FULLPAGE)) {
+            return self::creditsFullPageWrap($sections);
+        }
+
+        return $sections;
+    }
+
+    private static function creditsGeneralSectionHtml(): string
+    {
         $html = '<table><tr class="h"><td colspan="2"><h2>PHP Credits</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">Language Design &amp; Concept<br />';
+        $html .= 'Andi Gutmans, Rasmus Lerdorf, Zeev Suraski, Marcus Boerger</td></tr>';
         $html .= '<tr><td class="v" colspan="2">PurHur/php-compiler — PHP-in-PHP compiler runtime</td></tr>';
         $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsQaSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Quality Assurance Team</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::QA_TEAM.'</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsSapiSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>Server API (SAPI) Abstraction Layer</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::SAPI_AUTHORS.'</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsModulesSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>Module Authors</h2></td></tr>';
+        $html .= '<tr><td class="e">Module </td><td class="v">Authors </td></tr>';
+        foreach (VmCreditsData::moduleAuthorsForLoadedExtensions() as $module => $authors) {
+            $html .= '<tr><td class="e">'.$module.' </td><td class="v">'.$authors.' </td></tr>';
+        }
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsDocsSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Documentation Team</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::DOCS_TEAM.'</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
+    private static function creditsFullPageWrap(string $body): string
+    {
+        $html = '<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "DTD/xhtml1-transitional.dtd">';
+        $html .= '<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8" />';
+        $html .= '<title>PHP Credits</title><style type="text/css">.h{background-color:#9999cc;font-weight:bold;color:#000000;}';
+        $html .= '.v{background-color:#cccccc;color:#000000;}.e{background-color:#ccccff;font-weight:bold;color:#000000;}</style></head>';
+        $html .= '<body><div class="center">'.$body.'</div></body></html>';
 
         return $html;
     }
