@@ -15999,11 +15999,20 @@ class Compiler {
             return false;
         }
         // Statement-level side effects before f('lit', g(), lit) are not sibling producers (#13509).
-        if (
-            null === $producer->result
-            || !$this->operandsReferToSameVariable($producer->result, $targetArg)
-        ) {
+        // php-cfg f(g(), h()) — distinct dead arg temps without shared cfg roots (#10917, #13570).
+        if (null === $producer->result) {
             return false;
+        }
+        if (!$this->operandsReferToSameVariable($producer->result, $targetArg)) {
+            if (!$this->siblingMultiArgProducerWiresByDistinctDeadArgOrdinal(
+                $producer,
+                $producerIndex,
+                $consumerIndex,
+                $targetArgIndex,
+                $cfgChildren
+            )) {
+                return false;
+            }
         }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
@@ -16045,6 +16054,55 @@ class Compiler {
             || $op instanceof Op\Expr\UnaryPlus
             || $op instanceof Op\Expr\BitwiseNot
             || $op instanceof Op\Expr\BooleanNot;
+    }
+
+    /**
+     * php-cfg f(g(), h()) with distinct dead arg temps — ordinal sibling wiring (#10917, #13570).
+     *
+     * Skips cfgVarRoot equality when every consumer arg is a dead inline temp and every
+     * hoisted stmt from firstSibling..consumer-1 is a FuncCall (not f('lit', g(), lit) #13509).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingMultiArgProducerWiresByDistinctDeadArgOrdinal(
+        Op\Expr $producer,
+        int $producerIndex,
+        int $consumerIndex,
+        int $targetArgIndex,
+        array $cfgChildren
+    ): bool {
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        if (!$this->callArgsAreDistinctInlineTemporaries($consumer->args)) {
+            return false;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        if (null === $firstSibling) {
+            return false;
+        }
+        if ($producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
+            return false;
+        }
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            $sib = $cfgChildren[$j] ?? null;
+            if (
+                !$sib instanceof Op\Expr\FuncCall
+                && !$sib instanceof Op\Expr\NsFuncCall
+            ) {
+                return false;
+            }
+        }
+        $ordinal = $producerIndex - $firstSibling;
+
+        return $ordinal === $targetArgIndex;
     }
 
     /**
