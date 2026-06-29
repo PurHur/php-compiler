@@ -16022,9 +16022,11 @@ class Compiler {
             return null;
         }
         $args = $cfgCallOp->args;
-        if (1 === \count($args) && 0 === $argIndex) {
-            // var_export(f()) — adjacent nested FuncCall feeds the sole call arg (#11373).
-        } elseif (\count($args) < 2 || $argIndex !== \count($args) - 1) {
+        $callArg = $args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        if (1 === \count($args) && 0 !== $argIndex) {
             return null;
         }
         $callIndex = null;
@@ -16142,13 +16144,14 @@ class Compiler {
         }
         // php-cfg `f(g(), literal)` — adjacent producer feeds arg0 (#10402, levenshtein(str_repeat(...), 'b')).
         // php-cfg `f($named, g())` — producer feeds last arg (#11409, chown($path, getmyuid())).
-        $firstArg = $args[0] ?? null;
-        if ($this->callArgIsDeadInlineTemporary($firstArg)) {
-            return true;
+        // php-cfg `f('label', g(), 0)` — producer feeds a middle dead inline temp (#13451, #13450).
+        foreach ($args as $arg) {
+            if ($this->callArgIsDeadInlineTemporary($arg)) {
+                return true;
+            }
         }
-        $lastArg = $args[count($args) - 1];
 
-        return $this->callArgIsDeadInlineTemporary($lastArg);
+        return false;
     }
 
     private function isNamedVariableOperand(Operand $arg): bool
@@ -18835,6 +18838,9 @@ class Compiler {
             if ($child instanceof Op\Expr\BinaryOp\Concat) {
                 continue;
             }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
             if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
                 break;
             }
@@ -20624,6 +20630,7 @@ class Compiler {
             || $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
             || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
+            || $this->cfgCallImmediatelyFeedsAdjacentConsumer($cfgCallOp, $block)
         ) {
             return new OpCode(
                 OpCode::TYPE_FUNCCALL_EXEC_RETURN,
@@ -20682,6 +20689,42 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg `take('a', fseek(...), 0)` — adjacent hoisted producer needs EXEC_RETURN (#13451).
+     */
+    private function cfgCallImmediatelyFeedsAdjacentConsumer(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        $producerIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $producerIndex = $i;
+                break;
+            }
+        }
+        if (null === $producerIndex) {
+            return false;
+        }
+        $consumerIndex = $producerIndex + 1;
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (null === $consumer || !$this->isInlineExprCallArgConsumer($consumer)) {
+            return false;
+        }
+        if (!$cfgCallOp instanceof Op\Expr) {
+            return false;
+        }
+
+        return $this->isAdjacentNestedFuncCallProducer(
+            $cfgCallOp,
+            $consumer,
+            $producerIndex,
+            $consumerIndex
+        );
     }
 
     /**
