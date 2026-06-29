@@ -59,7 +59,7 @@ final class vfprintf_ extends Internal
             $i64
         );
         $fmt = JitStringArg::lower($context, $args[1], 'vfprintf() format');
-        $argsArray = JitVfprintf::loadArgsArray($context, $args[2]);
+        $argsArray = JitVfprintf::loadArgsArray($context, $args[2], 'vfprintf');
 
         return JitVfprintf::invoke($context, $handle, $fmt, $argsArray);
     }
