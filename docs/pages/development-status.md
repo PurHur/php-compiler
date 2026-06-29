@@ -80,7 +80,7 @@ Shipped examples under `examples/` are **regression fixtures** for VM/JIT/AOT an
 | 006-FileUploadWeb | ✅ | ✅ | multipart `$_FILES`; `FILE_UPLOAD_WEB_SMOKE_GATE=1`, `FILE_UPLOAD_WEB_AOT_LINK_GATE=1`, `FILE_UPLOAD_WEB_AOT_SMOKE_GATE=1` default ([#2009](https://github.com/PurHur/php-compiler/issues/2009), [#2011](https://github.com/PurHur/php-compiler/issues/2011), [#2012](https://github.com/PurHur/php-compiler/issues/2012)) |
 | 007-ThrowsWeb | ✅ | 🚧 | throw/catch VM smoke `THROWS_WEB_SMOKE_GATE=1` ([#2093](https://github.com/PurHur/php-compiler/issues/2093), [#2101](https://github.com/PurHur/php-compiler/issues/2101)); AOT link OK, execute segfault under investigation |
 | 008-SelfHostProbe | ✅ | ✅ | `SELFHOSTPROBE_AOT_SMOKE_GATE=1` in `examples-aot-smoke.sh` ([#2407](https://github.com/PurHur/php-compiler/issues/2407)) |
-| 009-FastCGIWeb | ✅ | ✅ | FastCGI execute `FASTCGI_WEB_AOT_SMOKE_GATE=1` ([#2351](https://github.com/PurHur/php-compiler/issues/2351)) |
+| 009-FastCGIWeb | ✅ | ✅ | `FASTCGI_WEB_SMOKE_GATE=1` default ([#2351](https://github.com/PurHur/php-compiler/issues/2351)); FastCGI execute 📋 [#173](https://github.com/PurHur/php-compiler/issues/173); [#2331](https://github.com/PurHur/php-compiler/issues/2331); `FASTCGI_WEB_AOT_SMOKE_GATE=1` |
 
 Example smoke gates in `script/ci-defaults.env`: `BOOTSTRAP_M3_COMPILE_SMOKE_PROBE_GATE=1` (M3 compile-smoke partial probe, [#1937](https://github.com/PurHur/php-compiler/issues/1937)).
 
