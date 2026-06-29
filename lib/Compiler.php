@@ -17160,6 +17160,15 @@ class Compiler {
         if (!$candidate instanceof Op\Expr || !\in_array($candidate, $producers, true)) {
             return null;
         }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        $stmtCoalesce = $cfgChildren[$callIndex - 1] ?? null;
+        if (
+            $stmtCoalesce instanceof Op\Expr\BinaryOp\Coalesce
+            && null !== $callArg
+            && !$this->isCallArgUnrelatedToPriorStmtCoalesce($callArg)
+        ) {
+            return $stmtCoalesce;
+        }
 
         return $candidate;
     }
