@@ -11,6 +11,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
@@ -171,7 +172,13 @@ final class RandomizerBuiltin
 
     private static function randomizerIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['getint'], $entry->methods['nextint'], $entry->methods['__construct']);
+        return isset(
+            $entry->methods['getint'],
+            $entry->methods['nextint'],
+            $entry->methods['__construct'],
+            $entry->methods['__serialize'],
+            $entry->methods['__unserialize']
+        );
     }
 
     public static function receiverRandomizer(Frame $frame, string $method): ObjectEntry
@@ -642,8 +649,16 @@ final class RandomizerSerialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::__serialize()');
-        throw new \LogicException('Random\\Randomizer::__serialize() not implemented in this compiler build');
+        $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::__serialize()');
+        if (null === $frame->returnVar) {
+            return;
+        }
+
+        $engine = new Variable();
+        $engine->copyFrom(RandomizerStorage::engine($object)->resolveIndirect());
+        $ht = new HashTable();
+        $ht->add('engine', $engine);
+        $frame->returnVar->array($ht);
     }
 }
 
@@ -656,7 +671,37 @@ final class RandomizerUnserialize extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::__unserialize()');
-        throw new \LogicException('Random\\Randomizer::__unserialize() not implemented in this compiler build');
+        $object = RandomizerBuiltin::receiverRandomizer($frame, 'Random\\Randomizer::__unserialize()');
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'Random\\Randomizer::__unserialize() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $arg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_ARRAY !== $arg->type) {
+            throw new \TypeError(
+                'Random\\Randomizer::__unserialize(): Argument #1 ($data) must be of type array'
+            );
+        }
+
+        $engineVar = null;
+        foreach ($arg->toArray()->iterateKeyed(true) as [$keyVar, $valueVar]) {
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING === $key->type && 'engine' === $key->toString()) {
+                $engineVar = $valueVar;
+                break;
+            }
+        }
+        if (null === $engineVar) {
+            throw new \TypeError('Random\\Randomizer::__unserialize(): invalid serialized state');
+        }
+        $resolved = $engineVar->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            throw new \TypeError('Random\\Randomizer::__unserialize(): invalid serialized state');
+        }
+
+        RandomizerStorage::setEngine($object, $engineVar);
+        $object->constructed = true;
     }
 }
