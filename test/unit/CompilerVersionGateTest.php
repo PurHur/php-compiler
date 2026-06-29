@@ -69,9 +69,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsReflectionPropertyAccessProbes());
     }
 
-    public function testSupportsHrtimeAsNumberFloatTrueOn84DevForwardProfile(): void
+    public function testSupportsHrtimeAsNumberFloatFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsHrtimeAsNumberFloat());
+        $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());
     }
 
     public function testSupportsClassConstantsFalseOnReferenceProfile(): void
