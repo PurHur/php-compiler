@@ -13483,7 +13483,18 @@ class Compiler {
                     $producers,
                     $block->orig->children
                 );
-                if ($byIndex instanceof Op\Expr) {
+                if (null !== $byIndex) {
+                    $trailingUnaryProducer = $producers[$producerCount - 1] ?? null;
+                    if (
+                        $byIndex instanceof Op\Expr\Array_
+                        && (
+                            $trailingUnaryProducer instanceof Op\Expr\Cast
+                            || $trailingUnaryProducer instanceof Op\Expr\Clone_
+                        )
+                    ) {
+                        return $trailingUnaryProducer;
+                    }
+
                     return $byIndex;
                 }
             }
@@ -13519,17 +13530,29 @@ class Compiler {
                 $producers,
                 $block->orig->children
             );
-            if (
-                $byIndex instanceof Op\Expr\FuncCall
-                || $byIndex instanceof Op\Expr\NsFuncCall
-                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
-                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
-                || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
-                || $byIndex instanceof Op\Expr\ConstFetch
-                || $byIndex instanceof Op\Expr\ClassConstFetch
-                || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
-            ) {
-                return $byIndex;
+            if (null !== $byIndex) {
+                $trailingUnaryProducer = $producers[$producerCount - 1] ?? null;
+                if (
+                    $byIndex instanceof Op\Expr\Array_
+                    && (
+                        $trailingUnaryProducer instanceof Op\Expr\Cast
+                        || $trailingUnaryProducer instanceof Op\Expr\Clone_
+                    )
+                ) {
+                    return $trailingUnaryProducer;
+                }
+                if (
+                    $byIndex instanceof Op\Expr\FuncCall
+                    || $byIndex instanceof Op\Expr\NsFuncCall
+                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
+                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
+                    || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
+                    || $byIndex instanceof Op\Expr\ConstFetch
+                    || $byIndex instanceof Op\Expr\ClassConstFetch
+                    || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
+                ) {
+                    return $byIndex;
+                }
             }
         }
         if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
@@ -13705,6 +13728,10 @@ class Compiler {
                     }
                     // Hoisted ConstFetch prelude before inline scalar cast (#10143, #9479).
                     if ($last instanceof Op\Expr\Cast) {
+                        return $last;
+                    }
+                    // id(clone new C()) — Clone_ after New_ prelude (#13687).
+                    if ($last instanceof Op\Expr\Clone_) {
                         return $last;
                     }
                     // Inline array union `var_export([...] + [...])` — Plus after Array_ preludes (#10490, #10578).
@@ -14635,6 +14662,15 @@ class Compiler {
                 ) {
                     continue;
                 }
+                // id(clone new C()) — New_ prelude feeds Clone_, not the call arg (#13687).
+                if (
+                    $next instanceof Op\Expr\Clone_
+                    && property_exists($next, 'expr')
+                    && $next->expr instanceof Operand
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
                 // array_fill_keys([new C()], 1) — New_ prelude is array element, not the keys arg (#10849).
                 if (
                     $next instanceof Op\Expr\Array_
@@ -15446,6 +15482,7 @@ class Compiler {
             || $op instanceof Op\Expr\InstanceOf_
             || $op instanceof Op\Expr\In_
             || $op instanceof Op\Expr\Cast
+            || $op instanceof Op\Expr\Clone_
             || $op instanceof Op\Expr\MagicScriptConst
             || $op instanceof Op\Expr\Assign
             || $op instanceof Op\Expr\PostInc
