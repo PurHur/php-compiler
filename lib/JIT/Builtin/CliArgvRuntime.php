@@ -17,8 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for CLI $argc/$argv via CliArgvJitHelper + VmCliArgv PHP (#9439).
  *
- * Embed: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
- * Standalone: quarantined LLVM in {@see CliArgvStandaloneLlvm} (#11142).
+ * Embed and standalone: hashtable materialization via compiled {@see \PHPCompiler\ext\standard\CliArgvJitHelper}.
  * php-src: ext/standard/basic_functions.c — $argc / $argv in CLI SAPI
  */
 final class CliArgvRuntime
@@ -120,12 +119,6 @@ final class CliArgvRuntime
             return;
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            CliArgvStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         self::ensureGlobals($context);
         self::ensureExternals($context);
         self::ensureJitHelperCompiled($context);
@@ -165,10 +158,6 @@ final class CliArgvRuntime
     public static function buildArgvHashtable(Context $context): Value
     {
         self::ensureLinked($context);
-
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return CliArgvStandaloneLlvm::buildArgvHashtable($context);
-        }
 
         return self::emitFillArgvTableFromGlobals($context, BasicBlockHelper::parentFunction($context));
     }
