@@ -6,15 +6,15 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** getenv standalone AOT uses libc bridge; embed uses GetenvJitHelper (#9092, #13571). */
+/** getenv embed + standalone AOT route through GetenvJitHelper PHP (#9092, #13194, #13621). */
 final class GetenvJitRuntimeShrinkTest extends TestCase
 {
-    public function testStringGetenvRoutesStandaloneThroughLibcBridge(): void
+    public function testStringGetenvRoutesThroughGetenvJitHelperNotLibcBridge(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenv.php');
         $this->assertStringContainsString('GetenvJitHelper', $source);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/StringGetenvLibcBridge.php');
-        $this->assertStringContainsString('StringGetenvLibcBridge', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('implementGetenvBridge', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringGetenvLibcBridge.php');
+        $this->assertStringNotContainsString('StringGetenvLibcBridge', $source);
     }
 }

@@ -26,10 +26,11 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("getNamedGlobal('phpc_env_local_count')", $source);
     }
 
-    public function testStringGetenvAllUsesEnvLocalRuntimeMergeOverlay(): void
+    public function testStringGetenvAllUsesGetenvJitHelperFillAll(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
-        $this->assertStringContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
+        $this->assertStringContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
+        $this->assertStringNotContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
         $this->assertStringNotContainsString('emitLocalOverlay', $source);
         $this->assertStringNotContainsString('phpc_env_local_entries', $source);
     }
@@ -43,11 +44,11 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('Variable::string', $source);
     }
 
-    public function testMergeOverlayUsesPhpHelperNotLlvmTable(): void
+    public function testEnvLocalRuntimeNoMergeOverlayLlvmEmitter(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvLocalRuntime.php');
-        $this->assertStringContainsString('MERGE_OVERLAY_HELPER', $runtime);
-        $this->assertStringContainsString('mergeLocalOverlayInto', $runtime);
+        $this->assertStringNotContainsString('emitMergeOverlay', $runtime);
+        $this->assertStringNotContainsString('MERGE_OVERLAY_HELPER', $runtime);
         $this->assertStringNotContainsString('EnvLocalOverlayTableLlvm', $runtime);
         $this->assertStringNotContainsString('__compiler_env_local_sync_overlay', $runtime);
     }

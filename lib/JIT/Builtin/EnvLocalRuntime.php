@@ -29,13 +29,10 @@ final class EnvLocalRuntime
 
     private const REGISTER_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::registerPutenv';
 
-    private const MERGE_OVERLAY_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::mergeLocalOverlayInto';
-
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::LOOKUP_HELPER,
         self::REGISTER_HELPER,
-        self::MERGE_OVERLAY_HELPER,
     ];
 
     /** @var list<string> */
@@ -64,15 +61,6 @@ final class EnvLocalRuntime
         self::implementRegisterBridge($context);
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
-    }
-
-    public static function emitMergeOverlay(Context $context, Value $ht): void
-    {
-        self::ensureJitHelperCompiled($context);
-        $context->builder->call(
-            self::helperFunction($context, self::MERGE_OVERLAY_HELPER),
-            $ht
-        );
     }
 
     private static function implementLookupBridge(Context $context): void
