@@ -15675,6 +15675,10 @@ class Compiler {
                 )) {
                     continue;
                 }
+                // var_dump($g(), $g()) — adjacent hoisted producers are siblings, not nested-only (#13671).
+                if ($this->isSiblingMultiArgFuncCallProducer($child, $callOp, $i, $callIndex, $cfgChildren)) {
+                    continue;
+                }
                 break;
             }
             if (
@@ -16561,6 +16565,33 @@ class Compiler {
         }
 
         return $first;
+    }
+
+    /** True when php-cfg hoisted ≥2 sibling FuncCall producers before a multi-arg consumer (#13671). */
+    private function hasSiblingMultiArgInlineCallProducers(Block $block, Op $cfgCallOp): bool
+    {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        if (\count($cfgCallOp->args) < 2) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+        if (null === $firstSibling) {
+            return false;
+        }
+
+        return ($callIndex - $firstSibling) >= 2;
     }
 
     /**
@@ -20830,6 +20861,7 @@ class Compiler {
                 if (
                     0 === $argIndex
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? $arg)
+                    && !$this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 ) {
                     foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,
