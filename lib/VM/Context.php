@@ -521,7 +521,7 @@ class Context {
      *
      * php-src: zend_register_class_alias_ex — resolves alias-of-alias to canonical class (#11639).
      */
-    public function registerClassAlias(string $original, string $alias, bool $autoload = true): bool
+    public function registerClassAlias(string $original, string $alias, bool $autoload = true, ?\PHPCompiler\Frame $frame = null): bool
     {
         $aliasLc = strtolower($alias);
         $originalLc = strtolower($original);
@@ -529,7 +529,10 @@ class Context {
         if (isset($this->classes[$aliasLc]) || isset($this->classAliases[$aliasLc]) || isset($this->enums[$aliasLc])) {
             $this->errors->triggerError(
                 \sprintf('Cannot declare class %s, because the name is already in use', $alias),
-                ErrorReporter::E_WARNING
+                ErrorReporter::E_WARNING,
+                null,
+                $this,
+                $frame
             );
 
             return false;
@@ -539,7 +542,10 @@ class Context {
             if (!$autoload || !$this->autoloadClass($original)) {
                 $this->errors->triggerError(
                     \sprintf('Class "%s" not found', $original),
-                    ErrorReporter::E_WARNING
+                    ErrorReporter::E_WARNING,
+                    null,
+                    $this,
+                    $frame
                 );
 
                 return false;
@@ -548,7 +554,10 @@ class Context {
         if (!isset($this->classes[$originalLc])) {
             $this->errors->triggerError(
                 \sprintf('Class "%s" not found', $original),
-                ErrorReporter::E_WARNING
+                ErrorReporter::E_WARNING,
+                null,
+                $this,
+                $frame
             );
 
             return false;

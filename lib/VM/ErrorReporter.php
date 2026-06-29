@@ -477,6 +477,16 @@ final class ErrorReporter
             if ($line <= 0) {
                 $walk = $frame;
                 while (null !== $walk) {
+                    if ($walk->callSiteLine > 0) {
+                        $line = $walk->callSiteLine;
+                        break;
+                    }
+                    $walk = $walk->parent;
+                }
+            }
+            if ($line <= 0) {
+                $walk = $frame;
+                while (null !== $walk) {
                     if ('' !== $walk->scriptPath) {
                         $opcodeLine = FatalSite::lineFromOpcodes($walk);
                         if ($opcodeLine > 0) {
@@ -485,16 +495,6 @@ final class ErrorReporter
                         }
                     }
                     $walk = $walk->parent;
-                }
-                if ($line <= 0) {
-                    $walk = $frame;
-                    while (null !== $walk) {
-                        if ($walk->callSiteLine > 0) {
-                            $line = $walk->callSiteLine;
-                            break;
-                        }
-                        $walk = $walk->parent;
-                    }
                 }
             }
         }
