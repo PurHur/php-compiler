@@ -6,11 +6,13 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\VmSession;
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\BuiltinStubEnumTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7321 */
 final class SessionStatusEnumTest extends TestCase
 {
+    use BuiltinStubEnumTestSkip;
     protected function tearDown(): void
     {
         VmSession::reset();
@@ -19,6 +21,7 @@ final class SessionStatusEnumTest extends TestCase
 
     public function testSessionStatusBuiltinEnumAndHandler(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

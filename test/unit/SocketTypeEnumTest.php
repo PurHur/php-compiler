@@ -5,13 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Runtime;
+use PHPCompiler\Test\Support\BuiltinStubEnumTestSkip;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7235 */
 final class SocketTypeEnumTest extends TestCase
 {
+    use BuiltinStubEnumTestSkip;
+
     public function testSocketTypeBuiltinEnumExists(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -36,6 +40,7 @@ PHP;
 
     public function testSocketTypeEnumAotLint(): void
     {
+        $this->skipUnlessBuiltinStubEnumsEnabled();
         $root = dirname(__DIR__, 2);
         $bin = realpath($root.'/bin/compile.php');
         $this->assertNotFalse($bin);
