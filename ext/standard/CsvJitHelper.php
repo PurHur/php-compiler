@@ -40,6 +40,27 @@ final class CsvJitHelper
     }
 
     /**
+     * fgetcsv() for compiled JIT/AOT — SSOT {@see VmFs::fgetcsv()} (#13440).
+     *
+     * @return HashTable|null row hashtable, or null when fgetcsv() would return false
+     */
+    public static function fgetcsvArgv(
+        int $handle,
+        int $length,
+        string $separator,
+        string $enclosure,
+        string $escape,
+    ): ?HashTable {
+        $len = $length < 0 ? null : ($length === 0 ? null : $length);
+        $row = VmFs::fgetcsv($handle, $len, $separator, $enclosure, $escape);
+        if (false === $row) {
+            return null;
+        }
+
+        return VmFs::csvRowToArray($row);
+    }
+
+    /**
      * Format one CSV row for fputcsv() JIT/AOT (#12447, ext/standard/file.c).
      */
     public static function formatFieldsArgv(
