@@ -330,6 +330,54 @@ PHP;
         self::assertSame('100', ob_get_clean());
     }
 
+    /** Issue #13779 — dual inline array_keys() map to distinct array_diff_assoc() arg slots. */
+    public function testArrayDiffAssocDualInlineArrayKeysUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_diff_assoc(array_keys(['a' => 1, 'b' => 2]), array_keys(['a' => 9]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_diff_assoc_inline_array_keys.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertContains($sendSlots[1], $returnSlots, 'fcall returns='.json_encode($returnSlots));
+    }
+
+    /** Issue #13779 — array_diff_assoc(array_keys(), array_keys()) runtime parity with Zend. */
+    public function testArrayDiffAssocDualInlineArrayKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_diff_assoc(array_keys(['a' => 1, 'b' => 2]), array_keys(['a' => 9])));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_diff_assoc_inline_array_keys.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  1 => 'b',\n)", ob_get_clean());
+    }
+
     /** Issue #10918 — sibling str_repeat() producers map to distinct similar_text() arg slots. */
     public function testSimilarTextDualStrRepeatUsesDistinctProducerSlots(): void
     {
