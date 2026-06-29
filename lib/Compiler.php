@@ -1917,9 +1917,12 @@ class Compiler {
                         }
                     } elseif (
                         $child instanceof Op\Expr\NullsafePropertyFetch
-                        && $this->shouldSkipNullsafePropertyFetchForIssetOrEmpty($child, $ops, $i, $block)
+                        && (
+                            $this->shouldSkipNullsafePropertyFetchForIssetOrEmpty($child, $ops, $i, $block)
+                            || $this->shouldSkipNullsafePropertyFetchForCoalesce($child, $ops, $i, $block)
+                        )
                     ) {
-                        // Lowered by compileIssetNullsafePropertyFetchChain / compileEmptyNullsafePropertyFetchChain (#4980).
+                        // Lowered by compileIssetNullsafePropertyFetchChain / compileEmptyNullsafePropertyFetchChain / compileCoalesce (#4980, #13747).
                         break;
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         if ($this->isNullsafePropertyFetchInWriteContext($ops, $i)) {
@@ -3509,6 +3512,34 @@ class Compiler {
             }
             if ($next instanceof Op\Expr\Empty_) {
                 $chain = $this->collectNullsafePropertyFetchChainForEmpty($next, $block);
+
+                return [] !== $chain && in_array($fetch, $chain, true);
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg emits NullsafePropertyFetch stmts before Coalesce; lower as one chain (#13747).
+     *
+     * @param Op[] $ops
+     */
+    protected function shouldSkipNullsafePropertyFetchForCoalesce(
+        Op\Expr\NullsafePropertyFetch $fetch,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        for ($j = $index + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\NullsafePropertyFetch) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                $chain = $this->collectNullsafePropertyFetchChain($next->left, $block);
 
                 return [] !== $chain && in_array($fetch, $chain, true);
             }
@@ -9012,6 +9043,18 @@ class Compiler {
         Block $block,
         ?Operand $resultOverride = null
     ): Block {
+        if (null !== $expr->left) {
+            $nullsafeChain = $this->collectNullsafePropertyFetchChain($expr->left, $block);
+            if ([] !== $nullsafeChain) {
+                return $this->compileCoalesceFromNullsafePropertyFetchChain(
+                    $nullsafeChain,
+                    $expr,
+                    $block,
+                    $resultOverride
+                );
+            }
+        }
+
         $resultOperand = $resultOverride ?? $expr->result;
         // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
@@ -9773,6 +9816,174 @@ class Compiler {
         $nullsafeOp->block2 = $fetchBlock;
         $nullsafeOp->block3 = $endBlock;
         $block->addOpCode($nullsafeOp);
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileCoalesceFromNullsafePropertyFetchChain(
+        array $chain,
+        Op\Expr\BinaryOp\Coalesce $expr,
+        Block $block,
+        ?Operand $resultOverride = null
+    ): Block {
+        $resultOperand = $resultOverride ?? $expr->result;
+        if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
+            $resultOperand->usages[] = $resultOperand;
+        }
+        $resultSlot = $this->compileOperand($resultOperand, $block, false);
+        $chainSlot = $this->compileOperand($expr->left, $block, false);
+
+        $chainEndBlock = new Block($block->orig);
+        $chainEndBlock->inheritUndefinedLocals = true;
+        $chainEndBlock->inheritScopeFrom($block);
+        $this->compileCoalesceNullsafeChainEvalLink($chain, 0, $block, $chainSlot, $chainEndBlock);
+
+        $checkSlot = $this->compileBoolTemporary($chainEndBlock);
+        $chainEndBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ISSET,
+            $checkSlot,
+            $chainSlot,
+            null
+        ));
+
+        $endBlock = new Block($block->orig);
+        $endBlock->inheritUndefinedLocals = true;
+        $endBlock->inheritScopeFrom($chainEndBlock);
+
+        $rightBlock = new Block($block->orig);
+        $rightBlock->syntheticCfgBranch = true;
+        $rightBlock->inheritUndefinedLocals = true;
+        $rightBlock->inheritScopeFrom($chainEndBlock);
+        [$rightSlot, $rightEmitBlock] = $this->compileCoalesceRhsValue($expr->right, $rightBlock, $chainEndBlock);
+
+        if (null !== $rightSlot && $rightSlot !== $resultSlot) {
+            $rightEmitBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $rightSlot
+            ));
+        }
+
+        $leftBlock = new Block($block->orig);
+        $leftBlock->syntheticCfgBranch = true;
+        $leftBlock->inheritUndefinedLocals = true;
+        $leftBlock->inheritScopeFrom($chainEndBlock);
+        if (!$this->operandsChainEqual($resultOperand, $expr->left)) {
+            $leftBlock->addOpCode(new OpCode(
+                OpCode::TYPE_ASSIGN,
+                $resultSlot,
+                $resultSlot,
+                $chainSlot
+            ));
+        }
+
+        $leftJump = new OpCode(OpCode::TYPE_JUMP);
+        $leftJump->block1 = $endBlock;
+        $leftBlock->addOpCode($leftJump);
+        $rightJump = new OpCode(OpCode::TYPE_JUMP);
+        $rightJump->block1 = $endBlock;
+        $rightEmitBlock->addOpCode($rightJump);
+        $endBlock->parents[] = $leftBlock;
+        $endBlock->parents[] = $rightEmitBlock;
+        $endBlock->inheritScopeFrom($leftBlock);
+        $endBlock->inheritScopeFrom($rightEmitBlock);
+
+        $this->coalesceResultSlots[spl_object_id($expr)] = $resultSlot;
+
+        $coalesceOp = new OpCode(
+            OpCode::TYPE_COALESCE,
+            $resultSlot,
+            $checkSlot
+        );
+        $coalesceOp->block1 = $leftBlock;
+        $coalesceOp->block2 = $rightBlock;
+        $coalesceOp->block3 = $endBlock;
+        $chainEndBlock->addOpCode($coalesceOp);
+
+        return $endBlock;
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileCoalesceNullsafeChainEvalLink(
+        array $chain,
+        int $index,
+        Block $block,
+        int $chainSlot,
+        Block $chainEndBlock
+    ): void {
+        $fetch = $chain[$index];
+        $isLast = $index === count($chain) - 1;
+        $receiverSlot = $this->compileOperand($fetch->var, $block, true);
+
+        $nullBlock = new Block($block->orig);
+        $nullBlock->inheritUndefinedLocals = true;
+        $nullBlock->inheritScopeFrom($block);
+        $nullValueSlot = $this->compileOperand($this->syntheticNullConstOperand(), $nullBlock, true);
+        $nullBlock->addOpCode(new OpCode(
+            OpCode::TYPE_ASSIGN,
+            $chainSlot,
+            $chainSlot,
+            $nullValueSlot
+        ));
+        $nullJump = new OpCode(OpCode::TYPE_JUMP);
+        $nullJump->block1 = $chainEndBlock;
+        $nullBlock->addOpCode($nullJump);
+
+        $fetchBlock = new Block($block->orig);
+        $fetchBlock->inheritUndefinedLocals = true;
+        $fetchBlock->inheritScopeFrom($block);
+        if ($isLast) {
+            $fetchBlock->addOpCode($this->makeCoalesceNullsafeChainPropertyFetchOpCode(
+                $chainSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true)
+            ));
+            $fetchJump = new OpCode(OpCode::TYPE_JUMP);
+            $fetchJump->block1 = $chainEndBlock;
+            $fetchBlock->addOpCode($fetchJump);
+        } else {
+            $intermediateSlot = $this->compileOperand($fetch->result, $fetchBlock, false);
+            $fetchBlock->addOpCode($this->makeCoalesceNullsafeChainPropertyFetchOpCode(
+                $intermediateSlot,
+                $this->compileOperand($fetch->var, $fetchBlock, true),
+                $this->compileOperand($fetch->name, $fetchBlock, true)
+            ));
+            $this->compileCoalesceNullsafeChainEvalLink($chain, $index + 1, $fetchBlock, $chainSlot, $chainEndBlock);
+        }
+
+        $chainEndBlock->parents[] = $nullBlock;
+        $chainEndBlock->parents[] = $fetchBlock;
+
+        $nullsafeOp = new OpCode(
+            OpCode::TYPE_NULLSAFE,
+            $isLast ? $chainSlot : $this->compileOperand($fetch->result, $block, false),
+            $receiverSlot
+        );
+        $nullsafeOp->block1 = $nullBlock;
+        $nullsafeOp->block2 = $fetchBlock;
+        $nullsafeOp->block3 = $chainEndBlock;
+        $block->addOpCode($nullsafeOp);
+    }
+
+    protected function makeCoalesceNullsafeChainPropertyFetchOpCode(
+        int $destSlot,
+        int $containerSlot,
+        int $nameSlot
+    ): OpCode {
+        $op = new OpCode(
+            OpCode::TYPE_PROPERTY_FETCH,
+            $destSlot,
+            $containerSlot,
+            $nameSlot
+        );
+        $op->nullsafeFetchPropertyRead = true;
+        $op->nullsafeFetchAllowUninitNullable = true;
+
+        return $op;
     }
 
     /**

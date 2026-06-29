@@ -110,7 +110,10 @@ final class TypedPropertyCheck
             if ('mixed' === $label || 'null' === $label) {
                 return true;
             }
-            if (str_contains($label, '|null')) {
+            if (str_starts_with($label, '?')) {
+                return true;
+            }
+            if (str_contains($label, '|null') || str_starts_with($label, 'null|')) {
                 return true;
             }
         }
@@ -139,8 +142,9 @@ final class TypedPropertyCheck
 
     /**
      * ?-> receiver short-circuit: PHP null, or uninitialized nullable typed slot after a
-     * standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y reads y in the
-     * nullsafe fetch arm and must throw via nullsafeFetchPropertyRead (#5361).
+     * standalone PropertyFetch (e.g. $a->b?->v, #5220). Chained $x?->y in a plain read
+     * must throw via nullsafeFetchPropertyRead (#5361); ?? nullsafe chains use
+     * nullsafeFetchAllowUninitNullable on the fetch arm (#13747).
      */
     public static function nullsafeShortCircuitReceiver(Variable $receiver): bool
     {

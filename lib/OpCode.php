@@ -282,6 +282,8 @@ class OpCode {
     public bool $propertyHookCoalesceRead = false;
     /** TYPE_PROPERTY_FETCH in a ?-> fetch arm must read typed slots (#5361, zend_object_handlers.c). */
     public bool $nullsafeFetchPropertyRead = false;
+    /** ?? / isset nullsafe chain: uninitialized nullable typed slot is null, not Error (#13747, #5220). */
+    public bool $nullsafeFetchAllowUninitNullable = false;
     /**
      * Trait use adaptation entries for TYPE_TRAIT_USE_ADAPTATION (#3238).
      *

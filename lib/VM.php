@@ -6130,6 +6130,14 @@ restart:
                             }
                             $propSlot = $propertyObject->getProperty($name);
                             if ($op->nullsafeFetchPropertyRead) {
+                                if (
+                                    $op->nullsafeFetchAllowUninitNullable
+                                    && VM\TypedPropertyCheck::isUninitialized($propSlot)
+                                    && VM\TypedPropertyCheck::propertyAllowsNull($propSlot)
+                                ) {
+                                    $result->null();
+                                    break;
+                                }
                                 VM\TypedPropertyCheck::assertReadable($propSlot);
                             }
                             $result->indirect($propSlot);
