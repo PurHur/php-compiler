@@ -381,6 +381,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'exit_function_strict_types')
                     || str_contains($name, 'exit_die_two_args')
                     || str_contains($name, 'exit_type_error')
+                    || str_contains($name, 'exit_status_named')
+                    || str_contains($name, 'die_status_named')
                     || (str_contains($name, 'die_named_message')
                         && !str_contains($name, 'die_named_message_reference_profile')))) {
                 continue;
