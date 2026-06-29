@@ -8,7 +8,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * Locale helpers via libc setlocale(3) / localeconv(3) (issue #6133, #3254).
+ * Locale helpers via host setlocale/localeconv/nl_langinfo (#6133, #3254, #13584).
  *
  * php-src: ext/standard/locale.c — PHP_FUNCTION(setlocale), PHP_FUNCTION(localeconv)
  */
@@ -22,8 +22,6 @@ final class VmLocale
     /** @var array<string, int>|null */
     private static ?array $nlLanginfoConstants = null;
 
-    private static ?\FFI $ffi = null;
-
     /** @return array<string, int> */
     public static function lcConstants(): array
     {
@@ -31,35 +29,7 @@ final class VmLocale
             return self::$lcConstants;
         }
 
-        self::$lcConstants = [
-            'LC_CTYPE' => 0,
-            'LC_NUMERIC' => 1,
-            'LC_TIME' => 2,
-            'LC_COLLATE' => 3,
-            'LC_MONETARY' => 4,
-            'LC_MESSAGES' => 5,
-            'LC_ALL' => 6,
-        ];
-
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return self::$lcConstants;
-        }
-
-        foreach (self::$lcConstants as $name => $fallback) {
-            try {
-                self::$lcConstants[$name] = (int) $ffi->{$name};
-            } catch (\Throwable) {
-                self::$lcConstants[$name] = $fallback;
-            }
-        }
-
-        foreach (['LC_PAPER', 'LC_NAME', 'LC_ADDRESS', 'LC_TELEPHONE', 'LC_MEASUREMENT', 'LC_IDENTIFICATION'] as $name) {
-            try {
-                self::$lcConstants[$name] = (int) $ffi->{$name};
-            } catch (\Throwable) {
-            }
-        }
+        self::$lcConstants = VmLocalePure::lcConstants();
 
         return self::$lcConstants;
     }
@@ -75,72 +45,7 @@ final class VmLocale
             return self::$nlLanginfoConstants;
         }
 
-        self::$nlLanginfoConstants = [
-            'ABDAY_1' => 131072,
-            'ABDAY_2' => 131073,
-            'ABDAY_3' => 131074,
-            'ABDAY_4' => 131075,
-            'ABDAY_5' => 131076,
-            'ABDAY_6' => 131077,
-            'ABDAY_7' => 131078,
-            'ABMON_1' => 131086,
-            'ABMON_2' => 131087,
-            'ABMON_3' => 131088,
-            'ABMON_4' => 131089,
-            'ABMON_5' => 131090,
-            'ABMON_6' => 131091,
-            'ABMON_7' => 131092,
-            'ABMON_8' => 131093,
-            'ABMON_9' => 131094,
-            'ABMON_10' => 131095,
-            'ABMON_11' => 131096,
-            'ABMON_12' => 131097,
-            'AM_STR' => 131110,
-            'CODESET' => 14,
-            'CRNCYSTR' => 262159,
-            'DAY_1' => 131079,
-            'DAY_2' => 131080,
-            'DAY_3' => 131081,
-            'DAY_4' => 131082,
-            'DAY_5' => 131083,
-            'DAY_6' => 131084,
-            'DAY_7' => 131085,
-            'D_FMT' => 131113,
-            'D_T_FMT' => 131112,
-            'MON_1' => 131098,
-            'MON_2' => 131099,
-            'MON_3' => 131100,
-            'MON_4' => 131101,
-            'MON_5' => 131102,
-            'MON_6' => 131103,
-            'MON_7' => 131104,
-            'MON_8' => 131105,
-            'MON_9' => 131106,
-            'MON_10' => 131107,
-            'MON_11' => 131108,
-            'MON_12' => 131109,
-            'MON_DECIMAL_POINT' => 262146,
-            'MON_GROUPING' => 262148,
-            'MON_THOUSANDS_SEP' => 262147,
-            'PM_STR' => 131111,
-            'RADIXCHAR' => 65536,
-            'THOUSEP' => 65537,
-            'T_FMT' => 131114,
-            'T_FMT_AMPM' => 131115,
-        ];
-
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return self::$nlLanginfoConstants;
-        }
-
-        foreach (self::$nlLanginfoConstants as $name => $fallback) {
-            try {
-                self::$nlLanginfoConstants[$name] = (int) $ffi->{$name};
-            } catch (\Throwable) {
-                self::$nlLanginfoConstants[$name] = $fallback;
-            }
-        }
+        self::$nlLanginfoConstants = VmLocalePure::nlLanginfoConstants();
 
         return self::$nlLanginfoConstants;
     }
@@ -150,18 +55,7 @@ final class VmLocale
      */
     public static function nlLanginfo(int $item): string|false
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return false;
-        }
-
-        $result = $ffi->nl_langinfo($item);
-        if (null === $result) {
-            return false;
-        }
-        $text = \FFI::string($result);
-
-        return '' === $text ? false : $text;
+        return VmLocalePure::nlLanginfo($item);
     }
 
     /**
@@ -169,45 +63,18 @@ final class VmLocale
      */
     public static function setlocale(int $category, array $localeArgs): string|false
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
+        if (!VmLocalePure::available()) {
             return false;
         }
 
-        $locales = self::expandLocaleArgs($localeArgs);
-        if ([] === $locales) {
-            $result = $ffi->setlocale($category, null);
-
-            return self::ffiStringOrFalse($result);
-        }
-
-        foreach ($locales as $locale) {
-            if (null === $locale) {
-                $result = $ffi->setlocale($category, null);
-
-                return self::ffiStringOrFalse($result);
-            }
-            $result = $ffi->setlocale($category, $locale);
-            if (null !== $result && '' !== \FFI::string($result)) {
-                return \FFI::string($result);
-            }
-        }
-
-        return false;
+        return VmLocalePure::setlocale($category, self::expandLocaleArgs($localeArgs));
     }
 
     public static function localeconv(): HashTable
     {
         $ht = new HashTable();
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            self::writeEmptyLocaleconv($ht);
-
-            return $ht;
-        }
-
-        $lc = $ffi->localeconv();
-        if (null === $lc) {
+        $lc = VmLocalePure::localeconvArray();
+        if (false === $lc) {
             self::writeEmptyLocaleconv($ht);
 
             return $ht;
@@ -215,24 +82,24 @@ final class VmLocale
 
         $monetaryUnset = self::isMonetaryLocaleUnset($lc);
 
-        self::writeStringField($ht, 'decimal_point', $lc->decimal_point);
-        self::writeStringField($ht, 'thousands_sep', $lc->thousands_sep);
-        self::writeGroupingField($ht, 'grouping', $lc->grouping);
-        self::writeStringField($ht, 'int_curr_symbol', $lc->int_curr_symbol);
-        self::writeStringField($ht, 'currency_symbol', $lc->currency_symbol);
-        self::writeStringField($ht, 'mon_decimal_point', $lc->mon_decimal_point);
-        self::writeStringField($ht, 'mon_thousands_sep', $lc->mon_thousands_sep);
-        self::writeGroupingField($ht, 'mon_grouping', $lc->mon_grouping);
-        self::writeStringField($ht, 'positive_sign', $lc->positive_sign);
-        self::writeStringField($ht, 'negative_sign', $lc->negative_sign);
-        self::writeCharField($ht, 'int_frac_digits', self::lconvCharToPhpLong((int) $lc->int_frac_digits, $monetaryUnset));
-        self::writeCharField($ht, 'frac_digits', self::lconvCharToPhpLong((int) $lc->frac_digits, $monetaryUnset));
-        self::writeCharField($ht, 'p_cs_precedes', self::lconvCharToPhpLong((int) $lc->p_cs_precedes, $monetaryUnset));
-        self::writeCharField($ht, 'p_sep_by_space', self::lconvCharToPhpLong((int) $lc->p_sep_by_space, $monetaryUnset));
-        self::writeCharField($ht, 'n_cs_precedes', self::lconvCharToPhpLong((int) $lc->n_cs_precedes, $monetaryUnset));
-        self::writeCharField($ht, 'n_sep_by_space', self::lconvCharToPhpLong((int) $lc->n_sep_by_space, $monetaryUnset));
-        self::writeCharField($ht, 'p_sign_posn', self::lconvCharToPhpLong((int) $lc->p_sign_posn, $monetaryUnset));
-        self::writeCharField($ht, 'n_sign_posn', self::lconvCharToPhpLong((int) $lc->n_sign_posn, $monetaryUnset));
+        self::writeStringField($ht, 'decimal_point', self::stringField($lc, 'decimal_point'));
+        self::writeStringField($ht, 'thousands_sep', self::stringField($lc, 'thousands_sep'));
+        self::writeGroupingField($ht, 'grouping', self::groupingField($lc, 'grouping'));
+        self::writeStringField($ht, 'int_curr_symbol', self::stringField($lc, 'int_curr_symbol'));
+        self::writeStringField($ht, 'currency_symbol', self::stringField($lc, 'currency_symbol'));
+        self::writeStringField($ht, 'mon_decimal_point', self::stringField($lc, 'mon_decimal_point'));
+        self::writeStringField($ht, 'mon_thousands_sep', self::stringField($lc, 'mon_thousands_sep'));
+        self::writeGroupingField($ht, 'mon_grouping', self::groupingField($lc, 'mon_grouping'));
+        self::writeStringField($ht, 'positive_sign', self::stringField($lc, 'positive_sign'));
+        self::writeStringField($ht, 'negative_sign', self::stringField($lc, 'negative_sign'));
+        self::writeCharField($ht, 'int_frac_digits', self::charField($lc, 'int_frac_digits', $monetaryUnset));
+        self::writeCharField($ht, 'frac_digits', self::charField($lc, 'frac_digits', $monetaryUnset));
+        self::writeCharField($ht, 'p_cs_precedes', self::charField($lc, 'p_cs_precedes', $monetaryUnset));
+        self::writeCharField($ht, 'p_sep_by_space', self::charField($lc, 'p_sep_by_space', $monetaryUnset));
+        self::writeCharField($ht, 'n_cs_precedes', self::charField($lc, 'n_cs_precedes', $monetaryUnset));
+        self::writeCharField($ht, 'n_sep_by_space', self::charField($lc, 'n_sep_by_space', $monetaryUnset));
+        self::writeCharField($ht, 'p_sign_posn', self::charField($lc, 'p_sign_posn', $monetaryUnset));
+        self::writeCharField($ht, 'n_sign_posn', self::charField($lc, 'n_sign_posn', $monetaryUnset));
 
         return $ht;
     }
@@ -297,10 +164,10 @@ final class VmLocale
             'decimal_point', 'thousands_sep', 'int_curr_symbol', 'currency_symbol',
             'mon_decimal_point', 'mon_thousands_sep', 'positive_sign', 'negative_sign',
         ] as $key) {
-            self::writeStringField($ht, $key, null);
+            self::writeStringField($ht, $key, '');
         }
-        self::writeGroupingField($ht, 'grouping', null);
-        self::writeGroupingField($ht, 'mon_grouping', null);
+        self::writeGroupingField($ht, 'grouping', []);
+        self::writeGroupingField($ht, 'mon_grouping', []);
         foreach ([
             'int_frac_digits', 'frac_digits', 'p_cs_precedes', 'p_sep_by_space',
             'n_cs_precedes', 'n_sep_by_space', 'p_sign_posn', 'n_sign_posn',
@@ -309,11 +176,64 @@ final class VmLocale
         }
     }
 
-    /** php-src locale.c — monetary char fields are CHAR_MAX when LC_MONETARY is unset. */
-    private static function isMonetaryLocaleUnset(\FFI\CData $lc): bool
+    /** @param array<string, mixed> $lc */
+    private static function isMonetaryLocaleUnset(array $lc): bool
     {
-        return '' === self::ffiStringAt($lc->currency_symbol)
-            && '' === self::ffiStringAt($lc->int_curr_symbol);
+        return '' === self::stringField($lc, 'currency_symbol')
+            && '' === self::stringField($lc, 'int_curr_symbol');
+    }
+
+    /**
+     * @param array<string, mixed> $lc
+     */
+    private static function charField(array $lc, string $key, bool $monetaryUnset): int
+    {
+        if ($monetaryUnset) {
+            return self::CHAR_MAX;
+        }
+        if (!\array_key_exists($key, $lc)) {
+            return self::CHAR_MAX;
+        }
+        $value = $lc[$key];
+        if (!\is_int($value) && !\is_float($value) && !\is_string($value)) {
+            return self::CHAR_MAX;
+        }
+
+        return self::lconvCharToPhpLong((int) $value, false);
+    }
+
+    /**
+     * @param array<string, mixed> $lc
+     *
+     * @return list<int>
+     */
+    private static function groupingField(array $lc, string $key): array
+    {
+        if (!\array_key_exists($key, $lc) || !\is_array($lc[$key])) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($lc[$key] as $byte) {
+            if (!\is_int($byte) && !\is_float($byte) && !\is_string($byte)) {
+                continue;
+            }
+            $out[] = (int) $byte;
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param array<string, mixed> $lc
+     */
+    private static function stringField(array $lc, string $key): string
+    {
+        if (!\array_key_exists($key, $lc) || !\is_string($lc[$key])) {
+            return '';
+        }
+
+        return $lc[$key];
     }
 
     /**
@@ -331,54 +251,24 @@ final class VmLocale
         return $signedByte;
     }
 
-    private static function ffiStringAt(mixed $ptr): string
-    {
-        if (null === $ptr) {
-            return '';
-        }
-
-        return \FFI::string($ptr);
-    }
-
-    /** grouping/mon_grouping are int[] from null-terminated byte sequence (php-src locale.c). */
-    private static function writeGroupingField(HashTable $ht, string $key, ?\FFI\CData $ptr): void
+    /** @param list<int> $bytes */
+    private static function writeGroupingField(HashTable $ht, string $key, array $bytes): void
     {
         $var = new Variable();
-        $var->array(self::groupingBytesFromPtr($ptr));
-        $ht->add($key, $var);
-    }
-
-    private static function groupingBytesFromPtr(?\FFI\CData $ptr): HashTable
-    {
         $arr = new HashTable();
-        if (null === $ptr) {
-            return $arr;
-        }
-        for ($i = 0; ; ++$i) {
-            $byte = (int) $ptr[$i];
-            if (0 === $byte) {
-                break;
-            }
+        foreach ($bytes as $byte) {
             $v = new Variable();
             $v->int($byte);
             $arr->append($v);
         }
-
-        return $arr;
+        $var->array($arr);
+        $ht->add($key, $var);
     }
 
-    private static function writeStringField(HashTable $ht, string $key, mixed $ptr): void
+    private static function writeStringField(HashTable $ht, string $key, string $text): void
     {
         $var = new Variable();
-        if (null === $ptr) {
-            $var->string('');
-
-            $ht->add($key, $var);
-
-            return;
-        }
-        $text = \FFI::string($ptr);
-        $var->string('' === $text ? '' : $text);
+        $var->string($text);
         $ht->add($key, $var);
     }
 
@@ -394,82 +284,5 @@ final class VmLocale
             $var->int($byte);
         }
         $ht->add($key, $var);
-    }
-
-    private static function ffiStringOrFalse(?\FFI\CData $result): string|false
-    {
-        if (null === $result) {
-            return false;
-        }
-        $text = \FFI::string($result);
-
-        return '' === $text ? false : $text;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (self::ffiDisabled()) {
-            return null;
-        }
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-typedef unsigned long size_t;
-enum {
-    LC_CTYPE = 0,
-    LC_NUMERIC = 1,
-    LC_TIME = 2,
-    LC_COLLATE = 3,
-    LC_MONETARY = 4,
-    LC_MESSAGES = 5,
-    LC_ALL = 6
-};
-struct lconv {
-    char *decimal_point;
-    char *thousands_sep;
-    char *grouping;
-    char *int_curr_symbol;
-    char *currency_symbol;
-    char *mon_decimal_point;
-    char *mon_thousands_sep;
-    char *mon_grouping;
-    char *positive_sign;
-    char *negative_sign;
-    char int_frac_digits;
-    char frac_digits;
-    char p_cs_precedes;
-    char p_sep_by_space;
-    char n_cs_precedes;
-    char n_sep_by_space;
-    char p_sign_posn;
-    char n_sign_posn;
-};
-char *setlocale(int category, const char *locale);
-struct lconv *localeconv(void);
-char *nl_langinfo(int item);
-CDEF;
-
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        return null;
-    }
-
-    private static function ffiDisabled(): bool
-    {
-        $v = getenv('PHP_COMPILER_DISABLE_FFI');
-
-        return false !== $v && '' !== $v && '0' !== $v;
     }
 }
