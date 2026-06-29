@@ -7,9 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** unlink() — VM via VmFs; JIT/AOT via libc unlink(2). */
@@ -31,7 +29,7 @@ final class unlink extends Internal
         if (isset($frame->calledArgs[1])) {
             VmStreamContext::validateOptionalContextArg($frame->calledArgs[1], 'unlink', 2);
         }
-        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'unlink', 0, 'filename');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'unlink');
         $ok = VmFs::unlink($path);
         if (!$ok) {
             VmFilestatFailure::warnUnlinkFailed($frame, $path);
@@ -57,7 +55,7 @@ final class unlink extends Internal
         if (isset($args[1])) {
             JitStreamContextOptionalArg::validate($context, $args[1], 'unlink', 2);
         }
-        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'unlink', 0, 'filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'unlink');
 
         return JitUnlink::invoke($context, $path);
     }
