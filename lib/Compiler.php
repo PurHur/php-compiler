@@ -15030,15 +15030,82 @@ class Compiler {
         array $callArgs,
         int $argIndex
     ): ?Op\Expr {
-        if (!$this->producersAreChainedConcatProducers($producers)) {
-            return null;
-        }
         $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
         if (null === $soleHoisted || $argIndex !== $soleHoisted) {
             return null;
         }
+        if ($this->producersAreChainedConcatProducers($producers)) {
+            return $producers[\count($producers) - 1];
+        }
+        if (
+            1 === \count($producers)
+            && ($producers[0] ?? null) instanceof Op\Expr\BinaryOp\Concat
+        ) {
+            return $producers[0];
+        }
 
-        return $producers[\count($producers) - 1];
+        return null;
+    }
+
+    /**
+     * php-cfg dead call-arg temp for chained Concat before FuncCall (#13458, #13572).
+     *
+     * `fopen('/tmp/maint_' . 99 . '/sub/file.txt', 'r')` — arg temp may differ from final Concat.result.
+     *
+     * @param list<Op> $cfgChildren
+     *
+     * @return list<Op\Expr\BinaryOp\Concat>|null
+     */
+    private function chainedConcatInlineCallArgProducersBeforeCall(
+        array $cfgChildren,
+        int $callIndex,
+        Op $callOp
+    ): ?array {
+        if ($callIndex < 1 || !property_exists($callOp, 'args') || !is_array($callOp->args)) {
+            return null;
+        }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callOp->args);
+        if (null === $soleHoisted) {
+            return null;
+        }
+        $callArg = $callOp->args[$soleHoisted] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $immediate = $cfgChildren[$callIndex - 1] ?? null;
+        if (!$immediate instanceof Op\Expr\BinaryOp\Concat) {
+            return null;
+        }
+        $chain = [];
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i];
+            if (!$child instanceof Op\Expr\BinaryOp\Concat) {
+                break;
+            }
+            array_unshift($chain, $child);
+            if ($i > 0) {
+                $prev = $cfgChildren[$i - 1];
+                if (
+                    $prev instanceof Op\Expr\BinaryOp\Concat
+                    && null !== $child->left
+                    && $this->operandsReferToSameVariable($prev->result, $child->left)
+                ) {
+                    continue;
+                }
+            }
+            break;
+        }
+        if ([] === $chain) {
+            return null;
+        }
+        if (1 === \count($chain)) {
+            return $chain;
+        }
+        if (!$this->producersAreChainedConcatProducers($chain)) {
+            return null;
+        }
+
+        return $chain;
     }
 
     /**
@@ -15486,6 +15553,17 @@ class Compiler {
             if ($child instanceof Op\Expr\BinaryOp\Concat) {
                 if ($this->inlineCallArgProducerFeedsConsumer($child, $callOp)) {
                     array_unshift($producers, $child);
+                } else {
+                    $concatChain = $this->chainedConcatInlineCallArgProducersBeforeCall(
+                        $cfgChildren,
+                        $callIndex,
+                        $callOp
+                    );
+                    if (null !== $concatChain) {
+                        foreach ($concatChain as $concatProducer) {
+                            array_unshift($producers, $concatProducer);
+                        }
+                    }
                 }
                 break;
             }
@@ -19000,6 +19078,58 @@ class Compiler {
     }
 
     /**
+     * Lower chained BinaryOp\Concat call args when php-cfg allocates a dead arg temp (#13458, #13572).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function tryResolveChainedConcatCallArgSlot(
+        Operand $arg,
+        Block $block,
+        array &$emitOps,
+        ?Op $cfgCallOp = null,
+        int $argIndex = 0
+    ): ?int {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $chain = $this->chainedConcatInlineCallArgProducersBeforeCall(
+            $block->orig->children,
+            $callIndex,
+            $cfgCallOp
+        );
+        if (null === $chain) {
+            return null;
+        }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($cfgCallOp->args);
+        if (null === $soleHoisted || $argIndex !== $soleHoisted) {
+            return null;
+        }
+        $last = $chain[\count($chain) - 1];
+        if (null === $last->result) {
+            return null;
+        }
+        if (null === $block->slotForOperand($last->result)) {
+            foreach ($chain as $concat) {
+                foreach ($this->compileExpr($concat, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+            }
+        }
+
+        return $block->slotForOperand($last->result);
+    }
+
+    /**
      * php-cfg hoists encapsed ConcatList before FuncCall with a distinct dead arg temp (#13466).
      */
     private function concatListProducerForHoistedCallArg(
@@ -19468,6 +19598,9 @@ class Compiler {
                 }
             } else {
                 $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->tryResolveChainedConcatCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
