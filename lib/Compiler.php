@@ -13634,6 +13634,20 @@ class Compiler {
         if (null !== $foldedFirstNested) {
             return $foldedFirstNested;
         }
+        if ('array_combine' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
+            $funcProducer = null;
+            $valueArrayProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\Array_) {
+                    $valueArrayProducer = $producer;
+                }
+            }
+            if (null !== $funcProducer && null !== $valueArrayProducer) {
+                return 0 === $argIndex ? $funcProducer : $valueArrayProducer;
+            }
+        }
         if ($this->callIncludesNamedParameter($cfgCallOp)) {
             $callArg = $callArgs[$argIndex] ?? null;
             if (null === $callArg) {
@@ -14038,9 +14052,26 @@ class Compiler {
                 }
             }
             // array_merge(array_keys($src), ['b']) / array_merge(['a'=>1], array_keys(...)) (#12450, #13704, #13760).
-            $arrayMergePair = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
-            if (null !== $arrayMergePair) {
-                return $arrayMergePair;
+            if (\in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)) {
+                $arrayMergePair = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+                if (null !== $arrayMergePair) {
+                    return $arrayMergePair;
+                }
+            }
+            // array_combine(array_keys(...), [...]) — arg #0 FuncCall, arg #1 sibling Array_ (#13776).
+            if ('array_combine' === $inlineFuncName && 2 === $producerCount && 2 === $argCount) {
+                $funcIdx = null;
+                $arrayIdx = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                        $funcIdx = $pi;
+                    } elseif ($producer instanceof Op\Expr\Array_) {
+                        $arrayIdx = $pi;
+                    }
+                }
+                if (null !== $funcIdx && null !== $arrayIdx) {
+                    return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+                }
             }
             // filter_var('x', FILTER_*, ['options' => ['regexp' => '/a/']]) — ConstFetch + nested Array_ (#12007).
             $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
