@@ -17207,6 +17207,11 @@ class Compiler {
         if (!$hasNestedFuncCall) {
             return null;
         }
+        $mergeMapped = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+        if ($mergeMapped instanceof Op\Expr\FuncCall || $mergeMapped instanceof Op\Expr\NsFuncCall) {
+            // array_merge(['a'=>1], array_keys(...)) — arg #1 is nested FuncCall (#13760, #13775).
+            return null;
+        }
         $trailingArray = null;
         foreach ($producers as $producer) {
             if ($producer instanceof Op\Expr\Array_) {
@@ -20724,6 +20729,7 @@ class Compiler {
                                 && (int) $argIndex > 0
                                 && null !== $calleeName
                                 && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
+                                && $this->isEmbeddedCallLiteralArg($callArgProbe)
                             ) {
                                 $mergeTrailingArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                                 $funcCallFeedsTrailingArg = null !== $mergeTrailingArg
@@ -20881,6 +20887,7 @@ class Compiler {
                                 && (int) $argIndex > 0
                                 && null !== $calleeName
                                 && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
+                                && $this->isEmbeddedCallLiteralArg($callArgProbe)
                             ) {
                                 $mergeTrailingArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                                 $funcCallFeedsTrailingArg = null !== $mergeTrailingArg
