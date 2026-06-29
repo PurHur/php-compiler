@@ -39,6 +39,7 @@ final class FstatRuntimeShrinkTest extends TestCase
         $this->assertIsArray($stat);
         $this->assertSame(3, $stat['size']);
         $this->assertSame(3, $stat[7]);
+        $this->assertSame(33060, $stat['mode'], 'php://memory mode 100444 octal (#13388)');
         VmPhpMemoryStream::close($handle);
     }
 
