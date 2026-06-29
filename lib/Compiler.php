@@ -16244,6 +16244,9 @@ class Compiler {
             if ($sib instanceof Op\Expr\ConstFetch || $sib instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($sib)) {
+                continue;
+            }
             if (
                 !$sib instanceof Op\Expr\FuncCall
                 && !$sib instanceof Op\Expr\NsFuncCall
@@ -16363,6 +16366,26 @@ class Compiler {
         $firstChild = $cfgChildren[$first] ?? null;
         if (!$this->isSiblingInlineCallProducerExpr($firstChild)) {
             return null;
+        }
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        // fileperms(); sprintf('%o', …); substr(…, -N) — skip nested-only producers (#13616).
+        while ($first + 1 < $consumerIndex && $consumer instanceof Op\Expr) {
+            $chainChild = $cfgChildren[$first] ?? null;
+            $nextChild = $cfgChildren[$first + 1] ?? null;
+            $consumerArgCount = (
+                property_exists($consumer, 'args')
+                && is_array($consumer->args)
+            ) ? \count($consumer->args) : 0;
+            if (
+                $chainChild instanceof Op\Expr
+                && ($nextChild instanceof Op\Expr\FuncCall || $nextChild instanceof Op\Expr\NsFuncCall)
+                && $this->isAdjacentNestedFuncCallProducer($chainChild, $nextChild, $first, $first + 1)
+                && ($consumerIndex - $first) > $consumerArgCount
+            ) {
+                ++$first;
+                continue;
+            }
+            break;
         }
 
         return $first;
