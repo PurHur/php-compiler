@@ -81,6 +81,14 @@ final class VmFilestatFailure
         );
     }
 
+    public static function warnChdirFailed(Frame $frame, string $path): void
+    {
+        self::triggerWarningWithHandlerFirst(
+            $frame,
+            'chdir(): No such file or directory (errno 2)'
+        );
+    }
+
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
         self::triggerWarningWithHandlerFirst(
