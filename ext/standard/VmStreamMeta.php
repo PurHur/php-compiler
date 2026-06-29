@@ -15,7 +15,7 @@ final class VmStreamMeta
     /**
      * @param resource|null $fp host FILE* for plainfile streams; null for VmPhpMemoryStream et al.
      */
-    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null): array
+    public static function buildMetaArray(string $uri, $fp = null, ?bool $eofOverride = null, ?string $mode = null, ?bool $blocked = null): array
     {
         $isPhp = \str_starts_with($uri, 'php://');
         $isPhpMemory = \str_starts_with($uri, 'php://memory')
@@ -28,7 +28,7 @@ final class VmStreamMeta
 
         return [
             'timed_out' => false,
-            'blocked' => true,
+            'blocked' => $blocked ?? true,
             'eof' => $eof,
             'unread_bytes' => 0,
             'stream_type' => $socketType ?? ($isPhpMemory ? 'MEMORY' : ($isPhp ? 'STDIO' : 'STDIO')),
