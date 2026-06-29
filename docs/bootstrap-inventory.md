@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3506 |
-| Phase A inventory files (M2 ratio SSOT) | 3506 |
+| PHP files on vm.php path | 3505 |
+| Phase A inventory files (M2 ratio SSOT) | 3505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9493 |
+| Source constructs flagged (warnings) | 9492 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2482,7 +2482,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PackArgvSerialize.php` | 0 | 1 |
 | `lib/JIT/Builtin/PackJitRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PadTypeJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/ParseStrNativeLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
@@ -4796,8 +4795,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/VmMbstring.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 1103)
-- new ArgumentCountError (line 1111)
+- new ArgumentCountError (line 1050)
+- new ArgumentCountError (line 1058)
 - 98 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
@@ -10178,7 +10177,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ParseStrJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/ParseUrlJitHelper.php`
 
@@ -14008,8 +14007,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/explode.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 52)
-- new Variable (line 54)
+- new HashTable (line 47)
+- new Variable (line 49)
 - 3 class method(s)
 
 ### `ext/standard/expm1.php`
@@ -19845,15 +19844,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `lib/JIT/Builtin/ParseStrNativeLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 26 class method(s)
-
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 8 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 
@@ -21229,7 +21223,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 21 class method(s)
+- 22 class method(s)
 
 ### `lib/JIT/Builtin/SysGetTempDirRuntime.php`
 

@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
- * This path uses libc getenv + {@see __compiler_parse_str} on native __hashtable__*.
+ * Form/cookie parsing uses {@see ParseStrRuntime} + {@see ParseStrJitHelper} PHP (#13827).
  * php-src: main/php_variables.c
  */
 final class SuperglobalRefreshUserScriptLlvm
@@ -38,7 +38,7 @@ final class SuperglobalRefreshUserScriptLlvm
 
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
-        ParseStrNativeLlvm::ensureSubhelpers($context);
+        ParseStrRuntime::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
 
@@ -173,7 +173,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $cookieDoneBb = $fn->appendBasicBlock('sg_user_refresh_cookie_done');
         $context->builder->branchIf($cookieEmpty, $cookieDoneBb, $cookieParseBb);
         $context->builder->positionAtEnd($cookieParseBb);
-        self::parseFormEncodedFromCstrSlot($context, $cookieHt, $cookieCstr);
+        self::parseCookieFromCstrSlot($context, $cookieHt, $cookieCstr);
         $context->builder->branch($cookieDoneBb);
         $context->builder->positionAtEnd($cookieDoneBb);
 
@@ -294,28 +294,24 @@ final class SuperglobalRefreshUserScriptLlvm
 
     private static function parseFormEncoded(Context $context, Value $ht, Value $encodedStr): void
     {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
-        $cstr = $context->builder->structGep($encodedStr, $context->structFieldMap['__string__']['value']);
         $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $context->lookupFunction('__compiler_parse_str'),
             $ht,
-            $cstr,
-            $i8->constInt(38, false),
-            $i32->constInt(0, false)
+            $encodedStr
         );
     }
 
     private static function parseFormEncodedFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
     {
-        $i8 = $context->getTypeFromString('int8');
-        $i32 = $context->getTypeFromString('int32');
+        self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
+    }
+
+    private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
+    {
         $context->builder->call(
-            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $context->lookupFunction('__compiler_parse_cookie_header'),
             $ht,
-            $context->builder->load($cstrSlot),
-            $i8->constInt(38, false),
-            $i32->constInt(0, false)
+            self::cstrToPhpcString($context, $cstrSlot)
         );
     }
 

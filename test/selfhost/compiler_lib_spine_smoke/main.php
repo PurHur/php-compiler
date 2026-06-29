@@ -2534,7 +2534,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Output.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PackArgvSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PackJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PadTypeJit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentJit.php';

@@ -22,12 +22,11 @@ final class fread extends Internal
     {
         $this->requireExactArgCount($frame, 'fread', 2);
         $handleVar = $frame->calledArgs[0]->resolveIndirect();
-        $lenVar = $frame->calledArgs[1]->resolveIndirect();
         $handle = VmStreamArg::requireStreamHandle($handleVar, 'fread');
         if (null === $frame->returnVar) {
             return;
         }
-        $length = VmMath::parseIntBuiltinArg($lenVar, 'fread', 2, 'length');
+        $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'fread', 2, 'length');
         if ($length <= 0) {
             throw new \ValueError(self::LENGTH_ERROR);
         }
@@ -56,7 +55,7 @@ final class fread extends Internal
             JitLongArg::lower($context, $args[0], 'fread() handle'),
             $i64
         );
-        $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'fread', 2, 'length');
+        $length = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'fread', 2, 'length');
         JitFread::emitRuntimeLengthGuard($context, $length);
 
         return JitFread::invoke($context, $handle, $length);
