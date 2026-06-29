@@ -13786,6 +13786,21 @@ class Compiler {
             return $producers[$mappedIndex] ?? null;
         }
         if ($producerCount === $argCount) {
+            // str_contains($arr['k'], $fn . '():') — hoisted dim-fetch + concat (#13662, zend_execute.c).
+            if (2 === $producerCount) {
+                $dimIdx = null;
+                $concatIdx = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\ArrayDimFetch) {
+                        $dimIdx = $pi;
+                    } elseif ($producer instanceof Op\Expr\BinaryOp\Concat) {
+                        $concatIdx = $pi;
+                    }
+                }
+                if (null !== $dimIdx && null !== $concatIdx) {
+                    return (0 === $argIndex) ? $producers[$dimIdx] : $producers[$concatIdx];
+                }
+            }
             // filter_var('x', FILTER_*, ['options' => ['regexp' => '/a/']]) — ConstFetch + nested Array_ (#12007).
             $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
             if (null !== $leadingConstNested) {
@@ -20088,8 +20103,67 @@ class Compiler {
                     $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp);
                 }
                 if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
+                    $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
+                if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
+                    $fetch = $this->unwrapOperandChain($arg);
+                    if ($fetch instanceof Op\Expr\ArrayDimFetch && null !== $fetch->result) {
+                        if (null === $block->slotForOperand($fetch->result)) {
+                            foreach ($this->compileExpr($fetch, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                        }
+                        $fetchSlot = $block->slotForOperand($fetch->result);
+                        if (null !== $fetchSlot) {
+                            $valueSlot = $fetchSlot;
+                        }
+                    }
+                }
+                if (null === $valueSlot && null !== $cfgCallOp && null !== $block->orig) {
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    if ([] !== $producers) {
+                        $matched = $this->matchInlineCallArgProducer(
+                            $producers,
+                            $cfgCallOp->args ?? [],
+                            (int) $argIndex,
+                            $cfgCallOp,
+                            $block,
+                            $calleeName
+                        );
+                        if ($matched instanceof Op\Expr) {
+                            $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            if (
+                                $matched instanceof Op\Expr\Array_
+                                && null !== $callArgProbe
+                                && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            ) {
+                                $matched = null;
+                            }
+                        }
+                        if ($matched instanceof Op\Expr) {
+                            if (null === $block->slotForOperand($matched->result)) {
+                                foreach ($this->compileExpr($matched, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                            }
+                            $matchedSlot = $block->slotForOperand($matched->result);
+                            if (null !== $matchedSlot) {
+                                $valueSlot = $matchedSlot;
+                            }
+                        }
+                    }
+                }
+                if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->compileOperand($arg, $block, true);
-                } else                if (null === $valueSlot) {
+                } elseif (null === $valueSlot) {
                     $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
                         $arg,
                         $block,
