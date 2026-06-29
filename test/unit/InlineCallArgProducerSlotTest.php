@@ -1944,6 +1944,47 @@ PHP;
         self::assertStringContainsString("0 => 'b'", $out);
     }
 
+    /** Issue #13776 — array_combine(array_keys(...), [...]) wires FuncCall + trailing Array_ producer slots. */
+    public function testArrayCombineInlineArrayKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_combine(array_keys(['a' => 1, 'b' => 2]), [10, 20]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_combine_inline_array_keys.php');
+
+        $keysReturnSlot = null;
+        $combineSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $combineSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $combineSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($keysReturnSlot);
+        self::assertCount(2, $combineSends);
+        self::assertSame($keysReturnSlot, $combineSends[0], 'combine sends='.json_encode($combineSends));
+        self::assertNotSame($keysReturnSlot, $combineSends[1], 'combine sends='.json_encode($combineSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'a' => 10", $out);
+        self::assertStringContainsString("'b' => 20", $out);
+    }
+
     /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayMergeSiblingInlineLiteralRuntime(): void
     {
