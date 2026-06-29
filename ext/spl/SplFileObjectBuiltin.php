@@ -65,12 +65,14 @@ final class SplFileObjectBuiltin
             'fputcsv' => SplFileObjectFputcsv::class,
             'setcsvcontrol' => SplFileObjectSetCsvControl::class,
             'getcsvcontrol' => SplFileObjectGetCsvControl::class,
+            '__tostring' => SplFileObjectToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
         }
         $entry->methodNames['setcsvcontrol'] = 'setCsvControl';
         $entry->methodNames['getcsvcontrol'] = 'getCsvControl';
+        $entry->methodNames['__tostring'] = '__toString';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -579,5 +581,26 @@ final class SplFileObjectGetCsvControl extends VmClassMethod
             $cell->string($value);
             $ht->append($cell);
         }
+    }
+}
+
+final class SplFileObjectToString extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__toString');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::__toString()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(SplFileObjectStorage::readAll($object));
     }
 }

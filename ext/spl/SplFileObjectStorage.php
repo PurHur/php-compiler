@@ -100,6 +100,24 @@ final class SplFileObjectStorage
         return VmFs::feof(self::state($object)['handle']);
     }
 
+    /**
+     * Read from current stream position through EOF (php-src spl_filesystem_file_read_all; #13610).
+     */
+    public static function readAll(ObjectEntry $object): string
+    {
+        $handle = self::state($object)['handle'];
+        $buf = '';
+        while (!VmFs::feof($handle)) {
+            $chunk = VmFs::fread($handle, 8192);
+            if (false === $chunk || '' === $chunk) {
+                break;
+            }
+            $buf .= $chunk;
+        }
+
+        return $buf;
+    }
+
     /** @return array{0: string, 1: string, 2: string} */
     public static function getCsvControl(ObjectEntry $object): array
     {
