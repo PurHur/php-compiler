@@ -82,11 +82,13 @@ final class VmStreamSelectPure
         }
         $readySet = [];
         foreach ($readyHosts as $host) {
-            $readySet[\spl_object_id($host)] = true;
+            if (\is_resource($host)) {
+                $readySet[\get_resource_id($host)] = true;
+            }
         }
         $filtered = [];
         foreach ($pairs as $pair) {
-            if (\is_resource($pair->host) && isset($readySet[\spl_object_id($pair->host)])) {
+            if (\is_resource($pair->host) && isset($readySet[\get_resource_id($pair->host)])) {
                 $filtered[] = $pair;
             }
         }
