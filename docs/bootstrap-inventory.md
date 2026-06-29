@@ -15701,9 +15701,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_filter.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 98)
-- new Variable (line 100)
-- new Variable (line 106)
+- new HashTable (line 91)
+- new Variable (line 93)
+- new Variable (line 99)
 - 4 class method(s)
 
 ### `ext/standard/preg_grep.php`
@@ -15741,9 +15741,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 125)
+- new HashTable (line 119)
+- new Variable (line 121)
 - new Variable (line 127)
-- new Variable (line 133)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`
@@ -15762,7 +15762,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_split.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/prev.php`
 
