@@ -13466,6 +13466,22 @@ class Compiler {
         if (0 === $producerCount) {
             return null;
         }
+        $siblingNestedArray = $this->matchSiblingNestedArrayLiteralCallArgProducer(
+            $producers,
+            $argIndex,
+            $argCount
+        );
+        if (null !== $siblingNestedArray) {
+            return $siblingNestedArray;
+        }
+        $foldedFirstNested = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
+            $producers,
+            $argIndex,
+            $argCount
+        );
+        if (null !== $foldedFirstNested) {
+            return $foldedFirstNested;
+        }
         if ($this->callIncludesNamedParameter($cfgCallOp)) {
             $callArg = $callArgs[$argIndex] ?? null;
             if (null === $callArg) {
@@ -14733,6 +14749,77 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Sibling nested inline Array_ literals — map each arg to its outermost producer (#12729, #10230).
+     *
+     * e.g. array_merge_recursive(['a' => ['x' => 1]], ['a' => ['y' => 2]])
+     * — producers [inner Array_, outer Array_, inner Array_, outer Array_].
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchSiblingNestedArrayLiteralCallArgProducer(
+        array $producers,
+        int $argIndex,
+        int $argCount
+    ): ?Op\Expr {
+        $producerCount = \count($producers);
+        if ($argCount < 2 || $producerCount <= $argCount) {
+            return null;
+        }
+        if (!$this->producersAreNestedArrayLiteralChain($producers)) {
+            return null;
+        }
+        if (0 !== $producerCount % $argCount) {
+            return null;
+        }
+        $depth = intdiv($producerCount, $argCount);
+        if ($depth < 2) {
+            return null;
+        }
+        for ($g = 0; $g < $argCount; ++$g) {
+            $group = \array_slice($producers, $g * $depth, $depth);
+            if (!$this->arrayProducersFormNestedChain($group)) {
+                return null;
+            }
+        }
+        $mappedIndex = $argIndex * $depth + ($depth - 1);
+
+        return $producers[$mappedIndex] ?? null;
+    }
+
+    /**
+     * php-cfg may omit the first nested arg's inner Array_ when folding into its outer (#10230, #12729).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
+        array $producers,
+        int $argIndex,
+        int $argCount
+    ): ?Op\Expr {
+        if (2 !== $argCount || 3 !== \count($producers)) {
+            return null;
+        }
+        $outer0 = $producers[0] ?? null;
+        $inner1 = $producers[1] ?? null;
+        $outer1 = $producers[2] ?? null;
+        if (
+            !$outer0 instanceof Op\Expr\Array_
+            || !$inner1 instanceof Op\Expr\Array_
+            || !$outer1 instanceof Op\Expr\Array_
+        ) {
+            return null;
+        }
+        if (!$this->arrayProducersFormNestedChain([$inner1, $outer1])) {
+            return null;
+        }
+        if ($this->cfgExprUsesOperand($inner1, $outer0->result)) {
+            return null;
+        }
+
+        return 0 === $argIndex ? $outer0 : $outer1;
     }
 
     /**
