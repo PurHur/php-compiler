@@ -8272,8 +8272,12 @@ class Compiler {
                     )
                 );
             case Op\Expr\PropertyFetch::class:
+                $fetchType = $this->isPropertyFetchForWrite($expr, $block)
+                    ? OpCode::TYPE_PROPERTY_FETCH_WRITE
+                    : OpCode::TYPE_PROPERTY_FETCH;
+
                 return [new OpCode(
-                    OpCode::TYPE_PROPERTY_FETCH,
+                    $fetchType,
                     $this->compileOperand($expr->result, $block, false),
                     $this->compileOperand($expr->var, $block, true),
                     $this->compileOperand($expr->name, $block, true)
@@ -9258,7 +9262,7 @@ class Compiler {
     private function compilePropertyFetchWrite(Op\Expr\PropertyFetch $fetch, Block $block): void
     {
         $block->addOpCode(new OpCode(
-            OpCode::TYPE_PROPERTY_FETCH,
+            OpCode::TYPE_PROPERTY_FETCH_WRITE,
             $this->compileOperand($fetch->result, $block, false),
             $this->compileOperand($fetch->var, $block, true),
             $this->compileOperand($fetch->name, $block, true)
@@ -11265,6 +11269,79 @@ class Compiler {
             return true;
         }
         // php-cfg often leaves operand->usages empty; fall back to the next stmt in this block.
+        $children = $block->orig->children;
+        foreach ($children as $i => $child) {
+            if ($child !== $fetch) {
+                continue;
+            }
+            if ($i + 1 >= count($children)) {
+                break;
+            }
+            $next = $children[$i + 1];
+
+            if ($next instanceof Op\Expr\Assign && $next->var === $fetch->result) {
+                return true;
+            }
+            if (
+                $next instanceof Op\Expr\AssignRef
+                && ($next->var === $fetch->result || $next->expr === $fetch->result)
+            ) {
+                return true;
+            }
+            if ($next instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($next, $fetch->result)) {
+                return true;
+            }
+            if ($this->isIncDecUsingOperand($next, $fetch->result)) {
+                return true;
+            }
+            if (
+                $next instanceof Op\Expr\ArrayDimFetch
+                && $next->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($next, $block)
+            ) {
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * True when property fetch is only used as write/ref lvalue (assign, AssignRef, unset, ++/--; #13559).
+     */
+    protected function isPropertyFetchForWrite(Op\Expr\PropertyFetch $fetch, Block $block): bool
+    {
+        foreach ($fetch->result->usages as $usage) {
+            if ($usage instanceof Op\Expr\Assign && $usage->var === $fetch->result) {
+                continue;
+            }
+            if (
+                $usage instanceof Op\Expr\AssignRef
+                && ($usage->var === $fetch->result || $usage->expr === $fetch->result)
+            ) {
+                continue;
+            }
+            if ($usage instanceof Op\Terminal\Unset_ && $this->unsetTerminalUsesOperand($usage, $fetch->result)) {
+                continue;
+            }
+            if ($this->isIncDecUsingOperand($usage, $fetch->result)) {
+                continue;
+            }
+            if (
+                $usage instanceof Op\Expr\ArrayDimFetch
+                && $usage->var === $fetch->result
+                && $this->isArrayDimFetchForWrite($usage, $block)
+            ) {
+                return true;
+            }
+
+            return false;
+        }
+        if (!empty($fetch->result->usages)) {
+            return true;
+        }
         $children = $block->orig->children;
         foreach ($children as $i => $child) {
             if ($child !== $fetch) {

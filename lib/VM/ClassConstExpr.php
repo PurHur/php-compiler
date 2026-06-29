@@ -37,7 +37,8 @@ final class ClassConstExpr
             OpCode::TYPE_CONST_FETCH,
             OpCode::TYPE_CLASS_CONST_FETCH,
             OpCode::TYPE_ARRAY_DIM_FETCH,
-            OpCode::TYPE_PROPERTY_FETCH => true,
+            OpCode::TYPE_PROPERTY_FETCH,
+            OpCode::TYPE_PROPERTY_FETCH_WRITE => true,
             default => false,
         };
     }
@@ -90,6 +91,7 @@ final class ClassConstExpr
                 self::executeArrayDimFetch($context, $frame, $block, $op);
                 break;
             case OpCode::TYPE_PROPERTY_FETCH:
+            case OpCode::TYPE_PROPERTY_FETCH_WRITE:
                 self::executePropertyFetch($context, $frame, $op);
                 break;
             default:

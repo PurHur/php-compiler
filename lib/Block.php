@@ -2223,7 +2223,7 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $i => $op) {
-                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                if (!in_array($op->type, [OpCode::TYPE_PROPERTY_FETCH, OpCode::TYPE_PROPERTY_FETCH_WRITE], true)) {
                     foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                         if ($sub instanceof self) {
                             $stack[] = $sub;
@@ -2299,7 +2299,7 @@ class Block {
             }
             $seen->attach($block);
             foreach ($block->opCodes as $i => $op) {
-                if (OpCode::TYPE_PROPERTY_FETCH !== $op->type) {
+                if (!in_array($op->type, [OpCode::TYPE_PROPERTY_FETCH, OpCode::TYPE_PROPERTY_FETCH_WRITE], true)) {
                     foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
                         if ($sub instanceof self) {
                             $stack[] = $sub;

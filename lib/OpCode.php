@@ -39,6 +39,8 @@ class OpCode {
     const TYPE_GREATER = 23;
     const TYPE_DECLARE_PROPERTY = 24;
     const TYPE_PROPERTY_FETCH = 25;
+    /** Property fetch for assign/ref lvalues and AssignRef RHS (#13559, Zend FETCH_OBJ_W). */
+    const TYPE_PROPERTY_FETCH_WRITE = 128;
     const TYPE_UNARY_MINUS = 26;
     const TYPE_UNARY_PLUS = 27;
     const TYPE_BITWISE_NOT = 28;
