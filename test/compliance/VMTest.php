@@ -435,10 +435,6 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'class_has_')) {
                 continue;
             }
-            if (!CompilerVersion::supportsStrPadded()
-                && str_contains($name, 'str_padded')) {
-                continue;
-            }
             if (str_contains(strtolower($case[0]), 'splobjectstorage')) {
                 continue;
             }

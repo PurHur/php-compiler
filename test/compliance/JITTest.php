@@ -422,10 +422,6 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'class_has_')) {
                 continue;
             }
-            if (!CompilerVersion::supportsStrPadded()
-                && str_contains($name, 'str_padded')) {
-                continue;
-            }
             // ?-> LLVM lowering verified in NullsafeJitCompileTest (#3219); MCJIT execute needs jit-runtime-probe (#98).
             if (str_contains(strtolower($case[0]), 'nullsafe')) {
                 continue;

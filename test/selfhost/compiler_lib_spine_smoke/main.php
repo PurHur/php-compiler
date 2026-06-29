@@ -2028,7 +2028,6 @@ require_once __DIR__.'/../../../ext/standard/str_getcsv.php';
 require_once __DIR__.'/../../../ext/standard/str_increment.php';
 require_once __DIR__.'/../../../ext/standard/str_ireplace.php';
 require_once __DIR__.'/../../../ext/standard/str_pad.php';
-require_once __DIR__.'/../../../ext/standard/str_padded.php';
 require_once __DIR__.'/../../../ext/standard/str_repeat.php';
 require_once __DIR__.'/../../../ext/standard/str_replace.php';
 require_once __DIR__.'/../../../ext/standard/str_rot13.php';

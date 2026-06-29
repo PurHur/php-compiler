@@ -452,7 +452,6 @@ class Module extends ModuleAbstract
             new getrandmax(),
             new uniqid(),
             new str_pad(),
-            ...(CompilerVersion::supportsStrPadded() ? [new str_padded()] : []),
             new str_split(),
             new chunk_split(),
             new wordwrap(),
