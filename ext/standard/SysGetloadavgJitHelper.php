@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 /**
  * sys_getloadavg() for compiled JIT/AOT modules (#12106, php-in-PHP).
  *
- * SSOT: {@see VmSys::getLoadavg} → {@see VmSysGetloadavgNative} (libc FFI or {@see VmSysGetloadavgPure}).
+ * SSOT: {@see VmSys::getLoadavg} → {@see VmSysGetloadavgNative} → {@see VmSysGetloadavgPure}.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(sys_getloadavg)
  */
 final class SysGetloadavgJitHelper
