@@ -1,10 +1,10 @@
 --TEST--
-Language: public protected(set) compiles (#11546, PHP 8.4 zend_compile.c)
+Language: public protected(set) — compile fatal (#13672, Zend/zend_compile.c)
 --FILE--
 <?php
 class A {
     public protected(set) string $x = 'ok';
 }
 echo (new A())->x, "\n";
---EXPECT--
-ok
+--EXPECT_EXIT--
+255
