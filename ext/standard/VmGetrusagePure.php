@@ -162,7 +162,7 @@ final class VmGetrusagePure
         if ($ticks <= 0) {
             return [0, 0];
         }
-        $hz = self::clockTicksPerSecond();
+        $hz = VmProcClockTicksPure::clockTicksPerSecond();
         if ($hz <= 0) {
             $hz = 100;
         }
@@ -171,20 +171,6 @@ final class VmGetrusagePure
         $usec = (int) max(0, (int) (($rem * 1000000) / $hz));
 
         return [$sec, $usec];
-    }
-
-    private static function clockTicksPerSecond(): int
-    {
-        // Best-effort: allow overriding for deterministic tests.
-        $v = getenv('PHP_COMPILER_PROC_CLK_TCK');
-        if (false !== $v && '' !== $v) {
-            $n = (int) $v;
-            if ($n > 0) {
-                return $n;
-            }
-        }
-
-        return 100;
     }
 
     private static function pageSizeBytes(): int
