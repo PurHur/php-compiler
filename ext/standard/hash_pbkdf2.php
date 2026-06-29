@@ -43,6 +43,12 @@ final class hash_pbkdf2 extends Internal
             }
             $raw = $rawArg->toBool();
         }
+        if ($iterations < 1) {
+            throw new \ValueError('hash_pbkdf2(): Argument #4 ($iterations) must be greater than 0');
+        }
+        if ($length < 0) {
+            throw new \ValueError('hash_pbkdf2(): Argument #5 ($length) must be greater than or equal to 0');
+        }
         $algoName = strtolower($algo);
         if (!\in_array($algoName, ['sha256', 'sha1', 'md5'], true)) {
             throw new \ValueError(
