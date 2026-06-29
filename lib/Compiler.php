@@ -11515,6 +11515,21 @@ class Compiler {
                 }
             }
         }
+        $positionalCallArg = $callOp->args[$argIndex] ?? $arg;
+        if (
+            $this->callArgIsDeadInlineTemporary($positionalCallArg)
+            && $this->callArgOperandExpectsArrayProducer($positionalCallArg)
+        ) {
+            $unassigned = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                $producers,
+                $callOp,
+                $argIndex,
+                $block
+            );
+            if ($unassigned instanceof Op\Expr\Array_) {
+                return $unassigned;
+            }
+        }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
         $lastProducer = $producers[\count($producers) - 1] ?? null;
         if ($lastProducer instanceof Op\Expr\BinaryOp\Plus) {
@@ -11743,8 +11758,11 @@ class Compiler {
         if ('array' === $repr) {
             return true;
         }
-
-        return str_ends_with($repr, '[]');
+        if (str_ends_with($repr, '[]')) {
+            return true;
+        }
+        // Union/intersection builtins (proc_open array|string, etc.) may pass inline Expr_Array (#13734).
+        return (bool) preg_match('/\barray\b/', $repr);
     }
 
     /**
@@ -13609,10 +13627,17 @@ class Compiler {
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
-                        || $byIndex instanceof Op\Expr\ConstFetch
                         || $byIndex instanceof Op\Expr\ClassConstFetch
                         || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
                     )
+                ) {
+                    return $byIndex;
+                }
+                if (
+                    null !== $byIndex
+                    && $byIndex instanceof Op\Expr\ConstFetch
+                    && null !== $callArg
+                    && !$this->callArgOperandExpectsArrayProducer($callArg)
                 ) {
                     return $byIndex;
                 }
@@ -20453,6 +20478,7 @@ class Compiler {
                 null !== $inlineArray
                 && null !== $callArgOperand
                 && !$this->callArgOperandExpectsArrayProducer($callArgOperand)
+                && !$this->callArgIsDeadInlineTemporary($callArgOperand)
             ) {
                 $inlineArray = null;
             }
@@ -20551,6 +20577,7 @@ class Compiler {
                                 $matched instanceof Op\Expr\Array_
                                 && null !== $callArgProbe
                                 && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                                && !$this->callArgIsDeadInlineTemporary($callArgProbe)
                             ) {
                                 $matched = null;
                             }
@@ -20697,6 +20724,7 @@ class Compiler {
                                 $matched instanceof Op\Expr\Array_
                                 && null !== $callArgProbe
                                 && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                                && !$this->callArgIsDeadInlineTemporary($callArgProbe)
                             ) {
                                 $matched = null;
                             }
@@ -20968,6 +20996,7 @@ class Compiler {
                             $matched instanceof Op\Expr\Array_
                             && null !== $callArgProbe
                             && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            && !$this->callArgIsDeadInlineTemporary($callArgProbe)
                         ) {
                             $matched = null;
                         }
@@ -21311,7 +21340,13 @@ class Compiler {
                         }
                     }
                 }
-                if ($this->callArgIsDeadInlineTemporary($arg) && !$comparisonFeedsCallArg) {
+                if (
+                    $this->callArgIsDeadInlineTemporary($arg)
+                    && !$comparisonFeedsCallArg
+                    && !$this->callArgOperandExpectsArrayProducer(
+                        $cfgCallOp->args[(int) $argIndex] ?? $arg
+                    )
+                ) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 foreach ($trailingProducers as $producer) {
                     if (!$producer instanceof Op\Expr\ConstFetch && !$producer instanceof Op\Expr\ClassConstFetch) {
