@@ -89,4 +89,17 @@ final class GetenvJitHelper
             $ht->update($name, $var);
         }
     }
+
+    /** Populate a hashtable with inherited environ + local putenv overlay (JIT getenv argc==0, #5075). */
+    public static function fillAllEnvironmentHashtable(HashTable $ht): void
+    {
+        foreach (self::getAllEnvironmentMap() as $name => $value) {
+            if ('' === $name) {
+                continue;
+            }
+            $var = new Variable();
+            $var->string($value);
+            $ht->update($name, $var);
+        }
+    }
 }
