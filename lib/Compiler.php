@@ -18739,6 +18739,75 @@ class Compiler {
     }
 
     /**
+     * Fold or lower UnaryMinus/UnaryPlus call args before ARG_SEND (#13387, zend_operators.c concat chains).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function tryResolveUnaryLiteralCallArgSlot(
+        Operand $arg,
+        Block $block,
+        array &$emitOps,
+        ?Op $cfgCallOp = null,
+        int $argIndex = 0
+    ): ?int {
+        $unaryRoot = $this->unwrapOperandChain($arg);
+        if (!$unaryRoot instanceof Op\Expr\UnaryMinus && !$unaryRoot instanceof Op\Expr\UnaryPlus) {
+            $unaryRoot = $this->unaryLiteralProducerForHoistedCallArg($cfgCallOp, $argIndex, $block);
+        }
+        if (!$unaryRoot instanceof Op\Expr\UnaryMinus && !$unaryRoot instanceof Op\Expr\UnaryPlus) {
+            return null;
+        }
+        $vm = $this->tryFoldUnaryLiteralDefault($unaryRoot);
+        if (null !== $vm) {
+            return $block->registerConstant($arg, $vm);
+        }
+        if (null === $block->slotForOperand($unaryRoot->result)) {
+            foreach ($this->compileExpr($unaryRoot, $block) as $op) {
+                $emitOps[] = $op;
+            }
+        }
+
+        return $block->slotForOperand($unaryRoot->result);
+    }
+
+    /**
+     * php-cfg echo ConcatList hoists sibling FuncCalls with Concat stmts between them (#13387).
+     */
+    private function unaryLiteralProducerForHoistedCallArg(
+        ?Op $callOp,
+        int $argIndex,
+        Block $block
+    ): Op\Expr\UnaryMinus|Op\Expr\UnaryPlus|null {
+        if (null === $callOp || 0 !== $argIndex || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
+                return $child;
+            }
+            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Fold compile-time call arguments, including php-cfg dead ClassConstFetch preludes (#5933).
      */
     protected function tryFoldCallArgCompileTimeValue(
@@ -19067,13 +19136,13 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = null;
+                $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 $assignVarProbe = $arg;
                 if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
                     $assignVarProbe = $cfgCallOp->args[(int) $argIndex];
                 }
                 $assignedNamedLocal = $this->slotForNamedLocalFromAssignVarOperand($assignVarProbe, $block);
-                if (null !== $assignedNamedLocal) {
+                if (null === $valueSlot && null !== $assignedNamedLocal) {
                     $namedAssignDest = $block->slotForNamedAssignDest($assignVarProbe);
                     $valueSlot = null !== $namedAssignDest
                         ? $this->resolveNamedAssignCallArgSlot(
@@ -19089,7 +19158,7 @@ class Compiler {
                             true
                         );
                 }
-                if (null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
+                if (null === $valueSlot && null !== $cfgCallOp && !$this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolveHoistedIssetOrEmptyCallArgSlot(
                         $arg,
                         $block,
