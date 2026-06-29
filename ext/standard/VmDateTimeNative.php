@@ -360,6 +360,52 @@ final class VmDateTimeNative
             return self::parseResultFromTimestamp((int) $date, 0);
         }
         if (1 === preg_match(
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
+            $date,
+            $matches
+        )) {
+            $hasTime = isset($matches[4]);
+            $fraction = false;
+            if ($hasTime) {
+                $fraction = 0.0;
+                if (isset($matches[7]) && '' !== $matches[7]) {
+                    $fraction = (float) ('0.'.\str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT));
+                }
+            }
+            try {
+                $tzId = self::validateTimezoneId($matches[8]);
+            } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                return self::parseUnrecognizedDateString($date);
+            }
+            $result = self::finalizeParsedDateComponents([
+                'year' => (int) $matches[1],
+                'month' => (int) $matches[2],
+                'day' => (int) $matches[3],
+                'hour' => $hasTime ? (int) $matches[4] : false,
+                'minute' => $hasTime ? (int) $matches[5] : false,
+                'second' => $hasTime ? (int) $matches[6] : false,
+                'fraction' => $fraction,
+            ], $tzId);
+
+            return self::withNamedTimezoneMetadata($result, $tzId);
+        }
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $date, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return self::parseUnrecognizedDateString($date);
+            }
+
+            return self::finalizeParsedDateComponents([
+                'year' => (int) $matches[3],
+                'month' => $month,
+                'day' => (int) $matches[2],
+                'hour' => false,
+                'minute' => false,
+                'second' => false,
+                'fraction' => false,
+            ], $tzName);
+        }
+        if (1 === preg_match(
             '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?$/',
             $date,
             $matches
@@ -625,6 +671,82 @@ final class VmDateTimeNative
             'errors' => [],
             'is_localtime' => false,
         ];
+    }
+
+    /**
+     * php-src timelib — named timezone suffix metadata for date_parse() (#13405).
+     *
+     * @param array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool
+     * } $result
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool,
+     *   zone_type: int,
+     *   tz_id: string
+     * }
+     */
+    private static function withNamedTimezoneMetadata(array $result, string $tzId): array
+    {
+        $result['is_localtime'] = true;
+        $result['zone_type'] = 3;
+        $result['tz_id'] = $tzId;
+
+        return $result;
+    }
+
+    private static function englishMonthToNumber(string $monthName): ?int
+    {
+        static $map = [
+            'january' => 1,
+            'february' => 2,
+            'march' => 3,
+            'april' => 4,
+            'may' => 5,
+            'june' => 6,
+            'july' => 7,
+            'august' => 8,
+            'september' => 9,
+            'october' => 10,
+            'november' => 11,
+            'december' => 12,
+            'jan' => 1,
+            'feb' => 2,
+            'mar' => 3,
+            'apr' => 4,
+            'jun' => 6,
+            'jul' => 7,
+            'aug' => 8,
+            'sep' => 9,
+            'sept' => 9,
+            'oct' => 10,
+            'nov' => 11,
+            'dec' => 12,
+        ];
+
+        return $map[strtolower($monthName)] ?? null;
     }
 
     /**
