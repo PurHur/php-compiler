@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3487 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9442 |
+| Source constructs flagged (warnings) | 9444 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -983,7 +983,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PackEngine.php` | 0 | 1 |
 | `ext/standard/PackEngineEncode.php` | 0 | 1 |
 | `ext/standard/PackJitEngine.php` | 0 | 1 |
-| `ext/standard/PackJitHelper.php` | 0 | 1 |
+| `ext/standard/PackJitHelper.php` | 0 | 2 |
 | `ext/standard/ParseIniEngine.php` | 0 | 1 |
 | `ext/standard/ParseStrEngine.php` | 0 | 2 |
 | `ext/standard/ParseStrJitHelper.php` | 0 | 1 |
@@ -1027,7 +1027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SortJitHelper.php` | 0 | 1 |
 | `ext/standard/SoundexJitHelper.php` | 0 | 1 |
 | `ext/standard/SplAutoloadJitHelper.php` | 0 | 1 |
-| `ext/standard/SprintfJitHelper.php` | 0 | 2 |
+| `ext/standard/SprintfJitHelper.php` | 0 | 3 |
 | `ext/standard/SscanfJitHelper.php` | 0 | 2 |
 | `ext/standard/StatArrayJitHelper.php` | 0 | 3 |
 | `ext/standard/StatCacheJitHelper.php` | 0 | 1 |
@@ -9108,7 +9108,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JITVariable (line 23)
 - new JITVariable (line 51)
 - new JITVariable (line 53)
-- new JITVariable (line 150)
+- new JITVariable (line 151)
 - 5 class method(s)
 
 ### `ext/standard/JitVfscanf.php`
@@ -10068,7 +10068,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/PackJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new PackedArgvArrayMarker (line 32)
+- 4 class method(s)
 
 ### `ext/standard/ParseIniEngine.php`
 
@@ -10310,7 +10311,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 41)
+- new Variable (line 42)
+- new HashTable (line 54)
 - 3 class method(s)
 
 ### `ext/standard/SscanfJitHelper.php`
@@ -10987,10 +10989,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 271)
 - new HashTable (line 274)
 - new Variable (line 276)
-- new HashTable (line 420)
-- new Variable (line 437)
-- new Variable (line 444)
-- 37 class method(s)
+- new HashTable (line 441)
+- new Variable (line 458)
+- new Variable (line 465)
+- 38 class method(s)
 - 2 closure(s)
 
 ### `ext/standard/VmDnsMx.php`
@@ -12366,7 +12368,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 221)
 - new Error (line 336)
-- 26 class method(s)
+- 27 class method(s)
 
 ### `ext/standard/VmSscanf.php`
 
@@ -21810,22 +21812,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 829)
 - new Call\ReflectionEnumUnitCaseGetName (line 830)
 - new Call\ExceptionGetMessage (line 831)
-- new Result (line 1052)
-- new Result (line 1073)
-- new Variable (line 1345)
-- new Variable (line 1665)
-- new Variable (line 1796)
-- new Variable (line 1982)
-- new VMVariable (line 2131)
-- new VMVariable (line 2137)
-- new VMVariable (line 2143)
-- new VMVariable (line 2149)
-- new VMVariable (line 2156)
-- new VMVariable (line 2162)
-- new VMVariable (line 2168)
-- new VMVariable (line 2174)
-- new Variable (line 2199)
-- new Variable (line 2238)
+- new Result (line 1053)
+- new Result (line 1074)
+- new Variable (line 1346)
+- new Variable (line 1666)
+- new Variable (line 1797)
+- new Variable (line 1983)
+- new VMVariable (line 2132)
+- new VMVariable (line 2138)
+- new VMVariable (line 2144)
+- new VMVariable (line 2150)
+- new VMVariable (line 2157)
+- new VMVariable (line 2163)
+- new VMVariable (line 2169)
+- new VMVariable (line 2175)
+- new Variable (line 2200)
+- new Variable (line 2239)
 - 93 class method(s)
 - 28 closure(s)
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__.'/../LlvmToolchain.php';
 
+use PHPCompiler\LlvmToolchain;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -18,6 +19,7 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
     {
         $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT/Context.php');
         $this->assertStringContainsString('ensureMinimalUserStandaloneBodies', $source);
+        $this->assertStringContainsString('StringHtmlspecialchars::ensureStandaloneBodies', $source);
         $this->assertStringContainsString('ensureUserScriptMainStubs', $source);
         $this->assertStringContainsString('PHP_COMPILER_AOT_USER_SCRIPT', $source);
     }
@@ -83,5 +85,46 @@ final class ExamplesHelloWorldAotRegressionTest extends TestCase
         @unlink($outBin);
         $this->assertSame(0, $runCode, $runOut);
         $this->assertStringContainsString('Hello World', $runOut);
+    }
+
+    public function testSimpleWebExampleStandaloneAotBuilds(): void
+    {
+        if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
+            $this->markTestSkipped(LlvmToolchain::readyFailureReason() ?? 'LLVM 9 toolchain not available');
+        }
+        $repoRoot = dirname(__DIR__, 2);
+        $example = $repoRoot.'/examples/001-SimpleWeb/example.php';
+        $outBin = sys_get_temp_dir().'/phpc_sw_'.(string) getmypid();
+        @unlink($outBin);
+        $cmd = [
+            PHP_BINARY,
+            $repoRoot.'/bin/compile.php',
+            '-o',
+            $outBin,
+            $example,
+        ];
+        $env = $_ENV;
+        $llvmPath = getenv('PHP_COMPILER_LLVM_PATH');
+        if (is_string($llvmPath) && '' !== $llvmPath) {
+            $env['PHP_COMPILER_LLVM_PATH'] = $llvmPath;
+        }
+        $pipes = [];
+        $proc = proc_open(
+            $cmd,
+            [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']],
+            $pipes,
+            $repoRoot,
+            $env
+        );
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+        $code = proc_close($proc);
+        $this->assertSame(0, $code, $stderr."\n".$stdout);
+        $this->assertFileExists($outBin);
+        @unlink($outBin);
     }
 }
