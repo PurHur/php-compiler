@@ -620,6 +620,32 @@ final class VmPregEngine
             throw new VmPregCompileException();
         }
         $ch = $this->peek();
+        if ($ch >= '0' && $ch <= '7') {
+            $octal = '';
+            for ($i = 0; $i < 3 && !$this->atEnd(); ++$i) {
+                $digit = $this->peek();
+                if ($digit < '0' || $digit > '7') {
+                    break;
+                }
+                $octal .= $digit;
+                $this->advance(1);
+            }
+
+            return new VmPregAstCharNode(\chr(\octdec($octal)), $this->caseless);
+        }
+        if ('x' === $ch) {
+            $this->advance(1);
+            $hex = '';
+            for ($i = 0; $i < 2 && !$this->atEnd() && \ctype_xdigit($this->peek()); ++$i) {
+                $hex .= $this->peek();
+                $this->advance(1);
+            }
+            if ('' === $hex) {
+                throw new VmPregCompileException();
+            }
+
+            return new VmPregAstCharNode(\chr((int) \hexdec($hex)), $this->caseless);
+        }
         $this->advance(1);
 
         return match ($ch) {
@@ -807,6 +833,154 @@ final class VmPregEngine
         return false;
     }
 
+    /**
+     * @param list<VmPregAstNode> $parts
+     */
+    public function matchConcatParts(
+        array $parts,
+        int $idx,
+        string $subject,
+        int &$pos,
+        int $len,
+        array &$captures
+    ): bool {
+        if ($idx >= \count($parts)) {
+            return true;
+        }
+        $part = $parts[$idx];
+        $quant = self::unwrapQuantPart($part);
+        if (null !== $quant) {
+            return $this->matchQuantWithContinuation(
+                $quant['node'],
+                $part,
+                $parts,
+                $idx,
+                $subject,
+                $pos,
+                $len,
+                $captures
+            );
+        }
+        $saved = $captures;
+        $cur = $pos;
+        if (!$this->matchNode($part, $subject, $cur, $len, $captures)) {
+            return false;
+        }
+        $pos = $captures[0][1] ?? $cur;
+        if (!$this->matchConcatParts($parts, $idx + 1, $subject, $pos, $len, $captures)) {
+            $captures = $saved;
+            $pos = $cur;
+
+            return false;
+        }
+
+        return true;
+    }
+
+    /**
+     * @param list<VmPregAstNode> $parts
+     */
+    private function matchQuantWithContinuation(
+        VmPregAstQuantNode $quant,
+        VmPregAstNode $wrapperPart,
+        array $parts,
+        int $idx,
+        string $subject,
+        int &$pos,
+        int $len,
+        array &$captures
+    ): bool {
+        $start = $pos;
+        $saved = $captures;
+        $maxCount = $this->countQuantMatches($quant->childNode(), $subject, $start, $len);
+        if ($maxCount > $quant->maxCount()) {
+            $maxCount = $quant->maxCount();
+        }
+        if ($maxCount < $quant->minCount()) {
+            $captures = $saved;
+            $pos = $start;
+
+            return false;
+        }
+        $tryOrder = [];
+        for ($c = $quant->minCount(); $c <= $maxCount; ++$c) {
+            $tryOrder[] = $c;
+        }
+        if ($quant->isGreedy()) {
+            $tryOrder = \array_reverse($tryOrder);
+        }
+        foreach ($tryOrder as $count) {
+            $tryCaptures = $saved;
+            $p = $start;
+            $ok = true;
+            for ($i = 0; $i < $count; ++$i) {
+                if (!$this->matchNode($quant->childNode(), $subject, $p, $len, $tryCaptures)) {
+                    $ok = false;
+                    break;
+                }
+                $next = $tryCaptures[0][1] ?? $p;
+                if ($next <= $p) {
+                    $ok = false;
+                    break;
+                }
+                $p = $next;
+            }
+            if (!$ok) {
+                continue;
+            }
+            if ($wrapperPart instanceof VmPregAstGroupNode) {
+                $tryCaptures[$wrapperPart->groupIndex()] = [$start, $p];
+                $tryCaptures[0] = [$start, $p];
+            } else {
+                $tryCaptures[0] = [$start, $p];
+            }
+            $captures = $tryCaptures;
+            $pos = $p;
+            if ($this->matchConcatParts($parts, $idx + 1, $subject, $pos, $len, $captures)) {
+                return true;
+            }
+        }
+        $captures = $saved;
+        $pos = $start;
+
+        return false;
+    }
+
+    private function countQuantMatches(VmPregAstNode $child, string $subject, int $pos, int $len): int
+    {
+        $cur = $pos;
+        $count = 0;
+        while ($cur < $len) {
+            $sub = [];
+            if (!$this->matchNode($child, $subject, $cur, $len, $sub)) {
+                break;
+            }
+            $next = $sub[0][1] ?? $cur;
+            if ($next <= $cur) {
+                break;
+            }
+            $cur = $next;
+            ++$count;
+        }
+
+        return $count;
+    }
+
+    /**
+     * @return array{node: VmPregAstQuantNode}|null
+     */
+    private static function unwrapQuantPart(VmPregAstNode $part): ?array
+    {
+        if ($part instanceof VmPregAstQuantNode) {
+            return ['node' => $part];
+        }
+        if ($part instanceof VmPregAstGroupNode && $part->innerNode() instanceof VmPregAstQuantNode) {
+            return ['node' => $part->innerNode()];
+        }
+
+        return null;
+    }
+
     public function charEqual(string $a, string $b): bool
     {
         if ($this->caseless) {
@@ -978,17 +1152,14 @@ final class VmPregAstConcatNode implements VmPregAstNode
         int $len,
         array &$captures
     ): bool {
-        $cur = $pos;
+        $start = $pos;
         $saved = $captures;
-        foreach ($this->parts as $part) {
-            if (!$engine->matchNode($part, $subject, $cur, $len, $captures)) {
-                $captures = $saved;
+        if (!$engine->matchConcatParts($this->parts, 0, $subject, $pos, $len, $captures)) {
+            $captures = $saved;
 
-                return false;
-            }
-            $cur = $captures[0][1] ?? $cur;
+            return false;
         }
-        $captures[0] = [$pos, $cur];
+        $captures[0] = [$start, $pos];
 
         return true;
     }
@@ -1031,6 +1202,26 @@ final class VmPregAstQuantNode implements VmPregAstNode
     ) {
     }
 
+    public function childNode(): VmPregAstNode
+    {
+        return $this->child;
+    }
+
+    public function minCount(): int
+    {
+        return $this->min;
+    }
+
+    public function maxCount(): int
+    {
+        return $this->max;
+    }
+
+    public function isGreedy(): bool
+    {
+        return $this->greedy;
+    }
+
     public function match(
         VmPregEngine $engine,
         string $subject,
@@ -1057,6 +1248,16 @@ final class VmPregAstGroupNode implements VmPregAstNode
         private readonly VmPregAstNode $inner,
         private readonly int $index
     ) {
+    }
+
+    public function innerNode(): VmPregAstNode
+    {
+        return $this->inner;
+    }
+
+    public function groupIndex(): int
+    {
+        return $this->index;
     }
 
     public function match(
