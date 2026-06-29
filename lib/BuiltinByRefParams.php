@@ -21,6 +21,7 @@ final class BuiltinByRefParams
             case 'array_pop':
             case 'array_shift':
             case 'array_unshift':
+            case 'array_splice':
             case 'current':
             case 'end':
             case 'key':
