@@ -6,15 +6,18 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** IncludePathRuntime embed uses JIT helper; standalone AOT keeps thin LLVM quarantine (#9245, #12801, #13571). */
+/** IncludePathRuntime routes through IncludePathJitHelper PHP; user-script AOT uses thin stubs (#9245, #13678). */
 final class IncludePathRuntimeShrinkTest extends TestCase
 {
-    public function testIncludePathRuntimeUsesJitHelperNotLlvmGlobals(): void
+    public function testIncludePathRuntimeUsesJitHelperNotStandaloneLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IncludePathRuntime.php');
         $this->assertStringContainsString('IncludePathJitHelper', $source);
         $this->assertStringContainsString('IncludePathResolveJitHelper', $source);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
+        $this->assertStringContainsString('shouldDeferHeavyStreamIoEmitters', $source);
+        $this->assertStringContainsString('implementThinStandaloneStubs', $source);
+        $this->assertStringNotContainsString('IncludePathStandaloneLlvm', $source);
+        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
     }
 }
