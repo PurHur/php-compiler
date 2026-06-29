@@ -133,7 +133,24 @@ final class JitSprintf
                     $context->helper->loadValue($arg)
                 );
                 return;
+            case JITVariable::TYPE_HASHTABLE:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeHashtable'),
+                    $ptr,
+                    $context->helper->loadValue($arg)
+                );
+                return;
             default:
+                if ($arg->type & JITVariable::IS_NATIVE_ARRAY) {
+                    $htVar = \PHPCompiler\JIT\HashTableHelper::coerceToPackedHashtable($context, $arg);
+                    $context->builder->call(
+                        $context->lookupFunction('__value__writeHashtable'),
+                        $ptr,
+                        $context->helper->loadValue($htVar)
+                    );
+
+                    return;
+                }
                 throw new \LogicException(
                     'sprintf() argument must be a scalar value in this compiler build'
                 );

@@ -30,6 +30,8 @@ final class PackArgvSerialize
 
     private const TAG_STRING = 4;
 
+    private const TAG_ARRAY = 5;
+
     public static function ensureLinked(Context $context): void
     {
         $probe = $context->module->getNamedFunction('phpc_pack_argv_serialize');
@@ -150,6 +152,8 @@ final class PackArgvSerialize
         $boolBb = $fn->appendBasicBlock('pack_ser_val_bool');
         $checkStringBb = $fn->appendBasicBlock('pack_ser_val_check_string');
         $stringBb = $fn->appendBasicBlock('pack_ser_val_string');
+        $checkArrayBb = $fn->appendBasicBlock('pack_ser_val_check_array');
+        $arrayBb = $fn->appendBasicBlock('pack_ser_val_array');
         $coerceLongBb = $fn->appendBasicBlock('pack_ser_val_coerce_long');
         $after = $fn->appendBasicBlock('pack_ser_val_after');
 
@@ -170,7 +174,11 @@ final class PackArgvSerialize
 
         $context->builder->positionAtEnd($checkStringBb);
         $isString = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_STRING, false));
-        $context->builder->branchIf($isString, $stringBb, $coerceLongBb);
+        $context->builder->branchIf($isString, $stringBb, $checkArrayBb);
+
+        $context->builder->positionAtEnd($checkArrayBb);
+        $isArray = $context->builder->icmp(Builder::INT_EQ, $typeByte, $i8->constInt(VmVariable::TYPE_ARRAY, false));
+        $context->builder->branchIf($isArray, $arrayBb, $coerceLongBb);
 
         $context->builder->positionAtEnd($nullBb);
         self::writeTagByte($context, $buf, $posSlot, self::TAG_NULL);
@@ -212,6 +220,10 @@ final class PackArgvSerialize
             $context->builder->add($pos, $context->builder->truncOrBitCast($slen, $sizeT)),
             $posSlot
         );
+        $context->builder->branch($after);
+
+        $context->builder->positionAtEnd($arrayBb);
+        self::writeTagByte($context, $buf, $posSlot, self::TAG_ARRAY);
         $context->builder->branch($after);
 
         $context->builder->positionAtEnd($coerceLongBb);
