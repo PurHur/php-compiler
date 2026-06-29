@@ -115,7 +115,9 @@ final class VmUnserializeFormat
         }
         foreach ($propsCell->value as $name => $child) {
             \assert($child instanceof VmUnserializeCell);
-            $value = self::cellToVariableWithContext($ctx, $child, [], [], $frame);
+            $localCanonical = [];
+            $localSlotForCell = [];
+            $value = self::cellToVariableWithContext($ctx, $child, $localCanonical, $localSlotForCell, $frame);
             if (null !== $frame) {
                 $ctx->runtime->vm()->assignUnserializeProperty($entry, (string) $name, $value, $frame);
                 continue;
