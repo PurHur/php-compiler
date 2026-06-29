@@ -562,6 +562,12 @@ final class VmDate
         self::hashSetLong($ht, 'warning_count', $result['warning_count']);
         self::hashSetLong($ht, 'error_count', $result['error_count']);
         self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
+        if (isset($result['zone_type'])) {
+            self::hashSetLong($ht, 'zone_type', $result['zone_type']);
+        }
+        if (isset($result['tz_id'])) {
+            self::hashSetString($ht, 'tz_id', $result['tz_id']);
+        }
 
         $warnings = new HashTable();
         foreach ($result['warnings'] as $pos => $message) {

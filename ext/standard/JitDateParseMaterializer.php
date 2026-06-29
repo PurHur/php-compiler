@@ -64,6 +64,26 @@ final class JitDateParseMaterializer
         self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
         self::setNestedMessages($context, $ht, 'errors', $result['errors']);
 
+        if (isset($result['zone_type'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('zone_type'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $i64->constInt($result['zone_type'], false)
+            );
+        }
+        if (isset($result['tz_id'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('tz_id'));
+            $tzStr = $context->builder->load($context->constantStringFromString($result['tz_id']));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyString'),
+                $ht,
+                $keyStr,
+                $tzStr
+            );
+        }
+
         return $ht;
     }
 
