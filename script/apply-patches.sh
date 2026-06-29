@@ -201,6 +201,9 @@ patch_already_applied() {
     php-cfg-error-suppress-read.patch)
       grep -q 'ZEND_COMPILE_SILENCE' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-bare-variable-read-stmt.patch)
+      grep -q 'ZEND_CHECK_UNDEFINED_VAR (#13587)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-error-suppress-simplifier.patch)
       grep -q 'instanceof ErrorSuppressBlock' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/Simplifier.php" 2>/dev/null
       ;;
@@ -5808,6 +5811,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-nullsafe.patch"
   apply_patch "$PATCH_DIR/php-cfg-nullsafe-parser.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-read.patch"
+  apply_patch "$PATCH_DIR/php-cfg-bare-variable-read-stmt.patch"
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
   apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
