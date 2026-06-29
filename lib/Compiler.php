@@ -1917,9 +1917,13 @@ class Compiler {
                         }
                     } elseif (
                         $child instanceof Op\Expr\NullsafePropertyFetch
-                        && $this->shouldSkipNullsafePropertyFetchForIssetOrEmpty($child, $ops, $i, $block)
+                        && (
+                            $this->shouldSkipNullsafePropertyFetchForIssetOrEmpty($child, $ops, $i, $block)
+                            || $this->shouldSkipNullsafePropertyFetchForCoalesce($child, $ops, $i, $block)
+                        )
                     ) {
-                        // Lowered by compileIssetNullsafePropertyFetchChain / compileEmptyNullsafePropertyFetchChain (#4980).
+                        // Lowered by compileIssetNullsafePropertyFetchChain / compileEmptyNullsafePropertyFetchChain (#4980)
+                        // or compileCoalesce nullsafe chain eval (#13747).
                         break;
                     } elseif ($child instanceof Op\Expr\NullsafePropertyFetch) {
                         if ($this->isNullsafePropertyFetchInWriteContext($ops, $i)) {
@@ -3509,6 +3513,32 @@ class Compiler {
             }
             if ($next instanceof Op\Expr\Empty_) {
                 $chain = $this->collectNullsafePropertyFetchChainForEmpty($next, $block);
+
+                return [] !== $chain && in_array($fetch, $chain, true);
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param Op[] $ops
+     */
+    protected function shouldSkipNullsafePropertyFetchForCoalesce(
+        Op\Expr\NullsafePropertyFetch $fetch,
+        array $ops,
+        int $index,
+        Block $block
+    ): bool {
+        for ($j = $index + 1, $count = count($ops); $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\NullsafePropertyFetch) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\BinaryOp\Coalesce) {
+                $chain = $this->collectNullsafePropertyFetchChain($next->left, $block);
 
                 return [] !== $chain && in_array($fetch, $chain, true);
             }
@@ -9013,11 +9043,18 @@ class Compiler {
         ?Operand $resultOverride = null
     ): Block {
         $resultOperand = $resultOverride ?? $expr->result;
+        $nullsafeChain = null !== $expr->left
+            ? $this->collectNullsafePropertyFetchChain($expr->left, $block)
+            : [];
+        $preEvaluatedNullsafeChain = [] !== $nullsafeChain;
+        if ($preEvaluatedNullsafeChain) {
+            $block = $this->compileNullsafePropertyFetchChainEval($nullsafeChain, $block, true);
+        }
         // php-cfg may mark the ?? result dead while it is still assigned on branch blocks (#99).
         if ($resultOperand instanceof Operand\Temporary && [] === $resultOperand->usages) {
             $resultOperand->usages[] = $resultOperand;
         }
-        if (null === $expr->left) {
+        if (null === $expr->left || $preEvaluatedNullsafeChain) {
             $propFetch = null;
             $staticPropFetch = null;
             $dimFetch = null;
@@ -9079,7 +9116,12 @@ class Compiler {
             }
             $block->addOpCode($issetOp);
         } elseif (null !== $expr->left) {
-            $evaluatedLeftSlot = $this->compileOperand($expr->left, $block, true);
+            if ($preEvaluatedNullsafeChain) {
+                $lastFetch = $nullsafeChain[count($nullsafeChain) - 1];
+                $evaluatedLeftSlot = $this->compileOperand($lastFetch->result, $block, false);
+            } else {
+                $evaluatedLeftSlot = $this->compileOperand($expr->left, $block, true);
+            }
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ISSET,
                 $checkSlot,
@@ -9550,10 +9592,13 @@ class Compiler {
         return $endBlock;
     }
 
-    protected function compileNullsafePropertyFetch(Op\Expr\NullsafePropertyFetch $expr, Block $block): Block
-    {
+    protected function compileNullsafePropertyFetch(
+        Op\Expr\NullsafePropertyFetch $expr,
+        Block $block,
+        bool $allowUninitNullableShortCircuit = false
+    ): Block {
         $resultSlot = $this->compileOperand($expr->result, $block, false);
-        $receiverSlot = $this->compileOperand($expr->var, $block, true);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($expr->var, $block);
 
         $endBlock = new Block($block->orig);
         $endBlock->inheritUndefinedLocals = true;
@@ -9585,6 +9630,7 @@ class Compiler {
             $this->compileOperand($expr->name, $fetchBlock, true)
         );
         $nullsafePropertyFetch->nullsafeFetchPropertyRead = true;
+        $nullsafePropertyFetch->nullsafeUninitNullableToNull = $allowUninitNullableShortCircuit;
         $fetchBlock->addOpCode($nullsafePropertyFetch);
         $fetchJump = new OpCode(OpCode::TYPE_JUMP);
         $fetchJump->block1 = $endBlock;
@@ -9603,6 +9649,45 @@ class Compiler {
         $block->addOpCode($nullsafeOp);
 
         return $endBlock;
+    }
+
+    /**
+     * @param list<Op\Expr\NullsafePropertyFetch> $chain
+     */
+    protected function compileNullsafePropertyFetchChainEval(
+        array $chain,
+        Block $block,
+        bool $allowUninitNullableShortCircuit
+    ): Block {
+        foreach ($chain as $fetch) {
+            $block = $this->compileNullsafePropertyFetch($fetch, $block, $allowUninitNullableShortCircuit);
+        }
+
+        return $block;
+    }
+
+    /**
+     * Bind a ?-> receiver without reading typed slots (#5220, $a->b?->v).
+     */
+    private function compileNullsafeReceiverSlot(?Operand $var, Block $block): int
+    {
+        if (null === $var) {
+            throw new \LogicException('Nullsafe property fetch requires a receiver operand');
+        }
+        $propFetch = $this->unwrapPropertyFetch($var);
+        if (null !== $propFetch) {
+            $receiverSlot = $this->compileOperand($propFetch->result, $block, false);
+            $block->addOpCode(new OpCode(
+                OpCode::TYPE_PROPERTY_FETCH,
+                $receiverSlot,
+                $this->compileOperand($propFetch->var, $block, true),
+                $this->compileOperand($propFetch->name, $block, true)
+            ));
+
+            return $receiverSlot;
+        }
+
+        return $this->compileOperand($var, $block, true);
     }
 
     /**
@@ -9651,7 +9736,7 @@ class Compiler {
     ): void {
         $fetch = $chain[$index];
         $isLast = $index === count($chain) - 1;
-        $receiverSlot = $this->compileOperand($fetch->var, $block, true);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block);
 
         $nullBlock = new Block($block->orig);
         $nullBlock->inheritUndefinedLocals = true;
@@ -9689,6 +9774,7 @@ class Compiler {
                 $this->compileOperand($fetch->name, $fetchBlock, true)
             );
             $propFetch->nullsafeFetchPropertyRead = true;
+            $propFetch->nullsafeUninitNullableToNull = true;
             $fetchBlock->addOpCode($propFetch);
             $this->compileIssetNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
         }
@@ -9719,7 +9805,7 @@ class Compiler {
     ): void {
         $fetch = $chain[$index];
         $isLast = $index === count($chain) - 1;
-        $receiverSlot = $this->compileOperand($fetch->var, $block, true);
+        $receiverSlot = $this->compileNullsafeReceiverSlot($fetch->var, $block);
 
         $nullBlock = new Block($block->orig);
         $nullBlock->inheritUndefinedLocals = true;
@@ -9757,6 +9843,7 @@ class Compiler {
                 $this->compileOperand($fetch->name, $fetchBlock, true)
             );
             $propFetch->nullsafeFetchPropertyRead = true;
+            $propFetch->nullsafeUninitNullableToNull = true;
             $fetchBlock->addOpCode($propFetch);
             $this->compileEmptyNullsafeChainLink($chain, $index + 1, $fetchBlock, $resultSlot, $endBlock);
         }
