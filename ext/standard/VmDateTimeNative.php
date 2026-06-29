@@ -278,6 +278,76 @@ final class VmDateTimeNative
                 'timezone' => $useTz !== $tzName ? $useTz : null,
             ];
         }
+        if (1 === preg_match(
+            '/^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?)?\s+([A-Za-z][A-Za-z0-9_+\/-]*(?:\/[A-Za-z][A-Za-z0-9_+\/-]*)*)$/',
+            $time,
+            $matches
+        )) {
+            $hour = isset($matches[4]) ? (int) $matches[4] : 0;
+            $minute = isset($matches[5]) ? (int) $matches[5] : 0;
+            $second = isset($matches[6]) ? (int) $matches[6] : 0;
+            $microsecond = 0;
+            if (isset($matches[7]) && '' !== $matches[7]) {
+                $microsecond = (int) \str_pad(\substr($matches[7], 0, 6), 6, '0', STR_PAD_RIGHT);
+            }
+            try {
+                $useTz = self::validateTimezoneId($matches[8]);
+            } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[1],
+                    (int) $matches[2],
+                    (int) $matches[3],
+                    $hour,
+                    $minute,
+                    $second,
+                    $useTz
+                ),
+                'microsecond' => $microsecond,
+                'timezone' => $useTz,
+            ];
+        }
+        if (1 === preg_match('/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[2]);
+            if (null === $month) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[3],
+                    $month,
+                    (int) $matches[1],
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match('/^([A-Za-z]+)\s+(\d{1,2}),\s+(\d{4})$/', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                self::throwMalformedDateTime($time);
+            }
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    (int) $matches[3],
+                    $month,
+                    (int) $matches[2],
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
 
         self::throwMalformedDateTime($time);
     }
