@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\mbstring;
 
 use PHPCompiler\ext\iconv\CharsetEngine;
+use PHPCompiler\ext\standard\VmMath;
 use PHPCompiler\ext\standard\VmString;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -233,25 +234,7 @@ final class VmMbstring
 
     public static function coerceOffsetArg(Variable $var, string $function, int $argIndex = 2): int
     {
-        $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($offset) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($offset) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                self::typeLabel($var)
-            ));
-        }
-
-        return $var->toInt();
+        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'offset');
     }
 
     public static function coercePartArg(Variable $var, string $function, int $argIndex = 2): bool
@@ -603,48 +586,12 @@ final class VmMbstring
 
     public static function coerceStartArg(Variable $var, string $function, int $argIndex = 1): int
     {
-        $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($start) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($start) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                self::typeLabel($var)
-            ));
-        }
-
-        return $var->toInt();
+        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'start');
     }
 
     public static function coerceLengthArg(Variable $var, string $function, int $argIndex = 2): int
     {
-        $var = $var->resolveIndirect();
-        if (EnumCaseSupport::isEnumCaseVariable($var)) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($length) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s(): Argument #%d ($length) must be of type int, %s given',
-                $function,
-                $argIndex + 1,
-                self::typeLabel($var)
-            ));
-        }
-
-        return $var->toInt();
+        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'length');
     }
 
     public static function coerceOptionalLengthArg(Variable $var, string $function, int $argIndex = 2): ?int
@@ -1087,9 +1034,9 @@ final class VmMbstring
     {
         return match ($var->type) {
             Variable::TYPE_NULL => 'null',
-            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_BOOLEAN => 'bool',
             Variable::TYPE_INTEGER => 'int',
-            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_FLOAT => 'float',
             Variable::TYPE_STRING => 'string',
             Variable::TYPE_ARRAY => 'array',
             Variable::TYPE_OBJECT => $var->toObject()->class->name,
