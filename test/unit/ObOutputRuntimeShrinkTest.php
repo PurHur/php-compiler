@@ -23,6 +23,8 @@ final class ObOutputRuntimeShrinkTest extends TestCase
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ObOutputJitBridge.php');
         $this->assertStringContainsString('ObOutputJitHelper', $bridge);
         $this->assertStringContainsString('NestedJitCompileScope', $bridge);
+        $this->assertStringContainsString('ObOutputEchoJitEmit::implementAll', $bridge);
+        $this->assertStringContainsString('ObOutputUserScriptLlvm::shouldUse', $bridge);
         $this->assertStringNotContainsString('ObStorageGlobals::ensureGlobals', $bridge);
         $this->assertStringNotContainsString('GLOBAL_STORAGE', $bridge);
         $this->assertStringNotContainsString('implementPopBuffer', $bridge);

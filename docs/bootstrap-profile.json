@@ -2198,6 +2198,7 @@
         "ext/stats/JitStats.php",
         "ext/stats/Module.php",
         "ext/stats/StatsFunction.php",
+        "ext/stats/StatsJitHelper.php",
         "ext/stats/VmStats.php",
         "ext/stats/stats_covariance.php",
         "ext/stats/stats_standard_deviation.php",
@@ -2525,8 +2526,10 @@
         "lib/JIT/Builtin/ObGzhandler.php",
         "lib/JIT/Builtin/ObGzhandlerJitRuntime.php",
         "lib/JIT/Builtin/ObOutput.php",
+        "lib/JIT/Builtin/ObOutputEchoJitEmit.php",
         "lib/JIT/Builtin/ObOutputJitBridge.php",
         "lib/JIT/Builtin/ObOutputRuntime.php",
+        "lib/JIT/Builtin/ObOutputUserScriptLlvm.php",
         "lib/JIT/Builtin/ObStatusRuntime.php",
         "lib/JIT/Builtin/ObStorageGlobals.php",
         "lib/JIT/Builtin/Output.php",
@@ -3733,9 +3736,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3503,
+        "inventory_files": 3506,
         "excluded": 0,
-        "eligible": 3503,
+        "eligible": 3506,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

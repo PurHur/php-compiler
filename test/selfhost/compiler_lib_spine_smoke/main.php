@@ -2524,7 +2524,9 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/NonObjectPropertyFetchRuntime.ph
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandler.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandlerJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutput.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputEchoJitEmit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputJitBridge.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputUserScriptLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObOutputRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObStatusRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObStorageGlobals.php';
