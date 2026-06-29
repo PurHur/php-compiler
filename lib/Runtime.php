@@ -235,6 +235,7 @@ class Runtime {
         $this->load(new ext\zstd\Module);
         $this->load(new ext\lzf\Module);
         $this->load(new ext\bz2\Module);
+        $this->load(new ext\sodium\Module);
         $this->load(new ext\standard\Module);
     }
 
