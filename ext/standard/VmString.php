@@ -1988,6 +1988,13 @@ final class VmString
             $path = $rest;
         }
 
+        $host = self::replaceUrlControlChars($host);
+        $user = self::replaceUrlControlChars($user);
+        $pass = self::replaceUrlControlChars($pass);
+        $path = self::replaceUrlControlChars($path);
+        $query = self::replaceUrlControlChars($query);
+        $fragment = self::replaceUrlControlChars($fragment);
+
         if (-1 === $component) {
             $filtered = [];
             if (null !== $scheme && '' !== $scheme) {
@@ -2041,6 +2048,30 @@ final class VmString
                     $component
                 ));
         }
+    }
+
+    /**
+     * php-src url.c php_replace_controlchars — control bytes become underscore (#13553).
+     */
+    private static function replaceUrlControlChars(?string $value): ?string
+    {
+        if (null === $value || '' === $value) {
+            return $value;
+        }
+        $len = self::byteLength($value);
+        $out = '';
+        $changed = false;
+        for ($i = 0; $i < $len; ++$i) {
+            $ord = self::byteOrd($value[$i]);
+            if ($ord < 0x20 || 0x7f === $ord) {
+                $out .= '_';
+                $changed = true;
+            } else {
+                $out .= $value[$i];
+            }
+        }
+
+        return $changed ? $out : $value;
     }
 
     /**
