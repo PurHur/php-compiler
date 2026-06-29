@@ -21,7 +21,7 @@ use PHPLLVM\Value;
 
 /**
  * substr_compare() — compare haystack slice to needle (subset of PHP; issue #2400).
- * JIT lowers via {@see StringSubstrCompareJit} (VmString parity; no phpc_substr_compare.c).
+ * JIT lowers via {@see StringSubstrCompare} + {@see SubstrCompareJitHelper} (VmString parity; no phpc_substr_compare.c).
  */
 final class substr_compare extends Internal
 {
