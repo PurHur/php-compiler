@@ -7,7 +7,7 @@ Path: `parseAndCompile` → `standalone` → `Compiler::compile` under `PHP_COMP
 | Metric | Count |
 |--------|------:|
 | Compiler hot-path skip patterns (`isSkippedCompilerHotPathName`) | 48 |
-| M3 real-lowering allowlist (`isM3CompileDriverRealLoweringName`) | 27 |
+| M3 real-lowering allowlist (`isM3CompileDriverRealLoweringName`) | 32 |
 | M3 spine deny fragments (`m3CompileDriverSpineDenyNames`) | 1 |
 | Compile-spine symbols — M3 real lowering | 30 |
 | Compile-spine symbols — entry stub | 0 |
