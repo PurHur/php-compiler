@@ -23,14 +23,18 @@ final class ParseStrRuntime
 
     private const PARSE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseInto';
 
+    private const PARSE_COOKIE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderInto';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::PARSE_INTO_HELPER,
+        self::PARSE_COOKIE_INTO_HELPER,
     ];
 
     /** @var list<string> */
     private const RUNTIME_FUNCTIONS = [
         '__compiler_parse_str',
+        '__compiler_parse_cookie_header',
     ];
 
     public static function ensureLinked(Context $context): void
@@ -40,8 +44,7 @@ final class ParseStrRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_parse_str');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::allRuntimeFunctionsLinked($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -60,6 +63,7 @@ final class ParseStrRuntime
             '#9295'
         );
         self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
+        self::implementIfMissing($context, '__compiler_parse_cookie_header', self::implementCookieBridge(...));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -132,6 +136,38 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
     }
 
+    private static function implementCookieBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('parse_cookie_bridge_entry');
+        $early = $fn->appendBasicBlock('parse_cookie_bridge_early');
+        $work = $fn->appendBasicBlock('parse_cookie_bridge_work');
+        $context->builder->positionAtEnd($entry);
+
+        $dest = $fn->getParam(0);
+        $header = $fn->getParam(1);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $nullDest = $context->builder->icmp(Builder::INT_EQ, $dest, $htPtr->constNull());
+        $context->builder->branchIf($nullDest, $early, $work);
+
+        $context->builder->positionAtEnd($early);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($work);
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_COOKIE_INTO_HELPER, '#13827');
+        $destArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $dest,
+            $helperFn->getParam(0)->typeOf()
+        );
+        $headerArg = JitNestedHelperCoerce::coerceArgForHelper(
+            $context,
+            $header,
+            $helperFn->getParam(1)->typeOf()
+        );
+        $context->builder->call($helperFn, $destArg, $headerArg);
+        $context->builder->returnVoid();
+    }
+
     private static function registerLinkedRuntime(Context $context): void
     {
         foreach (self::RUNTIME_FUNCTIONS as $name) {
@@ -141,5 +177,17 @@ final class ParseStrRuntime
             }
             $context->registerFunction($name, $fn);
         }
+    }
+
+    private static function allRuntimeFunctionsLinked(Context $context): bool
+    {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
