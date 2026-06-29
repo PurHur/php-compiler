@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\NestedJitCompileScope;
-use PHPLLVM\Value\Function_ as LlvmFunction;
+use PHPCompiler\JIT\JitVmHelperLink;
+use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for __compiler_gettimeofday_* via GettimeofdayJitHelper PHP (#13764).
+ * JIT/AOT link for __compiler_gettimeofday_* via GettimeofdayJitHelper PHP (#13764, #13804).
  *
- * Replaces libc gettimeofday LLVM; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
+ * Thin {@see JitVmHelperLink} glue; SSOT {@see \PHPCompiler\ext\standard\VmDate}.
  * php-src: ext/standard/microtimers.c — PHP_FUNCTION(gettimeofday)
  */
 final class StringGettimeofday
@@ -35,6 +34,12 @@ final class StringGettimeofday
         self::USEC_MASKED_HELPER,
     ];
 
+    /** @var list<string> */
+    private const RUNTIME_FUNCTIONS = [
+        '__compiler_gettimeofday_array',
+        '__compiler_gettimeofday_float',
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -49,9 +54,55 @@ final class StringGettimeofday
             return;
         }
 
-        self::ensureJitHelperCompiled($context);
-        self::implementFloatBridge($context);
-        self::implementArrayBridge($context);
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $doubleTy = $context->getTypeFromString('double');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_gettimeofday_float',
+            'gettimeofday_float_bridge_entry',
+            [],
+            $doubleTy,
+            self::FLOAT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#13804'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_gettimeofday_array',
+            'gettimeofday_array_bridge_entry',
+            [],
+            $htPtr,
+            self::ARRAY_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#13804'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_gettimeofday_sec',
+            'gettimeofday_sec_bridge_entry',
+            [],
+            $i64,
+            self::SEC_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#13804'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            '__compiler_gettimeofday_usec_masked',
+            'gettimeofday_usec_masked_bridge_entry',
+            [$i32],
+            $i64,
+            self::USEC_MASKED_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#13804'
+        );
         self::registerLinkedRuntime($context);
         $context->builder->clearInsertionPosition();
     }
@@ -65,11 +116,11 @@ final class StringGettimeofday
     {
         self::ensureLinked($context);
         $i32 = $context->getTypeFromString('int32');
-        $sec = $context->builder->call(self::helperFunction($context, self::SEC_HELPER));
+        $sec = $context->builder->call($context->lookupFunction('__compiler_gettimeofday_sec'));
         $sec32 = $context->builder->truncOrBitCast($sec, $i32);
         $usecModArg = $i32->constInt(max(0, $usecMod), false);
         $usec = $context->builder->call(
-            self::helperFunction($context, self::USEC_MASKED_HELPER),
+            $context->lookupFunction('__compiler_gettimeofday_usec_masked'),
             $usecModArg
         );
         $usec32 = $context->builder->truncOrBitCast($usec, $i32);
@@ -77,126 +128,20 @@ final class StringGettimeofday
         return [$sec32, $usec32];
     }
 
-    private static function implementFloatBridge(Context $context): void
-    {
-        $abiName = '__compiler_gettimeofday_float';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $doubleTy = $context->getTypeFromString('double');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($doubleTy, false)
-            );
-
-        $entry = $fn->appendBasicBlock('gettimeofday_float_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, self::FLOAT_HELPER));
-        $context->builder->returnValue($result);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementArrayBridge(Context $context): void
-    {
-        $abiName = '__compiler_gettimeofday_array';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction(
-                $abiName,
-                $context->context->functionType($htPtr, false)
-            );
-
-        $entry = $fn->appendBasicBlock('gettimeofday_array_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $result = $context->builder->call(self::helperFunction($context, self::ARRAY_HELPER));
-        $ht = $result->typeOf() === $htPtr
-            ? $result
-            : $context->builder->pointerCast($result, $htPtr);
-        $context->builder->returnValue($ht);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function helperFunction(Context $context, string $logical): LlvmFunction
-    {
-        self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after GettimeofdayJitHelper compile (#13764)');
-        }
-
-        return $fn;
-    }
-
-    private static function ensureJitHelperCompiled(Context $context): void
-    {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
-            }
-        }
-        if (!$missing) {
-            return;
-        }
-
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        $realPath = \realpath($path) ?: $path;
-        $prevSelfHostAot = \getenv('PHP_COMPILER_SELFHOST_AOT');
-        if (\function_exists('putenv')) {
-            \putenv('PHP_COMPILER_SELFHOST_AOT=0');
-        }
-        try {
-            NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path, $realPath): void {
-                $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'GettimeofdayJitHelper.php');
-                if (null === $block) {
-                    throw new \LogicException('GettimeofdayJitHelper.php parseAndCompile failed (#13764)');
-                }
-                $jit = new JIT($context);
-                $jit->compile($block);
-                $context->markJitIncludedFileCompiled($realPath);
-            });
-        } finally {
-            if (\function_exists('putenv')) {
-                if (false === $prevSelfHostAot || null === $prevSelfHostAot) {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT=');
-                } else {
-                    \putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
-                }
-            }
-        }
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#13764)');
-            }
-        }
-    }
-
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__compiler_gettimeofday_array', '__compiler_gettimeofday_float'] as $name) {
+        foreach (self::RUNTIME_FUNCTIONS as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn) {
-                throw new \LogicException($name.' missing after StringGettimeofday bridge (#13764)');
+                throw new \LogicException($name.' missing after StringGettimeofday bridge (#13804)');
             }
             $context->registerFunction($name, $fn);
+        }
+        foreach (['__compiler_gettimeofday_sec', '__compiler_gettimeofday_usec_masked'] as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null !== $fn) {
+                $context->registerFunction($name, $fn);
+            }
         }
     }
 }
