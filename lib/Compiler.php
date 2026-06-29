@@ -13502,7 +13502,8 @@ class Compiler {
         $foldedFirstNested = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
             $producers,
             $argIndex,
-            $argCount
+            $argCount,
+            $callArgs
         );
         if (null !== $foldedFirstNested) {
             return $foldedFirstNested;
@@ -14168,7 +14169,11 @@ class Compiler {
                 // Fall through — dead haystack temp (#9888).
             }
             if ($argCount - 1 === $argIndex) {
-                if ($this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)) {
+                // array_column([['n'=>'a']], 'n') — haystack Array_ must not feed column_key (#13703).
+                if (
+                    $this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
+                    && !($producers[0] instanceof Op\Expr\Array_)
+                ) {
                     return $producers[0];
                 }
                 // strtotime('next Monday', strtotime('...')) — nested FuncCall feeds trailing arg (#10838).
@@ -14845,7 +14850,8 @@ class Compiler {
     private function matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
         array $producers,
         int $argIndex,
-        int $argCount
+        int $argCount,
+        array $callArgs = []
     ): ?Op\Expr {
         if (2 !== $argCount || 3 !== \count($producers)) {
             return null;
@@ -14864,6 +14870,14 @@ class Compiler {
             return null;
         }
         if ($this->cfgExprUsesOperand($inner1, $outer0->result)) {
+            return null;
+        }
+        // array_column([[..]], 'col') — single nested haystack + embedded scalar (#13703).
+        if (
+            $argIndex > 0
+            && isset($callArgs[$argIndex])
+            && !$this->callArgOperandExpectsArrayProducer($callArgs[$argIndex])
+        ) {
             return null;
         }
 

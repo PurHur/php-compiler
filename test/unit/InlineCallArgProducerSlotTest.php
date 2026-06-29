@@ -3196,4 +3196,20 @@ PHP;
         $out = ob_get_clean();
         self::assertStringContainsString('bool(true)', $out);
     }
+
+    /** Issue #13703 — array_column() inline haystack literal runtime parity with Zend. */
+    public function testArrayColumnInlineHaystackTwoArgRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+$r = array_column([['n' => 'a'], ['n' => 'b']], 'n');
+var_export($r);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_column_inline_haystack.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => 'a',\n  1 => 'b',\n)\n", ob_get_clean());
+    }
 }
