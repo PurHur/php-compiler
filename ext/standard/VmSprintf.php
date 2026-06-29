@@ -346,6 +346,8 @@ final class VmSprintf
                 return $var->toBool() ? '1' : '';
             case Variable::TYPE_NULL:
                 return '';
+            case Variable::TYPE_OBJECT:
+                return VmString::coerceOperand($var);
             default:
                 throw new \LogicException('sprintf() %s requires a scalar value in this compiler build');
         }

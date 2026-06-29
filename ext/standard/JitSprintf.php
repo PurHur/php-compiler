@@ -126,6 +126,13 @@ final class JitSprintf
                     $context->helper->loadValue($arg)
                 );
                 return;
+            case JITVariable::TYPE_OBJECT:
+                $context->builder->call(
+                    $context->lookupFunction('__value__writeObject'),
+                    $ptr,
+                    $context->helper->loadValue($arg)
+                );
+                return;
             default:
                 throw new \LogicException(
                     'sprintf() argument must be a scalar value in this compiler build'
