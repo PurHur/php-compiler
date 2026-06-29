@@ -579,6 +579,22 @@ final class VmUnserializeFormat
             if ($class->isInterface || $class->isTrait || $class->isEnum || $class->isAbstract) {
                 throw new \LogicException('unserialize(): invalid object class in this compiler build');
             }
+            if (isset($class->methods['__unserialize'])) {
+                $ht = new HashTable();
+                foreach ($payload->properties as $name => $child) {
+                    \assert($child instanceof VmUnserializeCell);
+                    $slot = self::cellToVariableWithContext($ctx, $child, $canonical, $slotForCell, $frame);
+                    if (\is_int($name)) {
+                        $ht->addIndex($name, $slot);
+                    } else {
+                        $ht->add((string) $name, $slot);
+                    }
+                }
+                $dataVar = new Variable();
+                $dataVar->array($ht);
+
+                return VmSerialize::instantiateWithUnserializeData($ctx, $class, $dataVar);
+            }
             $entry = new ObjectEntry($class);
             $entry->constructed = true;
             $objectVar = new Variable();
@@ -747,8 +763,17 @@ final class VmUnserializeFormat
                 if ($this->pos + 1 >= $this->length) {
                     return null;
                 }
-                $content .= $this->payload[$this->pos + 1];
-                $this->pos += 2;
+                $next = $this->payload[$this->pos + 1];
+                // php-src var_unserializer.re — only \" and \\ are escapes; \E in O: class names stays literal (#13476).
+                if ('"' === $next || '\\' === $next) {
+                    $content .= $next;
+                    $this->pos += 2;
+                    $consumed += 1;
+
+                    continue;
+                }
+                $content .= '\\';
+                ++$this->pos;
                 $consumed += 1;
 
                 continue;

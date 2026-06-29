@@ -145,21 +145,36 @@ final class VmSerialize
         }
 
         if (str_starts_with($payload, 'O:')) {
+            $header = self::parseObjectWireHeader($payload);
+            if (null === $header) {
+                return false;
+            }
+            [$className] = $header;
+            if (0 === strcasecmp($className, 'Closure')) {
+                throw new \Exception("Unserialization of 'Closure' is not allowed");
+            }
+            if (!self::isClassAllowedForUnserialize($className, $options)) {
+                $parsed = self::parseCustomObjectPayload($payload);
+                if (null === $parsed || !\is_array($parsed[1])) {
+                    return false;
+                }
+
+                return self::instantiateIncompleteObject($ctx, $className, $parsed[1]);
+            }
+            $class = self::resolveClassEntryForUnserialize($ctx, $className);
+            if (null !== $class && self::hasInstanceMethod($class, '__unserialize')) {
+                $magicData = self::decodeMagicSerializePropertyBag($ctx, $payload, $options, $frame);
+                if (false === $magicData) {
+                    return false;
+                }
+
+                return self::instantiateWithUnserializeData($ctx, $class, $magicData);
+            }
             $parsed = self::parseCustomObjectPayload($payload);
             if (null === $parsed) {
                 return false;
             }
             [$className, $data] = $parsed;
-            if (0 === strcasecmp($className, 'Closure')) {
-                throw new \Exception("Unserialization of 'Closure' is not allowed");
-            }
-            if (!self::isClassAllowedForUnserialize($className, $options)) {
-                if (!\is_array($data)) {
-                    return false;
-                }
-
-                return self::instantiateIncompleteObject($ctx, $className, $data);
-            }
             $lcClass = strtolower($className);
             if (\is_array($data)
                 && (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass)) {
@@ -202,20 +217,12 @@ final class VmSerialize
 
                 return $var;
             }
-            $class = self::resolveClassEntryForUnserialize($ctx, $className);
             if (null === $class) {
                 if (!\is_array($data)) {
                     return false;
                 }
 
                 return self::instantiateIncompleteObject($ctx, $className, $data);
-            }
-            if (self::hasInstanceMethod($class, '__unserialize')) {
-                if (!\is_array($data)) {
-                    return false;
-                }
-
-                return self::instantiateWithUnserialize($ctx, $class, $data);
             }
             if (self::hasInstanceMethod($class, '__wakeup')) {
                 if (!\is_array($data)) {
@@ -469,6 +476,23 @@ final class VmSerialize
     }
 
     /**
+     * @return array{0: string, 1: int, 2: string}|null
+     */
+    public static function parseObjectWireHeader(string $payload): ?array
+    {
+        if (!\preg_match('/^O:(\d+):"((?:[^"\\\\]|\\\\.)*)":(\d+):\{(.*)\}$/s', $payload, $m)) {
+            return null;
+        }
+        $declaredLen = (int) $m[1];
+        $className = self::unescapeSerializedClassName($m[2]);
+        if (\strlen($className) !== $declaredLen) {
+            return null;
+        }
+
+        return [$className, (int) $m[3], $m[4]];
+    }
+
+    /**
      * @return array{0: string, 1: array<string, mixed>}|null
      */
     public static function parseCustomObjectPayload(string $payload): ?array
@@ -525,11 +549,18 @@ final class VmSerialize
         ClassEntry $class,
         array $data
     ): Variable {
+        return self::instantiateWithUnserializeData($ctx, $class, VmJson::import($data));
+    }
+
+    public static function instantiateWithUnserializeData(
+        Context $ctx,
+        ClassEntry $class,
+        Variable $dataVar
+    ): Variable {
         $method = $class->methods['__unserialize'] ?? null;
         $entry = new ObjectEntry($class);
         $recv = new Variable();
         $recv->object($entry);
-        $dataVar = VmJson::import($data);
         if ($method instanceof VmClassMethod) {
             self::invokeBuiltinClassMethod($ctx, $method, $entry, $dataVar);
 
@@ -543,6 +574,27 @@ final class VmSerialize
         $ctx->runtime->vm->invokePhpFunctionIsolated($method, $recv, $dataVar);
 
         return $recv;
+    }
+
+    /**
+     * Decode O: wire whose class uses __serialize() — nested objects need Context (#13476).
+     *
+     * @param array<string, mixed>|null $options
+     */
+    public static function decodeMagicSerializePropertyBag(
+        Context $ctx,
+        string $payload,
+        ?array $options = null,
+        ?Frame $frame = null
+    ): Variable|false {
+        $header = self::parseObjectWireHeader($payload);
+        if (null === $header) {
+            return false;
+        }
+        [, $propCount, $inner] = $header;
+        $arrayPayload = 'a:'.$propCount.':{'.$inner.'}';
+
+        return VmUnserializeFormat::decodeToVariableWithContext($ctx, $arrayPayload, $options, $frame);
     }
 
     /**
