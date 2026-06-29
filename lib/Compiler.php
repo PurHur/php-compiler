@@ -18817,11 +18817,17 @@ class Compiler {
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
             if ($child instanceof Op\Expr\UnaryMinus || $child instanceof Op\Expr\UnaryPlus) {
-                if (
-                    null !== $child->result
-                    && $this->operandsReferToSameVariable($child->result, $callArg)
-                ) {
-                    return $child;
+                if (null !== $child->result) {
+                    if ($this->operandsReferToSameVariable($child->result, $callArg)) {
+                        return $child;
+                    }
+                    // php-cfg dead-temp alias: hoisted call arg temp may differ from UnaryMinus.result (#13387, #13434).
+                    if (
+                        $i === $callIndex - 1
+                        && $callArg instanceof Operand\Temporary
+                    ) {
+                        return $child;
+                    }
                 }
 
                 return null;
