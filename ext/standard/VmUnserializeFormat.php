@@ -20,6 +20,18 @@ final class VmUnserializeFormat
 {
     private const DEFAULT_MAX_DEPTH = 4096;
 
+    /**
+     * @param array<string, mixed>|null $options
+     */
+    private static function resolveMaxDepth(?array $options): int
+    {
+        if (null !== $options && \array_key_exists('max_depth', $options)) {
+            return (int) $options['max_depth'];
+        }
+
+        return VmIni::getUnserializeMaxDepth();
+    }
+
     private static ?int $lastErrorOffset = null;
 
     private static ?int $lastPayloadLength = null;
@@ -141,10 +153,7 @@ final class VmUnserializeFormat
         if ('' === $payload) {
             return false;
         }
-        $maxDepth = self::DEFAULT_MAX_DEPTH;
-        if (null !== $options && \array_key_exists('max_depth', $options)) {
-            $maxDepth = (int) $options['max_depth'];
-        }
+        $maxDepth = self::resolveMaxDepth($options);
 
         $parser = new self($payload, $maxDepth);
         $value = $parser->parseValue(0);

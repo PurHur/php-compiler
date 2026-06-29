@@ -69,6 +69,7 @@ final class VmIni
         'memory_limit',
         'precision',
         'serialize_precision',
+        'unserialize_max_depth',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
@@ -101,6 +102,9 @@ final class VmIni
 
     private const CFG_SERIALIZE_PRECISION = '-1';
 
+    /** php-src PG(unserialize_max_depth) default 4096 (ext/standard/ini.c, #13628). */
+    private const CFG_UNSERIALIZE_MAX_DEPTH = '4096';
+
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
 
     /** php-src ext/session/session.c — PG(session_save_path) default on Linux CLI. */
@@ -126,6 +130,8 @@ final class VmIni
                 return self::setPrecision($newValue);
             case 'serialize_precision':
                 return self::setSerializePrecision($newValue);
+            case 'unserialize_max_depth':
+                return self::setUnserializeMaxDepth($newValue);
             case 'unserialize_callback_func':
                 return self::setUnserializeCallbackFunc($newValue);
             case 'session.gc_maxlifetime':
@@ -181,6 +187,8 @@ final class VmIni
                 return (string) self::$precision;
             case 'serialize_precision':
                 return (string) self::$serializePrecision;
+            case 'unserialize_max_depth':
+                return (string) self::$unserializeMaxDepth;
             case 'unserialize_callback_func':
                 return self::$unserializeCallbackFunc;
             case 'session.gc_maxlifetime':
@@ -223,6 +231,7 @@ final class VmIni
             'memory_limit' => self::CFG_MEMORY_LIMIT,
             'precision' => self::CFG_PRECISION,
             'serialize_precision' => self::CFG_SERIALIZE_PRECISION,
+            'unserialize_max_depth' => self::CFG_UNSERIALIZE_MAX_DEPTH,
             'unserialize_callback_func' => '',
             'session.gc_maxlifetime' => self::CFG_SESSION_GC_MAXLIFETIME,
             'session.save_path' => self::CFG_SESSION_SAVE_PATH,
@@ -255,6 +264,12 @@ final class VmIni
         return (string) self::$serializePrecision;
     }
 
+    /** php-src PG(unserialize_max_depth) (ext/standard/ini.c, #13628). */
+    public static function getUnserializeMaxDepth(): int
+    {
+        return self::$unserializeMaxDepth;
+    }
+
     /** Raw ini_set() value for display_errors; null uses php.ini default formatting (#11835). */
     private static ?string $displayErrorsLocalValue = null;
 
@@ -263,6 +278,8 @@ final class VmIni
     private static int $precision = 14;
 
     private static int $serializePrecision = -1;
+
+    private static int $unserializeMaxDepth = 4096;
 
     private static string $unserializeCallbackFunc = '';
 
@@ -359,6 +376,19 @@ final class VmIni
     private static function setSerializePrecision(string $newValue) {
         $old = (string) self::$serializePrecision;
         self::$serializePrecision = self::parseSerializePrecision($newValue);
+
+        return $old;
+    }
+
+    /** @return string|false */
+    private static function setUnserializeMaxDepth(string $newValue): string|false
+    {
+        $parsed = (int) trim($newValue);
+        if ($parsed <= 0) {
+            return false;
+        }
+        $old = (string) self::$unserializeMaxDepth;
+        self::$unserializeMaxDepth = $parsed;
 
         return $old;
     }
@@ -484,6 +514,9 @@ final class VmIni
                 break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecision(self::CFG_SERIALIZE_PRECISION);
+                break;
+            case 'unserialize_max_depth':
+                self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
                 break;
             case 'unserialize_callback_func':
                 self::$unserializeCallbackFunc = '';

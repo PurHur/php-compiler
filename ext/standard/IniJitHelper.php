@@ -22,6 +22,7 @@ final class IniJitHelper
         'memory_limit',
         'precision',
         'serialize_precision',
+        'unserialize_max_depth',
         'unserialize_callback_func',
         'session.gc_maxlifetime',
         'session.save_path',
@@ -96,6 +97,8 @@ final class IniJitHelper
 
     private const CFG_SERIALIZE_PRECISION = '-1';
 
+    private const CFG_UNSERIALIZE_MAX_DEPTH = '4096';
+
     private const CFG_SESSION_GC_MAXLIFETIME = '1440';
 
     private const CFG_SESSION_SAVE_PATH = '/var/lib/php/sessions';
@@ -114,6 +117,8 @@ final class IniJitHelper
     private static int $precision = 14;
 
     private static int $serializePrecision = -1;
+
+    private static int $unserializeMaxDepth = 4096;
 
     private static string $unserializeCallbackFunc = '';
 
@@ -141,6 +146,11 @@ final class IniJitHelper
     public static function getSerializePrecisionInt(): int
     {
         return self::$serializePrecision;
+    }
+
+    public static function getUnserializeMaxDepthInt(): int
+    {
+        return self::$unserializeMaxDepth;
     }
 
     public static function syncMaxExecutionTime(int $seconds): void
@@ -178,6 +188,11 @@ final class IniJitHelper
         return \sprintf('%d', self::$sessionGcMaxlifetime);
     }
 
+    private static function unserializeMaxDepthAsIniString(): string
+    {
+        return \sprintf('%d', self::$unserializeMaxDepth);
+    }
+
     /** @return string|null null when ini_get() is false */
     public static function iniGet(string $option): ?string
     {
@@ -212,6 +227,9 @@ final class IniJitHelper
         }
         if ('serialize_precision' === $key) {
             return self::serializePrecisionAsIniString();
+        }
+        if ('unserialize_max_depth' === $key) {
+            return self::unserializeMaxDepthAsIniString();
         }
         if ('unserialize_callback_func' === $key) {
             return self::$unserializeCallbackFunc;
@@ -276,6 +294,9 @@ final class IniJitHelper
         if ('serialize_precision' === $key) {
             return self::setSerializePrecision($newValue);
         }
+        if ('unserialize_max_depth' === $key) {
+            return self::setUnserializeMaxDepth($newValue);
+        }
         if ('unserialize_callback_func' === $key) {
             return self::setUnserializeCallbackFunc($newValue);
         }
@@ -335,6 +356,9 @@ final class IniJitHelper
         }
         if ('serialize_precision' === $key) {
             return self::CFG_SERIALIZE_PRECISION;
+        }
+        if ('unserialize_max_depth' === $key) {
+            return self::CFG_UNSERIALIZE_MAX_DEPTH;
         }
         if ('unserialize_callback_func' === $key) {
             return '';
@@ -399,6 +423,9 @@ final class IniJitHelper
                 break;
             case 'serialize_precision':
                 self::$serializePrecision = self::parseSerializePrecisionIni(self::CFG_SERIALIZE_PRECISION);
+                break;
+            case 'unserialize_max_depth':
+                self::$unserializeMaxDepth = (int) self::CFG_UNSERIALIZE_MAX_DEPTH;
                 break;
             case 'unserialize_callback_func':
                 self::$unserializeCallbackFunc = '';
@@ -478,6 +505,19 @@ final class IniJitHelper
     {
         $old = self::serializePrecisionAsIniString();
         self::$serializePrecision = self::parseSerializePrecisionIni($newValue);
+
+        return $old;
+    }
+
+    /** @return string|null null when ini_set rejected the value */
+    private static function setUnserializeMaxDepth(string $newValue): ?string
+    {
+        $parsed = (int) trim($newValue);
+        if ($parsed <= 0) {
+            return null;
+        }
+        $old = self::unserializeMaxDepthAsIniString();
+        self::$unserializeMaxDepth = $parsed;
 
         return $old;
     }
