@@ -14486,6 +14486,36 @@ class Compiler {
                 $nonEmbeddedArgIndices[] = $i;
             }
         }
+        // preg_match(..., $matches, PREG_OFFSET_CAPTURE) — ConstFetch/BitwiseOr only for flags/offset, not &$matches (#13714).
+        if (\in_array($inlineFuncName, ['preg_match', 'preg_match_all'], true)) {
+            if (2 === $argIndex) {
+                return null;
+            }
+            if ($argIndex >= 3) {
+                $lastProducer = $producers[\count($producers) - 1] ?? null;
+                if (
+                    $lastProducer instanceof Op\Expr\ConstFetch
+                    || $lastProducer instanceof Op\Expr\BinaryOp\BitwiseOr
+                    || $lastProducer instanceof Op\Expr\BinaryOp\BitwiseAnd
+                    || $lastProducer instanceof Op\Expr\BinaryOp\BitwiseXor
+                ) {
+                    $trailingNonEmbedded = $nonEmbeddedArgIndices[\count($nonEmbeddedArgIndices) - 1] ?? null;
+                    if ($argIndex === $trailingNonEmbedded) {
+                        return $lastProducer;
+                    }
+                }
+                foreach ($producers as $producer) {
+                    if (
+                        ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus)
+                        && $argIndex === (\count($callArgs) - 1)
+                    ) {
+                        return $producer;
+                    }
+                }
+            }
+
+            return null;
+        }
         // array_map(fn, [...], [...]) — php-cfg omits ArrowFunction from hoisted producers (#10094).
         if (
             'array_map' === $inlineFuncName
@@ -17269,6 +17299,13 @@ class Compiler {
     private function callArgIsDeadInlineTemporary(?Operand $arg): bool
     {
         if (null === $arg) {
+            return false;
+        }
+        if ($this->isNamedVariableOperand($arg)) {
+            return false;
+        }
+        if (null !== Block::resolveVariableName($arg)) {
+            // preg_match(..., $m, PREG_OFFSET_CAPTURE) — by-ref named local must not map to hoisted ConstFetch (#13714).
             return false;
         }
         if ($arg instanceof Operand\Temporary) {
