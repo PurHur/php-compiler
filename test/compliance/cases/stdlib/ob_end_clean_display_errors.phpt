@@ -1,5 +1,5 @@
 --TEST--
-stdlib ob_end_clean()/ob_end_flush() no buffer — no stderr when display_errors=0 (#13486, ext/standard/output.c)
+stdlib ob_end_clean()/ob_end_flush() no buffer — stderr notice via php_error_cb (#13486, #13542, ext/standard/output.c)
 --FILE--
 <?php
 error_reporting(E_ALL);

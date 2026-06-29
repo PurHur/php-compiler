@@ -57,9 +57,10 @@ final class ErrorSilenceJitHelper
         self::$displayErrors = $display;
     }
 
+    /** php-src php_error_cb: stderr when error_reporting includes level (#13542). */
     public static function shouldDisplayCliError(int $level): bool
     {
-        return self::$displayErrors && self::isErrorLevelEnabled($level);
+        return self::isErrorLevelEnabled($level);
     }
 
     public static function getErrorReporting(): int

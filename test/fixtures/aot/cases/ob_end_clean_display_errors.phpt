@@ -1,5 +1,5 @@
 --TEST--
-stdlib ob_end_clean() display_errors=0 — no stderr notice (#13486, ext/standard/output.c)
+stdlib ob_end_clean() display_errors=0 — stderr notice via php_error_cb (#13486, #13542, ext/standard/output.c)
 --FILE--
 <?php
 error_reporting(E_ALL);
