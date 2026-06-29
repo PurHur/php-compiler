@@ -1213,6 +1213,7 @@ require_once __DIR__.'/../../../ext/standard/VmGetcwdPure.php';
 require_once __DIR__.'/../../../ext/standard/VmGetopt.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusageArg.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusageNative.php';
+require_once __DIR__.'/../../../ext/standard/VmProcClockTicksPure.php';
 require_once __DIR__.'/../../../ext/standard/VmGetrusagePure.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStream.php';
 require_once __DIR__.'/../../../ext/standard/VmGzStreamNative.php';
