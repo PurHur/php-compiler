@@ -571,6 +571,17 @@ final class VmFs
 
             return $data;
         }
+        if (VmPhpFilterStream::isSupportedUri($path)) {
+            $data = self::readPathContentsViaOpen($path, $ctx);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
+        }
         if (VmDataUri::isDataUri($path)) {
             $data = VmDataUri::decode($path);
             if (false === $data) {

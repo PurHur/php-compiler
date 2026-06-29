@@ -26,6 +26,8 @@ final class VmStreamFilterChain
         'string.tolower' => true,
         'convert.base64-encode' => true,
         'convert.base64-decode' => true,
+        'convert.quoted-printable-decode' => true,
+        'convert.quoted-printable-encode' => true,
     ];
 
     /** @var array<int, array{stream: int, name: string, active: bool}> */
@@ -215,6 +217,8 @@ final class VmStreamFilterChain
             'string.tolower' => VmString::asciiLower($data),
             'convert.base64-encode' => \base64_encode($data),
             'convert.base64-decode' => (string) \base64_decode($data, true),
+            'convert.quoted-printable-decode' => VmString::quoted_printable_decode($data),
+            'convert.quoted-printable-encode' => VmString::quoted_printable_encode($data),
             default => $data,
         };
     }
