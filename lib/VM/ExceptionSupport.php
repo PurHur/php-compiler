@@ -375,9 +375,9 @@ final class ExceptionSupport
      *
      * @return never
      */
-    public static function emitNativeUncaughtFatal(\Throwable $native): void
+    public static function emitNativeUncaughtFatal(\Throwable $native, ?ObjectEntry $vmEntry = null): void
     {
-        self::writeNativeUncaughtFatalBlock($native, true);
+        self::writeNativeUncaughtFatalBlock($native, true, $vmEntry);
         throw new ScriptExit(255);
     }
 
@@ -408,8 +408,11 @@ final class ExceptionSupport
         throw new ScriptExit(255);
     }
 
-    private static function writeNativeUncaughtFatalBlock(\Throwable $native, bool $includeThrownIn): void
-    {
+    private static function writeNativeUncaughtFatalBlock(
+        \Throwable $native,
+        bool $includeThrownIn,
+        ?ObjectEntry $vmEntry = null,
+    ): void {
         $class = $native::class;
         $message = $native->getMessage();
         $file = $native->getFile();
@@ -423,7 +426,16 @@ final class ExceptionSupport
         }
         fwrite(STDERR, $fatal."\n");
         fwrite(STDERR, "Stack trace:\n");
-        fwrite(STDERR, "#0 {main}\n");
+        if (null !== $vmEntry) {
+            $trace = ExceptionTrace::resolveTraceVariable($vmEntry);
+            if (Variable::TYPE_ARRAY === $trace->type && $trace->toArray()->getNumElements() > 0) {
+                fwrite(STDERR, ExceptionTraceFormat::asString($trace)."\n");
+            } else {
+                fwrite(STDERR, "#0 {main}\n");
+            }
+        } else {
+            fwrite(STDERR, "#0 {main}\n");
+        }
         if ($includeThrownIn && '' !== $file && $line > 0) {
             fwrite(STDERR, "  thrown in {$file} on line {$line}\n");
         }

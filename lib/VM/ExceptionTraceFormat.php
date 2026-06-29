@@ -56,25 +56,35 @@ final class ExceptionTraceFormat
 
     private static function formatCall(string $function, HashTable $ht): string
     {
+        $class = self::readStringKey($ht, 'class');
+        $type = self::readStringKey($ht, 'type');
+        $prefix = '';
+        if ('' !== $class) {
+            $prefix = $class.('' !== $type ? $type : '->');
+        }
         $argsKey = new Variable(Variable::TYPE_STRING);
         $argsKey->string('args');
         if (!$ht->keyExists($argsKey)) {
-            return '' === $function ? '{main}' : $function.'()';
+            if ('' === $function) {
+                return '{main}';
+            }
+
+            return $prefix.$function.'()';
         }
         $argsVar = $ht->findVariable($argsKey, false);
         if (null === $argsVar) {
-            return $function.'()';
+            return $prefix.$function.'()';
         }
         $argsVar = $argsVar->resolveIndirect();
         if (Variable::TYPE_ARRAY !== $argsVar->type) {
-            return $function.'()';
+            return $prefix.$function.'()';
         }
         $parts = [];
         foreach ($argsVar->toArray()->iterate(true) as $arg) {
             $parts[] = SensitiveParamSupport::formatTraceArg($arg);
         }
 
-        return $function.'('.implode(', ', $parts).')';
+        return $prefix.$function.'('.implode(', ', $parts).')';
     }
 
     private static function readStringKey(HashTable $ht, string $key): string
