@@ -51,7 +51,9 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
     {
         $nested = 'a:1:{i:0;a:1:{i:0;a:1:{i:0;i:1;}}}';
         $this->assertFalse(VmUnserializeFormat::decodePayload($nested, ['max_depth' => 2]));
+        $this->assertSame(2, VmUnserializeFormat::lastMaxDepthExceeded());
         $ok = VmUnserializeFormat::decodePayload($nested, ['max_depth' => 4]);
+        $this->assertNull(VmUnserializeFormat::lastMaxDepthExceeded());
         $this->assertIsArray($ok);
         $this->assertSame(1, $ok[0][0][0]);
     }

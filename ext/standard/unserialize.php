@@ -52,7 +52,7 @@ final class unserialize extends Internal
             $frame
         );
         if (false === $decoded) {
-            self::emitParseFailureNotice($frame, $payload);
+            self::emitParseFailureNotice($frame, $payload, $options);
             $frame->returnVar->bool(false);
 
             return;
@@ -189,11 +189,24 @@ final class unserialize extends Internal
         return self::parseUnserializeOptionsArray($optionsVar);
     }
 
-    /** php-src var_unserializer.c — E_NOTICE + error_get_last even when @-silenced (#9206). */
-    private static function emitParseFailureNotice(Frame $frame, string $payload): void
+    /** php-src var_unserializer.c — E_WARNING on max_depth, then E_NOTICE + error_get_last (#13715, #9206). */
+    private static function emitParseFailureNotice(Frame $frame, string $payload, ?array $options = null): void
     {
         if (null === $frame->vmContext) {
             return;
+        }
+        $depthLimit = VmUnserializeFormat::lastMaxDepthExceeded();
+        if (null !== $depthLimit) {
+            $frame->vmContext->errors->triggerError(
+                \sprintf(
+                    'unserialize(): Maximum depth of %d exceeded. The depth limit can be changed using the max_depth unserialize() option or the unserialize_max_depth ini setting',
+                    $depthLimit
+                ),
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
         }
         $offset = VmUnserializeFormat::lastErrorOffset();
         $length = VmUnserializeFormat::lastPayloadLength();
