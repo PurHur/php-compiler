@@ -2,11 +2,22 @@
 
 declare(strict_types=1);
 
-$zipped = array_map(null, [1, 2], [3, 4]);
-$expected = [[1, 3], [2, 4]];
-if ($zipped !== $expected) {
-    echo 'fail: got ', var_export($zipped, true), ' expected ', var_export($expected, true), "\n";
+$z = array_map(null, [1, 2], [3, 4]);
+$expect = [[1, 3], [2, 4]];
+$ok = true;
+foreach ($expect as $i => $row) {
+    if (!isset($z[$i]) || !\is_array($z[$i])) {
+        $ok = false;
+        break;
+    }
+    if ($z[$i] !== $row) {
+        $ok = false;
+        break;
+    }
+}
+if (!$ok) {
+    var_export($z);
     exit(1);
 }
-
 echo "ok\n";
+exit(0);
