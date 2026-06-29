@@ -2058,12 +2058,9 @@ class Compiler {
                     ) {
                         // Lowered via following `Case::class` fold / call-arg compile-time value (#9426, #9518).
                         break;
-                    } elseif (
-                        ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
-                        && $this->isDeferredSiblingInlineCallArgProducer($child, $ops, $i)
-                    ) {
+                    } elseif ($this->isDeferredSiblingInlineCallArgProducer($child, $ops, $i)) {
                         // Hoisted sibling call-arg producers compile at the consumer via
-                        // resolveSiblingInlineCallArgProducerSlot (#9463, #10981).
+                        // resolveSiblingInlineCallArgProducerSlot (#9463, #10981, #12421, #13788).
                         break;
                     } elseif ($this->isForeachLoopVarAssignRefFusion($ops, $i)) {
                         /** @var Op\Iterator\Value $iter */
@@ -16651,7 +16648,7 @@ class Compiler {
      */
     private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
     {
-        if (!$op instanceof Op\Expr\FuncCall && !$op instanceof Op\Expr\NsFuncCall) {
+        if (!$this->isSiblingInlineCallProducerExpr($op)) {
             return null;
         }
         $opCount = \count($ops);
@@ -16673,6 +16670,9 @@ class Compiler {
                     return $j;
                 }
 
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($next)) {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($next)) {
@@ -16701,7 +16701,7 @@ class Compiler {
         $count = 0;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
-            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
                 ++$count;
             }
         }
@@ -16741,7 +16741,7 @@ class Compiler {
         $ordinal = -1;
         for ($j = $firstSibling; $j <= $producerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
-            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
                 ++$ordinal;
             }
         }
@@ -16761,7 +16761,7 @@ class Compiler {
         $seen = -1;
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $child = $cfgChildren[$j] ?? null;
-            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
                 ++$seen;
                 if ($seen === $ordinal) {
                     return $j;
@@ -16978,10 +16978,7 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($sib)) {
                 continue;
             }
-            if (
-                !$sib instanceof Op\Expr\FuncCall
-                && !$sib instanceof Op\Expr\NsFuncCall
-            ) {
+            if (!$this->isSiblingInlineCallProducerExpr($sib)) {
                 return false;
             }
         }
