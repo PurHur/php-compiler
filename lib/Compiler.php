@@ -17032,25 +17032,39 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        $hasNestedFuncCall = false;
         foreach ($producers as $producer) {
-            if (!$producer instanceof Op\Expr\Array_) {
-                continue;
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $hasNestedFuncCall = true;
+                break;
             }
-            if (null === $block->slotForOperand($producer->result)) {
-                foreach ($this->compileExpr($producer, $block) as $op) {
-                    $pendingSends[] = $op;
-                }
+        }
+        // array_merge([1], [2]) — sibling flat Array_ literals use normal producer matching (#10093).
+        if (!$hasNestedFuncCall) {
+            return null;
+        }
+        $trailingArray = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $trailingArray = $producer;
             }
-            $slot = $block->slotForOperand($producer->result);
-
-            return null !== $slot ? (string) $slot : null;
         }
-        $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
-        if ($this->isEmbeddedCallLiteralArg($callArg)) {
-            return (string) $this->compileOperand($callArg, $block, true);
-        }
+        if (!$trailingArray instanceof Op\Expr\Array_) {
+            $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                return (string) $this->compileOperand($callArg, $block, true);
+            }
 
-        return null;
+            return null;
+        }
+        if (null === $block->slotForOperand($trailingArray->result)) {
+            foreach ($this->compileExpr($trailingArray, $block) as $op) {
+                $pendingSends[] = $op;
+            }
+        }
+        $slot = $block->slotForOperand($trailingArray->result);
+
+        return null !== $slot ? (string) $slot : null;
     }
 
     private function resolveAdjacentNestedFuncCallArgSlot(
