@@ -2897,6 +2897,15 @@ class VM {
         }
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
+            $generatorThrowTrace = null;
+            $thrownObj = $thrown->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $thrownObj->type) {
+                $resolvedTrace = VM\ExceptionTrace::resolveTraceVariable($thrownObj->toObject());
+                if (Variable::TYPE_ARRAY === $resolvedTrace->type && $resolvedTrace->toArray()->getNumElements() > 0) {
+                    $generatorThrowTrace = new Variable();
+                    $generatorThrowTrace->duplicateFrom($resolvedTrace);
+                }
+            }
             $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
             if (null !== $catchFrame) {
                 $catchFrame->generatorState = $gen;
@@ -2904,9 +2913,16 @@ class VM {
 
                 return $catchFrame;
             }
+            if (null !== $generatorThrowTrace) {
+                $thrownObj->toObject()
+                    ->getProperty(VM\ExceptionSupport::PROP_TRACE)
+                    ->duplicateFrom($generatorThrowTrace);
+            } else {
+                VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
+            }
             $gen->frame = null;
             $gen->markClosedWithoutReturn();
-            throw new VM\GeneratorUncaughtThrow($thrown);
+            throw new VM\GeneratorUncaughtThrow($thrown, $frame);
         }
         $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
         if (null !== $catchFrame) {
@@ -8079,9 +8095,9 @@ restart:
         } catch (\Error $e) {
             return $this->dispatchVmError($e->getMessage(), $callerFrame);
         } catch (VM\GeneratorUncaughtThrow $e) {
-            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame, $handlerFrame);
         } catch (VM\FiberUncaughtThrow $e) {
-            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame);
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $callerFrame, $handlerFrame);
         } catch (TypedPropertyReadSignal $signal) {
             $catchFrame = $this->findCatchFrameForThrow($callerFrame, $signal->errorObject);
             if (null !== $catchFrame) {
@@ -8111,8 +8127,19 @@ restart:
         }
     }
 
-    private function dispatchUncaughtGeneratorThrow(Variable $thrown, Frame $callerFrame): ?Frame
-    {
+    private function dispatchUncaughtGeneratorThrow(
+        Variable $thrown,
+        Frame $callerFrame,
+        ?Frame $resumeHandlerFrame = null,
+    ): ?Frame {
+        if (null !== $resumeHandlerFrame) {
+            VM\ExceptionTrace::captureOnGeneratorResumeUncaught(
+                $this->context,
+                $callerFrame,
+                $resumeHandlerFrame,
+                $thrown
+            );
+        }
         $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
         if (null !== $catchFrame) {
             return $catchFrame;
@@ -8995,7 +9022,7 @@ restart:
             if ($this->context->isolatedPhpFunctionInvoke) {
                 throw $native;
             }
-            VM\ExceptionSupport::emitNativeUncaughtFatal($native);
+            VM\ExceptionSupport::emitNativeUncaughtFatal($native, $entry);
         }
         throw new \Exception($thrown->toString());
     }
@@ -11299,6 +11326,17 @@ restart:
         $thrown = new Variable();
         $thrown->copyFrom($gen->pendingThrow);
         $gen->hasPendingThrow = false;
+        $frame = $gen->frame;
+        VM\ExceptionTrace::captureOnThrow($this->context, $frame, $thrown);
+        $generatorThrowTrace = null;
+        $thrownObj = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $thrownObj->type) {
+            $resolvedTrace = VM\ExceptionTrace::resolveTraceVariable($thrownObj->toObject());
+            if (Variable::TYPE_ARRAY === $resolvedTrace->type && $resolvedTrace->toArray()->getNumElements() > 0) {
+                $generatorThrowTrace = new Variable();
+                $generatorThrowTrace->duplicateFrom($resolvedTrace);
+            }
+        }
         $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
         if (null !== $catchFrame) {
             $catchFrame->generatorState = $gen;
@@ -11306,9 +11344,16 @@ restart:
 
             return;
         }
+        if (null !== $generatorThrowTrace) {
+            $thrownObj->toObject()
+                ->getProperty(VM\ExceptionSupport::PROP_TRACE)
+                ->duplicateFrom($generatorThrowTrace);
+        } else {
+            VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
+        }
         $gen->frame = null;
         $gen->markClosedWithoutReturn();
-        throw new VM\GeneratorUncaughtThrow($thrown);
+        throw new VM\GeneratorUncaughtThrow($thrown, $frame);
     }
 
     /** Catch handlers inside the generator function only (not caller try/catch). */
@@ -11342,7 +11387,7 @@ restart:
 
             return null;
         } catch (VM\GeneratorUncaughtThrow $e) {
-            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $frame);
+            return $this->dispatchUncaughtGeneratorThrow($e->thrown, $frame, null);
         } finally {
             $gen->foreachAdvance = false;
         }
@@ -11372,6 +11417,17 @@ restart:
                 $result = $this->runFrames();
             } catch (\TypeError|\Error $e) {
                 $thrown = VM\BuiltinExceptionSupport::materializeNativeError($this->context, $e);
+                $frame = $gen->frame;
+                VM\ExceptionTrace::captureOnThrow($this->context, $frame, $thrown);
+                $generatorThrowTrace = null;
+                $thrownObj = $thrown->resolveIndirect();
+                if (Variable::TYPE_OBJECT === $thrownObj->type) {
+                    $resolvedTrace = VM\ExceptionTrace::resolveTraceVariable($thrownObj->toObject());
+                    if (Variable::TYPE_ARRAY === $resolvedTrace->type && $resolvedTrace->toArray()->getNumElements() > 0) {
+                        $generatorThrowTrace = new Variable();
+                        $generatorThrowTrace->duplicateFrom($resolvedTrace);
+                    }
+                }
                 $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
                 if (null !== $catchFrame) {
                     $catchFrame->generatorState = $gen;
@@ -11379,9 +11435,16 @@ restart:
 
                     return $this->advanceGeneratorIteration($gen);
                 }
+                if (null !== $generatorThrowTrace) {
+                    $thrownObj->toObject()
+                        ->getProperty(VM\ExceptionSupport::PROP_TRACE)
+                        ->duplicateFrom($generatorThrowTrace);
+                } else {
+                    VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
+                }
                 $gen->frame = null;
                 $gen->markClosedWithoutReturn();
-                throw new VM\GeneratorUncaughtThrow($thrown);
+                throw new VM\GeneratorUncaughtThrow($thrown, $frame);
             }
         } finally {
             $this->context->swapRunStack($savedStack);
