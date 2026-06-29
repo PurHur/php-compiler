@@ -318,13 +318,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.c, #13065, #13284).
+     * PHP 8.4+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.c, #13065, #13663).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsReflectionPropertyAccessProbes(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989). */
