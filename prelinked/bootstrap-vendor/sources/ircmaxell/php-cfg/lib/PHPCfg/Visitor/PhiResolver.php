@@ -48,11 +48,20 @@ class PhiResolver extends AbstractVisitor
         if (null === $phi->result) {
             return;
         }
+        // Nested foreach + continue N can leave a second phi whose result was already
+        // forwarded by an earlier resolvePhi pass; re-running replaceWith() nulls Return expr (#13611).
+        if ($phi->result instanceof Operand\Temporary
+            && $phi->result->original instanceof Operand\Temporary) {
+            return;
+        }
         // resolve to result var
         $replacement = new Operand\Temporary($phi->result);
         $replacement->type = $phi->result->type;
         foreach ($phi->vars as $var) {
             if (null === $var) {
+                continue;
+            }
+            if ($var === $phi->result) {
                 continue;
             }
             $var->replaceWith($replacement);
