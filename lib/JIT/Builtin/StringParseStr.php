@@ -7,10 +7,14 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT link for __compiler_parse_str — ParseStrRuntime PHP on embed and standalone (#9295, #13360).
+ * parse_str dispatch — embed + standalone AOT via ParseStrRuntime PHP (#9295, #13360, #13429).
+ *
+ * php-src: ext/standard/basic_functions.c
  */
 final class StringParseStr
 {
+    private const RUNTIME_FUNCTION = '__compiler_parse_str';
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -23,7 +27,13 @@ final class StringParseStr
 
     public static function implement(Context $context): void
     {
-        ParseStrRuntime::implement($context);
-        StringParseStrJit::ensureSubhelpers($context);
+        $fn = $context->module->getNamedFunction(self::RUNTIME_FUNCTION);
+        if (null !== $fn && $fn->countBasicBlocks() > 0) {
+            $context->registerFunction(self::RUNTIME_FUNCTION, $fn);
+
+            return;
+        }
+
+        ParseStrRuntime::ensureLinked($context);
     }
 }

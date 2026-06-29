@@ -13,8 +13,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295).
  *
- * Replaces {@see StringParseStrJit} LLVM for the main parse_str entry; sub-helpers
- * remain in StringParseStrJit for superglobals/multipart until those paths migrate.
+ * Replaces legacy LLVM parse_str lowering; superglobals refresh uses
+ * {@see \PHPCompiler\Web\SuperglobalRefreshJitHelper} PHP (#9907, #13429).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime

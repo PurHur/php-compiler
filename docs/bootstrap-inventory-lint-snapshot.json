@@ -5235,9 +5235,6 @@
         "lib/JIT/Builtin/StringParseStr.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
-        "lib/JIT/Builtin/StringParseStrJit.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 8"
-        ],
         "lib/JIT/Builtin/StringPasswordCrypto.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 7"
         ],
