@@ -11571,6 +11571,10 @@ class Compiler {
             }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+        if ($this->producersIncludeInlineArrayUnionPlus($producers)) {
+            // Array union — Plus.result is the call arg, not a hoisted Array_ (#10490, #13787).
+            return null;
+        }
         if (
             ($this->callIncludesNamedParameter($callOp) || null !== $this->callArgName($callOp->args[$argIndex] ?? $arg))
             && isset($callOp->args[$argIndex])
@@ -11618,10 +11622,6 @@ class Compiler {
             }
         }
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
-        $lastProducer = $producers[\count($producers) - 1] ?? null;
-        if ($lastProducer instanceof Op\Expr\BinaryOp\Plus) {
-            return null;
-        }
         if ($producer instanceof Op\Expr\Array_) {
             $producerIdx = array_search($producer, $producers, true);
             if (
@@ -11722,6 +11722,25 @@ class Compiler {
         return $matched instanceof Op\Expr\Array_
             || $matched instanceof Op\Expr\BinaryOp\Plus
             || $matched instanceof Op\Expr\BinaryOp\Concat;
+    }
+
+    /**
+     * Hoisted Array_ preludes followed by Plus — inline array union call arg (#10490, #13787).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function producersIncludeInlineArrayUnionPlus(array $producers): bool
+    {
+        $seenArray = false;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                $seenArray = true;
+            } elseif ($seenArray && $producer instanceof Op\Expr\BinaryOp\Plus) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** True when hoisted producers before $callOp include array union / concat (#12763, re-#10578). */
@@ -13689,6 +13708,18 @@ class Compiler {
                     ) {
                         $byIndex = null;
                     }
+                    if (
+                        $byIndex instanceof Op\Expr\Array_
+                        && $trailingUnaryProducer instanceof Op\Expr\BinaryOp\Plus
+                    ) {
+                        $byIndex = null;
+                    }
+                    if (
+                        $byIndex instanceof Op\Expr\Array_
+                        && $this->producersIncludeInlineArrayUnionPlus($producers)
+                    ) {
+                        $byIndex = null;
+                    }
                     if (null !== $byIndex) {
                         return $byIndex;
                     }
@@ -13748,6 +13779,10 @@ class Compiler {
                 }
                 if (
                     null !== $byIndex
+                    && !(
+                        $byIndex instanceof Op\Expr\Array_
+                        && $this->producersIncludeInlineArrayUnionPlus($producers)
+                    )
                     && (
                         $byIndex instanceof Op\Expr\FuncCall
                         || $byIndex instanceof Op\Expr\NsFuncCall
@@ -15017,6 +15052,15 @@ class Compiler {
         }
         if (1 !== $argCount || !$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
+        }
+        $arrayLiteralCount = 0;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                ++$arrayLiteralCount;
+            }
+        }
+        if ($arrayLiteralCount >= 2) {
+            return $last;
         }
         foreach ([$last->left, $last->right] as $operand) {
             if (null !== $operand && $this->operandsReferToSameVariable($operand, $callArg)) {
