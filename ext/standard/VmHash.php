@@ -12,14 +12,6 @@ use PHPCompiler\VM\Variable;
  */
 final class VmHash
 {
-    /** Digest algorithms supported by VmHashNative / StringHashCryptoJit (issue #6229, #6937, #4644, #5165). */
-    private const HASH_ALGOS = [
-        'md5', 'sha1', 'sha256',
-        'sha3-224', 'sha3-256', 'sha3-384', 'sha3-512',
-        'crc32', 'crc32b', 'crc32c', 'adler32', 'fnv132', 'fnv1a32',
-        'xxh3', 'xxh128',
-    ];
-
     public const HASH_UNKNOWN_ALGO_MSG = 'hash(): Argument #1 ($algo) must be a valid hashing algorithm';
 
     public static function hash(string $algo, string $data, bool $raw = false): string
@@ -43,15 +35,13 @@ final class VmHash
         return $native;
     }
 
-    /** @throws \ValueError ext/hash/hash.c unknown algo (issue #4186). */
+    /** @throws \ValueError ext/hash/hash.c unknown algo (issue #4186, #13629). */
     public static function ensureDigestAlgo(string $algo): void
     {
-        $lower = \strtolower($algo);
-        foreach (self::HASH_ALGOS as $known) {
-            if ($lower === $known) {
-                return;
-            }
+        if (VmHashNative::supports($algo)) {
+            return;
         }
+        $lower = \strtolower($algo);
         if (VmHashHostFallback::supportsDigest($lower)) {
             return;
         }

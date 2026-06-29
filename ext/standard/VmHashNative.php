@@ -27,6 +27,12 @@ final class VmHashNative
         0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
     ];
 
+    /** Whether this build implements $algo without host ext/hash delegation (#13629). */
+    public static function supports(string $algo): bool
+    {
+        return 0 !== self::algoId($algo);
+    }
+
     public static function hash(string $algo, string $data, bool $raw = false): string|false
     {
         $id = self::algoId($algo);
