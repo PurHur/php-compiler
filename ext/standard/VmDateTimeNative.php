@@ -547,7 +547,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * @return array{timestamp: int, microsecond: int}|false
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|false
      */
     public static function parseFromFormat(string $format, string $time, string $tzName): array|false
     {
@@ -567,12 +567,20 @@ final class VmDateTimeNative
         $minute = false === $matched['minute'] ? 0 : $matched['minute'];
         $second = false === $matched['second'] ? 0 : $matched['second'];
         $microsecond = (int) \round(($matched['fraction'] ?? 0.0) * 1_000_000);
+        $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
+            ? $matched['timezone']
+            : $tzName;
 
         try {
-            return [
-                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            $result = [
+                'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $useTz),
                 'microsecond' => $microsecond,
             ];
+            if ($useTz !== $tzName) {
+                $result['timezone'] = $useTz;
+            }
+
+            return $result;
         } catch (NativeDateMalformedStringException) {
             return false;
         }
@@ -827,7 +835,8 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float,
+     *   timezone?: string
      * }|false
      */
     private static function matchFormatComponents(string $format, string $time): array|false
@@ -968,6 +977,38 @@ final class VmDateTimeNative
                     $components['hour'] = (int) $tm->tm_hour;
                     $components['minute'] = (int) $tm->tm_min;
                     $components['second'] = (int) $tm->tm_sec;
+
+                    break;
+                case 'e':
+                    $tzId = self::readFormatTimezoneIdentifier($time, $pos, $timeLen);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'T':
+                    $tzId = self::readFormatTimezoneAbbreviation($time, $pos, $timeLen);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'P':
+                    $tzId = self::readFormatTimezoneOffset($time, $pos, $timeLen, true);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
+
+                    break;
+                case 'O':
+                    $tzId = self::readFormatTimezoneOffset($time, $pos, $timeLen, false);
+                    if (false === $tzId) {
+                        return false;
+                    }
+                    $components['timezone'] = $tzId;
 
                     break;
                 default:
@@ -1276,6 +1317,79 @@ final class VmDateTimeNative
         }
 
         return \substr($time, $start, $len);
+    }
+
+    /**
+     * php-src timelib — parse timezone from createFromFormat input (#11487).
+     */
+    private static function readFormatTimezoneIdentifier(string $time, int &$pos, int $timeLen): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $start = $pos;
+        while ($pos < $timeLen && (bool) preg_match('/[A-Za-z0-9_+\/-]/', $time[$pos])) {
+            ++$pos;
+        }
+        if ($start === $pos) {
+            return false;
+        }
+        $tzId = \substr($time, $start, $pos - $start);
+        try {
+            return self::validateTimezoneId($tzId);
+        } catch (\PHPCompiler\VM\NativeDateInvalidTimeZoneException) {
+            return false;
+        }
+    }
+
+    private static function readFormatTimezoneAbbreviation(string $time, int &$pos, int $timeLen): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $start = $pos;
+        while ($pos < $timeLen && \ctype_alpha($time[$pos])) {
+            ++$pos;
+        }
+        if ($start === $pos) {
+            return false;
+        }
+        $resolved = self::timezoneNameFromAbbr(\substr($time, $start, $pos - $start));
+        if (false === $resolved) {
+            return false;
+        }
+
+        return $resolved;
+    }
+
+    private static function readFormatTimezoneOffset(string $time, int &$pos, int $timeLen, bool $withColon): string|false
+    {
+        while ($pos < $timeLen && \ctype_space($time[$pos])) {
+            ++$pos;
+        }
+        if ($pos >= $timeLen) {
+            return false;
+        }
+        $pattern = $withColon ? '/^([+-]\d{2}):(\d{2})/' : '/^([+-])(\d{2})(\d{2})/';
+        if (!preg_match($pattern, \substr($time, $pos), $matches)) {
+            return false;
+        }
+        $raw = $withColon
+            ? $matches[0]
+            : $matches[1].$matches[2].':'.$matches[3];
+        $canonical = self::canonicalNumericTimezoneId($raw);
+        if (null === $canonical) {
+            return false;
+        }
+        $pos += \strlen($matches[0]);
+
+        return $canonical;
     }
 
     /**

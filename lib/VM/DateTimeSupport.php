@@ -350,6 +350,7 @@ final class DateTimeSupport
 
             return null;
         }
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
         $components = VmDateTimeNative::parseFromFormatComponents($format, $time);
         if ($components['warning_count'] > 0) {
             self::$createFromFormatLastErrors = [
@@ -362,7 +363,7 @@ final class DateTimeSupport
             self::clearCreateFromFormatLastErrors();
         }
         $entry = new ObjectEntry($class);
-        self::applyParsedState($entry, $parsed, $tzName);
+        self::applyParsedState($entry, $parsed, $effectiveTz);
         $entry->constructed = true;
         self::markDateTimeLikeInitialized($entry);
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -532,7 +533,8 @@ final class DateTimeSupport
                 'DateTimeImmutable::createFromFormat(): Failed to parse time string ('.$time.')'
             );
         }
-        self::applyParsedState($dt, $parsed, $tzName);
+        $effectiveTz = $parsed['timezone'] ?? $tzName;
+        self::applyParsedState($dt, $parsed, $effectiveTz);
         $dt->constructed = true;
         self::markDateTimeLikeInitialized($dt);
     }
