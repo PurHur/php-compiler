@@ -13783,6 +13783,8 @@ class Compiler {
                     && (
                         $byIndex instanceof Op\Expr\FuncCall
                         || $byIndex instanceof Op\Expr\NsFuncCall
+                        || $byIndex instanceof Op\Expr\StaticCall
+                        || $byIndex instanceof Op\Expr\MethodCall
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
@@ -13922,7 +13924,9 @@ class Compiler {
                         && null !== ($callArgs[0] ?? null)
                         && !$this->callArgOperandExpectsArrayProducer($callArgs[0])
                         && (($filtered[1] ?? null) instanceof Op\Expr\FuncCall
-                            || ($filtered[1] ?? null) instanceof Op\Expr\NsFuncCall)
+                            || ($filtered[1] ?? null) instanceof Op\Expr\NsFuncCall
+                            || ($filtered[1] ?? null) instanceof Op\Expr\StaticCall
+                            || ($filtered[1] ?? null) instanceof Op\Expr\MethodCall)
                     ) {
                         return $filtered[1];
                     }
@@ -14054,12 +14058,14 @@ class Compiler {
                 $mappedIndex = $producerCount - 1;
             } else {
                 $mappedIndex = $argIndex + ($argIndex > 0 ? $extra : 0);
-                // current([1,2]) / key([...]) hoisted before var_export(..., true) — arg #0 is FuncCall (#10654).
+                // current([1,2]) / key([...]) / C::__set_state([]) hoisted before var_export(..., true) — arg #0 is call result, not Array_ (#10654, #11896).
                 if (
                     0 === $argIndex
                     && ($producers[0] ?? null) instanceof Op\Expr\Array_
                     && (($producers[1] ?? null) instanceof Op\Expr\FuncCall
-                        || ($producers[1] ?? null) instanceof Op\Expr\NsFuncCall)
+                        || ($producers[1] ?? null) instanceof Op\Expr\NsFuncCall
+                        || ($producers[1] ?? null) instanceof Op\Expr\StaticCall
+                        || ($producers[1] ?? null) instanceof Op\Expr\MethodCall)
                     && null !== ($callArgs[0] ?? null)
                     && !$this->callArgOperandExpectsArrayProducer($callArgs[0])
                 ) {
@@ -14108,6 +14114,17 @@ class Compiler {
                 }
                 if (null !== $funcIdx && null !== $arrayIdx) {
                     return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+                }
+            }
+            // var_export(C::__set_state([]), true) — arg #0 is sibling call result, nested Array_ is callee arg (#11896).
+            if ('var_export' === $inlineFuncName && 2 === $producerCount && 2 === $argCount && 0 === $argIndex) {
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\StaticCall
+                        || $producer instanceof Op\Expr\MethodCall
+                        || $producer instanceof Op\Expr\FuncCall
+                        || $producer instanceof Op\Expr\NsFuncCall) {
+                        return $producer;
+                    }
                 }
             }
             // filter_var('x', FILTER_*, ['options' => ['regexp' => '/a/']]) — ConstFetch + nested Array_ (#12007).
@@ -14323,6 +14340,24 @@ class Compiler {
                         || $this->operandsReferToSameVariable($producer->result, $callArg)
                     ) {
                         return $producer;
+                    }
+                }
+            }
+            if (
+                $paired instanceof Op\Expr\Array_
+                && null !== $callArg
+                && !$this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                foreach ($producers as $candidate) {
+                    if (
+                        ($candidate instanceof Op\Expr\StaticCall
+                            || $candidate instanceof Op\Expr\MethodCall
+                            || $candidate instanceof Op\Expr\FuncCall
+                            || $candidate instanceof Op\Expr\NsFuncCall)
+                        && null !== $candidate->result
+                        && $this->operandsReferToSameVariable($candidate->result, $callArg)
+                    ) {
+                        return $candidate;
                     }
                 }
             }
@@ -15182,6 +15217,48 @@ class Compiler {
                 && $this->callArgOperandExpectsArrayProducer($callArg)
             ) {
                 return $producer;
+            }
+            // var_export(C::__set_state([]), true) — arg #0 is StaticCall/MethodCall, not nested Array_ (#11896).
+            if (
+                $producer instanceof Op\Expr\StaticCall
+                || $producer instanceof Op\Expr\MethodCall
+                || $producer instanceof Op\Expr\FuncCall
+                || $producer instanceof Op\Expr\NsFuncCall
+            ) {
+                return $producer;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * var_export(C::__set_state([]), true) — nested Array_ is not arg #0 when a sibling call feeds the dead temp (#11896).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function preferSiblingCallOverNestedArrayInlineMatch(
+        ?Op\Expr $matched,
+        array $producers,
+        ?Operand $callArgProbe
+    ): ?Op\Expr {
+        if (
+            !$matched instanceof Op\Expr\Array_
+            || null === $callArgProbe
+            || $this->callArgOperandExpectsArrayProducer($callArgProbe)
+        ) {
+            return $matched;
+        }
+        foreach ($producers as $candidate) {
+            if (
+                ($candidate instanceof Op\Expr\StaticCall
+                    || $candidate instanceof Op\Expr\MethodCall
+                    || $candidate instanceof Op\Expr\FuncCall
+                    || $candidate instanceof Op\Expr\NsFuncCall)
+                && null !== $candidate->result
+                && $this->operandsReferToSameVariable($candidate->result, $callArgProbe)
+            ) {
+                return $candidate;
             }
         }
 
@@ -17349,6 +17426,66 @@ class Compiler {
         }
 
         return $block->slotForOperand($producer->result);
+    }
+
+    /**
+     * var_export(C::__set_state([]), true) — compile nested StaticCall/MethodCall before ARG_SEND (#11896).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function slotForVarExportNestedInlineCallArg(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$emitOps = []
+    ): ?int {
+        if (0 !== $argIndex || 'var_export' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return null;
+        }
+        if (null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $candidate = null;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
+                $candidate = $child;
+                break;
+            }
+            break;
+        }
+        if (!$candidate instanceof Op\Expr || null === $candidate->result) {
+            return null;
+        }
+        if (null === $block->slotForOperand($candidate->result)) {
+            $prevForce = $this->forceDeferredSiblingCallReturnSlot;
+            $this->forceDeferredSiblingCallReturnSlot = true;
+            try {
+                foreach ($this->compileExpr($candidate, $block) as $op) {
+                    $emitOps[] = $op;
+                }
+            } finally {
+                $this->forceDeferredSiblingCallReturnSlot = $prevForce;
+            }
+        }
+
+        return $block->slotForOperand($candidate->result);
     }
 
     /**
@@ -20954,14 +21091,11 @@ class Compiler {
                         );
                         if ($matched instanceof Op\Expr) {
                             $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                            if (
-                                $matched instanceof Op\Expr\Array_
-                                && null !== $callArgProbe
-                                && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
-                                && !$this->callArgIsDeadInlineTemporary($callArgProbe)
-                            ) {
-                                $matched = null;
-                            }
+                            $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
+                                $matched,
+                                $producers,
+                                $callArgProbe
+                            );
                             if (
                                 ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
                                 && (int) $argIndex > 0
@@ -21112,14 +21246,11 @@ class Compiler {
                         );
                         if ($matched instanceof Op\Expr) {
                             $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                            if (
-                                $matched instanceof Op\Expr\Array_
-                                && null !== $callArgProbe
-                                && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
-                                && !$this->callArgIsDeadInlineTemporary($callArgProbe)
-                            ) {
-                                $matched = null;
-                            }
+                            $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
+                                $matched,
+                                $producers,
+                                $callArgProbe
+                            );
                             if (
                                 ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
                                 && (int) $argIndex > 0
@@ -21393,14 +21524,11 @@ class Compiler {
                     );
                     if ($matched instanceof Op\Expr) {
                         $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                        if (
-                            $matched instanceof Op\Expr\Array_
-                            && null !== $callArgProbe
-                            && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
-                            && !$this->callArgIsDeadInlineTemporary($callArgProbe)
-                        ) {
-                            $matched = null;
-                        }
+                        $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
+                            $matched,
+                            $producers,
+                            $callArgProbe
+                        );
                     }
                     if ($matched instanceof Op\Expr) {
                         if (null === $block->slotForOperand($matched->result)) {
@@ -21809,6 +21937,21 @@ class Compiler {
                 );
                 if (null !== $mergeTrailingSlot) {
                     $valueSlot = $mergeTrailingSlot;
+                }
+            }
+            if (null !== $cfgCallOp && 0 === (int) $argIndex) {
+                $varExportOps = [];
+                $varExportSlot = $this->slotForVarExportNestedInlineCallArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $varExportOps
+                );
+                if (null !== $varExportSlot) {
+                    if ([] !== $varExportOps) {
+                        $sends = array_merge($sends, $varExportOps);
+                    }
+                    $valueSlot = (string) $varExportSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
