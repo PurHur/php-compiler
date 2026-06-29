@@ -30,6 +30,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\TypeCheck;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\ClassReadonly;
@@ -11476,6 +11477,7 @@ class Compiler {
                 }
                 if ($child instanceof Op\Expr\Array_
                     && $this->operandsReferToSameVariable($child->result, $arg)
+                    && $this->callArgOperandExpectsArrayProducer($arg)
                 ) {
                     return $child;
                 }
@@ -11492,6 +11494,7 @@ class Compiler {
                     $candidate instanceof Op\Expr\Array_
                     && null !== $candidate->result
                     && $this->operandsReferToSameVariable($candidate->result, $namedCallArg)
+                    && $this->callArgOperandExpectsArrayProducer($namedCallArg)
                 ) {
                     return $candidate;
                 }
@@ -11503,8 +11506,12 @@ class Compiler {
                     $argIndex,
                     $block
                 );
-                if ($this->inlineCallArgProducerUsesExprResultSlot($unassigned)) {
-                    return $unassigned instanceof Op\Expr\Array_ ? $unassigned : null;
+                if (
+                    $this->inlineCallArgProducerUsesExprResultSlot($unassigned)
+                    && $unassigned instanceof Op\Expr\Array_
+                    && $this->callArgOperandExpectsArrayProducer($namedCallArg)
+                ) {
+                    return $unassigned;
                 }
             }
         }
@@ -11533,6 +11540,15 @@ class Compiler {
                 ) {
                     return $arrayProducers[\count($arrayProducers) - 1];
                 }
+            }
+
+            $callArg = $callOp->args[$argIndex] ?? $arg;
+            if (
+                null !== $callArg
+                && !$this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                // var_export(current([1,2]), true) — arg #0 is FuncCall result, not ephemeral Array_ (#10654).
+                return null;
             }
 
             return $producer;
@@ -13550,7 +13566,19 @@ class Compiler {
             ) {
                 $filtered = $this->filterNestedNewInlineCallArgProducers($producers);
                 if (\count($filtered) === $argCount) {
-                    return $filtered[$argIndex] ?? null;
+                    $mapped = $filtered[$argIndex] ?? null;
+                    if (
+                        0 === $argIndex
+                        && $mapped instanceof Op\Expr\Array_
+                        && null !== ($callArgs[0] ?? null)
+                        && !$this->callArgOperandExpectsArrayProducer($callArgs[0])
+                        && (($filtered[1] ?? null) instanceof Op\Expr\FuncCall
+                            || ($filtered[1] ?? null) instanceof Op\Expr\NsFuncCall)
+                    ) {
+                        return $filtered[1];
+                    }
+
+                    return $mapped;
                 }
                 // PropertyFetch prelude for empty($obj->prop) / isset($obj->prop) call args (#8901).
                 foreach ($producers as $producer) {
@@ -13669,6 +13697,17 @@ class Compiler {
                 $mappedIndex = $producerCount - 1;
             } else {
                 $mappedIndex = $argIndex + ($argIndex > 0 ? $extra : 0);
+                // current([1,2]) / key([...]) hoisted before var_export(..., true) — arg #0 is FuncCall (#10654).
+                if (
+                    0 === $argIndex
+                    && ($producers[0] ?? null) instanceof Op\Expr\Array_
+                    && (($producers[1] ?? null) instanceof Op\Expr\FuncCall
+                        || ($producers[1] ?? null) instanceof Op\Expr\NsFuncCall)
+                    && null !== ($callArgs[0] ?? null)
+                    && !$this->callArgOperandExpectsArrayProducer($callArgs[0])
+                ) {
+                    $mappedIndex = 1;
+                }
             }
             if ($mappedIndex >= $producerCount || $mappedIndex < 0) {
                 return null;
@@ -16417,6 +16456,48 @@ class Compiler {
     }
 
     /**
+     * Hoisted current()/key()/… before a consumer — wire arg to FuncCall result, not ephemeral Array_ (#10654).
+     */
+    private function slotForHoistedArrayPointerBuiltinCallArg(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg
+    ): ?string {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        foreach ($producers as $producer) {
+            if (!($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)) {
+                continue;
+            }
+            $fn = $this->resolveCfgFuncCallName($producer);
+            if (null === $fn || !ReferencableCheck::allowsEphemeralArrayLiteralByRef($fn)) {
+                continue;
+            }
+            if (null === $producer->result || !$this->operandsReferToSameVariable($producer->result, $callArg)) {
+                continue;
+            }
+            $slot = $block->slotForOperand($producer->result);
+            if (null === $slot) {
+                foreach ($this->compileExpr($producer, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+                $slot = $block->slotForOperand($producer->result);
+            }
+
+            return null !== $slot ? (string) $slot : null;
+        }
+
+        return null;
+    }
+
+    /**
      * strtotime('next Monday', strtotime('...')) — adjacent nested FuncCall feeds trailing arg (#10838).
      */
     private function resolveAdjacentNestedFuncCallArgSlot(
@@ -16445,13 +16526,22 @@ class Compiler {
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
-        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        $probeIndex = $callIndex - 1;
+        while ($probeIndex >= 0) {
+            $probe = $block->orig->children[$probeIndex] ?? null;
+            if ($probe instanceof Op\Expr\ConstFetch || $probe instanceof Op\Expr\ClassConstFetch) {
+                --$probeIndex;
+                continue;
+            }
+            break;
+        }
+        $prev = $block->orig->children[$probeIndex] ?? null;
         if (
             !($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall)
             || !$this->isNestedCallArgProducerForConsumer(
                 $prev,
                 $cfgCallOp,
-                $callIndex - 1,
+                $probeIndex,
                 $callIndex,
                 $block->orig->children
             )
@@ -19729,6 +19819,14 @@ class Compiler {
                 }
             }
             $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex);
+            $callArgOperand = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (
+                null !== $inlineArray
+                && null !== $callArgOperand
+                && !$this->callArgOperandExpectsArrayProducer($callArgOperand)
+            ) {
+                $inlineArray = null;
+            }
             $prefetchOps = [];
             $assignedNamedLocal = null;
             if (null !== $inlineArray) {
@@ -19891,6 +19989,16 @@ class Compiler {
                             $block,
                             $calleeName
                         );
+                        if ($matched instanceof Op\Expr) {
+                            $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            if (
+                                $matched instanceof Op\Expr\Array_
+                                && null !== $callArgProbe
+                                && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            ) {
+                                $matched = null;
+                            }
+                        }
                         if ($matched instanceof Op\Expr) {
                             if (null === $block->slotForOperand($matched->result)) {
                                 foreach ($this->compileExpr($matched, $block) as $op) {
@@ -20104,6 +20212,16 @@ class Compiler {
                         $block,
                         $calleeName
                     );
+                    if ($matched instanceof Op\Expr) {
+                        $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                        if (
+                            $matched instanceof Op\Expr\Array_
+                            && null !== $callArgProbe
+                            && !$this->callArgOperandExpectsArrayProducer($callArgProbe)
+                        ) {
+                            $matched = null;
+                        }
+                    }
                     if ($matched instanceof Op\Expr) {
                         if (null === $block->slotForOperand($matched->result)) {
                             foreach ($this->compileExpr($matched, $block) as $op) {
@@ -20393,6 +20511,17 @@ class Compiler {
                 $closureSlot = $this->slotForRecentClosureCallArg($block);
                 if (null !== $closureSlot) {
                     $valueSlot = $closureSlot;
+                }
+            }
+            if (null !== $cfgCallOp) {
+                $pointerSlot = $this->slotForHoistedArrayPointerBuiltinCallArg(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $arg
+                );
+                if (null !== $pointerSlot) {
+                    $valueSlot = $pointerSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
