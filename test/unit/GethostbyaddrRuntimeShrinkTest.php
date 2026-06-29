@@ -48,4 +48,23 @@ final class GethostbyaddrRuntimeShrinkTest extends TestCase
         $this->assertSame('10.0.0.1', GethostbyaddrJitHelper::resolve('10.0.0.1'));
         $this->assertSame('', GethostbyaddrJitHelper::resolve('not-an-ip'));
     }
+
+    public function testIpv4ToInAddrArpaBuildsReverseZone(): void
+    {
+        $this->assertSame('8.8.8.8.in-addr.arpa', VmDns::ipv4ToInAddrArpa('8.8.8.8'));
+        $this->assertNull(VmDns::ipv4ToInAddrArpa('not-an-ip'));
+    }
+
+    /** @group network */
+    public function testGethostbyaddrResolvesPublicPtrWhenNetworkAvailable(): void
+    {
+        $error = VmDns::ERR_NONE;
+        $result = VmDns::gethostbyaddr('8.8.8.8', $error);
+        if (false === $result || '8.8.8.8' === $result) {
+            $this->markTestSkipped('PTR lookup for 8.8.8.8 unavailable in this environment');
+        }
+        $this->assertIsString($result);
+        $this->assertNotSame('8.8.8.8', $result);
+        $this->assertStringContainsString('.', $result);
+    }
 }

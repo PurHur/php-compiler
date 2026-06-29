@@ -174,15 +174,107 @@ final class VmDns
         }
 
         $name = self::resolveHostnameViaEtcHosts($ipAddress);
-        if (null === $name || '' === $name) {
-            $error = self::isValidIpv4Address($ipAddress)
-                ? self::ERR_NOT_FOUND
-                : self::ERR_INVALID_ADDRESS;
+        if (null !== $name && '' !== $name) {
+            return $name;
+        }
+
+        if (self::isValidIpv4Address($ipAddress)) {
+            $arpa = self::ipv4ToInAddrArpa($ipAddress);
+            if (null !== $arpa) {
+                $ptr = self::resolveViaUdpPtr($arpa);
+                if (null !== $ptr && '' !== $ptr) {
+                    return $ptr;
+                }
+            }
+            $error = self::ERR_NOT_FOUND;
 
             return false;
         }
 
-        return $name;
+        $error = self::ERR_INVALID_ADDRESS;
+
+        return false;
+    }
+
+    /**
+     * Build in-addr.arpa query name for IPv4 reverse DNS (php-src dns.c).
+     */
+    public static function ipv4ToInAddrArpa(string $ip): ?string
+    {
+        if (!self::isValidIpv4Address($ip)) {
+            return null;
+        }
+        $octets = \explode('.', $ip);
+        if (4 !== \count($octets)) {
+            return null;
+        }
+
+        return \implode('.', \array_reverse($octets)).'.in-addr.arpa';
+    }
+
+    private static function resolveViaUdpPtr(string $arpaName): ?string
+    {
+        $packet = self::queryViaUdp($arpaName, self::DNS_RECORD_TYPES['PTR']);
+        if (null === $packet) {
+            return null;
+        }
+
+        return self::parseDnsPtrRecord($packet);
+    }
+
+    /**
+     * @return string|null first PTR target hostname
+     */
+    public static function parseDnsPtrRecord(string $packet): ?string
+    {
+        $len = \strlen($packet);
+        if ($len < 12) {
+            return null;
+        }
+
+        $qdcount = self::readUint16($packet, 4);
+        $ancount = self::readUint16($packet, 6);
+        $offset = 12;
+
+        for ($i = 0; $i < $qdcount; ++$i) {
+            $next = self::skipDnsName($packet, $len, $offset);
+            if (null === $next) {
+                return null;
+            }
+            $offset = $next + 4;
+            if ($offset > $len) {
+                return null;
+            }
+        }
+
+        for ($i = 0; $i < $ancount; ++$i) {
+            $parsed = self::readDnsName($packet, $len, $offset);
+            if (null === $parsed) {
+                break;
+            }
+            [$offset] = $parsed;
+            if ($offset + 10 > $len) {
+                break;
+            }
+            $type = self::readUint16($packet, $offset);
+            $offset += 8;
+            $rdlength = self::readUint16($packet, $offset);
+            $offset += 2;
+            if ($offset + $rdlength > $len) {
+                break;
+            }
+            if (12 === $type && $rdlength > 0) {
+                $target = self::readDnsName($packet, $len, $offset);
+                if (null !== $target) {
+                    $host = \rtrim($target[1], '.');
+
+                    return '' !== $host ? $host : null;
+                }
+            }
+            $offset += $rdlength;
+        }
+
+        return null;
     }
 
     /**
