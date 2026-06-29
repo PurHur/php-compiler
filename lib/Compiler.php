@@ -16483,6 +16483,18 @@ class Compiler {
                     continue;
                 }
             }
+            if ($skip instanceof Op\Expr\ConstFetch || $skip instanceof Op\Expr\ClassConstFetch) {
+                ++$first;
+                continue;
+            }
+            if ($skip instanceof Op\Expr\Array_) {
+                ++$first;
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($skip)) {
+                ++$first;
+                continue;
+            }
             break;
         }
         if ($first >= $consumerIndex) {
