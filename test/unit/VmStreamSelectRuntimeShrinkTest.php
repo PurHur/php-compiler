@@ -33,4 +33,11 @@ final class VmStreamSelectRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmStreamSelect::multiplex', $source);
         $this->assertStringNotContainsString('@\\stream_select', $source);
     }
+
+    public function testVmStreamSelectPureIndexesReadyHostsByResourceIdNotSplObjectId(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelectPure.php');
+        $this->assertStringContainsString('get_resource_id', $source);
+        $this->assertStringNotContainsString('spl_object_id', $source);
+    }
 }
