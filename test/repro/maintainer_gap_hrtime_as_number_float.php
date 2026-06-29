@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+if ('integer' === gettype(hrtime(true))) {
+    echo "skip — hrtime(true) integer on reference profile\n";
+    exit(0);
+}
+
 $type = gettype(hrtime(true));
 if ('double' !== $type) {
     fwrite(STDERR, "fail: hrtime(true) type is {$type} not float\n");
