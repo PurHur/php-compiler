@@ -191,8 +191,18 @@ final class WeakRefSupport
             if (WeakRefRegistry::isReferentInvalidated($objectId)) {
                 return false;
             }
+            if (!ObjectRegistry::isRegistered($objectId)) {
+                return false;
+            }
+            if ($object->refCount <= 0) {
+                return false;
+            }
+            // Orphan internal refcount with no live scope binding — treat as collected (#13474).
+            if (!self::hasStrongScopeBinding($objectId)) {
+                return false;
+            }
 
-            return ObjectRegistry::isRegistered($objectId);
+            return true;
         }
 
         return true;
@@ -244,6 +254,57 @@ final class WeakRefSupport
             }
         }
         $dst->copyFrom($target);
+    }
+
+    /** True when a run-stack slot or global still holds a strong ref to $objectId (#13474). */
+    public static function hasStrongScopeBinding(int $objectId): bool
+    {
+        $vm = \PHPCompiler\VM::running();
+        if (null === $vm) {
+            return false;
+        }
+        $ctx = $vm->context;
+        foreach ($ctx->runStackFrames() as $frame) {
+            if (self::scopeReferencesObject($frame->scope, $objectId)) {
+                return true;
+            }
+        }
+        $found = false;
+        $ctx->visitGlobalVariables(function (Variable $global) use ($objectId, &$found): void {
+            if ($found) {
+                return;
+            }
+            $resolved = $global->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $resolved->type && $resolved->toObject()->id === $objectId) {
+                $found = true;
+            }
+        });
+        if ($found) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, Variable> $scope
+     */
+    private static function scopeReferencesObject(array $scope, int $objectId): bool
+    {
+        foreach ($scope as $slot) {
+            $resolved = $slot->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $resolved->type) {
+                continue;
+            }
+            try {
+                if ($resolved->toObject()->id === $objectId) {
+                    return true;
+                }
+            } catch (\LogicException) {
+            }
+        }
+
+        return false;
     }
 
     /** Stable WeakMap hash key for enum case operands — identity is class+name, not ephemeral object id (#5629). */

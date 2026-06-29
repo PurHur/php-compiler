@@ -666,6 +666,14 @@ class Context {
         return $this->globalVars[$name];
     }
 
+    /** @param callable(Variable): void $visitVar */
+    public function visitGlobalVariables(callable $visitVar): void
+    {
+        foreach ($this->globalVars as $global) {
+            $visitVar($global);
+        }
+    }
+
     /** True when $var is the canonical storage cell for a script global (#5089). */
     public function isGlobalStorage(Variable $var): bool
     {

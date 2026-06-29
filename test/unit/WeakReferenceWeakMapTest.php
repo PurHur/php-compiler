@@ -10,6 +10,21 @@ use PHPUnit\Framework\TestCase;
 /** @covers issue #1366 */
 final class WeakReferenceWeakMapTest extends TestCase
 {
+    public function testWeakReferenceGetNullAfterAssignNull(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+$r = WeakReference::create($o);
+$o = null;
+echo $r->get() === null ? '1' : '0';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakref_assign_null.php'));
+        $this->assertSame('1', ob_get_clean());
+    }
+
     public function testWeakReferenceGetNullAfterUnset(): void
     {
         $runtime = new Runtime();

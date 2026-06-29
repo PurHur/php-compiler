@@ -94,7 +94,7 @@ final class WeakRefRegistry
     {
         self::$invalidatedTargetIds[$objectId] = true;
         foreach (self::$refsByTargetId[$objectId] ?? [] as $entry) {
-            $entry['slot']->null();
+            $entry['slot']->clearWeakTarget();
         }
         unset(self::$refsByTargetId[$objectId]);
 

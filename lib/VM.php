@@ -3122,6 +3122,7 @@ restart:
                         }
                     }
                     $this->markScopeSlotInitialized($frame, (int) $op->arg2);
+                    $this->releaseVmStatementDeadTemps($frame, (int) $op->arg2);
                     break;
                 case OpCode::TYPE_ASSIGN_REF:
                     $catchFrame = $this->dispatchThisReassignFatalIfNeeded($frame, $op->arg1);
@@ -4791,6 +4792,7 @@ restart:
                             } elseif (
                                 Variable::TYPE_OBJECT === $unsetTarget->type
                                 && isset($unsetTarget->object)
+                                && $unsetTarget->object->refCount <= 1
                             ) {
                                 WeakRefRegistry::clearForObject($unsetTarget->toObject()->id);
                             }
@@ -5436,6 +5438,9 @@ restart:
                         }
                         $frame->call = null;
                         $this->clearOutgoingCallState($frame);
+                        if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                            $this->releaseVmStatementDeadTemps($frame, (int) $op->arg1);
+                        }
                         break;
                     }
                     $catchFrame = $this->guardFiberStackBeforeCall($frame);
