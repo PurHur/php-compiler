@@ -5,17 +5,17 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\Variable;
 
 /**
- * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, php-in-PHP).
+ * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, #13803, php-in-PHP).
  *
  * VM SSOT: {@see VmInfo} / {@see ModuleRegistry}
  * php-src: ext/standard/info.c
  */
 final class InfoJitHelper
 {
-    private static string $extensionFuncsExtension = '';
-
     public static function phpversion(?string $extension): string
     {
         if (null === $extension || '' === $extension) {
@@ -29,6 +29,17 @@ final class InfoJitHelper
         }
 
         return ModuleRegistry::getExtensionVersion($extension) ?? CompilerVersion::VERSION;
+    }
+
+    /** ABI: unknown extension version → null {@see __string__*} (#13803). */
+    public static function phpversionArgv(?string $extension): ?string
+    {
+        if (null === $extension) {
+            return CompilerVersion::VERSION;
+        }
+        $v = self::phpversion($extension);
+
+        return '' === $v ? null : $v;
     }
 
     public static function php_sapi_name(): string
@@ -57,6 +68,47 @@ final class InfoJitHelper
         return ModuleRegistry::extensionLoaded($name);
     }
 
+    /** ABI: null/empty name → 0 (#13803). */
+    public static function extensionLoadedArgv(?string $name): int
+    {
+        if (null === $name || '' === $name) {
+            return 0;
+        }
+
+        return self::extension_loaded($name) ? 1 : 0;
+    }
+
+    public static function getLoadedExtensionsArgv(int $zendExtensions): HashTable
+    {
+        return VmInfo::get_loaded_extensions(0 !== $zendExtensions);
+    }
+
+    public static function getExtensionFuncsArgv(?string $extension): ?HashTable
+    {
+        if (null === $extension) {
+            return null;
+        }
+        $result = VmInfo::get_extension_funcs($extension);
+
+        return false === $result ? null : $result;
+    }
+
+    public static function posixUnameArgv(): ?HashTable
+    {
+        if (!VmUnamePure::available()) {
+            return null;
+        }
+        $ht = new HashTable();
+        foreach (VmUnamePure::utsname() as $key => $value) {
+            $slot = new Variable();
+            $slot->string((string) $value);
+            $ht->add((string) $key, $slot);
+        }
+
+        return $ht;
+    }
+
+    /** @deprecated LLVM loop helper — use {@see getLoadedExtensionsArgv()} (#13803) */
     public static function countLoadedExtensions(int $zendExtensions): int
     {
         if (0 !== $zendExtensions) {
@@ -64,64 +116,5 @@ final class InfoJitHelper
         }
 
         return \count(ModuleRegistry::getLoadedExtensions());
-    }
-
-    public static function loadedExtensionAt(int $index): string
-    {
-        return ModuleRegistry::getLoadedExtensions()[$index];
-    }
-
-    public static function prepareGetExtensionFuncs(string $name): int
-    {
-        if ('' === $name) {
-            self::$extensionFuncsExtension = '';
-
-            return 0;
-        }
-        $funcs = ModuleRegistry::getExtensionFunctions($name);
-        if (null === $funcs) {
-            self::$extensionFuncsExtension = '';
-
-            return 0;
-        }
-        self::$extensionFuncsExtension = $name;
-
-        return \count($funcs);
-    }
-
-    public static function extensionFuncAt(int $index): string
-    {
-        $funcs = ModuleRegistry::getExtensionFunctions(self::$extensionFuncsExtension);
-        if (null === $funcs) {
-            return '';
-        }
-
-        return $funcs[$index];
-    }
-
-    public static function posixUnameAvailable(): int
-    {
-        return VmUnamePure::available() ? 1 : 0;
-    }
-
-    public static function posixUnameField(int $index): string
-    {
-        $uts = VmUnamePure::utsname();
-
-        return match ($index) {
-            0 => $uts['sysname'],
-            1 => $uts['nodename'],
-            2 => $uts['release'],
-            3 => $uts['version'],
-            4 => $uts['machine'],
-            5 => $uts['domainname'],
-            default => '',
-        };
-    }
-
-    /** @internal test reset */
-    public static function resetForTest(): void
-    {
-        self::$extensionFuncsExtension = '';
     }
 }

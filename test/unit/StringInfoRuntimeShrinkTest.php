@@ -15,12 +15,13 @@ final class StringInfoRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringInfo.php');
         $this->assertStringContainsString('InfoJitHelper', $source);
-        $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString('ensureLibc', $source);
         $this->assertStringNotContainsString('UTSNAME_SIZE', $source);
         $this->assertStringNotContainsString('stringEqualsIgnoreCase', $source);
-        $this->assertStringNotContainsString('ModuleRegistry::getLoadedExtensions', $source);
-        $this->assertLessThan(620, \substr_count($source, "\n") + 1);
+        $this->assertStringNotContainsString('__hashtable__setStringAt', $source);
+        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
     }
 
     public function testInfoJitHelperDelegatesToVmInfo(): void
@@ -28,12 +29,15 @@ final class StringInfoRuntimeShrinkTest extends TestCase
         $this->assertSame(VmInfo::php_sapi_name(), InfoJitHelper::php_sapi_name());
         $this->assertSame(VmInfo::zend_version(), InfoJitHelper::zend_version());
         $this->assertSame(VmInfo::phpversion(), InfoJitHelper::phpversion(null));
-        $this->assertSame(VmInfo::phpversion('pcre'), InfoJitHelper::phpversion('pcre'));
+        $this->assertSame(VmInfo::phpversion('Core'), InfoJitHelper::phpversion('Core'));
         $this->assertSame(
             VmInfo::extension_loaded('standard'),
             InfoJitHelper::extension_loaded('standard')
         );
-        $this->assertSame(0, InfoJitHelper::prepareGetExtensionFuncs(''));
-        $this->assertGreaterThan(0, InfoJitHelper::countLoadedExtensions(0));
+        $this->assertNull(InfoJitHelper::getExtensionFuncsArgv(''));
+        $this->assertSame(
+            InfoJitHelper::countLoadedExtensions(0),
+            \count(InfoJitHelper::getLoadedExtensionsArgv(0)->exportKeyValuePairs())
+        );
     }
 }
