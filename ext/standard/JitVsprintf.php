@@ -20,14 +20,14 @@ use PHPLLVM\Value;
  */
 final class JitVsprintf
 {
-    private const VALUES_TYPE_ERROR = '%s(): Argument #2 ($values) must be of type array, %s given';
+    private const VALUES_TYPE_ERROR = '%s(): Argument #%d ($values) must be of type array, %s given';
 
     public static function format(Context $context, JITVariable ...$args): Value
     {
         if (2 !== \count($args)) {
             throw new \LogicException('vsprintf() requires exactly two arguments');
         }
-        self::requireValuesArrayArg($context, $args[1], 'vsprintf');
+        self::requireValuesArrayArg($context, $args[1], 'vsprintf', 2);
         $fmt = JitStringArg::lower($context, $args[0], 'vsprintf() format');
         $ht = ArrayBuiltinHelper::loadHashTable($context, $args[1]);
         $num = ArrayBuiltinHelper::getNumElements($context, $ht);
@@ -115,7 +115,7 @@ final class JitVsprintf
         return $phi;
     }
 
-    public static function requireValuesArrayArg(Context $context, JITVariable $arg, string $fn): void
+    public static function requireValuesArrayArg(Context $context, JITVariable $arg, string $fn, int $argNum = 2): void
     {
         if (JITVariable::TYPE_HASHTABLE === $arg->type
             || ($arg->type & JITVariable::IS_NATIVE_ARRAY)
@@ -148,16 +148,16 @@ final class JitVsprintf
             $errBlock = BasicBlockHelper::append($context, 'vsprintf_values_err');
             $context->builder->branchIf($isArray, $okBlock, $errBlock);
             $context->builder->positionAtEnd($errBlock);
-            self::emitBoxedValuesTypeError($context, $fn, $typeByte);
+            self::emitBoxedValuesTypeError($context, $fn, $typeByte, $argNum);
             $context->builder->positionAtEnd($okBlock);
 
             return;
         }
 
-        self::emitValuesTypeErrorAndAbort($context, $fn, self::jitGivenTypeName($arg->type));
+        self::emitValuesTypeErrorAndAbort($context, $fn, self::jitGivenTypeName($arg->type), $argNum);
     }
 
-    private static function emitBoxedValuesTypeError(Context $context, string $fn, Value $typeByte): void
+    private static function emitBoxedValuesTypeError(Context $context, string $fn, Value $typeByte, int $argNum): void
     {
         $i8 = $context->getTypeFromString('int8');
         $nullBlock = BasicBlockHelper::append($context, 'vsprintf_values_null');
@@ -180,7 +180,7 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isNull, $nullBlock, $afterNull);
         $context->builder->positionAtEnd($nullBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'null');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'null', $argNum);
 
         $context->builder->positionAtEnd($afterNull);
         $isString = $context->builder->icmp(
@@ -190,7 +190,7 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isString, $stringBlock, $afterString);
         $context->builder->positionAtEnd($stringBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'string');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'string', $argNum);
 
         $context->builder->positionAtEnd($afterString);
         $isObject = $context->builder->icmp(
@@ -200,7 +200,7 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isObject, $objectBlock, $afterObject);
         $context->builder->positionAtEnd($objectBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'object');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'object', $argNum);
 
         $context->builder->positionAtEnd($afterObject);
         $isInt = $context->builder->icmp(
@@ -210,7 +210,7 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isInt, $intBlock, $afterInt);
         $context->builder->positionAtEnd($intBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'int');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'int', $argNum);
 
         $context->builder->positionAtEnd($afterInt);
         $isFloat = $context->builder->icmp(
@@ -220,7 +220,7 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isFloat, $floatBlock, $afterFloat);
         $context->builder->positionAtEnd($floatBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'float');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'float', $argNum);
 
         $context->builder->positionAtEnd($afterFloat);
         $isBool = $context->builder->icmp(
@@ -230,16 +230,16 @@ final class JitVsprintf
         );
         $context->builder->branchIf($isBool, $boolBlock, $mixedBlock);
         $context->builder->positionAtEnd($boolBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'bool');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'bool', $argNum);
         $context->builder->positionAtEnd($mixedBlock);
-        self::emitValuesTypeErrorAndAbort($context, $fn, 'mixed');
+        self::emitValuesTypeErrorAndAbort($context, $fn, 'mixed', $argNum);
     }
 
-    private static function emitValuesTypeErrorAndAbort(Context $context, string $fn, string $given): void
+    private static function emitValuesTypeErrorAndAbort(Context $context, string $fn, string $given, int $argNum): void
     {
         TypeErrorRaise::registerDeclarations($context);
         TypeErrorRaise::ensureLinked($context);
-        TypeErrorRaise::emitRaise($context, \sprintf(self::VALUES_TYPE_ERROR, $fn, $given));
+        TypeErrorRaise::emitRaise($context, \sprintf(self::VALUES_TYPE_ERROR, $fn, $argNum, $given));
         $context->builder->call($context->lookupFunction('abort'));
     }
 
