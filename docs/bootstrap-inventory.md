@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3502 |
-| Phase A inventory files (M2 ratio SSOT) | 3502 |
+| PHP files on vm.php path | 3503 |
+| Phase A inventory files (M2 ratio SSOT) | 3503 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9491 |
+| Source constructs flagged (warnings) | 9492 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1131,6 +1131,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDataUri.php` | 0 | 1 |
 | `ext/standard/VmDate.php` | 0 | 22 |
 | `ext/standard/VmDateInterval.php` | 0 | 2 |
+| `ext/standard/VmDatePure.php` | 0 | 1 |
 | `ext/standard/VmDateSunFunc.php` | 0 | 3 |
 | `ext/standard/VmDateSunNative.php` | 0 | 1 |
 | `ext/standard/VmDateTimeNative.php` | 0 | 7 |
@@ -11016,27 +11017,27 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDate.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 199)
-- new HashTable (line 315)
-- new HashTable (line 468)
-- new HashTable (line 534)
-- new Variable (line 545)
+- new HashTable (line 192)
+- new HashTable (line 294)
+- new HashTable (line 446)
+- new HashTable (line 512)
+- new Variable (line 523)
+- new Variable (line 532)
+- new Variable (line 536)
+- new HashTable (line 550)
 - new Variable (line 554)
-- new Variable (line 558)
-- new HashTable (line 572)
-- new Variable (line 576)
-- new HashTable (line 580)
-- new Variable (line 584)
-- new HashTable (line 605)
-- new HashTable (line 609)
-- new Variable (line 613)
-- new HashTable (line 617)
-- new Variable (line 621)
-- new HashTable (line 769)
-- new HashTable (line 809)
-- new Variable (line 1344)
-- new Variable (line 1351)
-- new Variable (line 1358)
+- new HashTable (line 558)
+- new Variable (line 562)
+- new HashTable (line 583)
+- new HashTable (line 587)
+- new Variable (line 591)
+- new HashTable (line 595)
+- new Variable (line 599)
+- new HashTable (line 709)
+- new HashTable (line 749)
+- new Variable (line 1239)
+- new Variable (line 1246)
+- new Variable (line 1253)
 - 67 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
@@ -11044,6 +11045,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Exception (line 230)
 - 7 class method(s)
+
+### `ext/standard/VmDatePure.php`
+
+**Warnings** (review for bootstrap subset):
+- 11 class method(s)
 
 ### `ext/standard/VmDateSunFunc.php`
 
