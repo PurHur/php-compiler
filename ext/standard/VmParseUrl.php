@@ -46,10 +46,13 @@ final class VmParseUrl
         return self::validateUserComponentInt($var->toInt());
     }
 
-    /** php-src url.c — invalid component id ValueError (#10645). */
+    /** php-src url.c — negative component returns full assoc array; out-of-range positives ValueError (#10645). */
     public static function validateUserComponentInt(int $component): int
     {
-        if ($component < self::PHP_URL_SCHEME || $component > self::PHP_URL_FRAGMENT) {
+        if ($component < 0) {
+            return -1;
+        }
+        if ($component > self::PHP_URL_FRAGMENT) {
             throw new \ValueError(sprintf(
                 'parse_url(): Argument #2 ($component) must be a valid URL component identifier, %d given',
                 $component
