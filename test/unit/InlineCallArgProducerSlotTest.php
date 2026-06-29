@@ -2864,4 +2864,24 @@ PHP;
         $runtime->run($block);
         $this->addToAssertionCount(1);
     }
+
+    /** Issue #13424 — explode(..., -1) nested in check() wires limit + result slots. */
+    public function testExplodeNegativeLimitNestedCallArg(): void
+    {
+        $code = <<<'PHP'
+<?php
+check('explode(-1)', explode('a', 'bab', -1), ['b']);
+check('explode(-2)', explode('-', 'a-b-c-d', -2), ['a', 'b']);
+function check(string $label, mixed $got, mixed $expected): void
+{
+    if ($got !== $expected) {
+        throw new \LogicException('mismatch: '.$label);
+    }
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'explode_nested_negative_limit.php');
+        $runtime->run($block);
+        $this->addToAssertionCount(1);
+    }
 }
