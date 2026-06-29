@@ -46,6 +46,11 @@ final class CycleCollector
         GcToggleJitHelper::disable();
     }
 
+    public static function isGcProtected(): bool
+    {
+        return self::$protected;
+    }
+
     /**
      * @return array{
      *     running: bool,
@@ -120,10 +125,17 @@ final class CycleCollector
                 $candidates[$object->id] = $object;
             }
         }
+        /** @var array<int, HashTable> $arrayCandidates */
+        $arrayCandidates = [];
+        foreach (HashTableRegistry::snapshot() as $arrayId => $table) {
+            if (!isset($marked['a'.$arrayId])) {
+                $arrayCandidates[$arrayId] = $table;
+            }
+        }
         /** @var array<int, true> $peerLinked */
         $peerLinked = [];
         foreach ($candidates as $object) {
-            if (self::referencesCandidatePeer($object, $candidates)) {
+            if (self::referencesCandidatePeer($object, $candidates, $arrayCandidates)) {
                 $peerLinked[$object->id] = true;
             }
         }
@@ -139,6 +151,14 @@ final class CycleCollector
             ++$collected;
         }
 
+        foreach ($arrayCandidates as $table) {
+            if (!self::referencesCandidateArrayPeer($table, $candidates, $arrayCandidates)) {
+                continue;
+            }
+            HashTableRegistry::release($table);
+            ++$collected;
+        }
+
         self::$totalCollected += $collected;
         self::$running = false;
         self::$protected = false;
@@ -151,20 +171,83 @@ final class CycleCollector
      *
      * @param array<int, ObjectEntry> $candidates
      */
-    private static function referencesCandidatePeer(ObjectEntry $object, array $candidates): bool
-    {
+    /**
+     * True when an unreachable object still references another GC candidate (#10111, #13400).
+     *
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function referencesCandidatePeer(
+        ObjectEntry $object,
+        array $objectCandidates,
+        array $arrayCandidates
+    ): bool {
         foreach ($object->propertiesWithNames() as $prop) {
-            if (Variable::TYPE_OBJECT !== $prop->type) {
-                continue;
-            }
-            try {
-                $peer = $prop->toObject();
-            } catch (\LogicException) {
-                continue;
-            }
-            if ($peer->id !== $object->id && isset($candidates[$peer->id])) {
+            if (self::variableReferencesGcCandidates($prop, $objectCandidates, $arrayCandidates)) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function referencesCandidateArrayPeer(
+        HashTable $table,
+        array $objectCandidates,
+        array $arrayCandidates
+    ): bool {
+        $selfId = \spl_object_id($table);
+        foreach ($table->iterate(false) as $element) {
+            if (self::variableReferencesGcCandidates($element, $objectCandidates, $arrayCandidates, $selfId)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function variableReferencesGcCandidates(
+        Variable $var,
+        array $objectCandidates,
+        array $arrayCandidates,
+        ?int $selfArrayId = null
+    ): bool {
+        if ($var->isUndefined()) {
+            return false;
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::variableReferencesGcCandidates(
+                $var->resolveIndirect(),
+                $objectCandidates,
+                $arrayCandidates,
+                $selfArrayId
+            );
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            try {
+                $objectId = $var->toObject()->id;
+            } catch (\LogicException) {
+                return false;
+            }
+
+            return isset($objectCandidates[$objectId]);
+        }
+        if (Variable::TYPE_ARRAY === $var->type) {
+            try {
+                $arrayId = \spl_object_id($var->toArray());
+            } catch (\LogicException) {
+                return false;
+            }
+
+            return ($selfArrayId !== null && $arrayId === $selfArrayId) || isset($arrayCandidates[$arrayId]);
         }
 
         return false;
@@ -191,6 +274,11 @@ final class CycleCollector
         $roots = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
             if (!isset($marked['o'.$object->id])) {
+                ++$roots;
+            }
+        }
+        foreach (HashTableRegistry::snapshot() as $arrayId => $table) {
+            if (!isset($marked['a'.$arrayId])) {
                 ++$roots;
             }
         }
