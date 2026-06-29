@@ -17178,6 +17178,11 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+        // array_merge(['a'=>1], array_keys(...)) — arg #1 is sibling FuncCall, not any Array_ (#13775).
+        $mergePair = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+        if ($mergePair instanceof Op\Expr\FuncCall || $mergePair instanceof Op\Expr\NsFuncCall) {
+            return null;
+        }
         foreach ($producers as $producer) {
             if (
                 ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
@@ -20720,11 +20725,21 @@ class Compiler {
                                 && null !== $calleeName
                                 && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
                             ) {
-                                $matched = null;
-                                foreach ($producers as $producer) {
-                                    if ($producer instanceof Op\Expr\Array_) {
-                                        $matched = $producer;
-                                        break;
+                                $mergeTrailingArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                                $funcCallFeedsTrailingArg = null !== $mergeTrailingArg
+                                    && (
+                                        $matched->result === $mergeTrailingArg
+                                        || $this->operandsReferToSameVariable($matched->result, $mergeTrailingArg)
+                                    );
+                                // array_merge(array_keys(...), ['b']) — trailing Array_, not leading FuncCall (#13704).
+                                // array_merge(['a'=>1], array_keys(...)) — keep FuncCall when it feeds arg #1 (#13775).
+                                if (!$funcCallFeedsTrailingArg) {
+                                    $matched = null;
+                                    foreach ($producers as $producer) {
+                                        if ($producer instanceof Op\Expr\Array_) {
+                                            $matched = $producer;
+                                            break;
+                                        }
                                     }
                                 }
                             }
@@ -20867,11 +20882,19 @@ class Compiler {
                                 && null !== $calleeName
                                 && \in_array(strtolower($calleeName), ['array_merge', 'array_merge_recursive'], true)
                             ) {
-                                $matched = null;
-                                foreach ($producers as $producer) {
-                                    if ($producer instanceof Op\Expr\Array_) {
-                                        $matched = $producer;
-                                        break;
+                                $mergeTrailingArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                                $funcCallFeedsTrailingArg = null !== $mergeTrailingArg
+                                    && (
+                                        $matched->result === $mergeTrailingArg
+                                        || $this->operandsReferToSameVariable($matched->result, $mergeTrailingArg)
+                                    );
+                                if (!$funcCallFeedsTrailingArg) {
+                                    $matched = null;
+                                    foreach ($producers as $producer) {
+                                        if ($producer instanceof Op\Expr\Array_) {
+                                            $matched = $producer;
+                                            break;
+                                        }
                                     }
                                 }
                             }

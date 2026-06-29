@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_merge() inline array_keys() trailing arg preserves string-key order (#13760, ext/standard/array.c)
+stdlib array_merge() inline array_keys() trailing arg preserves string-key order (#13760, #13775, ext/standard/array.c)
 --FILE--
 <?php
 declare(strict_types=1);
