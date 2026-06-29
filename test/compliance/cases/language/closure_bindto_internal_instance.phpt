@@ -7,7 +7,7 @@ var_dump($c->bindTo(new stdClass()) instanceof Closure);
 var_dump($c->bindTo(new ArrayObject()) instanceof Closure);
 var_dump($c->bindTo(new stdClass(), 'stdClass'));
 --EXPECTF--
+PHP Warning:  Cannot bind closure to scope of internal class stdClass in %s on line %d
 bool(true)
 bool(true)
-PHP Warning:  Cannot bind closure to scope of internal class stdClass
 NULL
