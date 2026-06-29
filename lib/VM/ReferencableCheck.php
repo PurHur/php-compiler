@@ -89,33 +89,24 @@ final class ReferencableCheck
             }
             if (
                 0 === $paramIdx
-                && (
-                    (
-                        self::allowsEphemeralArrayLiteralByRef($fn)
-                        && (
-                            self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
-                            || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
-                        )
-                    )
-                    || (
-                        self::skipsByRefWhenNotArray($fn)
-                        && !self::isArrayOperand($calledArgs[$paramIdx])
-                    )
-                )
-            ) {
-            if (
-                self::skipsByRefWhenNotArray($fn)
+                && self::skipsByRefWhenNotArray($fn)
                 && !self::isArrayOperand($calledArgs[$paramIdx])
-                && !self::isReferenceable($calledArgs[$paramIdx], $caller)
             ) {
                 // #13408 / #4333: null literal → by-ref Error before array type validation.
                 if (Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type) {
-                    self::emitNonVariableByRefNotice($caller);
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
                 }
-                self::emitNonVariableByRefNotice($caller);
+                continue;
             }
+            if (
+                0 === $paramIdx
+                && self::allowsEphemeralArrayLiteralByRef($fn)
+                && (
+                    self::isEphemeralArrayArg($calledArgs[$paramIdx], $caller)
+                    || !self::isArrayOrObjectOperand($calledArgs[$paramIdx])
+                )
+            ) {
                 continue;
             }
             if (!BuiltinByRefParams::isByRefArg($fn, $paramIdx, $calledArgs[$paramIdx] ?? null)) {
