@@ -11700,6 +11700,11 @@ class Compiler {
             return null;
         }
         if (1 === \count($deadArrayArgIndices)) {
+            $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
+            if ($immediate instanceof Op\Expr\Array_) {
+                return $immediate;
+            }
+
             return $unassigned[\count($unassigned) - 1];
         }
         // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
@@ -16638,7 +16643,7 @@ class Compiler {
             return false;
         }
 
-        return ($consumerIndex - $firstSibling) >= 2;
+        return $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $ops) >= 2;
     }
 
     /**
@@ -16673,10 +16678,121 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($next)) {
                 continue;
             }
+            if ($next instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\ConstFetch || $next instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
             break;
         }
 
         return null;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function countSiblingInlineFuncCallProducers(
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): int {
+        $count = 0;
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                ++$count;
+            }
+        }
+
+        return $count;
+    }
+
+    /**
+     * True when php-cfg hoisted sibling Array_ literals between FuncCall producers (#13778).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingFuncCallChainHasArrayPrelude(
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            if (($cfgChildren[$j] ?? null) instanceof Op\Expr\Array_) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * 0-based ordinal among hoisted sibling FuncCall producers (skips Array_/ConstFetch between calls).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingInlineFuncCallProducerOrdinal(
+        int $producerIndex,
+        int $firstSibling,
+        array $cfgChildren
+    ): int {
+        $ordinal = -1;
+        for ($j = $firstSibling; $j <= $producerIndex; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                ++$ordinal;
+            }
+        }
+
+        return $ordinal;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingInlineFuncCallProducerIndexAtOrdinal(
+        int $ordinal,
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): ?int {
+        $seen = -1;
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                ++$seen;
+                if ($seen === $ordinal) {
+                    return $j;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg `array_keys([...])` hoists the literal Array_ stmt immediately before the call (#13778).
+     */
+    private function inlineArrayProducerImmediatelyBeforeCfgCall(?Op $callOp, Block $block): ?Op\Expr\Array_
+    {
+        if (null === $callOp || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+
+        return $prev instanceof Op\Expr\Array_ ? $prev : null;
     }
 
     /** Hoisted FuncCall / MethodCall / StaticCall sibling inline call-arg producers (#9463, #9351, #12421). */
@@ -16725,9 +16841,25 @@ class Compiler {
                 return false;
             }
         }
-        $distance = $consumerIndex - $producerIndex;
-        if ($distance < 1 || $distance > $argCount) {
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        if (null === $firstSibling) {
             return false;
+        }
+        $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren);
+        if ($arrayPreludeChain) {
+            $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+                $producerIndex,
+                $firstSibling,
+                $cfgChildren
+            );
+            if ($producerOrdinal < 0 || $producerOrdinal >= $argCount) {
+                return false;
+            }
+        } else {
+            $distance = $consumerIndex - $producerIndex;
+            if ($distance < 1 || $distance > $argCount) {
+                return false;
+            }
         }
         $targetArgIndex = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
             $producerIndex,
@@ -16840,6 +16972,9 @@ class Compiler {
             if ($sib instanceof Op\Expr\ConstFetch || $sib instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
+            if ($sib instanceof Op\Expr\Array_) {
+                continue;
+            }
             if ($this->isUnaryInlineSiblingCallArgExpr($sib)) {
                 continue;
             }
@@ -16850,7 +16985,9 @@ class Compiler {
                 return false;
             }
         }
-        $ordinal = $producerIndex - $firstSibling;
+        $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
+            ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
+            : ($producerIndex - $firstSibling);
         $leadingEmbedded = 0;
         foreach ($consumer->args as $callArg) {
             if ($this->isEmbeddedCallLiteralArg($callArg)) {
@@ -16887,7 +17024,9 @@ class Compiler {
             return null;
         }
 
-        $ordinal = $producerIndex - $firstSibling;
+        $ordinal = $this->siblingFuncCallChainHasArrayPrelude($firstSibling, $consumerIndex, $cfgChildren)
+            ? $this->siblingInlineFuncCallProducerOrdinal($producerIndex, $firstSibling, $cfgChildren)
+            : ($producerIndex - $firstSibling);
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         if (
             ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
@@ -17053,11 +17192,21 @@ class Compiler {
         if (null === $firstSibling) {
             return;
         }
-        $siblingCount = $callIndex - $firstSibling;
-        if ($siblingCount < 2) {
+        $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children
+        );
+        $siblingFuncCount = $this->countSiblingInlineFuncCallProducers(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children
+        );
+        if ($siblingFuncCount < 2) {
             return;
         }
-        for ($argIndex = 0; $argIndex < $siblingCount; ++$argIndex) {
+        $loopBound = $arrayPreludeChain ? min($argCount, $siblingFuncCount) : ($callIndex - $firstSibling);
+        for ($argIndex = 0; $argIndex < $loopBound; ++$argIndex) {
             $emitOps = [];
             $slot = $this->resolveSiblingInlineCallArgProducerSlot(
                 $block,
@@ -17104,11 +17253,28 @@ class Compiler {
         if (null === $firstSibling) {
             return null;
         }
-        $siblingCount = $callIndex - $firstSibling;
-        if ($siblingCount < 2 || $argIndex >= $siblingCount) {
-            return null;
+        $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children
+        );
+        if ($arrayPreludeChain) {
+            $producerIndex = $this->siblingInlineFuncCallProducerIndexAtOrdinal(
+                $argIndex,
+                $firstSibling,
+                $callIndex,
+                $block->orig->children
+            );
+            if (null === $producerIndex) {
+                return null;
+            }
+        } else {
+            $siblingCount = $callIndex - $firstSibling;
+            if ($siblingCount < 2 || $argIndex >= $siblingCount) {
+                return null;
+            }
+            $producerIndex = $firstSibling + $argIndex;
         }
-        $producerIndex = $firstSibling + $argIndex;
         $producer = $block->orig->children[$producerIndex] ?? null;
         if (!$this->isSiblingInlineCallProducerExpr($producer)) {
             return null;
@@ -21453,9 +21619,23 @@ class Compiler {
                 }
                 // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
                 if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
-                    $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
-                    if (null !== $initArraySlot) {
-                        $valueSlot = $initArraySlot;
+                    $immediateArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if ($immediateArray instanceof Op\Expr\Array_) {
+                        $immediateSlot = $block->slotForOperand($immediateArray->result);
+                        if (null === $immediateSlot) {
+                            foreach ($this->compileExpr($immediateArray, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $immediateSlot = $block->slotForOperand($immediateArray->result);
+                        }
+                        if (null !== $immediateSlot) {
+                            $valueSlot = (string) $immediateSlot;
+                        }
+                    } else {
+                        $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                        if (null !== $initArraySlot) {
+                            $valueSlot = $initArraySlot;
+                        }
                     }
                 }
             }
@@ -22435,7 +22615,10 @@ class Compiler {
                 continue;
             }
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
-            if (null === $firstSibling || $consumerIndex - $firstSibling < 2) {
+            if (
+                null === $firstSibling
+                || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
+            ) {
                 continue;
             }
             foreach ($cfgChildren as $producerIndex => $producer) {
