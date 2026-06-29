@@ -7,13 +7,13 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT LLVM body for strnatcmp (natural-order compare; mirrors VmString::strnatcmp).
+ * JIT bridge for strnatcmp — delegates to {@see StringNaturalCompare} (#13535).
  */
 final class StringStrnatcmp
 {
     public static function ensureLinked(Context $context): void
     {
-        StringNaturalCompareJit::implementStrnatcmp($context);
+        StringNaturalCompare::ensureStrnatcmpLinked($context);
     }
 
     public static function implement(Context $context): void
