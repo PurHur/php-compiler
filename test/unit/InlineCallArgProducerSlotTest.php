@@ -1994,6 +1994,35 @@ PHP;
         self::assertSame('0644', $out);
     }
 
+    /** Issue #13662 — str_contains($last['message'], $fn . '():') must not mis-wire call args. */
+    public function testStrContainsArrayDimFetchAndInlineConcatCallArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+function assert_warning(string $function, callable $call): void
+{
+    $call();
+    $last = error_get_last();
+    $message = $last['message'];
+    if (!\is_string($message)) {
+        throw new \RuntimeException('message not string: ' . get_debug_type($message));
+    }
+    if (!str_contains($message, $function . '():')) {
+        throw new \RuntimeException('missing function prefix');
+    }
+    if (!str_contains($message, 'No ending delimiter')) {
+        throw new \RuntimeException('missing delimiter text');
+    }
+}
+assert_warning('preg_match', static fn () => preg_match('/[', 'x'));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'str_contains_dim_concat_call_arg.php');
+        $runtime->run($block);
+        $this->addToAssertionCount(1);
+    }
+
     /** Issue #10663 — hoisted null ConstFetch must not replace concat result call arg. */
     public function testVarExportConcatNullUsesConcatSlotNotHoistedNull(): void
     {
