@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3469 |
-| Phase A inventory files (M2 ratio SSOT) | 3469 |
+| PHP files on vm.php path | 3470 |
+| Phase A inventory files (M2 ratio SSOT) | 3470 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9403 |
+| Source constructs flagged (warnings) | 9404 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1265,6 +1265,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPregReplaceCallbackArray.php` | 0 | 5 |
 | `ext/standard/VmPrintR.php` | 0 | 1 |
 | `ext/standard/VmPrintRFloat.php` | 0 | 1 |
+| `ext/standard/VmProcClockTicksPure.php` | 0 | 1 |
 | `ext/standard/VmProcNiceNative.php` | 0 | 1 |
 | `ext/standard/VmProcNicePure.php` | 0 | 1 |
 | `ext/standard/VmProcess.php` | 0 | 3 |
@@ -5104,7 +5105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/PosixLibcThinAbi.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `ext/posix/PosixSessionJitHelper.php`
 
@@ -5175,7 +5176,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/posix/VmPosixTimesPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 6 class method(s)
 
 ### `ext/posix/posix_access.php`
 
@@ -11262,7 +11263,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmGetrusagePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 8 class method(s)
 
 ### `ext/standard/VmGzStream.php`
 
@@ -11910,6 +11911,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/VmProcClockTicksPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/VmProcNiceNative.php`
 
@@ -17891,76 +17897,76 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 10958)
 - new Operand\Temporary (line 10960)
 - new OpCode (line 11007)
-- new CfgVariable (line 16717)
-- new Literal (line 16717)
-- new Variable (line 16749)
-- new Variable (line 16803)
-- new OpCode (line 16827)
-- new OpCode (line 17215)
-- new OpCode (line 17231)
-- new OpCode (line 17239)
+- new CfgVariable (line 16724)
+- new Literal (line 16724)
+- new Variable (line 16756)
+- new Variable (line 16810)
+- new OpCode (line 16834)
+- new OpCode (line 17222)
+- new OpCode (line 17238)
 - new OpCode (line 17246)
-- new OpCode (line 17258)
-- new OpCode (line 17275)
-- new OpCode (line 17281)
-- new OpCode (line 17287)
-- new OpCode (line 17292)
-- new OpCode (line 17308)
-- new OpCode (line 17321)
-- new Variable (line 17332)
-- new Operand\Literal (line 17334)
-- new OpCode (line 17337)
-- new OpCode (line 17407)
-- new OpCode (line 17418)
-- new OpCode (line 17431)
-- new OpCode (line 17605)
-- new OpCode (line 17853)
-- new OpCode (line 17859)
-- new OpCode (line 17865)
-- new OpCode (line 17890)
-- new Variable (line 17917)
-- new Temporary (line 17919)
-- new Variable (line 17927)
-- new Temporary (line 17929)
-- new OpCode (line 17977)
-- new Operand\Temporary (line 17997)
-- new Operand\Temporary (line 18003)
-- new Operand\Temporary (line 18009)
-- new Operand\Temporary (line 18015)
-- new Operand\Temporary (line 18024)
-- new Variable (line 19035)
-- new Variable (line 19039)
-- new Variable (line 19047)
-- new Variable (line 19051)
-- new Variable (line 19293)
-- new Operand\Literal (line 19664)
-- new Variable (line 19666)
-- new OpCode (line 19986)
-- new OpCode (line 20178)
-- new OpCode (line 20459)
-- new OpCode (line 20660)
-- new OpCode (line 20670)
-- new OpCode (line 20673)
-- new Operand\Temporary (line 20705)
-- new OpCode (line 20707)
-- new OpCode (line 20718)
-- new Operand\Temporary (line 20721)
-- new OpCode (line 20723)
-- new OpCode (line 20731)
-- new OpCode (line 20738)
-- new OpCode (line 20746)
+- new OpCode (line 17253)
+- new OpCode (line 17265)
+- new OpCode (line 17282)
+- new OpCode (line 17288)
+- new OpCode (line 17294)
+- new OpCode (line 17299)
+- new OpCode (line 17315)
+- new OpCode (line 17328)
+- new Variable (line 17339)
+- new Operand\Literal (line 17341)
+- new OpCode (line 17344)
+- new OpCode (line 17414)
+- new OpCode (line 17425)
+- new OpCode (line 17438)
+- new OpCode (line 17612)
+- new OpCode (line 17860)
+- new OpCode (line 17866)
+- new OpCode (line 17872)
+- new OpCode (line 17897)
+- new Variable (line 17924)
+- new Temporary (line 17926)
+- new Variable (line 17934)
+- new Temporary (line 17936)
+- new OpCode (line 17984)
+- new Operand\Temporary (line 18004)
+- new Operand\Temporary (line 18010)
+- new Operand\Temporary (line 18016)
+- new Operand\Temporary (line 18022)
+- new Operand\Temporary (line 18031)
+- new Variable (line 19061)
+- new Variable (line 19065)
+- new Variable (line 19073)
+- new Variable (line 19077)
+- new Variable (line 19319)
+- new Operand\Literal (line 19690)
+- new Variable (line 19692)
+- new OpCode (line 20012)
+- new OpCode (line 20204)
+- new OpCode (line 20485)
+- new OpCode (line 20686)
+- new OpCode (line 20696)
+- new OpCode (line 20699)
+- new Operand\Temporary (line 20731)
+- new OpCode (line 20733)
+- new OpCode (line 20744)
+- new Operand\Temporary (line 20747)
 - new OpCode (line 20749)
-- new OpCode (line 20766)
-- new OpCode (line 20794)
-- new OpCode (line 20801)
-- new OpCode (line 20938)
-- new Literal (line 20970)
-- new OpCode (line 21069)
-- new Variable (line 21076)
-- new Temporary (line 21078)
-- new OpCode (line 21081)
-- new CompileFatal (line 21379)
-- new CompileFatal (line 21598)
+- new OpCode (line 20757)
+- new OpCode (line 20764)
+- new OpCode (line 20772)
+- new OpCode (line 20775)
+- new OpCode (line 20792)
+- new OpCode (line 20820)
+- new OpCode (line 20827)
+- new OpCode (line 20964)
+- new Literal (line 20996)
+- new OpCode (line 21095)
+- new Variable (line 21102)
+- new Temporary (line 21104)
+- new OpCode (line 21107)
+- new CompileFatal (line 21405)
+- new CompileFatal (line 21624)
 - 626 class method(s)
 - 19 closure(s)
 
