@@ -1898,6 +1898,52 @@ PHP;
         self::assertStringNotContainsString("3 =>", $out);
     }
 
+    /** Issue #13760 — array_merge(['a'=>1], array_keys(...)) wires Array_ + nested FuncCall producer slots. */
+    public function testArrayMergeLeadingArrayTrailingArrayKeysRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_merge(['a' => 1], array_keys(['b' => 2])));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_string_key_order.php');
+
+        $leadingArraySlot = null;
+        $keysReturnSlot = null;
+        $mergeSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $mergeSends = [];
+                }
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $leadingArraySlot) {
+                $leadingArraySlot = $op->arg1;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mergeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($leadingArraySlot);
+        self::assertNotNull($keysReturnSlot);
+        self::assertCount(2, $mergeSends);
+        self::assertSame($leadingArraySlot, $mergeSends[0], 'merge sends='.json_encode($mergeSends));
+        self::assertSame($keysReturnSlot, $mergeSends[1], 'merge sends='.json_encode($mergeSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("'a' => 1", $out);
+        self::assertStringContainsString("0 => 'b'", $out);
+    }
+
     /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayMergeSiblingInlineLiteralRuntime(): void
     {
