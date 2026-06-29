@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 class C {
     public function __construct(public int $n = 0) {}
 }

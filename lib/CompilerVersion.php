@@ -205,11 +205,12 @@ final class CompilerVersion
     /**
      * PHP 8.3+ object class constants (`public const X = new Class(...)`).
      *
-     * Enabled on the 8.4.0-dev forward profile — version_compare treats -dev below stable 8.4.0 (#12940, #13488).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 (#13705).
+     * Forward 8.4.0+ enables const-new parity (#12940, #13488).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        return version_compare(self::VERSION, '8.3', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
