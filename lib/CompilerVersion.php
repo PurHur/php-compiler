@@ -266,14 +266,10 @@ final class CompilerVersion
     /**
      * PHP 8.4+ exit()/die() as proper functions — FCC, named args, two-arg (#6975, #12413, #12414, #12435).
      *
-     * Enabled on the 8.4.0-dev forward profile — version_compare treats -dev below stable 8.4.0 (#13487).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects exit(status:) like Zend 8.2 (#13496).
      */
     public static function supportsExitFunctionForm(): bool
     {
-        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4)) {
-            return true;
-        }
-
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
