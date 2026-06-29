@@ -410,14 +410,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780, #13485).
+     * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780, #13495).
      *
-     * Enabled on the 8.4.0-dev forward line via builtinAdvertisementVersion — Zend 8.4 advertises
-     * running/protected/full/buffer_size while VERSION is 8.4.0-dev (#13485).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 legacy keys (#13495).
      */
     public static function supportsGcStatusPhp84Schema(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
