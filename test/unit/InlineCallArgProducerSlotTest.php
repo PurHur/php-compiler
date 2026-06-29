@@ -622,6 +622,63 @@ PHP;
         self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #13687 — id((object) ['a' => 1]) wires Cast producer, not hoisted Array_ temp. */
+    public function testObjectCastArrayLiteralUsesCastProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function id(object $o): string {
+    return get_class($o);
+}
+id((object) ['a' => 1]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'object_cast_array_call_arg.php');
+
+        $castSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertSame([$castSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #13687 — id(clone new C()) wires Clone producer, not dead arg temp. */
+    public function testCloneNewObjectUsesCloneProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {}
+function id(object $o): string {
+    return get_class($o);
+}
+id(clone new C());
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'clone_new_call_arg.php');
+
+        $cloneSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLONE === $op->type) {
+                $cloneSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($cloneSlot);
+        self::assertSame([$cloneSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
