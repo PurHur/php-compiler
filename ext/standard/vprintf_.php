@@ -34,6 +34,7 @@ final class vprintf_ extends Internal
         if (Variable::TYPE_STRING !== $fmtVar->type) {
             throw new \LogicException('vprintf() format must be a string in this compiler build');
         }
+        VmVprintf::requireValuesArray($argsVar, 'vprintf');
         $written = VmVprintf::vprintf($fmtVar->toString(), $argsVar, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($written);

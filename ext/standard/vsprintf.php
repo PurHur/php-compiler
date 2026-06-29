@@ -34,9 +34,7 @@ final class vsprintf extends Internal
             throw new \LogicException('vsprintf() format must be a string in this compiler build');
         }
         $argsVar = $frame->calledArgs[1]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $argsVar->type) {
-            throw new \LogicException('vsprintf() second argument must be an array in this compiler build');
-        }
+        VmVprintf::requireValuesArray($argsVar, 'vsprintf');
         $values = [];
         foreach ($argsVar->toArray()->iterate(true) as $element) {
             $values[] = $element->resolveIndirect();
