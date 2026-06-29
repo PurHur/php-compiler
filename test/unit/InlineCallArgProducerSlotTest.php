@@ -3160,4 +3160,40 @@ PHP;
         self::assertStringContainsString('4', $out);
         self::assertStringNotContainsString('TypeError', $out);
     }
+
+    /** Issue #13694 — comparison inside call arg must not bind as (call($x)) !== false. */
+    public function testNotIdenticalInsideCallArgUsesComparisonSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(var_dump(1) !== false);
+$r = (1 !== 2);
+var_dump($r);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'comparison_call_arg.php');
+
+        $notIdenticalResultSlot = null;
+        $outerSendSlot = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NOT_IDENTICAL === $op->type && null === $notIdenticalResultSlot) {
+                $notIdenticalResultSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type && 2 === $fcallOrdinal) {
+                $outerSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($notIdenticalResultSlot);
+        self::assertSame($notIdenticalResultSlot, $outerSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('bool(true)', $out);
+    }
 }

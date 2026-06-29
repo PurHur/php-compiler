@@ -13760,6 +13760,10 @@ class Compiler {
                     if ($last instanceof Op\Expr\BinaryOp\Concat) {
                         return $last;
                     }
+                    // var_dump($x !== false) — comparison is the sole hoisted arg (#13694, zend_compile.c).
+                    if ($this->isComparisonInlineCallArgProducer($last)) {
+                        return $last;
+                    }
                     // Inline eval() call arg — php-cfg dead temp vs TYPE_EVAL producer (#10661, zif_eval).
                     if ($last instanceof Op\Expr\Eval_) {
                         return $last;
@@ -14875,8 +14879,26 @@ class Compiler {
                 }
             }
         }
+        $last = $producers[\count($producers) - 1] ?? null;
+        if (
+            $this->isComparisonInlineCallArgProducer($last)
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            return $last;
+        }
 
         return null;
+    }
+
+    /** Hoisted Identical/NotIdentical/… feeds a call arg, not an inner FuncCall operand (#13694, #5901). */
+    private function isComparisonInlineCallArgProducer(?Op\Expr $expr): bool
+    {
+        return $expr instanceof Op\Expr\BinaryOp\Identical
+            || $expr instanceof Op\Expr\BinaryOp\NotIdentical
+            || $expr instanceof Op\Expr\BinaryOp\Equal
+            || $expr instanceof Op\Expr\BinaryOp\NotEqual
+            || $expr instanceof Op\Expr\InstanceOf_
+            || $expr instanceof Op\Expr\In_;
     }
 
     /**
@@ -20523,7 +20545,41 @@ class Compiler {
                     }
                 }
                 if (null === $valueSlot) {
-                    $valueSlot = $this->compileOperand($arg, $block, true);
+                    if (
+                        null !== $cfgCallOp
+                        && null !== $block->orig
+                        && $this->callArgIsDeadInlineTemporary($arg)
+                    ) {
+                        $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                        if (null === $valueSlot) {
+                            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                                $block->orig->children,
+                                $cfgCallOp
+                            );
+                            $matched = $this->matchInlineCallArgProducer(
+                                $producers,
+                                $cfgCallOp->args ?? [],
+                                (int) $argIndex,
+                                $cfgCallOp,
+                                $block,
+                                $calleeName
+                            );
+                            if ($matched instanceof Op\Expr) {
+                                if (null === $block->slotForOperand($matched->result)) {
+                                    foreach ($this->compileExpr($matched, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                }
+                                $matchedSlot = $block->slotForOperand($matched->result);
+                                if (null !== $matchedSlot) {
+                                    $valueSlot = $matchedSlot;
+                                }
+                            }
+                        }
+                    }
+                    if (null === $valueSlot) {
+                        $valueSlot = $this->compileOperand($arg, $block, true);
+                    }
                 }
                 if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
                     $valueSlot = $this->registerNullConstantSlot($block, $arg);
@@ -20993,16 +21049,31 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && null !== $block->orig) {
+                $trailingProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $trailingComparisonProducer = $trailingProducers[\count($trailingProducers) - 1] ?? null;
+                $comparisonFeedsCallArg = $this->isComparisonInlineCallArgProducer($trailingComparisonProducer);
+                if (
+                    $comparisonFeedsCallArg
+                    && $this->callArgIsDeadInlineTemporary($arg)
+                    && $trailingComparisonProducer instanceof Op\Expr
+                    && null !== $trailingComparisonProducer->result
+                ) {
+                    $comparisonSlot = $block->slotForOperand($trailingComparisonProducer->result);
+                    if (null !== $comparisonSlot) {
+                        $valueSlot = (string) $comparisonSlot;
+                    }
+                }
                 if (
                     0 === $argIndex
+                    && !$comparisonFeedsCallArg
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? $arg)
                     && !$this->callArgOperandExpectsArrayProducer($cfgCallOp->args[0] ?? $arg)
                     && !$this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 ) {
-                    foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
-                        $block->orig->children,
-                        $cfgCallOp
-                    ) as $producer) {
+                    foreach ($trailingProducers as $producer) {
                         if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
                             continue;
                         }
@@ -21013,12 +21084,9 @@ class Compiler {
                         }
                     }
                 }
-                if ($this->callArgIsDeadInlineTemporary($arg)) {
+                if ($this->callArgIsDeadInlineTemporary($arg) && !$comparisonFeedsCallArg) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
-                foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
-                    $block->orig->children,
-                    $cfgCallOp
-                ) as $producer) {
+                foreach ($trailingProducers as $producer) {
                     if (!$producer instanceof Op\Expr\ConstFetch && !$producer instanceof Op\Expr\ClassConstFetch) {
                         continue;
                     }
