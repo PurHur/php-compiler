@@ -3192,7 +3192,16 @@ restart:
                     $rhs = $rhsSlot->resolveIndirect();
                     // ArrayDimFetch / property fetch temps are indirect to live storage; write the
                     // reference into that cell instead of redirecting the temp (#5349).
-                    $writeTarget = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
+                    $lhsPeel = $lhs->isIndirect() ? $lhs->directIndirectTarget() : $lhs;
+                    if (null !== $lhsPeel->objectPropertyOwner) {
+                        // $obj->prop =& $v — bind into declared property storage (#5370).
+                        $writeTarget = $lhsPeel;
+                    } elseif (null !== $rhs->objectPropertyOwner) {
+                        // $ref = &$obj->prop — bind variable slot, not peeled global wrapper (#13559).
+                        $writeTarget = $lhs;
+                    } else {
+                        $writeTarget = $lhs->isIndirect() ? $lhsPeel : $lhs;
+                    }
                     if (
                         null !== $op->arg3
                         && OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK === (int) $op->arg3
@@ -5887,7 +5896,9 @@ restart:
                     }
                     break;
                 case OpCode::TYPE_PROPERTY_FETCH:
+                case OpCode::TYPE_PROPERTY_FETCH_WRITE:
                     $result = $frame->scope[$op->arg1];
+                    $propertyFetchForWrite = OpCode::TYPE_PROPERTY_FETCH_WRITE === $op->type;
                     $fiber = $this->context->currentFiber;
                     if (null !== $fiber?->propertyHookResumeRead) {
                         $result->copyFrom($fiber->propertyHookResumeRead->resolveIndirect());
@@ -5912,7 +5923,7 @@ restart:
                     }
                     if (Variable::TYPE_ENUM_CASE === $var->type) {
                         $enumEntry = $var->toEnumCase()->enumClass;
-                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
                             $enumEntry,
                             $name,
@@ -5947,7 +5958,7 @@ restart:
                         $resolved = $var->resolveIndirect();
                         $typeName = TypeCheck::typeNameForConstraint($resolved->type);
                         $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
-                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         if ($forWrite) {
                             if (
                                 Variable::TYPE_NULL === $resolved->type
@@ -5996,7 +6007,7 @@ restart:
                     }
                     $propertyObject = VM\LazyObjectSupport::getLazyInstance($propertyObject);
                     if (EnumCaseSupport::isEnumCase($propertyObject)) {
-                        $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                        $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                         $readonlyMsg = EnumCaseSupport::readonlyPseudoPropertyViolationMessage(
                             $propertyObject->class,
                             $name,
@@ -6029,7 +6040,7 @@ restart:
                         }
                         break;
                     }
-                    $forWrite = $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
+                    $forWrite = $propertyFetchForWrite || $this->propertyFetchDestUsedAsAssignLvalue($frame, $op);
                     $magicGetForRead = !$forWrite
                         && !$op->propertyHookCoalesceRead
                         && $this->propertyReadUsesMagicGet($propertyObject, $name, $frame);
@@ -9589,7 +9600,20 @@ restart:
         if (null === $propName || $this->isPropertyHookRawWrite($frame, $propName)) {
             return null;
         }
-        if (null !== $this->resolvePropertyWriteOwner($operand)) {
+        $owner = $this->resolvePropertyWriteOwner($operand);
+        if (null !== $owner) {
+            $meta = $this->classPropertyMeta($owner, $propName);
+            if (
+                null === $meta
+                || (
+                    !$meta->propertyHookVirtual
+                    && null === $meta->setHookMethodLc
+                    && null === $meta->getHookMethodLc
+                )
+            ) {
+                return null;
+            }
+
             return $operand;
         }
         $target = $operand->resolveIndirect();
