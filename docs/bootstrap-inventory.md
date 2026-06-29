@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3505 |
-| Phase A inventory files (M2 ratio SSOT) | 3505 |
+| PHP files on vm.php path | 3506 |
+| Phase A inventory files (M2 ratio SSOT) | 3506 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9492 |
+| Source constructs flagged (warnings) | 9495 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1054,6 +1054,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamIoJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLibcHandleJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLifecycleJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamMetaJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamModeJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamNotificationJitHelper.php` | 0 | 5 |
 | `ext/standard/StreamPathJitHelper.php` | 0 | 1 |
@@ -2575,7 +2576,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamLifecycleJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamLifecycleRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamMeta.php` | 0 | 1 |
-| `lib/JIT/Builtin/StreamMetaJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamMetaJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamModeRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamNotificationRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamPathRuntime.php` | 0 | 3 |
@@ -10496,6 +10497,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/StreamMetaJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/StreamModeJitHelper.php`
 
@@ -20390,7 +20396,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamMetaJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- new JIT (line 187)
+- 8 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamModeRuntime.php`
 
