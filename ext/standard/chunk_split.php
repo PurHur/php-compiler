@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -34,12 +35,7 @@ final class chunk_split extends Internal
         );
         $length = 76;
         if ($argc >= 2) {
-            $length = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
-                'chunk_split',
-                2,
-                'length'
-            );
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'chunk_split', 2, 'length');
         }
         $separator = "\r\n";
         if (3 === $argc) {
@@ -70,6 +66,7 @@ final class chunk_split extends Internal
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
         if ($argc >= 2) {
+            JitInternalStrictArg::requireInt($context, $args[1], 'chunk_split', 'length', 2);
             $chunkLen = JitChunkSplit::lowerLengthArg($context, $args[1]);
             JitChunkSplit::emitRuntimeLengthGuard($context, $chunkLen);
         }

@@ -40,12 +40,7 @@ final class wordwrap extends Internal
         );
         $width = 75;
         if ($argc >= 2) {
-            $width = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1],
-                'wordwrap',
-                2,
-                'width'
-            );
+            $width = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'wordwrap', 2, 'width');
         }
         $break = "\n";
         if ($argc >= 3) {
@@ -80,7 +75,7 @@ final class wordwrap extends Internal
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
         if ($argc >= 2) {
-            $width = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'wordwrap', 2, 'width');
+            $width = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'wordwrap', 2, 'width');
         }
         if ($argc >= 3) {
             $break = JitStringBuiltinArg::lower($context, $args[2], 'wordwrap', 2, 'break');
