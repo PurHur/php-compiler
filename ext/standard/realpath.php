@@ -18,7 +18,7 @@ final class realpath extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('realpath() requires exactly one argument');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'realpath');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'realpath', 'path');
         if (null === $frame->returnVar) {
             return;
         }

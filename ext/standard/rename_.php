@@ -35,8 +35,8 @@ final class rename_ extends Internal
         if (isset($frame->calledArgs[2])) {
             VmStreamContext::validateOptionalContextArg($frame->calledArgs[2], 'rename', 3);
         }
-        $from = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'rename', 0, 'from');
-        $to = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'rename', 1, 'to');
+        $from = VmString::stringBuiltinArgForFrame($frame, 0, 'rename', 0, 'from');
+        $to = VmString::stringBuiltinArgForFrame($frame, 1, 'rename', 1, 'to');
         $ok = VmFs::rename($from, $to);
         if (!$ok) {
             VmFilestatFailure::warnRenameFailed($frame, $from, $to);

@@ -21,7 +21,7 @@ final class pathinfo extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('pathinfo() requires one or two arguments in this compiler build');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'pathinfo', 0, 'path');
+        $path = VmString::stringBuiltinArgForFrame($frame, 0, 'pathinfo', 0, 'path');
         $flags = 15;
         if (2 === $argc) {
             $flagVar = $frame->calledArgs[1]->resolveIndirect();
