@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3487 |
-| Phase A inventory files (M2 ratio SSOT) | 3487 |
+| PHP files on vm.php path | 3486 |
+| Phase A inventory files (M2 ratio SSOT) | 3486 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9444 |
+| Source constructs flagged (warnings) | 9445 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -463,7 +463,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetDeclaredExcludeDeprecatedJit.php` | 0 | 1 |
 | `ext/standard/GetcwdJitHelper.php` | 0 | 1 |
 | `ext/standard/GetdateJitHelper.php` | 0 | 1 |
-| `ext/standard/GetenvJitHelper.php` | 0 | 2 |
+| `ext/standard/GetenvJitHelper.php` | 0 | 3 |
 | `ext/standard/GethostbyaddrJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbynamelJitHelper.php` | 0 | 1 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
@@ -1405,7 +1405,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_intersect_uassoc.php` | 0 | 1 |
 | `ext/standard/array_intersect_ukey.php` | 0 | 1 |
 | `ext/standard/array_is_list.php` | 0 | 3 |
-| `ext/standard/array_key_exists.php` | 0 | 3 |
+| `ext/standard/array_key_exists.php` | 0 | 2 |
 | `ext/standard/array_key_first.php` | 0 | 3 |
 | `ext/standard/array_key_last.php` | 0 | 3 |
 | `ext/standard/array_keys.php` | 0 | 1 |
@@ -2599,8 +2599,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringFunctionExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGetenv.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringGetenvLibcBridge.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGetenvAll.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGetrusage.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
@@ -6554,7 +6553,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 87)
-- 5 class method(s)
+- new Variable (line 100)
+- 6 class method(s)
 
 ### `ext/standard/GethostbyaddrJitHelper.php`
 
@@ -12958,8 +12958,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_key_exists.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 54)
-- new self (line 162)
+- new self (line 151)
 - 6 class method(s)
 
 ### `ext/standard/array_key_first.php`
@@ -19169,8 +19168,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 285)
-- 12 class method(s)
+- new JIT (line 273)
+- 11 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ErrorHandler.php`
@@ -20490,19 +20489,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenv.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 133)
+- new JIT (line 121)
 - 9 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
-
-### `lib/JIT/Builtin/StringGetenvLibcBridge.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- new JIT (line 152)
+- 8 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringGetrusage.php`
 
