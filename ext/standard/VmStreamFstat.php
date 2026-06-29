@@ -55,7 +55,7 @@ final class VmStreamFstat
         return VmStatPure::normalize([
             'dev' => 12,
             'ino' => 0,
-            'mode' => 33206,
+            'mode' => 33060,
             'nlink' => 1,
             'uid' => 0,
             'gid' => 0,
