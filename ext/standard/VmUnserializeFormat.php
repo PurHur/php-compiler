@@ -36,6 +36,9 @@ final class VmUnserializeFormat
 
     private static ?int $lastPayloadLength = null;
 
+    /** Set when parse fails because max_depth was exceeded (ext/standard/var.c, #13715). */
+    private static ?int $lastMaxDepthExceeded = null;
+
     private int $pos = 0;
 
     private readonly int $length;
@@ -150,6 +153,7 @@ final class VmUnserializeFormat
     {
         self::$lastErrorOffset = null;
         self::$lastPayloadLength = null;
+        self::$lastMaxDepthExceeded = null;
         if ('' === $payload) {
             return false;
         }
@@ -177,6 +181,11 @@ final class VmUnserializeFormat
         return self::$lastPayloadLength;
     }
 
+    public static function lastMaxDepthExceeded(): ?int
+    {
+        return self::$lastMaxDepthExceeded;
+    }
+
     /** @return false */
     private function fail(): bool
     {
@@ -191,6 +200,14 @@ final class VmUnserializeFormat
         $this->fail();
 
         return false;
+    }
+
+    /** @return false */
+    private function failDepthExceeded(): false
+    {
+        self::$lastMaxDepthExceeded = $this->maxDepth;
+
+        return $this->failCell();
     }
 
     private function pushRef(VmUnserializeCell $cell): void
@@ -244,7 +261,7 @@ final class VmUnserializeFormat
     private function parseObject(int $depth): VmUnserializeCell|false
     {
         if ($depth >= $this->maxDepth) {
-            return $this->failCell();
+            return $this->failDepthExceeded();
         }
         if (!$this->expect('O:')) {
             return $this->failCell();
@@ -409,7 +426,7 @@ final class VmUnserializeFormat
     private function parseArray(int $depth): VmUnserializeCell|false
     {
         if ($depth >= $this->maxDepth) {
-            return $this->failCell();
+            return $this->failDepthExceeded();
         }
         if (!$this->expect('a:')) {
             return $this->failCell();
