@@ -69,13 +69,7 @@ final class preg_replace extends Internal
         );
         $limit = -1;
         if (4 === $argc) {
-            $limitVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $limitVar->type) {
-                throw new \LogicException(
-                    'preg_replace() limit must be an integer in this compiler build'
-                );
-            }
-            $limit = $limitVar->toInt();
+            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_replace', 4, 'limit');
         }
 
         $pattern = self::patternOrReplacementOperand($patternVar, $frame->calledArgs[0], 'preg_replace', 0, 'pattern');
@@ -197,17 +191,23 @@ final class preg_replace extends Internal
             return $context->constantFromInteger($lit, 'int64');
         }
 
-        return JitLongArg::lower($context, $arg, 'preg_replace() argument #4 ($limit)');
+        return JitIntdiv::lowerIntBuiltinArg($context, $arg, 'preg_replace', 4, 'limit');
     }
 
     private static function compileTimeLimit(JITVariable $arg): ?int
     {
-        if (JITVariable::TYPE_NATIVE_LONG !== $arg->type
-            || JITVariable::KIND_VALUE !== $arg->kind) {
-            return null;
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type
+            && JITVariable::KIND_VALUE === $arg->kind) {
+            if (null !== ($arg->compileTimeLong ?? null)) {
+                return (int) $arg->compileTimeLong;
+            }
         }
-        if (null !== ($arg->compileTimeLong ?? null)) {
-            return (int) $arg->compileTimeLong;
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type
+            && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
         }
 
         return null;

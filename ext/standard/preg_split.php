@@ -7,10 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** preg_split() — VM via VmPreg; JIT/AOT via __compiler_preg_split (issue #1178, #3639). */
@@ -35,22 +33,10 @@ final class preg_split extends Internal
         $limit = -1;
         $flags = 0;
         if ($argc >= 3) {
-            $limitVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $limitVar->type) {
-                throw new \LogicException(
-                    'preg_split() limit must be an integer in this compiler build'
-                );
-            }
-            $limit = $limitVar->toInt();
+            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'preg_split', 3, 'limit');
         }
         if (4 === $argc) {
-            $flagsVar = $frame->calledArgs[3]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
-                throw new \LogicException(
-                    'preg_split() flags must be an integer in this compiler build'
-                );
-            }
-            $flags = $flagsVar->toInt();
+            $flags = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'preg_split', 4, 'flags');
         }
         if (null === $frame->returnVar) {
             return;
@@ -74,25 +60,26 @@ final class preg_split extends Internal
         }
         $patternLit = JitStringBuiltinArg::compileTimeLiteral($args[0]);
         $subjectLit = JitStringBuiltinArg::compileTimeLiteral($args[1]);
-        if (null !== $patternLit && null !== $subjectLit) {
-            $limit = -1;
-            $flags = 0;
-            if ($argc >= 3) {
-                if (JITVariable::TYPE_INTEGER !== $args[2]->type) {
-                    throw new \LogicException(
-                        'preg_split() limit must be an integer in this compiler build'
-                    );
-                }
-                $limit = (int) $args[2]->value->toLong();
+        $canConstexpr = null !== $patternLit && null !== $subjectLit;
+        $limit = -1;
+        $flags = 0;
+        if ($argc >= 3) {
+            $limitCt = self::compileTimeLimit($context, $args[2]);
+            if (null === $limitCt) {
+                $canConstexpr = false;
+            } else {
+                $limit = $limitCt;
             }
-            if (4 === $argc) {
-                if (JITVariable::TYPE_INTEGER !== $args[3]->type) {
-                    throw new \LogicException(
-                        'preg_split() flags must be an integer in this compiler build'
-                    );
-                }
-                $flags = (int) $args[3]->value->toLong();
+        }
+        if (4 === $argc) {
+            $flagsCt = self::compileTimeLimit($context, $args[3]);
+            if (null === $flagsCt) {
+                $canConstexpr = false;
+            } else {
+                $flags = $flagsCt;
             }
+        }
+        if ($canConstexpr) {
             $parts = VmPreg::pregSplit($patternLit, $subjectLit, $limit, $flags);
             if (false === $parts) {
                 return $context->getTypeFromString('bool')->constInt(0, false);
@@ -107,10 +94,10 @@ final class preg_split extends Internal
         $limit = $context->getTypeFromString('int64')->constInt(-1, true);
         $flags = $context->getTypeFromString('int64')->constInt(0, false);
         if ($argc >= 3) {
-            $limit = JitLongArg::lower($context, $args[2], 'preg_split() limit');
+            $limit = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'preg_split', 3, 'limit');
         }
         if (4 === $argc) {
-            $flags = JitLongArg::lower($context, $args[3], 'preg_split() flags');
+            $flags = JitIntdiv::lowerIntBuiltinArg($context, $args[3], 'preg_split', 4, 'flags');
         }
 
         return JitPregSplit::invoke(
@@ -120,5 +107,23 @@ final class preg_split extends Internal
             $limit,
             $flags
         );
+    }
+
+    private static function compileTimeLimit(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+
+        return null;
     }
 }
