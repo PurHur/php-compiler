@@ -26,10 +26,11 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("getNamedGlobal('phpc_env_local_count')", $source);
     }
 
-    public function testStringGetenvAllUsesEnvLocalRuntimeMergeOverlay(): void
+    public function testStringGetenvAllUsesGetenvJitHelperFillAll(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGetenvAll.php');
-        $this->assertStringContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
+        $this->assertStringContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
+        $this->assertStringNotContainsString('EnvLocalRuntime::emitMergeOverlay', $source);
         $this->assertStringNotContainsString('emitLocalOverlay', $source);
         $this->assertStringNotContainsString('phpc_env_local_entries', $source);
     }
