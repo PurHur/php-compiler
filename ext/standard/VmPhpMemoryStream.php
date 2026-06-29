@@ -41,6 +41,30 @@ final class VmPhpMemoryStream
         return $id;
     }
 
+    /**
+     * Open an in-memory stream with a pre-filled buffer (data:// wrapper, #10263).
+     */
+    public static function openWithBuffer(string $uri, string $buffer, string $mode): int|false
+    {
+        $flags = self::parseMode($mode);
+        if (null === $flags) {
+            return false;
+        }
+
+        $id = VmFs::allocateStreamHandleId();
+        $state = new PhpMemoryStreamState($uri, $flags);
+        $state->canRead = true;
+        if ($flags['truncate']) {
+            $state->buffer = '';
+        } else {
+            $state->buffer = $buffer;
+        }
+        $state->position = $flags['append'] ? \strlen($state->buffer) : 0;
+        self::$streams[$id] = $state;
+
+        return $id;
+    }
+
     public static function isValidHandle(int $handle): bool
     {
         return isset(self::$streams[$handle]);

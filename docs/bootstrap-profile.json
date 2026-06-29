@@ -1154,6 +1154,7 @@
         "ext/standard/VmCrc32c.php",
         "ext/standard/VmCsv.php",
         "ext/standard/VmCsvArg.php",
+        "ext/standard/VmDataStream.php",
         "ext/standard/VmDataUri.php",
         "ext/standard/VmDate.php",
         "ext/standard/VmDateInterval.php",
@@ -3716,9 +3717,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3486,
+        "inventory_files": 3487,
         "excluded": 0,
-        "eligible": 3486,
+        "eligible": 3487,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
