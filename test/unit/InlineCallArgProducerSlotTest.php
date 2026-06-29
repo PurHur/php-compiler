@@ -1871,12 +1871,31 @@ PHP;
         self::assertNotNull($keysReturnSlot);
         self::assertCount(2, $mergeSends);
         self::assertSame($keysReturnSlot, $mergeSends[0], 'merge sends='.json_encode($mergeSends));
+        self::assertNotSame($keysReturnSlot, $mergeSends[1], 'merge sends='.json_encode($mergeSends));
 
         ob_start();
         $runtime->run($block);
         $out = ob_get_clean();
         self::assertStringContainsString("'a'", $out);
         self::assertStringContainsString("'b'", $out);
+        self::assertStringNotContainsString("'a', 'b', 'a', 'b'", $out);
+    }
+
+    /** Issue #13704 — array_merge(array_keys($src), ['b']) runtime output parity. */
+    public function testArrayMergeInlineArrayKeysOutput(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_merge_inline_array_keys.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_inline_array_keys.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'a'", $out);
+        self::assertStringContainsString("1 => 'b'", $out);
+        self::assertStringContainsString("2 => 'b'", $out);
+        self::assertStringNotContainsString("3 =>", $out);
     }
 
     /** Issue #11373 — in_array('md5', hash_algos(), true) nested producer runtime parity with Zend. */
