@@ -44,9 +44,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
     }
 
-    public function testAdvertisesReflectionConstantClassTrueOn84DevForwardProfile(): void
+    public function testAdvertisesReflectionConstantClassFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::advertisesReflectionConstantClass());
+        $this->assertFalse(CompilerVersion::advertisesReflectionConstantClass());
     }
 
     public function testSupportsClockGettimeFalseOnReferenceProfile(): void

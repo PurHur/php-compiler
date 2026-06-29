@@ -130,6 +130,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'mb_str_pad_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesReflectionConstantClass()
+                && (str_contains($name, 'reflection_constant_forward_profile')
+                    || str_contains($name, 'reflection_oop'))) {
+                continue;
+            }
+            if (CompilerVersion::advertisesReflectionConstantClass()
+                && str_contains($name, 'reflection_constant_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
