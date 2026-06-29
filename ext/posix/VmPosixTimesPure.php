@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\posix;
 
+use PHPCompiler\ext\standard\VmProcClockTicksPure;
+
 /**
  * posix_times() via /proc/self/stat — no libc times(2) FFI (#12411).
  *
@@ -73,40 +75,39 @@ final class VmPosixTimesPure
         return $n < 0 ? 0 : $n;
     }
 
-    private static function clockTicksPerSecond(): int
-    {
-        $v = \getenv('PHP_COMPILER_PROC_CLK_TCK');
-        if (false !== $v && '' !== $v) {
-            $n = (int) $v;
-            if ($n > 0) {
-                return $n;
-            }
-        }
-
-        return 100;
-    }
-
     private static function systemTicks(): int
     {
-        $btime = self::readBootTime();
-        if (null === $btime) {
-            return self::clockTicksPerSecond();
+        $fromLibc = PosixLibcThinAbi::systemClockTicks();
+        if (null !== $fromLibc && $fromLibc > 0) {
+            return $fromLibc;
         }
-        $elapsed = \time() - $btime;
 
-        return ($elapsed > 0 ? $elapsed : 0) * self::clockTicksPerSecond();
+        $uptime = self::readUptimeSeconds();
+        if (null === $uptime) {
+            return VmProcClockTicksPure::clockTicksPerSecond();
+        }
+
+        return (int) \round($uptime * VmProcClockTicksPure::clockTicksPerSecond());
     }
 
-    private static function readBootTime(): ?int
+    private static function readUptimeSeconds(): ?float
     {
-        $raw = @\file_get_contents('/proc/stat');
+        if ('Linux' !== \PHP_OS_FAMILY || !\is_readable('/proc/uptime')) {
+            return null;
+        }
+
+        $raw = @\file_get_contents('/proc/uptime');
         if (!\is_string($raw) || '' === $raw) {
             return null;
         }
-        if (!\preg_match('/^btime (\\d+)/m', $raw, $m)) {
+
+        $space = \strpos($raw, ' ');
+        if (false === $space) {
             return null;
         }
 
-        return (int) $m[1];
+        $secs = (float) \substr($raw, 0, $space);
+
+        return $secs >= 0.0 ? $secs : null;
     }
 }

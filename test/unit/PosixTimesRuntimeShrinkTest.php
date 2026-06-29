@@ -47,7 +47,29 @@ final class PosixTimesRuntimeShrinkTest extends TestCase
 
         $pure = (string) file_get_contents(__DIR__.'/../../ext/posix/VmPosixTimesPure.php');
         $this->assertStringContainsString('/proc/self/stat', $pure);
+        $this->assertStringContainsString('VmProcClockTicksPure::clockTicksPerSecond', $pure);
+        $this->assertStringContainsString('PosixLibcThinAbi::systemClockTicks', $pure);
         $this->assertStringNotContainsString('FFI::cdef', $pure);
+    }
+
+    public function testPosixTimesTicksWithinOrderOfMagnitudeOfZendOnLinux(): void
+    {
+        if ('Linux' !== \PHP_OS_FAMILY || !\function_exists('posix_times')) {
+            $this->markTestSkipped('Linux libc posix_times only');
+        }
+
+        $zend = \posix_times();
+        $got = VmPosixTimesPure::times();
+        $this->assertIsArray($zend);
+        $this->assertNotNull($got);
+
+        $zendTicks = (int) ($zend['ticks'] ?? 0);
+        $vmTicks = (int) ($got['ticks'] ?? 0);
+        $this->assertGreaterThan(0, $zendTicks);
+        $this->assertGreaterThan(0, $vmTicks);
+
+        $ratio = \max($zendTicks, $vmTicks) / \max(1, \min($zendTicks, $vmTicks));
+        $this->assertLessThanOrEqual(10.0, $ratio, "zend={$zendTicks} vm={$vmTicks}");
     }
 
     public function testPosixTimesPureReturnsPositiveTicksOnLinux(): void
