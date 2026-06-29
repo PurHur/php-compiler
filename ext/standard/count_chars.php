@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -40,12 +41,7 @@ final class count_chars extends Internal
         );
         $mode = 0;
         if (2 === $argc) {
-            $mode = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[1]->resolveIndirect(),
-                'count_chars',
-                2,
-                'mode'
-            );
+            $mode = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'count_chars', 2, 'mode');
         }
         if (null === $frame->returnVar) {
             return;
@@ -79,6 +75,7 @@ final class count_chars extends Internal
             throw new \LogicException('count_chars() accepts one or two arguments in this compiler build');
         }
         if (2 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
+            JitInternalStrictArg::requireInt($context, $args[1], 'count_chars', 'mode', 2);
             throw new \LogicException('count_chars() argument #2 must be an integer in this compiler build');
         }
 

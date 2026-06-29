@@ -44,10 +44,10 @@ final class JitStrspn
         $i32 = $context->getTypeFromString('int32');
         $sizeT = $context->getTypeFromString('size_t');
         $offset = $argc >= 3
-            ? JitLongArg::lower($context, $args[2], "{$name}() offset")
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], $name, 3, 'offset')
             : $i64->constInt(0, false);
         $length = 4 === $argc
-            ? JitLongArg::lower($context, $args[3], "{$name}() length")
+            ? JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[3], $name, 4, 'length')
             : $i64->constInt(0, false);
         $lenIsNull = $i32->constInt(4 === $argc ? 0 : 1, false);
         $mode = $i32->constInt($isStrspn ? 1 : 0, false);

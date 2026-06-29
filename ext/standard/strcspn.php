@@ -31,11 +31,11 @@ final class strcspn extends Internal
         $mask = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'strcspn', 1, 'characters');
         $offset = 0;
         if ($argc >= 3) {
-            $offset = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'strcspn', 3, 'offset');
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strcspn', 3, 'offset');
         }
         $length = null;
         if (4 === $argc) {
-            $length = VmMath::parseIntBuiltinArg($frame->calledArgs[3], 'strcspn', 4, 'length');
+            $length = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'strcspn', 4, 'length');
         }
         if (null === $frame->returnVar) {
             return;
