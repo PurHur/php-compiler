@@ -2436,6 +2436,30 @@ PHP;
         self::assertStringContainsString("''", $out);
     }
 
+    /** Issue #13790 — preg_match(chained concat pattern with NUL) wires final Concat slot. */
+    public function testPregMatchChainedConcatPatternWithNulUsesFinalConcatSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+echo preg_match('/' . chr(0) . '/', "a\0b") ? '1' : '0';
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_match_concat_nul_pattern.php');
+
+        $concatSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+
+        self::assertGreaterThanOrEqual(2, \count($concatSlots), 'concat slots='.json_encode($concatSlots));
+        self::assertContains($concatSlots[\count($concatSlots) - 1], $sendSlots, 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame('1', $out);
+    }
+
     /** Issue #13458 — chained inline concat path args must wire final Concat slot, not first. */
     public function testFopenChainedInlineConcatPathUsesFinalConcatSlot(): void
     {
