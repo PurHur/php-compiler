@@ -13592,6 +13592,15 @@ restart:
         }
         $receiver = $table->findVariable($idx0, false)->resolveIndirect();
         $methodName = $table->findVariable($idx1, false)->resolveIndirect()->toString();
+        if (Variable::TYPE_STRING === $receiver->type) {
+            $class = $receiver->toString();
+            if ('' === $class) {
+                throw new \LogicException('Invalid array callable');
+            }
+            $this->initStaticCallable($frame, $class.'::'.$methodName);
+
+            return;
+        }
         if (Variable::TYPE_OBJECT !== $receiver->type
             && Variable::TYPE_ENUM_CASE !== $receiver->type) {
             throw new \LogicException('Invalid array callable');
