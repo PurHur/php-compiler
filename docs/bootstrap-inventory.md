@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3461 |
-| Phase A inventory files (M2 ratio SSOT) | 3461 |
+| PHP files on vm.php path | 3462 |
+| Phase A inventory files (M2 ratio SSOT) | 3462 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9361 |
+| Source constructs flagged (warnings) | 9364 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -464,6 +464,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GlobalIntrospectionNameJitHelper.php` | 0 | 1 |
 | `ext/standard/GmgetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/GmmktimeJitHelper.php` | 0 | 1 |
+| `ext/standard/GzStreamJitHelper.php` | 0 | 1 |
 | `ext/standard/HashCryptoJitHelper.php` | 0 | 1 |
 | `ext/standard/HashEqualsJitHelper.php` | 0 | 1 |
 | `ext/standard/HebrevJitHelper.php` | 0 | 1 |
@@ -2387,7 +2388,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/Getopt.php` | 0 | 2 |
 | `lib/JIT/Builtin/GlobalIntrospectionNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/GzStreamIo.php` | 0 | 1 |
-| `lib/JIT/Builtin/GzStreamIoJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/GzStreamRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/HashtableValueOutJitBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/Hebrev.php` | 0 | 3 |
 | `lib/JIT/Builtin/Highlight.php` | 0 | 3 |
@@ -6509,6 +6510,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/standard/GzStreamJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/HashCryptoJitHelper.php`
 
@@ -10775,20 +10781,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 545)
 - new Variable (line 554)
 - new Variable (line 558)
-- new HashTable (line 566)
-- new Variable (line 570)
-- new HashTable (line 574)
-- new Variable (line 578)
-- new HashTable (line 599)
-- new HashTable (line 603)
-- new Variable (line 607)
-- new HashTable (line 611)
-- new Variable (line 615)
-- new HashTable (line 763)
-- new HashTable (line 803)
-- new Variable (line 1338)
-- new Variable (line 1345)
-- new Variable (line 1352)
+- new HashTable (line 572)
+- new Variable (line 576)
+- new HashTable (line 580)
+- new Variable (line 584)
+- new HashTable (line 605)
+- new HashTable (line 609)
+- new Variable (line 613)
+- new HashTable (line 617)
+- new Variable (line 621)
+- new HashTable (line 769)
+- new HashTable (line 809)
+- new Variable (line 1344)
+- new Variable (line 1351)
+- new Variable (line 1358)
 - 67 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
@@ -10813,11 +10819,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 101)
-- new RecursiveIteratorIterator (line 1563)
-- new RecursiveDirectoryIterator (line 1564)
-- new RecursiveIteratorIterator (line 1665)
-- new RecursiveDirectoryIterator (line 1666)
-- 61 class method(s)
+- new RecursiveIteratorIterator (line 1685)
+- new RecursiveDirectoryIterator (line 1686)
+- new RecursiveIteratorIterator (line 1787)
+- new RecursiveDirectoryIterator (line 1788)
+- 63 class method(s)
 - 10 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -11031,21 +11037,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFs.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 54)
-- new Variable (line 56)
-- new HashTable (line 71)
-- new Variable (line 73)
-- new HashTable (line 211)
-- new Variable (line 218)
-- new Variable (line 223)
-- new HashTable (line 1298)
-- new Variable (line 1300)
-- new HashTable (line 2111)
-- new Variable (line 2114)
-- new Variable (line 2120)
-- new Variable (line 2126)
-- new Variable (line 2132)
-- 119 class method(s)
+- new HashTable (line 73)
+- new Variable (line 75)
+- new HashTable (line 90)
+- new Variable (line 92)
+- new HashTable (line 230)
+- new Variable (line 237)
+- new Variable (line 242)
+- new HashTable (line 1325)
+- new Variable (line 1327)
+- new HashTable (line 2142)
+- new Variable (line 2145)
+- new Variable (line 2151)
+- new Variable (line 2157)
+- new Variable (line 2163)
+- 121 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
 
@@ -11713,13 +11719,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new PhpInputOutputStreamState (line 33)
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/VmPhpMemoryStream.php`
 
 **Warnings** (review for bootstrap subset):
 - new PhpMemoryStreamState (line 36)
-- 21 class method(s)
+- 22 class method(s)
 
 ### `ext/standard/VmPhpcRunCommandNative.php`
 
@@ -16779,10 +16785,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/unlink.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 22)
-- new ArgumentCountError (line 27)
-- new ArgumentCountError (line 48)
-- new ArgumentCountError (line 53)
+- new ArgumentCountError (line 20)
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 46)
+- new ArgumentCountError (line 51)
 - 2 class method(s)
 
 ### `ext/standard/unpack.php`
@@ -18413,16 +18419,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14018)
 - new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14079)
 - new JIT\Call\VmCoerceVariableToString (line 14154)
-- new Variable (line 15303)
-- new VM (line 15347)
-- new VM\Variable (line 15354)
-- new Operand\Literal (line 15368)
-- new Operand\Literal (line 15372)
+- new Variable (line 15311)
+- new VM (line 15355)
+- new VM\Variable (line 15362)
 - new Operand\Literal (line 15376)
-- new Variable (line 15380)
-- new Variable (line 15404)
-- new Variable (line 15416)
-- new Variable (line 15849)
+- new Operand\Literal (line 15380)
+- new Operand\Literal (line 15384)
+- new Variable (line 15388)
+- new Variable (line 15412)
+- new Variable (line 15424)
+- new Variable (line 15857)
 - 343 class method(s)
 - 7 closure(s)
 
@@ -19218,10 +19224,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `lib/JIT/Builtin/GzStreamIoJit.php`
+### `lib/JIT/Builtin/GzStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- new JIT (line 325)
+- 12 class method(s)
+- 8 closure(s)
 
 ### `lib/JIT/Builtin/HashtableValueOutJitBridge.php`
 
@@ -24983,18 +24991,18 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 368)
 - new Variable (line 375)
 - new Variable (line 386)
-- new Variable (line 636)
-- new HashTable (line 637)
-- new Variable (line 652)
-- new Variable (line 744)
-- new Variable (line 756)
-- new HashTable (line 757)
-- new Variable (line 788)
-- new Variable (line 795)
-- new Variable (line 830)
-- new Variable (line 837)
+- new Variable (line 645)
+- new HashTable (line 646)
+- new Variable (line 661)
+- new Variable (line 753)
+- new Variable (line 765)
+- new HashTable (line 766)
+- new Variable (line 797)
+- new Variable (line 804)
+- new Variable (line 839)
 - new Variable (line 846)
-- new RunStackEntry (line 876)
+- new Variable (line 855)
+- new RunStackEntry (line 885)
 - 47 class method(s)
 
 ### `lib/VM/CycleCollector.php`
@@ -25600,7 +25608,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReferencableCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 162)
+- new Error (line 168)
 - 16 class method(s)
 
 ### `lib/VM/ReflectionPropertyHookSupport.php`
@@ -25679,8 +25687,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ResourceSupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new ObjectEntry (line 275)
-- new ResourceState (line 277)
+- new ObjectEntry (line 283)
+- new ResourceState (line 285)
 - 22 class method(s)
 
 ### `lib/VM/SapiOutput.php`

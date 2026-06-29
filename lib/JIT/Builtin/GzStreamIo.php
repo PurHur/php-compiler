@@ -6,12 +6,16 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
 
-/** JIT LLVM bodies for gzopen/gzwrite/gzread/gzclose stream API (#6168). */
+/**
+ * JIT link for gzopen/gzwrite/gzread/gzclose stream API (#6168, #13420).
+ *
+ * PHP lowering via {@see GzStreamRuntime} → {@see \PHPCompiler\ext\standard\GzStreamJitHelper}.
+ */
 final class GzStreamIo
 {
     public static function ensureLinked(Context $context): void
     {
-        GzStreamIoJit::implement($context);
+        GzStreamRuntime::ensureLinked($context);
     }
 
     public static function implement(Context $context): void
