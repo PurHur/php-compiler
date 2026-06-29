@@ -14,6 +14,7 @@ final class VmPosixStrerrorPure
 {
     /** @var array<int, string> */
     private const LINUX_MESSAGES = [
+        0 => 'Success',
         1 => 'Operation not permitted',
         2 => 'No such file or directory',
         3 => 'No such process',
