@@ -15404,6 +15404,13 @@ class Compiler {
                 }
                 break;
             }
+            // echo floor(-2.5) . ' ' . ceil(-2.5) — inner Concat does not feed outer FuncCall args (#13494).
+            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+                if ($this->inlineCallArgProducerFeedsConsumer($child, $callOp)) {
+                    array_unshift($producers, $child);
+                }
+                break;
+            }
             array_unshift($producers, $child);
         }
 
@@ -18966,13 +18973,18 @@ class Compiler {
                         return $child;
                     }
                     // php-cfg dead-temp alias: hoisted call arg temp may differ from UnaryMinus.result (#13387, #13434).
-                    // Map by hoisted producer ordinal — ftruncate(fopen(), -1) must not wire UnaryMinus to arg #0 (#12622).
+                    // Trailing arg with immediate UnaryMinus/Plus (ceil(-2.5) after concat chain, ftruncate($f, -1)).
+                    // ftruncate(fopen(), -1) arg #0 must not take callIndex-1 UnaryMinus — only trailing args (#12622).
                     if (
                         $i === $callIndex - 1
                         && $callArg instanceof Operand\Temporary
                         && is_array($callOp->args ?? null)
                         && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex] ?? $arg)
                     ) {
+                        $argCount = \count($callOp->args);
+                        if ($argIndex === $argCount - 1) {
+                            return $child;
+                        }
                         $producerSlot = $this->inlineHoistedProducerSlotIndexForCallArg(
                             $callOp->args,
                             $argIndex
