@@ -4299,6 +4299,7 @@ restart:
                         return self::EXCEPTION;
                     }
                     $frame->scope[$op->arg1]->copyFrom($value);
+                    $this->markScopeSlotInitialized($frame, (int) $op->arg1);
                     break;
                 case OpCode::TYPE_STATICCALL_INIT:
                     $instanceScopeCall = false;
