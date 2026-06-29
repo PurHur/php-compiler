@@ -27,6 +27,7 @@ final class BuiltinExceptionSupport
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
+    public const CLASS_OUT_OF_BOUNDS_EXCEPTION = 'outofboundsexception';
     public const CLASS_DATE_INVALID_TIME_ZONE_EXCEPTION = 'dateinvalidtimezoneexception';
     public const CLASS_DATE_MALFORMED_INTERVAL_EXCEPTION = 'datemalformedintervalexception';
     public const CLASS_DATE_MALFORMED_PERIOD_EXCEPTION = 'datemalformedperiodexception';
@@ -246,6 +247,32 @@ final class BuiltinExceptionSupport
         }
 
         return self::materializeThrowable($ctx, self::CLASS_BAD_METHOD_CALL_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeOutOfBoundsException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes[self::CLASS_OUT_OF_BOUNDS_EXCEPTION])) {
+            return self::materializeRuntimeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, self::CLASS_OUT_OF_BOUNDS_EXCEPTION, $message, $file, $line);
+    }
+
+    public static function materializeRuntimeException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        if (!isset($ctx->classes['runtimeexception'])) {
+            return self::materializeException($ctx, $message, $file, $line);
+        }
+
+        return self::materializeThrowable($ctx, 'runtimeexception', $message, $file, $line);
     }
 
     public static function materializeNativeError(Context $ctx, \Error $error, string $file = '', int $line = 0): Variable

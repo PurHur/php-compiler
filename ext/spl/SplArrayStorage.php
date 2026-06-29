@@ -75,6 +75,16 @@ final class SplArrayStorage
         ++self::$store[$object->id]['pos'];
     }
 
+    /** php-src spl_array_seek — position by numeric offset into iterator key list. */
+    public static function seekIterator(ObjectEntry $object, int $position): void
+    {
+        $keyCount = \count(self::iteratorKeys($object));
+        if ($position < 0 || $position >= $keyCount) {
+            throw new \OutOfBoundsException('Seek position '.$position.' is out of range');
+        }
+        self::$store[$object->id]['pos'] = $position;
+    }
+
     /** @return list<int|string> */
     public static function iteratorKeys(ObjectEntry $object): array
     {

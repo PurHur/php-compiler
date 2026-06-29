@@ -39,6 +39,9 @@ final class ArrayIteratorBuiltin
         if (isset($ctx->classes['arrayaccess'])) {
             $entry->interfaces[] = 'arrayaccess';
         }
+        if (isset($ctx->classes['seekableiterator'])) {
+            $entry->interfaces[] = 'seekableiterator';
+        }
 
         $entry->constructor = new ArrayIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -51,6 +54,8 @@ final class ArrayIteratorBuiltin
         $entry->methodVisibility['next'] = $pub;
         $entry->methods['rewind'] = new ArrayIteratorRewind();
         $entry->methodVisibility['rewind'] = $pub;
+        $entry->methods['seek'] = new ArrayIteratorSeek();
+        $entry->methodVisibility['seek'] = $pub;
         $entry->methods['valid'] = new ArrayIteratorValid();
         $entry->methodVisibility['valid'] = $pub;
         $entry->methods['count'] = new ArrayIteratorCount();
@@ -112,6 +117,11 @@ final class ArrayIteratorBuiltin
         return SplArrayStorage::iteratorKey($object);
     }
 
+    public static function seek(ObjectEntry $object, int $position): void
+    {
+        SplArrayStorage::seekIterator($object, $position);
+    }
+
     public static function count(ObjectEntry $object): int
     {
         return SplArrayStorage::count($object);
@@ -159,6 +169,31 @@ final class ArrayIteratorRewind extends VmClassMethod
             'ArrayIterator::rewind()'
         );
         ArrayIteratorBuiltin::rewind($object);
+    }
+}
+
+final class ArrayIteratorSeek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiver(
+            $frame,
+            ArrayIteratorBuiltin::CLASS_LC,
+            'ArrayIterator::seek()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'ArrayIterator::seek() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $offset = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        ArrayIteratorBuiltin::seek($object, $offset);
     }
 }
 

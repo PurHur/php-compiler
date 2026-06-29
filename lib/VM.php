@@ -8117,6 +8117,8 @@ restart:
             throw $e;
         } catch (\BadMethodCallException $e) {
             return $this->dispatchVmBadMethodCallException($e, $callerFrame);
+        } catch (\OutOfBoundsException $e) {
+            return $this->dispatchVmOutOfBoundsException($e, $callerFrame);
         } catch (\LogicException $e) {
             return $this->dispatchVmLogicException($e, $callerFrame);
         } catch (VM\MagicMethodInvocationAborted) {
@@ -8207,6 +8209,20 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeBadMethodCallException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge OutOfBoundsException from SPL builtins (#13561, ext/spl/spl_array.c). */
+    private function dispatchVmOutOfBoundsException(\OutOfBoundsException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeOutOfBoundsException(
             $this->context,
             $error->getMessage(),
             $file,
