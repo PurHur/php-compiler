@@ -30,12 +30,12 @@ echo (int) function_exists('filter_var');
 echo (int) function_exists('filter_list');
 echo (int) function_exists('filter_id');
 echo filter_var('42', FILTER_VALIDATE_INT);
-echo filter_id('validate_int');
+echo filter_id('int');
 echo count(filter_list());
 PHP;
         $block = $runtime->parseAndCompile($code, 'filter_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111422577', ob_get_clean());
+        self::assertSame('1114225721', ob_get_clean());
     }
 }
