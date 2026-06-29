@@ -1175,6 +1175,7 @@
         "ext/standard/VmDataUri.php",
         "ext/standard/VmDate.php",
         "ext/standard/VmDateInterval.php",
+        "ext/standard/VmDatePure.php",
         "ext/standard/VmDateSunFunc.php",
         "ext/standard/VmDateSunNative.php",
         "ext/standard/VmDateTimeNative.php",
@@ -3732,9 +3733,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3502,
+        "inventory_files": 3503,
         "excluded": 0,
-        "eligible": 3502,
+        "eligible": 3503,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
