@@ -42,6 +42,7 @@
             <file>./test/compliance/IncludeScopeVMTest.php</file>
             <file>./test/compliance/ClassMemberConstVMTest.php</file>
             <file>./test/compliance/ClassConstFetchVMTest.php</file>
+            <file>./test/compliance/ClassConstSelfInheritedVMTest.php</file>
             <file>./test/compliance/ClassStaticMethodVMTest.php</file>
             <file>./test/compliance/SplAutoloadRegisterJITTest.php</file>
             <file>./test/compliance/GethostnameJITTest.php</file>

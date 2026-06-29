@@ -146,7 +146,7 @@ final class ClassConstExpr
         $constName = strtolower($constNameRaw);
 
         if ($lcClass === strtolower($entry->name)) {
-            self::fetchFromDeclaringClass($frame, $op, $entry, $constName);
+            self::fetchFromDeclaringClass($context, $frame, $op, $entry, $constName);
 
             return;
         }
@@ -193,6 +193,7 @@ final class ClassConstExpr
     }
 
     private static function fetchFromDeclaringClass(
+        Context $context,
         Frame $frame,
         OpCode $op,
         ClassEntry $entry,
@@ -204,6 +205,12 @@ final class ClassConstExpr
             return;
         }
         if (!isset($entry->constants[$constName])) {
+            $inherited = self::resolveInheritedConstantInDeclaringClass($context, $entry, $constName);
+            if (null !== $inherited) {
+                $frame->scope[$op->arg1]->copyFrom($inherited);
+
+                return;
+            }
             if (
                 null !== $entry->forwardDeclaredConstNames
                 && isset($entry->forwardDeclaredConstNames[$constName])
@@ -219,6 +226,43 @@ final class ClassConstExpr
             return;
         }
         $frame->scope[$op->arg1]->copyFrom($entry->constants[$constName]);
+    }
+
+    /**
+     * Resolve inherited class constants for {@code self::} in the declaring class (#13532, zend_constants.c).
+     */
+    private static function resolveInheritedConstantInDeclaringClass(
+        Context $context,
+        ClassEntry $entry,
+        string $constName
+    ): ?Variable {
+        foreach ($entry->interfaces as $ifaceLc) {
+            if (!isset($context->classes[$ifaceLc])) {
+                continue;
+            }
+            $iface = $context->classes[$ifaceLc];
+            if (isset($iface->constants[$constName])) {
+                return $iface->constants[$constName];
+            }
+            $fromIface = self::resolveInheritedConstantInDeclaringClass($context, $iface, $constName);
+            if (null !== $fromIface) {
+                return $fromIface;
+            }
+        }
+        if (null === $entry->parentLc || !isset($context->classes[$entry->parentLc])) {
+            return null;
+        }
+        $parent = $context->classes[$entry->parentLc];
+        if (isset($parent->constants[$constName])) {
+            $vis = $parent->constVisibility[$constName] ?? \PHPCfg\Func::FLAG_PUBLIC;
+            if (($vis & \PHPCfg\Func::FLAG_PRIVATE) !== 0) {
+                return self::resolveInheritedConstantInDeclaringClass($context, $parent, $constName);
+            }
+
+            return $parent->constants[$constName];
+        }
+
+        return self::resolveInheritedConstantInDeclaringClass($context, $parent, $constName);
     }
 
     private static function executePropertyFetch(Context $context, Frame $frame, OpCode $op): void
