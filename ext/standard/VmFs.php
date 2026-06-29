@@ -460,12 +460,50 @@ final class VmFs
 
     public static function copy(string $from, string $to): bool
     {
+        if (self::pathRequiresStreamOpen($from) || self::pathRequiresStreamOpen($to)) {
+            return self::copyViaStreamOpen($from, $to);
+        }
+
         $ok = VmFsPathNative::copy($from, $to);
         if ($ok) {
             VmStatCache::invalidatePath($to);
         }
 
         return $ok;
+    }
+
+    private static function pathRequiresStreamOpen(string $path): bool
+    {
+        return VmDataUri::isDataUri($path)
+            || VmPhpMemoryStream::isSupportedUri($path)
+            || VmPhpInputOutputStream::isSupportedUri($path)
+            || VmFsStdio::isStdioUri($path)
+            || VmPhpFilterStream::isSupportedUri($path)
+            || VmHttpLastResponseHeaders::isHttpUrl($path)
+            || VmStreamWrapperRegistry::isCustomProtocol($path);
+    }
+
+    private static function copyViaStreamOpen(string $from, string $to): bool
+    {
+        $src = self::fopen($from, 'rb');
+        if (false === $src) {
+            return false;
+        }
+        $dst = self::fopen($to, 'wb');
+        if (false === $dst) {
+            self::fclose($src);
+
+            return false;
+        }
+        $copied = self::streamCopyToStream($src, $dst);
+        self::fclose($src);
+        self::fclose($dst);
+        if (false === $copied) {
+            return false;
+        }
+        VmStatCache::invalidatePath($to);
+
+        return true;
     }
 
     public static function touch(string $path, ?int $mtime = null, ?int $atime = null): bool
@@ -518,6 +556,17 @@ final class VmFs
             }
 
             return VmString::byteSlice($body, $offset, $length);
+        }
+        if (VmPhpMemoryStream::isSupportedUri($path)) {
+            $data = self::readPathContentsViaOpen($path, $ctx);
+            if (false === $data) {
+                return false;
+            }
+            if (0 !== $offset || null !== $length) {
+                return VmString::byteSlice($data, $offset, $length);
+            }
+
+            return $data;
         }
         if (VmDataUri::isDataUri($path)) {
             $data = VmDataUri::decode($path);
@@ -672,10 +721,29 @@ final class VmFs
         if (\is_array($data)) {
             $data = implode('', $data);
         }
+        if (VmPhpMemoryStream::isSupportedUri($path)) {
+            return self::filePutContentsViaOpen($path, $data, $flags);
+        }
 
         $written = VmFsWriteNative::write($path, $data, $flags);
         if (false !== $written) {
             VmStatCache::invalidatePath($path);
+        }
+
+        return $written;
+    }
+
+    private static function filePutContentsViaOpen(string $path, string $data, int $flags): int|false
+    {
+        $mode = (0 !== ($flags & StdlibConstants::FILE_APPEND)) ? 'ab' : 'wb';
+        $handle = self::fopen($path, $mode);
+        if (false === $handle) {
+            return false;
+        }
+        $written = self::fwrite($handle, $data);
+        self::fclose($handle);
+        if (false === $written) {
+            return false;
         }
 
         return $written;
@@ -701,6 +769,9 @@ final class VmFs
             }
 
             return self::finalizeStreamOpen(VmPhpMemoryStream::open($path, $mode), $mode);
+        }
+        if (VmDataStream::isSupportedUri($path)) {
+            return self::finalizeStreamOpen(VmDataStream::open($path, $mode), $mode);
         }
         if (VmPhpInputOutputStream::isSupportedUri($path)) {
             if (!VmPhpInputOutputStream::isValidMode($path, $mode)) {
