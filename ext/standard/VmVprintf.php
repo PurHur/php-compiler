@@ -17,17 +17,18 @@ use PHPCompiler\VM\Variable;
 final class VmVprintf
 {
     /**
-     * Z_PARAM_ARRAY values arg (php-src ext/standard/sprintf.c; #13589).
+     * Z_PARAM_ARRAY values arg (php-src ext/standard/sprintf.c; #13589, #13597).
      */
-    public static function requireArgsArray(Variable $arrayVar, string $function): void
+    public static function requireArgsArray(Variable $arrayVar, string $function, int $argNum = 2): void
     {
         $resolved = $arrayVar->resolveIndirect();
         if (Variable::TYPE_ARRAY === $resolved->type) {
             return;
         }
         throw new \TypeError(\sprintf(
-            '%s(): Argument #2 ($values) must be of type array, %s given',
+            '%s(): Argument #%d ($values) must be of type array, %s given',
             $function,
+            $argNum,
             self::valueTypeLabel($resolved)
         ));
     }
@@ -35,9 +36,9 @@ final class VmVprintf
     /**
      * @return list<Variable>
      */
-    public static function argsFromArray(Variable $arrayVar, string $function = 'vprintf'): array
+    public static function argsFromArray(Variable $arrayVar, string $function = 'vprintf', int $argNum = 2): array
     {
-        self::requireArgsArray($arrayVar, $function);
+        self::requireArgsArray($arrayVar, $function, $argNum);
         $values = [];
         foreach ($arrayVar->toArray()->iterate(true) as $value) {
             $values[] = $value->resolveIndirect();
@@ -46,9 +47,14 @@ final class VmVprintf
         return $values;
     }
 
-    public static function formatString(string $format, Variable $argsVar, ?Frame $frame = null, string $function = 'vprintf'): string
-    {
-        return VmSprintf::format($format, self::argsFromArray($argsVar, $function), $frame);
+    public static function formatString(
+        string $format,
+        Variable $argsVar,
+        ?Frame $frame = null,
+        string $function = 'vprintf',
+        int $valuesArgNum = 2
+    ): string {
+        return VmSprintf::format($format, self::argsFromArray($argsVar, $function, $valuesArgNum), $frame);
     }
 
     public static function vprintf(string $format, Variable $argsVar, ?Frame $frame = null): int
@@ -65,7 +71,7 @@ final class VmVprintf
 
     public static function vfprintf(int $handle, string $format, Variable $argsVar, ?Frame $frame = null): int
     {
-        $formatted = self::formatString($format, $argsVar, $frame, 'vfprintf');
+        $formatted = self::formatString($format, $argsVar, $frame, 'vfprintf', 3);
         $written = VmFs::fwrite($handle, $formatted, null);
         if (false === $written) {
             throw new \LogicException('vfprintf() failed to write to stream in this compiler build');
