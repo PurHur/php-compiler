@@ -137,8 +137,9 @@ final class JitVfprintf
     }
 
     /** @return Value */
-    public static function loadArgsArray(Context $context, JITVariable $arg): JITVariable
+    public static function loadArgsArray(Context $context, JITVariable $arg, string $fn = 'vprintf'): JITVariable
     {
+        JitVsprintf::requireValuesArrayArg($context, $arg, $fn);
         if ($arg->type & JITVariable::IS_NATIVE_ARRAY) {
             return $arg;
         }
@@ -154,6 +155,6 @@ final class JitVfprintf
             );
         }
 
-        throw new \LogicException('vfprintf() args must be an array in this compiler build');
+        throw new \LogicException('vprintf() args must be an array in this compiler build');
     }
 }

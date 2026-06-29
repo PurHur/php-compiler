@@ -1,6 +1,6 @@
 --- vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
 +++ vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php
-@@ -231,7 +231,15 @@
+@@ -231,7 +231,16 @@
  
      protected function parseStmt_Expression(Stmt\Expression $node)
      {
@@ -18,7 +18,7 @@
      }
  
      protected function parseStmt_Class(Stmt\Class_ $node)
-@@ -1415,8 +1423,15 @@
+@@ -1417,8 +1426,16 @@
          $block->addParent($this->block);
          $this->block = $block;
          $result = $this->parseExprNode($expr->expr);
