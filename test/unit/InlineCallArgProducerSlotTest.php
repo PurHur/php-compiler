@@ -2784,6 +2784,48 @@ PHP;
         self::assertSame("array (\n  0 => 4,\n  1 => 6,\n)\n", ob_get_clean());
     }
 
+    /** Issue #13812 — array_map(null, [...], [...]) wires null + both inline array slots. */
+    public function testArrayMapNullZipInlineArrayLiteralUsesAllSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_map(null, [1, 2], [3, 4]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_null_zip_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[1]);
+        self::assertSame($arraySlots[1], $sendSlots[2]);
+    }
+
+    /** Issue #13812 — array_map(null) zip runtime parity. */
+    public function testArrayMapNullZipInlineArrayLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map(null, [1, 2], [3, 4]));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_null_zip_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => array (\n    0 => 1,\n    1 => 3,\n  ),\n  1 => array (\n    0 => 2,\n    1 => 4,\n  ),\n)\n", ob_get_clean());
+    }
+
     /** Issue #11187 — rename($src, $dst) after file_put_contents must send path locals, not int returns. */
     public function testRenameAfterFilePutContentsUsesNamedPathSlots(): void
     {
