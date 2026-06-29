@@ -19,6 +19,11 @@ class ObjectEntry {
     private static int $counter = 0;
     public ClassEntry $class;
     public int $id;
+
+    public static function maxId(): int
+    {
+        return self::$counter;
+    }
     /** @var array<string, Variable> */
     private array $properties = [];
 

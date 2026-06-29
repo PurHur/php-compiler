@@ -31,6 +31,21 @@ final class CycleCollector
 
     private static bool $protected = false;
 
+    /** Highest {@see ObjectEntry::id} before user script execution (#13437). */
+    private static int $baselineObjectMaxId = 0;
+
+    /** @var array<int, true> spl_object_id of arrays registered before user script (#13437). */
+    private static array $baselineArrayIds = [];
+
+    public static function captureRequestBaseline(): void
+    {
+        self::$baselineObjectMaxId = ObjectEntry::maxId();
+        self::$baselineArrayIds = [];
+        foreach (array_keys(HashTableRegistry::snapshot()) as $arrayId) {
+            self::$baselineArrayIds[$arrayId] = true;
+        }
+    }
+
     public static function isEnabled(): bool
     {
         return GcToggleJitHelper::isEnabled();
@@ -273,11 +288,17 @@ final class CycleCollector
 
         $roots = 0;
         foreach (ObjectRegistry::snapshot() as $object) {
+            if ($object->id <= self::$baselineObjectMaxId) {
+                continue;
+            }
             if (!isset($marked['o'.$object->id])) {
                 ++$roots;
             }
         }
         foreach (HashTableRegistry::snapshot() as $arrayId => $table) {
+            if (isset(self::$baselineArrayIds[$arrayId])) {
+                continue;
+            }
             if (!isset($marked['a'.$arrayId])) {
                 ++$roots;
             }

@@ -27,6 +27,7 @@ use PHPCompiler\VM\CastSupport;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\DnfCheck;
 use PHPCompiler\VM\ClosureState;
+use PHPCompiler\VM\CycleCollector;
 use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ErrorReporter;
@@ -83,6 +84,7 @@ class VM {
 
     public function run(Block $block): int {
         ObjectLifetime::setVm($this);
+        CycleCollector::captureRequestBaseline();
         try {
             if (!is_null($block->handler)) {
                 $frame = $block->getFrame($this->context);
