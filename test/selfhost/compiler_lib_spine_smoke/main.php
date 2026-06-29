@@ -1507,6 +1507,8 @@ require_once __DIR__.'/../../../ext/standard/class_alias.php';
 require_once __DIR__.'/../../../ext/standard/class_constants_.php';
 require_once __DIR__.'/../../../ext/standard/class_exists_.php';
 require_once __DIR__.'/../../../ext/standard/class_has_constant_.php';
+require_once __DIR__.'/../../../ext/standard/class_has_lazy_object_initializer.php';
+require_once __DIR__.'/../../../ext/standard/class_has_lazy_object_uninitializer.php';
 require_once __DIR__.'/../../../ext/standard/class_has_method_.php';
 require_once __DIR__.'/../../../ext/standard/class_has_property_.php';
 require_once __DIR__.'/../../../ext/standard/class_implements_.php';
