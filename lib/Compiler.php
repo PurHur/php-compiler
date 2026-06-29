@@ -18990,6 +18990,20 @@ class Compiler {
                             $argIndex
                         );
                         if (null !== $producerSlot) {
+                            // Single hoisted dead-temp unary arg (#13508): producer walk skips immediate
+                            // UnaryMinus when the consumer FuncCall is the next sibling (same as trailing
+                            // wiring for ceil(-2.5) / ftruncate($f, -1) in #13434).
+                            if (0 === $producerSlot && 0 === $argIndex) {
+                                $deadHoisted = 0;
+                                foreach ($callOp->args as $hoistedArg) {
+                                    if ($this->callArgIsDeadInlineTemporary($hoistedArg)) {
+                                        ++$deadHoisted;
+                                    }
+                                }
+                                if (1 === $deadHoisted) {
+                                    return $child;
+                                }
+                            }
                             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                                 $block->orig->children,
                                 $callOp
