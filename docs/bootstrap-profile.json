@@ -2679,8 +2679,6 @@
         "lib/JIT/Builtin/StringMetaphone.php",
         "lib/JIT/Builtin/StringMicrotime.php",
         "lib/JIT/Builtin/StringMktime.php",
-        "lib/JIT/Builtin/StringMultipart.php",
-        "lib/JIT/Builtin/StringMultipartStandaloneLlvm.php",
         "lib/JIT/Builtin/StringNaturalCompare.php",
         "lib/JIT/Builtin/StringNetInterfacesJit.php",
         "lib/JIT/Builtin/StringNetworkServices.php",
@@ -2747,7 +2745,6 @@
         "lib/JIT/Builtin/StripWhitespace.php",
         "lib/JIT/Builtin/SuperglobalNameRuntime.php",
         "lib/JIT/Builtin/SuperglobalRefreshRuntime.php",
-        "lib/JIT/Builtin/SuperglobalRefreshStandaloneLlvm.php",
         "lib/JIT/Builtin/SysGetTempDirRuntime.php",
         "lib/JIT/Builtin/SysGetloadavgRuntime.php",
         "lib/JIT/Builtin/TimeSleepRuntime.php",
@@ -3714,7 +3711,7 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3485,
+        "inventory_files": 3482,
         "excluded": 0,
         "eligible": 3485,
         "aot_lint_targets": 111,
