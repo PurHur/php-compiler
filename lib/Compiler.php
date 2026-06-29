@@ -20721,7 +20721,10 @@ class Compiler {
                 }
             }
             if (null !== $cfgCallOp && null !== $block->orig) {
-                if (0 === $argIndex) {
+                if (
+                    0 === $argIndex
+                    && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? $arg)
+                ) {
                     foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,
                         $cfgCallOp
