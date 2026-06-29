@@ -350,6 +350,17 @@ final class CompilerVersion
      */
     public static function supportsSortingEnum(): bool
     {
+        return self::supportsBuiltinStubEnums();
+    }
+
+    /**
+     * PHP 8.4+ builtin stub enums (StringTrimMode, PadType, MemoryUsage, ExitStatus, …).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#13630).
+     * php-src: Zend/zend_enum.def; ext/standard/basic_functions.stub.php
+     */
+    public static function supportsBuiltinStubEnums(): bool
+    {
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
@@ -390,7 +401,7 @@ final class CompilerVersion
      */
     public static function supportsClockGettime(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::supportsBuiltinStubEnums();
     }
 
     /**

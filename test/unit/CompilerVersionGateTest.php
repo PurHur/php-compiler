@@ -54,6 +54,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClockGettime());
     }
 
+    public function testSupportsBuiltinStubEnumsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
+    }
+
     public function testSupportsGcStatusPhp84SchemaFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsGcStatusPhp84Schema());

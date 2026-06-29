@@ -104,6 +104,29 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'sorting_enum_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsBuiltinStubEnums()
+                && (str_contains($name, 'pad_type_enum')
+                    || str_contains($name, 'string_trim_mode')
+                    || str_contains($name, 'memory_usage_enum')
+                    || str_contains($name, 'session_status_enum')
+                    || str_contains($name, 'requestmethod_enum')
+                    || str_contains($name, 'phpinfo_infoview')
+                    || str_contains($name, 'http_response_code_enum')
+                    || str_contains($name, 'filter_input_phpinputfilter')
+                    || str_contains($name, 'connection_status_enum')
+                    || str_contains($name, 'connection_status_cli')
+                    || str_contains($name, 'parse_url_enum')
+                    || str_contains($name, 'property_hook_type_enum')
+                    || str_contains($name, 'exit_status_enum')
+                    || str_contains($name, 'socket_type_enum')
+                    || str_contains($name, 'trim_named_mode'))
+                && !str_contains($name, 'builtin_stub_enums_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsBuiltinStubEnums()
+                && str_contains($name, 'builtin_stub_enums_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp84ArraySearchFunctions()
                 && (str_contains($name, 'array_find')
                     || str_contains($name, 'array_any')

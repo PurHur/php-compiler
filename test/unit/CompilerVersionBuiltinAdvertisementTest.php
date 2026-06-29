@@ -29,6 +29,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsSortingEnum());
     }
 
+    public function testBuiltinStubEnumsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
+    }
+
     public function testJsonValidateWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsJsonValidate());
@@ -117,6 +122,29 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->classes['sorting']));
         $this->assertFalse(isset($ctx->classes['sortdirection']));
+    }
+
+    public function testVmDoesNotRegisterBuiltinStubEnumsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach ([
+            'padtype',
+            'stringtrimmode',
+            'memoryusage',
+            'exitstatus',
+            'parseurl',
+            'requestmethod',
+            'infoview',
+            'connectionstatus',
+            'sessionstatus',
+            'responsecode',
+            'propertyhooktype',
+            'phpinputfilter',
+            'sockettype',
+        ] as $lc) {
+            $this->assertFalse(isset($ctx->classes[$lc]), $lc);
+        }
     }
 
     public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void

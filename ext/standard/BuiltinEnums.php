@@ -20,26 +20,24 @@ final class BuiltinEnums
     public static function register(Context $ctx): void
     {
         $before = array_keys($ctx->classes);
-        self::registerPropertyHookType($ctx);
-        self::registerExitStatus($ctx);
-        self::registerStringTrimMode($ctx);
-        self::registerPadType($ctx);
-        self::registerMemoryUsage($ctx);
-        self::registerConnectionStatus($ctx);
-        self::registerSessionStatus($ctx);
-        self::registerResponseCode($ctx);
-        if (CompilerVersion::supportsSortingEnum()) {
+        if (CompilerVersion::supportsBuiltinStubEnums()) {
+            self::registerPropertyHookType($ctx);
+            self::registerExitStatus($ctx);
+            self::registerStringTrimMode($ctx);
+            self::registerPadType($ctx);
+            self::registerMemoryUsage($ctx);
+            self::registerConnectionStatus($ctx);
+            self::registerSessionStatus($ctx);
+            self::registerResponseCode($ctx);
             self::registerSorting($ctx);
             self::registerSortDirection($ctx);
+            self::registerParseUrl($ctx);
+            self::registerRequestMethod($ctx);
+            self::registerInfoView($ctx);
+            self::registerClockInterface($ctx);
         }
         if (CompilerVersion::supportsRoundingModeEnum()) {
             self::registerRoundingMode($ctx);
-        }
-        self::registerParseUrl($ctx);
-        self::registerRequestMethod($ctx);
-        self::registerInfoView($ctx);
-        if (CompilerVersion::supportsClockGettime()) {
-            self::registerClockInterface($ctx);
         }
         foreach (array_diff(array_keys($ctx->classes), $before) as $lc) {
             $ctx->classes[$lc]->isInternal = true;
