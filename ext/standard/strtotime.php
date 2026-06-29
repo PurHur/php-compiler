@@ -55,6 +55,6 @@ final class strtotime extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException('strtotime() is not implemented for JIT in this compiler build (#10742)');
+        return JitStrtotime::invoke($context, ...$args);
     }
 }
