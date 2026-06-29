@@ -2125,6 +2125,28 @@ class Context {
         }
     }
 
+    /**
+     * CLI stdio constants lower to integer fds for fwrite/standalone AOT (#90953, #10163).
+     * VmStdStreamConstants registers stream objects on the VM; JIT must not see TYPE_OBJECT.
+     */
+    private function vmStdioFdVariable(string $name): ?VMVariable
+    {
+        return match ($name) {
+            'STDIN' => $this->vmIntegerConstant(0),
+            'STDOUT' => $this->vmIntegerConstant(1),
+            'STDERR' => $this->vmIntegerConstant(2),
+            default => null,
+        };
+    }
+
+    private function vmIntegerConstant(int $value): VMVariable
+    {
+        $var = new VMVariable(VMVariable::TYPE_INTEGER);
+        $var->int($value);
+
+        return $var;
+    }
+
     private function zendConstantVariable(string $name): ?VMVariable
     {
         if (!\is_string($name) || !\defined($name)) {
@@ -2132,10 +2154,7 @@ class Context {
         }
         $value = \constant($name);
         if (\is_int($value)) {
-            $var = new VMVariable(VMVariable::TYPE_INTEGER);
-            $var->int($value);
-
-            return $var;
+            return $this->vmIntegerConstant($value);
         }
         if (\is_float($value)) {
             $var = new VMVariable(VMVariable::TYPE_FLOAT);
@@ -2156,23 +2175,9 @@ class Context {
             return $var;
         }
         if (\is_resource($value)) {
-            if ('STDIN' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(0);
-
-                return $var;
-            }
-            if ('STDOUT' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(1);
-
-                return $var;
-            }
-            if ('STDERR' === $name) {
-                $var = new VMVariable(VMVariable::TYPE_INTEGER);
-                $var->int(2);
-
-                return $var;
+            $stdio = $this->vmStdioFdVariable($name);
+            if (null !== $stdio) {
+                return $stdio;
             }
             // Other stream resources are unused in bundled bootstrap fixtures.
             $var = new VMVariable(VMVariable::TYPE_NULL);
@@ -2193,6 +2198,11 @@ class Context {
             $phpVar = $this->runtime->vmContext->constantFetch($name);
             if (is_null($phpVar)) {
                 $phpVar = $this->zendConstantVariable($name);
+            } elseif (VMVariable::TYPE_OBJECT === $phpVar->type) {
+                $stdio = $this->vmStdioFdVariable($name);
+                if (null !== $stdio) {
+                    $phpVar = $stdio;
+                }
             }
             if (is_null($phpVar)) {
                 return null;
