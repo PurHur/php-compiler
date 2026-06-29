@@ -49,4 +49,11 @@ final class VmSyslogRuntimeShrinkTest extends TestCase
             }
         }
     }
+
+    public function testSyslogPerrorUsesHumanFormatNotRfc3164(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSyslogPure.php');
+        $this->assertStringContainsString('writeConsole($humanLine)', $source);
+        $this->assertStringContainsString('LOG_PERROR mirrors human format', $source);
+    }
 }

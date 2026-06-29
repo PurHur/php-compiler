@@ -66,13 +66,15 @@ final class VmSyslogPure
             $tag .= '['.(null !== $pid ? $pid : 0).']';
         }
 
-        $line = '<'.$pri.'>'.$tag.': '.$message;
+        $humanLine = $tag.': '.$message;
+        $line = '<'.$pri.'>'.$humanLine;
         $sent = self::writeLog($line);
         if (!$sent && 0 !== (self::$option & StdlibConstants::LOG_CONS)) {
             $sent = self::writeConsole($line);
         }
         if (0 !== (self::$option & StdlibConstants::LOG_PERROR)) {
-            self::writeConsole($line);
+            // php-syslog LOG_PERROR mirrors human format to stderr, not RFC3164 (#13521).
+            self::writeConsole($humanLine);
         }
 
         // php-src ext/standard/syslog.c PHP_FUNCTION(syslog) always RETURN_TRUE (#12507).
