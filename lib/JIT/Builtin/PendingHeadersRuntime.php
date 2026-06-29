@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 
 /**
- * JIT/AOT pending HTTP header dispatch via PendingHeadersJitHelper PHP (#9545, #12898).
+ * JIT/AOT pending HTTP header dispatch — standalone LLVM quarantine + embed PHP bridge (#9545).
  *
- * JIT embed and AOT standalone compile {@see PendingHeadersJitBridge}; thin LLVM bridges forward the ABI.
- * php-src: ext/standard/head.c
+ * Replaces ~1.1k-line monolithic LLVM in embed builds. php-src: ext/standard/head.c
  */
 final class PendingHeadersRuntime
 {
@@ -21,6 +21,12 @@ final class PendingHeadersRuntime
 
     public static function implement(Context $context): void
     {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            PendingHeadersStandaloneLlvm::implement($context);
+
+            return;
+        }
+
         PendingHeadersJitBridge::implement($context);
     }
 }

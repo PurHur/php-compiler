@@ -77,6 +77,10 @@ final class ObOutput
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        $userScriptAot = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScriptAot || 'true' === strtolower((string) $userScriptAot)) {
+            return;
+        }
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();

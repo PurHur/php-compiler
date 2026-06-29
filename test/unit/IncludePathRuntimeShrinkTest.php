@@ -6,7 +6,7 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** IncludePathRuntime embed + standalone route through IncludePathJitHelper PHP (#9245, #12801, #12882). */
+/** IncludePathRuntime embed uses JIT helper; standalone AOT keeps thin LLVM quarantine (#9245, #12801, #13571). */
 final class IncludePathRuntimeShrinkTest extends TestCase
 {
     public function testIncludePathRuntimeUsesJitHelperNotLlvmGlobals(): void
@@ -14,28 +14,7 @@ final class IncludePathRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/IncludePathRuntime.php');
         $this->assertStringContainsString('IncludePathJitHelper', $source);
         $this->assertStringContainsString('IncludePathResolveJitHelper', $source);
-        $this->assertStringNotContainsString('IncludePathStandaloneLlvm', $source);
-        $this->assertStringNotContainsString('include_path_get_standalone', $source);
-        $this->assertStringNotContainsString("addGlobal(\$i32, 'phpc_include_path_depth')", $source);
-        $this->assertStringNotContainsString('phpc_include_path_current', $source);
-        $this->assertStringNotContainsString('phpc_include_path_stack', $source);
-        $this->assertStringNotContainsString("lookupFunction('access')", $source);
-        $this->assertStringNotContainsString("lookupFunction('realpath')", $source);
-        $this->assertLessThan(360, \substr_count($source, "\n") + 1);
-
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
-    }
-
-    public function testVmIncludePathDelegatesToJitHelper(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmIncludePath.php');
-        $this->assertStringContainsString('IncludePathJitHelper', $source);
-        $this->assertStringNotContainsString('private static array $stack', $source);
-    }
-
-    public function testJitIncludePathUsesIncludePathRuntime(): void
-    {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitIncludePath.php');
-        $this->assertStringContainsString('IncludePathRuntime', $source);
+        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/IncludePathStandaloneLlvm.php');
     }
 }

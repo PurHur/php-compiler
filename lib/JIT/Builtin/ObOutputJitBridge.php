@@ -9,6 +9,7 @@ use PHPCompiler\ext\standard\ob_end_flush;
 use PHPCompiler\ext\standard\ob_flush;
 use PHPCompiler\ext\standard\ob_get_flush;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -91,6 +92,12 @@ final class ObOutputJitBridge
 
     public static function implement(Context $context): void
     {
+        if (self::shouldUseDirectStdoutEcho($context)) {
+            self::implementDirectStdoutEcho($context);
+
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__phpc_ob_start');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -615,6 +622,51 @@ final class ObOutputJitBridge
                 throw new \LogicException($name.' missing after ObOutputJitBridge bridge (#9268)');
             }
             $context->registerFunction($name, $fn);
+        }
+    }
+
+    /** Inventory emit only needs linkable ABI symbols — skip nested STDOUT JIT (#13301). */
+    private static function shouldUseDirectStdoutEcho(Context $context): bool
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return false;
+        }
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function implementDirectStdoutEcho(Context $context): void
+    {
+        $restore = self::captureInsertBlock($context);
+        self::ensureExtraGlobals($context);
+        self::ensureLibc($context);
+        self::ensureWriteLibc($context);
+        ObOutput::registerExternals($context);
+        EmbedObEchoBridge::implementAll($context);
+        self::implementDeferredInventoryStubs($context);
+        self::registerLinkedRuntime($context);
+        self::restoreInsertBlock($context, $restore);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function ensureWriteLibc(Context $context): void
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        try {
+            $context->lookupFunction('write');
+        } catch (\Throwable) {
+            $fn = $context->module->addFunction(
+                'write',
+                $context->context->functionType($i64, false, $i32, $i8p, $sizeT)
+            );
+            $context->registerFunction('write', $fn);
         }
     }
 

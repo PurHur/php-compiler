@@ -354,6 +354,10 @@ final class StreamIoRuntime
                 return true;
             }
         }
+        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+        if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return true;
+        }
 
         return false;
     }
