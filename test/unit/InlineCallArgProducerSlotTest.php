@@ -679,6 +679,39 @@ PHP;
         self::assertSame([$cloneSlot], $sendSlots, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #13685 — probe(new ArrayIterator([])) wires New_ producer, not ctor Array_ prelude. */
+    public function testSplArrayInlineNewUsesNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function probe(mixed $x): string {
+    return get_debug_type($x);
+}
+probe(new ArrayIterator([]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'spl_array_inline_new_call_arg.php');
+
+        $newSlots = [];
+        $probeSendSlot = null;
+        $inProbeCall = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $inProbeCall = true;
+            }
+            if ($inProbeCall && OpCode::TYPE_ARG_SEND === $op->type) {
+                $probeSendSlot = $op->arg1;
+                $inProbeCall = false;
+            }
+        }
+
+        self::assertNotNull($probeSendSlot, 'probe() call must emit ARG_SEND');
+        self::assertContains($probeSendSlot, $newSlots, 'probe() must send New_ producer slot, not ctor Array_ prelude');
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {
