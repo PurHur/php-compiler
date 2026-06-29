@@ -18,6 +18,9 @@ final class StreamLifecycleJitHelper
         if ($handle <= 0) {
             return 0;
         }
+        if (VmFs::isFailedStreamHandle($handle)) {
+            return 1;
+        }
         if (VmDir::isValidHandle($handle)) {
             return 1;
         }

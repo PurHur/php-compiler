@@ -40,10 +40,29 @@ final class VmFs
 
     private static int $nextHandleId = 0;
 
+    /** @var array<int, true> bogus stream resources after invalid mode on built-in wrappers (#13401) */
+    private static array $failedStreamHandles = [];
+
     /** Single VM stream handle namespace (php-src php_stream_alloc; fixes #10556 id collisions). */
     public static function allocateStreamHandleId(): int
     {
         return ++self::$nextHandleId;
+    }
+
+    /**
+     * Zend fopen on registered wrapper with invalid $mode — non-false resource sentinel (#13401).
+     */
+    public static function allocateFailedStreamHandle(): int
+    {
+        $id = self::allocateStreamHandleId();
+        self::$failedStreamHandles[$id] = true;
+
+        return $id;
+    }
+
+    public static function isFailedStreamHandle(int $handle): bool
+    {
+        return isset(self::$failedStreamHandles[$handle]);
     }
 
     /**
@@ -677,9 +696,17 @@ final class VmFs
             return self::finalizeStreamOpen(VmFsStdio::open($path, $mode), $mode);
         }
         if (VmPhpMemoryStream::isSupportedUri($path)) {
+            if (!VmPhpMemoryStream::isValidMode($mode)) {
+                return self::allocateFailedStreamHandle();
+            }
+
             return self::finalizeStreamOpen(VmPhpMemoryStream::open($path, $mode), $mode);
         }
         if (VmPhpInputOutputStream::isSupportedUri($path)) {
+            if (!VmPhpInputOutputStream::isValidMode($path, $mode)) {
+                return self::allocateFailedStreamHandle();
+            }
+
             return self::finalizeStreamOpen(VmPhpInputOutputStream::open($path, $mode), $mode);
         }
         if (VmPhpFilterStream::isSupportedUri($path)) {
@@ -2091,6 +2118,10 @@ final class VmFs
 
     public static function isValidHandle(int $handle): bool
     {
+        if (self::isFailedStreamHandle($handle)) {
+            return false;
+        }
+
         return isset(self::$handles[$handle])
             || VmUserStream::isValidHandle($handle)
             || VmPhpMemoryStream::isValidHandle($handle)
