@@ -8,7 +8,6 @@ use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 
 /** DateTime::createFromFormat() — VM (#9921, ext/date/php_datetime.c). */
@@ -48,13 +47,7 @@ final class DateTimeCreateFromFormat extends VmClassMethod
             $timezone
         );
         if (null === $created) {
-            $frame->vmContext->errors->triggerError(
-                'DateTime::createFromFormat(): Failed to parse time string ('.$time.')',
-                ErrorReporter::E_WARNING,
-                '' !== $frame->scriptPath ? $frame->scriptPath : null,
-                $frame->vmContext,
-                $frame
-            );
+            // php-src ext/date/php_datetime.c — false on failure; errors via getLastErrors(), no E_WARNING (#10010).
             BuiltinExecute::writeReturn($frame, static function (Variable $ret): void {
                 $ret->bool(false);
             });

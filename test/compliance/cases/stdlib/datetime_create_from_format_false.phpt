@@ -17,7 +17,6 @@ var_export(DateTimeImmutable::getLastErrors());
 echo "\n";
 ?>
 --EXPECT--
-PHP Warning:  DateTimeImmutable::createFromFormat(): Failed to parse time string (notadate)
 false
 true
 2

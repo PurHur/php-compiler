@@ -9,9 +9,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\NativeDateInvalidTimeZoneException;
-use PHPCompiler\JIT\Builtin\StringTriggerError;
 use PHPLLVM\Value;
 
 /**
@@ -127,33 +125,13 @@ final class JitDateCreateFromFormat
 
     private static function emitParseFailure(Context $context, string $function, string $timeLit): Value
     {
-        self::emitParseWarningLiteral($context, $function, $timeLit);
+        // php-src ext/date/php_date.c — false on failure without E_WARNING (#10010).
+        unset($function, $timeLit);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         JitValueBox::writeBool($context, $slot, $context->getTypeFromString('int1')->constInt(0, false));
 
         return $ptr;
-    }
-
-    private static function emitParseWarningLiteral(Context $context, string $function, string $timeLit): void
-    {
-        StringTriggerError::ensureLinked($context);
-        $msg = $function.'(): Failed to parse time string ('.$timeLit.')';
-        $msgStr = $context->builder->pointerCast(
-            $context->constantFromString($msg),
-            $context->getTypeFromString('int8*')
-        );
-        $i32 = $context->getTypeFromString('int32');
-        $sizeT = $context->getTypeFromString('size_t');
-        $emptyFile = $context->builder->pointerCast($context->constantFromString(''), $context->getTypeFromString('int8*'));
-        $context->builder->call(
-            $context->lookupFunction('__compiler_trigger_error'),
-            $msgStr,
-            $sizeT->constInt(\strlen($msg), false),
-            $i32->constInt(ErrorReporter::E_WARNING, false),
-            $emptyFile,
-            $i32->constInt(0, false)
-        );
     }
 
     private static function materializeDateTimeLike(

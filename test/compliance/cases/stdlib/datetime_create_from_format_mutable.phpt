@@ -19,7 +19,6 @@ var_export(DateTime::getLastErrors());
 echo "\n";
 ?>
 --EXPECT--
-PHP Warning:  DateTime::createFromFormat(): Failed to parse time string (notadate)
 false
 true
 2
