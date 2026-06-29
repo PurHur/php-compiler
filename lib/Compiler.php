@@ -11990,7 +11990,21 @@ class Compiler {
                     }
                     // php-cfg may lower later call-arg producers (e.g. var_export(..., true)) between ?? and FuncCall (#11601).
                     if ($this->onlyInlineCallArgProducersBetweenIndices($block->orig->children, $j, $i)) {
-                        return $prev;
+                        // Stmt-level ?? feeds arg #0 only; trailing hoisted true/false/null are unrelated (#13789).
+                        $firstArg = $child->args[0] ?? null;
+                        if (
+                            null === $matchedCallArg
+                            || (
+                                null !== $firstArg
+                                && (
+                                    $firstArg === $matchedCallArg
+                                    || $this->operandsReferToSameVariable($firstArg, $matchedCallArg)
+                                    || $this->operandsReferToSameVariable($prev->result, $matchedCallArg)
+                                )
+                            )
+                        ) {
+                            return $prev;
+                        }
                     }
                     break;
                 }
@@ -17775,6 +17789,36 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
+        $coalesceProducerIndex = null;
+        foreach ($producers as $pi => $producer) {
+            if ($producer instanceof Op\Expr\BinaryOp\Coalesce) {
+                $coalesceProducerIndex = $pi;
+                break;
+            }
+        }
+        if (null !== $coalesceProducerIndex && $argIndex > 0) {
+            $trailingProducers = \array_values(\array_slice($producers, $coalesceProducerIndex + 1));
+            $trailingCount = \count($trailingProducers);
+            if ($trailingCount < 1) {
+                return null;
+            }
+            $trailingArgs = \array_slice($callOp->args, 1);
+            $relativeIndex = $argIndex - 1;
+            $trailingSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg($trailingArgs, $relativeIndex);
+            if (null === $trailingSlotIndex || $trailingSlotIndex >= $trailingCount) {
+                return null;
+            }
+            $cfgProducerIndex = $callIndex - $trailingCount + $trailingSlotIndex;
+            if ($cfgProducerIndex < 0 || $cfgProducerIndex >= $callIndex) {
+                return null;
+            }
+            $candidate = $cfgChildren[$cfgProducerIndex] ?? null;
+            if ($candidate instanceof Op\Expr && \in_array($candidate, $trailingProducers, true)) {
+                return $candidate;
+            }
+
+            return null;
+        }
         $producerCount = \count($producers);
         if ($producerCount < 1 || $producerSlotIndex >= $producerCount) {
             return null;
@@ -21744,14 +21788,29 @@ class Compiler {
                     && !$this->callArgOperandExpectsArrayProducer($cfgCallOp->args[0] ?? $arg)
                     && !$this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 ) {
-                    foreach ($trailingProducers as $producer) {
-                        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
-                            continue;
+                    $concatChainOps = [];
+                    $chainedConcatSlot = $this->tryResolveChainedConcatCallArgSlot(
+                        $arg,
+                        $block,
+                        $concatChainOps,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                    if (null !== $chainedConcatSlot) {
+                        if ([] !== $concatChainOps) {
+                            $sends = array_merge($sends, $concatChainOps);
                         }
-                        $subjectSlot = $block->slotForOperand($producer->result);
-                        if (null !== $subjectSlot) {
-                            $valueSlot = (string) $subjectSlot;
-                            break;
+                        $valueSlot = (string) $chainedConcatSlot;
+                    } else {
+                        foreach ($trailingProducers as $producer) {
+                            if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                                continue;
+                            }
+                            $subjectSlot = $block->slotForOperand($producer->result);
+                            if (null !== $subjectSlot) {
+                                $valueSlot = (string) $subjectSlot;
+                                break;
+                            }
                         }
                     }
                 }
