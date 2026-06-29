@@ -10,7 +10,7 @@ class D {
 var_export(new D());
 echo "\n";
 --EXPECT--
-D::__set_state(array (
+\D::__set_state(array (
   'secret' => 99,
   'prot' => 1,
   'pub' => 2,
