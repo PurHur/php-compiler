@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 /** Shared VM argument guards for filestat permission builtins (php-src ext/standard/filestat.c; #6079). */
@@ -18,6 +20,26 @@ final class VmFilestatArg
     public static function coerceFilenameArg(Variable $var, string $function): string
     {
         return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
+    }
+
+    /**
+     * Z_PARAM_PATH with caller strict_types parity (#13419, ext/standard/filestat.c).
+     *
+     * @throws \TypeError when caller strict_types rejects null operands
+     */
+    public static function filenameArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName = 'filename'
+    ): string {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
+
+            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
+        }
+
+        return self::coerceFilenameArg($frame->calledArgs[$argIndex], $function);
     }
 
     /**

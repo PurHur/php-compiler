@@ -22,7 +22,7 @@ final class filesize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'filesize');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filesize');
         $size = VmFs::fileSize($path);
         if (false === $size) {
             VmFilestatFailure::warnPathStatFailed($frame, 'filesize', $path, false);

@@ -24,7 +24,7 @@ final class chmod_ extends Internal
         if (2 !== \count($frame->calledArgs)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chmod');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'chmod');
         $mode = VmFilestatArg::requireIntArg($frame->calledArgs[1], 'chmod', 1, 'permissions');
         if (null === $frame->returnVar) {
             return;

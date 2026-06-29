@@ -29,7 +29,7 @@ final class unlink extends Internal
         if (isset($frame->calledArgs[1])) {
             VmStreamContext::validateOptionalContextArg($frame->calledArgs[1], 'unlink', 2);
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'unlink');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'unlink');
         $ok = VmFs::unlink($path);
         if (!$ok) {
             VmFilestatFailure::warnUnlinkFailed($frame, $path);
