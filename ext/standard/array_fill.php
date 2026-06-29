@@ -13,8 +13,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayFillRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -63,11 +63,8 @@ final class array_fill extends Internal
         $startIndex = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'array_fill', 1, 'start_index');
         $count = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_fill', 2, 'count');
         JitArrayFill::emitRuntimeCountGuard($context, $count);
-        $sizeT = $context->getTypeFromString('size_t');
-        $countSized = $context->builder->truncOrBitCast($count, $sizeT);
-        $startSized = $context->builder->truncOrBitCast($startIndex, $sizeT);
 
-        return HashTableHelper::buildArrayFill($context, $startSized, $countSized, $args[2]);
+        return ArrayFillRuntime::fill($context, $startIndex, $count, $args[2]);
     }
 
     private static function vmStartIndexArg(Frame $frame): int
