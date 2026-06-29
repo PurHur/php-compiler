@@ -6,29 +6,25 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\SysGetloadavgJitHelper;
 use PHPCompiler\ext\standard\VmSys;
-use PHPCompiler\ext\standard\VmSysGetloadavgLibc;
 use PHPCompiler\ext\standard\VmSysGetloadavgNative;
 use PHPCompiler\ext\standard\VmSysGetloadavgPure;
 use PHPUnit\Framework\TestCase;
 
-/** sys_getloadavg() pure /proc path without libc getloadavg FFI (#12106, php-in-php). */
+/** sys_getloadavg() pure path without libc getloadavg FFI (#12106, #13564, php-in-php). */
 final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
 {
-    public function testVmSysGetloadavgUsesPureBackendWithoutHostDelegation(): void
+    public function testVmSysGetloadavgUsesPureBackendWithoutLibcFfi(): void
     {
         $native = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetloadavgNative.php');
         $this->assertStringContainsString('VmSysGetloadavgPure::getLoadavg', $native);
-        $this->assertStringContainsString('VmSysGetloadavgLibc::getLoadavg', $native);
+        $this->assertStringNotContainsString('VmSysGetloadavgLibc', $native);
         $this->assertStringNotContainsString('\\FFI', $native);
         $this->assertStringNotContainsString('$ffi->getloadavg', $native);
         $this->assertStringNotContainsString('int getloadavg', $native);
-        $this->assertDoesNotMatchRegularExpression('/\\\\sys_getloadavg\\s*\\(/', $native);
-
-        $libc = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetloadavgLibc.php');
-        $this->assertStringContainsString('getloadavg', $libc);
-        $this->assertStringContainsString('\\FFI::cdef', $libc);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/VmSysGetloadavgLibc.php');
 
         $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmSysGetloadavgPure.php');
+        $this->assertStringContainsString('sys_getloadavg', $pure);
         $this->assertStringContainsString('/proc/loadavg', $pure);
         $this->assertStringNotContainsString('\\FFI', $pure);
     }
@@ -45,7 +41,7 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
     public function testSysGetloadavgJitHelperMatchesVmSys(): void
     {
         if (!VmSysGetloadavgPure::available()) {
-            $this->markTestSkipped('/proc/loadavg unavailable');
+            $this->markTestSkipped('sys_getloadavg and /proc/loadavg unavailable');
         }
 
         $vm = VmSys::getLoadavg();
@@ -58,7 +54,7 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
     public function testNativeGetLoadavgShapeOnLinux(): void
     {
         if (!VmSysGetloadavgNative::available()) {
-            $this->markTestSkipped('/proc/loadavg unavailable');
+            $this->markTestSkipped('sys_getloadavg unavailable');
         }
 
         $avg = VmSysGetloadavgNative::getLoadavg();
@@ -70,19 +66,18 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testLibcPathMatchesProcPrecisionWhenFfiDisabled(): void
+    public function testProcFallbackWhenHostBuiltinDisabled(): void
     {
-        if (!VmSysGetloadavgPure::available()) {
+        if (!\is_readable('/proc/loadavg')) {
             $this->markTestSkipped('/proc/loadavg unavailable');
         }
 
         $previous = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $pure = VmSysGetloadavgPure::getLoadavg();
-            $native = VmSysGetloadavgNative::getLoadavg();
-            $this->assertIsArray($pure);
-            $this->assertSame($pure, $native);
+            $avg = VmSysGetloadavgPure::getLoadavg();
+            $this->assertIsArray($avg);
+            $this->assertCount(3, $avg);
         } finally {
             if (false === $previous) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
@@ -92,10 +87,10 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
         }
     }
 
-    public function testLibcPathHasMorePrecisionThanProcStringWhenAvailable(): void
+    public function testHostBuiltinHasMorePrecisionThanProcStringWhenAvailable(): void
     {
-        if (!VmSysGetloadavgLibc::available() || !VmSysGetloadavgPure::available()) {
-            $this->markTestSkipped('libc or /proc/loadavg unavailable');
+        if (!\function_exists('sys_getloadavg') || !\is_readable('/proc/loadavg')) {
+            $this->markTestSkipped('host sys_getloadavg or /proc/loadavg unavailable');
         }
 
         $raw = @\file_get_contents('/proc/loadavg');
@@ -107,8 +102,8 @@ final class VmSysGetloadavgRuntimeShrinkTest extends TestCase
             $this->markTestSkipped('empty /proc/loadavg');
         }
 
-        $libc = VmSysGetloadavgLibc::getLoadavg();
-        $this->assertIsArray($libc);
-        $this->assertNotSame($procField, \rtrim(\sprintf('%.12F', $libc[0]), '0'));
+        $host = @\sys_getloadavg();
+        $this->assertIsArray($host);
+        $this->assertNotSame($procField, \rtrim(\sprintf('%.12F', (float) $host[0]), '0'));
     }
 }

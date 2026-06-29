@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM sys_getloadavg() — libc getloadavg(3) when FFI available, else /proc/loadavg (#12106, #13020).
+ * VM sys_getloadavg() — {@see VmSysGetloadavgPure} SSOT, no libc FFI (#12106, #13564).
  *
- * Mirrors {@see SysGetloadavgJitHelper} — {@see VmSysGetloadavgPure} is FFI-free fallback.
+ * Mirrors {@see SysGetloadavgJitHelper} — host `\sys_getloadavg()` or `/proc/loadavg` fallback.
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(sys_getloadavg)
  */
@@ -15,7 +15,7 @@ final class VmSysGetloadavgNative
 {
     public static function available(): bool
     {
-        return VmSysGetloadavgLibc::available() || VmSysGetloadavgPure::available();
+        return VmSysGetloadavgPure::available();
     }
 
     /**
@@ -23,13 +23,6 @@ final class VmSysGetloadavgNative
      */
     public static function getLoadavg(): array|false
     {
-        if (VmSysGetloadavgLibc::available()) {
-            $libc = VmSysGetloadavgLibc::getLoadavg();
-            if (false !== $libc) {
-                return $libc;
-            }
-        }
-
         return VmSysGetloadavgPure::getLoadavg();
     }
 }
