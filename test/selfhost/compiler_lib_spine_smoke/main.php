@@ -343,6 +343,7 @@ require_once __DIR__.'/../../../ext/posix/posix_strerror.php';
 require_once __DIR__.'/../../../ext/posix/posix_times.php';
 require_once __DIR__.'/../../../ext/posix/posix_uname.php';
 require_once __DIR__.'/../../../ext/random/BuiltinClasses.php';
+require_once __DIR__.'/../../../ext/random/BuiltinEnums.php';
 require_once __DIR__.'/../../../ext/random/Mt19937Instance.php';
 require_once __DIR__.'/../../../ext/random/RandomizerBuiltin.php';
 require_once __DIR__.'/../../../ext/random/Module.php';
