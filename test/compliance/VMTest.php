@@ -331,6 +331,18 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'nodiscard_class_exists')) {
                 continue;
             }
+            if (!CompilerVersion::advertisesEnumCasesAttributeClass()
+                && str_contains($name, 'enumcases_class_exists')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesNoDiscardAttributeClass()
+                && str_contains($name, 'nodiscard_class_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::advertisesEnumCasesAttributeClass()
+                && str_contains($name, 'enumcases_class_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::advertisesDateExceptionHierarchy()
                 && (str_contains($name, 'dateexception')
                     || str_contains($name, 'dateerror')
