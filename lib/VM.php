@@ -15106,6 +15106,9 @@ restart:
         if (!isset($frame->scope[$slot]) || $frame->block->isNamedVariableSlot($slot)) {
             return;
         }
+        if ($this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
+            return;
+        }
         $var = $frame->scope[$slot]->resolveIndirect();
         if (Variable::TYPE_OBJECT === $var->type) {
             try {
@@ -15137,6 +15140,17 @@ restart:
         $frame->scope[$slot]->null();
     }
 
+    /** True when a scope/call-arg cell resolves to a live object property backing store (#6041). */
+    private function variableAliasesObjectPropertyCell(Variable $var): bool
+    {
+        if (null !== $var->objectPropertyOwner) {
+            return true;
+        }
+        $resolved = $var->resolveIndirect();
+
+        return null !== $resolved->objectPropertyOwner;
+    }
+
     /**
      * Zend fcall end — drop by-value send snapshots and dead inline call-arg temps (#11602).
      */
@@ -15162,6 +15176,9 @@ restart:
                 $slot = $entry[2] ?? null;
             }
             if (!is_int($slot) || $frame->block->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            if (isset($frame->scope[$slot]) && $this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
                 continue;
             }
             $this->releaseVmDeadScopeSlot($frame, $slot);

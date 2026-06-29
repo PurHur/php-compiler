@@ -163,6 +163,10 @@ final class DateTimeSupport
 
     public static function timezoneName(ObjectEntry $zone): string
     {
+        if (null !== $zone->dateTimeZoneName && '' !== $zone->dateTimeZoneName) {
+            return $zone->dateTimeZoneName;
+        }
+
         return self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->toString();
     }
 
@@ -260,6 +264,7 @@ final class DateTimeSupport
             self::throwDateInvalidTimeZoneException($timezone);
         }
         self::requireStringProperty($zone, self::TZ_NAME_PROPERTY, 'DateTimeZone')->string($name);
+        $zone->dateTimeZoneName = $name;
         $zone->constructed = true;
     }
 

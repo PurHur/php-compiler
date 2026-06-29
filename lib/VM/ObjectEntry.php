@@ -90,6 +90,9 @@ class ObjectEntry {
     /** PHP 8.1 fiber callback state (issue #3130). */
     public ?FiberState $fiberState = null;
 
+    /** Canonical IANA id for DateTimeZone instances — survives scope temp clobber (#6041). */
+    public ?string $dateTimeZoneName = null;
+
     /** PHP 8.4 Resource object handle payload (#7073). */
     public ?ResourceState $resourceState = null;
 
