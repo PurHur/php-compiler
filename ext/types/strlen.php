@@ -32,7 +32,7 @@ class strlen extends Internal {
         if (null !== $frame->parent && InternalStrictArg::isCallerStrict($frame)) {
             $string = VmString::requireStringBuiltinArg($var, 'strlen', 0, 'string');
         } else {
-            $string = VmString::coerceStringBuiltinArgNoObject($var, 'strlen', 0, 'string');
+            $string = VmString::coerceStringBuiltinArg($var, 'strlen', 0, 'string');
         }
         if (!is_null($frame->returnVar)) {
             $frame->returnVar->int(VmString::byteLength($string));

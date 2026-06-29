@@ -13,6 +13,7 @@ use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
+use PHPCompiler\JIT\JitNativeString;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\TryCatchHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -54,9 +55,13 @@ final class JitStrlen
             return self::unreachableStringPtr($context);
         }
         if (JITVariable::TYPE_OBJECT === $arg->type) {
-            JitStringBuiltinArg::emitObjectTypeErrorReject($context, $arg, 'strlen', 0, 'string');
+            if ($context->callerStrictTypes) {
+                JitStringBuiltinArg::emitObjectTypeErrorReject($context, $arg, 'strlen', 0, 'string');
 
-            return self::unreachableStringPtr($context);
+                return self::unreachableStringPtr($context);
+            }
+
+            return $context->helper->loadValue(JitNativeString::coerce($context, $arg));
         }
         if (JITVariable::TYPE_VALUE === $arg->type) {
             return self::lowerBoxedStringOperand($context, $arg);
@@ -101,7 +106,11 @@ final class JitStrlen
         $context->builder->branchIf($isObjOrEnum, $objectBlock, $strictBlock);
 
         $context->builder->positionAtEnd($objectBlock);
-        JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        if ($context->callerStrictTypes) {
+            JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        } else {
+            return JitStringBuiltinArg::lowerCoercible($context, $arg, 'strlen', 0, 'string');
+        }
 
         $context->builder->positionAtEnd($strictBlock);
         if ($context->callerStrictTypes) {
@@ -168,7 +177,13 @@ final class JitStrlen
         $isObjOrEnum = $context->builder->or($isObject, $isEnumCase);
         $context->builder->branchIf($isObjOrEnum, $objectBlock, $coerceBlock);
         $context->builder->positionAtEnd($objectBlock);
-        JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        if ($context->callerStrictTypes) {
+            JitStringBuiltinArg::emitRuntimeBoxedRejectForStrlen($context, $valuePtr, $isEnumCase);
+        } else {
+            $argValue = JitStringBuiltinArg::lowerCoercible($context, $arg, 'strlen', 0, 'string');
+
+            return self::loadStringLength($context, $argValue);
+        }
         $context->builder->positionAtEnd($coerceBlock);
         $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
 
