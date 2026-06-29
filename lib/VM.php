@@ -6079,6 +6079,17 @@ restart:
                                     break;
                                 }
                             }
+                            if ($this->propertyFetchDestUsedAsDimWriteContainer($frame, $op)) {
+                                $proxy = new Variable();
+                                $proxy->objectPropertyOwner = $propertyObject;
+                                $proxy->objectPropertyName = $name;
+                                $catchFrame = $this->enforceAsymmetricPropertyWrite($proxy, $frame);
+                                if (null !== $catchFrame) {
+                                    $frame = $catchFrame;
+                                    goto restart;
+                                }
+                                $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
+                            }
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
                         }
