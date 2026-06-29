@@ -140,6 +140,11 @@ class Module extends ModuleAbstract
             'STREAM_REPORT_ERRORS' => StdlibConstants::STREAM_REPORT_ERRORS,
             'STREAM_CAST_AS_STREAM' => StdlibConstants::STREAM_CAST_AS_STREAM,
             'STREAM_CAST_FOR_SELECT' => StdlibConstants::STREAM_CAST_FOR_SELECT,
+            'PSFS_PASS_ON' => StdlibConstants::PSFS_PASS_ON,
+            'PSFS_FEED_ME' => StdlibConstants::PSFS_FEED_ME,
+            'PSFS_FLAG_NORMAL' => StdlibConstants::PSFS_FLAG_NORMAL,
+            'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
+            'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
         ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);

@@ -152,6 +152,17 @@ final class StdlibConstants
 
     public const STREAM_FILTER_WRITE = 2;
 
+    /** php_user_filter::filter() status (ext/standard/php_stream_filter.h; #11747). */
+    public const PSFS_PASS_ON = 2;
+
+    public const PSFS_FEED_ME = 1;
+
+    public const PSFS_FLAG_NORMAL = 0;
+
+    public const PSFS_FLAG_FLUSH_INC = 1;
+
+    public const PSFS_FLAG_FLUSH_CLOSE = 2;
+
     /** stream_socket_client() / stream_socket_server() flags (ext/standard/streamsfuncs.c, #4993). */
     public const STREAM_CLIENT_PERSISTENT = 1;
 
@@ -293,6 +304,11 @@ final class StdlibConstants
         'fnm_casefold' => VmFnmatch::FNM_CASEFOLD,
         'stream_filter_read' => self::STREAM_FILTER_READ,
         'stream_filter_write' => self::STREAM_FILTER_WRITE,
+        'psfs_pass_on' => self::PSFS_PASS_ON,
+        'psfs_feed_me' => self::PSFS_FEED_ME,
+        'psfs_flag_normal' => self::PSFS_FLAG_NORMAL,
+        'psfs_flag_flush_inc' => self::PSFS_FLAG_FLUSH_INC,
+        'psfs_flag_flush_close' => self::PSFS_FLAG_FLUSH_CLOSE,
         'stream_client_persistent' => self::STREAM_CLIENT_PERSISTENT,
         'stream_client_async_connect' => self::STREAM_CLIENT_ASYNC_CONNECT,
         'stream_client_connect' => self::STREAM_CLIENT_CONNECT,
