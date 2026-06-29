@@ -710,6 +710,21 @@ final class Variable {
         $this->reset();
         $this->type = self::TYPE_NULL;
     }
+
+    /** Clear a WeakReference target slot without dropping a strong ref (#13474, zend_weakrefs.c). */
+    public function clearWeakTarget(): void
+    {
+        $this->releaseTrackedMemory();
+        $this->releaseArrayRef();
+        $this->resetScalars();
+        $this->type = self::TYPE_NULL;
+        $this->streamResource = false;
+        $this->dirResource = false;
+        $this->brigadeResource = false;
+        $this->bucketResource = false;
+        $this->streamFilterResource = false;
+        $this->procResource = false;
+    }
     
     public function bool(bool $value): void {
         $this->reset();
@@ -908,6 +923,9 @@ final class Variable {
     public function reset(): void {
         $this->releaseTrackedMemory();
         if (self::TYPE_OBJECT === $this->type && isset($this->object)) {
+            if ($this->object->refCount <= 1) {
+                WeakRefRegistry::clearForObject($this->object->id);
+            }
             ObjectLifetime::releaseRef($this->object);
         }
         $this->releaseArrayRef();
