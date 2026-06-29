@@ -15,10 +15,12 @@ final class GettimeofdayRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringGettimeofday.php');
         $this->assertStringContainsString('GettimeofdayJitHelper', $source);
+        $this->assertStringContainsString('JitVmHelperLink', $source);
+        $this->assertStringNotContainsString('NestedJitCompileScope', $source);
         $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $source);
         $this->assertStringNotContainsString('ensureLibcGettimeofday', $source);
         $this->assertStringNotContainsString('TIMEVAL_SIZE', $source);
-        $this->assertLessThan(220, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(160, \substr_count($source, "\n") + 1);
     }
 
     public function testGettimeofdayJitHelperDelegatesToVmDate(): void
