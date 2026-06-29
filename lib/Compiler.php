@@ -123,6 +123,9 @@ class Compiler {
     /** Lowercase class name while compiling a class body (#3803). */
     private ?string $compilingClassLc = null;
 
+    /** Parent lc while compiling a class body — registerClass() runs after body (#13533). */
+    private ?string $compilingClassParentLc = null;
+
     /** Display class name while compiling a class body (#4286). */
     private ?string $compilingClassDisplayName = null;
 
@@ -3953,11 +3956,14 @@ class Compiler {
         }
         $prevClassStaticCompile = $this->currentClassStaticPropertyCompile;
         $this->currentClassStaticPropertyCompile = $classLc;
+        $prevCompilingParentLc = $this->compilingClassParentLc;
+        $this->compilingClassParentLc = $parentLc;
         $return->block1 = $this->compileClassBody(
             $class->stmts,
             $type,
             $className
         );
+        $this->compilingClassParentLc = $prevCompilingParentLc;
         $this->currentClassStaticPropertyCompile = $prevClassStaticCompile;
         $this->mergeTraitStaticPropertiesIntoClass($class->stmts, $classLc);
         $this->mergeTraitCompileTimeClassConstsIntoClass($class->stmts, $classLc);
@@ -4579,10 +4585,18 @@ class Compiler {
         }
         if ('parent' === $lc) {
             $declaringLc = $this->declaringClassLcForTypeHint($block);
+            if (null === $declaringLc) {
+                return $lexical;
+            }
+            $resolved = $this->classCompileRegistry->parentDisplayName($declaringLc);
+            if ((null === $resolved || '' === $resolved)
+                && $declaringLc === $this->compilingClassLc
+                && null !== $this->compilingClassParentLc
+                && '' !== $this->compilingClassParentLc) {
+                $resolved = $this->classCompileRegistry->traitDisplayName($this->compilingClassParentLc);
+            }
 
-            return null !== $declaringLc
-                ? ($this->classCompileRegistry->parentDisplayName($declaringLc) ?? $lexical)
-                : $lexical;
+            return (null !== $resolved && '' !== $resolved) ? $resolved : $lexical;
         }
 
         return $lexical;
