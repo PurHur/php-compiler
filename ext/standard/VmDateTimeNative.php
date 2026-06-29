@@ -219,9 +219,9 @@ final class VmDateTimeNative
     }
 
     /**
-     * @return array{timestamp: int, microsecond: int}
+     * @return array{timestamp: int, microsecond: int, timezone?: string}
      */
-    public static function parseDateTime(string $time, string $tzName): array
+    public static function parseDateTime(string $time, string $tzName, ?int $baseTimestamp = null): array
     {
         $time = trim($time);
         if ('' === $time) {
@@ -230,6 +230,94 @@ final class VmDateTimeNative
         if ('now' === strtolower($time)) {
             return self::readNow();
         }
+        $base = $baseTimestamp ?? self::readNow()['timestamp'];
+        $extended = self::tryParseExtendedDateTimeString($time, $tzName, $base);
+        if (null !== $extended) {
+            return $extended;
+        }
+
+        return self::parseDateTimeAbsolute($time, $tzName);
+    }
+
+    /**
+     * php-src timelib relative grammar — next weekday, first/last day of month, date + modifier (#11327).
+     *
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|null
+     */
+    private static function tryParseExtendedDateTimeString(string $time, string $tzName, int $base): ?array
+    {
+        if (1 === preg_match(
+            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            $timestamp = self::nextWeekdayTimestamp(strtolower($matches[1]), $base, $tzName);
+            if (false === $timestamp) {
+                return null;
+            }
+
+            return ['timestamp' => $timestamp, 'microsecond' => 0];
+        }
+        if (1 === preg_match('/^last day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+            $year = (int) $matches[2];
+
+            return [
+                'timestamp' => self::mktimeInTimezone(
+                    $year,
+                    $month,
+                    self::daysInMonth($year, $month),
+                    0,
+                    0,
+                    0,
+                    $tzName
+                ),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match('/^first day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
+            $month = self::englishMonthToNumber($matches[1]);
+            if (null === $month) {
+                return null;
+            }
+            $year = (int) $matches[2];
+
+            return [
+                'timestamp' => self::mktimeInTimezone($year, $month, 1, 0, 0, 0, $tzName),
+                'microsecond' => 0,
+            ];
+        }
+        if (1 === preg_match(
+            '/^(.+?)\s+([+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))$/i',
+            $time,
+            $matches
+        )) {
+            try {
+                $parsed = self::parseDateTimeAbsolute(trim($matches[1]), $tzName);
+                $modifier = preg_replace('/\s+/', ' ', trim($matches[2])) ?? trim($matches[2]);
+                $timestamp = self::modifyRelative($parsed['timestamp'], $modifier, $tzName);
+                $result = ['timestamp' => $timestamp, 'microsecond' => $parsed['microsecond']];
+                if (isset($parsed['timezone'])) {
+                    $result['timezone'] = $parsed['timezone'];
+                }
+
+                return $result;
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int, timezone?: string}
+     */
+    private static function parseDateTimeAbsolute(string $time, string $tzName): array
+    {
         if (str_starts_with($time, '@')) {
             $unix = substr($time, 1);
             if ('' === $unix || !ctype_digit($unix)) {
@@ -587,7 +675,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src PHP_FUNCTION(strtotime) — natural-language / relative timestamps (#10742).
+     * php-src PHP_FUNCTION(strtotime) — natural-language / relative timestamps (#10742, #11327).
      */
     public static function strtotime(string $time, ?int $now = null): int|false
     {
@@ -603,24 +691,21 @@ final class VmDateTimeNative
         }
         $base = $now ?? self::readNow()['timestamp'];
         if (1 === preg_match(
-            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
-            $time,
-            $matches
-        )) {
-            return self::nextWeekdayTimestamp(strtolower($matches[1]), $base, $tzName);
-        }
-        if (1 === preg_match(
             '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
             $time
         )) {
+            $modifier = $time;
+            if (!preg_match('/^[+-]/', $modifier)) {
+                $modifier = '+'.$modifier;
+            }
             try {
-                return self::modifyRelative($base, $time, $tzName);
+                return self::modifyRelative($base, $modifier, $tzName);
             } catch (NativeDateMalformedStringException) {
                 return false;
             }
         }
         try {
-            $parsed = self::parseDateTime($time, $tzName);
+            $parsed = self::parseDateTime($time, $tzName, $base);
 
             return $parsed['timestamp'];
         } catch (NativeDateMalformedStringException) {
