@@ -2195,6 +2195,7 @@ require_once __DIR__.'/../../../ext/standard/zlib_get_coding_type.php';
 require_once __DIR__.'/../../../ext/stats/JitStats.php';
 require_once __DIR__.'/../../../ext/stats/Module.php';
 require_once __DIR__.'/../../../ext/stats/StatsFunction.php';
+require_once __DIR__.'/../../../ext/stats/StatsJitHelper.php';
 require_once __DIR__.'/../../../ext/stats/VmStats.php';
 require_once __DIR__.'/../../../ext/stats/stats_covariance.php';
 require_once __DIR__.'/../../../ext/stats/stats_standard_deviation.php';
