@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayIsListRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -43,6 +44,6 @@ final class array_is_list extends Internal
             return JitArrayIsList::unreachableBool($context);
         }
 
-        return JitArrayIsList::invoke($context, $args[0]);
+        return ArrayIsListRuntime::isList($context, $args[0]);
     }
 }
