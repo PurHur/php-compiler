@@ -17487,6 +17487,13 @@ class Compiler {
         if (!$candidate instanceof Op\Expr || null === $candidate->result) {
             return null;
         }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (
+            null === $callArg
+            || !$this->inlineCallArgProducerFeedsCallArgOp($candidate, $cfgCallOp, $callArg)
+        ) {
+            return null;
+        }
         if (null === $block->slotForOperand($candidate->result)) {
             $prevForce = $this->forceDeferredSiblingCallReturnSlot;
             $this->forceDeferredSiblingCallReturnSlot = true;
@@ -18730,7 +18737,7 @@ class Compiler {
 
         // Producer may feed a dead temp via position matching when operand identity
         // does not link result→arg (#11313, #11409); unrelated named locals are skipped above.
-        return true;
+        return $feedsConsumerArg;
     }
 
     /**
@@ -21930,8 +21937,15 @@ class Compiler {
                         }
                         $valueSlot = (string) $chainedConcatSlot;
                     } else {
+                        $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                         foreach ($trailingProducers as $producer) {
                             if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                                continue;
+                            }
+                            if (
+                                null === $callArgProbe
+                                || !$this->inlineCallArgProducerFeedsCallArgOp($producer, $cfgCallOp, $callArgProbe)
+                            ) {
                                 continue;
                             }
                             $subjectSlot = $block->slotForOperand($producer->result);

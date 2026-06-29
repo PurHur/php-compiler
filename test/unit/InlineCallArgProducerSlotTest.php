@@ -3504,4 +3504,38 @@ PHP;
         $runtime->run($block);
         self::assertSame("array (\n  0 => 'a',\n  1 => 'b',\n)\n", ob_get_clean());
     }
+
+    /** Issue #13800 — extract(inline array) then var_export($local) must not re-compile extract for var_export arg. */
+    public function testExtractInlineArrayThenVarExportNamedLocal(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$a = 1;
+extract(['a' => 2]);
+var_export($a);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'extract_inline_var_export.php');
+
+        $initNames = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $initNames[] = $block->constants[$op->arg1]->toString();
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertSame(['extract', 'var_export'], $initNames, 'fcall inits='.json_encode($initNames));
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'extract and var_export must use distinct arg slots');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\n", ob_get_clean());
+    }
 }
