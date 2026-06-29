@@ -2109,7 +2109,22 @@ final class VmString
                 }
             }
         }
-        if (str_contains($authority, ':')) {
+        if (str_starts_with($authority, '[')) {
+            $closeBracket = strpos($authority, ']');
+            if (false !== $closeBracket) {
+                $host = substr($authority, 0, $closeBracket + 1);
+                $remainder = substr($authority, $closeBracket + 1);
+                if ('' !== $remainder && ':' === $remainder[0]) {
+                    $portVal = (int) substr($remainder, 1);
+                    if ($portVal > 0 && $portVal <= 65535) {
+                        $port = $portVal;
+                        $hasPort = true;
+                    }
+                }
+            } else {
+                $host = $authority;
+            }
+        } elseif (str_contains($authority, ':')) {
             [$host, $portStr] = explode(':', $authority, 2);
             $portVal = (int) $portStr;
             if ($portVal > 0 && $portVal <= 65535) {
