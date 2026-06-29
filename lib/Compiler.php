@@ -15913,6 +15913,10 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($targetArg)) {
             return false;
         }
+        // array_splice($a, …); json_encode($a, JSON_*) — stmt FuncCall must not feed named arg (#13573).
+        if ($this->isNamedVariableOperand($targetArg)) {
+            return false;
+        }
         // Trailing hoisted literal preludes only (e.g. var_export(g(), true), in_array('x', g(), true);
         // statement-level calls before multiple hoisted ConstFetch args must not match (#11312, #11373).
         // json_decode(str_repeat(...), true, 512, JSON_THROW_ON_ERROR): embedded 512 is not a cfg prelude (#12009).
@@ -15946,6 +15950,13 @@ class Compiler {
             } else {
                 return false;
             }
+        }
+
+        if (
+            null === $producer->result
+            || !$this->operandsReferToSameVariable($producer->result, $targetArg)
+        ) {
+            return false;
         }
 
         return true;
