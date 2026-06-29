@@ -15821,6 +15821,13 @@ class Compiler {
         if (!$this->callArgIsDeadInlineTemporary($targetArg)) {
             return false;
         }
+        // Statement-level side effects before f('lit', g(), lit) are not sibling producers (#13509).
+        if (
+            null === $producer->result
+            || !$this->operandsReferToSameVariable($producer->result, $targetArg)
+        ) {
+            return false;
+        }
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
             if (
