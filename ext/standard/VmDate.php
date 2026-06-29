@@ -6,7 +6,7 @@ declare(strict_types=1);
  * VM date/time helpers without host Zend time()/date() (issue #5045).
  *
  * php-src: ext/date/php_date.c — time, date, gmdate, microtime, getdate.
- * JIT/AOT: JitDate.php, StringMicrotime/StringGettimeofday LLVM, StringDateTime (__compiler_format_datetime).
+ * JIT/AOT: JitDate.php, MicrotimeJitHelper/GettimeofdayJitHelper PHP, StringDateTime (__compiler_format_datetime).
  */
 namespace PHPCompiler\ext\standard;
 

@@ -512,6 +512,7 @@ require_once __DIR__.'/../../../ext/standard/GetClassJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetDeclaredExcludeDeprecatedJit.php';
 require_once __DIR__.'/../../../ext/standard/GetcwdJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetdateJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/GettimeofdayJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GetenvJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbyaddrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/GethostbynamelJitHelper.php';

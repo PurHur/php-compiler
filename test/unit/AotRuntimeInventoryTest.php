@@ -84,5 +84,7 @@ final class AotRuntimeInventoryTest extends TestCase
 
         $gettimeofday = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/StringGettimeofday.php');
         $this->assertStringContainsString('__compiler_gettimeofday', $gettimeofday);
+        $this->assertStringContainsString('GettimeofdayJitHelper', $gettimeofday);
+        $this->assertStringNotContainsString("lookupFunction('gettimeofday')", $gettimeofday);
     }
 }
