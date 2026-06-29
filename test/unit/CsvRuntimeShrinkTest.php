@@ -23,13 +23,26 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
     }
 
-    public function testStringFgetcsvJitUsesPhpParseOnStandalone(): void
+    public function testStringFgetcsvJitUsesPhpHelperNotFgetsLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringFgetcsvJit.php');
-        $this->assertStringContainsString('emitCompilerFgetcsvPhpParse', $source);
-        $this->assertStringContainsString('CsvJitHelper::parseLineArgv', $source);
-        $this->assertStringNotContainsString('emitCompilerFgetcsv(', $source);
-        $this->assertStringNotContainsString('__phpc_csv_parse_line', $source);
+        $this->assertStringContainsString('CsvJitHelper::fgetcsvArgv', $source);
+        $this->assertStringContainsString('implementFgetcsvBridge', $source);
+        $this->assertStringNotContainsString('emitCompilerFgetcsvPhpParse', $source);
+        $this->assertStringNotContainsString('lookupFunction(\'fgets\')', $source);
+        $this->assertStringNotContainsString('lookupFunction(\'malloc\')', $source);
+        $this->assertStringNotContainsString('__phpc_resolve_stream', $source);
+    }
+
+    public function testCsvJitHelperFgetcsvArgvMatchesVmFs(): void
+    {
+        $handle = \PHPCompiler\ext\standard\VmPhpMemoryStream::open('php://memory', 'w+b');
+        $this->assertIsInt($handle);
+        \PHPCompiler\ext\standard\VmPhpMemoryStream::write($handle, "a,b\n");
+        \PHPCompiler\ext\standard\VmPhpMemoryStream::seek($handle, 0, \SEEK_SET);
+        $ht = CsvJitHelper::fgetcsvArgv($handle, -1, ',', '"', '\\');
+        $this->assertNotNull($ht);
+        $this->assertSame(2, $ht->getNumElements());
     }
 
     public function testCsvJitHelperMatchesVmCsvSemantics(): void
