@@ -2,6 +2,7 @@
 stdlib: sort() on null throws Error cannot be passed by reference (VM, #4333, ext/standard/array.c)
 --FILE--
 <?php
+error_reporting(0);
 $fns = ['sort', 'rsort', 'asort', 'arsort', 'ksort', 'krsort', 'usort', 'uasort', 'uksort'];
 foreach ($fns as $fn) {
     try {
@@ -11,7 +12,8 @@ foreach ($fns as $fn) {
         echo $fn, ': ', $e->getMessage(), "\n";
     }
 }
---EXPECT--
+--EXPECTF--
+%A
 sort: sort(): Argument #1 ($array) cannot be passed by reference
 rsort: rsort(): Argument #1 ($array) cannot be passed by reference
 asort: asort(): Argument #1 ($array) cannot be passed by reference
