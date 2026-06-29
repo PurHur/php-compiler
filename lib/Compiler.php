@@ -15970,8 +15970,13 @@ class Compiler {
         }
         $useHoistedArgLiteralPreludeCount = $embeddedLiteralCount > 0
             && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall);
+        // Leading embedded literal + middle hoisted producer (in_array('x', g(), true)): trailing
+        // ConstFetch preludes count from $targetArgIndex (#11373, #13507). json_decode(g(), true, …)
+        // keeps hoisted-arg formula when the producer feeds arg 0 (#12009).
         $expectedLiteralPreludes = $useHoistedArgLiteralPreludeCount
-            ? max(0, $hoistedArgCount - 1 - $targetArgIndex)
+            ? ($targetArgIndex > 0
+                ? max(0, $argCount - 1 - $targetArgIndex)
+                : max(0, $hoistedArgCount - 1 - $targetArgIndex))
             : ($argCount - 1 - $targetArgIndex);
         if ($literalPreludeCount !== $expectedLiteralPreludes) {
             // var_export(in_array(..., true), true) — nested producer feeds arg0, not arg1 (#11399).
@@ -15991,11 +15996,26 @@ class Compiler {
             }
         }
 
-        if (
-            null === $producer->result
-            || !$this->operandsReferToSameVariable($producer->result, $targetArg)
-        ) {
+        if (null === $producer->result) {
             return false;
+        }
+        if (!$this->operandsReferToSameVariable($producer->result, $targetArg)) {
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null === $firstSibling || $producerIndex !== $firstSibling) {
+                return false;
+            }
+            $leadingEmbedded = 0;
+            foreach ($consumer->args as $callArg) {
+                if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                    ++$leadingEmbedded;
+                    continue;
+                }
+                break;
+            }
+            $ordinal = $producerIndex - $firstSibling;
+            if (($leadingEmbedded + $ordinal) !== $targetArgIndex) {
+                return false;
+            }
         }
 
         return true;
@@ -16221,6 +16241,9 @@ class Compiler {
         }
         for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
             $sib = $cfgChildren[$j] ?? null;
+            if ($sib instanceof Op\Expr\ConstFetch || $sib instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
             if (
                 !$sib instanceof Op\Expr\FuncCall
                 && !$sib instanceof Op\Expr\NsFuncCall
@@ -16229,8 +16252,16 @@ class Compiler {
             }
         }
         $ordinal = $producerIndex - $firstSibling;
+        $leadingEmbedded = 0;
+        foreach ($consumer->args as $callArg) {
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                ++$leadingEmbedded;
+                continue;
+            }
+            break;
+        }
 
-        return $ordinal === $targetArgIndex;
+        return ($leadingEmbedded + $ordinal) === $targetArgIndex;
     }
 
     /**
