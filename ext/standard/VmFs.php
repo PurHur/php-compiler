@@ -23,6 +23,9 @@ final class VmFs
     /** @var array<int, string> user fopen mode at open time (stream_get_meta_data mode; #13021) */
     private static array $handleModes = [];
 
+    /** @var array<int, bool> stream blocking flag for stream_get_meta_data blocked key (#13724) */
+    private static array $handleBlocked = [];
+
     /** @var array<int, int> stream handle => dup(2) socket fd from VmStreamSocketNative (#8202) */
     private static array $handleSocketFds = [];
 
@@ -911,7 +914,7 @@ final class VmFs
         unset(self::$gzNativePlaceholders[$handle]);
         if (VmPhpMemoryStream::isValidHandle($handle)) {
             VmPhpMemoryStream::close($handle);
-            unset(self::$handlePaths[$handle], self::$handleModes[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
 
             return;
         }
@@ -1087,7 +1090,7 @@ final class VmFs
             return VmUserStream::close($handle);
         }
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            unset(self::$handlePaths[$handle], self::$handleModes[$handle]);
+            unset(self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle]);
 
             return VmPhpMemoryStream::close($handle);
         }
@@ -1105,7 +1108,7 @@ final class VmFs
             return false;
         }
         VmStreamFilterChain::clearStream($handle);
-        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleSocketFds[$handle]);
+        unset(self::$handles[$handle], self::$handlePaths[$handle], self::$handleModes[$handle], self::$handleBlocked[$handle], self::$handleSocketFds[$handle]);
         if (!self::releaseHostResourceRef($fp)) {
             return true;
         }
@@ -1352,14 +1355,16 @@ final class VmFs
         $uri = self::handleUri($handle);
         $fp = self::lookup($handle);
         $reportedMode = VmStreamMeta::userFacingMode($uri, self::handleMode($handle));
+        $blocked = self::handleBlocked($handle);
         if (null !== $fp) {
-            $meta = VmStreamMeta::buildMetaArray($uri, $fp, null, $reportedMode);
+            $meta = VmStreamMeta::buildMetaArray($uri, $fp, null, $reportedMode, $blocked);
         } else {
             $meta = VmStreamMeta::buildMetaArray(
                 $uri,
                 null,
                 VmStreamMeta::eofForNativeHandle($handle),
-                $reportedMode
+                $reportedMode,
+                $blocked
             );
         }
 
@@ -1374,18 +1379,29 @@ final class VmFs
         if (VmPhpMemoryStream::isValidHandle($handle)
             || VmPhpInputOutputStream::isValidHandle($handle)
             || VmUserStream::isValidHandle($handle)) {
+            self::setHandleBlocked($handle, $mode);
+
             return true;
         }
         $fd = self::socketFdForHandle($handle);
         if (null !== $fd) {
-            return VmStreamBlockingNative::setBlocking($fd, $mode);
+            $ok = VmStreamBlockingNative::setBlocking($fd, $mode);
+            if ($ok) {
+                self::setHandleBlocked($handle, $mode);
+            }
+
+            return $ok;
         }
         $fp = self::lookup($handle);
         if (null === $fp) {
             return false;
         }
+        $ok = VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
+        if ($ok) {
+            self::setHandleBlocked($handle, $mode);
+        }
 
-        return VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
+        return $ok;
     }
 
     /**
@@ -2280,6 +2296,7 @@ final class VmFs
             self::$handles[$handle],
             self::$handlePaths[$handle],
             self::$handleModes[$handle],
+            self::$handleBlocked[$handle],
             self::$handleSocketFds[$handle],
             self::$popenHandles[$handle]
         );
@@ -2341,6 +2358,18 @@ final class VmFs
     public static function handleMode(int $handle): ?string
     {
         return self::$handleModes[$handle] ?? null;
+    }
+
+    public static function setHandleBlocked(int $handle, bool $blocked): void
+    {
+        if ($handle > 0) {
+            self::$handleBlocked[$handle] = $blocked;
+        }
+    }
+
+    public static function handleBlocked(int $handle): bool
+    {
+        return self::$handleBlocked[$handle] ?? true;
     }
 
     public static function tempDir(): string

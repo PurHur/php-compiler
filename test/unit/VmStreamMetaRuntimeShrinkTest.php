@@ -83,4 +83,21 @@ final class VmStreamMetaRuntimeShrinkTest extends TestCase
         $this->assertTrue(VmFs::streamSetBlocking($handle, true));
         VmFs::fclose($handle);
     }
+
+    public function testStreamSetBlockingUpdatesBlockedMetadata(): void
+    {
+        $handle = VmFs::fopen('php://memory', 'r+');
+        $this->assertNotFalse($handle);
+        $this->assertTrue(VmFs::streamSetBlocking($handle, false));
+        $meta = VmFs::streamGetMetaData($handle);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $meta);
+        $blocked = null;
+        foreach ($meta->iterateKeyed(false) as [$keyVar, $value]) {
+            if (Variable::TYPE_STRING === $keyVar->type && 'blocked' === $keyVar->toString()) {
+                $blocked = $value->toBool();
+            }
+        }
+        $this->assertFalse($blocked);
+        VmFs::fclose($handle);
+    }
 }
