@@ -26,9 +26,10 @@ final class VmHttpBuildQuery
         array $data,
         string $numericPrefix = '',
         string $argSeparator = '&',
-        int $encodingType = self::ENCODING_RFC1738
+        int $encodingType = self::ENCODING_RFC1738,
+        bool $legacyIntEncodingArg = false
     ): string {
-        return self::buildWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null);
+        return self::buildWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null, $legacyIntEncodingArg);
     }
 
     /**
@@ -39,9 +40,10 @@ final class VmHttpBuildQuery
         string $numericPrefix,
         string $argSeparator,
         int $encodingType,
-        ?string $keyPrefix
+        ?string $keyPrefix,
+        bool $legacyIntEncodingArg = false
     ): string {
-        $useRaw = self::ENCODING_RFC3986 === $encodingType;
+        $useRaw = !$legacyIntEncodingArg && self::ENCODING_RFC3986 === $encodingType;
         $parts = [];
         foreach ($data as $key => $value) {
             $encoded = self::encodeEntry(
@@ -51,7 +53,8 @@ final class VmHttpBuildQuery
                 $keyPrefix,
                 $useRaw,
                 $argSeparator,
-                $encodingType
+                $encodingType,
+                $legacyIntEncodingArg
             );
             if ('' !== $encoded) {
                 $parts[] = $encoded;
@@ -68,9 +71,10 @@ final class VmHttpBuildQuery
         HashTable $data,
         string $numericPrefix = '',
         string $argSeparator = '&',
-        int $encodingType = self::ENCODING_RFC1738
+        int $encodingType = self::ENCODING_RFC1738,
+        bool $legacyIntEncodingArg = false
     ): string {
-        return self::buildHashTableWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null);
+        return self::buildHashTableWithKeyPrefix($data, $numericPrefix, $argSeparator, $encodingType, null, $legacyIntEncodingArg);
     }
 
     private static function buildHashTableWithKeyPrefix(
@@ -78,9 +82,10 @@ final class VmHttpBuildQuery
         string $numericPrefix,
         string $argSeparator,
         int $encodingType,
-        ?string $keyPrefix
+        ?string $keyPrefix,
+        bool $legacyIntEncodingArg = false
     ): string {
-        $useRaw = self::ENCODING_RFC3986 === $encodingType;
+        $useRaw = !$legacyIntEncodingArg && self::ENCODING_RFC3986 === $encodingType;
         $parts = [];
         foreach ($data->exportKeyValuePairs(true) as [$keyVar, $valVar]) {
             $encoded = self::encodeHashTableEntry(
@@ -90,7 +95,8 @@ final class VmHttpBuildQuery
                 $keyPrefix,
                 $useRaw,
                 $argSeparator,
-                $encodingType
+                $encodingType,
+                $legacyIntEncodingArg
             );
             if ('' !== $encoded) {
                 $parts[] = $encoded;
@@ -107,7 +113,8 @@ final class VmHttpBuildQuery
         ?string $keyPrefix,
         bool $useRaw,
         string $argSeparator,
-        int $encodingType
+        int $encodingType,
+        bool $legacyIntEncodingArg = false
     ): string {
         $key = $keyVar->resolveIndirect();
         $isIntKey = Variable::TYPE_INTEGER === $key->type;
@@ -131,7 +138,8 @@ final class VmHttpBuildQuery
                 '',
                 $argSeparator,
                 $encodingType,
-                $childPrefix
+                $childPrefix,
+                $legacyIntEncodingArg
             );
         }
         if (Variable::TYPE_NULL === $value->type) {
@@ -178,7 +186,8 @@ final class VmHttpBuildQuery
         ?string $keyPrefix,
         bool $useRaw,
         string $argSeparator,
-        int $encodingType
+        int $encodingType,
+        bool $legacyIntEncodingArg = false
     ): string {
         $isIntKey = \is_int($key);
         $keyStr = $isIntKey ? (string) $key : $key;
@@ -195,7 +204,7 @@ final class VmHttpBuildQuery
                 $useRaw
             );
 
-            return self::buildWithKeyPrefix($value, '', $argSeparator, $encodingType, $childPrefix);
+            return self::buildWithKeyPrefix($value, '', $argSeparator, $encodingType, $childPrefix, $legacyIntEncodingArg);
         }
         if (null === $value) {
             return '';
