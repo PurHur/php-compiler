@@ -856,6 +856,7 @@ class Context {
         Builtin\JitReturnPending::ensureStandaloneBodies($this);
         Builtin\ObOutputRuntime::ensureLinked($this);
         Builtin\StringTriggerError::ensureStandaloneBodies($this);
+        Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
         Builtin\StringRandomBytes::implement($this);
         Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
         Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
