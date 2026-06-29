@@ -16,7 +16,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -37,11 +36,7 @@ final class strpos extends Internal
         }
         $offset = 0;
         if (3 === $argc) {
-            $offVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offVar->type) {
-                throw new \LogicException('strpos() offset must be an integer in this compiler build');
-            }
-            $offset = $offVar->toInt();
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'strpos', 3, 'offset');
         }
         $result = VmString::strpos($haystackStr, $needleStr, $offset);
         if (false === $result) {
@@ -60,14 +55,10 @@ final class strpos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('strpos() requires two or three arguments');
         }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('strpos() offset must be an integer in this compiler build');
-        }
-
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'strpos', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'strpos', 1, 'needle');
         $offset = 3 === $argc
-            ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strpos', 3, 'offset')
             : null;
 
         return JitStrpos::find($context, $hay, $needle, $offset);

@@ -31,11 +31,7 @@ final class stripos extends Internal
         $needleStr = VmString::coerceOperand($needle);
         $offset = 0;
         if (3 === $argc) {
-            $offVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offVar->type) {
-                throw new \LogicException('stripos() offset must be an integer in this compiler build');
-            }
-            $offset = $offVar->toInt();
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'stripos', 3, 'offset');
         }
         $result = VmString::stripos($haystackStr, $needleStr, $offset);
         if (false === $result) {
@@ -54,14 +50,10 @@ final class stripos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('stripos() requires two or three arguments');
         }
-        if (3 === $argc && JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
-            throw new \LogicException('stripos() offset must be an integer in this compiler build');
-        }
-
         $hay = $this->jitString($context, $args[0], 'stripos() argument #1');
         $needle = $this->jitString($context, $args[1], 'stripos() argument #2');
         $offset = 3 === $argc
-            ? $context->builder->truncOrBitCast($context->helper->loadValue($args[2]), $context->getTypeFromString('int64'))
+            ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'stripos', 3, 'offset')
             : null;
 
         return JitStrpos::find($context, $hay, $needle, $offset, true);
