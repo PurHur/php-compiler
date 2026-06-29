@@ -1051,9 +1051,10 @@ final class VmString
             $length = $needleLen > $hayRemain ? $hayRemain : $needleLen;
         }
         $s1 = self::byteSlice($haystack, $offset, $length);
+        $strncmpLen = $lengthOmitted ? $length : min($length, $needleLen);
         $cmp = $caseInsensitive
-            ? self::strncmpCase($s1, $needle, $length)
-            : self::strncmp($s1, $needle, $length);
+            ? self::strncmpCase($s1, $needle, $strncmpLen)
+            : self::strncmp($s1, $needle, $strncmpLen);
         if (0 !== $cmp) {
             return $cmp;
         }
