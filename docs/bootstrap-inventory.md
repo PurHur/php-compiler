@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3498 |
-| Phase A inventory files (M2 ratio SSOT) | 3498 |
+| PHP files on vm.php path | 3502 |
+| Phase A inventory files (M2 ratio SSOT) | 3502 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9483 |
+| Source constructs flagged (warnings) | 9491 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -480,6 +480,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetoptEngine.php` | 0 | 1 |
 | `ext/standard/GetoptJitHelper.php` | 0 | 1 |
 | `ext/standard/GetrusageJitHelper.php` | 0 | 1 |
+| `ext/standard/GettimeofdayJitHelper.php` | 0 | 1 |
 | `ext/standard/GlobalIntrospectionNameJitHelper.php` | 0 | 1 |
 | `ext/standard/GmgetdateJitHelper.php` | 0 | 1 |
 | `ext/standard/GmmktimeJitHelper.php` | 0 | 1 |
@@ -928,6 +929,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrspn.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
 | `ext/standard/JitStrtok.php` | 0 | 1 |
+| `ext/standard/JitStrtotime.php` | 0 | 1 |
 | `ext/standard/JitStrtr.php` | 0 | 1 |
 | `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitSubstrReplace.php` | 0 | 1 |
@@ -1064,6 +1066,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
+| `ext/standard/StrtotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtrArrayJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtrTwoStringJitHelper.php` | 0 | 1 |
 | `ext/standard/SubstrCompareJitHelper.php` | 0 | 1 |
@@ -2619,7 +2622,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringGetrusageRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGettext.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringGettextRuntime.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringGettimeofday.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringGmgetdate.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringGmmktime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashAlgos.php` | 0 | 1 |
@@ -2681,6 +2684,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrtotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtr.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSubstrCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSuperglobalName.php` | 0 | 1 |
@@ -6660,6 +6664,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/GettimeofdayJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `ext/standard/GlobalIntrospectionNameJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9016,6 +9025,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/JitStrtotime.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/JitStrtr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10545,6 +10559,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
+### `ext/standard/StrtotimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/StrtrArrayJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11042,11 +11061,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 101)
-- new RecursiveIteratorIterator (line 1869)
-- new RecursiveDirectoryIterator (line 1870)
-- new RecursiveIteratorIterator (line 1971)
-- new RecursiveDirectoryIterator (line 1972)
-- 66 class method(s)
+- new RecursiveIteratorIterator (line 1954)
+- new RecursiveDirectoryIterator (line 1955)
+- new RecursiveIteratorIterator (line 2056)
+- new RecursiveDirectoryIterator (line 2057)
+- 68 class method(s)
 - 10 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -20641,7 +20660,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGettimeofday.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- new JIT (line 171)
+- 8 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringGmgetdate.php`
 
@@ -21014,6 +21035,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `lib/JIT/Builtin/StringStrtotime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 177)
+- 6 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringStrtr.php`
 
