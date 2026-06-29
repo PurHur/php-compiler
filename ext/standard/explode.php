@@ -38,7 +38,7 @@ final class explode extends Internal
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'explode', 1, 'string');
         $limit = \PHP_INT_MAX;
         if (3 === $argc) {
-            $limit = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'explode', 3, 'limit');
+            $limit = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'explode', 3, 'limit');
         }
         if (null === $frame->returnVar) {
             return;
@@ -77,7 +77,7 @@ final class explode extends Internal
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
         $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
         if (3 === $argc) {
-            $limitLit = self::compileTimeLimit($args[2]);
+            $limitLit = self::compileTimeLimit($context, $args[2]);
             $delimLit = $args[0]->compileTimeString ?? null;
             $hayLit = $args[1]->compileTimeString ?? null;
             if (null !== $limitLit && null !== $delimLit && null !== $hayLit) {
@@ -85,7 +85,7 @@ final class explode extends Internal
             }
             $limit = null !== $limitLit
                 ? $context->constantFromInteger($limitLit, 'int64')
-                : JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'explode', 3, 'limit');
+                : JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'explode', 3, 'limit');
 
             return JitExplode::explode($context, $delimiter, $haystack, $limit);
         }
@@ -93,7 +93,7 @@ final class explode extends Internal
         return JitExplode::explode($context, $delimiter, $haystack);
     }
 
-    private static function compileTimeLimit(JITVariable $arg): ?int
+    private static function compileTimeLimit(Context $context, JITVariable $arg): ?int
     {
         if (JITVariable::KIND_VALUE !== $arg->kind) {
             return null;
@@ -102,6 +102,10 @@ final class explode extends Internal
             return (int) $arg->compileTimeLong;
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && null !== ($arg->compileTimeDouble ?? null)) {
+            if ($context->callerStrictTypes) {
+                return null;
+            }
+
             return VmMath::floatToZendLong((float) $arg->compileTimeDouble);
         }
 
