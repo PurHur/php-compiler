@@ -84,4 +84,76 @@ final class VmPregNative
     {
         return VmPregPure::patternWarningMessage($pattern);
     }
+
+    /**
+     * preg_replace_callback() match loop for JIT/AOT PHP bridge (#13736).
+     *
+     * @param callable(array<int|string, string>): string $invokeMatchCallback
+     */
+    public static function pregReplaceCallbackJit(
+        string $pattern,
+        string $subject,
+        callable $invokeMatchCallback,
+        int $limit = -1
+    ): ?string {
+        if (\strlen($pattern) > VmPreg::MAX_PATTERN_BYTES) {
+            self::setLastError(1);
+
+            return null;
+        }
+
+        $result = '';
+        $offset = 0;
+        $len = \strlen($subject);
+        $replacements = 0;
+
+        while ($offset < $len) {
+            if ($limit >= 0 && $replacements >= $limit) {
+                $result .= \substr($subject, $offset);
+
+                break;
+            }
+
+            $matches = [];
+            $matchCount = self::pregMatch(
+                $pattern,
+                $subject,
+                $matches,
+                StdlibConstants::PREG_OFFSET_CAPTURE,
+                $offset
+            );
+            if (false === $matchCount) {
+                return null;
+            }
+            if (0 === $matchCount) {
+                $result .= \substr($subject, $offset);
+
+                break;
+            }
+
+            $full = $matches[0];
+            $matchStart = $full[1];
+            $matchText = $full[0];
+            $matchLen = \strlen($matchText);
+            $result .= \substr($subject, $offset, $matchStart - $offset);
+
+            $stripped = VmPreg::stripMatchOffsets($matches);
+            $replacement = $invokeMatchCallback($stripped);
+            $result .= (string) $replacement;
+
+            ++$replacements;
+
+            $next = $matchStart + $matchLen;
+            if ($next <= $offset) {
+                self::setLastError(1);
+
+                return null;
+            }
+            $offset = $next;
+        }
+
+        self::setLastError(0);
+
+        return $result;
+    }
 }

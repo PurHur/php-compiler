@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\ext\standard\PregJitHelper;
 use PHPUnit\Framework\TestCase;
 
-/** preg_* JIT embed routes through PregJitHelper PHP not StringPregMatchStandaloneLlvm (#9542). */
+/** preg_* JIT embed routes through PregJitHelper PHP not StringPregMatchStandaloneLlvm (#9542, #13736). */
 final class PregMatchRuntimeShrinkTest extends TestCase
 {
     public function testStringPregMatchJitIsThinDispatcher(): void
@@ -20,16 +20,15 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $this->assertLessThan(80, \substr_count($source, "\n") + 1);
     }
 
-    public function testPregMatchRuntimeUsesJitHelper(): void
+    public function testPregMatchRuntimeUsesJitHelperForReplaceCallback(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PregMatchRuntime.php');
         $this->assertStringContainsString('PregJitHelper', $source);
+        $this->assertStringContainsString('replaceCallbackArgv', $source);
+        $this->assertStringContainsString('PregCallbackInvokeJitHelper', $source);
         $this->assertStringNotContainsString('pcre2_compile', $source);
-
-        $standalone = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
-        $this->assertStringContainsString('implementReplaceCallbackOnly', $standalone);
-        $this->assertStringNotContainsString('public static function implement(', $standalone);
-        $this->assertLessThan(1400, substr_count($standalone, "\n") + 1);
+        $this->assertStringNotContainsString('StringPregMatchStandaloneLlvm', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php');
     }
 
     public function testPregJitHelperDelegatesToVmPregNative(): void
@@ -37,6 +36,7 @@ final class PregMatchRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/PregJitHelper.php');
         $this->assertStringContainsString('VmPregNative::pregMatch', $source);
         $this->assertStringContainsString('VmPregNative::pregReplace', $source);
+        $this->assertStringContainsString('VmPregNative::pregReplaceCallbackJit', $source);
         $this->assertStringContainsString('VmPregMatches::hostMatchesToHashTable', $source);
     }
 

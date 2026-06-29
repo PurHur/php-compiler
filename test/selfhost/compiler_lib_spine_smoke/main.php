@@ -2708,7 +2708,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringPhpinfoRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPosixTimes.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatch.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchJit.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregMatchStandaloneLlvm.php';
+require_once __DIR__.'/../../../ext/standard/PregCallbackInvokeJitHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPregQuote.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringPrintR.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringQuotPrint.php';

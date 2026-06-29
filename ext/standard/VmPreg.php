@@ -15,7 +15,7 @@ use PHPCompiler\VM\Variable;
  * VM preg_match() — native PCRE via VmPregNative (issue #4874).
  *
  * JIT/AOT use {@see PregMatchRuntime} + {@see PregJitHelper} (embed) or
- * {@see StringPregMatchStandaloneLlvm} (standalone AOT, issue #9542).
+ * {@see PregMatchRuntime} + {@see PregJitHelper} (JIT/AOT embed, #9542, #13736).
  */
 final class VmPreg
 {
