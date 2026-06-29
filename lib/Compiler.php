@@ -16887,7 +16887,15 @@ class Compiler {
             return null;
         }
 
-        $ordinal = $producerIndex - $firstSibling;
+        $ordinal = $this->siblingHoistedFuncCallProducerOrdinal(
+            $producerIndex,
+            $firstSibling,
+            $consumerIndex,
+            $cfgChildren
+        );
+        if (null === $ordinal) {
+            $ordinal = $producerIndex - $firstSibling;
+        }
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         if (
             ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
@@ -16997,6 +17005,81 @@ class Compiler {
         }
 
         return $first;
+    }
+
+    private function isSiblingHoistedFuncCallProducer(?Op $op): bool
+    {
+        return $op instanceof Op\Expr\FuncCall || $op instanceof Op\Expr\NsFuncCall;
+    }
+
+    private function isSiblingHoistedFuncCallGapStmt(?Op $op): bool
+    {
+        return $op instanceof Op\Expr\Array_
+            || $op instanceof Op\Expr\ConstFetch
+            || $op instanceof Op\Expr\ClassConstFetch
+            || $this->isUnaryInlineSiblingCallArgExpr($op);
+    }
+
+    /**
+     * FuncCall-only ordinal among hoisted sibling inline call-arg producers (#13779, #13778).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingHoistedFuncCallProducerOrdinal(
+        int $producerIndex,
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): ?int {
+        if ($producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
+            return null;
+        }
+        if (!$this->isSiblingHoistedFuncCallProducer($cfgChildren[$producerIndex] ?? null)) {
+            return null;
+        }
+        $ordinal = 0;
+        for ($i = $firstSibling; $i < $consumerIndex; ++$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($this->isSiblingHoistedFuncCallProducer($child)) {
+                if ($i === $producerIndex) {
+                    return $ordinal;
+                }
+                ++$ordinal;
+                continue;
+            }
+            if (!$this->isSiblingHoistedFuncCallGapStmt($child)) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function siblingHoistedFuncCallProducerIndexAtOrdinal(
+        int $firstSibling,
+        int $consumerIndex,
+        int $targetOrdinal,
+        array $cfgChildren
+    ): ?int {
+        $ordinal = 0;
+        for ($i = $firstSibling; $i < $consumerIndex; ++$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($this->isSiblingHoistedFuncCallProducer($child)) {
+                if ($ordinal === $targetOrdinal) {
+                    return $i;
+                }
+                ++$ordinal;
+                continue;
+            }
+            if (!$this->isSiblingHoistedFuncCallGapStmt($child)) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /** True when php-cfg hoisted ≥2 sibling FuncCall producers before a multi-arg consumer (#13671). */
