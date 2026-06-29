@@ -665,7 +665,10 @@ final class VmFs
      */
     private static function readFileLines(string $path, int $flags): array|false
     {
-        $content = VmFsReadNative::read($path);
+        // Wrapper streams (php://memory, data://, …) — fopen + stream_get_contents parity (#13748).
+        $content = self::pathRequiresStreamOpen($path)
+            ? self::readPathContentsViaOpen($path)
+            : VmFsReadNative::read($path);
         if (false === $content) {
             return false;
         }
