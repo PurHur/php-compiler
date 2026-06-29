@@ -803,6 +803,28 @@ final class VmArray
     }
 
     /**
+     * array_key_exists() / key_exists() — key present regardless of null value (#13735).
+     */
+    public static function keyExists(Variable $key, HashTable $table): bool
+    {
+        $key = $key->resolveIndirect();
+        if (Variable::TYPE_NULL === $key->type) {
+            $empty = new Variable();
+            $empty->string('');
+
+            return null !== self::valueAtKeyInHashTable($empty, $table);
+        }
+        if (Variable::TYPE_BOOLEAN === $key->type) {
+            $intKey = new Variable();
+            $intKey->int($key->toBool() ? 1 : 0);
+
+            return null !== self::valueAtKeyInHashTable($intKey, $table);
+        }
+
+        return null !== self::valueAtKeyInHashTable($key, $table);
+    }
+
+    /**
      * in_array() — scan {@param $haystack} for {@param $needle} (ext/standard/array.c).
      */
     public static function contains(Variable $needle, HashTable $haystack, bool $strict): bool
