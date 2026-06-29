@@ -1944,6 +1944,44 @@ PHP;
         self::assertStringContainsString("0 => 'b'", $out);
     }
 
+    /** Issue #13778 — array_intersect_assoc(array_keys(...), array_keys(...)) wires both sibling FuncCall slots. */
+    public function testArrayIntersectAssocInlineArrayKeysRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_intersect_assoc_inline_array_keys.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_intersect_assoc_inline_array_keys.php');
+
+        $keysReturnSlots = [];
+        $intersectSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $intersectSends = [];
+                }
+            }
+            if ($fcallOrdinal <= 2 && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $intersectSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $keysReturnSlots);
+        self::assertCount(2, $intersectSends);
+        self::assertSame($keysReturnSlots[0], $intersectSends[0], 'intersect sends='.json_encode($intersectSends));
+        self::assertSame($keysReturnSlots[1], $intersectSends[1], 'intersect sends='.json_encode($intersectSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString("0 => 'a'", $out);
+        self::assertStringContainsString("ok", $out);
+    }
+
     /** Issue #13776 — array_combine(array_keys(...), [...]) wires FuncCall + trailing Array_ producer slots. */
     public function testArrayCombineInlineArrayKeysRuntime(): void
     {
