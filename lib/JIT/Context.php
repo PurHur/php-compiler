@@ -784,6 +784,7 @@ class Context {
             Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
             Builtin\JitReturnPending::ensureStandaloneBodies($this);
             Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            Builtin\StringMetaphone::ensureStandaloneBodies($this);
             Builtin\StringStripTags::ensureStandaloneBodies($this);
             Builtin\StringStrtr::ensureStandaloneBodies($this);
             Builtin\StringParseStr::ensureStandaloneBodies($this);
