@@ -21913,7 +21913,7 @@ class Compiler {
                 $elemTemp = new Operand\Temporary();
                 $elemSlot = $block->getVarSlot($elemTemp, false);
                 $return[] = new OpCode(
-                    OpCode::TYPE_ARRAY_DIM_FETCH,
+                    OpCode::TYPE_ARRAY_DIM_FETCH_WRITE,
                     $elemSlot,
                     $result,
                     $keySlot instanceof Operand\NullOperand ? null : $keySlot
