@@ -6,14 +6,15 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** PendingHeaders embed uses JIT helper; standalone AOT keeps thin LLVM quarantine (#9545, #13571). */
+/** PendingHeaders routes through PendingHeadersJitHelper PHP (#9545, #13679). */
 final class PendingHeadersRuntimeShrinkTest extends TestCase
 {
     public function testPendingHeadersRuntimeIsThinRouter(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersRuntime.php');
         $this->assertStringContainsString('PendingHeadersJitBridge::implement', $runtime);
-        $this->assertStringContainsString('PendingHeadersStandaloneLlvm::implement', $runtime);
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
+        $this->assertStringNotContainsString('PendingHeadersStandaloneLlvm', $runtime);
+        $this->assertLessThan(35, substr_count($runtime, "\n"), 'PendingHeadersRuntime should be a thin router');
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php');
     }
 }

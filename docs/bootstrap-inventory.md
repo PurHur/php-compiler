@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3492 |
-| Phase A inventory files (M2 ratio SSOT) | 3492 |
+| PHP files on vm.php path | 3491 |
+| Phase A inventory files (M2 ratio SSOT) | 3491 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9469 |
+| Source constructs flagged (warnings) | 9468 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2478,7 +2478,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PendingHeaders.php` | 0 | 1 |
 | `lib/JIT/Builtin/PendingHeadersJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/PendingHeadersRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixCtermidRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixSessionRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/PosixStrerrorRuntime.php` | 0 | 1 |
@@ -19804,11 +19803,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
-
-### `lib/JIT/Builtin/PendingHeadersStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 38 class method(s)
 
 ### `lib/JIT/Builtin/PosixCtermidRuntime.php`
 
