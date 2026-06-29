@@ -4,11 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\HashTable;
+
 /**
  * putenv()/getenv() local overlay for compiled JIT/AOT modules (#9814, php-in-PHP).
  *
  * SSOT: {@see GetenvJitHelper} static overlay storage.
- * Zero-arg getenv merge uses {@see \PHPCompiler\JIT\Builtin\EnvLocalOverlayTableLlvm} (#12810, #1492).
  * php-src: ext/standard/basic_functions.c — EG(env)
  */
 final class EnvLocalJitHelper
@@ -21,5 +22,10 @@ final class EnvLocalJitHelper
     public static function registerPutenv(string $assignment): bool
     {
         return GetenvJitHelper::putenv($assignment);
+    }
+
+    public static function mergeLocalOverlayInto(HashTable $ht): void
+    {
+        GetenvJitHelper::mergeLocalOverlayInto($ht);
     }
 }

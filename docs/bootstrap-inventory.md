@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3461 |
-| Phase A inventory files (M2 ratio SSOT) | 3461 |
+| PHP files on vm.php path | 3460 |
+| Phase A inventory files (M2 ratio SSOT) | 3460 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 9363 |
@@ -454,7 +454,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/GetDeclaredExcludeDeprecatedJit.php` | 0 | 1 |
 | `ext/standard/GetcwdJitHelper.php` | 0 | 1 |
 | `ext/standard/GetdateJitHelper.php` | 0 | 1 |
-| `ext/standard/GetenvJitHelper.php` | 0 | 1 |
+| `ext/standard/GetenvJitHelper.php` | 0 | 2 |
 | `ext/standard/GethostbyaddrJitHelper.php` | 0 | 1 |
 | `ext/standard/GethostbynamelJitHelper.php` | 0 | 1 |
 | `ext/standard/GetimagesizeJitHelper.php` | 0 | 1 |
@@ -2356,7 +2356,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/EmbedObEchoBridge.php` | 0 | 1 |
 | `lib/JIT/Builtin/EmbedObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnumCasesRuntime.php` | 0 | 1 |
-| `lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/EnvLocalRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ErrorHandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ErrorHandlerJitRuntime.php` | 0 | 3 |
@@ -6349,7 +6348,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/EnvLocalJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/ErrorHandlerJitHelper.php`
 
@@ -6463,7 +6462,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GetenvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new Variable (line 87)
+- 5 class method(s)
 
 ### `ext/standard/GethostbyaddrJitHelper.php`
 
@@ -17881,39 +17881,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Operand\Temporary (line 17917)
 - new Operand\Temporary (line 17923)
 - new Operand\Temporary (line 17932)
-- new Variable (line 18837)
-- new Variable (line 18841)
-- new Variable (line 18849)
-- new Variable (line 18853)
-- new Variable (line 19095)
-- new Operand\Literal (line 19463)
-- new Variable (line 19465)
-- new OpCode (line 19785)
-- new OpCode (line 19977)
-- new OpCode (line 20258)
-- new OpCode (line 20459)
-- new OpCode (line 20469)
-- new OpCode (line 20472)
-- new Operand\Temporary (line 20504)
-- new OpCode (line 20506)
-- new OpCode (line 20517)
-- new Operand\Temporary (line 20520)
-- new OpCode (line 20522)
-- new OpCode (line 20530)
-- new OpCode (line 20537)
-- new OpCode (line 20545)
-- new OpCode (line 20548)
-- new OpCode (line 20565)
-- new OpCode (line 20592)
-- new OpCode (line 20599)
-- new OpCode (line 20700)
-- new Literal (line 20732)
-- new OpCode (line 20831)
-- new Variable (line 20838)
-- new Temporary (line 20840)
-- new OpCode (line 20843)
-- new CompileFatal (line 21141)
-- new CompileFatal (line 21360)
+- new Variable (line 18846)
+- new Variable (line 18850)
+- new Variable (line 18858)
+- new Variable (line 18862)
+- new Variable (line 19104)
+- new Operand\Literal (line 19472)
+- new Variable (line 19474)
+- new OpCode (line 19794)
+- new OpCode (line 19986)
+- new OpCode (line 20267)
+- new OpCode (line 20468)
+- new OpCode (line 20478)
+- new OpCode (line 20481)
+- new Operand\Temporary (line 20513)
+- new OpCode (line 20515)
+- new OpCode (line 20526)
+- new Operand\Temporary (line 20529)
+- new OpCode (line 20531)
+- new OpCode (line 20539)
+- new OpCode (line 20546)
+- new OpCode (line 20554)
+- new OpCode (line 20557)
+- new OpCode (line 20574)
+- new OpCode (line 20601)
+- new OpCode (line 20608)
+- new OpCode (line 20709)
+- new Literal (line 20741)
+- new OpCode (line 20840)
+- new Variable (line 20847)
+- new Temporary (line 20849)
+- new OpCode (line 20852)
+- new CompileFatal (line 21150)
+- new CompileFatal (line 21369)
 - 621 class method(s)
 - 19 closure(s)
 
@@ -19025,16 +19025,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
-### `lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 17 class method(s)
-
 ### `lib/JIT/Builtin/EnvLocalRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 250)
-- 10 class method(s)
+- new JIT (line 285)
+- 12 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ErrorHandler.php`
@@ -25602,7 +25597,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReferencableCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 168)
+- new Error (line 159)
 - 16 class method(s)
 
 ### `lib/VM/ReflectionPropertyHookSupport.php`
