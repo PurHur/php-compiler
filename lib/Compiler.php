@@ -13490,6 +13490,7 @@ class Compiler {
                         && (
                             $trailingUnaryProducer instanceof Op\Expr\Cast
                             || $trailingUnaryProducer instanceof Op\Expr\Clone_
+                            || $trailingUnaryProducer instanceof Op\Expr\New_
                         )
                     ) {
                         return $trailingUnaryProducer;
@@ -13537,6 +13538,7 @@ class Compiler {
                     && (
                         $trailingUnaryProducer instanceof Op\Expr\Cast
                         || $trailingUnaryProducer instanceof Op\Expr\Clone_
+                        || $trailingUnaryProducer instanceof Op\Expr\New_
                     )
                 ) {
                     return $trailingUnaryProducer;
