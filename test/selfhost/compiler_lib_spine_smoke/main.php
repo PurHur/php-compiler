@@ -245,6 +245,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_encoding_aliases.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_encode_mimeheader.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_encode_numericentity.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_http_output.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_internal_encoding.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_ltrim.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_preferred_mime_name.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_rtrim.php';
