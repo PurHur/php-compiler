@@ -15,9 +15,9 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
+use PHPCompiler\JIT\Builtin\RangeIntRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -75,7 +75,7 @@ final class range extends Internal
         }
         self::emitZeroStepGuard($context, $step);
 
-        return HashTableHelper::buildIntegerRange($context, $start, $end, $step);
+        return RangeIntRuntime::intRange($context, $start, $end, $step);
     }
 
     private static function emitZeroStepGuard(Context $context, Value $step): void

@@ -270,6 +270,12 @@ final class VmRange
         return $step;
     }
 
+    /** Int range list for JIT/AOT helpers (#13502). */
+    public static function intRangeTable(int $start, int $end, int $step): HashTable
+    {
+        return self::buildIntRange($start, $end, $step);
+    }
+
     private static function buildIntRange(int $start, int $end, int $step): HashTable
     {
         $ht = new HashTable();
