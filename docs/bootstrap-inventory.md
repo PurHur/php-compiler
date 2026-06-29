@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3486 |
-| Phase A inventory files (M2 ratio SSOT) | 3486 |
+| PHP files on vm.php path | 3485 |
+| Phase A inventory files (M2 ratio SSOT) | 3485 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9445 |
+| Source constructs flagged (warnings) | 9444 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2451,7 +2451,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObGzhandler.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObGzhandlerJitRuntime.php` | 0 | 4 |
-| `lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutput.php` | 0 | 1 |
 | `lib/JIT/Builtin/ObOutputJitBridge.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObOutputRuntime.php` | 0 | 1 |
@@ -19632,15 +19631,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ObGzhandlerJitRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 362)
-- new JIT (line 371)
+- new JIT (line 354)
+- new JIT (line 363)
 - 20 class method(s)
 - 2 closure(s)
-
-### `lib/JIT/Builtin/ObGzhandlerStandaloneLlvm.php`
-
-**Warnings** (review for bootstrap subset):
-- 17 class method(s)
 
 ### `lib/JIT/Builtin/ObOutput.php`
 
