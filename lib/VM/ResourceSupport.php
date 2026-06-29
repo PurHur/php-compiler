@@ -175,6 +175,11 @@ final class ResourceSupport
             return false;
         }
         if (self::isStreamResource($var)) {
+            $handle = self::resolveHandle($var);
+            if (null !== $handle && VmFs::isFailedStreamHandle($handle)) {
+                return false;
+            }
+
             return !self::isOpenStreamResource($var);
         }
         if (self::isDirResource($var)) {
@@ -227,6 +232,9 @@ final class ResourceSupport
         }
         if (self::isStreamResource($var)) {
             $handle = self::resolveHandle($var);
+            if (null !== $handle && VmFs::isFailedStreamHandle($handle)) {
+                return 'resource (stream)';
+            }
             if (null === $handle) {
                 return 'Resource';
             }

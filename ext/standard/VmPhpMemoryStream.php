@@ -363,6 +363,14 @@ final class VmPhpMemoryStream
     /**
      * @return array{canRead: bool, canWrite: bool, truncate: bool, append: bool}|null
      */
+    public static function isValidMode(string $mode): bool
+    {
+        return null !== self::parseMode($mode);
+    }
+
+    /**
+     * @return array{canRead: bool, canWrite: bool, truncate: bool, append: bool}|null
+     */
     private static function parseMode(string $mode): ?array
     {
         $mode = \strtolower($mode);
