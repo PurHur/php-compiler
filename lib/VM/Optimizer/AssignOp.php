@@ -40,12 +40,16 @@ class AssignOp extends Optimizer
         }
         $seen->attach($block);
         $prior = null;
+        $priorPrior = null;
         $toRemove = [];
         foreach ($block->opCodes as $key => $op) {
             if ($op->type === OpCode::TYPE_ASSIGN && null !== $prior && in_array($prior->type, self::CANDIDATE_OPS, true)) {
                 // replace
                 $binaryOpResult = $block->getOperand($prior->arg1);
-                if (count($binaryOpResult->usages) === 1) {
+                if (
+                    count($binaryOpResult->usages) === 1
+                    && !$this->assignOpMustSkipConcatChainPeephole($prior, $priorPrior, $op)
+                ) {
                     // We can safely replace it with an assign op
                     $binaryDest = $prior->arg1;
                     $prior->arg1 = $op->arg2;
@@ -64,6 +68,7 @@ class AssignOp extends Optimizer
                     }
                 }
             }
+            $priorPrior = $prior;
             $prior = $op;
             if (null !== $op->block1) {
                 $this->optimize($op->block1, $seen);
@@ -80,5 +85,27 @@ class AssignOp extends Optimizer
             $block->opCodes = array_values($block->opCodes);
             $block->nOpCodes = \count($block->opCodes);
         }
+    }
+
+    /**
+     * Multi-part encapsed ConcatList lowers as CONCAT chain + assign; redirecting the
+     * trailing in-place append to the assign dest drops the prior chain result (#13466).
+     */
+    private function assignOpMustSkipConcatChainPeephole(OpCode $prior, ?OpCode $priorPrior, OpCode $assign): bool
+    {
+        if (OpCode::TYPE_CONCAT !== $prior->type) {
+            return false;
+        }
+        if (null === $prior->arg1 || null === $prior->arg2 || (int) $prior->arg2 !== (int) $prior->arg1) {
+            return false;
+        }
+        if (null === $assign->arg2 || (int) $prior->arg1 === (int) $assign->arg2) {
+            return false;
+        }
+        if (null === $priorPrior || OpCode::TYPE_CONCAT !== $priorPrior->type) {
+            return false;
+        }
+
+        return null !== $priorPrior->arg1 && (int) $priorPrior->arg1 === (int) $prior->arg1;
     }
 }

@@ -14992,7 +14992,8 @@ class Compiler {
             || $op instanceof Op\Expr\PostInc
             || $op instanceof Op\Expr\PreInc
             || $op instanceof Op\Expr\PostDec
-            || $op instanceof Op\Expr\PreDec;
+            || $op instanceof Op\Expr\PreDec
+            || $op instanceof Op\Expr\ConcatList;
     }
 
     /**
@@ -18796,6 +18797,79 @@ class Compiler {
     }
 
     /**
+     * Lower encapsed ConcatList call args when php-cfg allocates a dead arg temp (#13466).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function tryResolveEncapsedConcatListCallArgSlot(
+        Operand $arg,
+        Block $block,
+        array &$emitOps,
+        ?Op $cfgCallOp = null,
+        int $argIndex = 0
+    ): ?int {
+        $concat = $this->concatListProducerForHoistedCallArg($cfgCallOp, $argIndex, $block, $arg);
+        if (!$concat instanceof Op\Expr\ConcatList) {
+            return null;
+        }
+        if (null === $block->slotForOperand($concat->result)) {
+            $this->compileOp($concat, $block);
+        }
+
+        return $block->slotForOperand($concat->result);
+    }
+
+    /**
+     * php-cfg hoists encapsed ConcatList before FuncCall with a distinct dead arg temp (#13466).
+     */
+    private function concatListProducerForHoistedCallArg(
+        ?Op $callOp,
+        int $argIndex,
+        Block $block,
+        Operand $arg
+    ): ?Op\Expr\ConcatList {
+        if (null === $callOp || null === $block->orig) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $callArg = \is_array($callOp->args ?? null) ? ($callOp->args[$argIndex] ?? $arg) : $arg;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\ConcatList) {
+                if (null !== $child->result) {
+                    if ($this->operandsReferToSameVariable($child->result, $callArg)) {
+                        return $child;
+                    }
+                    // php-cfg dead-temp alias: hoisted call arg temp may differ from ConcatList.result (#13466).
+                    if ($i === $callIndex - 1 && $callArg instanceof Operand\Temporary) {
+                        return $child;
+                    }
+                }
+
+                return null;
+            }
+            if ($child instanceof Op\Expr\PropertyFetch || $child instanceof Op\Expr\ArrayDimFetch) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\BinaryOp\Concat) {
+                continue;
+            }
+            break;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg echo ConcatList hoists sibling FuncCalls with Concat stmts between them (#13387).
      */
     private function unaryLiteralProducerForHoistedCallArg(
@@ -19179,7 +19253,10 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                if (null === $valueSlot) {
+                    $valueSlot = $this->tryResolveUnaryLiteralCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
                 $assignVarProbe = $arg;
                 if (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null) && isset($cfgCallOp->args[(int) $argIndex])) {
                     $assignVarProbe = $cfgCallOp->args[(int) $argIndex];
