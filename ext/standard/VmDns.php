@@ -244,7 +244,7 @@ final class VmDns
      */
     public static function dnsGetRecord(string $hostname, int $type = 1)
     {
-        if ('' === $hostname || \strlen($hostname) > 255) {
+        if (!self::isValidDnsHostname($hostname)) {
             return false;
         }
         self::validateDnsGetRecordType($type);
@@ -279,6 +279,27 @@ final class VmDns
         }
 
         return $ht;
+    }
+
+    /**
+     * php-src ext/standard/dns.c — php_dns_check_hostname() (#13600).
+     */
+    public static function isValidDnsHostname(string $hostname): bool
+    {
+        if ('' === $hostname || \strlen($hostname) > 255) {
+            return false;
+        }
+        $hostname = \rtrim($hostname, '.');
+        if ('' === $hostname) {
+            return false;
+        }
+        foreach (\explode('.', $hostname) as $label) {
+            if ('' === $label || \strlen($label) > 63) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @throws \ValueError */
