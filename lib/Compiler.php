@@ -12427,6 +12427,12 @@ class Compiler {
             }
             $producerSlot = $block->slotForOperand($producer->result);
         }
+        if (null === $producerSlot && $producer instanceof Op\Expr\BinaryOp) {
+            foreach ($this->compileExpr($producer, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $producerSlot = $block->slotForOperand($producer->result);
+        }
         if (null === $producerSlot && $producer instanceof Op\Expr\Cast) {
             foreach ($this->compileExpr($producer, $block) as $op) {
                 $block->addOpCode($op);
@@ -13519,6 +13525,9 @@ class Compiler {
                 || $byIndex instanceof Op\Expr\BinaryOp\BitwiseOr
                 || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
                 || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
+                || $byIndex instanceof Op\Expr\ConstFetch
+                || $byIndex instanceof Op\Expr\ClassConstFetch
+                || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
             ) {
                 return $byIndex;
             }
@@ -15804,6 +15813,17 @@ class Compiler {
                         foreach ($concatChain as $concatProducer) {
                             array_unshift($producers, $concatProducer);
                         }
+                    } elseif (
+                        property_exists($callOp, 'args')
+                        && is_array($callOp->args)
+                        && $this->callArgsAreDistinctInlineTemporaries($callOp->args)
+                        && (
+                            ($cfgChildren[$i + 1] ?? null) instanceof Op\Expr\ConstFetch
+                            || ($cfgChildren[$i + 1] ?? null) instanceof Op\Expr\ClassConstFetch
+                        )
+                    ) {
+                        // glob($dir.'/*', GLOB_MARK) — Concat + ConstFetch hoisted siblings (#13660).
+                        array_unshift($producers, $child);
                     }
                 }
                 break;

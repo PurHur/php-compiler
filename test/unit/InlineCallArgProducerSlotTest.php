@@ -2941,4 +2941,32 @@ PHP;
         $runtime->run($block);
         self::assertSame("ok\n", ob_get_clean());
     }
+
+    /** Issue #13660 — glob($dir.'/*', GLOB_MARK) wires Concat + ConstFetch hoisted producer slots. */
+    public function testGlobInlineConcatAndGlobMarkConstUsesProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+$dir = 'test/compliance/cases/stdlib/glob_onlydir_fixture';
+glob($dir.'/*', GLOB_MARK);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'glob_inline_concat_glob_mark.php');
+
+        $concatSlots = [];
+        $constSlots = [];
+        $sendSlots = [];
+        $this->collectOpCodesFromBlock($block, $concatSlots, $sendSlots);
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotEmpty($concatSlots);
+        self::assertNotEmpty($constSlots);
+        self::assertCount(2, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($concatSlots[0], $sendSlots[0], 'arg sends='.json_encode($sendSlots));
+        self::assertSame($constSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+    }
 }
