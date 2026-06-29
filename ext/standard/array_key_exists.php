@@ -20,7 +20,6 @@ use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -40,7 +39,6 @@ final class array_key_exists extends Internal
         $fn = $this->getName();
         $this->requireExactArgCount($frame, $fn, 2);
         $key = $frame->calledArgs[0]->resolveIndirect();
-        EnumCaseSupport::rejectIllegalArrayOffset($key);
         $array = VmArray::requireArrayParam(
             $frame->calledArgs[1],
             $fn,
@@ -49,15 +47,6 @@ final class array_key_exists extends Internal
         );
         if (null === $frame->returnVar) {
             return;
-        }
-        if (Variable::TYPE_NULL === $key->type) {
-            $emptyKey = new Variable();
-            $emptyKey->string('');
-            $key = $emptyKey;
-        } elseif (Variable::TYPE_INTEGER !== $key->type
-            && Variable::TYPE_STRING !== $key->type
-            && Variable::TYPE_FLOAT !== $key->type) {
-            throw new \TypeError('Illegal offset type');
         }
         $frame->returnVar->bool($array->hasKey($key));
     }
@@ -186,6 +175,18 @@ final class array_key_exists extends Internal
                 $index
             );
         }
+        if (JITVariable::TYPE_NATIVE_BOOL === $key->type) {
+            $index = $context->builder->zext(
+                $context->helper->loadValue($key),
+                $context->getTypeFromString('size_t')
+            );
+
+            return $context->builder->call(
+                $context->lookupFunction('__hashtable__offsetIsSet'),
+                $ht,
+                $index
+            );
+        }
         if (JITVariable::TYPE_OBJECT === $key->type) {
             HashTableHelper::emitIllegalOffsetType($context, 'Illegal offset type');
 
@@ -230,6 +231,7 @@ final class array_key_exists extends Internal
         $stringBlock = $fn->appendBasicBlock('ake_vk_str');
         $longBlock = $fn->appendBasicBlock('ake_vk_long');
         $nullBlock = $fn->appendBasicBlock('ake_vk_null');
+        $boolBlock = $fn->appendBasicBlock('ake_vk_bool');
         $falseBlock = $fn->appendBasicBlock('ake_vk_false');
         $merge = $fn->appendBasicBlock('ake_vk_merge');
         $afterString = $fn->appendBasicBlock('ake_vk_after_str');
@@ -296,6 +298,7 @@ final class array_key_exists extends Internal
         );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($afterDouble);
+        $afterNull = $fn->appendBasicBlock('ake_vk_after_null');
         $context->builder->branchIf(
             $context->builder->icmp(
                 Builder::INT_EQ,
@@ -303,10 +306,36 @@ final class array_key_exists extends Internal
                 $i8->constInt(JITVariable::TYPE_NULL, false)
             ),
             $nullBlock,
-            $falseBlock
+            $afterNull
         );
         $context->builder->positionAtEnd($nullBlock);
         $nullResult = self::jitEmptyStringKeyExists($context, $ht);
+        $context->builder->branch($merge);
+        $context->builder->positionAtEnd($afterNull);
+        $context->builder->branchIf(
+            $context->builder->icmp(
+                Builder::INT_EQ,
+                $typeByte,
+                $i8->constInt(Variable::TYPE_BOOLEAN, false)
+            ),
+            $boolBlock,
+            $falseBlock
+        );
+        $context->builder->positionAtEnd($boolBlock);
+        $valueField = $context->builder->structGep($valPtr, $valueMap['value']);
+        $boolByte = $context->builder->load(
+            $context->builder->inBoundsGEP(
+                $valueField,
+                $context->getTypeFromString('int32')->constInt(0, false),
+                $context->getTypeFromString('int64')->constInt(0, false)
+            )
+        );
+        $boolIndex = $context->builder->zext($boolByte, $sizeT);
+        $boolResult = $context->builder->call(
+            $context->lookupFunction('__hashtable__offsetIsSet'),
+            $ht,
+            $boolIndex
+        );
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($falseBlock);
         $context->builder->branch($merge);
@@ -316,6 +345,7 @@ final class array_key_exists extends Internal
         $phi->addIncoming($longResult, $longBlock);
         $phi->addIncoming($doubleResult, $doubleBlock);
         $phi->addIncoming($nullResult, $nullBlock);
+        $phi->addIncoming($boolResult, $boolBlock);
         $phi->addIncoming($i1->constInt(0, false), $falseBlock);
 
         return $phi;
