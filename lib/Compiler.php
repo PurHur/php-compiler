@@ -14748,14 +14748,24 @@ class Compiler {
 
             return null;
         }
-        // array_map(fn, [...], [...]) — php-cfg omits ArrowFunction from hoisted producers (#10094).
-        if (
-            'array_map' === $inlineFuncName
-            && $this->producersAreNestedArrayLiteralChain($producers)
-            && $argIndex >= 1
-            && $argIndex - 1 < \count($producers)
-        ) {
-            return $producers[$argIndex - 1];
+        // array_map(callback, [...], [...]) — map hoisted Array_ producers to array args by order (#10094, #13812).
+        if ('array_map' === $inlineFuncName && $argIndex >= 1) {
+            $arrayProducers = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if ([] !== $arrayProducers) {
+                $arrayArgIndices = [];
+                foreach ($callArgs as $i => $arg) {
+                    if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
+                        $arrayArgIndices[] = $i;
+                    }
+                }
+                $position = array_search($argIndex, $arrayArgIndices, true);
+                if (false !== $position && isset($arrayProducers[$position])) {
+                    return $arrayProducers[$position];
+                }
+            }
         }
         // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
         if (
@@ -22025,6 +22035,66 @@ class Compiler {
                         $sends = array_merge($sends, $varExportOps);
                     }
                     $valueSlot = (string) $varExportSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
+            ) {
+                if (0 === (int) $argIndex) {
+                    $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    foreach ($producers as $producer) {
+                        if (!$producer instanceof Op\Expr\ConstFetch) {
+                            continue;
+                        }
+                        $slot = $block->slotForOperand($producer->result);
+                        if (null === $slot) {
+                            foreach ($this->compileExpr($producer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $slot = $block->slotForOperand($producer->result);
+                        }
+                        if (null !== $slot) {
+                            $valueSlot = (string) $slot;
+                        }
+                        break;
+                    }
+                } elseif ((int) $argIndex >= 1) {
+                    $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                    if (null !== $callArgProbe && $this->callArgOperandExpectsArrayProducer($callArgProbe)) {
+                        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                            $block->orig->children,
+                            $cfgCallOp
+                        );
+                        $arrayProducers = array_values(array_filter(
+                            $producers,
+                            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                        ));
+                        $arrayArgIndices = [];
+                        foreach ($cfgCallOp->args as $i => $callArg) {
+                            if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+                                $arrayArgIndices[] = $i;
+                            }
+                        }
+                        $position = array_search((int) $argIndex, $arrayArgIndices, true);
+                        if (false !== $position && isset($arrayProducers[$position])) {
+                            $producer = $arrayProducers[$position];
+                            $slot = $block->slotForOperand($producer->result);
+                            if (null === $slot) {
+                                foreach ($this->compileArrayLiteral($producer, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $slot = $block->slotForOperand($producer->result);
+                            }
+                            if (null !== $slot) {
+                                $valueSlot = (string) $slot;
+                            }
+                        }
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
