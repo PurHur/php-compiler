@@ -15119,7 +15119,15 @@ class JIT {
                 && !self::jitArgLooksLikeArray($args[$idx])
             ) {
                 if (!JIT\JitReferencableCheck::isOperandReferenceable($operand, $args[$idx])) {
-                    JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    if (
+                        Variable::TYPE_NULL === $args[$idx]->type
+                        || $args[$idx]->isNullConstant
+                    ) {
+                        JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                        JIT\JitReferencableCheck::emitByRefError($this->context, $name, $idx);
+                    } else {
+                        JIT\JitReferencableCheck::emitNonVariableByRefNotice($this->context);
+                    }
                 }
                 continue;
             }
