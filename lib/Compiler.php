@@ -20898,6 +20898,7 @@ class Compiler {
                 if (
                     0 === $argIndex
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[0] ?? $arg)
+                    && !$this->callArgOperandExpectsArrayProducer($cfgCallOp->args[0] ?? $arg)
                     && !$this->hasSiblingMultiArgInlineCallProducers($block, $cfgCallOp)
                 ) {
                     foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(

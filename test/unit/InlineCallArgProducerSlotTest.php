@@ -3055,4 +3055,61 @@ PHP;
         self::assertSame($concatSlots[0], $sendSlots[0], 'arg sends='.json_encode($sendSlots));
         self::assertSame($constSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
     }
+
+    /** Issue #13684 — array_slice($a, array_search(...)) wires hoisted Array_ to arg0, nested FuncCall to arg1. */
+    public function testArraySliceNestedIntBuiltinOffsetUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_slice([1, 2, 3, 4], array_search(3, [1, 2, 3, 4])));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_nested_offset.php');
+
+        $searchReturnSlot = null;
+        $sliceArraySlot = null;
+        $sliceSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $sliceArraySlot) {
+                $sliceArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $sliceSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $searchReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sliceSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($sliceArraySlot);
+        self::assertNotNull($searchReturnSlot);
+        self::assertCount(2, $sliceSends, 'array_slice arg sends='.json_encode($sliceSends));
+        self::assertSame($sliceArraySlot, $sliceSends[0], 'array arg must use hoisted Array_ slot');
+        self::assertSame($searchReturnSlot, $sliceSends[1], 'offset must use array_search return slot');
+    }
+
+    /** Issue #13684 — array_slice nested offset runtime parity. */
+    public function testArraySliceNestedIntBuiltinOffsetRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_slice([1, 2, 3, 4], array_search(3, [1, 2, 3, 4])));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_slice_nested_offset_runtime.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('3', $out);
+        self::assertStringContainsString('4', $out);
+        self::assertStringNotContainsString('TypeError', $out);
+    }
 }
