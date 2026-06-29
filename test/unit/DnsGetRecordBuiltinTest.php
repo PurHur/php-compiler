@@ -80,4 +80,16 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $result);
         $this->assertSame(0, $result->getNumElements());
     }
+
+    public function testInvalidHostnameLabelReturnsFalse(): void
+    {
+        $this->assertFalse(VmDns::dnsGetRecord('invalid..domain', StdlibConstants::DNS_A));
+    }
+
+    public function testNxdomainHostnameReturnsEmptyArray(): void
+    {
+        $result = VmDns::dnsGetRecord('invalid.invalid', StdlibConstants::DNS_A);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $result);
+        $this->assertSame(0, $result->getNumElements());
+    }
 }
