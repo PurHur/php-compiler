@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3491 |
-| Phase A inventory files (M2 ratio SSOT) | 3491 |
+| PHP files on vm.php path | 3493 |
+| Phase A inventory files (M2 ratio SSOT) | 3493 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9468 |
+| Source constructs flagged (warnings) | 9475 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1054,6 +1054,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamPathJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamReadJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamSocketGetNameJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamSocketPairJitHelper.php` | 0 | 4 |
 | `ext/standard/StreamSyncJitHelper.php` | 0 | 1 |
 | `ext/standard/StrftimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StripTagsJitHelper.php` | 0 | 1 |
@@ -2575,6 +2576,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSocketGetNameRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamSocketPair.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSocketPairJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamSocketPairRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamSync.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
@@ -4021,8 +4023,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/filter/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 38)
-- new Variable (line 60)
+- new ClassEntry (line 43)
+- new Variable (line 65)
 - 3 class method(s)
 
 ### `ext/filter/FilterBooleanJitHelper.php`
@@ -5486,8 +5488,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sockets/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 38)
-- new Variable (line 59)
+- new ClassEntry (line 43)
+- new Variable (line 64)
 - 3 class method(s)
 
 ### `ext/sockets/JitSocketAtmark.php`
@@ -6345,24 +6347,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/BuiltinEnums.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 60)
-- new ClassEntry (line 86)
-- new ClassEntry (line 112)
-- new ClassEntry (line 139)
-- new ClassEntry (line 166)
-- new ClassEntry (line 192)
-- new ClassEntry (line 219)
-- new ClassEntry (line 246)
-- new ClassEntry (line 273)
-- new ClassEntry (line 299)
-- new ClassEntry (line 324)
-- new ClassEntry (line 359)
-- new ClassEntry (line 391)
-- new ClassEntry (line 418)
-- new ClassEntry (line 450)
-- new Variable (line 468)
-- new Variable (line 482)
-- new Variable (line 496)
+- new ClassEntry (line 58)
+- new ClassEntry (line 84)
+- new ClassEntry (line 110)
+- new ClassEntry (line 137)
+- new ClassEntry (line 164)
+- new ClassEntry (line 190)
+- new ClassEntry (line 217)
+- new ClassEntry (line 244)
+- new ClassEntry (line 271)
+- new ClassEntry (line 297)
+- new ClassEntry (line 322)
+- new ClassEntry (line 357)
+- new ClassEntry (line 389)
+- new ClassEntry (line 416)
+- new ClassEntry (line 448)
+- new Variable (line 466)
+- new Variable (line 480)
+- new Variable (line 494)
 - 19 class method(s)
 
 ### `ext/standard/BuiltinRegistry.php`
@@ -10483,6 +10485,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/StreamSocketPairJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 31)
+- new Variable (line 32)
+- new Variable (line 35)
+- 1 class method(s)
+
 ### `ext/standard/StreamSyncJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11008,11 +11018,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 101)
-- new RecursiveIteratorIterator (line 1685)
-- new RecursiveDirectoryIterator (line 1686)
-- new RecursiveIteratorIterator (line 1787)
-- new RecursiveDirectoryIterator (line 1788)
-- 63 class method(s)
+- new RecursiveIteratorIterator (line 1869)
+- new RecursiveDirectoryIterator (line 1870)
+- new RecursiveIteratorIterator (line 1971)
+- new RecursiveDirectoryIterator (line 1972)
+- 66 class method(s)
 - 10 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -18047,77 +18057,77 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11019)
 - new Operand\Temporary (line 11021)
 - new OpCode (line 11068)
-- new CfgVariable (line 17418)
-- new Literal (line 17418)
-- new Variable (line 17450)
-- new Variable (line 17504)
-- new OpCode (line 17528)
-- new OpCode (line 17916)
-- new OpCode (line 17932)
-- new OpCode (line 17940)
-- new OpCode (line 17947)
-- new OpCode (line 17959)
-- new OpCode (line 17976)
-- new OpCode (line 17982)
-- new OpCode (line 17988)
-- new OpCode (line 17993)
-- new OpCode (line 18009)
-- new OpCode (line 18022)
-- new Variable (line 18033)
-- new Operand\Literal (line 18035)
-- new OpCode (line 18038)
-- new OpCode (line 18108)
-- new OpCode (line 18119)
-- new OpCode (line 18132)
-- new OpCode (line 18306)
-- new OpCode (line 18554)
-- new OpCode (line 18560)
-- new OpCode (line 18566)
-- new OpCode (line 18591)
-- new Variable (line 18618)
-- new Temporary (line 18620)
-- new Variable (line 18628)
-- new Temporary (line 18630)
-- new OpCode (line 18678)
-- new Operand\Temporary (line 18698)
-- new Operand\Temporary (line 18704)
-- new Operand\Temporary (line 18710)
-- new Operand\Temporary (line 18716)
-- new Operand\Temporary (line 18725)
-- new Variable (line 19807)
-- new Variable (line 19811)
-- new Variable (line 19819)
-- new Variable (line 19823)
-- new Variable (line 20065)
-- new Operand\Literal (line 20516)
-- new Variable (line 20518)
-- new OpCode (line 20905)
-- new OpCode (line 21097)
-- new OpCode (line 21378)
-- new OpCode (line 21579)
-- new OpCode (line 21589)
-- new OpCode (line 21592)
-- new Operand\Temporary (line 21624)
-- new OpCode (line 21626)
+- new CfgVariable (line 17619)
+- new Literal (line 17619)
+- new Variable (line 17651)
+- new Variable (line 17705)
+- new OpCode (line 17729)
+- new OpCode (line 18117)
+- new OpCode (line 18133)
+- new OpCode (line 18141)
+- new OpCode (line 18148)
+- new OpCode (line 18160)
+- new OpCode (line 18177)
+- new OpCode (line 18183)
+- new OpCode (line 18189)
+- new OpCode (line 18194)
+- new OpCode (line 18210)
+- new OpCode (line 18223)
+- new Variable (line 18234)
+- new Operand\Literal (line 18236)
+- new OpCode (line 18239)
+- new OpCode (line 18309)
+- new OpCode (line 18320)
+- new OpCode (line 18333)
+- new OpCode (line 18507)
+- new OpCode (line 18755)
+- new OpCode (line 18761)
+- new OpCode (line 18767)
+- new OpCode (line 18792)
+- new Variable (line 18819)
+- new Temporary (line 18821)
+- new Variable (line 18829)
+- new Temporary (line 18831)
+- new OpCode (line 18879)
+- new Operand\Temporary (line 18899)
+- new Operand\Temporary (line 18905)
+- new Operand\Temporary (line 18911)
+- new Operand\Temporary (line 18917)
+- new Operand\Temporary (line 18926)
+- new Variable (line 20008)
+- new Variable (line 20012)
+- new Variable (line 20020)
+- new Variable (line 20024)
+- new Variable (line 20266)
+- new Operand\Literal (line 20751)
+- new Variable (line 20753)
+- new OpCode (line 21164)
+- new OpCode (line 21356)
 - new OpCode (line 21637)
-- new Operand\Temporary (line 21640)
-- new OpCode (line 21642)
-- new OpCode (line 21650)
-- new OpCode (line 21657)
-- new OpCode (line 21665)
-- new OpCode (line 21668)
-- new OpCode (line 21685)
-- new OpCode (line 21713)
-- new OpCode (line 21720)
-- new OpCode (line 21857)
-- new Literal (line 21889)
-- new OpCode (line 21988)
-- new Variable (line 21995)
-- new Temporary (line 21997)
-- new OpCode (line 22000)
-- new CompileFatal (line 22298)
-- new CompileFatal (line 22517)
-- 635 class method(s)
+- new OpCode (line 21838)
+- new OpCode (line 21848)
+- new OpCode (line 21851)
+- new Operand\Temporary (line 21883)
+- new OpCode (line 21885)
+- new OpCode (line 21896)
+- new Operand\Temporary (line 21899)
+- new OpCode (line 21901)
+- new OpCode (line 21909)
+- new OpCode (line 21916)
+- new OpCode (line 21924)
+- new OpCode (line 21927)
+- new OpCode (line 21944)
+- new OpCode (line 21972)
+- new OpCode (line 21979)
+- new OpCode (line 22116)
+- new Literal (line 22148)
+- new OpCode (line 22247)
+- new Variable (line 22254)
+- new Temporary (line 22256)
+- new OpCode (line 22259)
+- new CompileFatal (line 22557)
+- new CompileFatal (line 22776)
+- 638 class method(s)
 - 19 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -18439,7 +18449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 63 class method(s)
+- 64 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -20370,7 +20380,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamSocketPairJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 23 class method(s)
+- 1 class method(s)
+
+### `lib/JIT/Builtin/StreamSocketPairRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 206)
+- 10 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamSync.php`
 
@@ -23158,33 +23175,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 13412)
 - new Variable (line 13586)
 - new Variable (line 13588)
-- new VM\ClassProperty (line 13704)
-- new Func\PHP (line 13823)
-- new Variable (line 13899)
-- new Variable (line 13906)
-- new Variable (line 13912)
-- new Variable (line 13949)
-- new Variable (line 13978)
-- new Variable (line 14162)
-- new Variable (line 14208)
-- new VM\ClassProperty (line 14270)
-- new Error (line 14307)
-- new Error (line 14339)
-- new Error (line 14342)
-- new Error (line 14345)
-- new Error (line 14364)
-- new ObjectEntry (line 14368)
-- new Variable (line 14370)
-- new Variable (line 14384)
-- new Error (line 14509)
-- new Error (line 14514)
-- new VM\ObjectEntry (line 14518)
-- new Variable (line 14658)
-- new Variable (line 14676)
-- new NoDiscardMetadata (line 14797)
-- new Variable (line 14954)
-- new Variable (line 14956)
-- new Variable (line 15048)
+- new VM\ClassProperty (line 13713)
+- new Func\PHP (line 13832)
+- new Variable (line 13908)
+- new Variable (line 13915)
+- new Variable (line 13921)
+- new Variable (line 13958)
+- new Variable (line 13987)
+- new Variable (line 14171)
+- new Variable (line 14217)
+- new VM\ClassProperty (line 14279)
+- new Error (line 14316)
+- new Error (line 14348)
+- new Error (line 14351)
+- new Error (line 14354)
+- new Error (line 14373)
+- new ObjectEntry (line 14377)
+- new Variable (line 14379)
+- new Variable (line 14393)
+- new Error (line 14518)
+- new Error (line 14523)
+- new VM\ObjectEntry (line 14527)
+- new Variable (line 14667)
+- new Variable (line 14685)
+- new NoDiscardMetadata (line 14806)
+- new Variable (line 14963)
+- new Variable (line 14965)
+- new Variable (line 15057)
 - 430 class method(s)
 - 14 closure(s)
 
@@ -25273,20 +25290,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 244)
 - new ObjectEntry (line 282)
 - new Variable (line 284)
-- new ObjectEntry (line 364)
-- new Variable (line 368)
-- new ObjectEntry (line 411)
-- new Variable (line 424)
-- new NativeDateInvalidTimeZoneException (line 433)
-- new NativeDateRangeError (line 441)
-- new NativeDateObjectError (line 447)
-- new NativeDateMalformedStringException (line 473)
-- new ObjectEntry (line 801)
-- new ObjectEntry (line 823)
-- new ObjectEntry (line 846)
-- new ObjectEntry (line 869)
-- new ObjectEntry (line 879)
-- new ObjectEntry (line 974)
+- new ObjectEntry (line 365)
+- new Variable (line 369)
+- new ObjectEntry (line 412)
+- new Variable (line 425)
+- new NativeDateInvalidTimeZoneException (line 434)
+- new NativeDateRangeError (line 442)
+- new NativeDateObjectError (line 448)
+- new NativeDateMalformedStringException (line 474)
+- new ObjectEntry (line 803)
+- new ObjectEntry (line 825)
+- new ObjectEntry (line 848)
+- new ObjectEntry (line 871)
+- new ObjectEntry (line 881)
+- new ObjectEntry (line 976)
 - 64 class method(s)
 
 ### `lib/VM/DateTimeZoneSupport.php`
