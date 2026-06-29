@@ -109,6 +109,25 @@ PHP;
         $this->assertStringContainsString('second=0', $output);
     }
 
+    public function testGcStatusRootsZeroAtColdStart(): void
+    {
+        if (CompilerVersion::supportsGcStatusPhp84Schema()) {
+            $this->markTestSkipped('PHP 8.4 gc_status schema has no roots key (#12790)');
+        }
+        $code = <<<'PHP'
+<?php
+echo 'roots=', gc_status()['roots'], "\n";
+PHP;
+
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile($code, 'gc_status_roots_cold.php');
+        ob_start();
+        $rt->run($block);
+        $output = ob_get_clean();
+
+        $this->assertStringContainsString('roots=0', $output);
+    }
+
     public function testGcCollectCyclesUpdatesStatus(): void
     {
         $code = <<<'PHP'
