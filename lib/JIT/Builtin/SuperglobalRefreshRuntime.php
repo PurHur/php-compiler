@@ -16,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * JIT/AOT link for __superglobals__refresh via SuperglobalRefreshJitHelper PHP (#9907).
  *
  * MCJIT embed: {@see \PHPCompiler\JIT\SuperglobalInit::implementRefresh} copies VM tables.
- * Standalone LLVM quarantine: {@see SuperglobalRefreshStandaloneLlvm}
+ * Standalone AOT: compiled PHP bridge via {@see SuperglobalRefreshJitHelper}.
  * SSOT: {@see \PHPCompiler\Web\Superglobals}
  * php-src: main/php_variables.c
  */
@@ -101,12 +101,6 @@ final class SuperglobalRefreshRuntime
             return;
         }
 
-        if (self::useStandaloneLlvmFallback($context)) {
-            SuperglobalRefreshStandaloneLlvm::implement($context);
-
-            return;
-        }
-
         $restore = self::captureInsertBlock($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
@@ -117,29 +111,6 @@ final class SuperglobalRefreshRuntime
 
         self::restoreInsertBlock($context, $restore);
         self::registerLinkedRuntime($context);
-    }
-
-    private static function useStandaloneLlvmFallback(Context $context): bool
-    {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            // Nested SuperglobalRefreshJitHelper returns VM HashTable handles, not native
-            // __hashtable__* — coerceToHashtablePtr bitcast corrupts sg_* (#12039).
-            $phpBridge = getenv('PHP_COMPILER_SUPERGLOBAL_REFRESH_PHP');
-            if ('1' === $phpBridge || 'true' === strtolower((string) $phpBridge)) {
-                return false;
-            }
-
-            return true;
-        }
-
-        foreach (['PHP_COMPILER_SUPERGLOBAL_REFRESH_LLVM', 'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER'] as $key) {
-            $flag = getenv($key);
-            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
-                return true;
-            }
-        }
-
-        return false;
     }
 
     private static function declareRefresh(Context $context): LlvmFunction
