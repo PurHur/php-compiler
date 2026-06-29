@@ -2410,7 +2410,6 @@
         "lib/JIT/Builtin/EmbedObEchoBridge.php",
         "lib/JIT/Builtin/EmbedObOutput.php",
         "lib/JIT/Builtin/EnumCasesRuntime.php",
-        "lib/JIT/Builtin/EnvLocalOverlayTableLlvm.php",
         "lib/JIT/Builtin/EnvLocalRuntime.php",
         "lib/JIT/Builtin/ErrorHandler.php",
         "lib/JIT/Builtin/ErrorHandlerJitRuntime.php",
@@ -3691,9 +3690,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3461,
+        "inventory_files": 3460,
         "excluded": 0,
-        "eligible": 3461,
+        "eligible": 3460,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

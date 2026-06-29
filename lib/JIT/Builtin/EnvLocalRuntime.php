@@ -14,7 +14,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #12810).
+ * JIT/AOT link for __compiler_env_local_* via EnvLocalJitHelper PHP (#9814, #13431).
  *
  * JIT embed and AOT standalone compile {@see \PHPCompiler\ext\standard\EnvLocalJitHelper}; thin LLVM bridges
  * forward the ABI. Replaces {@see StringEnvLocal} LLVM overlay table (phpc_env_local_entries).
@@ -29,10 +29,13 @@ final class EnvLocalRuntime
 
     private const REGISTER_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::registerPutenv';
 
+    private const MERGE_OVERLAY_HELPER = 'PHPCompiler\\ext\\standard\\EnvLocalJitHelper::mergeLocalOverlayInto';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::LOOKUP_HELPER,
         self::REGISTER_HELPER,
+        self::MERGE_OVERLAY_HELPER,
     ];
 
     /** @var list<string> */
@@ -57,7 +60,6 @@ final class EnvLocalRuntime
 
         self::ensureLibc($context);
         self::ensureJitHelperCompiled($context);
-        EnvLocalOverlayTableLlvm::implementSyncOverlayBridge($context);
         self::implementLookupBridge($context);
         self::implementRegisterBridge($context);
         self::registerLinkedRuntime($context);
@@ -66,7 +68,11 @@ final class EnvLocalRuntime
 
     public static function emitMergeOverlay(Context $context, Value $ht): void
     {
-        EnvLocalOverlayTableLlvm::emitMergeOverlay($context, $ht);
+        self::ensureJitHelperCompiled($context);
+        $context->builder->call(
+            self::helperFunction($context, self::MERGE_OVERLAY_HELPER),
+            $ht
+        );
     }
 
     private static function implementLookupBridge(Context $context): void
@@ -122,7 +128,7 @@ final class EnvLocalRuntime
             $context->lookupFunction('__value__readString'),
             $overlayPtr
         );
-        $dup = EnvLocalOverlayTableLlvm::dupCstrFromStringStruct($context, $valueStr);
+        $dup = self::dupCstrFromStringStruct($context, $valueStr);
         $doneBb = $fn->appendBasicBlock('el_lookup_done');
         $context->builder->branch($doneBb);
 
@@ -176,10 +182,6 @@ final class EnvLocalRuntime
             self::helperFunction($context, self::REGISTER_HELPER),
             $settingStr
         );
-        $context->builder->call(
-            $context->lookupFunction('__compiler_env_local_sync_overlay'),
-            $settingCstr
-        );
         $context->builder->branch($skipBb);
 
         $context->builder->positionAtEnd($skipBb);
@@ -187,15 +189,48 @@ final class EnvLocalRuntime
         $context->registerFunction($abiName, $fn);
     }
 
+    /** Duplicate __string__ payload bytes into a malloc'd C string (#12910). */
+    private static function dupCstrFromStringStruct(Context $context, Value $src): Value
+    {
+        $strMap = $context->structFieldMap['__string__'];
+        $valueBytes = $context->builder->structGep($src, $strMap['value']);
+
+        return self::dupCstrBytes($context, $valueBytes);
+    }
+
+    private static function dupCstrBytes(Context $context, Value $src): Value
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $len = $context->builder->call($context->lookupFunction('strlen'), $src);
+        $buf = $context->builder->call(
+            $context->lookupFunction('malloc'),
+            $context->builder->add($len, $sizeT->constInt(1, false))
+        );
+        $dest = $context->builder->pointerCast($buf, $i8p);
+        $context->builder->call($context->lookupFunction('memcpy'), $dest, $src, $len);
+        $context->builder->store(
+            $i8->constInt(0, false),
+            $context->builder->inBoundsGEP($dest, $len)
+        );
+
+        return $dest;
+    }
+
     private static function ensureLibc(Context $context): void
     {
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
         $voidPtr = $context->getTypeFromString('void*');
+        $voidTy = $context->getTypeFromString('void');
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8 = $context->getTypeFromString('int8');
 
         foreach ([
             ['strlen', $i64, [$i8p]],
-            ['malloc', $voidPtr, [$i64]],
+            ['malloc', $voidPtr, [$sizeT]],
+            ['memcpy', $voidPtr, [$voidPtr, $voidPtr, $sizeT]],
             ['__string__init', $context->getTypeFromString('__string__*'), [$i64, $i8p]],
             ['__value__readString', $context->getTypeFromString('__string__*'), [$context->getTypeFromString('__value__*')]],
         ] as [$name, $ret, $params]) {
