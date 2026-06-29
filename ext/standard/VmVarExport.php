@@ -141,7 +141,7 @@ final class VmVarExport
                 return '(object) '.$exported;
             }
 
-            return $className.'::__set_state('.$exported.')';
+            return '\\'.ltrim($className, '\\').'::__set_state('.$exported.')';
         } finally {
             $visited->detach($object);
         }
