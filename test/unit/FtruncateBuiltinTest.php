@@ -29,6 +29,24 @@ PHP;
         $this->assertSame(self::EXPECT, $this->runBin('bin/vm.php', self::CODE));
     }
 
+    /** Issue #12622 — negative literal size must throw ValueError (not mis-wire stream arg). */
+    public function testNegativeLiteralSizeThrowsValueError(): void
+    {
+        $code = <<<'PHP'
+$path = sys_get_temp_dir() . '/phpc_ftruncate_neg_unit.txt';
+$fp = fopen($path, 'w+');
+try {
+    ftruncate($fp, -1);
+    echo "fail\n";
+} catch (ValueError $e) {
+    echo ($e->getMessage() === 'ftruncate(): Argument #2 ($size) must be greater than or equal to 0') ? "ok\n" : 'msg:'.$e->getMessage()."\n";
+}
+fclose($fp);
+@unlink($path);
+PHP;
+        $this->assertSame('ok', $this->runBin('bin/vm.php', $code));
+    }
+
     /**
      * @group llvm
      * @group jit

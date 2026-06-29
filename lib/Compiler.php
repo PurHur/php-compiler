@@ -13828,12 +13828,25 @@ class Compiler {
                 // Fall through — inline haystack may use a dead temp (#9888).
             }
             if (
+                ($producers[0] instanceof Op\Expr\UnaryMinus || $producers[0] instanceof Op\Expr\UnaryPlus)
+                && $argCount >= 2
+            ) {
+                // ftruncate($fp, -1) — hoisted UnaryMinus is the trailing arg, not arg #0 (#12622, #13450).
+                if ($argCount - 1 === $argIndex) {
+                    return $producers[0];
+                }
+
+                return null;
+            }
+            if (
                 0 === $argIndex
                 && !($producers[0] instanceof Op\Expr\Array_)
                 && !($producers[0] instanceof Op\Expr\ConstFetch)
                 && !($producers[0] instanceof Op\Expr\ClassConstFetch)
                 && !($producers[0] instanceof Op\Expr\ArrowFunction)
                 && !($producers[0] instanceof Op\Expr\Closure)
+                && !($producers[0] instanceof Op\Expr\UnaryMinus)
+                && !($producers[0] instanceof Op\Expr\UnaryPlus)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 $callArg = $callArgs[$argIndex] ?? null;
@@ -18784,7 +18797,7 @@ class Compiler {
         }
         $vm = $this->tryFoldUnaryLiteralDefault($unaryRoot);
         if (null !== $vm) {
-            return $block->registerConstant($arg, $vm);
+            return $block->registerConstant($unaryRoot->result, $vm);
         }
         if (null === $block->slotForOperand($unaryRoot->result)) {
             foreach ($this->compileExpr($unaryRoot, $block) as $op) {
@@ -18826,11 +18839,26 @@ class Compiler {
                         return $child;
                     }
                     // php-cfg dead-temp alias: hoisted call arg temp may differ from UnaryMinus.result (#13387, #13434).
+                    // Map by hoisted producer ordinal — ftruncate(fopen(), -1) must not wire UnaryMinus to arg #0 (#12622).
                     if (
                         $i === $callIndex - 1
                         && $callArg instanceof Operand\Temporary
+                        && is_array($callOp->args ?? null)
+                        && $this->callArgIsDeadInlineTemporary($callOp->args[$argIndex] ?? $arg)
                     ) {
-                        return $child;
+                        $producerSlot = $this->inlineHoistedProducerSlotIndexForCallArg(
+                            $callOp->args,
+                            $argIndex
+                        );
+                        if (null !== $producerSlot) {
+                            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                                $block->orig->children,
+                                $callOp
+                            );
+                            if (($producers[$producerSlot] ?? null) === $child) {
+                                return $child;
+                            }
+                        }
                     }
                 }
 
@@ -19011,7 +19039,7 @@ class Compiler {
             if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
                 $vm = $this->tryFoldUnaryLiteralDefault($producer);
                 if (null !== $vm) {
-                    return $block->registerConstant($arg, $vm);
+                    return $block->registerConstant($producer->result, $vm);
                 }
             }
             if ($this->callArgOperandIsClosureValue($arg, $block)) {
