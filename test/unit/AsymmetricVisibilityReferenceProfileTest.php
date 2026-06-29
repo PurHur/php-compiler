@@ -10,9 +10,39 @@ use PHPUnit\Framework\TestCase;
 /** Asymmetric visibility reference profile gate (#12508). */
 final class AsymmetricVisibilityReferenceProfileTest extends TestCase
 {
-    public function testSupportsAsymmetricVisibilityTrueOn84DevForwardProfile(): void
+    public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+    }
+
+    public function testRejectorThrowsOnPropertyPrivateSet(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
+        $this->expectExceptionMessage(AsymmetricVisibilityRejector::PARSE_MESSAGE);
+        AsymmetricVisibilityRejector::reject(
+            file_get_contents(__DIR__.'/../repro/maintainer_gap_private_set_reference_profile.php'),
+            'maintainer_gap_private_set_reference_profile.php'
+        );
+    }
+
+    public function testRuntimeRejectsPropertyPrivateSet(): void
+    {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ target');
+        }
+        $runtime = new Runtime();
+        try {
+            $runtime->parseAndCompile(
+                file_get_contents(__DIR__.'/../repro/maintainer_gap_private_set_reference_profile.php'),
+                'maintainer_gap_private_set_reference_profile.php'
+            );
+            $this->fail('Expected compile failure');
+        } catch (\PHPCompiler\Compiler\CompileFatal $e) {
+            $this->assertStringContainsString(AsymmetricVisibilityRejector::PARSE_MESSAGE, $e->getMessage());
+        }
     }
 
     public function testRewriterNoOpWhenAsymmetricDisabled(): void
