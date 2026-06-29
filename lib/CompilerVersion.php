@@ -416,11 +416,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ hrtime(true) returns double (ext/standard/hrtime.c, #12779).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps integer nanoseconds (#12789).
+     * Enabled on the 8.4.0-dev forward profile — version_compare treats -dev below stable 8.4.0 (#12779).
      */
     public static function supportsHrtimeAsNumberFloat(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::VERSION, '8.4', '>=');
     }
 
     /**
