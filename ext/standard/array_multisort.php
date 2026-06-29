@@ -82,21 +82,13 @@ final class array_multisort extends Internal
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, $allValues, $entries);
         foreach ($entries as $entryIdx => $entry) {
-            $entry['array']->separateArrayForWrite();
-            $target = $entry['array']->resolveIndirect()->toArray();
-            if ($allPacked[$entryIdx]) {
-                $reordered = [];
-                foreach ($indices as $idx) {
-                    $reordered[] = $allValues[$entryIdx][$idx];
-                }
-                $target->replacePackedValues($reordered);
-            } else {
-                $reorderedPairs = [];
-                foreach ($indices as $idx) {
-                    $reorderedPairs[] = $allPairs[$entryIdx][$idx];
-                }
-                $target->reorderKeyedPairs($reorderedPairs);
-            }
+            self::writeSortedArray(
+                $entry['array'],
+                $allValues[$entryIdx],
+                $allPairs[$entryIdx],
+                $allPacked[$entryIdx],
+                $indices
+            );
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
@@ -163,6 +155,26 @@ final class array_multisort extends Internal
         }
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, [0 => $values], [$entry]);
+        self::writeSortedArray($array, $values, $pairs, $isPacked, $indices);
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->bool(true);
+        }
+    }
+
+    /**
+     * Write sorted values back — php-src php_array_multisort reindexes int keys to 0..n-1 (#13449).
+     *
+     * @param list<Variable>                             $values
+     * @param list<array{0: Variable, 1: Variable}>|null $pairs
+     * @param list<int>                                  $indices
+     */
+    private static function writeSortedArray(
+        Variable $array,
+        array $values,
+        ?array $pairs,
+        bool $isPacked,
+        array $indices
+    ): void {
         $array->separateArrayForWrite();
         $target = $array->resolveIndirect()->toArray();
         if ($isPacked) {
@@ -171,16 +183,23 @@ final class array_multisort extends Internal
                 $reordered[] = $values[$idx];
             }
             $target->replacePackedValues($reordered);
-        } else {
-            $reorderedPairs = [];
-            foreach ($indices as $idx) {
-                $reorderedPairs[] = $pairs[$idx];
+
+            return;
+        }
+        $reorderedPairs = [];
+        $numericNext = 0;
+        foreach ($indices as $idx) {
+            [$key, $value] = $pairs[$idx];
+            $keyResolved = $key->resolveIndirect();
+            if (Variable::TYPE_INTEGER === $keyResolved->type) {
+                $newKey = new Variable();
+                $newKey->int($numericNext++);
+                $reorderedPairs[] = [$newKey, $value];
+            } else {
+                $reorderedPairs[] = [$key, $value];
             }
-            $target->reorderKeyedPairs($reorderedPairs);
         }
-        if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(true);
-        }
+        $target->reorderKeyedPairs($reorderedPairs);
     }
 
     /**
