@@ -52,7 +52,9 @@ final class stream_filter_register extends Internal
                 $frame->vmContext,
                 $frame
             );
-            $frame->returnVar->bool(false);
+            // php-src ext/standard/streams.c — register name and return true despite invalid class.
+            VmStreamFilters::register($filterName, $className);
+            $frame->returnVar->bool(true);
 
             return;
         }
