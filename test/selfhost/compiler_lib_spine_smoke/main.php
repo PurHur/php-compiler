@@ -1256,6 +1256,7 @@ require_once __DIR__.'/../../../ext/standard/VmIncludePath.php';
 require_once __DIR__.'/../../../ext/standard/VmInet.php';
 require_once __DIR__.'/../../../ext/standard/VmInetNative.php';
 require_once __DIR__.'/../../../ext/standard/VmInetPure.php';
+require_once __DIR__.'/../../../ext/standard/VmCreditsData.php';
 require_once __DIR__.'/../../../ext/standard/VmInfo.php';
 require_once __DIR__.'/../../../ext/standard/VmIni.php';
 require_once __DIR__.'/../../../ext/standard/VmIniIntrospection.php';
