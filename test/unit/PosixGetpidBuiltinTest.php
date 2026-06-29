@@ -47,7 +47,7 @@ final class PosixGetpidBuiltinTest extends TestCase
         $frame->calledArgs[0]->int(0);
         $fn->execute($frame);
         $msg = $frame->returnVar->resolveIndirect()->toString();
-        $this->assertNotSame('', $msg);
+        $this->assertSame('Success', $msg);
         $this->assertSame((string) \posix_strerror(0), $msg);
     }
 
