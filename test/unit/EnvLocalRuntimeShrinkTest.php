@@ -44,11 +44,11 @@ final class EnvLocalRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('Variable::string', $source);
     }
 
-    public function testMergeOverlayUsesPhpHelperNotLlvmTable(): void
+    public function testEnvLocalRuntimeNoMergeOverlayLlvmEmitter(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/EnvLocalRuntime.php');
-        $this->assertStringContainsString('MERGE_OVERLAY_HELPER', $runtime);
-        $this->assertStringContainsString('mergeLocalOverlayInto', $runtime);
+        $this->assertStringNotContainsString('emitMergeOverlay', $runtime);
+        $this->assertStringNotContainsString('MERGE_OVERLAY_HELPER', $runtime);
         $this->assertStringNotContainsString('EnvLocalOverlayTableLlvm', $runtime);
         $this->assertStringNotContainsString('__compiler_env_local_sync_overlay', $runtime);
     }
