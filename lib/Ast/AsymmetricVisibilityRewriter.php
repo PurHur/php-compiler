@@ -289,18 +289,18 @@ final class AsymmetricVisibilityRewriter
             || 1 === preg_match(
                 '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
                 $line
-            );
+            )
+            || self::lineHasExplicitReadPlusSetModifier($line);
     }
 
     /**
-     * Zend 8.2 reference profile: any explicit read plus asymmetric set is fatal (#12576).
+     * Zend reference profile: same multiple-modifier rules as PHP 8.4 (#12576, #13672).
      *
-     * PHP 8.4 allows distinct read+set pairs such as public read with private set (#11868, #12781).
+     * Valid dual-modifier form is set-first only, e.g. private(set) protected $x — not public private(set).
      */
     private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
     {
-        return self::lineViolatesMultipleSetModifierRules($line)
-            || self::lineHasExplicitReadPlusSetModifier($line);
+        return self::lineViolatesMultipleSetModifierRules($line);
     }
 
     private static function lineHasExplicitReadPlusSetModifier(string $line): bool
