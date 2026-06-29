@@ -58,6 +58,15 @@ final class VmUnserializeRuntimeShrinkTest extends TestCase
         $this->assertSame(1, $ok[0][0][0]);
     }
 
+    /** Issue #13777 — max_depth Notice offset matches Zend (end of exceeded nesting, not early abort). */
+    public function testMaxDepthNoticeOffsetMatchesZend(): void
+    {
+        $nested = 'a:1:{i:0;a:1:{i:0;a:1:{i:0;i:1;}}}';
+        $this->assertFalse(VmUnserializeFormat::decodePayload($nested, ['max_depth' => 1]));
+        $this->assertSame(14, VmUnserializeFormat::lastErrorOffset());
+        $this->assertSame(34, VmUnserializeFormat::lastPayloadLength());
+    }
+
     public function testRoundTripViaVmSerializeExported(): void
     {
         $payload = VmSerialize::serializeExported(['ok' => true, 'n' => 1, 'msg' => 'hi']);

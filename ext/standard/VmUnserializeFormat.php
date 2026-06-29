@@ -260,9 +260,6 @@ final class VmUnserializeFormat
      */
     private function parseObject(int $depth): VmUnserializeCell|false
     {
-        if ($depth >= $this->maxDepth) {
-            return $this->failDepthExceeded();
-        }
         if (!$this->expect('O:')) {
             return $this->failCell();
         }
@@ -285,6 +282,9 @@ final class VmUnserializeFormat
         /** @var array<int|string, VmUnserializeCell> $properties */
         $properties = [];
         for ($i = 0; $i < $propCount; ++$i) {
+            if ($depth + 1 > $this->maxDepth) {
+                return $this->failDepthExceeded();
+            }
             $keyCell = $this->parseArrayKey();
             if (false === $keyCell) {
                 return $this->failCell();
@@ -425,9 +425,6 @@ final class VmUnserializeFormat
      */
     private function parseArray(int $depth): VmUnserializeCell|false
     {
-        if ($depth >= $this->maxDepth) {
-            return $this->failDepthExceeded();
-        }
         if (!$this->expect('a:')) {
             return $this->failCell();
         }
@@ -442,6 +439,9 @@ final class VmUnserializeFormat
         /** @var array<int|string, VmUnserializeCell> $elements */
         $elements = [];
         for ($i = 0; $i < $count; ++$i) {
+            if ($depth + 1 > $this->maxDepth) {
+                return $this->failDepthExceeded();
+            }
             $keyCell = $this->parseArrayKey();
             if (false === $keyCell) {
                 return $this->failCell();
