@@ -300,6 +300,22 @@ final class LazyObjectSupport
         return $object->lazyPending;
     }
 
+    /** class_has_lazy_object_initializer() — ghost with pending initializer (#6052). */
+    public static function hasLazyObjectInitializer(ObjectEntry $object): bool
+    {
+        return $object->lazyGhost
+            && $object->lazyPending
+            && null !== $object->lazyInitializer;
+    }
+
+    /** class_has_lazy_object_uninitializer() — proxy with pending factory (#6097). */
+    public static function hasLazyObjectUninitializer(ObjectEntry $object): bool
+    {
+        return !$object->lazyGhost
+            && $object->lazyPending
+            && null !== $object->lazyInitializer;
+    }
+
     /** Zend zend_lazy_object_get_instance — proxy real instance or ghost shell (#7054, #9999). */
     public static function getLazyInstance(ObjectEntry $object): ObjectEntry
     {
