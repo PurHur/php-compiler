@@ -45,7 +45,7 @@ final class JitHighlight
             throw new \LogicException($functionName.'() expects 1 or 2 arguments in this compiler build');
         }
 
-        $pathStr = JitStringBuiltinArg::lower($context, $args[0], $functionName, 0, 'filename');
+        $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], $functionName, 0, 'filename');
         StringFileGetContents::implement($context);
         JitNativeString::ensureInsertBlock($context);
         $contents = $context->builder->call(
