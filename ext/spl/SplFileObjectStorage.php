@@ -100,6 +100,46 @@ final class SplFileObjectStorage
         return VmFs::feof(self::state($object)['handle']);
     }
 
+    public static function seek(ObjectEntry $object, int $line): void
+    {
+        $state = &self::$state[$object->id];
+        if (!VmFs::rewind($state['handle'])) {
+            throw new \RuntimeException('Cannot rewind file');
+        }
+        self::freeLine($state);
+        $state['lineNum'] = 0;
+        for ($i = 0; $i < $line; ++$i) {
+            if (!self::readLineForIterator($object, true)) {
+                return;
+            }
+            self::freeLine($state);
+            ++$state['lineNum'];
+        }
+        self::readLineForIterator($object, true);
+    }
+
+    public static function fseek(ObjectEntry $object, int $offset, int $whence = \SEEK_SET): int
+    {
+        $state = &self::$state[$object->id];
+        $result = VmFs::fseek($state['handle'], $offset, $whence);
+        if (-1 === $result) {
+            return -1;
+        }
+        self::freeLine($state);
+        self::syncLineNumFromHandle($state);
+        if (self::hasFlag($state, self::FLAG_READ_AHEAD)) {
+            self::readLineForIterator($object, true);
+        }
+
+        return 0;
+    }
+
+    /** @return string|false */
+    public static function getCurrentLine(ObjectEntry $object)
+    {
+        return self::current($object);
+    }
+
     /**
      * Read from current stream position through EOF (php-src spl_filesystem_file_read_all; #13610).
      */
@@ -191,6 +231,32 @@ final class SplFileObjectStorage
         $state['lineNum'] += $lineAdd;
 
         return true;
+    }
+
+    /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string} $state */
+    private static function syncLineNumFromHandle(array &$state): void
+    {
+        $pos = VmFs::ftell($state['handle']);
+        if (false === $pos || $pos <= 0) {
+            $state['lineNum'] = 0;
+
+            return;
+        }
+        $saved = $pos;
+        if (!VmFs::rewind($state['handle'])) {
+            $state['lineNum'] = 0;
+
+            return;
+        }
+        $prefix = VmFs::fread($state['handle'], $saved);
+        if (false === $prefix) {
+            $state['lineNum'] = 0;
+            VmFs::fseek($state['handle'], $saved, \SEEK_SET);
+
+            return;
+        }
+        $state['lineNum'] = substr_count($prefix, "\n");
+        VmFs::fseek($state['handle'], $saved, \SEEK_SET);
     }
 
     /** @param array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int} $state */
