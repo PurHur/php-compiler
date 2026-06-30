@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\hash;
 
 use PHPCompiler\ext\standard\JitBoolArg;
 use PHPCompiler\ext\standard\JitHashFile;
+use PHPCompiler\ext\standard\JitStreamPath;
 use PHPCompiler\ext\standard\JitStringBuiltinArg;
 use PHPCompiler\ext\standard\VmHashFile;
 use PHPCompiler\ext\standard\VmStreamOpenFailure;
@@ -64,7 +65,7 @@ final class hash_file extends Internal
             $raw = JitBoolArg::lower($context, $args[2], 'hash_file() raw_output');
         }
         $algo = JitStringBuiltinArg::lower($context, $args[0], 'hash_file', 0, 'algo');
-        $path = JitStringBuiltinArg::lower($context, $args[1], 'hash_file', 1, 'filename');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[1], 'hash_file', 1, 'filename');
 
         return JitHashFile::hash($context, $algo, $path, $raw);
     }

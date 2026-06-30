@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\PathSupport;
+
 /**
  * VM helpers for md5_file() / sha1_file() (issue #3590, ext/standard/md5.c parity).
  */
@@ -13,6 +15,7 @@ final class VmHashFile
      * @return string|false hex or raw digest
      */
     public static function hashFile(string $algo, string $path, bool $raw = false) {
+        self::rejectEmptyPath($path);
         $data = VmFs::fileGetContents($path);
         if (false === $data) {
             return false;
@@ -25,11 +28,20 @@ final class VmHashFile
      * @return string|false hex or raw digest
      */
     public static function hashHmacFile(string $algo, string $path, string $key, bool $raw = false) {
+        self::rejectEmptyPath($path);
         $data = VmFs::fileGetContents($path);
         if (false === $data) {
             return false;
         }
 
         return VmHash::hashHmac($algo, $data, $key, $raw);
+    }
+
+    /** @throws \ValueError php-src Z_PARAM_PATH empty-string guard (#14074). */
+    private static function rejectEmptyPath(string $path): void
+    {
+        if (PathSupport::isEmptyPath($path)) {
+            throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
+        }
     }
 }

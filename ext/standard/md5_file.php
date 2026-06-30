@@ -56,7 +56,7 @@ final class md5_file extends Internal
         if (isset($args[1])) {
             $raw = JitBoolArg::lower($context, $args[1], 'md5_file() raw_output');
         }
-        $path = JitFilestatArg::lowerFilename($context, $args[0], 'md5_file');
+        $path = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'md5_file');
 
         return JitHashFile::md5($context, $path, $raw);
     }
