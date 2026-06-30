@@ -2,8 +2,8 @@
 
 declare(strict_types=1);
 
-if (\PHPCompiler\CompilerVersion::supportsBz2()) {
-    echo "skip: bz2 enabled via pure PHP VmBz2Core (#14198)\n";
+if (function_exists('bzcompress') || function_exists('bzdecompress')) {
+    echo "skip: bz2 enabled via VmBz2Core (#14198)\n";
     exit(0);
 }
 
