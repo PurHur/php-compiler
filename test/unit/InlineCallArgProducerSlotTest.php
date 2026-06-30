@@ -3810,4 +3810,70 @@ PHP;
         self::assertSame($constSlots[1], $argSendSlots[0], 'null ConstFetch must feed file_exists arg');
         self::assertNotSame($constSlots[0], $argSendSlots[0], 'hoisted false must not feed file_exists arg');
     }
+
+    /** Issue #14042 — nested array_reverse() feeds trailing mixed param, not hoisted Array_ prelude. */
+    public function testNestedArrayReverseTrailingMixedCallArgUsesFuncCallSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function out(string $k, mixed $v): void {
+    echo $k;
+}
+out('rev', array_reverse(['a' => 1, 'b' => 2], true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_reverse_trailing_mixed_call_arg.php');
+
+        $reverseReturnSlot = null;
+        $outSendSlots = [];
+        $pendingSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type && null === $reverseReturnSlot) {
+                $reverseReturnSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if ([] !== $pendingSends) {
+                    $outSendSlots = $pendingSends;
+                }
+                $pendingSends = [];
+                continue;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $pendingSends[] = $op->arg1;
+            }
+        }
+        if ([] !== $pendingSends) {
+            $outSendSlots = $pendingSends;
+        }
+
+        self::assertNotNull($reverseReturnSlot);
+        self::assertSame($reverseReturnSlot, $outSendSlots[1] ?? null, 'out() must send array_reverse return slot');
+    }
+
+    /** Issue #14042 — runtime parity for array_reverse + array_slice in one compile unit. */
+    public function testArrayReverseWithSliceSameUnitRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+function out(string $k, mixed $v): void {
+    echo $k . '=' . (is_string($v) ? $v : var_export($v, true)) . "\n";
+}
+$ks = ['10' => 1, '2' => 2];
+krsort($ks, SORT_NUMERIC);
+out('array_reverse', array_reverse(['a' => 1, 'b' => 2], true));
+out('array_slice', array_slice(['a' => 1, 'b' => 2, 'c' => 3], 1, 2, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_reverse_with_slice_same_unit.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+
+        self::assertStringContainsString("'b' => 2", $out);
+        self::assertStringContainsString("'a' => 1", $out);
+        self::assertStringContainsString("'c' => 3", $out);
+        self::assertStringNotContainsString('NULL', $out);
+    }
 }
