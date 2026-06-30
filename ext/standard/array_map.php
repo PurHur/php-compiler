@@ -168,8 +168,18 @@ final class array_map extends Internal
 
                 continue;
             }
+            if (Variable::TYPE_STRING === $callback->type) {
+                if (ArrayMapCallbackPolicy::isPhpSrcInvalidCallbackType($callback->type)) {
+                    throw new \TypeError(ArrayMapCallbackPolicy::invalidCallbackTypeError());
+                }
+                $fn = VmInternalCall::resolveStringCallback($callback->toString());
+                $mapped = VmInternalCall::invoke($fn, ...$rowArgs);
+                $out->addIndex($destIdx++, $mapped);
+
+                continue;
+            }
             throw new \LogicException(
-                'array_map() with multiple arrays requires a null or closure callback in this compiler build'
+                'array_map() with multiple arrays requires a null, closure, or string builtin callback in this compiler build'
             );
         }
 
