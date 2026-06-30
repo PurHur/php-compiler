@@ -491,7 +491,10 @@ final class BootstrapSelfhostBundleTest extends TestCase
             $rel = $m[1];
             if ('lib/VM/Builtin/VmClassMethod.php' === $rel) {
                 $vmClassMethodLine = $i + 1;
-                break;
+                continue;
+            }
+            if (null !== $firstExtenderLine) {
+                continue;
             }
             $abs = self::$root.'/'.$rel;
             if (!is_file($abs)) {
@@ -500,7 +503,6 @@ final class BootstrapSelfhostBundleTest extends TestCase
             $src = (string) file_get_contents($abs);
             if (str_contains($src, 'extends VmClassMethod')) {
                 $firstExtenderLine = $i + 1;
-                break;
             }
         }
         $this->assertNotNull($vmClassMethodLine, 'VmClassMethod.php must be in spine');
