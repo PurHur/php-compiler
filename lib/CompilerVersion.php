@@ -328,14 +328,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063).
+     * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063, #14113).
      *
-     * Enabled on 8.4.0-dev forward profile — Zend 8.2 rejects; stable 8.4+ accepts.
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects ?? in encapsed braces like Zend 8.2.
      * php-src: Zend/zend_language_parser.y encapsed variable grammar.
      */
     public static function supportsEncapsedCoalesce(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
