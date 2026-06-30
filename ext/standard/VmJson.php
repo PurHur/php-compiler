@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\MethodVisibility;
 use PHPCompiler\VM;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseEntry;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\InterfaceCheck;
@@ -309,6 +310,14 @@ final class VmJson
                 }
                 $visited->attach($object);
                 try {
+                    $lcClass = strtolower($object->class->name);
+                    if (DateTimeSupport::CLASS_DATETIME === $lcClass
+                        || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass) {
+                        return DateTimeSupport::exportZendJsonWireDateTimeLike($object);
+                    }
+                    if (DateTimeSupport::CLASS_DATETIMEZONE === $lcClass) {
+                        return DateTimeSupport::exportZendJsonWireDateTimeZone($object);
+                    }
                     if (EnumCaseSupport::isEnumCase($object)) {
                         $backing = new Variable();
                         if (null !== $object->enumCaseValue) {

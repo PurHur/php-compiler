@@ -934,21 +934,46 @@ final class DateTimeSupport
         return $var;
     }
 
-    /** php-src php_date_serialize — Zend `date` / `timezone_type` / `timezone` wire (#10710). */
-    public static function encodeZendSerializeWire(ObjectEntry $dt): string
+    /**
+     * php-src ext/json/php_json.c — DateTime/DateTimeImmutable json encode wire (#14143).
+     *
+     * @return array{date: string, timezone_type: int, timezone: string}
+     */
+    public static function exportZendJsonWireDateTimeLike(ObjectEntry $dt): array
     {
         self::requireInitializedDateTimeLike($dt, self::classLabel($dt));
         $className = self::classLabel($dt);
         $timestamp = self::requireIntProperty($dt, self::TS_PROPERTY, $className)->toInt();
         $microsecond = self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $className)->toInt();
         $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $className)->toString();
-        $dateWire = VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName);
 
-        return VmSerialize::encodeExportedPropertyBag($className, [
-            'date' => $dateWire,
+        return [
+            'date' => VmDateTimeNative::formatZendDateWire($timestamp, $microsecond, $tzName),
             'timezone_type' => 3,
             'timezone' => $tzName,
-        ]);
+        ];
+    }
+
+    /**
+     * php-src ext/json/php_json.c — DateTimeZone json encode wire (#14143).
+     *
+     * @return array{timezone_type: int, timezone: string}
+     */
+    public static function exportZendJsonWireDateTimeZone(ObjectEntry $zone): array
+    {
+        return [
+            'timezone_type' => 3,
+            'timezone' => self::timezoneName($zone),
+        ];
+    }
+
+    /** php-src php_date_serialize — Zend `date` / `timezone_type` / `timezone` wire (#10710). */
+    public static function encodeZendSerializeWire(ObjectEntry $dt): string
+    {
+        return VmSerialize::encodeExportedPropertyBag(
+            self::classLabel($dt),
+            self::exportZendJsonWireDateTimeLike($dt)
+        );
     }
 
     /**
