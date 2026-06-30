@@ -2415,15 +2415,30 @@ class VM {
 
                 return $out->resolveIndirect();
             }
-            $this->context->push($child);
-            $result = $this->runFrames();
+            if ($isolated) {
+                $this->context->deferBuiltinCallbackCatchToOuterRunFrames = true;
+            }
+            try {
+                $this->context->push($child);
+                $result = $this->runFrames();
+            } finally {
+                if ($isolated) {
+                    $this->context->deferBuiltinCallbackCatchToOuterRunFrames = false;
+                }
+            }
             if (self::SUCCESS !== $result) {
                 throw new \LogicException('Closure invocation failed in this compiler build');
             }
 
             return $out->resolveIndirect();
-        } finally {
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
             if ($isolated) {
+                $this->context->swapRunStack($savedStack);
+                $savedStack = null;
+            }
+            throw $redirect;
+        } finally {
+            if ($isolated && null !== $savedStack) {
                 $this->context->swapRunStack($savedStack);
             }
         }
@@ -7166,6 +7181,12 @@ restart:
                 }
                 $frame = $signal->catchFrame;
                 goto restart;
+            } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                    throw $redirect;
+                }
+                $frame = $redirect->catchFrame;
+                goto restart;
             }
             if ($this->shouldAbortPropertyHookInvocation($frame)) {
                 return self::FAILURE;
@@ -8217,6 +8238,8 @@ restart:
             ++$callerFrame->pos;
 
             return null;
+        } catch (VM\BuiltinCallbackCatchRedirect $redirect) {
+            return $redirect->catchFrame;
         } catch (\Exception $e) {
             return $this->dispatchVmEngineException($e->getMessage(), $callerFrame);
         } finally {
@@ -8679,6 +8702,9 @@ restart:
                 if ($this->context->coercingObjectToString) {
                     $this->context->magicMethodThrowHandled = true;
                 }
+                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                    throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
+                }
 
                 return $catchFrame;
             }
@@ -8688,6 +8714,9 @@ restart:
             if (null !== $catchFrame) {
                 if ($this->context->coercingObjectToString) {
                     $this->context->magicMethodThrowHandled = true;
+                }
+                if ($this->context->deferBuiltinCallbackCatchToOuterRunFrames) {
+                    throw new VM\BuiltinCallbackCatchRedirect($catchFrame);
                 }
 
                 return $catchFrame;
