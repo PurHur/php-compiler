@@ -54,7 +54,7 @@ final class VmVprintf
         string $function = 'vprintf',
         int $valuesArgNum = 2
     ): string {
-        return VmSprintf::format($format, self::argsFromArray($argsVar, $function, $valuesArgNum), $frame);
+        return VmSprintf::format($format, self::argsFromArray($argsVar, $function, $valuesArgNum), $frame, true);
     }
 
     public static function vprintf(string $format, Variable $argsVar, ?Frame $frame = null): int
