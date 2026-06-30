@@ -56,6 +56,23 @@ final class VmPregEngine
 
     private int $backtrackLimit = 0;
 
+    private int $matchStart = 0;
+
+    public function resetMatchStart(int $start): void
+    {
+        $this->matchStart = $start;
+    }
+
+    public function keepOutAt(int $pos): void
+    {
+        $this->matchStart = $pos;
+    }
+
+    public function matchStartPos(): int
+    {
+        return $this->matchStart;
+    }
+
     /**
      * @return array{0: VmPregAstNode, 1: array<string, int>}|null
      */
@@ -98,7 +115,10 @@ final class VmPregEngine
         }
         if ($engine->anchored || $anchoredAttempt) {
             $captures = [];
+            $engine->resetMatchStart($offset);
             if ($engine->matchNode($ast, $subject, $offset, $len, $captures) && $captures[0][1] >= $offset) {
+                $captures[0][0] = $engine->matchStartPos();
+
                 return self::capturesToOvector($captures);
             }
 
@@ -106,7 +126,10 @@ final class VmPregEngine
         }
         for ($start = $offset; $start <= $len; ++$start) {
             $captures = [];
-            if ($engine->matchNode($ast, $subject, $start, $len, $captures) && $captures[0][0] === $start) {
+            $engine->resetMatchStart($start);
+            if ($engine->matchNode($ast, $subject, $start, $len, $captures)) {
+                $captures[0][0] = $engine->matchStartPos();
+
                 return self::capturesToOvector($captures);
             }
         }
@@ -656,6 +679,7 @@ final class VmPregEngine
             's' => new VmPregAstClassNode([["\t", "\t"], ["\n", "\n"], ["\v", "\v"], ["\f", "\f"], ["\r", "\r"], [' ', ' ']], false, false),
             'S' => new VmPregAstClassNode([["\t", "\t"], ["\n", "\n"], ["\v", "\v"], ["\f", "\f"], ["\r", "\r"], [' ', ' ']], true, false),
             'A' => new VmPregAstBolNode(false),
+            'K' => new VmPregAstKeepOutNode(),
             'Z' => new VmPregAstEolNode(false, true),
             'z' => new VmPregAstEolNode(false, true),
             default => new VmPregAstCharNode($ch, $this->caseless),
@@ -1138,6 +1162,25 @@ final class VmPregAstEolNode implements VmPregAstNode
     }
 }
 
+/** PCRE \\K keep-out — reset reported match start without dropping prior captures (ext/pcre/php_pcre.c). */
+final class VmPregAstKeepOutNode implements VmPregAstNode
+{
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        unset($subject, $len);
+        $engine->keepOutAt($pos);
+        $end = $captures[0][1] ?? $pos;
+        $captures[0] = [$pos, $end];
+
+        return true;
+    }
+}
+
 final class VmPregAstConcatNode implements VmPregAstNode
 {
     /** @param list<VmPregAstNode> $parts */
@@ -1159,7 +1202,7 @@ final class VmPregAstConcatNode implements VmPregAstNode
 
             return false;
         }
-        $captures[0] = [$start, $pos];
+        $captures[0] = [$engine->matchStartPos(), $pos];
 
         return true;
     }
@@ -1276,7 +1319,7 @@ final class VmPregAstGroupNode implements VmPregAstNode
         }
         $end = $captures[0][1] ?? $pos;
         $captures[$this->index] = [$start, $end];
-        $captures[0] = [$start, $end];
+        $captures[0] = [$engine->matchStartPos(), $end];
 
         return true;
     }
