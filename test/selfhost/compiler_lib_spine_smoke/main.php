@@ -1334,6 +1334,7 @@ require_once __DIR__.'/../../../ext/standard/VmParseIni.php';
 require_once __DIR__.'/../../../ext/standard/VmParseStr.php';
 require_once __DIR__.'/../../../ext/standard/VmParseUrl.php';
 require_once __DIR__.'/../../../ext/standard/VmPassword.php';
+require_once __DIR__.'/../../../ext/standard/VmPasswordPure.php';
 require_once __DIR__.'/../../../ext/standard/VmPasswordNative.php';
 require_once __DIR__.'/../../../ext/standard/VmPersistentSocket.php';
 require_once __DIR__.'/../../../ext/standard/VmPhpCoreConstants.php';

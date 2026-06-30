@@ -59,10 +59,19 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPasswordNative.php');
         $this->assertStringContainsString('argon2Ffi', $source);
+        $this->assertStringContainsString('VmPasswordPure::', $source);
+        $this->assertStringNotContainsString('libcrypt.so', $source);
         $this->assertStringNotContainsString('hostPasswordHash', $source);
         $this->assertStringNotContainsString('hostPasswordVerify', $source);
         $this->assertStringNotContainsString('\\password_hash(', $source);
         $this->assertStringNotContainsString('\\password_verify(', $source);
+    }
+
+    public function testVmPasswordPureHasNoFfi(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPasswordPure.php');
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('\\FFI', $source);
     }
 
     public function testStringPasswordCryptoHasNoLibcryptDlopen(): void

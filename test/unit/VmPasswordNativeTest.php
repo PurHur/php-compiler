@@ -17,7 +17,7 @@ final class VmPasswordNativeTest extends TestCase
     {
         $this->assertTrue(
             VmPasswordNative::available(),
-            'libcrypt FFI required for native password builtins (#4794)'
+            'host crypt() required for native password builtins (#4794, #14182)'
         );
     }
 
@@ -83,7 +83,7 @@ final class VmPasswordNativeTest extends TestCase
     public function testCryptSha256Salt(): void
     {
         if (!VmPasswordNative::available()) {
-            $this->markTestSkipped('libcrypt FFI unavailable');
+            $this->markTestSkipped('host crypt() unavailable');
         }
         $hash = VmPassword::crypt('pass', '$5$rounds=1000$usesomesillystringf');
         $this->assertNotSame('*0', $hash);
