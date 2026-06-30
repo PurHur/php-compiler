@@ -106,7 +106,7 @@ final class VmPregEngine
         }
         for ($start = $offset; $start <= $len; ++$start) {
             $captures = [];
-            if ($engine->matchNode($ast, $subject, $start, $len, $captures) && $captures[0][0] === $start) {
+            if ($engine->matchNode($ast, $subject, $start, $len, $captures)) {
                 return self::capturesToOvector($captures);
             }
         }
@@ -658,6 +658,7 @@ final class VmPregEngine
             'A' => new VmPregAstBolNode(false),
             'Z' => new VmPregAstEolNode(false, true),
             'z' => new VmPregAstEolNode(false, true),
+            'K' => new VmPregAstKeepNode(),
             default => new VmPregAstCharNode($ch, $this->caseless),
         };
     }
@@ -1159,7 +1160,25 @@ final class VmPregAstConcatNode implements VmPregAstNode
 
             return false;
         }
-        $captures[0] = [$start, $pos];
+        $g0Start = $captures['__keep_start__'] ?? $start;
+        unset($captures['__keep_start__']);
+        $captures[0] = [$g0Start, $pos];
+
+        return true;
+    }
+}
+
+final class VmPregAstKeepNode implements VmPregAstNode
+{
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        unset($engine, $subject, $len);
+        $captures['__keep_start__'] = $pos;
 
         return true;
     }
