@@ -24,6 +24,8 @@ final class JitStringSearch
     private const HELPER = '__phpc_string_find_substr';
     private const HELPER_CI = '__phpc_string_find_substr_ci';
 
+    private const MEMCMP_CI = '__phpc_string_memcasecmp';
+
     public static function ensureLinked(Context $context): void
     {
         self::ensureHelperLinked($context, self::HELPER, self::emitFindSubstr(...));
@@ -31,6 +33,7 @@ final class JitStringSearch
 
     public static function ensureCiLinked(Context $context): void
     {
+        self::ensureMemcasecmpCi($context);
         self::ensureHelperLinked($context, self::HELPER_CI, self::emitFindSubstrCi(...));
     }
 
@@ -63,6 +66,35 @@ final class JitStringSearch
         );
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
+        self::restoreInsertBlock($context, $restore);
+    }
+
+    private static function ensureMemcasecmpCi(Context $context): void
+    {
+        try {
+            $context->lookupFunction(self::MEMCMP_CI);
+
+            return;
+        } catch (\Throwable) {
+        }
+
+        $probe = $context->module->getNamedFunction(self::MEMCMP_CI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::MEMCMP_CI, $probe);
+
+            return;
+        }
+
+        $restore = self::captureInsertBlock($context);
+        $i32 = $context->getTypeFromString('int32');
+        $i8p = $context->getTypeFromString('int8*');
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->addFunction(
+            self::MEMCMP_CI,
+            $context->context->functionType($i32, false, $i8p, $i8p, $sizeT)
+        );
+        self::emitMemcasecmpCi($context, $fn);
+        $context->registerFunction(self::MEMCMP_CI, $fn);
         self::restoreInsertBlock($context, $restore);
     }
 
@@ -232,7 +264,7 @@ final class JitStringSearch
 
     private static function emitFindSubstrCi(Context $context, LlvmFunction $fn): void
     {
-        self::emitFindSubstrLoop($context, $fn, 'strncasecmp');
+        self::emitFindSubstrLoop($context, $fn, self::MEMCMP_CI);
     }
 
     private static function emitFindSubstrLoop(Context $context, LlvmFunction $fn, string $cmpFn): void
@@ -300,6 +332,82 @@ final class JitStringSearch
 
         $context->builder->positionAtEnd($retNeg);
         $context->builder->returnValue($minusOne);
+    }
+
+    /** ASCII case-insensitive memcmp — mirrors VmString::compareBytesCaseInsensitive(). */
+    private static function emitMemcasecmpCi(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('entry');
+        $context->builder->positionAtEnd($entry);
+
+        $i32 = $context->getTypeFromString('int32');
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $one = $sizeT->constInt(1, false);
+
+        $left = $fn->getParam(0);
+        $right = $fn->getParam(1);
+        $len = $fn->getParam(2);
+
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
+        $retZero = $fn->appendBasicBlock('ret_zero');
+        $loopHead = $fn->appendBasicBlock('loop_head');
+        $context->builder->branchIf($isEmpty, $retZero, $loopHead);
+
+        $iSlot = BasicBlockHelper::entryAlloca($context, $sizeT);
+        $context->builder->positionAtEnd($loopHead);
+        $context->builder->store($zero, $iSlot);
+        $head = $fn->appendBasicBlock('head');
+        $body = $fn->appendBasicBlock('body');
+        $done = $fn->appendBasicBlock('done');
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($head);
+        $i = $context->builder->load($iSlot);
+        $hasMore = $context->builder->icmp(Builder::INT_ULT, $i, $len);
+        $context->builder->branchIf($hasMore, $body, $done);
+
+        $context->builder->positionAtEnd($body);
+        $leftByte = $context->builder->load($context->builder->inBoundsGEP($left, $i));
+        $rightByte = $context->builder->load($context->builder->inBoundsGEP($right, $i));
+        $leftLower = self::asciiLowerByte($context, $leftByte);
+        $rightLower = self::asciiLowerByte($context, $rightByte);
+        $diff = $context->builder->icmp(Builder::INT_NE, $leftLower, $rightLower);
+        $mismatch = $fn->appendBasicBlock('mismatch');
+        $next = $fn->appendBasicBlock('next');
+        $context->builder->branchIf($diff, $mismatch, $next);
+
+        $context->builder->positionAtEnd($mismatch);
+        $context->builder->returnValue($i32->constInt(1, false));
+
+        $context->builder->positionAtEnd($next);
+        $context->builder->store($context->builder->add($i, $one), $iSlot);
+        $context->builder->branch($head);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->branch($retZero);
+
+        $context->builder->positionAtEnd($retZero);
+        $context->builder->returnValue($i32->constInt(0, false));
+    }
+
+    private static function asciiLowerByte(Context $context, Value $byte): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+        $ord = $context->builder->zExt($byte, $i32);
+        $isUpper = $context->builder->and(
+            $context->builder->icmp(Builder::INT_SGE, $ord, $i32->constInt(65, false)),
+            $context->builder->icmp(Builder::INT_SLE, $ord, $i32->constInt(90, false))
+        );
+
+        return $context->builder->trunc(
+            $context->builder->select(
+                $isUpper,
+                $context->builder->add($ord, $i32->constInt(32, false)),
+                $ord
+            ),
+            $context->getTypeFromString('int8')
+        );
     }
 
     private static function captureInsertBlock(Context $context): ?BasicBlock
