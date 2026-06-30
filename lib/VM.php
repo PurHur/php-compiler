@@ -15311,6 +15311,10 @@ restart:
             if (isset($frame->scope[$slot]) && $this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
                 continue;
             }
+            // Unhandled match arms re-read the scrutinee on JUMPIF targets after the probe call (#13955).
+            if ($frame->block->scopeSlotReadInJumpTargets($slot)) {
+                continue;
+            }
             $this->releaseVmDeadScopeSlot($frame, $slot);
         }
     }

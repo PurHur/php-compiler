@@ -767,6 +767,58 @@ class Block {
         return false;
     }
 
+    /**
+     * Match unhandled-error lowering reads the scrutinee again on JUMPIF targets (#13955).
+     */
+    public function scopeSlotReadInJumpTargets(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_JUMPIF !== $op->type) {
+                continue;
+            }
+            foreach ([$op->block1, $op->block2] as $target) {
+                if (!$target instanceof self) {
+                    continue;
+                }
+                $seen = [];
+                if ($target->blockReadsScopeSlotTree($slot, $seen)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<int, true> $seen
+     */
+    private function blockReadsScopeSlotTree(int $slot, array &$seen): bool
+    {
+        $id = spl_object_id($this);
+        if (isset($seen[$id])) {
+            return false;
+        }
+        $seen[$id] = true;
+        foreach ($this->opCodes as $op) {
+            if ($this->opCodeReadsScopeSlot($op, $slot)) {
+                return true;
+            }
+        }
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_JUMPIF !== $op->type) {
+                continue;
+            }
+            foreach ([$op->block1, $op->block2] as $target) {
+                if ($target instanceof self && $target->blockReadsScopeSlotTree($slot, $seen)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
     /** Yields [variable name, scope slot] pairs. */
     public function eachNamedScopeSlot(): \Generator
     {
