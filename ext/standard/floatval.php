@@ -17,6 +17,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -32,6 +33,7 @@ final class floatval extends Internal
             throw new \LogicException('floatval() requires exactly one argument');
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
             return;
         }
