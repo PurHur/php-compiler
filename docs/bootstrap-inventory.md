@@ -2226,7 +2226,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/AsymmetricVisibilityRewriter.php` | 0 | 9 |
 | `lib/Ast/CloneWithDesugar.php` | 0 | 1 |
 | `lib/Ast/DnfParenTypeRewriter.php` | 0 | 1 |
-| `lib/Ast/EncapsedCoalesceDesugar.php` | 0 | 2 |
 | `lib/Ast/EnumCaseImportRewriter.php` | 0 | 5 |
 | `lib/Ast/EnumCaseMatchSwitchRewriter.php` | 0 | 4 |
 | `lib/Ast/EnumPropertyCompileCheck.php` | 0 | 2 |
@@ -2304,6 +2303,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/CurlyBraceOffsetRejector.php` | 0 | 2 |
 | `lib/DnfType.php` | 0 | 2 |
 | `lib/Doctor.php` | 0 | 1 |
+| `lib/EncapsedCoalesceRejector.php` | 0 | 2 |
 | `lib/EnumCaseListRewriter.php` | 0 | 1 |
 | `lib/ExitFunctionSyntaxRejector.php` | 0 | 2 |
 | `lib/Frame.php` | 0 | 1 |
@@ -5640,59 +5640,59 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 32)
-- new ArrayIteratorConstruct (line 46)
-- new ArrayIteratorCurrent (line 49)
-- new ArrayIteratorKey (line 51)
-- new ArrayIteratorNext (line 53)
-- new ArrayIteratorRewind (line 55)
-- new ArrayIteratorSeek (line 57)
-- new ArrayIteratorValid (line 59)
-- new ArrayIteratorCount (line 61)
-- new ArrayIteratorGetArrayCopy (line 63)
-- new ArrayIteratorAppend (line 65)
-- new ArrayIteratorOffsetGet (line 67)
-- new ArrayIteratorOffsetSet (line 69)
-- new ArrayIteratorOffsetExists (line 71)
-- new ArrayIteratorOffsetUnset (line 73)
-- new ArrayIteratorSortMethod (line 83)
-- new HashTable (line 145)
-- new ArgumentCountError (line 190)
-- new ArgumentCountError (line 337)
-- new ArgumentCountError (line 361)
-- new ArgumentCountError (line 391)
-- new ArgumentCountError (line 415)
-- new ArgumentCountError (line 442)
-- new ArgumentCountError (line 472)
-- new ArgumentCountError (line 485)
+- new ArrayIteratorConstruct (line 49)
+- new ArrayIteratorCurrent (line 52)
+- new ArrayIteratorKey (line 54)
+- new ArrayIteratorNext (line 56)
+- new ArrayIteratorRewind (line 58)
+- new ArrayIteratorSeek (line 60)
+- new ArrayIteratorValid (line 62)
+- new ArrayIteratorCount (line 64)
+- new ArrayIteratorGetArrayCopy (line 66)
+- new ArrayIteratorAppend (line 68)
+- new ArrayIteratorOffsetGet (line 70)
+- new ArrayIteratorOffsetSet (line 72)
+- new ArrayIteratorOffsetExists (line 74)
+- new ArrayIteratorOffsetUnset (line 76)
+- new ArrayIteratorSortMethod (line 86)
+- new HashTable (line 148)
+- new ArgumentCountError (line 193)
+- new ArgumentCountError (line 340)
+- new ArgumentCountError (line 364)
+- new ArgumentCountError (line 394)
+- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 445)
+- new ArgumentCountError (line 475)
+- new ArgumentCountError (line 488)
 - 24 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 32)
-- new ArrayObjectConstruct (line 52)
-- new ArrayObjectGetArrayCopy (line 55)
-- new ArrayObjectCount (line 57)
-- new ArrayObjectGetIteratorClass (line 59)
-- new ArrayObjectSetIteratorClass (line 61)
-- new ArrayObjectGetFlags (line 63)
-- new ArrayObjectSetFlags (line 65)
-- new ArrayObjectGetIterator (line 67)
-- new ArrayObjectOffsetGet (line 69)
-- new ArrayObjectOffsetSet (line 71)
-- new ArrayObjectOffsetExists (line 73)
-- new ArrayObjectOffsetUnset (line 75)
-- new ArrayObjectAppend (line 77)
-- new ArrayObjectExchangeArray (line 79)
-- new HashTable (line 100)
-- new ArgumentCountError (line 202)
-- new ArgumentCountError (line 261)
-- new ArgumentCountError (line 310)
-- new ArgumentCountError (line 340)
-- new ArgumentCountError (line 364)
-- new ArgumentCountError (line 391)
-- new ArgumentCountError (line 415)
-- new ArgumentCountError (line 450)
+- new ArrayObjectConstruct (line 55)
+- new ArrayObjectGetArrayCopy (line 58)
+- new ArrayObjectCount (line 60)
+- new ArrayObjectGetIteratorClass (line 62)
+- new ArrayObjectSetIteratorClass (line 64)
+- new ArrayObjectGetFlags (line 66)
+- new ArrayObjectSetFlags (line 68)
+- new ArrayObjectGetIterator (line 70)
+- new ArrayObjectOffsetGet (line 72)
+- new ArrayObjectOffsetSet (line 74)
+- new ArrayObjectOffsetExists (line 76)
+- new ArrayObjectOffsetUnset (line 78)
+- new ArrayObjectAppend (line 80)
+- new ArrayObjectExchangeArray (line 82)
+- new HashTable (line 103)
+- new ArgumentCountError (line 205)
+- new ArgumentCountError (line 264)
+- new ArgumentCountError (line 313)
+- new ArgumentCountError (line 343)
+- new ArgumentCountError (line 367)
+- new ArgumentCountError (line 394)
+- new ArgumentCountError (line 418)
+- new ArgumentCountError (line 453)
 - 15 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -6042,28 +6042,28 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/spl/SplObjectStorageBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ClassEntry (line 41)
-- new SplObjectStorageConstruct (line 49)
-- new Variable (line 134)
-- new Variable (line 137)
-- new UnexpectedValueException (line 160)
-- new Variable (line 162)
-- new Variable (line 238)
-- new Variable (line 250)
-- new Variable (line 262)
-- new Variable (line 277)
-- new ArgumentCountError (line 317)
-- new ArgumentCountError (line 342)
-- new ArgumentCountError (line 394)
-- new ArgumentCountError (line 444)
-- new ArgumentCountError (line 471)
-- new ArgumentCountError (line 495)
-- new ArgumentCountError (line 524)
-- new ArgumentCountError (line 647)
-- new ArgumentCountError (line 671)
-- new ArgumentCountError (line 695)
-- new ArgumentCountError (line 724)
-- 41 class method(s)
+- new ClassEntry (line 43)
+- new SplObjectStorageConstruct (line 46)
+- new Variable (line 150)
+- new Variable (line 153)
+- new UnexpectedValueException (line 176)
+- new Variable (line 178)
+- new Variable (line 254)
+- new Variable (line 266)
+- new Variable (line 278)
+- new Variable (line 293)
+- new ArgumentCountError (line 333)
+- new ArgumentCountError (line 358)
+- new ArgumentCountError (line 410)
+- new ArgumentCountError (line 460)
+- new ArgumentCountError (line 487)
+- new ArgumentCountError (line 511)
+- new ArgumentCountError (line 540)
+- new ArgumentCountError (line 663)
+- new ArgumentCountError (line 687)
+- new ArgumentCountError (line 711)
+- new ArgumentCountError (line 740)
+- 42 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/SplQueueSplStackBuiltin.php`
@@ -17718,12 +17718,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
 
-### `lib/Ast/EncapsedCoalesceDesugar.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
-- 1 closure(s)
-
 ### `lib/Ast/EnumCaseImportRewriter.php`
 
 **Warnings** (review for bootstrap subset):
@@ -18628,6 +18622,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 38 class method(s)
+
+### `lib/EncapsedCoalesceRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 38)
+- 7 class method(s)
 
 ### `lib/EnumCaseListRewriter.php`
 
