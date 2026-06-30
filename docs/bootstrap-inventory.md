@@ -7954,7 +7954,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitIntdiv.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 17 class method(s)
 
 ### `ext/standard/JitInterfaceExists.php`
 
@@ -13020,8 +13020,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_fill.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 45)
-- new Variable (line 47)
+- new HashTable (line 44)
+- new Variable (line 46)
 - 3 class method(s)
 
 ### `ext/standard/array_fill_keys.php`
@@ -14088,7 +14088,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/file_get_contents.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/standard/file_put_contents.php`
@@ -20887,7 +20887,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringPasswordCrypto.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringPhpinfoRuntime.php`
 
@@ -22221,7 +22221,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 16 class method(s)
 
 ### `lib/JIT/IntersectionParamCheck.php`
 
@@ -25745,7 +25745,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `lib/VM/IterableCheck.php`
 
