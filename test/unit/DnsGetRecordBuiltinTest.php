@@ -19,7 +19,7 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $this->assertSame('dns_get_record', $fn->getName());
     }
 
-    public function testEmptyHostnameReturnsFalse(): void
+    public function testEmptyHostnameReturnsEmptyArray(): void
     {
         $runtime = new Runtime();
         $fn = new dns_get_record();
@@ -31,7 +31,9 @@ final class DnsGetRecordBuiltinTest extends TestCase
         $frame->returnVar = new VMVariable();
         $fn->execute($frame);
 
-        $this->assertFalse($frame->returnVar->resolveIndirect()->toBool());
+        $ret = $frame->returnVar->resolveIndirect();
+        $this->assertSame(VMVariable::TYPE_ARRAY, $ret->type);
+        $this->assertSame(0, $ret->toArray()->getNumElements());
     }
 
     public function testInvalidTypeThrowsValueError(): void
@@ -84,6 +86,13 @@ final class DnsGetRecordBuiltinTest extends TestCase
     public function testInvalidHostnameLabelReturnsFalse(): void
     {
         $this->assertFalse(VmDns::dnsGetRecord('invalid..domain', StdlibConstants::DNS_A));
+    }
+
+    public function testVmDnsEmptyHostnameReturnsEmptyArray(): void
+    {
+        $result = VmDns::dnsGetRecord('', StdlibConstants::DNS_A);
+        $this->assertInstanceOf(\PHPCompiler\VM\HashTable::class, $result);
+        $this->assertSame(0, $result->getNumElements());
     }
 
     public function testNxdomainHostnameReturnsEmptyArray(): void
