@@ -47,11 +47,31 @@ foreach ($lines as $line) {
 }
 
 $marker = '// VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).';
+// VmClassMethod + intermediate ext bases must load after Func\Internal (M4 spine VM/AOT #1492).
 $earlyBootstrap = [
+    'lib/OpCode.php',
+    'lib/Block.php',
+    'lib/Frame.php',
+    'lib/Func.php',
+    'lib/Handler.php',
+    'lib/JIT/Call.php',
+    'lib/Func/Internal.php',
     'lib/VM/Builtin/VmClassMethod.php',
+    'ext/dom/DomClassMethod.php',
 ];
 $earlySet = array_flip($earlyBootstrap);
+/** @var array<string, string> */
+$requireByPath = [];
+foreach ($requires as $req) {
+    if (preg_match("#require_once __DIR__\\.'/\\.\\./\\.\\./\\.\\./([^']+)';#", $req, $m)) {
+        $requireByPath[$m[1]] = $req;
+    }
+}
 $earlyRequires = [];
+foreach ($earlyBootstrap as $rel) {
+    $line = "require_once __DIR__.'/../../../{$rel}';";
+    $earlyRequires[] = $requireByPath[$rel] ?? $line;
+}
 $lateRequires = [];
 foreach ($requires as $req) {
     if (!preg_match("#require_once __DIR__\\.'/\\.\\./\\.\\./\\.\\./([^']+)';#", $req, $m)) {
@@ -59,16 +79,9 @@ foreach ($requires as $req) {
         continue;
     }
     if (isset($earlySet[$m[1]])) {
-        $earlyRequires[] = $req;
         continue;
     }
     $lateRequires[] = $req;
-}
-foreach ($earlyBootstrap as $rel) {
-    $line = "require_once __DIR__.'/../../../{$rel}';";
-    if (!in_array($line, $earlyRequires, true)) {
-        $earlyRequires[] = $line;
-    }
 }
 $requires = array_merge($earlyRequires, $lateRequires);
 $out = implode("\n", $header)."\n\n".implode("\n", $requires)."\n".$marker."\n".implode("\n", $footer)."\n";
