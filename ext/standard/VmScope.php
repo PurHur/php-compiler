@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
@@ -452,7 +453,7 @@ final class VmScope
         $caller = self::requireCaller($frame);
         $result = new HashTable();
         foreach ($caller->block->eachNamedScopeSlot() as [$name, $slot]) {
-            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+            if ('this' === $name) {
                 continue;
             }
             if (!isset($caller->scope[$slot])) {
@@ -467,7 +468,60 @@ final class VmScope
             $result->add($name, $copy);
         }
 
+        if ($caller->block->isMainScript()) {
+            self::appendFileScopeAutoGlobals($frame->vmContext, $result);
+        }
+
         return $result;
+    }
+
+    /**
+     * php-src active symbol table auto-globals at compile/file scope (#10934).
+     */
+    public const FILE_SCOPE_DEFINED_VAR_AUTO_NAMES = [
+        '_GET',
+        '_POST',
+        '_COOKIE',
+        '_FILES',
+        '_SERVER',
+        'argv',
+        'argc',
+    ];
+
+    private static function appendFileScopeAutoGlobals(?Context $ctx, HashTable $result): void
+    {
+        if (null === $ctx) {
+            return;
+        }
+        $present = [];
+        foreach ($result->iterateKeyed(true) as [$keyVar]) {
+            $present[$keyVar->resolveIndirect()->toString()] = true;
+        }
+        foreach (self::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES as $name) {
+            if (isset($present[$name])) {
+                continue;
+            }
+            $source = Superglobals::isSuperglobalName($name)
+                ? $ctx->ensureSuperglobal($name)
+                : self::scriptGlobalForDefinedVars($ctx, $name);
+            if (null === $source || !self::callerVarIsSet($source)) {
+                continue;
+            }
+            $copy = new Variable();
+            $copy->copyFrom($source->resolveIndirect());
+            $result->add($name, $copy);
+        }
+    }
+
+    private static function scriptGlobalForDefinedVars(Context $ctx, string $name): ?Variable
+    {
+        $key = new Variable(Variable::TYPE_STRING);
+        $key->string($name);
+        if (!$ctx->globalsTableOffsetIsSet($key)) {
+            return null;
+        }
+
+        return $ctx->ensureGlobal($name);
     }
 
     /** get_declared_variables() — caller local names only (php-src: php_get_defined_vars names). */
