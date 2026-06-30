@@ -274,13 +274,12 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        return self::lineViolatesDuplicateSetModifierRules($line);
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
     }
 
     /**
      * Zend 8.2 reference profile: any explicit read + set pair is a multiple-modifier fatal (#12576).
-     *
-     * PHP 8.4 allows read-before-set when set is equal or more restrictive, e.g. public private(set) (#13914).
      */
     private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
     {
