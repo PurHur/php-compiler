@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3523 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9568 |
+| Source constructs flagged (warnings) | 9570 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1288,7 +1288,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 7 |
-| `ext/standard/VmPregEngine.php` | 0 | 54 |
+| `ext/standard/VmPregEngine.php` | 0 | 56 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
 | `ext/standard/VmPregMatches.php` | 0 | 12 |
@@ -12109,37 +12109,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new VmPregAstCharNode (line 433)
 - new VmPregCompileException (line 453)
 - new VmPregAstEmptyNode (line 457)
-- new VmPregCompileException (line 462)
-- new VmPregCompileException (line 468)
-- new VmPregCompileException (line 474)
-- new VmPregAstEmptyNode (line 478)
-- new VmPregCompileException (line 480)
-- new VmPregCompileException (line 485)
-- new VmPregAstGroupNode (line 496)
-- new VmPregCompileException (line 521)
-- new VmPregCompileException (line 530)
-- new VmPregCompileException (line 549)
-- new VmPregCompileException (line 557)
-- new VmPregCompileException (line 609)
-- new VmPregAstClassNode (line 613)
-- new VmPregCompileException (line 623)
-- new VmPregCompileException (line 643)
-- new VmPregAstCharNode (line 657)
-- new VmPregCompileException (line 667)
-- new VmPregAstCharNode (line 670)
-- new VmPregAstClassNode (line 675)
-- new VmPregAstClassNode (line 676)
-- new VmPregAstClassNode (line 677)
-- new VmPregAstClassNode (line 678)
-- new VmPregAstClassNode (line 679)
-- new VmPregAstClassNode (line 680)
-- new VmPregAstBolNode (line 681)
-- new VmPregAstKeepOutNode (line 682)
-- new VmPregAstEolNode (line 683)
-- new VmPregAstEolNode (line 684)
-- new VmPregAstCharNode (line 685)
-- new VmPregBacktrackLimitException (line 744)
-- 62 class method(s)
+- new VmPregCompileException (line 466)
+- new VmPregCompileException (line 472)
+- new VmPregCompileException (line 478)
+- new VmPregAstEmptyNode (line 482)
+- new VmPregCompileException (line 484)
+- new VmPregCompileException (line 489)
+- new VmPregAstGroupNode (line 500)
+- new VmPregCompileException (line 518)
+- new VmPregAstBranchResetAltNode (line 522)
+- new VmPregCompileException (line 547)
+- new VmPregCompileException (line 556)
+- new VmPregCompileException (line 575)
+- new VmPregCompileException (line 583)
+- new VmPregCompileException (line 635)
+- new VmPregAstClassNode (line 639)
+- new VmPregCompileException (line 649)
+- new VmPregCompileException (line 669)
+- new VmPregAstCharNode (line 683)
+- new VmPregCompileException (line 693)
+- new VmPregAstCharNode (line 696)
+- new VmPregAstClassNode (line 701)
+- new VmPregAstClassNode (line 702)
+- new VmPregAstClassNode (line 703)
+- new VmPregAstClassNode (line 704)
+- new VmPregAstClassNode (line 705)
+- new VmPregAstClassNode (line 706)
+- new VmPregAstBolNode (line 707)
+- new VmPregAstKeepOutNode (line 708)
+- new VmPregAstEolNode (line 709)
+- new VmPregAstEolNode (line 710)
+- new VmPregAstCharNode (line 711)
+- new VmPregBacktrackLimitException (line 770)
+- 64 class method(s)
 
 ### `ext/standard/VmPregFailure.php`
 
