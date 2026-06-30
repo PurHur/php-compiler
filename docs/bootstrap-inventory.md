@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3522 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9562 |
+| Source constructs flagged (warnings) | 9563 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1166,7 +1166,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmFminMax.php` | 0 | 2 |
 | `ext/standard/VmFnmatch.php` | 0 | 1 |
 | `ext/standard/VmFnmatchPure.php` | 0 | 1 |
-| `ext/standard/VmForwardStaticCall.php` | 0 | 10 |
+| `ext/standard/VmForwardStaticCall.php` | 0 | 11 |
 | `ext/standard/VmFputcsv.php` | 0 | 3 |
 | `ext/standard/VmFs.php` | 0 | 15 |
 | `ext/standard/VmFsAccessNative.php` | 0 | 1 |
@@ -9282,7 +9282,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitWordwrap.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/JitZendScalarCast.php`
 
@@ -11330,14 +11330,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmForwardStaticCall.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 55)
-- new Variable (line 127)
-- new Error (line 151)
-- new Error (line 158)
-- new Variable (line 184)
-- new Variable (line 231)
-- new Variable (line 233)
-- new Error (line 349)
+- new Error (line 30)
+- new Variable (line 58)
+- new Variable (line 130)
+- new Error (line 154)
+- new Error (line 161)
+- new Variable (line 187)
+- new Variable (line 234)
+- new Variable (line 236)
+- new Error (line 352)
 - 14 class method(s)
 - 1 closure(s)
 
@@ -12768,11 +12769,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1407)
-- new Error (line 1418)
-- new Error (line 3572)
-- new Error (line 3597)
-- 203 class method(s)
+- new Error (line 1400)
+- new Error (line 1411)
+- new Error (line 3565)
+- new Error (line 3590)
+- 202 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
