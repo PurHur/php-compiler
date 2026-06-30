@@ -38,6 +38,9 @@ final class VmVarFormat
     private static function resourceDisplayId(Variable $var): ?int
     {
         $var = $var->resolveIndirect();
+        if (ResourceSupport::isStreamContextResource($var)) {
+            return VmStreamContext::idFrom($var);
+        }
         $state = ResourceSupport::stateFromVariable($var);
         if (null !== $state) {
             return $state->handle;
@@ -76,6 +79,9 @@ final class VmVarFormat
         }
         if (ResourceSupport::isStreamFilterResource($var)) {
             return VmStreamFilterChain::getResourceType($handle) ?? 'Unknown';
+        }
+        if (ResourceSupport::isStreamContextResource($var)) {
+            return 'stream-context';
         }
 
         return 'Unknown';
