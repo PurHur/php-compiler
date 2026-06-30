@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_flip() via ArrayFlipJitHelper PHP (#12329).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildFlipArray()}.
+ * Standalone AOT compiles {@see ArrayFlipJitHelper} via JitVmHelperLink (#14244); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildFlipArray()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — php_array_flip()
  */
@@ -33,8 +32,7 @@ final class ArrayFlipRuntime
 
     public static function flip(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildFlipArray($context, $array);
         }
 
@@ -52,12 +50,13 @@ final class ArrayFlipRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FLIP);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
