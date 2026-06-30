@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -58,7 +59,10 @@ final class ParseStrNativeOpsJit
         $ht = self::htFromI64($context, $htPtr);
         $valStr = self::loadStringArg($context, $value);
         $sizeT = $context->getTypeFromString('size_t');
-        $idx = $context->builder->zext($index->getValue(), $sizeT);
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setStringAt'),
             $ht,
@@ -72,7 +76,10 @@ final class ParseStrNativeOpsJit
         $ht = self::htFromI64($context, $htPtr);
         $childHt = self::htFromI64($context, $childPtr);
         $sizeT = $context->getTypeFromString('size_t');
-        $idx = $context->builder->zext($index->getValue(), $sizeT);
+        $idx = $context->builder->zext(
+            JitLongArg::lower($context, $index, 'phpc_native_ht index'),
+            $sizeT
+        );
         $context->builder->call(
             $context->lookupFunction('__hashtable__setHashtableAt'),
             $ht,
@@ -85,12 +92,28 @@ final class ParseStrNativeOpsJit
     {
         $htPtrTy = $context->getTypeFromString('__hashtable__*');
 
-        return JitNestedHelperCoerce::i64ToTypedPtr($context, $ptr->getValue(), $htPtrTy);
+        return JitNestedHelperCoerce::i64ToTypedPtr($context, self::i64FromVar($context, $ptr), $htPtrTy);
+    }
+
+    private static function i64FromVar(Context $context, JITVariable $var): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+        if (JITVariable::TYPE_NATIVE_LONG === $var->type) {
+            $raw = $var->value;
+            $ty = $context->getStringFromType($raw->typeOf());
+            if ('int64' === $ty || 'long long' === $ty) {
+                return $raw;
+            }
+
+            return $context->builder->load($raw);
+        }
+
+        return JitLongArg::lower($context, $var, 'phpc_native_ht pointer');
     }
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
     {
-        $raw = $arg->getValue();
+        $raw = $arg->value;
         if (JitNestedHelperCoerce::isValueBox($context, $raw)) {
             return $context->builder->call(
                 $context->lookupFunction('__value__readString'),
@@ -99,7 +122,7 @@ final class ParseStrNativeOpsJit
         }
         $ty = $context->getStringFromType($raw->typeOf());
         if ('__string__*' === $ty) {
-            return $context->builder->load($raw);
+            return $raw;
         }
         if ('__string__' === $ty) {
             return $raw;
