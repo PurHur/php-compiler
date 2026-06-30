@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * VM password_hash()/password_verify()/crypt() via libcrypt(3) + libargon2 FFI (#4794, #6906, #8731).
+ * VM password_hash()/password_verify()/crypt() — bcrypt via {@see VmPasswordPure}, Argon2 via libargon2 FFI (#4794, #6906, #8731, #14182).
  *
  * Mirrors {@see \PHPCompiler\ext\standard\PasswordJitHelper} — no host \\password_* delegation.
  *
@@ -45,17 +45,13 @@ final class VmPasswordNative
 
     private const ARGON2_VERSION = 19;
 
-    private static ?\FFI $ffi = null;
-
-    private static bool $ffiUnavailable = false;
-
     private static ?\FFI $argon2Ffi = null;
 
     private static bool $argon2FfiUnavailable = false;
 
     public static function available(): bool
     {
-        return null !== self::ffi();
+        return VmPasswordPure::available();
     }
 
     /**
@@ -383,23 +379,7 @@ final class VmPasswordNative
 
     private static function libcrypt(string $key, string $salt): ?string
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-
-        try {
-            $keyC = self::copyCString($ffi, $key);
-            $saltC = self::copyCString($ffi, $salt);
-            $result = $ffi->crypt($keyC, $saltC);
-            if (null === $result) {
-                return null;
-            }
-
-            return \FFI::string($result);
-        } catch (\Throwable) {
-            return null;
-        }
+        return VmPasswordPure::crypt($key, $salt);
     }
 
     private static function copyCString(\FFI $ffi, string $value): \FFI\CData
@@ -412,38 +392,6 @@ final class VmPasswordNative
         $buf[$len] = "\0";
 
         return $buf;
-    }
-
-    private static function ffi(): ?\FFI
-    {
-        if (self::$ffiUnavailable) {
-            return null;
-        }
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            self::$ffiUnavailable = true;
-
-            return null;
-        }
-
-        $cdef = <<<'CDEF'
-char *crypt(const char *key, const char *salt);
-CDEF;
-
-        foreach (['libcrypt.so.1', 'libcrypt.so', 'libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
-        }
-
-        self::$ffiUnavailable = true;
-
-        return null;
     }
 
     private static function argon2Ffi(): ?\FFI

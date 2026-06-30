@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * VM password_hash() / password_verify() / crypt() — libcrypt via VmPasswordNative (#4794, #6906).
+ * VM password_hash() / password_verify() / crypt() — bcrypt via VmPasswordPure, Argon2 via VmPasswordNative (#4794, #6906, #14182).
  * password_get_info() / password_needs_rehash() — native PHP (issue #6503).
  */
 final class VmPassword
@@ -102,7 +102,7 @@ final class VmPassword
         return VmPasswordNative::passwordVerify($password, $hash);
     }
 
-    /** crypt() — libcrypt(3) via FFI (issue #3771, #4794). */
+    /** crypt() — host crypt() via VmPasswordPure (#3771, #4794, #14182). */
     public static function crypt(string $password, string $salt): string
     {
         return VmPasswordNative::crypt($password, $salt);
