@@ -17195,6 +17195,40 @@ class Compiler {
     }
 
     /**
+     * Statement-level FuncCall before a hoisted sibling chain feeding a multi-arg consumer (#13912, #13916).
+     *
+     * php-cfg `next($a); var_export(next($a), true)` hoists only the inner call — do not fold the
+     * statement-level callee into {@see firstSiblingInlineFuncCallProducerIndex()}.
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function statementLevelFuncCallBeforeHoistedSiblingChain(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+
+            return $this->isSiblingInlineCallProducerExpr($mid);
+        }
+
+        return false;
+    }
+
+    /**
      * First hoisted FuncCall in a sibling inline call-arg chain ending at {@see $consumerIndex}.
      *
      * @param list<Op> $cfgChildren
@@ -17212,6 +17246,9 @@ class Compiler {
                 }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
+                if ($this->statementLevelFuncCallBeforeHoistedSiblingChain($i, $consumerIndex, $cfgChildren)) {
+                    break;
+                }
                 --$i;
                 continue;
             }
