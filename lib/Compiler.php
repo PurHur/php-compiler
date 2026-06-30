@@ -17216,10 +17216,59 @@ class Compiler {
                 continue;
             }
 
-            return $this->isSiblingInlineCallProducerExpr($mid);
+            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                // var_dump($g(), $g()) — every hoisted stmt feeds distinct dead arg temps (#13969, #10981).
+                // next($a); var_export(next($a), true) — literal trailing arg keeps stmt-level next() (#13912).
+                $producer = $cfgChildren[$producerIndex] ?? null;
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if (
+                    $producer instanceof Op\Expr
+                    && (
+                        $consumer instanceof Op\Expr\FuncCall
+                        || $consumer instanceof Op\Expr\NsFuncCall
+                    )
+                    && property_exists($consumer, 'args')
+                    && is_array($consumer->args)
+                    && \count($consumer->args) >= 2
+                    && $this->callArgsAreDistinctInlineTemporaries($consumer->args)
+                    && $this->onlySiblingInlineCallProducersBetweenIndices(
+                        $cfgChildren,
+                        $producerIndex,
+                        $consumerIndex
+                    )
+                ) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            return false;
         }
 
         return false;
+    }
+
+    /**
+     * Hoisted sibling FuncCall stmts immediately before a multi-arg consumer (#13969).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function onlySiblingInlineCallProducersBetweenIndices(
+        array $cfgChildren,
+        int $fromIndex,
+        int $toIndex
+    ): bool {
+        if ($fromIndex >= $toIndex) {
+            return false;
+        }
+        for ($k = $fromIndex; $k < $toIndex; ++$k) {
+            if (!$this->isSiblingInlineCallProducerExpr($cfgChildren[$k] ?? null)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
