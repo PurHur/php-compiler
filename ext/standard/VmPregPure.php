@@ -71,7 +71,8 @@ final class VmPregPure
                 $compiled['groupNameToIndex'],
                 $regex,
                 0 !== ($flags & StdlibConstants::PREG_OFFSET_CAPTURE),
-                0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL)
+                0 !== ($flags & StdlibConstants::PREG_UNMATCHED_AS_NULL),
+                $compiled['captureGroupCount']
             );
         }
 
@@ -435,7 +436,7 @@ final class VmPregPure
     }
 
     /**
-     * @return array{ast: VmPregAstNode, groupNameToIndex: array<string, int>, regex: string, opts: int}|null
+     * @return array{ast: VmPregAstNode, groupNameToIndex: array<string, int>, captureGroupCount: int, regex: string, opts: int}|null
      */
     private static function compile(string $pattern): ?array
     {
@@ -452,11 +453,12 @@ final class VmPregPure
 
             return null;
         }
-        [$ast, $groupNameToIndex] = $engineCompiled;
+        [$ast, $groupNameToIndex, $captureGroupCount] = $engineCompiled;
 
         return [
             'ast' => $ast,
             'groupNameToIndex' => $groupNameToIndex,
+            'captureGroupCount' => $captureGroupCount,
             'regex' => $regex,
             'opts' => $opts,
         ];
@@ -483,9 +485,13 @@ final class VmPregPure
         array $groupNameToIndex,
         string $regex,
         bool $offsetCapture,
-        bool $unmatchedNull
+        bool $unmatchedNull,
+        int $captureGroupCount = 0
     ): array {
         $groupCount = (int) (\count($ovector) / 2);
+        if ($unmatchedNull && $captureGroupCount >= $groupCount) {
+            $groupCount = $captureGroupCount + 1;
+        }
         $out = [];
         for ($i = 0; $i < $groupCount; ++$i) {
             if ($i > 0) {

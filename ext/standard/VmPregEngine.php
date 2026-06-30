@@ -74,7 +74,7 @@ final class VmPregEngine
     }
 
     /**
-     * @return array{0: VmPregAstNode, 1: array<string, int>}|null
+     * @return array{0: VmPregAstNode, 1: array<string, int>, 2: int}|null
      */
     public static function compile(string $regex, int $opts): ?array
     {
@@ -86,7 +86,7 @@ final class VmPregEngine
                 return null;
             }
 
-            return [$ast, $engine->groupNameToIndex];
+            return [$ast, $engine->groupNameToIndex, $engine->nextGroup - 1];
         } catch (VmPregCompileException) {
             return null;
         }
