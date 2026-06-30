@@ -82,11 +82,7 @@ final class get_meta_tags extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
     {
-        if (null !== $frame->parent && $frame->parent->block->strictTypes) {
-            return InternalStrictArg::requireString($frame, $argIndex, 'get_meta_tags', $paramName)->toString();
-        }
-
-        return VmString::coerceStringBuiltinArg(
+        return VmStreamPath::coerceNonEmptyPathArg(
             $frame->calledArgs[$argIndex],
             'get_meta_tags',
             $argIndex,
@@ -116,13 +112,7 @@ final class get_meta_tags extends Internal
     ): Value {
         JitInternalStrictArg::requireString($context, $arg, 'get_meta_tags', $paramName, $argNumber);
 
-        return JitStringBuiltinArg::lower(
-            $context,
-            $arg,
-            'get_meta_tags',
-            $argNumber - 1,
-            $paramName
-        );
+        return JitStreamPath::lowerNonEmptyPath($context, $arg, 'get_meta_tags', $argNumber - 1, $paramName);
     }
 
     private static function jitBoolArg(
