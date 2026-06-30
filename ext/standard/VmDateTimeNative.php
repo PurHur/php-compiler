@@ -249,12 +249,21 @@ final class VmDateTimeNative
             $time,
             $matches
         )) {
-            $timestamp = self::nextWeekdayTimestamp(strtolower($matches[1]), $base, $tzName);
-            if (false === $timestamp) {
-                return null;
-            }
-
-            return ['timestamp' => $timestamp, 'microsecond' => 0];
+            return self::weekdayParseResult('next', strtolower($matches[1]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^(last|previous|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayParseResult(strtolower($matches[1]), strtolower($matches[2]), $base, $tzName);
+        }
+        if (1 === preg_match(
+            '/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayParseResult('bare', strtolower($matches[1]), $base, $tzName);
         }
         if (1 === preg_match('/^last day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
             $month = self::englishMonthToNumber($matches[1]);
@@ -1351,13 +1360,57 @@ final class VmDateTimeNative
         return $day <= self::daysInMonth($year, $month);
     }
 
-    private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
+    /**
+     * @return array{timestamp: int, microsecond: int, timezone?: string}|null
+     */
+    private static function weekdayParseResult(string $modifier, string $weekday, int $base, string $tzName): ?array
     {
+        $timestamp = self::weekdayRelativeTimestamp($modifier, $weekday, $base, $tzName);
+        if (false === $timestamp) {
+            return null;
+        }
+
+        return ['timestamp' => $timestamp, 'microsecond' => 0];
+    }
+
+    /** php-src timelib relative weekday modifiers — next/last/this/bare (#14151). */
+    private static function weekdayRelativeTimestamp(
+        string $modifier,
+        string $weekday,
+        int $base,
+        string $tzName
+    ): int|false {
         $tm = self::localtime($base);
         if (null === $tm) {
             return false;
         }
-        $target = match ($weekday) {
+        $target = self::weekdayNameToNumber($weekday);
+        if ($target < 0) {
+            return false;
+        }
+        $current = self::tmInt($tm, 'tm_wday');
+        $days = match ($modifier) {
+            'next' => ($forward = ($target - $current + 7) % 7) === 0 ? 7 : $forward,
+            'last', 'previous' => -(($backward = ($current - $target + 7) % 7) === 0 ? 7 : $backward),
+            'this' => $current <= $target ? ($target - $current) : (7 - $current + $target),
+            'bare' => ($target - $current + 7) % 7,
+            default => -999,
+        };
+        if (-999 === $days) {
+            return false;
+        }
+        $sign = $days < 0 ? '-' : '+';
+        $abs = \abs($days);
+        try {
+            return self::modifyRelative($base, $sign.$abs.' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return false;
+        }
+    }
+
+    private static function weekdayNameToNumber(string $weekday): int
+    {
+        return match (strtolower($weekday)) {
             'sunday' => 0,
             'monday' => 1,
             'tuesday' => 2,
@@ -1367,19 +1420,11 @@ final class VmDateTimeNative
             'saturday' => 6,
             default => -1,
         };
-        if ($target < 0) {
-            return false;
-        }
-        $current = self::tmInt($tm, 'tm_wday');
-        $days = ($target - $current + 7) % 7;
-        if (0 === $days) {
-            $days = 7;
-        }
-        try {
-            return self::modifyRelative($base, '+'.$days.' day', $tzName);
-        } catch (NativeDateMalformedStringException) {
-            return false;
-        }
+    }
+
+    private static function nextWeekdayTimestamp(string $weekday, int $base, string $tzName): int|false
+    {
+        return self::weekdayRelativeTimestamp('next', $weekday, $base, $tzName);
     }
 
     private static function readDigits(string $time, int &$pos, int $min, ?int $max): string|false
