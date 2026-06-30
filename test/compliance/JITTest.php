@@ -709,6 +709,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;
             }
+            // ReflectionClass::getExtension() / ReflectionExtension are VM-only (#11462).
+            if (str_contains($name, 'reflection_extension_class')) {
+                continue;
+            }
             // uasort() closure comparators are VM-only (#3582).
             if (str_contains($name, 'uasort_closure')) {
                 continue;
