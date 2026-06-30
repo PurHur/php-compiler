@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -113,6 +114,10 @@ final class ParseStrNativeOpsJit
 
     private static function loadStringArg(Context $context, JITVariable $arg): Value
     {
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            return JitStringArg::lowerDominating($context, $arg, 'phpc_native_ht string argument');
+        }
+
         $raw = $arg->value;
         if (JitNestedHelperCoerce::isValueBox($context, $raw)) {
             return $context->builder->call(
