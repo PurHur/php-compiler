@@ -42,6 +42,9 @@ final class ClosureState
 
     public int $definitionLine = 0;
 
+    /** Owning Closure object for Closure::getCurrent() (#13981, Zend/zend_closures.c). */
+    public ?ObjectEntry $ownerObject = null;
+
     /**
      * Per-closure static locals (Zend zend_closure static_variables; issue #4872).
      *
@@ -267,6 +270,9 @@ final class ClosureState
         $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
         $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['getusedvariables'] = 'getUsedVariables';
+        $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
+        $entry->methodVisibility['getcurrent'] = $pubStatic;
+        $entry->methodNames['getcurrent'] = 'getCurrent';
         $ctx->classes['closure'] = $entry;
     }
 
@@ -275,6 +281,7 @@ final class ClosureState
         $entry = new ObjectEntry($ctx->classes['closure']);
         $entry->closureState = $this;
         $entry->constructed = true;
+        $this->ownerObject = $entry;
 
         return $entry;
     }

@@ -5466,7 +5466,13 @@ restart:
                     );
                     $closureState = $this->resolvePendingClosureState($frame);
                     $frame->closureCallableSlot = null;
-                    $frame->closureCall = null;
+                    $ownClosureState = $frame->closureCall;
+                    $preserveOwnClosureCall = null !== $ownClosureState
+                        && null !== $frame->block->func
+                        && (($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
+                    if (!$preserveOwnClosureCall) {
+                        $frame->closureCall = null;
+                    }
                     $frame->pendingClosureInvoke = null;
                     // Only bind captures/$this when entering the closure body, not nested $this->method() (#4927).
                     if (
