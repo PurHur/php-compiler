@@ -86,7 +86,6 @@ final class GzStreamRuntime
         } catch (\Throwable) {
         }
 
-        StringZlib::preloadLibz();
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__compiler_gzopen', static fn (Context $ctx, LlvmFunction $fn) => self::emitGzopenBridge($ctx, $fn));
         self::implementIfMissing($context, '__compiler_gzwrite', static fn (Context $ctx, LlvmFunction $fn) => self::emitGzwriteBridge($ctx, $fn));

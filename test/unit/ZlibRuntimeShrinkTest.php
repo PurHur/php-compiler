@@ -33,4 +33,15 @@ final class ZlibRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmZlibCore::zlib_encode', $source);
         $this->assertStringContainsString('VmZlibCore::zlib_decode', $source);
     }
+
+    public function testStringZlibHasNoLibzDlopen(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringZlib.php');
+        $this->assertStringNotContainsString('preloadLibz', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('dlopen', $source);
+
+        $gzStream = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GzStreamRuntime.php');
+        $this->assertStringNotContainsString('preloadLibz', $gzStream);
+    }
 }
