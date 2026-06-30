@@ -17906,7 +17906,10 @@ class Compiler {
         $feedsCallArg = $this->inlineCallArgProducerFeedsCallArgOp($candidate, $cfgCallOp, $callArg)
             || (
                 $this->callArgIsDeadInlineTemporary($callArg)
-                && ($candidate instanceof Op\Expr\FuncCall || $candidate instanceof Op\Expr\NsFuncCall)
+                && ($candidate instanceof Op\Expr\FuncCall
+                    || $candidate instanceof Op\Expr\NsFuncCall
+                    || $candidate instanceof Op\Expr\StaticCall
+                    || $candidate instanceof Op\Expr\MethodCall)
             );
         if (!$feedsCallArg) {
             return null;

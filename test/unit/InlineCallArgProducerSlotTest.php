@@ -1962,6 +1962,53 @@ PHP;
         self::assertStringContainsString("'b'", $out);
     }
 
+    /** Issue #11896 / #13810 — var_export(C::__set_state([]), true) wires StaticCall producer, not dead arg temp. */
+    public function testVarExportSetStateInlineStaticCallReturnTrueUsesStaticCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+class VE {
+    public static function __set_state(array $a): self { return new self(); }
+}
+echo var_export(VE::__set_state([]), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_set_state_inline.php');
+
+        $staticReturnSlot = null;
+        $varExportSends = [];
+        $pendingStaticReturn = false;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_STATICCALL_INIT === $op->type) {
+                $pendingStaticReturn = true;
+            }
+            if ($pendingStaticReturn && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $staticReturnSlot = $op->arg1;
+                $pendingStaticReturn = false;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($staticReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($staticReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('VE::__set_state(array', $out);
+        self::assertStringNotContainsString('NULL', $out);
+    }
+
     /** Issue #12450 — array_merge(array_keys($src), [...]) wires FuncCall + sibling Array_ producer slots. */
     public function testArrayMergeInlineArrayKeysRuntime(): void
     {
