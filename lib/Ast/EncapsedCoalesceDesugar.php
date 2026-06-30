@@ -7,10 +7,11 @@ namespace PHPCompiler\Ast;
 use PHPCompiler\CompilerVersion;
 
 /**
- * Desugar PHP 8.4+ null coalesce inside double-quoted `{$...}` interpolation (#14063).
+ * Desugar PHP 8.4+ null coalesce inside double-quoted `{$...}` interpolation (#14063, #14113).
  *
  * nikic/php-parser (ONLY_PHP7) rejects `??` in encapsed variables; Zend 8.4 allows it.
- * Lower to string concat: `"a{$x ?? 0}b"` → `'a' . ($x ?? 0) . 'b'`.
+ * Lower to string concat with statement temps for each `??` chunk so CFG merge blocks
+ * keep coalesce results when multiple chunks participate in one concat (#14113).
  *
  * php-src: Zend/zend_language_parser.y encapsed variable grammar; Zend/zend_compile.c.
  */
@@ -31,6 +32,7 @@ final class EncapsedCoalesceDesugar
         $tokens = token_get_all($code);
         $offsets = self::tokenByteOffsets($tokens);
         $replacements = [];
+        $tempCounter = 0;
 
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             $closeIdx = null;
@@ -43,11 +45,13 @@ final class EncapsedCoalesceDesugar
                 continue;
             }
 
-            $replacement = self::buildConcatExpression($tokens, $i, $closeIdx);
+            $built = self::buildConcatExpression($tokens, $i, $closeIdx, $tempCounter);
+            $tempCounter = $built['nextTemp'];
             $replacements[] = [
                 'start' => $offsets[$i],
                 'end' => $offsets[$closeIdx] + 1,
-                'text' => $replacement,
+                'text' => $built['expr'],
+                'prelude' => $built['prelude'],
             ];
             $i = $closeIdx;
         }
@@ -56,14 +60,38 @@ final class EncapsedCoalesceDesugar
             return $code;
         }
 
-        usort($replacements, static fn (array $a, array $b): int => $b['start'] <=> $a['start']);
+        usort($replacements, static fn (array $a, array $b): int => $a['start'] <=> $b['start']);
+        $shift = 0;
         foreach ($replacements as $replacement) {
-            $code = substr($code, 0, $replacement['start'])
+            $start = $replacement['start'] + $shift;
+            $end = $replacement['end'] + $shift;
+            if ([] !== $replacement['prelude']) {
+                $lineStart = self::lineStartForOffset($code, $start);
+                $preludeText = \implode("\n", $replacement['prelude'])."\n";
+                $code = \substr($code, 0, $lineStart)
+                    .$preludeText
+                    .\substr($code, $lineStart);
+                $preludeLen = \strlen($preludeText);
+                if ($start >= $lineStart) {
+                    $start += $preludeLen;
+                    $end += $preludeLen;
+                }
+                $shift += $preludeLen;
+            }
+            $code = \substr($code, 0, $start)
                 .$replacement['text']
-                .substr($code, $replacement['end']);
+                .\substr($code, $end);
+            $shift += \strlen($replacement['text']) - ($end - $start);
         }
 
         return $code;
+    }
+
+    private static function lineStartForOffset(string $code, int $offset): int
+    {
+        $lineStart = \strrpos(\substr($code, 0, $offset), "\n");
+
+        return false === $lineStart ? 0 : $lineStart + 1;
     }
 
     /**
@@ -139,10 +167,17 @@ final class EncapsedCoalesceDesugar
 
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     *
+     * @return array{expr: string, prelude: list<string>, nextTemp: int}
      */
-    private static function buildConcatExpression(array $tokens, int $openIdx, int $closeIdx): string
-    {
+    private static function buildConcatExpression(
+        array $tokens,
+        int $openIdx,
+        int $closeIdx,
+        int $tempCounter
+    ): array {
         $parts = [];
+        $prelude = [];
         for ($j = $openIdx + 1; $j < $closeIdx; ++$j) {
             $token = $tokens[$j];
             if (\is_array($token) && \T_ENCAPSED_AND_WHITESPACE === $token[0]) {
@@ -171,20 +206,29 @@ final class EncapsedCoalesceDesugar
                 $innerStart = $j + 1;
                 $afterClose = self::consumeBalancedCurly($tokens, $j);
                 $innerTokens = \array_slice($tokens, $innerStart, $afterClose - $innerStart - 1);
-                $parts[] = '('.self::tokensToSource($innerTokens).')';
+                $innerSource = self::tokensToSource($innerTokens);
+                if (null !== self::findTopLevelCoalesceLine($innerTokens)) {
+                    $var = '$__encapsedCoalesce'.$tempCounter;
+                    ++$tempCounter;
+                    $prelude[] = $var.' = ('.$innerSource.');';
+                    $parts[] = $var;
+                } else {
+                    $parts[] = '('.$innerSource.')';
+                }
                 $j = $afterClose - 1;
                 continue;
             }
         }
 
         if ([] === $parts) {
-            return "''";
-        }
-        if (1 === \count($parts)) {
-            return $parts[0];
+            $expr = "''";
+        } elseif (1 === \count($parts)) {
+            $expr = $parts[0];
+        } else {
+            $expr = \implode(' . ', $parts);
         }
 
-        return \implode(' . ', $parts);
+        return ['expr' => $expr, 'prelude' => $prelude, 'nextTemp' => $tempCounter];
     }
 
     /**
