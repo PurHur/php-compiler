@@ -32,7 +32,7 @@ final class LimitIteratorBuiltin
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('LimitIterator');
         $entry->parentLc = IteratorIteratorBuiltin::CLASS_LC;
-        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
+        foreach (['OuterIterator', 'Traversable', 'Iterator', 'SeekableIterator'] as $iface) {
             if (isset($ctx->classes[strtolower($iface)])
                 && !\in_array($iface, $entry->interfaces, true)) {
                 $entry->interfaces[] = $iface;
@@ -48,6 +48,7 @@ final class LimitIteratorBuiltin
             'current' => LimitIteratorCurrent::class,
             'key' => LimitIteratorKey::class,
             'next' => LimitIteratorNext::class,
+            'seek' => LimitIteratorSeek::class,
             'getinneriterator' => LimitIteratorGetInnerIterator::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
@@ -61,7 +62,7 @@ final class LimitIteratorBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['__construct']);
+        return isset($entry->methods['rewind'], $entry->methods['valid'], $entry->methods['seek'], $entry->methods['__construct']);
     }
 }
 
@@ -149,6 +150,77 @@ final class SplLimitIteratorStorage
         }
         SplDualIteratorStorage::callInner($frame, $state['inner'], 'next');
         ++$state['pos'];
+    }
+
+    public static function position(ObjectEntry $object): int
+    {
+        return self::state($object)['pos'];
+    }
+
+    public static function seek(Frame $frame, ObjectEntry $object, int $pos): void
+    {
+        $state = &self::$store[$object->id];
+        if ($pos < $state['offset']) {
+            throw new \OutOfBoundsException(
+                \sprintf('Cannot seek to %d which is below the offset %d', $pos, $state['offset'])
+            );
+        }
+        $relative = $pos - $state['offset'];
+        if (-1 !== $state['limit'] && $relative >= $state['limit']) {
+            throw new \OutOfBoundsException(
+                \sprintf(
+                    'Cannot seek to %d which is behind offset %d plus count %d',
+                    $pos,
+                    $state['offset'],
+                    $state['limit']
+                )
+            );
+        }
+
+        $state['rewound'] = true;
+        $inner = $state['inner'];
+        if ($pos !== $state['pos'] && self::innerHasSeek($frame, $inner)) {
+            $posVar = new Variable(Variable::TYPE_INTEGER);
+            $posVar->int($pos);
+            SplDualIteratorStorage::callInnerWithArg($frame, $inner, 'seek', $posVar);
+            $state['pos'] = $pos;
+        } elseif ($pos < $state['pos']) {
+            SplDualIteratorStorage::callInner($frame, $inner, 'rewind');
+            $state['pos'] = 0;
+            while ($pos > $state['pos']) {
+                $valid = SplDualIteratorStorage::callInner($frame, $inner, 'valid')->resolveIndirect();
+                if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
+                    break;
+                }
+                SplDualIteratorStorage::callInner($frame, $inner, 'next');
+                ++$state['pos'];
+            }
+        } else {
+            while ($pos > $state['pos']) {
+                $valid = SplDualIteratorStorage::callInner($frame, $inner, 'valid')->resolveIndirect();
+                if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
+                    break;
+                }
+                SplDualIteratorStorage::callInner($frame, $inner, 'next');
+                ++$state['pos'];
+            }
+        }
+    }
+
+    private static function innerHasSeek(Frame $frame, ObjectEntry $inner): bool
+    {
+        $entry = $inner->class;
+        $classes = $frame->vmContext?->classes ?? [];
+        while (true) {
+            if (isset($entry->methods['seek'])) {
+                return true;
+            }
+            $parentLc = $entry->parentLc;
+            if (null === $parentLc || !isset($classes[$parentLc])) {
+                return false;
+            }
+            $entry = $classes[$parentLc];
+        }
     }
 
     /** @param array{inner: ObjectEntry, offset: int, limit: int, pos: int, rewound: bool} $state */
@@ -333,6 +405,54 @@ final class LimitIteratorNext extends VmClassMethod
             'LimitIterator::next()'
         );
         SplLimitIteratorStorage::next($frame, $object);
+    }
+}
+
+final class LimitIteratorSeek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            LimitIteratorBuiltin::CLASS_LC,
+            'LimitIterator::seek()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'LimitIterator::seek() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $offsetArg = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $offsetArg->type) {
+            throw new \TypeError(
+                'LimitIterator::seek(): Argument #1 ($offset) must be of type int, '
+                .self::typeLabel($offsetArg).' given'
+            );
+        }
+        SplLimitIteratorStorage::seek($frame, $object, $offsetArg->toInt());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->int(SplLimitIteratorStorage::position($object));
+        }
+    }
+
+    private static function typeLabel(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
     }
 }
 

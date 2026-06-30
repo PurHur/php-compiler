@@ -99,7 +99,7 @@ final class VmSplRegistry
         'InvalidArgumentException' => ['parent' => 'LogicException', 'interfaces' => ['Stringable', 'Throwable']],
         'IteratorIterator' => ['parent' => null, 'interfaces' => ['OuterIterator', 'Traversable', 'Iterator']],
         'LengthException' => ['parent' => 'LogicException', 'interfaces' => ['Stringable', 'Throwable']],
-        'LimitIterator' => ['parent' => 'IteratorIterator', 'interfaces' => ['Iterator', 'Traversable', 'OuterIterator']],
+        'LimitIterator' => ['parent' => 'IteratorIterator', 'interfaces' => ['SeekableIterator', 'Iterator', 'Traversable', 'OuterIterator']],
         'LogicException' => ['parent' => 'Exception', 'interfaces' => ['Throwable', 'Stringable']],
         'MultipleIterator' => ['parent' => null, 'interfaces' => ['Iterator', 'Traversable']],
         'NoRewindIterator' => ['parent' => 'IteratorIterator', 'interfaces' => ['Iterator', 'Traversable', 'OuterIterator']],

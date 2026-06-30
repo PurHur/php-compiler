@@ -566,6 +566,12 @@ final class SplDualIteratorStorage
         return self::vm($frame)->invokeInstanceMethod($inner, $method);
     }
 
+    /** @internal Shared by LimitIterator (#12893, #13963). */
+    public static function callInnerWithArg(Frame $frame, ObjectEntry $inner, string $method, Variable $arg): Variable
+    {
+        return self::vm($frame)->invokeInstanceMethod($inner, $method, $arg);
+    }
+
     private static function vm(Frame $frame): \PHPCompiler\VM
     {
         if (null === $frame->vmContext || null === $frame->vmContext->runtime) {
