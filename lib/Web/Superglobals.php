@@ -114,6 +114,7 @@ final class Superglobals
         ?string $scriptFilename = null
     ): void {
         self::$activeContext = $context;
+        $cgiDefaults = self::shouldPopulateCgiServerDefaults($queryString, $postBody);
         self::exportCgiEnvironment($queryString, $postBody, $scriptFilename);
         if (null === $queryString) {
             $fromEnv = getenv('QUERY_STRING');
@@ -135,7 +136,7 @@ final class Superglobals
             $context,
             false === $cookieHeader ? '' : $cookieHeader
         );
-        self::populateServer($context, $queryString, $postBody);
+        self::populateServer($context, $queryString, $postBody, $cgiDefaults);
         self::populateRequest($context);
         ResponseContext::syncHeaderQueueFromEnvironment();
         // Keep context for putenv() → $_ENV/$_SERVER sync during script execution (#1058, #1960).
@@ -418,9 +419,13 @@ final class Superglobals
         $queryString = getenv('QUERY_STRING');
         $queryString = false === $queryString ? '' : $queryString;
         $postBody = self::readRequestBody();
+        $cgiDefaults = self::shouldPopulateCgiServerDefaults(null, null);
         $server = new HashTable();
-        self::populateServerTable($server, $queryString, $postBody, $aotSoftware);
-        self::applyCgiHeadersFromEnviron($server);
+        self::applyProcessEnvironMirror($server);
+        self::populateServerTable($server, $queryString, $postBody, $aotSoftware, $cgiDefaults);
+        if ($cgiDefaults) {
+            self::applyCgiHeadersFromEnviron($server);
+        }
 
         return $server;
     }
@@ -440,30 +445,75 @@ final class Superglobals
         }
     }
 
+    /**
+     * Mirror the process environment into a server table (php-src CLI SAPI, #14209).
+     */
+    public static function applyProcessEnvironMirror(HashTable $server): void
+    {
+        foreach (VmEnvEnvironNative::enumerate() as $key => $value) {
+            if (!is_string($key) || !is_string($value) || '' === $key) {
+                continue;
+            }
+            self::setOrUpdateStringEntry($server, $key, $value);
+        }
+    }
+
+    /**
+     * Whether to synthesize CGI/web $_SERVER defaults (REQUEST_METHOD=GET, GATEWAY_INTERFACE, …).
+     *
+     * Bare CLI leaves REQUEST_METHOD unset when absent from environ (sapi/cli/php_cli.c, #14210).
+     */
+    public static function shouldPopulateCgiServerDefaults(?string $queryString, ?string $postBody): bool
+    {
+        if (false !== getenv('REQUEST_METHOD')) {
+            return true;
+        }
+        if (null !== $queryString || null !== $postBody) {
+            return true;
+        }
+        if ('' !== self::readRequestBody()) {
+            return true;
+        }
+        $queryFromEnv = getenv('QUERY_STRING');
+
+        return false !== $queryFromEnv && '' !== $queryFromEnv;
+    }
+
     private static function populateServerTable(
         HashTable $server,
         string $queryString,
         string $postBody,
-        bool $aotSoftware
+        bool $aotSoftware,
+        bool $cgiDefaults = true
     ): void {
         $method = self::requestMethod();
-        if ('' === $method) {
+        if ('' === $method && $cgiDefaults) {
             $method = '' !== $postBody ? 'POST' : 'GET';
         }
 
         $scriptName = getenv('SCRIPT_NAME');
         if (false === $scriptName || '' === $scriptName) {
-            $scriptName = '/index.php';
+            $scriptName = $cgiDefaults ? '/index.php' : '';
         }
 
-        self::setOrUpdateStringEntry($server, 'REQUEST_METHOD', $method);
-        self::setOrUpdateStringEntry($server, 'QUERY_STRING', $queryString);
-        self::setOrUpdateStringEntry($server, 'SCRIPT_NAME', $scriptName);
-        self::setOrUpdateStringEntry($server, 'PHP_SELF', $scriptName);
+        if ('' !== $method) {
+            self::setOrUpdateStringEntry($server, 'REQUEST_METHOD', $method);
+        }
+        if ($cgiDefaults || '' !== $queryString) {
+            self::setOrUpdateStringEntry($server, 'QUERY_STRING', $queryString);
+        }
+        if ('' !== $scriptName) {
+            self::setOrUpdateStringEntry($server, 'SCRIPT_NAME', $scriptName);
+            self::setOrUpdateStringEntry($server, 'PHP_SELF', $scriptName);
+        }
 
         $scriptFilename = self::resolveScriptFilename($scriptName);
         if ('' !== $scriptFilename) {
             self::setOrUpdateStringEntry($server, 'SCRIPT_FILENAME', $scriptFilename);
+        }
+
+        if (!$cgiDefaults) {
+            return;
         }
 
         $requestUri = getenv('REQUEST_URI');
@@ -588,10 +638,12 @@ final class Superglobals
     private static function populateServer(
         Context $context,
         string $queryString,
-        string $postBody
+        string $postBody,
+        bool $cgiDefaults
     ): void {
         $server = $context->ensureSuperglobal('_SERVER')->toArray();
-        self::populateServerTable($server, $queryString, $postBody, false);
+        self::applyProcessEnvironMirror($server);
+        self::populateServerTable($server, $queryString, $postBody, false, $cgiDefaults);
     }
 
     /**

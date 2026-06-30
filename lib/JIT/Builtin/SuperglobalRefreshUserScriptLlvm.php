@@ -40,6 +40,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
         ParseStrRuntime::ensureLinked($context);
+        StringGetenvAll::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
 
@@ -137,14 +138,15 @@ final class SuperglobalRefreshUserScriptLlvm
 
         $serverHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($serverHt, self::sgGlobalPtr($context, 'sg_SERVER'));
+        self::fillServerFromProcessEnviron($context, $fn, $serverHt);
         self::setServerKeyFromCstr($context, $serverHt, 'QUERY_STRING', $queryCstr);
         self::setServerKeyFromCstr($context, $serverHt, 'SCRIPT_NAME', $scriptNameCstr);
         self::setServerKeyFromCstr($context, $serverHt, 'PHP_SELF', $scriptNameCstr);
+        self::setServerKeyFromCstrIfNonEmpty($context, $fn, $serverHt, 'REQUEST_METHOD', $methodResolved);
+        self::setServerKeyFromCstr($context, $serverHt, 'REQUEST_URI', $requestUriResolved);
         self::setServerKeyFromLiteral($context, $serverHt, 'GATEWAY_INTERFACE', self::GATEWAY_INTERFACE);
         self::setServerKeyFromLiteral($context, $serverHt, 'SERVER_SOFTWARE', self::SERVER_SOFTWARE);
         self::setServerKeyFromCstr($context, $serverHt, 'SERVER_PROTOCOL', $serverProtocolCstr);
-        self::setServerKeyFromCstr($context, $serverHt, 'REQUEST_METHOD', $methodResolved);
-        self::setServerKeyFromCstr($context, $serverHt, 'REQUEST_URI', $requestUriResolved);
 
         foreach (
             [
@@ -241,7 +243,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $usePost = $context->builder->and($methodEmpty, $context->builder->not($postEmpty));
         $resolved = $context->builder->select(
             $methodEmpty,
-            $context->builder->select($usePost, self::literalCstr($context, 'POST'), self::literalCstr($context, 'GET')),
+            $context->builder->select($usePost, self::literalCstr($context, 'POST'), self::literalCstr($context, '')),
             $context->builder->load($methodSlot)
         );
         $context->builder->store($resolved, $outSlot);
@@ -328,6 +330,37 @@ final class SuperglobalRefreshUserScriptLlvm
             $lenI64,
             $cstr
         );
+    }
+
+    private static function setServerKeyFromCstrIfNonEmpty(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ht,
+        string $key,
+        Value $valCstrSlot
+    ): void {
+        $empty = self::isCstrSlotEmpty($context, $valCstrSlot);
+        $skipBb = $fn->appendBasicBlock('sg_user_refresh_skip_'.$key);
+        $setBb = $fn->appendBasicBlock('sg_user_refresh_set_'.$key);
+        $nextBb = $fn->appendBasicBlock('sg_user_refresh_after_'.$key);
+        $context->builder->branchIf($empty, $skipBb, $setBb);
+        $context->builder->positionAtEnd($setBb);
+        self::setServerKeyFromCstr($context, $ht, $key, $valCstrSlot);
+        $context->builder->branch($nextBb);
+        $context->builder->positionAtEnd($skipBb);
+        $context->builder->branch($nextBb);
+        $context->builder->positionAtEnd($nextBb);
+    }
+
+    private static function fillServerFromProcessEnviron(Context $context, LlvmFunction $fn, Value $serverHt): void
+    {
+        $logical = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::fillAllEnvironmentHashtable';
+        $lc = \strtolower($logical);
+        $fillFn = $context->functions[$lc] ?? null;
+        if (null === $fillFn) {
+            throw new \LogicException($logical.' missing after StringGetenvAll compile (#14209)');
+        }
+        $context->builder->call($fillFn, $serverHt);
     }
 
     private static function setServerKeyFromCstr(Context $context, Value $ht, string $key, Value $valCstrSlot): void
