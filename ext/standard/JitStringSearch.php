@@ -199,9 +199,9 @@ final class JitStringSearch
     }
 
     /**
-     * strpos()/stripos() — byte offset or NOT_FOUND (0 for JIT strpos sentinel).
+     * Raw byte offset as i32, or {@see self::NOT_FOUND} (-1) when absent.
      */
-    public static function find(
+    public static function findOffsetI32(
         Context $context,
         Value $haystack,
         Value $needle,
@@ -215,7 +215,6 @@ final class JitStringSearch
         }
         [$hayPtr, $hayLen, $needlePtr, $needleLen] = self::stringParts($context, $haystack, $needle);
         $sizeT = $context->getTypeFromString('size_t');
-        $i64 = $context->getTypeFromString('int64');
         $i32 = $context->getTypeFromString('int32');
         $zeroSize = $sizeT->constInt(0, false);
         $from = null === $offset
@@ -225,7 +224,8 @@ final class JitStringSearch
                 $sizeT
             );
         $helper = $caseInsensitive ? self::HELPER_CI : self::HELPER;
-        $found = $context->builder->call(
+
+        return $context->builder->call(
             $context->lookupFunction($helper),
             $hayPtr,
             $hayLen,
@@ -233,6 +233,21 @@ final class JitStringSearch
             $needleLen,
             $from
         );
+    }
+
+    /**
+     * strpos()/stripos() — byte offset or NOT_FOUND (0 for JIT strpos sentinel).
+     */
+    public static function find(
+        Context $context,
+        Value $haystack,
+        Value $needle,
+        ?Value $offset = null,
+        bool $caseInsensitive = false
+    ): Value {
+        $i64 = $context->getTypeFromString('int64');
+        $i32 = $context->getTypeFromString('int32');
+        $found = self::findOffsetI32($context, $haystack, $needle, $offset, $caseInsensitive);
         $notFound = $context->builder->icmp(
             Builder::INT_EQ,
             $found,
