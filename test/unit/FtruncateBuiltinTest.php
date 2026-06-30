@@ -47,6 +47,19 @@ PHP;
         $this->assertSame('ok', $this->runBin('bin/vm.php', $code));
     }
 
+    /** php://memory truncate via VmPhpMemoryStream (#9328). */
+    public function testPhpMemoryStreamTruncate(): void
+    {
+        $code = <<<'PHP'
+$fp = fopen('php://memory', 'r+');
+fwrite($fp, 'hello');
+echo ftruncate($fp, 3) ? 'ok' : 'no', "\n";
+rewind($fp);
+echo stream_get_contents($fp), "\n";
+PHP;
+        $this->assertSame("ok\nhel", $this->runBin('bin/vm.php', $code));
+    }
+
     /**
      * @group llvm
      * @group jit
