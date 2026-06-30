@@ -274,6 +274,22 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
+        return self::lineViolatesDuplicateSetModifierRules($line);
+    }
+
+    /**
+     * Zend 8.2 reference profile: any explicit read + set pair is a multiple-modifier fatal (#12576).
+     *
+     * PHP 8.4 allows read-before-set when set is equal or more restrictive, e.g. public private(set) (#13914).
+     */
+    private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
+    {
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
+    }
+
+    private static function lineViolatesDuplicateSetModifierRules(string $line): bool
+    {
         return 1 === preg_match(
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
             $line
@@ -289,18 +305,7 @@ final class AsymmetricVisibilityRewriter
             || 1 === preg_match(
                 '/(?<![a-zA-Z0-9_])public\s+\(\s*public\s*\(\s*set\s*\)\s*\)/i',
                 $line
-            )
-            || self::lineHasExplicitReadPlusSetModifier($line);
-    }
-
-    /**
-     * Zend reference profile: same multiple-modifier rules as PHP 8.4 (#12576, #13672).
-     *
-     * Valid dual-modifier form is set-first only, e.g. private(set) protected $x — not public private(set).
-     */
-    private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
-    {
-        return self::lineViolatesMultipleSetModifierRules($line);
+            );
     }
 
     private static function lineHasExplicitReadPlusSetModifier(string $line): bool
