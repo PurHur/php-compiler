@@ -100,6 +100,51 @@ final class TypedPropertyCheck
     }
 
     /**
+     * Zend by-reference write to uninitialized non-nullable typed property (zend_types.c, type.c).
+     */
+    public static function assertWritableByReference(Variable $var): void
+    {
+        if (!self::isUninitialized($var)) {
+            return;
+        }
+        if (self::propertyAllowsNull($var)) {
+            return;
+        }
+        $vm = \PHPCompiler\VM::running();
+        $message = self::writableByReferenceErrorMessage($var);
+        if (null === $vm) {
+            throw new \Error($message);
+        }
+        throw new TypedPropertyReadSignal($vm->makeEngineError($message));
+    }
+
+    public static function writableByReferenceErrorMessage(Variable $var): string
+    {
+        $target = $var->resolveIndirect();
+        $name = $target->objectPropertyName ?? 'property';
+        if (null !== $target->staticPropertyClassLc) {
+            $classLabel = $target->staticPropertyClassLc;
+            $vm = \PHPCompiler\VM::running();
+            if (null !== $vm && isset($vm->context->classes[$target->staticPropertyClassLc])) {
+                $classLabel = $vm->context->classes[$target->staticPropertyClassLc]->name;
+            }
+
+            return sprintf(
+                'Cannot access uninitialized non-nullable property %s::$%s by reference',
+                $classLabel,
+                $name
+            );
+        }
+        $owner = $target->objectPropertyOwner;
+
+        return sprintf(
+            'Cannot access uninitialized non-nullable property %s::$%s by reference',
+            $owner->class->name,
+            $name
+        );
+    }
+
+    /**
      * Nullable typed property (`?T`, `T|null`, `mixed`) — Zend nullsafe short-circuit (#5220).
      */
     public static function propertyAllowsNull(Variable $var): bool
