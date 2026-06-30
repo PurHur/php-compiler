@@ -11,6 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\OutputBuffer;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -47,38 +48,43 @@ final class debug_zval_dump extends Internal
         return JitDebugZvalDump::invoke($context, ...$args);
     }
 
+    private static function write(string $chunk): void
+    {
+        OutputBuffer::append($chunk);
+    }
+
     private static function dumpVariable(VM $vm, Variable $var, int $level, bool $showRefMarker = false, ?Frame $frame = null): void
     {
         TypedPropertyCheck::assertReadable($var);
         if ($level > 0) {
-            echo str_repeat(' ', $level);
+            self::write(str_repeat(' ', $level));
         }
         if ($showRefMarker && Variable::TYPE_INDIRECT === $var->type) {
-            echo '&';
+            self::write('&');
             $var = $var->resolveIndirect();
         }
         if (Variable::TYPE_INTEGER === $var->type) {
-            echo 'int(', $var->toInt(), ")\n";
+            self::write('int('.$var->toInt().")\n");
 
             return;
         }
         if (Variable::TYPE_FLOAT === $var->type) {
-            echo 'float(', VmFloatDtoa::formatVarDump($var->toFloat()), ")\n";
+            self::write('float('.VmFloatDtoa::formatVarDump($var->toFloat()).")\n");
 
             return;
         }
         if (Variable::TYPE_STRING === $var->type) {
-            echo 'string(', \strlen($var->toString()), ') "', $var->toString(), "\"\n";
+            self::write('string('.\strlen($var->toString()).') "'.$var->toString()."\"\n");
 
             return;
         }
         if (Variable::TYPE_BOOLEAN === $var->type) {
-            echo 'bool(', $var->toBool() ? 'true' : 'false', ")\n";
+            self::write('bool('.($var->toBool() ? 'true' : 'false').")\n");
 
             return;
         }
         if (Variable::TYPE_NULL === $var->type) {
-            echo "NULL\n";
+            self::write("NULL\n");
 
             return;
         }
@@ -94,12 +100,12 @@ final class debug_zval_dump extends Internal
         }
         if (Variable::TYPE_ENUM_CASE === $var->type) {
             $case = $var->toEnumCase();
-            echo 'enum('.$case->enumClass->name.'::'.$case->caseName.")\n";
+            self::write('enum('.$case->enumClass->name.'::'.$case->caseName.")\n");
 
             return;
         }
 
-        echo "unknown()\n";
+        self::write("unknown()\n");
     }
 
     private static function dumpArray(VM $vm, VM\HashTable $table, int $level, ?Frame $frame = null): void
@@ -108,37 +114,37 @@ final class debug_zval_dump extends Internal
         foreach ($table->iterateKeyed(false) as $_) {
             ++$count;
         }
-        echo 'array(', $count, ') refcount(', $table->getGcRefcount(), "){\n";
+        self::write('array('.$count.') refcount('.$table->getGcRefcount()."){\n");
         foreach ($table->iterateKeyed(false) as [$key, $value]) {
-            echo str_repeat(' ', $level + 1);
-            echo self::formatKey($key), "\n";
+            self::write(str_repeat(' ', $level + 1));
+            self::write(self::formatKey($key)."\n");
             self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 0) {
-            echo str_repeat(' ', $level);
+            self::write(str_repeat(' ', $level));
         }
-        echo "}\n";
+        self::write("}\n");
     }
 
     private static function dumpObject(VM $vm, VM\ObjectEntry $object, int $level, ?Frame $frame = null): void
     {
         if (EnumCaseSupport::isEnumCase($object)) {
-            echo 'enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n";
+            self::write('enum('.$object->class->name.'::'.($object->enumCaseName ?? '').")\n");
 
             return;
         }
         $props = $object->getProperties(ClassEntry::PROP_PURPOSE_DEBUG, $vm, $frame);
         $count = \count($props);
-        echo 'object(', $object->class->name, ')#', $object->id, ' (', $count, ') refcount(', $object->refCount, "){\n";
+        self::write('object('.$object->class->name.')#'.$object->id.' ('.$count.') refcount('.$object->refCount."){\n");
         foreach ($props as $name => $value) {
-            echo str_repeat(' ', $level + 1);
-            echo '["', $name, "\"]=>\n";
+            self::write(str_repeat(' ', $level + 1));
+            self::write('["'.$name."\"]=>\n");
             self::dumpVariable($vm, $value, $level + 2, true, $frame);
         }
         if ($level > 0) {
-            echo str_repeat(' ', $level);
+            self::write(str_repeat(' ', $level));
         }
-        echo "}\n";
+        self::write("}\n");
     }
 
     private static function formatKey(Variable $key): string
