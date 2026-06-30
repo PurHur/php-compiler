@@ -3162,6 +3162,7 @@
         "lib/VM/Builtin/ReflectionClassGetDeprecatedVersion.php",
         "lib/VM/Builtin/ReflectionClassGetDocComment.php",
         "lib/VM/Builtin/ReflectionClassGetEndLine.php",
+        "lib/VM/Builtin/ReflectionClassGetExtension.php",
         "lib/VM/Builtin/ReflectionClassGetExtensionName.php",
         "lib/VM/Builtin/ReflectionClassGetFileName.php",
         "lib/VM/Builtin/ReflectionClassGetLazyInitializationException.php",
@@ -3218,6 +3219,8 @@
         "lib/VM/Builtin/ReflectionEnumUnitCaseGetName.php",
         "lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php",
         "lib/VM/Builtin/ReflectionEnumUnitCaseIsBacked.php",
+        "lib/VM/Builtin/ReflectionExtensionConstruct.php",
+        "lib/VM/Builtin/ReflectionExtensionGetName.php",
         "lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php",
         "lib/VM/Builtin/ReflectionFunctionConstruct.php",
         "lib/VM/Builtin/ReflectionFunctionCreateFromCallable.php",
@@ -3753,9 +3756,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3523,
+        "inventory_files": 3526,
         "excluded": 0,
-        "eligible": 3523,
+        "eligible": 3526,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
