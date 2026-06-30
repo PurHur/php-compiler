@@ -17498,10 +17498,15 @@ class Compiler {
             return null;
         }
         $callArg = $cfgCallOp->args[$argIndex] ?? null;
-        if (
-            null === $callArg
-            || !$this->inlineCallArgProducerFeedsCallArgOp($candidate, $cfgCallOp, $callArg)
-        ) {
+        if (null === $callArg) {
+            return null;
+        }
+        $feedsCallArg = $this->inlineCallArgProducerFeedsCallArgOp($candidate, $cfgCallOp, $callArg)
+            || (
+                $this->callArgIsDeadInlineTemporary($callArg)
+                && ($candidate instanceof Op\Expr\FuncCall || $candidate instanceof Op\Expr\NsFuncCall)
+            );
+        if (!$feedsCallArg) {
             return null;
         }
         if (null === $block->slotForOperand($candidate->result)) {
@@ -21966,11 +21971,31 @@ class Compiler {
                         }
                     }
                 }
+                if (null !== $cfgCallOp && 0 === (int) $argIndex) {
+                    $varExportOps = [];
+                    $varExportSlot = $this->slotForVarExportNestedInlineCallArg(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $varExportOps
+                    );
+                    if (null !== $varExportSlot) {
+                        if ([] !== $varExportOps) {
+                            $sends = array_merge($sends, $varExportOps);
+                        }
+                        $valueSlot = (string) $varExportSlot;
+                    }
+                }
                 if (
                     $this->callArgIsDeadInlineTemporary($arg)
                     && !$comparisonFeedsCallArg
                     && !$this->callArgOperandExpectsArrayProducer(
                         $cfgCallOp->args[(int) $argIndex] ?? $arg
+                    )
+                    && !(
+                        null !== $cfgCallOp
+                        && 'var_export' === $this->resolveCfgFuncCallName($cfgCallOp)
+                        && 0 === (int) $argIndex
                     )
                 ) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
@@ -22020,21 +22045,6 @@ class Compiler {
                 );
                 if (null !== $mergeTrailingSlot) {
                     $valueSlot = $mergeTrailingSlot;
-                }
-            }
-            if (null !== $cfgCallOp && 0 === (int) $argIndex) {
-                $varExportOps = [];
-                $varExportSlot = $this->slotForVarExportNestedInlineCallArg(
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex,
-                    $varExportOps
-                );
-                if (null !== $varExportSlot) {
-                    if ([] !== $varExportOps) {
-                        $sends = array_merge($sends, $varExportOps);
-                    }
-                    $valueSlot = (string) $varExportSlot;
                 }
             }
             if (
@@ -23075,12 +23085,51 @@ class Compiler {
             return false;
         }
 
-        return $this->isAdjacentNestedFuncCallProducer(
+        if ($this->isAdjacentNestedFuncCallProducer(
             $cfgCallOp,
             $consumer,
             $producerIndex,
             $consumerIndex
-        );
+        )) {
+            return true;
+        }
+
+        return $this->siblingFuncCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex);
+    }
+
+    /**
+     * php-cfg `var_export(key($a), true)` hoists key() sibling; ConstFetch `true` may sit between (#13829).
+     */
+    private function siblingFuncCallFeedsVarExportConsumer(Op $cfgCallOp, Block $block, int $producerIndex): bool
+    {
+        if (!$this->isSiblingInlineCallProducerExpr($cfgCallOp)) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+            $child = $cfgChildren[$i];
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\Array_
+            ) {
+                continue;
+            }
+            if (
+                !$child instanceof Op\Expr\FuncCall
+                && !$child instanceof Op\Expr\NsFuncCall
+            ) {
+                return false;
+            }
+            if ('var_export' !== $this->resolveCfgFuncCallName($child)) {
+                return false;
+            }
+            $callArg = $child->args[0] ?? null;
+
+            return null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg);
+        }
+
+        return false;
     }
 
     /**
