@@ -1586,8 +1586,9 @@ final class PropertyHooks
     }
 
     /**
-     * php-src: Zend/zend_compile.c — asymmetric `(set)` on the property decl inside a hook block
-     * requires a set hook (`get; private set;`, `set =>`, …); get-only blocks are parse errors (#12203).
+     * php-src: Zend/zend_compile.c — asymmetric `(set)` on the property decl requires a set hook
+     * (`get; private set;`, `set =>`, …) unless the block is get-only with an implemented get hook
+     * (`get =>`, `get { }`) — PHP 8.4 (#13983, zend_property_hooks.c).
      */
     private function rejectAsymmetricDeclSetWithoutSetHook(
         string $declHead,
@@ -1606,6 +1607,9 @@ final class PropertyHooks
             || !empty($propMeta['requiresSet'])
             || $this->isImplicitAsymmetricBackingHookSource($hookSource);
         if ($hasSetHook) {
+            return;
+        }
+        if (isset($propMeta['get'])) {
             return;
         }
         throw new CompileFatal(

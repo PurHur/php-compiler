@@ -398,8 +398,8 @@ PHP;
         self::assertArrayNotHasKey('requiresSet', $registry['user']['email'] ?? []);
     }
 
-    /** @covers issue #12203 — `private(set)` decl + get-only hook is a Zend parse error */
-    public function testRejectsAsymmetricDeclSetWithGetOnlyHook(): void
+    /** @covers issue #13983 — `private(set)` decl + get-only hook compiles on PHP 8.4 */
+    public function testLowersAsymmetricDeclSetWithGetOnlyHook(): void
     {
         $src = <<<'PHP'
 <?php
@@ -409,10 +409,30 @@ class C {
     }
 }
 PHP;
+        [$out, $registry] = (new PropertyHooks())->process($src);
+        self::assertStringNotContainsString('$x {', $out);
+        self::assertStringContainsString('private(set) string $x;', $out);
+        self::assertStringContainsString('function __phpc_property_get_x', $out);
+        self::assertArrayHasKey('get', $registry['c']['x'] ?? []);
+        self::assertArrayNotHasKey('set', $registry['c']['x'] ?? []);
+        self::assertTrue($registry['c']['x']['virtual'] ?? false);
+    }
+
+    /** @covers issue #12203 — `private(set)` decl + get; obligation without set hook still rejected */
+    public function testRejectsAsymmetricDeclSetWithGetSemicolonOnlyHook(): void
+    {
+        $src = <<<'PHP'
+<?php
+class C {
+    private(set) string $x {
+        get;
+    }
+}
+PHP;
         $this->expectException(CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::ASYMMETRIC_DECL_SET_REQUIRES_SET_HOOK_MESSAGE);
 
-        (new PropertyHooks())->process($src, 'asymmetric_get_only.php');
+        (new PropertyHooks())->process($src, 'asymmetric_get_semicolon.php');
     }
 
     /** @covers issue #12203 — implicit `get; private set;` backing still allowed */
