@@ -43,5 +43,6 @@ final class ZlibRuntimeShrinkTest extends TestCase
 
         $gzStream = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GzStreamRuntime.php');
         $this->assertStringNotContainsString('preloadLibz', $gzStream);
+        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/NativeDlopen.php');
     }
 }
