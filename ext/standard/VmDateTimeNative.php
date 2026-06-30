@@ -626,10 +626,9 @@ final class VmDateTimeNative
     {
         $matched = self::matchFormatComponents($format, $time);
         if (false === $matched) {
-            return self::failedParseResult([
-                0 => 'A four digit year could not be found',
-                3 => 'Not enough data available to satisfy format',
-            ]);
+            $failure = self::buildCreateFromFormatFailureErrors($format, $time);
+
+            return self::failedParseResult($failure['errors'], $failure['error_count']);
         }
         $normalized = self::warnInvalidCalendarComponents($matched);
         $result = self::parseResultFromComponents($normalized['components']);
@@ -747,7 +746,10 @@ final class VmDateTimeNative
      *   is_localtime: bool
      * }
      */
-    private static function failedParseResult(array $errors): array
+    /**
+     * @param array<int, string> $errors
+     */
+    private static function failedParseResult(array $errors, ?int $errorCount = null): array
     {
         return [
             'year' => false,
@@ -759,10 +761,60 @@ final class VmDateTimeNative
             'fraction' => false,
             'warning_count' => 0,
             'warnings' => [],
-            'error_count' => \count($errors),
+            'error_count' => $errorCount ?? \count($errors),
             'errors' => $errors,
             'is_localtime' => false,
         ];
+    }
+
+    /**
+     * php-src ext/date/lib/parse_date.c — timelib_parse_from_format error accumulation (#14173).
+     *
+     * error_count is the number of recorded messages (not unique position keys).
+     *
+     * @return array{errors: array<int, string>, error_count: int}
+     */
+    private static function buildCreateFromFormatFailureErrors(string $format, string $time): array
+    {
+        /** @var list<array{0: int, 1: string}> $messages */
+        $messages = [];
+        $add = static function (int $position, string $message) use (&$messages): void {
+            $messages[] = [$position, $message];
+        };
+
+        $bare = \str_starts_with($format, '!') ? \substr($format, 1) : $format;
+        $timeLen = \strlen($time);
+        $primary = self::primaryCreateFromFormatFailureMessage($bare, $time);
+
+        if (\strlen($bare) > 1 && \preg_match('/[YymdHisuvGUeTOP]/', $bare)) {
+            $add(0, 'The format separator does not match');
+            $add(0, $primary);
+            $add($timeLen, 'Not enough data available to satisfy format');
+        } else {
+            if ($timeLen > 0) {
+                $add(0, 'Trailing data');
+            }
+            $add(0, $primary);
+        }
+
+        $errors = [];
+        foreach ($messages as [$position, $message]) {
+            $errors[$position] = $message;
+        }
+
+        return ['errors' => $errors, 'error_count' => \count($messages)];
+    }
+
+    private static function primaryCreateFromFormatFailureMessage(string $format, string $time): string
+    {
+        if (\str_contains($format, 'Y')) {
+            return 'A four digit year could not be found';
+        }
+        if (\str_contains($format, 'y')) {
+            return 'A two digit year could not be found';
+        }
+
+        return 'Not enough data available to satisfy format';
     }
 
     /**
