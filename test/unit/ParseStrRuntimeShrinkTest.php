@@ -127,4 +127,20 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('JitNestedHelperCoerce::coerceArgForHelper', $source);
         $this->assertStringContainsString('JitVmHelperLink::ensureCompiled', $source);
     }
+
+    /** Issue #14150 — parse_str() root keys map `.` and `+` to `_` (php_register_variable). */
+    public function testParseStrEngineNormalizesDotAndPlusRootKeys(): void
+    {
+        $dots = \PHPCompiler\ext\standard\ParseStrEngine::parse('a.b=1&a.c=2');
+        $this->assertSame(['a_b' => '1', 'a_c' => '2'], $dots);
+
+        $plus = \PHPCompiler\ext\standard\ParseStrEngine::parse('a+b=1');
+        $this->assertSame(['a_b' => '1'], $plus);
+
+        $nested = \PHPCompiler\ext\standard\ParseStrEngine::parse('a[b+c]=1');
+        $this->assertSame(['a' => ['b c' => '1']], $nested);
+
+        $nestedBase = \PHPCompiler\ext\standard\ParseStrEngine::parse('a.b[c]=1');
+        $this->assertSame(['a_b' => ['c' => '1']], $nestedBase);
+    }
 }

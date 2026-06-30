@@ -48,10 +48,10 @@ final class ParseStrEngine
             }
             $eq = strpos($pair, '=');
             if (false === $eq) {
-                $key = $cookiePairDecode ? $pair : self::urlDecode($pair);
+                $key = $cookiePairDecode ? $pair : self::decodeQueryKey($pair);
                 $value = '';
             } else {
-                $key = $cookiePairDecode ? substr($pair, 0, $eq) : self::urlDecode(substr($pair, 0, $eq));
+                $key = $cookiePairDecode ? substr($pair, 0, $eq) : self::decodeQueryKey(substr($pair, 0, $eq));
                 $value = $cookiePairDecode ? substr($pair, $eq + 1) : self::urlDecode(substr($pair, $eq + 1));
             }
             if ('' === $key) {
@@ -71,6 +71,41 @@ final class ParseStrEngine
     private static function urlDecode(string $value): string
     {
         $value = str_replace('+', ' ', $value);
+
+        return self::percentDecode($value);
+    }
+
+    /**
+     * Query key decoding — php-src treats `.` and `+` in the root segment as `_` (#14150).
+     *
+     * Bracket interior segments keep `+` → space (php_register_variable / parse_str parity).
+     */
+    private static function decodeQueryKey(string $value): string
+    {
+        $value = self::percentDecode($value);
+        $bracketPos = strpos($value, '[');
+        if (false === $bracketPos) {
+            return str_replace(['.', '+'], '_', $value);
+        }
+        $base = str_replace(['.', '+'], '_', substr($value, 0, $bracketPos));
+        $suffix = substr($value, $bracketPos);
+
+        return $base.self::decodeBracketKeySuffix($suffix);
+    }
+
+    private static function decodeBracketKeySuffix(string $suffix): string
+    {
+        return (string) preg_replace_callback(
+            '/\[([^\]]*)\]/',
+            static function (array $m): string {
+                return '['.self::urlDecode($m[1]).']';
+            },
+            $suffix
+        );
+    }
+
+    private static function percentDecode(string $value): string
+    {
         if (!str_contains($value, '%')) {
             return $value;
         }
