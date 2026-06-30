@@ -60,7 +60,7 @@ final class JitPath
         $context->builder->positionAtEnd($scanBlock);
         $schemeSepSlot = $context->builder->alloca($i64, 1, 'dirname_scheme_sep');
         $context->builder->store($minusOne, $schemeSepSlot);
-        self::findSchemeSepIndex($context, $charPtr, $end, $schemeSepSlot, $id);
+        self::findSchemeSepIndex($context, $str, $end, $schemeSepSlot, $id);
         $schemeSep = $context->builder->load($schemeSepSlot);
         $hasScheme = $context->builder->icmp(Builder::INT_SGE, $schemeSep, $zero);
         $minSepSlot = $context->builder->alloca($i64, 1, 'dirname_min_sep');
@@ -383,37 +383,44 @@ final class JitPath
 
     private static function findSchemeSepIndex(
         Context $context,
-        Value $charPtr,
+        Value $str,
         Value $end,
         Value $schemeSepSlot,
         string $id
     ): void {
         $i64 = JitStringIndex::i64($context);
-        $zero = JitStringIndex::zero($context);
+        $i32 = $context->getTypeFromString('int32');
         $minusOne = $i64->constInt(-1, false);
         $needle = self::loadLiteral($context, '://');
-        [, $needlePtr] = self::stringFields($context, $needle);
-        $match = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $charPtr,
-            $needlePtr
+        $foundI32 = JitStringSearch::findOffsetI32($context, $str, $needle);
+        $notFound = $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundI32,
+            $i32->constInt(JitStringSearch::NOT_FOUND, true)
         );
-        $nullPtr = $match->typeOf()->constNull();
-        $found = $context->builder->icmp(Builder::INT_NE, $match, $nullPtr);
 
         $done = self::block($context, 'dirname_scheme_done_'.$id);
         $miss = self::block($context, 'dirname_scheme_miss_'.$id);
         $hit = self::block($context, 'dirname_scheme_hit_'.$id);
-        $context->builder->branchIf($found, $hit, $miss);
+        $pastEnd = self::block($context, 'dirname_scheme_past_end_'.$id);
+        $store = self::block($context, 'dirname_scheme_store_'.$id);
+        $context->builder->branchIf($notFound, $miss, $hit);
 
         $context->builder->positionAtEnd($miss);
         $context->builder->store($minusOne, $schemeSepSlot);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($hit);
-        $offset = $context->builder->ptrToInt($match, $i64);
-        $base = $context->builder->ptrToInt($charPtr, $i64);
-        $context->builder->store($context->builder->sub($offset, $base), $schemeSepSlot);
+        $found = $context->builder->zExt($foundI32, $i64);
+        $within = $context->builder->icmp(Builder::INT_SLT, $found, $end);
+        $context->builder->branchIf($within, $store, $pastEnd);
+
+        $context->builder->positionAtEnd($pastEnd);
+        $context->builder->store($minusOne, $schemeSepSlot);
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($store);
+        $context->builder->store($found, $schemeSepSlot);
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($done);
