@@ -266,7 +266,7 @@ final class WeakRefSupport
         $dst->copyFrom($target);
     }
 
-    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103). */
+    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103, #14132). */
     public static function hasStrongScopeBinding(int $objectId): bool
     {
         $vm = \PHPCompiler\VM::running();
@@ -284,8 +284,7 @@ final class WeakRefSupport
                 return false;
             }
         };
-
-        foreach ($vm->context->runStackFrames() as $frame) {
+        $scanFrameLocals = static function (\PHPCompiler\Frame $frame) use ($matches): bool {
             if (null !== $frame->block) {
                 foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
                     if (!isset($frame->scope[$slot])) {
@@ -300,6 +299,23 @@ final class WeakRefSupport
                 if ($matches($var)) {
                     return true;
                 }
+            }
+
+            return false;
+        };
+
+        // Active opcode frame is not on runStack (only suspended callers are) — closures need it (#14132).
+        $executing = $vm->currentExecutingFrame();
+        if (
+            null !== $executing
+            && (null !== $executing->closureCall || null !== $executing->parent)
+            && $scanFrameLocals($executing)
+        ) {
+            return true;
+        }
+        foreach ($vm->context->runStackFrames() as $frame) {
+            if ($scanFrameLocals($frame)) {
+                return true;
             }
         }
 
