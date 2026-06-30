@@ -20,6 +20,9 @@ final class VmDateTimeNative
 {
     private const ZONEINFO_ROOT = '/usr/share/zoneinfo';
 
+    /** Day-scan fallback only for narrow windows; full-range uses TZif (#11069). */
+    private const TRANSITION_SCAN_MAX_SPAN = 86400 * 366 * 10;
+
     private const FORMAT_OUT_BYTES = 256;
 
     /** @var list<string>|null */
@@ -1783,11 +1786,26 @@ final class VmDateTimeNative
      */
     public static function timezoneTransitions(string $tzName, int $begin, int $end): array|false
     {
-        if (!self::zoneinfoPath($tzName)) {
+        $path = self::zoneinfoPath($tzName);
+        if (null === $path) {
             return false;
         }
         if ($begin > $end) {
             return false;
+        }
+
+        $fixedOffset = self::parseNumericTimezoneOffset($tzName);
+        if (null !== $fixedOffset) {
+            return [self::buildTransitionRecord($tzName, $begin)];
+        }
+
+        $tzifTimes = self::readTzifTransitionTimes($path);
+        if (null !== $tzifTimes) {
+            return self::transitionsFromTzifTimes($tzName, $begin, $end, $tzifTimes);
+        }
+
+        if ($end - $begin > self::TRANSITION_SCAN_MAX_SPAN) {
+            return [self::buildTransitionRecord($tzName, $begin)];
         }
 
         $transitions = [self::buildTransitionRecord($tzName, $begin)];
@@ -1989,6 +2007,111 @@ final class VmDateTimeNative
     /**
      * @return array{offset: int, isdst: bool}
      */
+    /**
+     * @param list<int> $times sorted TZif transition timestamps
+     *
+     * @return list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>
+     */
+    private static function transitionsFromTzifTimes(
+        string $tzName,
+        int $begin,
+        int $end,
+        array $times
+    ): array {
+        $transitions = [self::buildTransitionRecord($tzName, $begin)];
+        foreach ($times as $ts) {
+            if ($ts <= $begin) {
+                continue;
+            }
+            if ($ts > $end) {
+                break;
+            }
+            if (($transitions[\count($transitions) - 1]['ts'] ?? null) !== $ts) {
+                $transitions[] = self::buildTransitionRecord($tzName, $ts);
+            }
+        }
+
+        return $transitions;
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function readTzifTransitionTimes(string $path): ?array
+    {
+        $data = VmFs::fileGetContents($path);
+        if (!\is_string($data) || \strlen($data) < 44 || !\str_starts_with($data, 'TZif')) {
+            return null;
+        }
+        $pos = \strrpos($data, 'TZif');
+        if (false === $pos) {
+            return null;
+        }
+
+        return self::parseTzifBlockTransitionTimes($data, $pos);
+    }
+
+    /**
+     * @return list<int>|null
+     */
+    private static function parseTzifBlockTransitionTimes(string $data, int $pos): ?array
+    {
+        if ('TZif' !== \substr($data, $pos, 4)) {
+            return null;
+        }
+        $version = $data[$pos + 4];
+        $header = \unpack('Ntisut/Ntisgmt/Nleap/Ntime/Ntype/Nchar', \substr($data, $pos + 20, 24));
+        if (!\is_array($header)) {
+            return null;
+        }
+        $timecnt = (int) $header['time'];
+        if ($timecnt < 0) {
+            return null;
+        }
+        $offset = $pos + 44;
+        $timeSize = ($version >= '2') ? 8 : 4;
+        if ($offset + ($timecnt * $timeSize) > \strlen($data)) {
+            return null;
+        }
+        $times = [];
+        for ($i = 0; $i < $timecnt; ++$i) {
+            $times[] = 8 === $timeSize
+                ? self::readInt64BE($data, $offset + ($i * 8))
+                : self::readInt32BE($data, $offset + ($i * 4));
+        }
+
+        return $times;
+    }
+
+    private static function readInt32BE(string $data, int $off): int
+    {
+        $unpacked = \unpack('N', \substr($data, $off, 4));
+        if (!\is_array($unpacked)) {
+            return 0;
+        }
+        $u = (int) $unpacked[1];
+        if ($u > 0x7FFFFFFF) {
+            return $u - 0x100000000;
+        }
+
+        return $u;
+    }
+
+    private static function readInt64BE(string $data, int $off): int
+    {
+        $parts = \unpack('N2', \substr($data, $off, 8));
+        if (!\is_array($parts)) {
+            return 0;
+        }
+        $hi = (int) $parts[1];
+        $lo = (int) $parts[2];
+        if ($hi > 0x7FFFFFFF) {
+            $hi -= 0x100000000;
+        }
+
+        return (int) ($hi * 4294967296 + $lo);
+    }
+
     private static function transitionState(string $tzName, int $timestamp): array
     {
         $fixed = self::parseNumericTimezoneOffset($tzName);
