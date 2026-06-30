@@ -41,6 +41,31 @@ final class InternalStrictArg
         );
     }
 
+    public static function requireNullableInt(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        if (!$context->callerStrictTypes) {
+            return;
+        }
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NULL === $arg->type) {
+            return;
+        }
+        if (Variable::TYPE_VALUE === $arg->type) {
+            self::enforceNullableIntValueBox($context, $arg, $function, $paramName, $argNumber);
+
+            return;
+        }
+        JitNativeString::ensureInsertBlock($context);
+        self::raiseTypeErrorAndAbort(
+            $context,
+            self::message($context, $function, $argNumber, $paramName, '?int', $arg)
+        );
+    }
+
     /**
      * Builtin signature int — always reject non-int operands (php-src ZEND_ARG_INFO IS_LONG; #12215).
      */
@@ -424,6 +449,43 @@ final class InternalStrictArg
                 $argNumber,
                 $paramName,
                 $expectedLabel,
+                'mixed'
+            )
+        );
+        $context->builder->positionAtEnd($okBlock);
+    }
+
+    private static function enforceNullableIntValueBox(
+        Context $context,
+        Variable $arg,
+        string $function,
+        string $paramName,
+        int $argNumber
+    ): void {
+        TypeErrorRaise::registerDeclarations($context);
+        TypeErrorRaise::ensureLinked($context);
+        $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
+        $map = $context->structFieldMap['__value__'];
+        $typeByte = $context->builder->load(
+            $context->builder->structGep($valuePtr, $map['type'])
+        );
+        $i8 = $context->getTypeFromString('int8');
+        $nullTy = $i8->constInt(VmVariable::TYPE_NULL, false);
+        $intTy = $i8->constInt(VmVariable::TYPE_INTEGER, false);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $typeByte, $nullTy);
+        $isInt = $context->builder->icmp(Builder::INT_EQ, $typeByte, $intTy);
+        $ok = $context->builder->or($isNull, $isInt);
+        $okBlock = BasicBlockHelper::append($context, 'internal_strict_nullable_int_ok');
+        $failBlock = BasicBlockHelper::append($context, 'internal_strict_nullable_int_fail');
+        $context->builder->branchIf($ok, $okBlock, $failBlock);
+        $context->builder->positionAtEnd($failBlock);
+        ExceptionBridge::emitTypeErrorAndAbort(
+            $context,
+            sprintf(
+                '%s(): Argument #%d ($%s) must be of type ?int, %s given',
+                $function,
+                $argNumber,
+                $paramName,
                 'mixed'
             )
         );
