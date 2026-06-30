@@ -106,7 +106,7 @@ final class ScopeBuiltinHelper
             return $map;
         }
         foreach ($block->eachNamedScopeSlot() as [$name, $_slot]) {
-            if ('this' === $name || Superglobals::isSuperglobalName($name)) {
+            if ('this' === $name) {
                 continue;
             }
             $var = VarFetchHelper::bindingByName($context, $block, $name);
@@ -117,6 +117,26 @@ final class ScopeBuiltinHelper
                 continue;
             }
             $map[$name] = $var;
+        }
+
+        if ($block->isMainScript()) {
+            foreach (VmScope::FILE_SCOPE_DEFINED_VAR_AUTO_NAMES as $name) {
+                if (isset($map[$name])) {
+                    continue;
+                }
+                if (Superglobals::isSuperglobalName($name)) {
+                    try {
+                        $map[$name] = SuperglobalInit::load($context, $name);
+                    } catch (\LogicException) {
+                        continue;
+                    }
+                    continue;
+                }
+                $global = $context->ensureScriptGlobal($name);
+                if (0 === ($global->type & Variable::IS_NATIVE_ARRAY)) {
+                    $map[$name] = $global;
+                }
+            }
         }
 
         return $map;
