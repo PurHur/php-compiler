@@ -11595,6 +11595,17 @@ class Compiler {
             }
         }
         if (null !== $callIndex) {
+            $prev = $block->orig->children[$callIndex - 1] ?? null;
+            if ($prev instanceof Op\Expr\ArrayDimFetch) {
+                $positionalCallArg = $callOp->args[$argIndex] ?? $arg;
+                if (
+                    null !== $prev->result
+                    && null !== $positionalCallArg
+                    && $this->operandsReferToSameVariable($prev->result, $positionalCallArg)
+                ) {
+                    return null;
+                }
+            }
             for ($i = $callIndex - 1; $i >= 0; --$i) {
                 $child = $block->orig->children[$i];
                 if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
@@ -20912,15 +20923,47 @@ class Compiler {
             return null;
         }
         $fetch = $dimFetches[$dimIndex];
-        $slot = $block->slotForOperand($fetch->result);
+        $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $dimIndex);
+        if (null === $slot) {
+            $slot = $block->slotForOperand($fetch->result);
+        }
         if (null === $slot) {
             foreach ($this->compileExpr($fetch, $block) as $op) {
                 $block->addOpCode($op);
             }
-            $slot = $block->slotForOperand($fetch->result);
+            $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $dimIndex)
+                ?? $block->slotForOperand($fetch->result);
         }
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Operand slot map can lag TYPE_ARRAY_DIM_FETCH when php-cfg reuses result temps (#10401).
+     *
+     * @return int|null VM slot from the Nth dim-fetch opcode before the pending FUNCCALL_INIT
+     */
+    private function compiledArrayDimFetchResultSlotBeforePendingFuncCall(Block $block, int $dimIndex = 0): ?int
+    {
+        $dimFetchOpcodes = [];
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type || OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+            if (!\in_array($op->type, [OpCode::TYPE_ARRAY_DIM_FETCH, OpCode::TYPE_ARRAY_DIM_FETCH_WRITE], true)) {
+                if ([] !== $dimFetchOpcodes) {
+                    break;
+                }
+                continue;
+            }
+            array_unshift($dimFetchOpcodes, $op);
+        }
+        if (!isset($dimFetchOpcodes[$dimIndex])) {
+            return null;
+        }
+
+        return $dimFetchOpcodes[$dimIndex]->arg1;
     }
 
     /**
@@ -21841,7 +21884,15 @@ class Compiler {
                     ++$callOrdinal;
                 }
             }
-            $inlineArray = $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex);
+            $dimFetchSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                $arg,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            );
+            $inlineArray = null === $dimFetchSlot
+                ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
+                : null;
             $callArgOperand = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
             if (
                 null !== $inlineArray
@@ -21853,7 +21904,9 @@ class Compiler {
             }
             $prefetchOps = [];
             $assignedNamedLocal = null;
-            if (null !== $inlineArray) {
+            if (null !== $dimFetchSlot) {
+                $valueSlot = $dimFetchSlot;
+            } elseif (null !== $inlineArray) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);
                 if (null !== $existingArraySlot) {
                     $valueSlot = $existingArraySlot;
@@ -21865,7 +21918,15 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                    $arg,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null === $valueSlot) {
+                    $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
+                }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveChainedConcatCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
@@ -22976,6 +23037,15 @@ class Compiler {
                     }
                     break;
                 }
+            }
+            $dimFetchArgSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                $arg,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex
+            );
+            if (null !== $dimFetchArgSlot) {
+                $valueSlot = $dimFetchArgSlot;
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
