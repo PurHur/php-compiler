@@ -32,10 +32,8 @@ final class intval extends Internal
 {
     public function execute(Frame $frame): void
     {
+        $this->requireArgCountRange($frame, 'intval', 1, 2);
         $argc = \count($frame->calledArgs);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('intval() requires between 1 and 2 arguments');
-        }
         $base = 10;
         if (2 === $argc) {
             $base = self::parseBase($frame->calledArgs[1]->resolveIndirect());
@@ -105,8 +103,8 @@ final class intval extends Internal
     {
         $this->context = $context;
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('intval() requires between 1 and 2 arguments');
+        if (!$this->requireArgCountRangeJit($context, $args, 'intval', 1, 2)) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
         }
         $i64 = $context->getTypeFromString('int64');
         $baseVal = 2 === $argc
