@@ -33,6 +33,8 @@ final class VmFsTempnamPure
                 continue;
             }
             VmFs::fclose($handle);
+            // php-src main/php_open_temporary_file — private temp file mode 0600 (#14055).
+            VmFsDirPure::chmod($candidate, 0600);
 
             return $candidate;
         }
