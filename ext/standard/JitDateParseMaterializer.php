@@ -64,6 +64,26 @@ final class JitDateParseMaterializer
         self::setNestedMessages($context, $ht, 'warnings', $result['warnings']);
         self::setNestedMessages($context, $ht, 'errors', $result['errors']);
 
+        if (isset($result['relative']) && \is_array($result['relative'])) {
+            $relative = HashTableHelper::alloc($context);
+            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
+                $keyStr = $context->builder->load($context->constantStringFromString($relKey));
+                $context->builder->call(
+                    $context->lookupFunction('__hashtable__setStringKeyLong'),
+                    $relative,
+                    $keyStr,
+                    $i64->constInt((int) $result['relative'][$relKey], false)
+                );
+            }
+            $keyStr = $context->builder->load($context->constantStringFromString('relative'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyHashtable'),
+                $ht,
+                $keyStr,
+                $relative
+            );
+        }
+
         if (isset($result['zone_type'])) {
             $keyStr = $context->builder->load($context->constantStringFromString('zone_type'));
             $context->builder->call(

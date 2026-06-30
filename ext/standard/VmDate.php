@@ -563,6 +563,16 @@ final class VmDate
         $errorsVar->array($errors);
         $ht->add('errors', $errorsVar);
 
+        if (isset($result['relative']) && \is_array($result['relative'])) {
+            $relative = new HashTable();
+            foreach (['year', 'month', 'day', 'hour', 'minute', 'second', 'weekday'] as $relKey) {
+                self::hashSetLong($relative, $relKey, (int) $result['relative'][$relKey]);
+            }
+            $relativeVar = new Variable();
+            $relativeVar->array($relative);
+            $ht->add('relative', $relativeVar);
+        }
+
         return $ht;
     }
 
