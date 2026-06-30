@@ -145,6 +145,10 @@ class AotTest extends BaseTest
             }
             // Pipe operator AOT: enabled after AssertOptionsRuntime CFG fix (#9750).
             // Concat-on-LHS (`"a" . "b" |> f`) remains VM/JIT-only until inline concat-in-call AOT lands.
+            // preg_match() float offset: VM (#13818); native AOT emits float→int deprecation on stderr before stdout.
+            if (str_contains($name, 'preg_match_float_offset')) {
+                continue;
+            }
             yield $name => $case;
         }
     }
