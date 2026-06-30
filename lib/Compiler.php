@@ -7447,48 +7447,42 @@ class Compiler {
             return;
         }
         $endCfg = $endCompiled->orig;
-        $innerSlots = [];
-        foreach ($suppressCfg->children as $child) {
-            if (!$this->isErrorSuppressInnerExpr($child)) {
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($suppressCfg);
+        if (null === $primary || !isset($primary->result)) {
+            return;
+        }
+        $slot = $suppressCompiled->slotForOperand($primary->result);
+        if (null === $slot) {
+            $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
+        }
+        if (null === $slot) {
+            return;
+        }
+        $suppressResult = $primary->result;
+        $endCompiled->forceBindScopeSlot($suppressResult, $slot);
+        $root = Block::cfgVarRoot($suppressResult);
+        if (null !== $root) {
+            $endCompiled->prebindCfgVarRoot($root, $slot);
+        }
+        foreach ($suppressResult->usages as $usage) {
+            if (
+                !$usage instanceof Op\Expr\FuncCall
+                && !$usage instanceof Op\Expr\NsFuncCall
+                && !$usage instanceof Op\Expr\MethodCall
+                && !$usage instanceof Op\Expr\StaticCall
+                && !$usage instanceof Op\Expr\New_
+            ) {
                 continue;
             }
-            if (!isset($child->result)) {
-                continue;
-            }
-            $slot = $suppressCompiled->slotForOperand($child->result);
-            if (null === $slot) {
-                $slot = $this->findFuncCallExecReturnSlot($suppressCompiled);
-            }
-            if (null === $slot) {
-                continue;
-            }
-            $innerSlots[] = [$child->result, $slot];
-            $endCompiled->forceBindScopeSlot($child->result, $slot);
-            $root = Block::cfgVarRoot($child->result);
-            if (null !== $root) {
-                $endCompiled->prebindCfgVarRoot($root, $slot);
-            }
-            foreach ($child->result->usages as $usage) {
-                if (
-                    !$usage instanceof Op\Expr\FuncCall
-                    && !$usage instanceof Op\Expr\NsFuncCall
-                    && !$usage instanceof Op\Expr\MethodCall
-                    && !$usage instanceof Op\Expr\StaticCall
-                    && !$usage instanceof Op\Expr\New_
-                ) {
-                    continue;
-                }
-                if (property_exists($usage, 'args') && is_array($usage->args)) {
-                    foreach ($usage->args as $arg) {
-                        if ($arg instanceof Operand) {
-                            $endCompiled->forceBindScopeSlot($arg, $slot);
-                        }
+            if (property_exists($usage, 'args') && is_array($usage->args)) {
+                foreach ($usage->args as $arg) {
+                    if ($arg instanceof Operand) {
+                        $endCompiled->forceBindScopeSlot($arg, $slot);
                     }
                 }
             }
         }
-        if (1 === \count($innerSlots) && null !== $endCfg) {
-            [, $slot] = $innerSlots[0];
+        if (null !== $endCfg) {
             foreach ($endCfg->children as $endChild) {
                 if (
                     !$endChild instanceof Op\Expr\FuncCall
@@ -7514,15 +7508,26 @@ class Compiler {
                     $endCompiled->forceBindScopeSlot($arg, $slot);
                 }
             }
-        }
-        if (null === $endCfg) {
-            return;
-        }
-        foreach ($innerSlots as [$suppressResult, $slot]) {
             foreach ($endCfg->children as $endChild) {
                 $this->bindErrorSuppressResultOperandUsages($endChild, $endCompiled, $suppressResult, $slot);
             }
         }
+    }
+
+    /**
+     * Outermost `@` expression in php-cfg (last call/new/include before the jump).
+     * Nested arg-eval calls are hoisted as earlier siblings and must not steal the return slot (#9332).
+     */
+    private function findErrorSuppressPrimaryInnerExpr(ErrorSuppressBlock $block): ?Op
+    {
+        $primary = null;
+        foreach ($block->children as $child) {
+            if ($this->isErrorSuppressInnerExpr($child)) {
+                $primary = $child;
+            }
+        }
+
+        return $primary;
     }
 
     private function isErrorSuppressInnerExpr(Op $child): bool
@@ -7556,13 +7561,14 @@ class Compiler {
 
     private function findFuncCallExecReturnSlot(Block $block): ?int
     {
+        $last = null;
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
-                return (int) $op->arg1;
+                $last = (int) $op->arg1;
             }
         }
 
-        return null;
+        return $last;
     }
 
     private function bindErrorSuppressResultOperandUsages(
