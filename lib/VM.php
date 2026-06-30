@@ -3536,6 +3536,23 @@ restart:
                         if ($container->type !== Variable::TYPE_ARRAY) {
                             if (
                                 Variable::TYPE_OBJECT === $container->type
+                                && $this->objectImplementsArrayAccess($container->toObject())
+                            ) {
+                                if (!$forWrite) {
+                                    throw new \LogicException('[] is only supported for arrays');
+                                }
+                                $object = $container->toObject();
+                                $nullKey = new Variable(Variable::TYPE_NULL);
+                                $nullKey->null();
+                                $dim = new Variable();
+                                $dim->arrayAccessDimension(
+                                    new VM\ArrayAccessDimension($this, $object, $nullKey, $frame)
+                                );
+                                $arg1->indirect($dim);
+                                break;
+                            }
+                            if (
+                                Variable::TYPE_OBJECT === $container->type
                                 && !$this->objectImplementsArrayAccess($container->toObject())
                             ) {
                                 $className = $container->toObject()->class->name;

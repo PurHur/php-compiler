@@ -267,6 +267,11 @@ final class SplArrayStorage
 
     public static function offsetSet(ObjectEntry $object, Variable $offset, Variable $value): void
     {
+        if (Variable::TYPE_NULL === $offset->resolveIndirect()->type) {
+            self::append($object, $value);
+
+            return;
+        }
         $table = self::state($object)['table'];
         $resolved = $value->resolveIndirect();
         [$keyVar, $isInt] = self::offsetKeyVar($offset);
