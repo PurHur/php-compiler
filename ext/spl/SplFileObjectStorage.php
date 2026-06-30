@@ -137,7 +137,7 @@ final class SplFileObjectStorage
     /** @return string|false */
     public static function getCurrentLine(ObjectEntry $object)
     {
-        return self::current($object);
+        return self::fgets($object);
     }
 
     /**
@@ -182,24 +182,20 @@ final class SplFileObjectStorage
     public static function fgets(ObjectEntry $object, ?int $length = null)
     {
         $state = &self::$state[$object->id];
-        if (null !== $state['currentLine']) {
-            $line = $state['currentLine'];
-            self::freeLine($state);
-            ++$state['lineNum'];
-
-            return $line;
+        $lineAdd = null !== $state['currentLine'] ? 1 : 0;
+        self::freeLine($state);
+        if (VmFs::feof($state['handle'])) {
+            return '';
         }
-        if (!self::readLineEx($object, true, 1, $length)) {
+        if (!self::readLineEx($object, true, $lineAdd, $length)) {
             if (VmFs::feof($state['handle'])) {
                 return '';
             }
 
             return false;
         }
-        $line = $state['currentLine'];
-        self::freeLine($state);
 
-        return $line ?? false;
+        return $state['currentLine'] ?? false;
     }
 
     private static function readLineForIterator(ObjectEntry $object, bool $silent): bool
