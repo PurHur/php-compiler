@@ -1943,6 +1943,9 @@ class VM {
      */
     public function collectPublicPropertiesForSerialize(ObjectEntry $object, Frame $frame): array
     {
+        if (SplArrayStorage::hasState($object)) {
+            return SplArrayStorage::collectJsonEncodeProperties($object);
+        }
         $ctx = $this->context;
         $hookFrame = $this->resolvePropertyHookParentFrame($frame);
         /** @var array<string, Variable> $result */
