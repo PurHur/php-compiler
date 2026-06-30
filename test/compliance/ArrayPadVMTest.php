@@ -25,6 +25,14 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_negative_length.phpt',
             'array_pad_negative_length.phpt'
         );
+        yield 'array_pad_float_length_strict.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_float_length_strict.phpt',
+            'array_pad_float_length_strict.phpt'
+        );
+        yield 'array_pad_float_length_coerce.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_float_length_coerce.phpt',
+            'array_pad_float_length_coerce.phpt'
+        );
     }
 
     public function setUp(): void
