@@ -455,6 +455,10 @@ final class VmPregEngine
                 $this->advance(1);
 
                 return new VmPregAstEmptyNode();
+            } elseif ('|' === $flag) {
+                $this->advance(1);
+
+                return $this->parseBranchResetAlternation();
             } elseif ('P' === $flag || '<' === $flag) {
                 $this->advance(1);
                 if ('P' === $flag) {
@@ -494,6 +498,28 @@ final class VmPregEngine
         }
 
         return new VmPregAstGroupNode($inner, $index);
+    }
+
+    /** PCRE branch-reset `(?|…)` — duplicate named groups per alternative (PHP 7.3+, ext/pcre/php_pcre.c). */
+    private function parseBranchResetAlternation(): VmPregAstNode
+    {
+        $baseGroup = $this->nextGroup;
+        $branches = [];
+        while (true) {
+            $this->nextGroup = $baseGroup;
+            $branches[] = $this->parseConcatenation();
+            if ('|' === $this->peek()) {
+                $this->advance(1);
+                continue;
+            }
+            break;
+        }
+        if (')' !== $this->peek()) {
+            throw new VmPregCompileException();
+        }
+        $this->advance(1);
+
+        return new VmPregAstBranchResetAltNode($branches);
     }
 
     private function isInlineModifierStart(string $ch): bool
@@ -1209,6 +1235,34 @@ final class VmPregAstConcatNode implements VmPregAstNode
 }
 
 final class VmPregAstAltNode implements VmPregAstNode
+{
+    /** @param list<VmPregAstNode> $branches */
+    public function __construct(private readonly array $branches)
+    {
+    }
+
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        foreach ($this->branches as $branch) {
+            $sub = $captures;
+            if ($engine->matchNode($branch, $subject, $pos, $len, $sub)) {
+                $captures = $sub;
+
+                return true;
+            }
+        }
+
+        return false;
+    }
+}
+
+/** `(?|alt|alt)` — each alternative reuses capture numbering from the same base (#14091). */
+final class VmPregAstBranchResetAltNode implements VmPregAstNode
 {
     /** @param list<VmPregAstNode> $branches */
     public function __construct(private readonly array $branches)
