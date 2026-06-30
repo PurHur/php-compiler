@@ -32,6 +32,8 @@ final class SplObjectStorageBuiltin
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
+            self::attachDeclaredInterfaces($ctx, $ctx->classes[self::CLASS_LC]);
+
             return;
         }
 
@@ -39,12 +41,7 @@ final class SplObjectStorageBuiltin
         $entry = isset($ctx->classes[self::CLASS_LC])
             ? $ctx->classes[self::CLASS_LC]
             : new ClassEntry('SplObjectStorage');
-        foreach (['Countable', 'Iterator', 'Traversable', 'Serializable', 'ArrayAccess'] as $iface) {
-            if (isset($ctx->classes[strtolower($iface)])
-                && !\in_array($iface, $entry->interfaces, true)) {
-                $entry->interfaces[] = $iface;
-            }
-        }
+        self::attachDeclaredInterfaces($ctx, $entry);
 
         $entry->constructor = new SplObjectStorageConstruct();
         $entry->methods['__construct'] = $entry->constructor;
@@ -94,6 +91,25 @@ final class SplObjectStorageBuiltin
             $entry->methods['rewind'],
             $entry->methods['getinfo']
         );
+    }
+
+    /** php-src ext/spl/spl_observer.c — lowercase ctx keys for class_implements() (#14033). */
+    private static function attachDeclaredInterfaces(Context $ctx, ClassEntry $entry): void
+    {
+        $want = ['countable', 'iterator', 'traversable', 'serializable', 'arrayaccess'];
+        $normalized = [];
+        foreach ($entry->interfaces as $iface) {
+            $lc = strtolower($iface);
+            if (\in_array($lc, $want, true) && isset($ctx->classes[$lc])) {
+                $normalized[$lc] = $lc;
+            }
+        }
+        foreach ($want as $iface) {
+            if (isset($ctx->classes[$iface])) {
+                $normalized[$iface] = $iface;
+            }
+        }
+        $entry->interfaces = array_values($normalized);
     }
 
     public static function init(ObjectEntry $object): void
