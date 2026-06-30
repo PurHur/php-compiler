@@ -15318,7 +15318,10 @@ restart:
             if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
                 continue;
             }
-            if ($frame->block->scopeSlotReadInJumpTargets($slot)) {
+            if (
+                $frame->block->scopeSlotReadInJumpTargets($slot)
+                || $frame->block->scopeSlotReadInDirectJumpTargets($slot)
+            ) {
                 continue;
             }
             // Large inline array literals materialize after ternary JUMPIFs in the same block (#14134).
