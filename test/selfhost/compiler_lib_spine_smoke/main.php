@@ -57,6 +57,7 @@ require_once __DIR__.'/../../../ext/bcmath/bcround.php';
 require_once __DIR__.'/../../../ext/bcmath/bcscale.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsqrt.php';
 require_once __DIR__.'/../../../ext/bcmath/bcsub.php';
+require_once __DIR__.'/../../../ext/bz2/Bz2ExtensionPolicy.php';
 require_once __DIR__.'/../../../ext/bz2/Bz2JitHelper.php';
 require_once __DIR__.'/../../../ext/bz2/JitBz2.php';
 require_once __DIR__.'/../../../ext/bz2/Module.php';

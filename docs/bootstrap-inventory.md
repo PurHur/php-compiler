@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3540 |
-| Phase A inventory files (M2 ratio SSOT) | 3540 |
+| PHP files on vm.php path | 3541 |
+| Phase A inventory files (M2 ratio SSOT) | 3541 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9640 |
+| Source constructs flagged (warnings) | 9643 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -55,6 +55,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/bcmath/bcscale.php` | 0 | 1 |
 | `ext/bcmath/bcsqrt.php` | 0 | 1 |
 | `ext/bcmath/bcsub.php` | 0 | 1 |
+| `ext/bz2/Bz2ExtensionPolicy.php` | 0 | 1 |
 | `ext/bz2/Bz2JitHelper.php` | 0 | 1 |
 | `ext/bz2/JitBz2.php` | 0 | 1 |
 | `ext/bz2/Module.php` | 0 | 3 |
@@ -2049,7 +2050,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/stream_filter_remove.php` | 0 | 2 |
 | `ext/standard/stream_get_contents.php` | 0 | 1 |
 | `ext/standard/stream_get_filters.php` | 0 | 2 |
-| `ext/standard/stream_get_line.php` | 0 | 1 |
+| `ext/standard/stream_get_line.php` | 0 | 3 |
 | `ext/standard/stream_get_meta_data.php` | 0 | 1 |
 | `ext/standard/stream_get_transports.php` | 0 | 2 |
 | `ext/standard/stream_get_wrappers.php` | 0 | 2 |
@@ -3669,6 +3670,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/bz2/Bz2ExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/bz2/Bz2JitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -3682,8 +3688,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/bz2/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new bzcompress (line 43)
-- new bzdecompress (line 44)
+- new bzcompress (line 42)
+- new bzdecompress (line 43)
 - 3 class method(s)
 
 ### `ext/bz2/VmBz2Core.php`
@@ -12559,10 +12565,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 28)
-- new Variable (line 83)
-- new Error (line 222)
-- new ObjectEntry (line 259)
-- 12 class method(s)
+- new Variable (line 96)
+- new Error (line 348)
+- new ObjectEntry (line 385)
+- 17 class method(s)
 
 ### `ext/standard/VmShellExecNative.php`
 
@@ -16710,6 +16716,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stream_get_line.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 35)
 - 2 class method(s)
 
 ### `ext/standard/stream_get_meta_data.php`
