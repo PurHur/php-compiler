@@ -73,7 +73,7 @@ final class VmVarExport
             return VmVarExportFloat::format($v->toFloat());
         }
         if (Variable::TYPE_STRING === $v->type) {
-            return "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $v->toString())."'";
+            return self::formatExportString($v->toString());
         }
         if (Variable::TYPE_ARRAY === $v->type) {
             $ht = $v->toArray();
@@ -180,16 +180,24 @@ final class VmVarExport
     }
 
     /**
-     * php-src var.c php_array_element_export — addcslashes then NUL → concatenation form.
+     * php-src var.c php_addcslashes — embedded NUL becomes concatenation form.
      */
-    private static function formatExportStringKey(string $key): string
+    private static function formatExportString(string $str): string
     {
-        $escaped = str_replace(["\\", "'"], ["\\\\", "\\'"], $key);
+        $escaped = str_replace(["\\", "'"], ["\\\\", "\\'"], $str);
         if (str_contains($escaped, "\0")) {
             $escaped = str_replace("\0", "' . \"\\0\" . '", $escaped);
         }
 
         return "'".$escaped."'";
+    }
+
+    /**
+     * php-src var.c php_array_element_export — addcslashes then NUL → concatenation form.
+     */
+    private static function formatExportStringKey(string $key): string
+    {
+        return self::formatExportString($key);
     }
 
     private static function warnCircular(?Frame $frame, bool &$warned): void
