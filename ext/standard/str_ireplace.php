@@ -20,7 +20,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** str_ireplace() — case-insensitive str_replace for strings (VM + JIT/AOT; libc strcasestr in JIT). */
+/** str_ireplace() — case-insensitive str_replace for strings (VM + JIT/AOT via JitStringSearch). */
 final class str_ireplace extends Internal
 {
     public function __construct()
