@@ -12441,6 +12441,7 @@ class Compiler {
                 && null !== $prev->result
                 && (
                     $prev instanceof Op\Expr\In_
+                    || $this->isComparisonInlineCallArgProducer($prev)
                     || (
                         null !== $argRoot->type
                         && null !== $prev->result->type
@@ -13909,12 +13910,7 @@ class Compiler {
                 if ($prefixEnd > 0) {
                     $prefixLast = $producers[$prefixEnd - 1] ?? null;
                     if (
-                        $prefixLast instanceof Op\Expr\BinaryOp\Identical
-                        || $prefixLast instanceof Op\Expr\BinaryOp\NotIdentical
-                        || $prefixLast instanceof Op\Expr\BinaryOp\Equal
-                        || $prefixLast instanceof Op\Expr\BinaryOp\NotEqual
-                        || $prefixLast instanceof Op\Expr\InstanceOf_
-                        || $prefixLast instanceof Op\Expr\In_
+                        $this->isComparisonInlineCallArgProducer($prefixLast)
                         // var_export([...] + [...], true) — Plus prelude before trailing literal (#11511, #10490).
                         || $prefixLast instanceof Op\Expr\BinaryOp\Plus
                         || $prefixLast instanceof Op\Expr\BinaryOp\Concat
@@ -15297,14 +15293,7 @@ class Compiler {
     private function matchBooleanBinaryOpInlineCallArgProducer(array $producers, Operand $callArg): ?Op\Expr
     {
         foreach (array_reverse($producers) as $producer) {
-            if (
-                $producer instanceof Op\Expr\BinaryOp\Identical
-                || $producer instanceof Op\Expr\BinaryOp\NotIdentical
-                || $producer instanceof Op\Expr\BinaryOp\Equal
-                || $producer instanceof Op\Expr\BinaryOp\NotEqual
-                || $producer instanceof Op\Expr\InstanceOf_
-                || $producer instanceof Op\Expr\In_
-            ) {
+            if ($this->isComparisonInlineCallArgProducer($producer)) {
                 if ($this->operandsReferToSameVariable($producer->result, $callArg)) {
                     return $producer;
                 }
@@ -15321,13 +15310,18 @@ class Compiler {
         return null;
     }
 
-    /** Hoisted Identical/NotIdentical/… feeds a call arg, not an inner FuncCall operand (#13694, #5901). */
+    /** Hoisted compare/spaceship/relational Expr feeds a call arg, not an inner operand (#13694, #13945). */
     private function isComparisonInlineCallArgProducer(?Op\Expr $expr): bool
     {
         return $expr instanceof Op\Expr\BinaryOp\Identical
             || $expr instanceof Op\Expr\BinaryOp\NotIdentical
             || $expr instanceof Op\Expr\BinaryOp\Equal
             || $expr instanceof Op\Expr\BinaryOp\NotEqual
+            || $expr instanceof Op\Expr\BinaryOp\Spaceship
+            || $expr instanceof Op\Expr\BinaryOp\Smaller
+            || $expr instanceof Op\Expr\BinaryOp\Greater
+            || $expr instanceof Op\Expr\BinaryOp\SmallerOrEqual
+            || $expr instanceof Op\Expr\BinaryOp\GreaterOrEqual
             || $expr instanceof Op\Expr\InstanceOf_
             || $expr instanceof Op\Expr\In_;
     }

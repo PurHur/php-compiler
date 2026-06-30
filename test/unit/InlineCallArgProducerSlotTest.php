@@ -1435,6 +1435,33 @@ PHP;
         self::assertSame($spaceshipSlot, $varDumpSend, 'var_dump arg send='.$varDumpSend);
     }
 
+    /** Issue #13945 — hoisted null operand before spaceship must not bind ConstFetch slot to var_dump arg. */
+    public function testVarDumpNullSpaceshipSendsSpaceshipResultSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(null <=> 1);
+var_dump(null < 1);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'null_spaceship_var_dump.php');
+
+        $compareSlots = [];
+        $argSends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_SPACESHIP === $op->type || OpCode::TYPE_SMALLER === $op->type) {
+                $compareSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $argSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $compareSlots, 'spaceship + relational compare must lower');
+        self::assertCount(2, $argSends, 'two var_dump arg sends expected');
+        self::assertSame($compareSlots, $argSends, 'inline compare results must feed var_dump args');
+    }
+
     /** Issue #9660 — var_export(enum === scalar, true) wires Identical producer, not hoisted true literal. */
     public function testVarExportEnumIdenticalScalarUsesIdenticalProducerSlot(): void
     {
