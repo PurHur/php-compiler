@@ -34,7 +34,8 @@ final class JitTokenName
                 if (null !== $name) {
                     return $name;
                 }
-                throw new \Error('token_name(): Unknown token ID '.$id.' in this compiler build');
+
+                return 'UNKNOWN';
             }
         }
 

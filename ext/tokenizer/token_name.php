@@ -31,13 +31,7 @@ final class token_name extends Internal
         $type = $frame->calledArgs[0]->toInt();
 
         $name = TokenConstants::nameForId($type);
-        if (null !== $name) {
-            $frame->returnVar->string($name);
-
-            return;
-        }
-
-        throw new \Error('token_name(): Unknown token ID '.$type.' in this compiler build');
+        $frame->returnVar->string(null !== $name ? $name : 'UNKNOWN');
     }
 
     public function call(Context $context, JITVariable ...$args): Value
