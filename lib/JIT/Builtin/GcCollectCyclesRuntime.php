@@ -876,6 +876,12 @@ final class GcCollectCyclesRuntime
 
     private static function implementCollectCyclesImpl(Context $context): void
     {
+        if (self::usesPhpRegistry($context)) {
+            self::implementCollectCyclesPhpBridge($context);
+
+            return;
+        }
+
         $fn = $context->lookupFunction('phpc_gc_collect_cycles_impl');
         if ($fn->countBasicBlocks() > 0) {
             return;
@@ -1514,5 +1520,34 @@ final class GcCollectCyclesRuntime
         $idx = $context->builder->call(self::registryHelperFunction($context, self::REG_INDEX_OF), $objI64);
         $context->builder->returnValue($context->builder->trunc($idx, $i32));
         $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementCollectCyclesPhpBridge(Context $context): void
+    {
+        $fn = $context->lookupFunction('phpc_gc_collect_cycles_impl');
+        if ($fn->countBasicBlocks() > 0) {
+            return;
+        }
+
+        GcCollectCyclesCollectRuntime::ensureCollectHelperCompiled($context);
+        $collectEmbed = self::collectEmbedHelperFunction($context);
+        $i32 = $context->getTypeFromString('int32');
+        $entry = $fn->appendBasicBlock('collect_impl_php_entry');
+        $context->builder->positionAtEnd($entry);
+        $collected = $context->builder->call($collectEmbed);
+        $context->builder->returnValue($collected);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function collectEmbedHelperFunction(Context $context): LlvmFunction
+    {
+        $logical = 'PHPCompiler\\ext\\standard\\GcCollectCyclesJitHelper::collectCyclesEmbed';
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after GcCollectCyclesJitHelper compile (#13882)');
+        }
+
+        return $fn;
     }
 }
