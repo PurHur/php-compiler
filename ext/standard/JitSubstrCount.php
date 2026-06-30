@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT helper for substr_count() — inline strstr loop for MCJIT and AOT.
+ * LLVM JIT helper for substr_count() — binary-safe search via JitStringSearch (#14069).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -44,10 +44,9 @@ final class JitSubstrCount
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
-        $hayPtr = $context->builder->structGep($haystack, $map['value']);
-        $needlePtr = $context->builder->structGep($needle, $map['value']);
-
         [$startOffset, $end] = self::normalizeWindow($context, $hayLen, $offset, $length);
+
+        JitStringSearch::ensureLinked($context);
 
         $limit = $context->builder->sub($end, $needleLen);
         $pastStart = $context->builder->icmp(Builder::INT_SLT, $limit, $startOffset);
@@ -73,23 +72,20 @@ final class JitSubstrCount
         $context->builder->branchIf($pastLimit, $loopDone, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $searchPtr = $context->builder->inBoundsGEP($hayPtr, $pos);
-        $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $searchPtr,
-            $needlePtr
+        $i32 = $context->getTypeFromString('int32');
+        $found = JitStringSearch::findOffsetI32($context, $haystack, $needle, $pos);
+        $notFound = $context->builder->icmp(
+            Builder::INT_EQ,
+            $found,
+            $i32->constInt(JitStringSearch::NOT_FOUND, true)
         );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
 
         $missBlock = BasicBlockHelper::append($context, 'substr_count_miss_'.$id);
         $hitBlock = BasicBlockHelper::append($context, 'substr_count_hit_'.$id);
-        $context->builder->branchIf($isNull, $missBlock, $hitBlock);
+        $context->builder->branchIf($notFound, $missBlock, $hitBlock);
 
         $context->builder->positionAtEnd($hitBlock);
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $foundPos = $context->builder->sub($foundInt, $baseInt);
+        $foundPos = $context->builder->zExt($found, $i64);
         $beyondLimit = $context->builder->icmp(Builder::INT_SGT, $foundPos, $limit);
         $stopBlock = BasicBlockHelper::append($context, 'substr_count_stop_'.$id);
         $advanceBlock = BasicBlockHelper::append($context, 'substr_count_advance_'.$id);
