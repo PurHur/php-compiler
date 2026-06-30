@@ -97,6 +97,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstant;
 use PHPCompiler\VM\Builtin\ReflectionClassGetReflectionConstants;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionClassGetEndLine;
+use PHPCompiler\VM\Builtin\ReflectionClassGetExtension;
 use PHPCompiler\VM\Builtin\ReflectionClassGetExtensionName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetFileName;
 use PHPCompiler\VM\Builtin\ReflectionClassGetDeprecatedMessage;
@@ -135,6 +136,8 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
+use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
+use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
 use PHPCompiler\VM\Builtin\ReflectionFunctionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionFunctionCreateFromCallable;
@@ -460,6 +463,15 @@ final class BuiltinClasses
         $attr->methodVisibility['newinstance'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ATTRIBUTE] = $attr;
 
+        $rext = new ClassEntry('ReflectionExtension');
+        $rext->properties[] = new ClassProperty(ReflectionSupport::PROP_EXTENSION_NAME, null, $strProto);
+        $rext->constructor = new ReflectionExtensionConstruct();
+        $rext->methods['__construct'] = $rext->constructor;
+        $rext->methodVisibility['__construct'] = $pub;
+        $rext->methods['getname'] = new ReflectionExtensionGetName();
+        $rext->methodVisibility['getname'] = $pub;
+        $ctx->classes[ReflectionSupport::REFLECTION_EXTENSION] = $rext;
+
         $rparam = new ClassEntry('ReflectionParameter');
         $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rparam->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
@@ -645,6 +657,7 @@ final class BuiltinClasses
                 'getfilename' => new ReflectionClassGetFileName(),
                 'isuserdefined' => new ReflectionClassIsUserDefined(),
                 'getextensionname' => new ReflectionClassGetExtensionName(),
+                'getextension' => new ReflectionClassGetExtension(),
             ] as $name => $method
         ) {
             $rc->methods[$name] = $method;

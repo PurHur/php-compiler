@@ -41,6 +41,8 @@ final class ReflectionSupport
 
     public const REFLECTION_ATTRIBUTE = 'reflectionattribute';
 
+    public const REFLECTION_EXTENSION = 'reflectionextension';
+
     /** php-src REFLECTION_ATTRIBUTE_IS_INSTANCEOF — getAttributes() filter flag (#11471). */
     public const REFLECTION_ATTRIBUTE_IS_INSTANCEOF = 2;
 
@@ -82,6 +84,8 @@ final class ReflectionSupport
 
     /** Whether this attribute name is duplicated on the target (#6912). */
     public const PROP_ATTR_IS_REPEATED = 'isRepeated';
+
+    public const PROP_EXTENSION_NAME = 'extension';
 
     public const PROP_ENUM_CASE_NAME = 'case';
 
@@ -537,6 +541,20 @@ final class ReflectionSupport
         $obj = $receiver->toObject();
         if (strtolower($obj->class->name) !== self::REFLECTION_ATTRIBUTE) {
             throw new \LogicException('Expected ReflectionAttribute instance');
+        }
+
+        return $obj;
+    }
+
+    public static function requireReflectionExtension(Frame $frame, Variable $receiver): ObjectEntry
+    {
+        $receiver = $receiver->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $receiver->type) {
+            throw new \LogicException('ReflectionExtension method called without object');
+        }
+        $obj = $receiver->toObject();
+        if (strtolower($obj->class->name) !== self::REFLECTION_EXTENSION) {
+            throw new \LogicException('Expected ReflectionExtension instance');
         }
 
         return $obj;
@@ -1432,6 +1450,32 @@ final class ReflectionSupport
             return;
         }
         $returnVar->string('Core');
+    }
+
+    public static function returnExtension(?Variable $returnVar, ClassEntry $entry, Context $ctx): void
+    {
+        if (null === $returnVar) {
+            return;
+        }
+        if (!$entry->isInternal) {
+            $returnVar->null();
+
+            return;
+        }
+        $returnVar->object(self::newReflectionExtensionObject($ctx, 'Core'));
+    }
+
+    public static function newReflectionExtensionObject(Context $ctx, string $name): ObjectEntry
+    {
+        $class = $ctx->classes[self::REFLECTION_EXTENSION] ?? null;
+        if (null === $class) {
+            throw new \LogicException('ReflectionExtension is not registered in this compiler build');
+        }
+        $obj = new ObjectEntry($class);
+        $obj->getProperty(self::PROP_EXTENSION_NAME)->string($name);
+        $obj->constructed = true;
+
+        return $obj;
     }
 
     public static function newReflectionFunctionObject(Context $ctx): ObjectEntry
