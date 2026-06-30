@@ -14,8 +14,8 @@ use PHPCompiler\VM;
  * libcurl HTTP client parity tracked in #3325; curl_multi in #3721.
  * Register under {@see standard} so extension_loaded('curl') stays false until #3325 (#11627).
  * {@see CurlExtensionPolicy} withholds Curl* handle CEs from class_exists() until then (#12117).
- * Builtin stubs ({@see CurlFunction}) are withheld until #3325 so function_exists()
- * agrees with extension_loaded() for unimplemented entrypoints (#11654).
+ * curl_escape/curl_unescape are withheld until #3325 so function_exists() agrees
+ * with extension_loaded('curl') (#13588). Other CurlFunction stubs stay withheld (#11654).
  */
 class Module extends ModuleAbstract
 {
@@ -42,6 +42,10 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
+        if (!CurlExtensionPolicy::advertisesBuiltins()) {
+            return [];
+        }
+
         return [
             new curl_escape(),
             new curl_unescape(),

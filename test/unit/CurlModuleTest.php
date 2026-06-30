@@ -20,7 +20,7 @@ final class CurlModuleTest extends TestCase
         $ctx = $runtime->vmContext;
 
         foreach (['curl_escape', 'curl_unescape'] as $fn) {
-            self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
+            self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
         }
         foreach (['curl_init', 'curl_setopt', 'curl_exec', 'curl_close', 'curl_version'] as $fn) {
             self::assertFalse(VmReflection::functionExists($ctx, $fn), $fn);
@@ -44,7 +44,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'curl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('000001111100020', ob_get_clean());
+        self::assertSame('000000011100020', ob_get_clean());
     }
 
     public function test_curl_init_stub_class_throws_logic_exception(): void
