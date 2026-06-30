@@ -1601,28 +1601,28 @@ final class VmFs
 
     public static function fgets(int $handle, ?int $length = null) {
         if (VmPhpMemoryStream::isValidHandle($handle)) {
-            return VmPhpMemoryStream::fgets($handle, $length);
-        }
-        if (VmPhpFdStream::isValidHandle($handle)) {
-            return VmPhpFdStream::fgets($handle, $length);
-        }
-        $fp = self::lookup($handle);
-        if (null === $fp) {
-            return false;
-        }
-        if (null === $length) {
-            $line = @\fgets($fp);
+            $line = VmPhpMemoryStream::fgets($handle, $length);
+        } elseif (VmPhpFdStream::isValidHandle($handle)) {
+            $line = VmPhpFdStream::fgets($handle, $length);
         } else {
-            if ($length <= 0) {
+            $fp = self::lookup($handle);
+            if (null === $fp) {
                 return false;
             }
-            $line = @\fgets($fp, $length);
+            if (null === $length) {
+                $line = @\fgets($fp);
+            } else {
+                if ($length <= 0) {
+                    return false;
+                }
+                $line = @\fgets($fp, $length);
+            }
         }
         if (false === $line) {
             return false;
         }
 
-        return $line;
+        return VmStreamFilterChain::applyReadFilters($handle, $line);
     }
 
     /**
