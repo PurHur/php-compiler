@@ -71,14 +71,22 @@ final class JitExecutionLimits
                 $apply = $zero;
             } else {
                 $apply = $one;
-                $boolVal = JitBoolArg::lowerBuiltinTyped(
-                    $context,
-                    $arg,
-                    'ignore_user_abort',
-                    'enable',
-                    1,
-                    '?bool'
-                );
+                if ($context->callerStrictTypes) {
+                    $boolVal = JitBoolArg::lowerBuiltinTyped(
+                        $context,
+                        $arg,
+                        'ignore_user_abort',
+                        'enable',
+                        1,
+                        '?bool'
+                    );
+                } else {
+                    $boolVal = JitBoolArg::lower(
+                        $context,
+                        $arg,
+                        'ignore_user_abort(): Argument #1 ($enable)'
+                    );
+                }
                 $value = $context->builder->zext($boolVal, $i32);
             }
         }

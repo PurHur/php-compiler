@@ -87,6 +87,29 @@ final class InternalStrictArg
         throw new \TypeError(self::message($function, $argIndex, $paramName, '?bool', $var));
     }
 
+    /**
+     * Builtin ?bool with php-src int 0/1 coercion (ext/standard/basic_functions.c; #14174).
+     */
+    public static function parseBuiltinNullableBoolArgCoerceInt(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): ?bool {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $var->type) {
+            return null;
+        }
+        if (Variable::TYPE_BOOLEAN === $var->type) {
+            return $var->toBool();
+        }
+        if (Variable::TYPE_INTEGER === $var->type) {
+            return 0 !== $var->toInt();
+        }
+
+        throw new \TypeError(self::message($function, $argIndex, $paramName, '?bool', $var));
+    }
+
     public static function requireBool(Frame $frame, int $argIndex, string $function, string $paramName): Variable
     {
         $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
