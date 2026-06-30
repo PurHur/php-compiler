@@ -13,6 +13,7 @@ final class CurlExtensionPolicyTest extends TestCase
     public function testCurlHandleClassesWithheldUntilCurlLoaded(): void
     {
         self::assertFalse(CurlExtensionPolicy::advertisesHandleClasses());
+        self::assertFalse(CurlExtensionPolicy::advertisesBuiltins());
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
