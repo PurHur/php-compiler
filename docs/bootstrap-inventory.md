@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3518 |
-| Phase A inventory files (M2 ratio SSOT) | 3518 |
+| PHP files on vm.php path | 3519 |
+| Phase A inventory files (M2 ratio SSOT) | 3519 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9529 |
+| Source constructs flagged (warnings) | 9536 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -359,7 +359,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
 | `ext/spl/IteratorIteratorBuiltin.php` | 0 | 13 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
-| `ext/spl/LimitIteratorBuiltin.php` | 0 | 6 |
+| `ext/spl/LimitIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/Module.php` | 0 | 2 |
 | `ext/spl/MultipleIteratorBuiltin.php` | 0 | 11 |
 | `ext/spl/ParentIteratorBuiltin.php` | 0 | 5 |
@@ -1143,7 +1143,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmDirArg.php` | 0 | 1 |
 | `ext/standard/VmDirNative.php` | 0 | 1 |
 | `ext/standard/VmDirPure.php` | 0 | 1 |
-| `ext/standard/VmDns.php` | 0 | 10 |
+| `ext/standard/VmDns.php` | 0 | 11 |
 | `ext/standard/VmDnsMx.php` | 0 | 8 |
 | `ext/standard/VmDnsUdpNative.php` | 0 | 1 |
 | `ext/standard/VmDnsUdpPure.php` | 0 | 1 |
@@ -2304,6 +2304,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/DnfType.php` | 0 | 2 |
 | `lib/Doctor.php` | 0 | 1 |
 | `lib/EnumCaseListRewriter.php` | 0 | 1 |
+| `lib/ExitFunctionSyntaxRejector.php` | 0 | 2 |
 | `lib/Frame.php` | 0 | 1 |
 | `lib/Func.php` | 0 | 1 |
 | `lib/Func/Internal.php` | 0 | 7 |
@@ -5804,9 +5805,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new OutOfBoundsException (line 222)
 - new UnexpectedValueException (line 352)
 - new UnexpectedValueException (line 552)
-- new ArgumentCountError (line 608)
-- new ArgumentCountError (line 640)
-- 58 class method(s)
+- new ArgumentCountError (line 614)
+- new ArgumentCountError (line 646)
+- 59 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -5820,10 +5821,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 33)
 - new LimitIteratorConstruct (line 42)
-- new Variable (line 123)
-- new Variable (line 135)
-- new ArgumentCountError (line 186)
-- 19 class method(s)
+- new Variable (line 124)
+- new Variable (line 136)
+- new OutOfBoundsException (line 164)
+- new OutOfBoundsException (line 170)
+- new Variable (line 183)
+- new ArgumentCountError (line 258)
+- new ArgumentCountError (line 426)
+- 24 class method(s)
 
 ### `ext/spl/Module.php`
 
@@ -11164,12 +11169,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new HashTable (line 128)
 - new Variable (line 130)
-- new HashTable (line 363)
+- new HashTable (line 340)
 - new HashTable (line 366)
-- new Variable (line 368)
-- new HashTable (line 533)
-- new Variable (line 550)
-- new Variable (line 557)
+- new HashTable (line 369)
+- new Variable (line 371)
+- new HashTable (line 536)
+- new Variable (line 553)
+- new Variable (line 560)
 - 41 class method(s)
 - 2 closure(s)
 
@@ -11547,11 +11553,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmHash.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 103)
-- new Variable (line 105)
-- new HashTable (line 116)
-- new Variable (line 118)
-- 8 class method(s)
+- new HashTable (line 130)
+- new Variable (line 132)
+- new HashTable (line 143)
+- new Variable (line 145)
+- 9 class method(s)
 
 ### `ext/standard/VmHashFile.php`
 
@@ -13960,7 +13966,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/dns_get_record.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 88)
+- new Variable (line 93)
 - 3 class method(s)
 
 ### `ext/standard/doubleval.php`
@@ -14835,8 +14841,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 22)
 - new ArgumentCountError (line 28)
+- new ArgumentCountError (line 50)
 - new ArgumentCountError (line 56)
-- new ArgumentCountError (line 62)
 - 2 class method(s)
 
 ### `ext/standard/hash_hmac_algos.php`
@@ -17687,10 +17693,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new CompileError (line 207)
 - new CompileError (line 217)
 - new CompileError (line 266)
-- new CompileError (line 382)
-- new CompileError (line 459)
-- new CompileError (line 465)
-- new CompileError (line 477)
+- new CompileError (line 380)
+- new CompileError (line 457)
+- new CompileError (line 463)
+- new CompileError (line 475)
 - 33 class method(s)
 - 8 closure(s)
 
@@ -17730,7 +17736,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Ast/ExitFunctionDesugar.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 9 class method(s)
 - 1 closure(s)
 
 ### `lib/Ast/GeneratorYieldSourceMarker.php`
@@ -18613,6 +18619,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `lib/ExitFunctionSyntaxRejector.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 28)
+- 1 class method(s)
 
 ### `lib/Frame.php`
 
@@ -23091,14 +23103,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\standard\Module (line 239)
 - new JIT (line 315)
 - new JITContext (line 329)
-- new SealedClassPreprocessor (line 357)
-- new StaticClassPreprocessor (line 360)
-- new SourcePreprocessor\PropertyHooks (line 363)
-- new State (line 483)
-- new ReflectionProperty (line 510)
-- new ReflectionProperty (line 513)
-- new LintCompiler (line 904)
-- new Variable (line 1031)
+- new SealedClassPreprocessor (line 358)
+- new StaticClassPreprocessor (line 361)
+- new SourcePreprocessor\PropertyHooks (line 364)
+- new State (line 484)
+- new ReflectionProperty (line 511)
+- new ReflectionProperty (line 514)
+- new LintCompiler (line 905)
+- new Variable (line 1032)
 - 52 class method(s)
 
 ### `lib/RuntimeStrictness.php`

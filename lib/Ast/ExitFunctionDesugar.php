@@ -20,6 +20,47 @@ final class ExitFunctionDesugar
 
     public const MARKER_DIE = '__phpcDieCall';
 
+    /** Zend 8.2 profile message for exit(status:)/die(message:) (#13973). */
+    public const REFERENCE_PROFILE_UNEXPECTED_COLON = 'syntax error, unexpected token ":"';
+
+    /** Zend 8.2 profile message for exit($a, $b) two-arg form (#13973). */
+    public const REFERENCE_PROFILE_UNEXPECTED_COMMA = 'syntax error, unexpected token ","';
+
+    /** Zend 8.2 profile message for exit(...)/die(...) FCC (#13973). */
+    public const REFERENCE_PROFILE_UNEXPECTED_ELLIPSIS = 'syntax error, unexpected token "..."';
+
+    /**
+     * @return array{line: int, message: string}|null
+     */
+    public static function referenceProfileSyntaxError(string $code): ?array
+    {
+        if (!preg_match('/\b(?:exit|die)\s*\(/i', $code)) {
+            return null;
+        }
+
+        $tokens = token_get_all($code);
+        for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
+            if (!self::isExitKeyword($tokens, $i) || !self::hasParenCall($tokens, $i)) {
+                continue;
+            }
+            $violation = self::parenCallReferenceProfileViolation($tokens, $i);
+            if (null === $violation) {
+                continue;
+            }
+            $start = self::tokenByteOffset($tokens, $i);
+            if (null === $start) {
+                continue;
+            }
+
+            return [
+                'line' => self::byteOffsetToLine($code, $start),
+                'message' => $violation,
+            ];
+        }
+
+        return null;
+    }
+
     public static function desugar(string $code): string
     {
         if (!CompilerVersion::supportsExitFunctionForm()) {
@@ -116,5 +157,75 @@ final class ExitFunctionDesugar
         }
 
         return $offset;
+    }
+
+    /**
+     * PHP 8.4-only parenthesized exit/die forms: named args, two-arg, FCC (#13973).
+     *
+     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
+     */
+    private static function parenCallReferenceProfileViolation(array $tokens, int $exitIdx): ?string
+    {
+        $openIdx = $exitIdx + 1;
+        while ($openIdx < \count($tokens) && self::isIgnorable($tokens[$openIdx])) {
+            ++$openIdx;
+        }
+        if ($openIdx >= \count($tokens) || !\is_string($tokens[$openIdx]) || '(' !== $tokens[$openIdx]) {
+            return null;
+        }
+
+        $depth = 0;
+        $prevAtArgLevel = null;
+        for ($i = $openIdx; $i < \count($tokens); ++$i) {
+            $token = $tokens[$i];
+            if (self::isIgnorable($token)) {
+                continue;
+            }
+            if (\is_string($token)) {
+                if ('(' === $token) {
+                    ++$depth;
+                    if (1 === $depth) {
+                        $prevAtArgLevel = null;
+                    }
+                    continue;
+                }
+                if (')' === $token) {
+                    if (0 === $depth) {
+                        return null;
+                    }
+                    --$depth;
+                    if (0 === $depth) {
+                        break;
+                    }
+                    continue;
+                }
+                if (1 === $depth) {
+                    if (',' === $token) {
+                        return self::REFERENCE_PROFILE_UNEXPECTED_COMMA;
+                    }
+                    if (':' === $token
+                        && \is_array($prevAtArgLevel)
+                        && \T_STRING === $prevAtArgLevel[0]) {
+                        return self::REFERENCE_PROFILE_UNEXPECTED_COLON;
+                    }
+                    $prevAtArgLevel = $token;
+                }
+                continue;
+            }
+
+            if (1 === $depth) {
+                if (\T_ELLIPSIS === $token[0]) {
+                    return self::REFERENCE_PROFILE_UNEXPECTED_ELLIPSIS;
+                }
+                $prevAtArgLevel = $token;
+            }
+        }
+
+        return null;
+    }
+
+    private static function byteOffsetToLine(string $code, int $offset): int
+    {
+        return 1 + substr_count(substr($code, 0, max(0, $offset)), "\n");
     }
 }
