@@ -323,4 +323,41 @@ PHP;
         }
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** WeakMap offset read inside closure must see live key (#14132, Zend/zend_weakrefs.c). */
+    public function testWeakMapOffsetGetInsideClosure(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$read = (function (): int {
+    $wm = new WeakMap();
+    $o = new stdClass();
+    $wm[$o] = 9;
+    return $wm[$o];
+})();
+echo $read === 9 ? 'ok' : 'fail';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_closure_offsetget.php'));
+        $this->assertSame('ok', ob_get_clean());
+    }
+
+    /** WeakReference::get() inside closure must return referent (#14132). */
+    public function testWeakReferenceGetInsideClosure(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$alive = (function (): bool {
+    $o = new stdClass();
+    $wr = WeakReference::create($o);
+    return $wr->get() === $o;
+})();
+echo $alive ? 'ok' : 'fail';
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakreference_closure_get.php'));
+        $this->assertSame('ok', ob_get_clean());
+    }
 }
