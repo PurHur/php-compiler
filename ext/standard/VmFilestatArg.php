@@ -126,9 +126,12 @@ final class VmFilestatArg
         $var = $var->resolveIndirect();
         self::rejectEnumCaseIntArg($var, $function, $argIndex, $paramName);
         if (Variable::TYPE_INTEGER !== $var->type) {
-            throw new \LogicException(
-                $function.'() '.$paramName.' must be an integer in this compiler build'
-            );
+            throw new \TypeError(self::intTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
 
         return $var->toInt();

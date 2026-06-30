@@ -42,9 +42,6 @@ final class chmod_ extends Internal
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
         JitFilestatArg::guardInt($context, $args[1], 'chmod', 1, 'permissions');
-        if (JITVariable::TYPE_NATIVE_LONG !== $args[1]->type) {
-            throw new \LogicException('chmod() permissions must be an integer in this compiler build');
-        }
         $i32 = $context->getTypeFromString('int32');
         $mode = $context->builder->truncOrBitCast(
             $context->helper->loadValue($args[1]),
