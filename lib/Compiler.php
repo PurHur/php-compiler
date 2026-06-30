@@ -13446,9 +13446,20 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
-        $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
-        if ($producer instanceof Op\Expr\FirstClassCallable) {
-            return $this->slotForInlineFirstClassCallableProducer($producer, $block);
+        $funcName = $this->resolveInlineCallArgFuncName($callOp);
+        foreach ($producers as $candidate) {
+            if (!$candidate instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
+            $fccMatch = $this->matchSingleFirstClassCallableInlineProducer(
+                $candidate,
+                $callOp->args,
+                $argIndex,
+                $funcName
+            );
+            if (null !== $fccMatch) {
+                return $this->slotForInlineFirstClassCallableProducer($fccMatch, $block);
+            }
         }
         if (1 === count($callOp->args)) {
             $last = $producers[\count($producers) - 1] ?? null;
@@ -13501,9 +13512,6 @@ class Compiler {
         if ($producer instanceof Op\Expr\Closure || $producer instanceof Op\Expr\ArrowFunction) {
             return $this->slotForInlineClosureProducer($producer, $block);
         }
-        if ($producer instanceof Op\Expr\FirstClassCallable) {
-            return $this->slotForInlineFirstClassCallableProducer($producer, $block);
-        }
         foreach ($producers as $candidate) {
             if (!$candidate instanceof Op\Expr\Closure && !$candidate instanceof Op\Expr\ArrowFunction) {
                 continue;
@@ -13521,8 +13529,14 @@ class Compiler {
             if (!$candidate instanceof Op\Expr\FirstClassCallable) {
                 continue;
             }
-            if (null !== $this->matchInlineCallArgProducer([$candidate], $callOp->args, $argIndex, $callOp)) {
-                return $this->slotForInlineFirstClassCallableProducer($candidate, $block);
+            $fccMatch = $this->matchSingleFirstClassCallableInlineProducer(
+                $candidate,
+                $callOp->args,
+                $argIndex,
+                $this->resolveInlineCallArgFuncName($callOp)
+            );
+            if (null !== $fccMatch) {
+                return $this->slotForInlineFirstClassCallableProducer($fccMatch, $block);
             }
         }
 
@@ -13678,6 +13692,15 @@ class Compiler {
         $argCount = count($callArgs);
         if (0 === $producerCount) {
             return null;
+        }
+        $trailingComparator = $this->matchTrailingComparatorInlineCallArgProducer(
+            $producers,
+            $callArgs,
+            $argIndex,
+            $inlineFuncName
+        );
+        if (null !== $trailingComparator) {
+            return $trailingComparator;
         }
         $siblingNestedArray = $this->matchSiblingNestedArrayLiteralCallArgProducer(
             $producers,
@@ -14495,6 +14518,7 @@ class Compiler {
                 && !($producers[0] instanceof Op\Expr\ClassConstFetch)
                 && !($producers[0] instanceof Op\Expr\ArrowFunction)
                 && !($producers[0] instanceof Op\Expr\Closure)
+                && !($producers[0] instanceof Op\Expr\FirstClassCallable)
                 && !($producers[0] instanceof Op\Expr\UnaryMinus)
                 && !($producers[0] instanceof Op\Expr\UnaryPlus)
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
@@ -17085,6 +17109,12 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\ArrowFunction
+                || $mid instanceof Op\Expr\Closure
+                || $mid instanceof Op\Expr\FirstClassCallable) {
+                // array_udiff(array_keys(...), array_keys(...), strcmp(...)) — trailing FCC (#13990).
+                continue;
+            }
             if (!$this->isSiblingInlineCallProducerExpr($mid)) {
                 return false;
             }
@@ -17151,6 +17181,11 @@ class Compiler {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($sib)) {
+                continue;
+            }
+            if ($sib instanceof Op\Expr\ArrowFunction
+                || $sib instanceof Op\Expr\Closure
+                || $sib instanceof Op\Expr\FirstClassCallable) {
                 continue;
             }
             if (!$this->isSiblingInlineCallProducerExpr($sib)) {
@@ -17247,6 +17282,11 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\ArrowFunction
+                || $mid instanceof Op\Expr\Closure
+                || $mid instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
 
             return $this->isSiblingInlineCallProducerExpr($mid);
         }
@@ -17299,6 +17339,11 @@ class Compiler {
             if ($this->isUnaryInlineSiblingCallArgExpr($stmt)) {
                 continue;
             }
+            if ($stmt instanceof Op\Expr\ArrowFunction
+                || $stmt instanceof Op\Expr\Closure
+                || $stmt instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
             if ($this->isSiblingInlineCallProducerExpr($stmt)) {
                 // array_intersect_assoc(array_keys([...]), array_keys([...])) — literal callees (#13778, #13954).
                 if (!$this->funcCallExprUsesVariableCallee($stmt) && !$arrayPreludeChain) {
@@ -17312,6 +17357,10 @@ class Compiler {
         }
 
         $hoistedArgCount = \count($hoistedArgs);
+        $consumerName = $this->resolveInlineCallArgFuncName($consumer);
+        if ($this->builtinUsesTrailingComparatorCallback($consumerName) && $hoistedArgCount > 1) {
+            --$hoistedArgCount;
+        }
 
         return $producerFuncCalls >= 2 && $producerFuncCalls === $hoistedArgCount;
     }
@@ -17365,6 +17414,12 @@ class Compiler {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\ArrowFunction
+                || $child instanceof Op\Expr\Closure
+                || $child instanceof Op\Expr\FirstClassCallable) {
                 --$i;
                 continue;
             }
@@ -18201,6 +18256,118 @@ class Compiler {
             && 0 === $closureSlots[0]
         ) {
             return $producer;
+        }
+        if ($this->builtinUsesTrailingComparatorCallback($funcName) && $argIndex === \count($callArgs) - 1) {
+            return $producer;
+        }
+
+        return null;
+    }
+
+    /** Inline strcmp(...) and other FCC comparators — last callback arg only (#13990, zend_closures.c). */
+    private function matchSingleFirstClassCallableInlineProducer(
+        Op\Expr $producer,
+        array $callArgs,
+        int $argIndex,
+        ?string $funcName = null
+    ): ?Op\Expr {
+        if (!$producer instanceof Op\Expr\FirstClassCallable) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null !== $callArg && $this->operandsReferToSameVariable($producer->result, $callArg)) {
+            return $producer;
+        }
+        $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($funcName);
+        if ($callbackArgIndex >= 0 && $argIndex === $callbackArgIndex) {
+            return $producer;
+        }
+        if ($this->builtinUsesTrailingComparatorCallback($funcName) && $argIndex === \count($callArgs) - 1) {
+            return $producer;
+        }
+        if (1 === \count($callArgs) && 0 === $argIndex) {
+            return $producer;
+        }
+
+        return null;
+    }
+
+    /** array_udiff* / usort* — comparator is the trailing call argument (ext/standard/array.c). */
+    private function builtinUsesTrailingComparatorCallback(?string $funcName): bool
+    {
+        if (null === $funcName || '' === $funcName) {
+            return false;
+        }
+
+        return \in_array(strtolower($funcName), [
+            'usort',
+            'uasort',
+            'uksort',
+            'array_udiff',
+            'array_uintersect',
+            'array_udiff_assoc',
+            'array_uintersect_assoc',
+            'array_udiff_uassoc',
+            'array_uintersect_uassoc',
+            'array_diff_uassoc',
+            'array_intersect_uassoc',
+            'array_diff_ukey',
+            'array_intersect_ukey',
+        ], true);
+    }
+
+    /**
+     * array_udiff(array_keys(...), array_keys(...), strcmp(...)) — FuncCall/FCC hoists (#13990).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchTrailingComparatorInlineCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex,
+        ?string $funcName
+    ): ?Op\Expr {
+        if (!$this->builtinUsesTrailingComparatorCallback($funcName)) {
+            return null;
+        }
+        $argCount = \count($callArgs);
+        if ($argCount < 2) {
+            return null;
+        }
+        $callbackArgIndex = $argCount - 1;
+        $callbackProducer = null;
+        $funcProducers = [];
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\ArrowFunction
+                || $producer instanceof Op\Expr\Closure
+                || $producer instanceof Op\Expr\FirstClassCallable) {
+                $callbackProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $funcProducers[] = $producer;
+            }
+        }
+        if (null === $callbackProducer) {
+            return null;
+        }
+        if ($argIndex === $callbackArgIndex) {
+            return $callbackProducer;
+        }
+        $funcArgIndex = 0;
+        foreach ($callArgs as $i => $callArg) {
+            if ($i >= $callbackArgIndex) {
+                break;
+            }
+            if ($this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                continue;
+            }
+            if ($i === $argIndex) {
+                return $funcProducers[$funcArgIndex] ?? null;
+            }
+            ++$funcArgIndex;
         }
 
         return null;
