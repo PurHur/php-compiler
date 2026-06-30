@@ -53,8 +53,6 @@ final class timezone_name_from_abbr extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'timezone_name_from_abbr() is not implemented for JIT in this compiler build'
-        );
+        return JitTimezoneNameFromAbbr::invoke($context, ...$args);
     }
 }
