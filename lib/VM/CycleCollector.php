@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\ext\standard\GcToggleJitHelper;
 use PHPCompiler\Frame;
+use PHPCompiler\Web\Superglobals;
 
 /**
  * VM cycle collector entry point — Zend gc_collect_cycles() subset (issue #3113).
@@ -107,6 +108,17 @@ final class CycleCollector
     public static function memCaches(): int
     {
         return MemoryAccounting::releaseMmCaches();
+    }
+
+    /** JIT-callable bridge when Superglobals holds the active VM context (#13882). */
+    public static function collectActiveContext(): int
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            return 0;
+        }
+
+        return self::collect($ctx);
     }
 
     public static function collect(Context $ctx): int
