@@ -6,6 +6,9 @@ use PHPLLVM\Value;
 final class JitLongArg {
     public static function lower(Context $context, Variable $arg, string $contextLabel = "argument"): Value {
         if (Variable::TYPE_NATIVE_LONG === $arg->type) return $context->helper->loadValue($arg);
+        if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->builder->fpToSi($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+        }
         if (Variable::TYPE_NATIVE_BOOL === $arg->type) return $context->builder->zExt($context->helper->loadValue($arg), $context->getTypeFromString("int64"));
         if (JitValueBox::isValueOperand($arg)) {
             return self::lowerValueBoxToLong($context, $arg);

@@ -991,6 +991,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'path_functions_type_error')) {
                 continue;
             }
+            // preg_match() float offset: VM + AOT (#13818); MCJIT stderr deprecation merged before stdout.
+            if (str_contains($name, 'preg_match_float_offset') && !str_contains($name, '_jit')) {
+                continue;
+            }
             yield $name => $case;
         }
     }

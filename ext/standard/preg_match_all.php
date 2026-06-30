@@ -41,11 +41,13 @@ final class preg_match_all extends Internal
             $flags = $flagsVar->toInt();
         }
         if ($argc >= 5) {
-            $offsetVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $offsetVar->type) {
-                throw new \LogicException('preg_match_all() offset must be an integer in this compiler build');
-            }
-            $offset = $offsetVar->toInt();
+            $offset = VmMath::parseIntBuiltinArgForFrame(
+                $frame,
+                4,
+                'preg_match_all',
+                4,
+                'offset'
+            );
         }
 
         $hostMatches = [];
