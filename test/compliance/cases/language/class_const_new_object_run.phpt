@@ -34,7 +34,7 @@ echo D::Y->x === 7 ? "1\n" : "0\n";
 (object) array (
 )
 1
-Foo::__set_state(array (
+\Foo::__set_state(array (
   'x' => 7,
 ))
 1
