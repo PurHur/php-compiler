@@ -8,12 +8,10 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\JitRequestBody;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
@@ -53,29 +51,16 @@ final class file_get_contents extends Internal
 
         $offset = 0;
         if (isset($frame->calledArgs[3])) {
-            $offset = VmMath::parseIntBuiltinArg(
-                $frame->calledArgs[3]->resolveIndirect(),
-                'file_get_contents',
-                4,
-                'offset'
-            );
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'file_get_contents', 4, 'offset');
         }
 
         $length = null;
         if (isset($frame->calledArgs[4])) {
-            $lengthVar = $frame->calledArgs[4]->resolveIndirect();
-            if (Variable::TYPE_NULL !== $lengthVar->type) {
-                $length = VmMath::parseIntBuiltinArg(
-                    $lengthVar,
-                    'file_get_contents',
-                    5,
-                    'length'
+            $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 4, 'file_get_contents', 5, 'length');
+            if (null !== $length && $length < 0) {
+                throw new \ValueError(
+                    'file_get_contents(): Argument #5 ($length) must be greater than or equal to 0'
                 );
-                if ($length < 0) {
-                    throw new \ValueError(
-                        'file_get_contents(): Argument #5 ($length) must be greater than or equal to 0'
-                    );
-                }
             }
         }
 
@@ -140,13 +125,13 @@ final class file_get_contents extends Internal
         $offset = $i64->constInt(0, false);
         $length = $i64->constInt(-1, true);
         if ($argc >= 4) {
-            $offset = JitLongArg::lower($context, $args[3], 'file_get_contents offset');
+            $offset = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[3], 'file_get_contents', 4, 'offset');
         }
         if ($argc >= 5) {
             if (JITVariable::TYPE_VALUE === $args[4]->type && $args[4]->isNullConstant) {
                 $length = $i64->constInt(-1, true);
             } else {
-                $length = JitLongArg::lower($context, $args[4], 'file_get_contents length');
+                $length = JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $args[4], 'file_get_contents', 5, 'length');
                 JitFileGetContents::emitLengthValueErrorIfNegative($context, $length);
             }
         }
