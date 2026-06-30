@@ -37,9 +37,9 @@ echo array_all([], fn ($v) => true) ? 'y' : 'n', "\n";
 
 echo array_find($a, 'gt2'), "\n";
 
-echo array_all([1, 2, 3], 'is_int') ? 'y' : 'n', "\n";
-echo array_any([1, 2, 3], 'is_string') ? 'y' : 'n', "\n";
-echo array_find([1, 2, 3], 'is_int'), "\n";
+echo array_all([1, 2, 3], fn ($v) => is_int($v)) ? 'y' : 'n', "\n";
+echo array_any([1, 2, 3], fn ($v) => is_string($v)) ? 'y' : 'n', "\n";
+echo array_find([1, 2, 3], fn ($v) => is_int($v)), "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'

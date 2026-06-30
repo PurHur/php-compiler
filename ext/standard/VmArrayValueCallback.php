@@ -45,8 +45,7 @@ final class VmArrayValueCallback
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
 
-            // Zend 1-arg internals ignore the key operand; our Internal handlers count args.
-            return VmInternalCall::invoke($fn, $value);
+            return VmInternalCall::invoke($fn, $value, $key);
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
         }
