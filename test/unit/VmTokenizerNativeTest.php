@@ -67,6 +67,19 @@ final class VmTokenizerNativeTest extends TestCase
         self::assertSame('T_ECHO', $frame->returnVar->toString());
     }
 
+    public function test_token_name_unknown_id_returns_unknown(): void
+    {
+        $runtime = new Runtime();
+        $fn = new \PHPCompiler\ext\tokenizer\token_name();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $type = new \PHPCompiler\VM\Variable();
+        $type->int(101);
+        $frame->calledArgs = [$type];
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $fn->execute($frame);
+        self::assertSame('UNKNOWN', $frame->returnVar->toString());
+    }
+
     public function test_issue_13896_null_byte_after_dollar(): void
     {
         $src = "<?php \$\0 = 1;";
