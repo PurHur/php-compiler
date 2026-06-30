@@ -70,6 +70,30 @@ class VM {
         return self::$running;
     }
 
+    /**
+     * Visit slots that may strongly retain weak-ref targets — active opcode frame,
+     * in-flight builtin args, suspended callers, globals (#13923).
+     *
+     * @param callable(Variable): void $visitVar
+     */
+    public function visitStrongRefRoots(callable $visitVar): void
+    {
+        if (null !== $this->executingFrame) {
+            $frame = $this->executingFrame;
+            // Script-root scope mirrors globals — visit globals only (#13474, #13923).
+            if (null !== $frame->closureCall || null !== $frame->parent) {
+                CycleCollector::markFrameRoots($frame, $visitVar);
+            }
+        }
+        if (null !== $this->builtinHandlerFrameForTrace) {
+            CycleCollector::markFrameRoots($this->builtinHandlerFrameForTrace, $visitVar, false);
+        }
+        foreach ($this->context->runStackFrames() as $frame) {
+            CycleCollector::markFrameRoots($frame, $visitVar);
+        }
+        $this->context->visitGlobalVariables($visitVar);
+    }
+
     /** Generator body suspended at `yield` (issue #167). */
     const GENERATOR_YIELD = 3;
 
