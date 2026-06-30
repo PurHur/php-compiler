@@ -2731,7 +2731,7 @@ final class VmString
             foreach (HtmlEntityTable::entitiesEntQuotes() as $char => $entity) {
                 $map[$entity] = $char;
             }
-            $map['&apos;'] = "'";
+            // &apos; is HTML5/XHTML only — ENT_HTML401 leaves it unchanged (ext/standard/html.c, #13948).
         }
 
         return $map;
