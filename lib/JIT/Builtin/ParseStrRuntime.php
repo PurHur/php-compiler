@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -13,9 +14,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295).
  *
- * Replaces legacy LLVM parse_str lowering; superglobals refresh uses
- * {@see \PHPCompiler\Web\SuperglobalRefreshJitHelper} PHP (#9907, #13429).
- * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
+ * Replaces legacy LLVM parse_str lowering; user-script AOT refresh routes through
+ * init-safe native delimited LLVM until nested {@see ParseStrJitHelper::parseIntoNative}
+ * is init-safe (#13900). php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
 {
@@ -66,8 +67,11 @@ final class ParseStrRuntime
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#9295'
+            '#9299'
         );
+        if (self::isUserScriptStandaloneAot()) {
+            ParseStrNativeLlvm::ensureSubhelpers($context);
+        }
         self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
         self::implementIfMissing($context, '__compiler_parse_cookie_header', self::implementCookieBridge(...));
         self::registerLinkedRuntime($context);
@@ -127,6 +131,12 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
+        if (self::isUserScriptStandaloneAot()) {
+            self::emitUserScriptDelimitedParse($context, $dest, $encoded, false);
+            $context->builder->returnVoid();
+
+            return;
+        }
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_INTO_NATIVE_HELPER, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $encodedArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -155,6 +165,12 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
+        if (self::isUserScriptStandaloneAot()) {
+            self::emitUserScriptDelimitedParse($context, $dest, $header, true);
+            $context->builder->returnVoid();
+
+            return;
+        }
         $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_COOKIE_INTO_NATIVE_HELPER, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $headerArg = JitNestedHelperCoerce::coerceArgForHelper(
@@ -187,5 +203,32 @@ final class ParseStrRuntime
         }
 
         return true;
+    }
+
+    private static function isUserScriptStandaloneAot(): bool
+    {
+        $flag = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
+
+        return '1' === $flag || 'true' === strtolower((string) $flag);
+    }
+
+    private static function emitUserScriptDelimitedParse(
+        Context $context,
+        \PHPLLVM\Value $dest,
+        \PHPLLVM\Value $encoded,
+        bool $cookiePairDecode
+    ): void {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $cstr = $context->builder->structGep($encoded, $context->structFieldMap['__string__']['value']);
+        $delimiter = $cookiePairDecode ? $i8->constInt(59, false) : $i8->constInt(38, false);
+        $flags = $cookiePairDecode ? $i32->constInt(1, false) : $i32->constInt(0, false);
+        $context->builder->call(
+            $context->lookupFunction('__phpc_parse_str_parse_delimited_pairs'),
+            $dest,
+            $cstr,
+            $delimiter,
+            $flags
+        );
     }
 }

@@ -32,11 +32,12 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
     }
 
-    public function testUserScriptRefreshUsesNativeParseStrLlvmUntilPhpBridgeGreen(): void
+    public function testUserScriptRefreshRoutesThroughParseStrRuntimeBridge(): void
     {
-        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
-        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $source);
+        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('__compiler_parse_str', $source);
+        $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
+        $this->assertStringNotContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
     }
 }
