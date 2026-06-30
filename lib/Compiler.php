@@ -12554,6 +12554,16 @@ class Compiler {
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
         $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        if (
+            $producer instanceof Op\Expr\ConstFetch
+            || $producer instanceof Op\Expr\ClassConstFetch
+        ) {
+            // probe('label', in_array(..., g(), true)) — ConstFetch is inner callee arg, not this slot (#14237).
+            $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $callOp, $argIndex);
+            if (null !== $adjacentSlot) {
+                return $adjacentSlot;
+            }
+        }
         if (null === $producer) {
             $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot($block, $callOp, $argIndex);
             if (null !== $adjacentSlot) {
@@ -22034,6 +22044,20 @@ class Compiler {
                                 }
                             }
                         }
+                        if (
+                            ($matched instanceof Op\Expr\ConstFetch || $matched instanceof Op\Expr\ClassConstFetch)
+                            && null !== $cfgCallOp
+                        ) {
+                            $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                                $block,
+                                $cfgCallOp,
+                                (int) $argIndex
+                            );
+                            if (null !== $adjacentSlot) {
+                                $valueSlot = $adjacentSlot;
+                                $matched = null;
+                            }
+                        }
                         if ($matched instanceof Op\Expr) {
                             if (null === $block->slotForOperand($matched->result)) {
                                 foreach ($this->compileExpr($matched, $block) as $op) {
@@ -22185,6 +22209,20 @@ class Compiler {
                                         }
                                     }
                                 }
+                            }
+                        }
+                        if (
+                            ($matched instanceof Op\Expr\ConstFetch || $matched instanceof Op\Expr\ClassConstFetch)
+                            && null !== $cfgCallOp
+                        ) {
+                            $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                                $block,
+                                $cfgCallOp,
+                                (int) $argIndex
+                            );
+                            if (null !== $adjacentSlot) {
+                                $valueSlot = $adjacentSlot;
+                                $matched = null;
                             }
                         }
                         if ($matched instanceof Op\Expr) {
@@ -22441,6 +22479,20 @@ class Compiler {
                             $producers,
                             $callArgProbe
                         );
+                    }
+                    if (
+                        ($matched instanceof Op\Expr\ConstFetch || $matched instanceof Op\Expr\ClassConstFetch)
+                        && null !== $cfgCallOp
+                    ) {
+                        $adjacentSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                        if (null !== $adjacentSlot) {
+                            $valueSlot = $adjacentSlot;
+                            $matched = null;
+                        }
                     }
                     if ($matched instanceof Op\Expr) {
                         if (null === $block->slotForOperand($matched->result)) {
