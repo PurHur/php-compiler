@@ -773,6 +773,7 @@
         "ext/standard/JitIteratorWalk.php",
         "ext/standard/JitJsonDecode.php",
         "ext/standard/JitJsonEncode.php",
+        "ext/standard/JitJsonEncodeCompileTime.php",
         "ext/standard/JitJsonLastError.php",
         "ext/standard/JitJsonLastErrorMsg.php",
         "ext/standard/JitJsonValidate.php",
@@ -3751,9 +3752,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3521,
+        "inventory_files": 3522,
         "excluded": 0,
-        "eligible": 3521,
+        "eligible": 3522,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

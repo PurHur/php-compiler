@@ -783,6 +783,7 @@ require_once __DIR__.'/../../../ext/standard/JitIteratorToArray.php';
 require_once __DIR__.'/../../../ext/standard/JitIteratorWalk.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonDecode.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonEncode.php';
+require_once __DIR__.'/../../../ext/standard/JitJsonEncodeCompileTime.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonLastError.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonLastErrorMsg.php';
 require_once __DIR__.'/../../../ext/standard/JitJsonValidate.php';
