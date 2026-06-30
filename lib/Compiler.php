@@ -17268,6 +17268,11 @@ class Compiler {
         ) {
             return false;
         }
+        $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
+            $fromIndex,
+            $consumerIndex,
+            $cfgChildren
+        );
         $producerFuncCalls = 0;
         for ($k = $fromIndex; $k < $consumerIndex; ++$k) {
             $stmt = $cfgChildren[$k] ?? null;
@@ -17281,7 +17286,8 @@ class Compiler {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($stmt)) {
-                if (!$this->funcCallExprUsesVariableCallee($stmt)) {
+                // array_intersect_assoc(array_keys([...]), array_keys([...])) — literal callees (#13778, #13954).
+                if (!$this->funcCallExprUsesVariableCallee($stmt) && !$arrayPreludeChain) {
                     return false;
                 }
                 ++$producerFuncCalls;
