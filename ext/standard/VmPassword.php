@@ -35,14 +35,18 @@ final class VmPassword
 
     private const BCRYPT_DEFAULT_COST = 10;
 
-    /** crypt() salt generation flags (ext/standard/password.c — CRYPT_*). */
+    /** crypt() salt generation flags (ext/standard/crypt.c — all CRYPT_* are bitmask 1). */
     public const CRYPT_STD_DES = 1;
 
-    public const CRYPT_EXT_DES = 2;
+    public const CRYPT_EXT_DES = 1;
 
-    public const CRYPT_MD5 = 3;
+    public const CRYPT_MD5 = 1;
 
-    public const CRYPT_BLOWFISH = 4;
+    public const CRYPT_BLOWFISH = 1;
+
+    public const CRYPT_SHA256 = 1;
+
+    public const CRYPT_SHA512 = 1;
 
     public static function hash(string $password, int $algo, array $options = [])
     {

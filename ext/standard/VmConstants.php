@@ -194,6 +194,8 @@ final class VmConstants
                 'crypt_ext_des',
                 'crypt_md5',
                 'crypt_blowfish',
+                'crypt_sha256',
+                'crypt_sha512',
             ],
             array_keys(DateConstants::CORE_STRING_BY_NAME),
             Context::errorReportingConstantFetchNames(),
