@@ -330,6 +330,55 @@ PHP;
         self::assertSame('100', ob_get_clean());
     }
 
+    /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
+    public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(acosh(1.5), asinh(1.5), atanh(0.5));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'acosh_asinh_atanh_var_dump.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (4 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if ($fcallOrdinal <= 3 && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (4 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        self::assertCount(3, $sendSlots);
+        self::assertSame($returnSlots, $sendSlots, 'arg sends='.json_encode($sendSlots));
+    }
+
+    /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) runtime matches Zend. */
+    public function testVarDumpAcoshAsinhAtanhRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_acosh_asinh_atanh.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_acosh_asinh_atanh.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('float(0.962423650119207)', $out);
+        self::assertStringContainsString('float(1.1947632172871094)', $out);
+        self::assertStringContainsString('float(0.5493061443340548)', $out);
+        self::assertStringNotContainsString('NULL', $out);
+    }
+
     /** Issue #13779 — dual inline array_keys() map to distinct array_diff_assoc() arg slots. */
     public function testArrayDiffAssocDualInlineArrayKeysUsesDistinctProducerSlots(): void
     {

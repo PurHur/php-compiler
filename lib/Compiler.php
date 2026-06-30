@@ -17448,8 +17448,13 @@ class Compiler {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($stmt)) {
-                // array_intersect_assoc(array_keys([...]), array_keys([...])) — literal callees (#13778, #13954).
-                if (!$this->funcCallExprUsesVariableCallee($stmt) && !$arrayPreludeChain) {
+                // array_intersect_assoc(array_keys([...]), array_keys([...])) — literal callees with
+                // hoisted Array_ args (#13778, #13954). var_dump(acosh(1.5), …) / str_repeat('a', $n) (#14119, #10917).
+                if (
+                    !$this->funcCallExprUsesVariableCallee($stmt)
+                    && !$arrayPreludeChain
+                    && !$this->funcCallExprLiteralCalleeAllowedAsHoistedProducer($stmt)
+                ) {
                     return false;
                 }
                 ++$producerFuncCalls;
@@ -17468,6 +17473,21 @@ class Compiler {
                 --$hoistedArgCount;
             }
         }
+        $lastProducerIndex = -1;
+        for ($k = $fromIndex; $k < $consumerIndex; ++$k) {
+            $stmt = $cfgChildren[$k] ?? null;
+            if ($this->isSiblingInlineCallProducerExpr($stmt)) {
+                $lastProducerIndex = $k;
+            }
+        }
+        if ($lastProducerIndex >= 0) {
+            for ($k = $lastProducerIndex + 1; $k < $consumerIndex; ++$k) {
+                $mid = $cfgChildren[$k] ?? null;
+                if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                    --$hoistedArgCount;
+                }
+            }
+        }
 
         return $producerFuncCalls >= 2 && $producerFuncCalls === $hoistedArgCount;
     }
@@ -17483,6 +17503,60 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * True when every FuncCall argument is an embedded php-cfg literal (acosh(1.5), str_repeat('a', 1)).
+     */
+    private function funcCallExprHasOnlyEmbeddedLiteralArgs(Op\Expr $expr): bool
+    {
+        if (!$expr instanceof Op\Expr\FuncCall && !$expr instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($expr, 'args') || !is_array($expr->args)) {
+            return true;
+        }
+        foreach ($expr->args as $arg) {
+            if (!$arg instanceof Operand\Literal) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Literal-name callee allowed in a hoisted sibling producer chain (#14119, #10917).
+     *
+     * True for acosh(1.5) (embedded literals) and str_repeat('a', $n) (named variable temps).
+     * False for array_keys($hoistedArrayTemp) where args are dead temps without a Variable root (#13778).
+     */
+    private function funcCallExprLiteralCalleeAllowedAsHoistedProducer(Op\Expr $expr): bool
+    {
+        if ($this->funcCallExprHasOnlyEmbeddedLiteralArgs($expr)) {
+            return true;
+        }
+        if (!$expr instanceof Op\Expr\FuncCall && !$expr instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if (!property_exists($expr, 'args') || !is_array($expr->args)) {
+            return true;
+        }
+        foreach ($expr->args as $arg) {
+            if ($arg instanceof Operand\Literal) {
+                continue;
+            }
+            if ($arg instanceof Operand\Variable) {
+                continue;
+            }
+            if ($arg instanceof Operand\Temporary && $arg->original instanceof Operand\Variable) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -17507,6 +17581,14 @@ class Compiler {
                     $this->statementLevelFuncCallBeforeHoistedSiblingChain($i, $consumerIndex, $cfgChildren)
                     && !$this->hasContiguousHoistedFuncCallProducersFrom($i, $consumerIndex, $cfgChildren)
                 ) {
+                    // var_dump(acosh(), asinh(), atanh()) — partial scan from $i fails but chain from 0 is contiguous (#14119).
+                    if (
+                        $i > 0
+                        && $this->hasContiguousHoistedFuncCallProducersFrom(0, $consumerIndex, $cfgChildren)
+                    ) {
+                        --$i;
+                        continue;
+                    }
                     break;
                 }
                 --$i;
