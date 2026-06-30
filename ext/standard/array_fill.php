@@ -32,13 +32,12 @@ final class array_fill extends Internal
         if (3 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_fill() requires exactly three arguments');
         }
-        $count = $frame->calledArgs[1]->resolveIndirect();
         $value = $frame->calledArgs[2]->resolveIndirect();
         if (null === $frame->returnVar) {
             return;
         }
         $startIndex = self::vmStartIndexArg($frame);
-        $num = VmMath::parseIntBuiltinArg($count, 'array_fill', 2, 'count');
+        $num = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_fill', 2, 'count');
         if ($num < 0) {
             throw new \ValueError('array_fill(): Argument #2 ($count) must be greater than or equal to 0');
         }
@@ -61,7 +60,7 @@ final class array_fill extends Internal
         }
         JitInternalStrictArg::requireInt($context, $args[0], 'array_fill', 'start_index', 1);
         $startIndex = JitIntdiv::lowerIntBuiltinArg($context, $args[0], 'array_fill', 1, 'start_index');
-        $count = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_fill', 2, 'count');
+        $count = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'array_fill', 2, 'count');
         JitArrayFill::emitRuntimeCountGuard($context, $count);
 
         return ArrayFillRuntime::fill($context, $startIndex, $count, $args[2]);
