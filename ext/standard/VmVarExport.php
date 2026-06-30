@@ -164,7 +164,7 @@ final class VmVarExport
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
-                : "'".str_replace(["\\", "'"], ["\\\\", "\\'"], $key->toString())."'";
+                : self::formatExportStringKey($key->toString());
             $lines[] = $inner.$k.' => '.self::formatNested(
                 $vm,
                 $value->resolveIndirect(),
@@ -177,6 +177,19 @@ final class VmVarExport
         $lines[] = $indent.')';
 
         return implode('', $lines);
+    }
+
+    /**
+     * php-src var.c php_array_element_export — addcslashes then NUL → concatenation form.
+     */
+    private static function formatExportStringKey(string $key): string
+    {
+        $escaped = str_replace(["\\", "'"], ["\\\\", "\\'"], $key);
+        if (str_contains($escaped, "\0")) {
+            $escaped = str_replace("\0", "' . \"\\0\" . '", $escaped);
+        }
+
+        return "'".$escaped."'";
     }
 
     private static function warnCircular(?Frame $frame, bool &$warned): void
