@@ -16776,11 +16776,34 @@ class Compiler {
      */
     private function isDeferredSiblingInlineCallArgProducer(Op $op, array $ops, int $producerIndex): bool
     {
+        $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         // By-ref builtins (sort/natcasesort/array_push/…) mutate args — never defer as inline producers (#12732).
+        // Array pointer builtins nested in var_export are deferred and compiled at the consumer (#13916).
         if ($this->funcCallExprHasByRefMutatingSideEffects($op)) {
+            if (null === $consumerIndex) {
+                return false;
+            }
+            $consumer = $ops[$consumerIndex] ?? null;
+            $fn = $this->resolveCfgFuncCallName($op);
+            if (
+                null !== $fn
+                && \in_array(strtolower($fn), ['next', 'prev', 'current', 'end', 'key', 'reset', 'pos'], true)
+                && $consumer instanceof Op\Expr\FuncCall
+                && 'var_export' === $this->resolveCfgFuncCallName($consumer)
+                && $op instanceof Op\Expr
+                && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                    $op,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $ops
+                )
+            ) {
+                return true;
+            }
+
             return false;
         }
-        $consumerIndex = $this->deferredSiblingInlineCallArgConsumerIndex($op, $ops, $producerIndex);
         if (null === $consumerIndex) {
             return false;
         }
@@ -16788,8 +16811,21 @@ class Compiler {
         if (null === $firstSibling) {
             return false;
         }
+        if ($this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $ops) >= 2) {
+            return true;
+        }
+        $consumer = $ops[$consumerIndex] ?? null;
 
-        return $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $ops) >= 2;
+        return $op instanceof Op\Expr
+            && $consumer instanceof Op\Expr
+            && $producerIndex >= $firstSibling
+            && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                $op,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $ops
+            );
     }
 
     /**
@@ -17195,6 +17231,56 @@ class Compiler {
     }
 
     /**
+     * Statement-level FuncCall when a later hoisted sibling with the same callee feeds the consumer (#13916).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function statementLevelFuncCallDuplicatedByNestedSiblingProducer(
+        Op\Expr $producer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $name = $this->resolveCfgFuncCallName($producer);
+        if (null === $name) {
+            return false;
+        }
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            !$consumer instanceof Op\Expr\FuncCall
+            && !$consumer instanceof Op\Expr\NsFuncCall
+        ) {
+            return false;
+        }
+        if (
+            !property_exists($consumer, 'args')
+            || !is_array($consumer->args)
+            || $this->inlineCallArgProducerFeedsConsumer($producer, $consumer)
+        ) {
+            return false;
+        }
+        $distance = $consumerIndex - $producerIndex;
+        $argCount = \count($consumer->args);
+        if ($distance >= 1 && $distance <= $argCount) {
+            return false;
+        }
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $sibling = $cfgChildren[$j] ?? null;
+            if (!$sibling instanceof Op\Expr\FuncCall && !$sibling instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            if ($name === $this->resolveCfgFuncCallName($sibling)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * First hoisted FuncCall in a sibling inline call-arg chain ending at {@see $consumerIndex}.
      *
      * @param list<Op> $cfgChildren
@@ -17212,6 +17298,44 @@ class Compiler {
                 }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
+                if (
+                    $child instanceof Op\Expr
+                    && $this->statementLevelFuncCallDuplicatedByNestedSiblingProducer(
+                        $child,
+                        $i,
+                        $consumerIndex,
+                        $cfgChildren
+                    )
+                ) {
+                    break;
+                }
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if (
+                    ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                    && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                ) {
+                    $feedsConsumer = $this->inlineCallArgProducerFeedsConsumer($child, $consumer);
+                    if (!$feedsConsumer) {
+                        $onlyLiteralPreludes = true;
+                        for ($k = $i + 1; $k < $consumerIndex; ++$k) {
+                            $mid = $cfgChildren[$k] ?? null;
+                            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                                continue;
+                            }
+                            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                                $onlyLiteralPreludes = false;
+                                break;
+                            }
+                            $onlyLiteralPreludes = false;
+                            break;
+                        }
+                        $feedsConsumer = $onlyLiteralPreludes
+                            && $this->callArgIsDeadInlineTemporary($consumer->args[0] ?? null);
+                    }
+                    if (!$feedsConsumer) {
+                        break;
+                    }
+                }
                 --$i;
                 continue;
             }
