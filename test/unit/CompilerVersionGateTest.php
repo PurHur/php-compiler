@@ -109,9 +109,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
     }
 
-    public function testSupportsPropertyHooksTrueOn84ForwardProfile(): void
+    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
+        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testSupportsGetDeclaredExcludeDeprecatedFalseOnReferenceProfile(): void
