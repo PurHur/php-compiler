@@ -53,22 +53,34 @@ final class VmJsonFormat
         $parser = new VmJsonParser($json, $maxDepth, $assoc, $flags);
         $value = $parser->parseTop();
         if (VmJson::lastError() !== 0) {
-            if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), VmJson::lastError());
-            }
+            self::applyDecodeLastError($json, $flags);
 
             return null;
         }
         if (!$parser->atEnd()) {
             VmJson::setLastError(4);
-            if (VmJsonFlags::throwsOnError($flags)) {
-                throw new \JsonException(VmJson::lastErrorMsg(), 4);
-            }
+            self::applyDecodeLastError($json, $flags);
 
             return null;
         }
 
         return $value;
+    }
+
+    /**
+     * php-src ext/json/php_json.c — JSON_INVALID_UTF8_* still reports JSON_ERROR_UTF8 (5)
+     * when the input buffer contains malformed UTF-8 and decode fails (#14145).
+     */
+    private static function applyDecodeLastError(string $json, int $flags): void
+    {
+        $code = VmJson::lastError();
+        if (4 === $code && VmJsonFlags::ignoreInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($json)) {
+            VmJson::setLastError(5);
+            $code = 5;
+        }
+        if (VmJsonFlags::throwsOnError($flags)) {
+            throw new \JsonException(VmJson::lastErrorMsg(), $code);
+        }
     }
 
     /**
