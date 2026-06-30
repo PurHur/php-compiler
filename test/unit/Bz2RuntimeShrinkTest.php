@@ -28,6 +28,12 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/bz2/Bz2JitHelper.php');
     }
 
+    public function testSupportsBz2GateEnabledWhenVmBz2CoreAvailable(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsBz2());
+        $this->assertTrue(\PHPCompiler\ext\bz2\VmBz2Core::available());
+    }
+
     public function testBz2JitHelperDelegatesToVmBz2Native(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/bz2/Bz2JitHelper.php');
