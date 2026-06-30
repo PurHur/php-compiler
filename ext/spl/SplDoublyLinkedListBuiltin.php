@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\VmJson;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
@@ -21,6 +22,9 @@ final class SplDoublyLinkedListBuiltin
 
     /** @var array<int, list<Variable>> */
     private static array $store = [];
+
+    /** @var array<int, int> */
+    private static array $iteratorModes = [];
 
     public static function registerClass(Context $ctx): void
     {
@@ -70,9 +74,62 @@ final class SplDoublyLinkedListBuiltin
         return isset($entry->methods['push'], $entry->methods['pop'], $entry->methods['offsetget']);
     }
 
-    public static function init(ObjectEntry $object): void
+    public static function init(ObjectEntry $object, int $iteratorMode = 0): void
     {
         self::$store[$object->id] = [];
+        self::$iteratorModes[$object->id] = $iteratorMode;
+    }
+
+    public static function getIteratorMode(ObjectEntry $object): int
+    {
+        if (!isset(self::$iteratorModes[$object->id])) {
+            self::init($object);
+        }
+
+        return self::$iteratorModes[$object->id];
+    }
+
+    public static function setIteratorMode(ObjectEntry $object, int $mode): void
+    {
+        self::$iteratorModes[$object->id] = $mode;
+    }
+
+    /**
+     * @return array<int, mixed>
+     */
+    public static function exportElements(ObjectEntry $object): array
+    {
+        $exported = [];
+        foreach (self::state($object) as $index => $var) {
+            $exported[$index] = VmJson::export($var->resolveIndirect());
+        }
+
+        return $exported;
+    }
+
+    /**
+     * @param array<int|string, mixed> $elements
+     */
+    public static function restoreFromExported(ObjectEntry $object, int $iteratorMode, array $elements): void
+    {
+        self::init($object, $iteratorMode);
+        if ([] === $elements) {
+            return;
+        }
+        $indexed = [];
+        foreach ($elements as $key => $raw) {
+            if (!\is_int($key) && (!\is_string($key) || !ctype_digit((string) $key))) {
+                continue;
+            }
+            $indexed[(int) $key] = $raw;
+        }
+        ksort($indexed);
+        foreach ($indexed as $raw) {
+            $imported = VmJson::import($raw);
+            $copy = new Variable();
+            $copy->copyFrom($imported);
+            self::$store[$object->id][] = $copy;
+        }
     }
 
     /** @return list<Variable> */

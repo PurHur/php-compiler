@@ -23,6 +23,7 @@ final class SplObjectStorageBuiltin
     /**
      * @var array<int, array{
      *   entries: array<string, Variable>,
+     *   objects: array<string, Variable>,
      *   order: list<string>,
      *   pos: int
      * }>
@@ -114,10 +115,10 @@ final class SplObjectStorageBuiltin
 
     public static function init(ObjectEntry $object): void
     {
-        self::$store[$object->id] = ['entries' => [], 'order' => [], 'pos' => 0];
+        self::$store[$object->id] = ['entries' => [], 'objects' => [], 'order' => [], 'pos' => 0];
     }
 
-    /** @return array{entries: array<string, Variable>, order: list<string>, pos: int} */
+    /** @return array{entries: array<string, Variable>, objects: array<string, Variable>, order: list<string>, pos: int} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -131,7 +132,7 @@ final class SplObjectStorageBuiltin
     {
         $otherState = self::state($other);
         foreach ($otherState['order'] as $key) {
-            $object = WeakRefSupport::resolveMapKeyVariable($key);
+            $object = self::objectForStoredKey($otherState, $key);
             if (null === $object) {
                 continue;
             }
@@ -146,6 +147,9 @@ final class SplObjectStorageBuiltin
         if (!isset($state['entries'][$key])) {
             self::$store[$storage->id]['order'][] = $key;
         }
+        $objectCopy = new Variable();
+        $objectCopy->copyFrom($object->resolveIndirect());
+        self::$store[$storage->id]['objects'][$key] = $objectCopy;
         if (null === $info) {
             $stored = new Variable(Variable::TYPE_NULL);
             $stored->null();
@@ -166,6 +170,27 @@ final class SplObjectStorageBuiltin
     public static function count(ObjectEntry $storage): int
     {
         return \count(self::state($storage)['entries']);
+    }
+
+    /**
+     * @return list<array{0: Variable, 1: Variable}>
+     */
+    public static function exportSerializeEntries(ObjectEntry $storage): array
+    {
+        $out = [];
+        $state = self::state($storage);
+        foreach ($state['order'] as $key) {
+            if (!isset($state['entries'][$key])) {
+                continue;
+            }
+            $object = self::objectForStoredKey($state, $key);
+            if (null === $object) {
+                continue;
+            }
+            $out[] = [$object, $state['entries'][$key]];
+        }
+
+        return $out;
     }
 
     public static function offsetGet(ObjectEntry $storage, Variable $object): Variable
@@ -204,7 +229,7 @@ final class SplObjectStorageBuiltin
         }
         $order = self::$store[$storage->id]['order'];
         $removedIndex = array_search($key, $order, true);
-        unset(self::$store[$storage->id]['entries'][$key]);
+        unset(self::$store[$storage->id]['entries'][$key], self::$store[$storage->id]['objects'][$key]);
         self::$store[$storage->id]['order'] = array_values(
             array_filter($order, static fn (string $storedKey): bool => $storedKey !== $key)
         );
@@ -241,12 +266,24 @@ final class SplObjectStorageBuiltin
             throw new \RuntimeException('Called current() on invalid iterator position');
         }
         $key = self::state($storage)['order'][self::$store[$storage->id]['pos']];
-        $object = WeakRefSupport::resolveMapKeyVariable($key);
+        $object = self::objectForStoredKey(self::state($storage), $key);
         if (null === $object) {
             throw new \LogicException('SplObjectStorage iterator object missing');
         }
 
         return $object;
+    }
+
+    /**
+     * @param array{entries: array<string, Variable>, objects: array<string, Variable>, order: list<string>, pos: int} $state
+     */
+    private static function objectForStoredKey(array $state, string $key): ?Variable
+    {
+        if (isset($state['objects'][$key])) {
+            return $state['objects'][$key];
+        }
+
+        return WeakRefSupport::resolveMapKeyVariable($key);
     }
 
     public static function key(ObjectEntry $storage): Variable
