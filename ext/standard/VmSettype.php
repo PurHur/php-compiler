@@ -12,6 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\TypeCheck;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -21,6 +22,7 @@ final class VmSettype
 {
     public static function apply(Variable $slot, string $typeName, ?Frame $frame = null): void
     {
+        TypedPropertyCheck::assertWritableByReference($slot);
         $type = strtolower($typeName);
         $value = $slot->resolveIndirect();
         $result = new Variable();
