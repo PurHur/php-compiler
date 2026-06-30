@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
-use PHPCompiler\ext\standard\VmFs;
 use PHPCompiler\ext\standard\VmFsDirNative;
 use PHPCompiler\ext\standard\VmFsDirPure;
 use PHPUnit\Framework\TestCase;
@@ -15,9 +14,11 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
     public function testVmFsDirNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDirNative.php');
-        $this->assertStringContainsString('int mkdir(const char *pathname', $source);
-        $this->assertStringContainsString('FFI::cdef', $source);
-        $this->assertDoesNotMatchRegularExpression('/@\\\\mkdir\\s*\\(/', $source);
+        $this->assertStringContainsString('VmFsDirPure::mkdir', $source);
+        $this->assertStringContainsString('VmFsDirPure::chmod', $source);
+        $this->assertStringContainsString('VmFsDirPure::rmdir', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('int mkdir(const char *pathname', $source);
     }
 
     public function testVmFsDirPureDoesNotUseLibcFfi(): void
@@ -44,34 +45,23 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
         $this->assertFalse(is_dir($dir));
     }
 
-    public function testMkdirChmodRmdirRoundTripWhenFfiDisabled(): void
+    public function testMkdirChmodRmdirRoundTripViaNativeDelegate(): void
     {
         if (!VmFsDirPure::available()) {
             $this->markTestSkipped('host mkdir unavailable');
         }
 
-        $dir = sys_get_temp_dir().'/phpc_fsdir_ffi_off_'.getmypid();
+        $dir = sys_get_temp_dir().'/phpc_fsdir_native_'.getmypid();
         @rmdir($dir);
 
-        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
-        putenv('PHP_COMPILER_DISABLE_FFI=1');
-        try {
-            $this->assertFalse(VmFsDirNative::available());
-            $this->assertTrue(VmFsDirPure::mkdir($dir, 0700, false));
-            $this->assertTrue(VmFsDirPure::chmod($dir, 0755));
-            $this->assertTrue(VmFsDirPure::rmdir($dir));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_DISABLE_FFI');
-            } else {
-                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
-            }
-        }
-
+        $this->assertTrue(VmFsDirNative::mkdir($dir, 0700, false));
+        $this->assertTrue(is_dir($dir));
+        $this->assertTrue(VmFsDirNative::chmod($dir, 0755));
+        $this->assertTrue(VmFsDirNative::rmdir($dir));
         $this->assertFalse(is_dir($dir));
     }
 
-    public function testRecursiveMkdirWhenFfiDisabled(): void
+    public function testRecursiveMkdirViaNativeDelegate(): void
     {
         if (!VmFsDirPure::available()) {
             $this->markTestSkipped('host mkdir unavailable');
@@ -81,19 +71,8 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
         $dir = $base.'/a/b';
         self::rmdirRecursive($base);
 
-        $prev = getenv('PHP_COMPILER_DISABLE_FFI');
-        putenv('PHP_COMPILER_DISABLE_FFI=1');
-        try {
-            $this->assertFalse(VmFsDirNative::available());
-            $this->assertTrue(VmFsDirPure::mkdir($dir, 0700, true));
-            $this->assertTrue(is_dir($dir));
-        } finally {
-            if (false === $prev) {
-                putenv('PHP_COMPILER_DISABLE_FFI');
-            } else {
-                putenv('PHP_COMPILER_DISABLE_FFI='.$prev);
-            }
-        }
+        $this->assertTrue(VmFsDirNative::mkdir($dir, 0700, true));
+        $this->assertTrue(is_dir($dir));
 
         self::rmdirRecursive($base);
     }
