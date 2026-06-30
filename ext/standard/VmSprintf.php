@@ -19,7 +19,7 @@ final class VmSprintf
     /**
      * @param list<Variable> $args
      */
-    public static function format(string $format, array $args, ?Frame $frame = null): string
+    public static function format(string $format, array $args, ?Frame $frame = null, bool $arrayArgs = false): string
     {
         $out = '';
         $argIdx = 0;
@@ -43,7 +43,7 @@ final class VmSprintf
 
             $width = $parsed['width'];
             if ($parsed['widthFromArg']) {
-                $widthVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+                $widthVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
                 $width = self::argToWidth($args[$widthVarIdx], $frame);
                 if (null !== $parsed['positional']) {
                     $parsed['positional'] = null;
@@ -52,14 +52,14 @@ final class VmSprintf
 
             $precision = $parsed['precision'];
             if ($parsed['precisionFromArg']) {
-                $precVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+                $precVarIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
                 $precision = self::argToPrecision($args[$precVarIdx], $frame);
                 if (null !== $parsed['positional']) {
                     $parsed['positional'] = null;
                 }
             }
 
-            $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount);
+            $varIdx = self::resolveArgIndex($parsed['positional'], $argIdx, $argCount, $arrayArgs);
             $converted = self::applyConversion(
                 $parsed['spec'],
                 $args[$varIdx],
@@ -214,24 +214,37 @@ final class VmSprintf
         ];
     }
 
-    private static function resolveArgIndex(?int $positional, int &$sequentialIdx, int $argCount): int
+    private static function resolveArgIndex(?int $positional, int &$sequentialIdx, int $argCount, bool $arrayArgs): int
     {
         if (null !== $positional) {
             if ($positional > $argCount) {
-                throw new \ArgumentCountError(\sprintf(
-                    '%d arguments are required, %d given',
-                    $positional + 1,
-                    $argCount + 1
-                ));
+                self::throwTooFewArgs($arrayArgs, $positional, $argCount);
             }
 
             return $positional - 1;
         }
         if ($sequentialIdx >= $argCount) {
-            throw new \LogicException('sprintf() too few arguments for format string');
+            self::throwTooFewArgs($arrayArgs, $sequentialIdx + 1, $argCount);
         }
 
         return $sequentialIdx++;
+    }
+
+    private static function throwTooFewArgs(bool $arrayArgs, int $requiredValueArgs, int $givenValueArgs): void
+    {
+        if ($arrayArgs) {
+            throw new \ValueError(\sprintf(
+                'The arguments array must contain %d items, %d given',
+                $requiredValueArgs,
+                $givenValueArgs
+            ));
+        }
+
+        throw new \ArgumentCountError(\sprintf(
+            '%d arguments are required, %d given',
+            $requiredValueArgs + 1,
+            $givenValueArgs + 1
+        ));
     }
 
     private static function argToWidth(Variable $var, ?Frame $frame): int
