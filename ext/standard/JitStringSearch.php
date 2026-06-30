@@ -22,19 +22,33 @@ final class JitStringSearch
     public const NOT_FOUND = -1;
 
     private const HELPER = '__phpc_string_find_substr';
+    private const HELPER_CI = '__phpc_string_find_substr_ci';
 
     public static function ensureLinked(Context $context): void
     {
+        self::ensureHelperLinked($context, self::HELPER, self::emitFindSubstr(...));
+    }
+
+    public static function ensureCiLinked(Context $context): void
+    {
+        self::ensureHelperLinked($context, self::HELPER_CI, self::emitFindSubstrCi(...));
+    }
+
+    /**
+     * @param callable(Context, LlvmFunction): void $emit
+     */
+    private static function ensureHelperLinked(Context $context, string $name, callable $emit): void
+    {
         try {
-            $context->lookupFunction(self::HELPER);
+            $context->lookupFunction($name);
 
             return;
         } catch (\Throwable) {
         }
 
-        $probe = $context->module->getNamedFunction(self::HELPER);
+        $probe = $context->module->getNamedFunction($name);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction(self::HELPER, $probe);
+            $context->registerFunction($name, $probe);
 
             return;
         }
@@ -44,11 +58,11 @@ final class JitStringSearch
         $i8p = $context->getTypeFromString('int8*');
         $sizeT = $context->getTypeFromString('size_t');
         $fn = $context->module->addFunction(
-            self::HELPER,
+            $name,
             $context->context->functionType($i32, false, $i8p, $sizeT, $i8p, $sizeT, $sizeT)
         );
-        self::emitFindSubstr($context, $fn);
-        $context->registerFunction(self::HELPER, $fn);
+        $emit($context, $fn);
+        $context->registerFunction($name, $fn);
         self::restoreInsertBlock($context, $restore);
     }
 
@@ -163,9 +177,10 @@ final class JitStringSearch
         bool $caseInsensitive = false
     ): Value {
         if ($caseInsensitive) {
-            throw new \LogicException('JitStringSearch::find() case-insensitive path is not implemented');
+            self::ensureCiLinked($context);
+        } else {
+            self::ensureLinked($context);
         }
-        self::ensureLinked($context);
         [$hayPtr, $hayLen, $needlePtr, $needleLen] = self::stringParts($context, $haystack, $needle);
         $sizeT = $context->getTypeFromString('size_t');
         $i64 = $context->getTypeFromString('int64');
@@ -177,8 +192,9 @@ final class JitStringSearch
                 $context->builder->trunc($offset, $i32),
                 $sizeT
             );
+        $helper = $caseInsensitive ? self::HELPER_CI : self::HELPER;
         $found = $context->builder->call(
-            $context->lookupFunction(self::HELPER),
+            $context->lookupFunction($helper),
             $hayPtr,
             $hayLen,
             $needlePtr,
@@ -210,6 +226,16 @@ final class JitStringSearch
     }
 
     private static function emitFindSubstr(Context $context, LlvmFunction $fn): void
+    {
+        self::emitFindSubstrLoop($context, $fn, 'memcmp');
+    }
+
+    private static function emitFindSubstrCi(Context $context, LlvmFunction $fn): void
+    {
+        self::emitFindSubstrLoop($context, $fn, 'strncasecmp');
+    }
+
+    private static function emitFindSubstrLoop(Context $context, LlvmFunction $fn, string $cmpFn): void
     {
         $entry = $fn->appendBasicBlock('entry');
         $context->builder->positionAtEnd($entry);
@@ -252,7 +278,7 @@ final class JitStringSearch
 
         $context->builder->positionAtEnd($body);
         $cmp = $context->builder->call(
-            $context->lookupFunction('memcmp'),
+            $context->lookupFunction($cmpFn),
             $context->bytePtr($context->builder->inBoundsGEP($hay, $i)),
             $context->bytePtr($needle),
             $nlen

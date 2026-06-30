@@ -38,39 +38,10 @@ final class JitStrpos
         }
 
         if ($caseInsensitive) {
-            return self::findCaseInsensitive($context, $haystack, $needle, $searchOffset, $i64);
+            return JitStringSearch::find($context, $haystack, $needle, $searchOffset, true);
         }
 
         return JitStringSearch::find($context, $haystack, $needle, $searchOffset);
-    }
-
-    private static function findCaseInsensitive(
-        Context $context,
-        Value $haystack,
-        Value $needle,
-        ?Value $searchOffset,
-        \PHPLLVM\Type $i64
-    ): Value {
-        $map = $context->structFieldMap['__string__'];
-        $hayPtr = $context->builder->structGep($haystack, $map['value']);
-        $needlePtr = $context->builder->structGep($needle, $map['value']);
-        $searchPtr = $hayPtr;
-        if (null !== $searchOffset) {
-            $searchPtr = $context->builder->inBoundsGEP($hayPtr, $searchOffset);
-        }
-        $found = $context->builder->call(
-            $context->lookupFunction('strcasestr'),
-            $searchPtr,
-            $needlePtr
-        );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $found, $null);
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
-        $sentinel = $i64->constInt(self::NOT_FOUND, false);
-
-        return $context->builder->select($isNull, $sentinel, $pos);
     }
 
     /**
