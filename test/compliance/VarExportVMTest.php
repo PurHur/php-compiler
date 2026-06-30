@@ -21,6 +21,10 @@ final class VarExportVMTest extends BaseTest
             __DIR__.'/cases/stdlib/var_export_mangled_array_keys.phpt',
             'var_export_mangled_array_keys.phpt'
         );
+        yield 'var_export_string_null_byte.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/var_export_string_null_byte.phpt',
+            'var_export_string_null_byte.phpt'
+        );
     }
 
     public function setUp(): void
