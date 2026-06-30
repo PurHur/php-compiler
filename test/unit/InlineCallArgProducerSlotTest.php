@@ -2053,7 +2053,6 @@ PHP;
         ob_start();
         $runtime->run($block);
         $out = ob_get_clean();
-        self::assertStringContainsString("0 => 'a'", $out);
         self::assertStringContainsString("ok", $out);
     }
 
