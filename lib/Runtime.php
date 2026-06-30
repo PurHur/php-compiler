@@ -43,6 +43,7 @@ use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
 use PHPCompiler\Ast\EncapsedCoalesceDesugar;
 use PHPCompiler\EncapsedCoalesceRejector;
+use PHPCompiler\BareThrowSyntaxRejector;
 use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
 use PHPCompiler\Visitor\ExitFunctionResolver;
@@ -381,6 +382,7 @@ class Runtime {
         $code = GenericArrayTypeSourceRewriter::rewrite($code);
         [$code, $abstractEnumLines] = AbstractEnumSourceRewriter::rewrite($code);
         $this->abstractEnumMarker->setAbstractLines($abstractEnumLines);
+        BareThrowSyntaxRejector::reject($code, $filename);
 
         return SourceBareThrowRewriter::rewrite($code);
     }

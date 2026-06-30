@@ -537,6 +537,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ bare `throw;` catch rethrow (Zend/zend_compile.c, issue #3508, #14239).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 parse error.
+     */
+    public static function supportsBareRethrow(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ array_replace_key() (ext/standard/array.c, issue #5650, #12826).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
