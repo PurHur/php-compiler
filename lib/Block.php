@@ -193,6 +193,14 @@ class Block {
      */
     public array $deployIncludePaths = [];
 
+    /**
+     * Operand slots for deferred inline array literals — must survive JUMPIF dead-temp release
+     * until INIT_ARRAY materialization (#14134, Zend/zend_compile.c).
+     *
+     * @var array<int, true>
+     */
+    public array $deferredArrayLiteralKeepSlots = [];
+
     /** Absolute entry script path when CFG filename attribute is missing (issue #707). */
     private string $scriptPathOverride = '';
 
@@ -765,6 +773,16 @@ class Block {
         }
 
         return false;
+    }
+
+    public function markDeferredArrayLiteralKeepSlot(int $slot): void
+    {
+        $this->deferredArrayLiteralKeepSlots[$slot] = true;
+        foreach ($this->parents as $parent) {
+            if ($parent instanceof self) {
+                $parent->markDeferredArrayLiteralKeepSlot($slot);
+            }
+        }
     }
 
     /**
