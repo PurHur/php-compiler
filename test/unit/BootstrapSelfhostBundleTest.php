@@ -482,6 +482,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
     {
         $entry = self::$root.'/test/selfhost/compiler_lib_spine_smoke/main.php';
         $lines = file($entry, FILE_IGNORE_NEW_LINES) ?: [];
+        $internalLine = null;
         $vmClassMethodLine = null;
         $firstExtenderLine = null;
         foreach ($lines as $i => $line) {
@@ -489,6 +490,10 @@ final class BootstrapSelfhostBundleTest extends TestCase
                 continue;
             }
             $rel = $m[1];
+            if ('lib/Func/Internal.php' === $rel) {
+                $internalLine = $i + 1;
+                continue;
+            }
             if ('lib/VM/Builtin/VmClassMethod.php' === $rel) {
                 $vmClassMethodLine = $i + 1;
                 continue;
@@ -505,7 +510,13 @@ final class BootstrapSelfhostBundleTest extends TestCase
                 $firstExtenderLine = $i + 1;
             }
         }
+        $this->assertNotNull($internalLine, 'Func/Internal.php must be in spine');
         $this->assertNotNull($vmClassMethodLine, 'VmClassMethod.php must be in spine');
+        $this->assertLessThan(
+            $vmClassMethodLine,
+            $internalLine,
+            'Func/Internal must load before VmClassMethod (base class for VmClassMethod extenders)'
+        );
         if (null !== $firstExtenderLine) {
             $this->assertLessThan(
                 $firstExtenderLine,

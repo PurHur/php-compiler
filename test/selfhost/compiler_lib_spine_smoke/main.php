@@ -14,7 +14,17 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 }
 
 
+
+
+require_once __DIR__.'/../../../lib/OpCode.php';
+require_once __DIR__.'/../../../lib/Block.php';
+require_once __DIR__.'/../../../lib/Frame.php';
+require_once __DIR__.'/../../../lib/Func.php';
+require_once __DIR__.'/../../../lib/Handler.php';
+require_once __DIR__.'/../../../lib/JIT/Call.php';
+require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
+require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
 require_once __DIR__.'/../../../bin/vm.php';
 require_once __DIR__.'/../../../ext/bcmath/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathFunction.php';
@@ -112,7 +122,6 @@ require_once __DIR__.'/../../../ext/dom/DocumentAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/DocumentCreateElement.php';
 require_once __DIR__.'/../../../ext/dom/DocumentLoadXML.php';
 require_once __DIR__.'/../../../ext/dom/DocumentSaveXML.php';
-require_once __DIR__.'/../../../ext/dom/DomClassMethod.php';
 require_once __DIR__.'/../../../ext/dom/DomConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomNodeState.php';
 require_once __DIR__.'/../../../ext/dom/DomRegistry.php';
@@ -2295,7 +2304,6 @@ require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/VoidCastDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/EncapsedCoalesceDesugar.php';
 require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
-require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';
 require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
@@ -2357,14 +2365,10 @@ require_once __DIR__.'/../../../lib/CurlyBraceOffsetRejector.php';
 require_once __DIR__.'/../../../lib/DnfType.php';
 require_once __DIR__.'/../../../lib/Doctor.php';
 require_once __DIR__.'/../../../lib/EnumCaseListRewriter.php';
-require_once __DIR__.'/../../../lib/Frame.php';
-require_once __DIR__.'/../../../lib/Func.php';
-require_once __DIR__.'/../../../lib/Func/Internal.php';
 require_once __DIR__.'/../../../lib/Func/JIT.php';
 require_once __DIR__.'/../../../lib/Func/PHP.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSourceRewriter.php';
 require_once __DIR__.'/../../../lib/GenericArrayTypeSpec.php';
-require_once __DIR__.'/../../../lib/Handler.php';
 require_once __DIR__.'/../../../lib/HexFloat.php';
 require_once __DIR__.'/../../../lib/JIT.php';
 require_once __DIR__.'/../../../lib/JIT/Analyzer.php';
@@ -2821,7 +2825,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRegistryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/WeakRefSetup.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ZlibRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Call.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBind.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureBindTo.php';
 require_once __DIR__.'/../../../lib/JIT/Call/ClosureWithBinding.php';
@@ -3043,7 +3046,6 @@ require_once __DIR__.'/../../../lib/MethodVisibility.php';
 require_once __DIR__.'/../../../lib/Module.php';
 require_once __DIR__.'/../../../lib/ModuleAbstract.php';
 require_once __DIR__.'/../../../lib/NullSafeLivenessDetector.php';
-require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/OpCodeNames.php';
 require_once __DIR__.'/../../../lib/Printer.php';
 require_once __DIR__.'/../../../lib/PropertyHookSyntaxRejector.php';
