@@ -163,6 +163,13 @@ class Compiler {
     /** Class being compiled while lowering static property declarations (#3814). */
     private ?string $currentClassStaticPropertyCompile = null;
 
+    /**
+     * Operand slots for deferred inline array literals within the current CFG block compile (#14134).
+     *
+     * @var array<int, true>
+     */
+    private array $deferredArrayLiteralKeepSlots = [];
+
     /** @var array<string, true> lowercase user function names declared `: never` (#4117). */
     private array $neverFunctionNames = [];
 
@@ -748,6 +755,8 @@ class Compiler {
             $this->seen = new SplObjectStorage;
         }
         if (!$this->seen->contains($block)) {
+            $savedDeferredArrayLiteralKeepSlots = $this->deferredArrayLiteralKeepSlots;
+            $this->deferredArrayLiteralKeepSlots = [];
             $this->seen[$block] = $new = new Block($block);
             if ($this->compilingArrowAutoCapture) {
                 $new->arrowAutoCapture = true;
@@ -770,6 +779,10 @@ class Compiler {
                 $this->compileCtorPromotionAssignments($new, $params);
             }
             $this->compileBlock($new);
+            foreach ($this->deferredArrayLiteralKeepSlots as $slot => $_) {
+                $new->deferredArrayLiteralKeepSlots[$slot] = true;
+            }
+            $this->deferredArrayLiteralKeepSlots = $savedDeferredArrayLiteralKeepSlots;
         }
         /** @var mixed $out */
         $out = $this->seen[$block] ?? null;
@@ -19394,6 +19407,237 @@ class Compiler {
         return null;
     }
 
+    private function findCfgBlockContainingExpr(Op $expr): ?CfgBlock
+    {
+        if (null === $this->seen) {
+            return null;
+        }
+        foreach ($this->seen as $cfgBlock) {
+            if (!$cfgBlock instanceof CfgBlock) {
+                continue;
+            }
+            $seen = [];
+            $found = $this->findCfgBlockContainingExprInTree($cfgBlock, $expr, $seen);
+            if (null !== $found) {
+                return $found;
+            }
+        }
+
+        return null;
+    }
+
+    private function findCfgBlockContainingExprInTree(
+        CfgBlock $cfgBlock,
+        Op $expr,
+        array &$seen = []
+    ): ?CfgBlock {
+        $id = spl_object_id($cfgBlock);
+        if (isset($seen[$id])) {
+            return null;
+        }
+        $seen[$id] = true;
+        foreach ($cfgBlock->children as $child) {
+            if ($child === $expr) {
+                return $cfgBlock;
+            }
+        }
+        foreach ($cfgBlock->children as $child) {
+            if ($child instanceof CfgBlock) {
+                $found = $this->findCfgBlockContainingExprInTree($child, $expr, $seen);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+            if ($child instanceof Op\Stmt\JumpIf) {
+                foreach ([$child->if ?? null, $child->else ?? null] as $branch) {
+                    if ($branch instanceof CfgBlock) {
+                        $found = $this->findCfgBlockContainingExprInTree($branch, $expr, $seen);
+                        if (null !== $found) {
+                            return $found;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function findCfgProducerExprForOperand(Operand $operand): ?Op\Expr
+    {
+        if (null === $this->seen) {
+            return null;
+        }
+        $returnRoot = Block::cfgVarRoot($operand);
+        $rootMatch = null;
+        foreach ($this->seen as $cfgBlock) {
+            if (!$cfgBlock instanceof CfgBlock) {
+                continue;
+            }
+            $seen = [];
+            $producer = $this->findCfgProducerInBlockTree($cfgBlock, $operand, $returnRoot, $seen, true);
+            if (null !== $producer) {
+                return $producer;
+            }
+            $seen = [];
+            $candidate = $this->findCfgProducerInBlockTree($cfgBlock, $operand, $returnRoot, $seen, false);
+            if (null !== $candidate) {
+                $rootMatch = $candidate;
+            }
+        }
+
+        return $rootMatch;
+    }
+
+    private function findCfgProducerInBlockTree(
+        CfgBlock $cfgBlock,
+        Operand $operand,
+        ?Operand $returnRoot,
+        array &$seen = [],
+        bool $exactOnly = false
+    ): ?Op\Expr {
+        $id = spl_object_id($cfgBlock);
+        if (isset($seen[$id])) {
+            return null;
+        }
+        $seen[$id] = true;
+        foreach ($cfgBlock->children as $child) {
+            if ($child instanceof Op\Expr) {
+                $result = $child->result;
+                if (!$result instanceof Operand) {
+                    continue;
+                }
+                if ($result === $operand) {
+                    return $child;
+                }
+                if (!$exactOnly && null !== $returnRoot && Block::cfgVarRoot($result) === $returnRoot) {
+                    return $child;
+                }
+            }
+            if ($child instanceof CfgBlock) {
+                $found = $this->findCfgProducerInBlockTree($child, $operand, $returnRoot, $seen, $exactOnly);
+                if (null !== $found) {
+                    return $found;
+                }
+            }
+            if ($child instanceof Op\Stmt\JumpIf) {
+                foreach ([$child->if ?? null, $child->else ?? null] as $branch) {
+                    if ($branch instanceof CfgBlock) {
+                        $found = $this->findCfgProducerInBlockTree($branch, $operand, $returnRoot, $seen, $exactOnly);
+                        if (null !== $found) {
+                            return $found;
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private function cfgBlockContainsOp(?CfgBlock $cfgBlock, Op $needle): bool
+    {
+        if (null === $cfgBlock) {
+            return false;
+        }
+        foreach ($cfgBlock->children as $child) {
+            if ($child === $needle) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return list<OpCode>
+     */
+    private function rematerializeCfgProducerExprOps(Op\Expr $producer, Block $block): array
+    {
+        if ($this->cfgBlockContainsOp($block->orig, $producer)) {
+            return [];
+        }
+        if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+            return $this->compileFuncCall(
+                $this->compileOperand($producer->name, $block, true),
+                $producer->args ?? [],
+                $producer->result,
+                $block,
+                max(0, $producer->getLine()),
+                $producer
+            );
+        }
+        if ($producer instanceof Op\Expr\BinaryOp) {
+            $ops = [];
+            foreach (['left', 'right'] as $side) {
+                $operand = $producer->$side;
+                if (!$operand instanceof Operand) {
+                    continue;
+                }
+                $nested = $this->findCfgProducerExprForOperand($operand);
+                if ($nested instanceof Op\Expr) {
+                    $ops = array_merge($ops, $this->rematerializeCfgProducerExprOps($nested, $block));
+                }
+            }
+
+            return array_merge($ops, $this->compileExpr($producer, $block));
+        }
+        if ($producer instanceof Op\Expr\Cast) {
+            $nested = $this->findCfgProducerExprForOperand($producer->expr);
+            $ops = [];
+            if ($nested instanceof Op\Expr) {
+                $ops = $this->rematerializeCfgProducerExprOps($nested, $block);
+            }
+
+            return array_merge($ops, $this->compileExpr($producer, $block));
+        }
+
+        return $this->compileExpr($producer, $block);
+    }
+
+    /**
+     * php-cfg evaluates inline array elements before ternary JUMPIFs; rematerialize at INIT_ARRAY (#14134).
+     *
+     * @return array{0: list<OpCode>, 1: int}
+     */
+    private function compileDeferredArrayLiteralElementValue(
+        Operand $valueOperand,
+        Block $block,
+        Op\Expr\Array_ $arrayExpr,
+        int $elementIndex
+    ): array {
+        $prefetchOps = $this->compileRuntimeEnumCaseFetchOpsForArrayElement(
+            $valueOperand,
+            $block,
+            $arrayExpr,
+            $elementIndex
+        );
+        if ([] !== $prefetchOps) {
+            return [$prefetchOps, $prefetchOps[0]->arg1];
+        }
+
+        $folded = $this->tryFoldArrayElementCompileTimeValue($valueOperand, $block, $arrayExpr, $elementIndex);
+        if (null !== $folded) {
+            return [[], $folded];
+        }
+
+        $valueOperand = $arrayExpr->values[$elementIndex] ?? $valueOperand;
+        $producer = $this->findCfgProducerExprForOperand($valueOperand);
+        if ($producer instanceof Op\Expr) {
+            $ops = $this->rematerializeCfgProducerExprOps($producer, $block);
+            if ([] !== $ops) {
+                $valueSlot = $this->compileOperand($valueOperand, $block, true);
+                $snapshotOperand = new Operand\Temporary();
+                $snapshotSlot = $block->getVarSlot($snapshotOperand, false);
+                $ops[] = new OpCode(OpCode::TYPE_ASSIGN, $snapshotSlot, $valueSlot);
+
+                return [$ops, $snapshotSlot];
+            }
+        }
+
+        return [[], $this->compileOperand($valueOperand, $block, true)];
+    }
+
     /**
      * @return list<OpCode>
      */
@@ -23431,9 +23675,14 @@ class Compiler {
                 $valueSlot = $prefetchOps[0]->arg1;
                 $return = array_merge($return, $prefetchOps);
             } else {
-                $valueSlot = $this->tryFoldArrayElementCompileTimeValue($expr->values[$i], $block, $expr, $i);
-                if (null === $valueSlot) {
-                    $valueSlot = $this->compileOperand($expr->values[$i], $block, true);
+                [$rematerializeOps, $valueSlot] = $this->compileDeferredArrayLiteralElementValue(
+                    $expr->values[$i],
+                    $block,
+                    $expr,
+                    $i
+                );
+                if ([] !== $rematerializeOps) {
+                    $return = array_merge($return, $rematerializeOps);
                 }
             }
             $keyOperand = $expr->keys[$i];

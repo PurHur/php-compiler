@@ -15245,6 +15245,9 @@ restart:
             if ($frame->block->isNamedVariableSlot($slot)) {
                 continue;
             }
+            if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
+                continue;
+            }
             if ($this->isVmScopeSlotUsedByFollowingOps($frame, $slot)) {
                 continue;
             }
@@ -15267,7 +15270,14 @@ restart:
             if (isset($frame->block->constants[$slot])) {
                 continue;
             }
-            if ($frame->block->scopeSlotReadInDirectJumpTargets($slot)) {
+            if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
+                continue;
+            }
+            if ($frame->block->scopeSlotReadInJumpTargets($slot)) {
+                continue;
+            }
+            // Large inline array literals materialize after ternary JUMPIFs in the same block (#14134).
+            if ($this->isVmScopeSlotUsedByFollowingOps($frame, $slot)) {
                 continue;
             }
             $this->releaseVmDeadScopeSlot($frame, $slot);
@@ -15290,6 +15300,9 @@ restart:
     private function releaseVmDeadScopeSlot(Frame $frame, int $slot): void
     {
         if (!isset($frame->scope[$slot]) || $frame->block->isNamedVariableSlot($slot)) {
+            return;
+        }
+        if (isset($frame->block->deferredArrayLiteralKeepSlots[$slot])) {
             return;
         }
         if ($this->variableAliasesObjectPropertyCell($frame->scope[$slot])) {
