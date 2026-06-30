@@ -17359,7 +17359,11 @@ class Compiler {
         $hoistedArgCount = \count($hoistedArgs);
         $consumerName = $this->resolveInlineCallArgFuncName($consumer);
         if ($this->builtinUsesTrailingComparatorCallback($consumerName) && $hoistedArgCount > 1) {
-            --$hoistedArgCount;
+            $callbackArg = $consumer->args[\count($consumer->args) - 1] ?? null;
+            // array_udiff(g(), h(), 'strcmp') — embedded string callback is not a hoisted producer (#14021).
+            if (null !== $callbackArg && !$this->isEmbeddedCallLiteralArg($callbackArg)) {
+                --$hoistedArgCount;
+            }
         }
 
         return $producerFuncCalls >= 2 && $producerFuncCalls === $hoistedArgCount;
