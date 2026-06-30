@@ -595,6 +595,11 @@ final class VmDateTimeNative
             ], $tzName);
         }
 
+        $relativeWeekday = self::tryParseRelativeWeekdayForDateParse($date);
+        if (null !== $relativeWeekday) {
+            return $relativeWeekday;
+        }
+
         try {
             $parsed = self::parseDateTime($date, $tzName);
 
@@ -602,6 +607,89 @@ final class VmDateTimeNative
         } catch (NativeDateMalformedStringException) {
             return self::parseUnrecognizedDateString($date);
         }
+    }
+
+    /**
+     * php-src date_parse() — relative weekday modifiers keep false calendar fields (#14163).
+     *
+     * @return array{
+     *   year: int|false,
+     *   month: int|false,
+     *   day: int|false,
+     *   hour: int|false,
+     *   minute: int|false,
+     *   second: int|false,
+     *   fraction: float|false,
+     *   warning_count: int,
+     *   warnings: array<int, string>,
+     *   error_count: int,
+     *   errors: array<int, string>,
+     *   is_localtime: bool,
+     *   relative: array{
+     *     year: int,
+     *     month: int,
+     *     day: int,
+     *     hour: int,
+     *     minute: int,
+     *     second: int,
+     *     weekday: int
+     *   }
+     * }|null
+     */
+    private static function tryParseRelativeWeekdayForDateParse(string $date): ?array
+    {
+        $modifier = null;
+        $weekday = null;
+        if (1 === preg_match(
+            '/^next\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = 'next';
+            $weekday = strtolower($matches[1]);
+        } elseif (1 === preg_match(
+            '/^(last|previous|this)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = strtolower($matches[1]);
+            $weekday = strtolower($matches[2]);
+        } elseif (1 === preg_match(
+            '/^(monday|tuesday|wednesday|thursday|friday|saturday|sunday)$/i',
+            $date,
+            $matches
+        )) {
+            $modifier = 'bare';
+            $weekday = strtolower($matches[1]);
+        }
+        if (null === $weekday) {
+            return null;
+        }
+        $weekdayNum = self::weekdayNameToNumber($weekday);
+        if ($weekdayNum < 0) {
+            return null;
+        }
+        $relativeDay = \in_array($modifier, ['last', 'previous'], true) ? -7 : 0;
+        $result = self::parseResultFromComponents([
+            'year' => false,
+            'month' => false,
+            'day' => false,
+            'hour' => false,
+            'minute' => false,
+            'second' => false,
+            'fraction' => false,
+        ]);
+        $result['relative'] = [
+            'year' => 0,
+            'month' => 0,
+            'day' => $relativeDay,
+            'hour' => 0,
+            'minute' => 0,
+            'second' => 0,
+            'weekday' => $weekdayNum,
+        ];
+
+        return $result;
     }
 
     /**
