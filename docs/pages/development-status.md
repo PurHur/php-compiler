@@ -15,7 +15,7 @@ permalink: /development-status.html
 | **North star** | Compiler compiles itself without Zend ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | **v1.1.0 theme** | M5 fast-path stability; enum/property hooks; `preg_match` JIT; `spl_autoload*`; php-in-PHP JIT helpers ([#78](https://github.com/PurHur/php-compiler/issues/78)) |
 | **Wave 3** | Language **12/12** · Stdlib **13/13** on master ([#1380](https://github.com/PurHur/php-compiler/issues/1380)) |
-| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **3519** / **3519** |
+| **Spine SSOT** | `php script/bootstrap-spine-count.php` → **3521** / **3521** |
 | **Builtin matrix** | **852** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
@@ -50,7 +50,7 @@ permalink: /development-status.html
 ### Still open (high signal)
 
 - **MCJIT execute** — `bin/jit.php -r` SIGSEGV ([#98](https://github.com/PurHur/php-compiler/issues/98))
-- **Literal spine ratio** — **3519/3519** ✅ (Jun 2026)
+- **Literal spine ratio** — **3521/3521** ✅ (Jun 2026)
 - **Compile-spine stub retirement** — shrink `PHP_COMPILER_SELFHOST_AOT` on M3 allowlist ([#1402](https://github.com/PurHur/php-compiler/issues/1402))
 - **007-ThrowsWeb AOT execute** — invalid POST segfault at runtime (link OK; slice `EXAMPLES_AOT_SMOKE_ONLY=007`)
 - **LLVM 14+ upgrade** — experimental `script/install-llvm14.sh` ([#174](https://github.com/PurHur/php-compiler/issues/174))
@@ -62,7 +62,7 @@ permalink: /development-status.html
 - **`phpc` CLI** — `run`, `serve`, `build`, `deploy`, `lint`, `test`, `init`, `doctor`
 - **Examples 000–009** — VM and AOT link/execute for the curated web subset
 - **Self-host M0** — `compiler_minimal bundle OK` ✅
-- **Self-host M2** — spine **3519/3519** ✅; native link + lint ✅
+- **Self-host M2** — spine **3521/3521** ✅; native link + lint ✅
 - **Self-host M3** — HelloWorld strict `emit_path=native` ✅ ([#1493](https://github.com/PurHur/php-compiler/issues/1493)); inventory argv `bin/compile.php` ✅ ([#3024](https://github.com/PurHur/php-compiler/issues/3024) closed); compile-smoke strict native ✅ ([#1937](https://github.com/PurHur/php-compiler/issues/1937))
 - **Self-host M4** — `make bootstrap-loop-probe` full ladder ✅; gen-2→gen-3 full-spine recompile ✅
 - **Self-host M5** — vendor prelink **3/3** ✅; **`make north-star5-verify-fast`** daily ✅; `--strict` pre-merge; gen-0 refreshed; VM probe ~**20ms**
