@@ -11962,9 +11962,22 @@ restart:
         return (($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
     }
 
+    /**
+     * Enclosing-function statics use {@see Context} keys {@code func\0var}; closure-body
+     * statics use bare names (Zend/zend_closures.c static_variables, issue #4872).
+     * Captured parent statics via {@code use (&$n)} keep the context key (#14077).
+     */
+    protected function functionStaticUsesContextStorage(string $storageKey): bool
+    {
+        return str_contains($storageKey, "\0");
+    }
+
     protected function ensureFunctionStaticForFrame(Frame $frame, string $storageKey): Variable
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if (
+            $this->frameUsesClosureStaticStorage($frame)
+            && !$this->functionStaticUsesContextStorage($storageKey)
+        ) {
             return $frame->closureCall->ensureStatic($storageKey);
         }
 
@@ -11973,7 +11986,10 @@ restart:
 
     protected function isFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): bool
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if (
+            $this->frameUsesClosureStaticStorage($frame)
+            && !$this->functionStaticUsesContextStorage($storageKey)
+        ) {
             return $frame->closureCall->isStaticInitialized($storageKey);
         }
 
@@ -11982,7 +11998,10 @@ restart:
 
     protected function markFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): void
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if (
+            $this->frameUsesClosureStaticStorage($frame)
+            && !$this->functionStaticUsesContextStorage($storageKey)
+        ) {
             $frame->closureCall->markStaticInitialized($storageKey);
 
             return;
