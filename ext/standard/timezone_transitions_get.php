@@ -10,7 +10,6 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\BuiltinExecute;
 use PHPCompiler\VM\DateTimeSupport;
-use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -62,30 +61,7 @@ final class timezone_transitions_get extends Internal
             $end
         );
         BuiltinExecute::writeReturn($frame, static function (Variable $ret) use ($transitions): void {
-            if (false === $transitions) {
-                $ret->bool(false);
-
-                return;
-            }
-            $ht = new HashTable();
-            foreach ($transitions as $index => $transition) {
-                $row = new HashTable();
-                foreach ($transition as $key => $value) {
-                    $cell = new Variable();
-                    if (\is_int($value)) {
-                        $cell->int($value);
-                    } elseif (\is_bool($value)) {
-                        $cell->bool($value);
-                    } else {
-                        $cell->string((string) $value);
-                    }
-                    $row->addNew((string) $key, $cell);
-                }
-                $entry = new Variable();
-                $entry->array($row);
-                $ht->addNew((string) $index, $entry);
-            }
-            $ret->array($ht);
+            DateTimeSupport::timezoneTransitionsInto($transitions, $ret);
         });
     }
 

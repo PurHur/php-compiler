@@ -256,6 +256,39 @@ final class DateTimeSupport
         $returnVar->array($ht);
     }
 
+    /**
+     * php-src zim_DateTimeZone_getTransitions / timezone_transitions_get (#6041, #11211).
+     *
+     * @param list<array{ts: int, time: string, offset: int, isdst: bool, abbr: string}>|false $transitions
+     */
+    public static function timezoneTransitionsInto(array|false $transitions, Variable $returnVar): void
+    {
+        if (false === $transitions) {
+            $returnVar->bool(false);
+
+            return;
+        }
+        $ht = new HashTable();
+        foreach ($transitions as $index => $transition) {
+            $row = new HashTable();
+            foreach ($transition as $key => $value) {
+                $cell = new Variable();
+                if (\is_int($value)) {
+                    $cell->int($value);
+                } elseif (\is_bool($value)) {
+                    $cell->bool($value);
+                } else {
+                    $cell->string((string) $value);
+                }
+                $row->addNew((string) $key, $cell);
+            }
+            $entry = new Variable();
+            $entry->array($row);
+            $ht->addNew((string) $index, $entry);
+        }
+        $returnVar->array($ht);
+    }
+
     public static function initDateTimeZone(ObjectEntry $zone, string $timezone): void
     {
         try {
