@@ -5,17 +5,15 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\ext\standard\JitArrayIsList;
 use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for array_is_list() via ArrayIsListJitHelper PHP (#13645).
  *
- * Standalone AOT keeps LLVM in {@see JitArrayIsList::hashTableIsList()}.
+ * Standalone AOT compiles {@see ArrayIsListJitHelper} via JitVmHelperLink (#14246); native literal arrays return true without a PHP call.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::isList()}
  * php-src: ext/standard/array.c — php_array_is_list()
  */
@@ -37,9 +35,6 @@ final class ArrayIsListRuntime
         if ($array->type & JITVariable::IS_NATIVE_ARRAY) {
             return $context->constantFromBool(true);
         }
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return JitArrayIsList::invoke($context, $array);
-        }
 
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
@@ -55,12 +50,13 @@ final class ArrayIsListRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_IS_LIST);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
