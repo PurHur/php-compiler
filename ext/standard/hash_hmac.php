@@ -40,13 +40,7 @@ final class hash_hmac extends Internal
         if (4 === $argc) {
             $raw = VmMath::parseBoolBuiltinArg($frame->calledArgs[3], 'hash_hmac', 4, 'binary');
         }
-        $result = VmHash::hashHmac($algo, $data, $key, $raw);
-        if (false === $result) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-        $frame->returnVar->string($result);
+        $frame->returnVar->string(VmHash::hashHmac($algo, $data, $key, $raw));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -17,7 +17,7 @@ final class HashCryptoJitHelper
         return VmHash::hash($algo, $data, $raw);
     }
 
-    public static function hashHmac(string $algo, string $data, string $key, bool $raw): string|false
+    public static function hashHmac(string $algo, string $data, string $key, bool $raw): string
     {
         return VmHash::hashHmac($algo, $data, $key, $raw);
     }
