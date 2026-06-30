@@ -525,9 +525,6 @@ class VM {
      */
     private function materializeArrayElementForStorage(Variable $value): Variable
     {
-        if (!$value->isIndirect()) {
-            return $value;
-        }
         $copy = new Variable();
         $copy->copyFrom($value->resolveIndirect());
 
@@ -15323,10 +15320,40 @@ restart:
                     } catch (\LogicException) {
                     }
                 }
+                if ($this->scopeArraysReferenceObjectId($frame, $objectId)) {
+                    $frame->scope[$slot]->null();
+
+                    return;
+                }
             }
         }
         ObjectLifetime::releaseDirectObject($frame->scope[$slot]);
         $frame->scope[$slot]->null();
+    }
+
+    /** Keep array-literal element objects alive when expr temps are released (#14120, #5593). */
+    private function scopeArraysReferenceObjectId(Frame $frame, int $objectId): bool
+    {
+        foreach ($frame->scope as $scopeVar) {
+            $resolved = $scopeVar->resolveIndirect();
+            if (Variable::TYPE_ARRAY !== $resolved->type) {
+                continue;
+            }
+            foreach ($resolved->toArray()->iterateKeyed(true) as [, $element]) {
+                $cell = $element->resolveIndirect();
+                if (Variable::TYPE_OBJECT !== $cell->type) {
+                    continue;
+                }
+                try {
+                    if ($cell->toObject()->id === $objectId) {
+                        return true;
+                    }
+                } catch (\LogicException) {
+                }
+            }
+        }
+
+        return false;
     }
 
     /** True when a scope/call-arg cell resolves to a live object property backing store (#6041). */
