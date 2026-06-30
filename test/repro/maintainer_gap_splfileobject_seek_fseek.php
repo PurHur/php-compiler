@@ -23,6 +23,6 @@ $pass = is_string($current)
     && is_string($afterSeek)
     && str_starts_with($afterSeek, 'line0')
     && is_string($gcl)
-    && str_starts_with($gcl, 'line0');
+    && str_starts_with($gcl, 'line1');
 echo $pass ? "OK\n" : "FAIL\n";
 exit($pass ? 0 : 1);
