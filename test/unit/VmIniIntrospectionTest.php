@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\ext\standard\VmEnv;
 use PHPCompiler\ext\standard\VmIniIntrospection;
 use PHPUnit\Framework\TestCase;
 
@@ -41,5 +42,11 @@ final class VmIniIntrospectionTest extends TestCase
         putenv('PHP_COMPILER_INI_SCANNED_FILES=/explicit/a.ini,');
         VmIniIntrospection::seedHostIniEnvFromZend();
         $this->assertSame('/explicit/a.ini,', VmIniIntrospection::scannedFiles());
+    }
+
+    public function testLoadedFileReadsVmEnvPutenvOverlay(): void
+    {
+        VmEnv::putenv('PHP_COMPILER_INI_LOADED_FILE=/etc/custom/php.ini');
+        $this->assertSame('/etc/custom/php.ini', VmIniIntrospection::loadedFile());
     }
 }
