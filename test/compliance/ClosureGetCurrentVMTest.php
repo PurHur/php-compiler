@@ -13,6 +13,9 @@ final class ClosureGetCurrentVMTest extends BaseTest
 
     public static function providePHPTests(): \Generator
     {
+        if (!CompilerVersion::supportsClosureGetCurrent()) {
+            return;
+        }
         yield 'closure_get_current.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/closure_get_current.phpt',
             'closure_get_current.phpt'
