@@ -17223,6 +17223,65 @@ class Compiler {
     }
 
     /**
+     * Contiguous FuncCall stmts from {@see $fromIndex} feeding a distinct dead-temp consumer (#13969).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hasContiguousHoistedFuncCallProducersFrom(
+        int $fromIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall)
+            || !property_exists($consumer, 'args')
+            || !is_array($consumer->args)
+            || \count($consumer->args) < 2
+            || !$this->callArgsAreDistinctInlineTemporaries($consumer->args)
+        ) {
+            return false;
+        }
+        $producerFuncCalls = 0;
+        for ($k = $fromIndex; $k < $consumerIndex; ++$k) {
+            $stmt = $cfgChildren[$k] ?? null;
+            if ($stmt instanceof Op\Expr\ConstFetch || $stmt instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($stmt instanceof Op\Expr\Array_) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($stmt)) {
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($stmt)) {
+                if (!$this->funcCallExprUsesVariableCallee($stmt)) {
+                    return false;
+                }
+                ++$producerFuncCalls;
+                continue;
+            }
+
+            return false;
+        }
+
+        return $producerFuncCalls >= 2 && $producerFuncCalls === \count($consumer->args);
+    }
+
+    /** True when FuncCall callee is a variable/closure slot, not a literal name (#13969). */
+    private function funcCallExprUsesVariableCallee(Op\Expr $expr): bool
+    {
+        if ($expr instanceof Op\Expr\FuncCall || $expr instanceof Op\Expr\NsFuncCall) {
+            return !($expr->name instanceof Operand\Literal);
+        }
+        if ($expr instanceof Op\Expr\MethodCall || $expr instanceof Op\Expr\StaticCall) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * First hoisted FuncCall in a sibling inline call-arg chain ending at {@see $consumerIndex}.
      *
      * @param list<Op> $cfgChildren
@@ -17240,7 +17299,10 @@ class Compiler {
                 }
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
-                if ($this->statementLevelFuncCallBeforeHoistedSiblingChain($i, $consumerIndex, $cfgChildren)) {
+                if (
+                    $this->statementLevelFuncCallBeforeHoistedSiblingChain($i, $consumerIndex, $cfgChildren)
+                    && !$this->hasContiguousHoistedFuncCallProducersFrom($i, $consumerIndex, $cfgChildren)
+                ) {
                     break;
                 }
                 --$i;
