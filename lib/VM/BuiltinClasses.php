@@ -22,6 +22,7 @@ use PHPCompiler\VM\Builtin\DateTimeFormat;
 use PHPCompiler\VM\Builtin\DateTimeGetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeGetLastErrors;
 use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
+use PHPCompiler\VM\Builtin\DateTimeGetOffset;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableConstruct;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromFormat;
@@ -981,6 +982,7 @@ final class BuiltinClasses
         $dateTimeMethods = [
             'format' => new DateTimeFormat(),
             'gettimestamp' => new DateTimeGetTimestamp(),
+            'getoffset' => new DateTimeGetOffset(),
             'gettimezone' => new DateTimeGetTimezone(),
             'getmicrosecond' => new DateTimeGetMicrosecond(),
             'modify' => new DateTimeModify(),
