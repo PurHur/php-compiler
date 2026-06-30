@@ -179,6 +179,36 @@ final class DateIntervalSupport
         return $interval;
     }
 
+    /**
+     * php-src ext/json/php_json.c — DateInterval object json wire (#14144).
+     *
+     * @return array<string, mixed>
+     */
+    public static function exportZendJsonWireDateInterval(ObjectEntry $interval): array
+    {
+        $state = self::readState($interval);
+        $fromString = false;
+        if ($interval->hasProperty('from_string')) {
+            $fs = $interval->getProperty('from_string')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN === $fs->type) {
+                $fromString = $fs->toBool();
+            }
+        }
+
+        return [
+            'y' => $state['y'],
+            'm' => $state['m'],
+            'd' => $state['d'],
+            'h' => $state['h'],
+            'i' => $state['i'],
+            's' => $state['s'],
+            'f' => $state['f'],
+            'invert' => $state['invert'],
+            'days' => $state['days'],
+            'from_string' => $fromString,
+        ];
+    }
+
     /** php-src php_date_serialize — Zend DateInterval member order (#10692). */
     public static function encodeZendSerializeWire(ObjectEntry $interval): string
     {

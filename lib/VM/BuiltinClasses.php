@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\VM\Builtin\DatePeriodConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
@@ -1062,6 +1063,24 @@ final class BuiltinClasses
         $di->methods['createfromdatestring'] = new DateIntervalCreateFromDateString();
         $di->methodVisibility['createfromdatestring'] = $pubStatic;
         $ctx->classes[DateIntervalSupport::CLASS_DATEINTERVAL] = $di;
+
+        $objProto = new Variable(Variable::TYPE_OBJECT);
+        $nullProto = new Variable(Variable::TYPE_NULL);
+        $dp = new ClassEntry('DatePeriod');
+        $dp->properties[] = new ClassProperty('start', null, $objProto);
+        $dp->properties[] = new ClassProperty('current', null, $nullProto);
+        $dp->properties[] = new ClassProperty('end', null, $nullProto);
+        $dp->properties[] = new ClassProperty('interval', null, $objProto);
+        $dp->properties[] = new ClassProperty('recurrences', null, $intProto);
+        $dp->properties[] = new ClassProperty('include_start_date', null, $boolProto);
+        $dp->properties[] = new ClassProperty('include_end_date', null, $boolProto);
+        foreach ($dp->properties as $prop) {
+            $prop->visibility = $pub;
+        }
+        $dp->constructor = new DatePeriodConstruct();
+        $dp->methods['__construct'] = $dp->constructor;
+        $dp->methodVisibility['__construct'] = $pub;
+        $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 
     private static function registerExceptions(Context $ctx): void
