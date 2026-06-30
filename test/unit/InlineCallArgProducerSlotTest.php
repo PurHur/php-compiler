@@ -2270,6 +2270,63 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** Issue #13828 — var_export(current($a), true) in concat after next($a). */
+    public function testVarExportNestedCurrentUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+next($a);
+$concat = 'current=' . var_export(current($a), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_current.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("current=2\n", $out);
+    }
+
+    /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
+    public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+next($a);
+$concat = 'next=' . var_export(next($a), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_next.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("next=3\n", $out);
+    }
+
+    /** Issue #13831 — var_export(end($a), true) in concat when pointer already at end. */
+    public function testVarExportNestedEndSecondCallUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+end($a);
+$concat = 'end=' . var_export(end($a), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_end.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("end=3\n", $out);
+    }
+
     /** Issue #11400 — print_r(in_array(..., true), true) wires nested FuncCall + dual ConstFetch true slots. */
     public function testPrintRNestedBuiltinDualTrueLiteralUsesFuncCallProducerSlot(): void
     {
