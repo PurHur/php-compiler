@@ -7,12 +7,12 @@ namespace PHPCompiler;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
-/** Property-hook syntax reference profile gate (#12574). */
+/** Property-hook syntax on 8.4 forward profile (#13904). */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
-    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
+    public function testSupportsPropertyHooksTrueOn84ForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
@@ -25,17 +25,10 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         );
     }
 
-    public function testRejectorThrowsOnHookBlockAfterProperty(): void
+    public function testRejectorAcceptsHookBlockOn84ForwardProfile(): void
     {
-        if (CompilerVersion::supportsPropertyHooks()) {
-            $this->markTestSkipped('property hooks enabled on PHP 8.4.0+ target');
-        }
-        $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
-        $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE);
-        PropertyHookSyntaxRejector::reject(
-            file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hook_isset_empty.php'),
-            'isset_empty.php'
-        );
+        $code = file_get_contents(dirname(__DIR__).'/repro/maintainer_gap_property_hook_get_basic.php');
+        $this->assertSame($code, PropertyHookSyntaxRejector::reject($code, 'get_basic.php'));
     }
 
     public function testRuntimeRejectsDefaultInitializerHook(): void
