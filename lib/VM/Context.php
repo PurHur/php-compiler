@@ -351,6 +351,16 @@ class Context {
                 $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_BLOWFISH);
 
                 return $var;
+            case 'crypt_sha256':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_SHA256);
+
+                return $var;
+            case 'crypt_sha512':
+                $var = new Variable(Variable::TYPE_INTEGER);
+                $var->int(\PHPCompiler\ext\standard\VmPassword::CRYPT_SHA512);
+
+                return $var;
         }
         $filterVar = \PHPCompiler\ext\filter\FilterConstants::variableForName($name);
         if (null !== $filterVar) {
