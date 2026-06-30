@@ -40,4 +40,17 @@ final class VmStreamWrapperRegistryTest extends TestCase
         $this->assertTrue(VmStreamWrapperRegistry::unregister('http'));
         $this->assertFalse(VmStreamWrapperRegistry::unregister('http'));
     }
+
+    /** php-src registration order, not alphabetical (#14211). */
+    public function testGetWrappersPreservesRegistrationOrder(): void
+    {
+        $wrappers = VmStreamWrapperRegistry::getWrappers();
+        $this->assertSame('https', $wrappers[0] ?? null);
+        $this->assertSame(
+            ['https', 'ftps', 'compress.zlib', 'php', 'file', 'glob', 'data', 'http', 'ftp', 'phar'],
+            $wrappers
+        );
+        $this->assertTrue(VmStreamWrapperRegistry::register('var', 'VarStreamWrapper'));
+        $this->assertSame('var', VmStreamWrapperRegistry::getWrappers()[\count($wrappers)]);
+    }
 }

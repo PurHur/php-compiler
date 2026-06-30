@@ -14,17 +14,17 @@ use PHPCompiler\VM\ErrorReporter;
  */
 final class VmStreamWrapperRegistry
 {
-    /** @var list<string> Built-in schemes always reported by stream_get_wrappers(). */
+    /** @var list<string> Built-in schemes in php-src registration order (main/streams/streams.c). */
     private const BUILTIN_PROTOCOLS = [
-        'file',
-        'http',
         'https',
-        'ftp',
         'ftps',
-        'php',
         'compress.zlib',
-        'data',
+        'php',
+        'file',
         'glob',
+        'data',
+        'http',
+        'ftp',
         'phar',
     ];
 
@@ -129,7 +129,6 @@ final class VmStreamWrapperRegistry
         foreach (\array_keys(self::$custom) as $protocol) {
             $all[] = $protocol;
         }
-        \sort($all);
 
         return $all;
     }
