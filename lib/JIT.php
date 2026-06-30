@@ -6844,7 +6844,8 @@ class JIT {
                     if (isset($block->paramByRef[$idx])) {
                         $this->bindJitParamByReference($block, $param->result, $args[$argIdx]);
                     } else {
-                        $this->assignOperand($param->result, $args[$argIdx], true);
+                        $paramArg = $this->prepareNestedJitCalleeParamArgument($args[$argIdx]);
+                        $this->assignOperand($param->result, $paramArg, true);
                     }
                 }
                 $captureSlots = JIT\ClosureHelper::orderedCaptureSlots($block);
@@ -11675,6 +11676,47 @@ class JIT {
         $this->context->listUnpackAssignSlots[
             $this->context->resolveRefAliasName($name)
         ] = $slot;
+    }
+
+    private function prepareNestedJitCalleeParamArgument(Variable $arg): Variable
+    {
+        if (!JIT\NestedJitCompileScope::isActive() || Variable::TYPE_STRING !== $arg->type) {
+            return $arg;
+        }
+        if (Variable::KIND_VALUE !== $arg->kind) {
+            $materialized = JIT\JitStringArg::lowerDominating(
+                $this->context,
+                $arg,
+                'nested JIT string parameter'
+            );
+
+            return new Variable(
+                $this->context,
+                Variable::TYPE_STRING,
+                Variable::KIND_VALUE,
+                $materialized
+            );
+        }
+        $llvmTy = $this->context->getStringFromType($arg->value->typeOf());
+        if ('__string__*' !== $llvmTy) {
+            return $arg;
+        }
+        $slot = JIT\BasicBlockHelper::entryAlloca(
+            $this->context,
+            $this->context->getTypeFromString('__string__*')
+        );
+        $owned = $this->context->builder->call(
+            $this->context->lookupFunction('__string__separate'),
+            $arg->value
+        );
+        $this->context->builder->store($owned, $slot);
+
+        return new Variable(
+            $this->context,
+            Variable::TYPE_STRING,
+            Variable::KIND_VALUE,
+            $this->context->builder->load($slot)
+        );
     }
 
     private function assignOperand(Operand $resultOp, Variable $value, bool $force = false): void {

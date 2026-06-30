@@ -106,6 +106,15 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('->value', $source);
         $this->assertStringNotContainsString('->getValue()', $source);
         $this->assertStringContainsString('JitLongArg::lower', $source);
+        $this->assertStringContainsString('JitStringArg::lowerDominating', $source);
+    }
+
+    public function testJitMaterializesNestedStringParamsAtCalleeEntry(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT.php');
+        $this->assertStringContainsString('prepareNestedJitCalleeParamArgument', $source);
+        $this->assertStringContainsString('__string__separate', $source);
+        $this->assertStringContainsString('NestedJitCompileScope::isActive', $source);
     }
 
     public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void
