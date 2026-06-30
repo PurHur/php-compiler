@@ -83,6 +83,11 @@ class Context {
     /** True while serialize/unserialize magic hooks run on an isolated stack (#12069). */
     public bool $isolatedPhpFunctionInvoke = false;
 
+    /**
+     * Isolated closure invoke from stdlib callbacks — defer user catch to outer runFrames (#14104).
+     */
+    public bool $deferBuiltinCallbackCatchToOuterRunFrames = false;
+
     /** Catch frame for throw during nested __clone(); bubble to clone opcode caller (#12068). */
     public ?Frame $cloneMagicExternalCatchFrame = null;
 
