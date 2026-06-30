@@ -3780,4 +3780,34 @@ PHP;
         $runtime->run($block);
         self::assertSame("2\n", ob_get_clean());
     }
+
+    /** Issue #14022 — false !== file_exists(null) must ARG_SEND null, not hoisted false literal. */
+    public function testFileExistsNullArgSendUsesNullNotComparisonFalseLiteral(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+if (false !== file_exists(null)) {
+    echo "fail\n";
+}
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'file_exists_null_arg.php');
+
+        $constSlots = [];
+        $argSendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $constSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $argSendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $constSlots);
+        self::assertNotEmpty($argSendSlots);
+        self::assertSame($constSlots[1], $argSendSlots[0], 'null ConstFetch must feed file_exists arg');
+        self::assertNotSame($constSlots[0], $argSendSlots[0], 'hoisted false must not feed file_exists arg');
+    }
 }
