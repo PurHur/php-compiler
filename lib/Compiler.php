@@ -16194,6 +16194,7 @@ class Compiler {
                 ($child instanceof Op\Expr\StaticCall || $child instanceof Op\Expr\MethodCall)
                 && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
                 && !$this->isNestedCallArgProducerForConsumer($child, $callOp, $i, $callIndex, $cfgChildren)
+                && !$this->isSiblingMultiArgFuncCallProducer($child, $callOp, $i, $callIndex, $cfgChildren)
                 && !$this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
                     $child,
                     $callOp,
@@ -16267,6 +16268,9 @@ class Compiler {
                 && is_array($callOp->args)
             ) {
                 array_unshift($producers, $child);
+                if ($this->isSiblingMultiArgFuncCallProducer($child, $callOp, $i, $callIndex, $cfgChildren)) {
+                    continue;
+                }
                 break;
             }
             if (
@@ -23094,7 +23098,8 @@ class Compiler {
             return true;
         }
 
-        return $this->siblingFuncCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex);
+        return $this->siblingFuncCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex)
+            || $this->siblingMethodCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex);
     }
 
     /**
@@ -23103,6 +23108,41 @@ class Compiler {
     private function siblingFuncCallFeedsVarExportConsumer(Op $cfgCallOp, Block $block, int $producerIndex): bool
     {
         if (!$this->isSiblingInlineCallProducerExpr($cfgCallOp)) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+            $child = $cfgChildren[$i];
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\Array_
+            ) {
+                continue;
+            }
+            if (
+                !$child instanceof Op\Expr\FuncCall
+                && !$child instanceof Op\Expr\NsFuncCall
+            ) {
+                return false;
+            }
+            if ('var_export' !== $this->resolveCfgFuncCallName($child)) {
+                return false;
+            }
+            $callArg = $child->args[0] ?? null;
+
+            return null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg);
+        }
+
+        return false;
+    }
+
+    /**
+     * php-cfg `var_export($it->current(), true)` hoists MethodCall sibling; ConstFetch `true` may sit between (#13901).
+     */
+    private function siblingMethodCallFeedsVarExportConsumer(Op $cfgCallOp, Block $block, int $producerIndex): bool
+    {
+        if (!$cfgCallOp instanceof Op\Expr\MethodCall && !$cfgCallOp instanceof Op\Expr\StaticCall) {
             return false;
         }
         $cfgChildren = $block->orig->children;

@@ -2289,6 +2289,44 @@ PHP;
         self::assertSame("current=2\n", $out);
     }
 
+    /** Issue #13901 — var_export($it->current(), true) in concat after next(). */
+    public function testVarExportNestedArrayIteratorCurrentUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$it = new ArrayIterator([1, 2, 3]);
+$it->next();
+$concat = 'cur=' . var_export($it->current(), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_arrayiterator_current.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("cur=2\n", $out);
+    }
+
+    /** Issue #13901 — var_export($it->key(), true) in concat after next(). */
+    public function testVarExportNestedArrayIteratorKeyUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$it = new ArrayIterator([1, 2, 3]);
+$it->next();
+$concat = 'key=' . var_export($it->key(), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_arrayiterator_key.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("key=1\n", $out);
+    }
+
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
     public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
     {
