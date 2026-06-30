@@ -1046,14 +1046,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('strstr', $fn);
         }
         try {
-            $context->lookupFunction('strcasestr');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcasestr', $ft);
-            $context->registerFunction('strcasestr', $fn);
-        }
-        try {
             $context->lookupFunction('strrchr');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
