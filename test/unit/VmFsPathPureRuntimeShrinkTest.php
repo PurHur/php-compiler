@@ -11,7 +11,7 @@ use PHPUnit\Framework\TestCase;
 /** VmFsPathPure — rename/copy/link without libc FFI (#5213, #12316). */
 final class VmFsPathPureRuntimeShrinkTest extends TestCase
 {
-    public function testVmFsPathNativeDelegatesToPureWithoutFfi(): void
+    public function testVmFsPathNativeUsesLibcFfiWithPureFallback(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsPathNative.php');
         $this->assertStringContainsString('VmFsPathPure::rename', $source);
@@ -19,9 +19,8 @@ final class VmFsPathPureRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmFsPathPure::link', $source);
         $this->assertStringContainsString('VmFsPathPure::readlink', $source);
         $this->assertStringContainsString('VmFsPathPure::symlink', $source);
-        $this->assertStringContainsString('VmFsPathPure::available()', $source);
-        $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('int rename(const char *oldpath', $source);
+        $this->assertStringContainsString('int rename(const char *oldpath', $source);
+        $this->assertStringContainsString('symlinkat', $source);
     }
 
     public function testVmFsPathPureDoesNotUseLibcFfi(): void

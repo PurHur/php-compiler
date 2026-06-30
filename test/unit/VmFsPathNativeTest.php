@@ -28,11 +28,11 @@ final class VmFsPathNativeTest extends TestCase
         $this->assertDoesNotMatchRegularExpression('/@touch\\s*\\(/', $source);
     }
 
-    public function testNativeDelegatesToPureWithoutFfi(): void
+    public function testNativeFallsBackToPureWhenFfiDisabled(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsPathNative.php');
         $this->assertStringContainsString('VmFsPathPure::rename', $source);
-        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringContainsString('int rename(const char *oldpath', $source);
     }
 
     public function testRenameCopyLinkRoundTrip(): void
