@@ -54,6 +54,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrJitHelper.php');
         $this->assertStringContainsString('ParseStrEngine::parse', $source);
+        $this->assertStringContainsString('parseDelimitedIntoNative', $source);
         $this->assertStringContainsString('VmParseStr::mergeInto', $source);
         $this->assertStringContainsString('parseCookieHeaderInto', $source);
     }

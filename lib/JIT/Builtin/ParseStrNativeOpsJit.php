@@ -7,7 +7,6 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
