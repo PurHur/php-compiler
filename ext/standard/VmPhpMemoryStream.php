@@ -184,6 +184,30 @@ final class VmPhpMemoryStream
         return $state->position;
     }
 
+    /**
+     * Truncate in-memory buffer (php-src main/streams/php_stream_memory.c).
+     */
+    public static function truncate(int $handle, int $size): bool
+    {
+        $state = self::$streams[$handle] ?? null;
+        if (null === $state || !$state->canWrite || $size < 0) {
+            return false;
+        }
+
+        $len = \strlen($state->buffer);
+        if ($size < $len) {
+            $state->buffer = \substr($state->buffer, 0, $size);
+        } elseif ($size > $len) {
+            $state->buffer .= \str_repeat("\0", $size - $len);
+        }
+        if ($state->position > $size) {
+            $state->position = $size;
+        }
+        $state->atEof = false;
+
+        return true;
+    }
+
     public static function eof(int $handle): bool
     {
         $state = self::$streams[$handle] ?? null;
