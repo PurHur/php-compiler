@@ -33,8 +33,6 @@ final class timezone_abbreviations_list extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'timezone_abbreviations_list() is not implemented for JIT in this compiler build'
-        );
+        return JitTimezoneAbbreviationsList::invoke($context, ...$args);
     }
 }
