@@ -41,6 +41,7 @@ use PHPCompiler\Ast\HexFloatLiteralDesugar;
 use PHPCompiler\Ast\NewDereferenceableDesugar;
 use PHPCompiler\Ast\CloneWithDesugar;
 use PHPCompiler\Ast\PipeOperatorDesugar;
+use PHPCompiler\Ast\EncapsedCoalesceDesugar;
 use PHPCompiler\EncapsedCoalesceRejector;
 use PHPCompiler\Ast\VoidCastDesugar;
 use PHPCompiler\Visitor\InOperatorResolver;
@@ -465,6 +466,7 @@ class Runtime {
         $code = CloneWithDesugar::desugar($code);
         $code = VoidCastDesugar::desugar($code);
         $code = PipeOperatorDesugar::desugar($code);
+        $code = EncapsedCoalesceDesugar::desugar($code);
         return $code;
     }
 

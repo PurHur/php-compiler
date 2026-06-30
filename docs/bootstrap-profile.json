@@ -2277,6 +2277,7 @@
         "lib/Ast/AsymmetricVisibilityRewriter.php",
         "lib/Ast/CloneWithDesugar.php",
         "lib/Ast/DnfParenTypeRewriter.php",
+        "lib/Ast/EncapsedCoalesceDesugar.php",
         "lib/Ast/EnumCaseImportRewriter.php",
         "lib/Ast/EnumCaseMatchSwitchRewriter.php",
         "lib/Ast/EnumPropertyCompileCheck.php",
@@ -3752,9 +3753,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3522,
+        "inventory_files": 3523,
         "excluded": 0,
-        "eligible": 3522,
+        "eligible": 3523,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

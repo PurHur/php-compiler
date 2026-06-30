@@ -2303,6 +2303,7 @@ require_once __DIR__.'/../../../lib/Ast/MultiBlockNameContext.php';
 require_once __DIR__.'/../../../lib/Ast/MultiBlockNameResolver.php';
 require_once __DIR__.'/../../../lib/Ast/NewDereferenceableDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/PipeOperatorDesugar.php';
+require_once __DIR__.'/../../../lib/Ast/EncapsedCoalesceDesugar.php';
 require_once __DIR__.'/../../../lib/Ast/SealedClassAnnotator.php';
 require_once __DIR__.'/../../../lib/Ast/SealedClassPreprocessor.php';
 require_once __DIR__.'/../../../lib/Ast/StaticClassAnnotator.php';

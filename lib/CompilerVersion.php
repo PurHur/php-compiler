@@ -328,6 +328,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ null coalesce (??) inside double-quoted `{$...}` interpolation (#14063).
+     *
+     * Enabled on 8.4.0-dev forward profile — Zend 8.2 rejects; stable 8.4+ accepts.
+     * php-src: Zend/zend_language_parser.y encapsed variable grammar.
+     */
+    public static function supportsEncapsedCoalesce(): bool
+    {
+        return version_compare(self::VERSION, '8.4', '>=');
+    }
+
+    /**
      * PHP 8.4+ ReflectionProperty::{isReadable,isWritable} (ext/reflection/php_reflection.c, #13065, #13663).
      *
      * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).

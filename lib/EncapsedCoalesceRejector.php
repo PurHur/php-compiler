@@ -5,11 +5,13 @@ declare(strict_types=1);
 namespace PHPCompiler;
 
 use PHPCompiler\Compiler\CompileFatal;
+use PHPCompiler\CompilerVersion;
 
 /**
  * Reject null coalesce (??) inside encapsed/complex double-quoted interpolation (#14032).
  *
- * php-src: Zend/zend_language_scanner.l — encapsed variable grammar allows ->, ?->, [, { but not ??.
+ * php-src Zend 8.2: encapsed variable grammar allows ->, ?->, [, { but not ??.
+ * PHP 8.4+ allows ?? — gated by {@see CompilerVersion::supportsEncapsedCoalesce()} (#14063).
  */
 final class EncapsedCoalesceRejector
 {
@@ -17,6 +19,9 @@ final class EncapsedCoalesceRejector
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
+        if (CompilerVersion::supportsEncapsedCoalesce()) {
+            return $code;
+        }
         if (false === strpos($code, '??') || false === strpos($code, '"')) {
             return $code;
         }
