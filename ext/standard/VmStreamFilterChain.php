@@ -5,7 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
+use PHPCompiler\VM;
+use PHPCompiler\VM\ClassValidator;
+use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
 /**
@@ -30,7 +34,7 @@ final class VmStreamFilterChain
         'convert.quoted-printable-encode' => true,
     ];
 
-    /** @var array<int, array{stream: int, name: string, active: bool}> */
+    /** @var array<int, array{stream: int, name: string, active: bool, user: bool, instance: ?ObjectEntry, oncreate: bool}> */
     private static array $filters = [];
 
     /** @var array<int, list<int>> */
@@ -38,6 +42,9 @@ final class VmStreamFilterChain
 
     /** @var array<int, list<int>> */
     private static array $writeChains = [];
+
+    /** @var array<int, Context> VM context captured when user filters attach (#14001). */
+    private static array $streamContexts = [];
 
     private static int $nextFilterId = 1;
 
@@ -114,7 +121,7 @@ final class VmStreamFilterChain
 
     public static function clearStream(int $streamHandle): void
     {
-        unset(self::$readChains[$streamHandle], self::$writeChains[$streamHandle]);
+        unset(self::$readChains[$streamHandle], self::$writeChains[$streamHandle], self::$streamContexts[$streamHandle]);
         foreach (self::$filters as $id => $meta) {
             if ($meta['stream'] === $streamHandle) {
                 unset(self::$filters[$id]);
@@ -159,13 +166,21 @@ final class VmStreamFilterChain
 
             return false;
         }
-        if (!self::isBuiltinFilterName($filterName)) {
-            self::warning(
-                $frame,
-                \sprintf('stream_filter_%s(): user filter "%s" is not implemented in this compiler build', $prepend ? 'prepend' : 'append', $filterName)
-            );
+        $isUser = VmStreamFilters::isUserFilterName($filterName);
+        if ($isUser) {
+            if (null === $frame?->vmContext) {
+                self::warning(
+                    $frame,
+                    \sprintf(
+                        'stream_filter_%s(): user filter "%s" requires VM context in this compiler build',
+                        $prepend ? 'prepend' : 'append',
+                        $filterName
+                    )
+                );
 
-            return false;
+                return false;
+            }
+            self::$streamContexts[$streamHandle] = $frame->vmContext;
         }
         if (0 === ($readWrite & (self::READ | self::WRITE))) {
             $readWrite = self::READ;
@@ -176,6 +191,9 @@ final class VmStreamFilterChain
             'stream' => $streamHandle,
             'name' => $filterName,
             'active' => true,
+            'user' => $isUser,
+            'instance' => null,
+            'oncreate' => false,
         ];
 
         if (0 !== ($readWrite & self::READ)) {
@@ -205,8 +223,120 @@ final class VmStreamFilterChain
         if (!isset(self::$filters[$filterId]) || !self::$filters[$filterId]['active']) {
             return $data;
         }
+        $meta = self::$filters[$filterId];
+        if ($meta['user']) {
+            return self::applyUserFilter($filterId, $data);
+        }
 
-        return self::transform(self::$filters[$filterId]['name'], $data);
+        return self::transform($meta['name'], $data);
+    }
+
+    private static function applyUserFilter(int $filterId, string $data): string
+    {
+        $meta = self::$filters[$filterId];
+        $ctx = self::$streamContexts[$meta['stream']] ?? null;
+        if (null === $ctx) {
+            return $data;
+        }
+        $className = VmStreamFilters::classForFilter($meta['name']);
+        if (null === $className) {
+            return $data;
+        }
+        $vm = $ctx->runtime->vm();
+        $instance = $meta['instance'];
+        if (null === $instance) {
+            $instance = self::instantiateUserFilter($vm, $ctx, $className);
+            if (null === $instance) {
+                return $data;
+            }
+            self::$filters[$filterId]['instance'] = $instance;
+            $instance->getProperty(PhpUserFilterBuiltin::PROP_FILTERNAME)->string($meta['name']);
+            if (!self::$filters[$filterId]['oncreate']) {
+                self::$filters[$filterId]['oncreate'] = true;
+                if ($vm->hasInstanceMethod($instance->class, 'oncreate')) {
+                    $created = $vm->invokeInstanceMethod($instance, 'oncreate')->resolveIndirect();
+                    if (Variable::TYPE_BOOLEAN !== $created->type || !$created->toBool()) {
+                        return $data;
+                    }
+                }
+            }
+        }
+
+        $inBrigadeId = VmStreamBucket::allocateBrigade();
+        $outBrigadeId = VmStreamBucket::allocateBrigade();
+        $bucketVar = VmStreamBucket::newBucketObject($ctx, $meta['stream'], $data);
+        VmStreamBucket::append($inBrigadeId, $bucketVar->toObject());
+
+        $inVar = new Variable();
+        VmStreamBucket::brigadeHandle($inVar, $inBrigadeId);
+        $outVar = new Variable();
+        VmStreamBucket::brigadeHandle($outVar, $outBrigadeId);
+        $consumedVar = new Variable();
+        $consumedVar->int(0);
+        $consumedRef = new Variable();
+        $consumedRef->indirect($consumedVar);
+        $closingVar = new Variable();
+        $closingVar->bool(false);
+
+        $status = $vm->invokeInstanceMethod(
+            $instance,
+            'filter',
+            $inVar,
+            $outVar,
+            $consumedRef,
+            $closingVar
+        )->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $status->type
+            || StdlibConstants::PSFS_PASS_ON !== $status->toInt()
+        ) {
+            return $data;
+        }
+
+        return self::drainBrigade($ctx, $outBrigadeId);
+    }
+
+    private static function drainBrigade(Context $ctx, int $brigadeId): string
+    {
+        $chunks = [];
+        while (true) {
+            $bucketVar = VmStreamBucket::makeWriteable($ctx, $brigadeId);
+            if (null === $bucketVar) {
+                break;
+            }
+            $obj = $bucketVar->resolveIndirect()->toObject();
+            $chunks[] = $obj->getProperty(VmStreamBucket::PROP_DATA)->resolveIndirect()->toString();
+        }
+
+        return \implode('', $chunks);
+    }
+
+    private static function instantiateUserFilter(VM $vm, Context $ctx, string $className): ?ObjectEntry
+    {
+        PhpUserFilterBuiltin::registerClass($ctx);
+        if (!PhpUserFilterBuiltin::isSubclassOf($ctx, $className)) {
+            return null;
+        }
+        $lc = strtolower($className);
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($className);
+        }
+        if (!isset($ctx->classes[$lc])) {
+            return null;
+        }
+        $class = $ctx->classes[$lc];
+        if ($class->isEnum || $class->isAbstract || $class->isInterface) {
+            return null;
+        }
+        try {
+            ClassValidator::assertInstantiable($class);
+        } catch (\Error) {
+            return null;
+        }
+        $object = new ObjectEntry($class);
+        $vm->initInstancePropertyDefaults($object);
+        $object->constructed = true;
+
+        return $object;
     }
 
     private static function transform(string $filterName, string $data): string
