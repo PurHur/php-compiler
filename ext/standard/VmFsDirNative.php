@@ -5,50 +5,185 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 /**
- * mkdir/rmdir/chmod/chown/chgrp for VM — {@see VmFsDirPure} SSOT, no libc FFI (#8991, #12317).
+ * mkdir/rmdir/chmod/chown/chgrp via thin libc FFI — no VM builtin re-entry (#14109).
  *
- * Mirrors {@see \PHPCompiler\JIT\Builtin\StringFsDirJit} (__compiler_mkdir/chown/chgrp)
- * and {@see JitRmdir}/{@see JitChmod} (php-src ext/standard/filestat.c).
+ * VM path uses libc mkdir(2) directly; {@see VmFsDirPure} remains bootstrap/Zend SSOT.
+ * Mirrors {@see FsDirJitHelper} / {@see \PHPCompiler\JIT\Builtin\FsDirRuntime}.
+ *
+ * php-src: ext/standard/filestat.c — php_mkdir, php_chmod, php_chown
  */
 final class VmFsDirNative
 {
+    private const PATH_MAX = 4096;
+
+    private const AT_FDCWD = -100;
+
+    private const AT_SYMLINK_NOFOLLOW = 0x100;
+
+    private static ?\FFI $ffi = null;
+
     public static function available(): bool
     {
-        return VmFsDirPure::available();
+        return null !== self::ffi();
     }
 
     public static function mkdir(string $path, int $mode, bool $recursive): bool
     {
-        return VmFsDirPure::mkdir($path, $mode, $recursive);
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        $mode &= 0777;
+        if (!$recursive) {
+            return self::mkdirOne($path, $mode);
+        }
+        if (VmStatPath::isDir($path)) {
+            return true;
+        }
+        $path = rtrim($path, '/');
+        if ('' === $path || \strlen($path) >= self::PATH_MAX) {
+            return false;
+        }
+        $len = \strlen($path);
+        for ($i = 1; $i < $len; ++$i) {
+            if ('/' !== $path[$i]) {
+                continue;
+            }
+            $partial = \substr($path, 0, $i);
+            if ('' === $partial) {
+                continue;
+            }
+            if (VmStatPath::isDir($partial)) {
+                continue;
+            }
+            if (!self::mkdirOne($partial, $mode)) {
+                return false;
+            }
+        }
+
+        return self::mkdirOne($path, $mode);
     }
 
     public static function rmdir(string $path): bool
     {
-        return VmFsDirPure::rmdir($path);
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return 0 === (int) $ffi->rmdir($path);
     }
 
     public static function chmod(string $path, int $permissions): bool
     {
-        return VmFsDirPure::chmod($path, $permissions);
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return 0 === (int) $ffi->chmod($path, $permissions & 07777);
     }
 
     public static function chown(string $path, int $uid): bool
     {
-        return VmFsDirPure::chown($path, $uid);
+        return self::chownAt($path, $uid, -1, false);
     }
 
     public static function lchown(string $path, int $uid): bool
     {
-        return VmFsDirPure::lchown($path, $uid);
+        return self::chownAt($path, $uid, -1, true);
     }
 
     public static function chgrp(string $path, int $gid): bool
     {
-        return VmFsDirPure::chgrp($path, $gid);
+        return self::chownAt($path, -1, $gid, false);
     }
 
     public static function lchgrp(string $path, int $gid): bool
     {
-        return VmFsDirPure::lchgrp($path, $gid);
+        return self::chownAt($path, -1, $gid, true);
+    }
+
+    private static function mkdirOne(string $path, int $mode): bool
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return 0 === (int) $ffi->mkdir($path, $mode);
+    }
+
+    private static function chownAt(string $path, int $uid, int $gid, bool $linkOnly): bool
+    {
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+        if ($linkOnly) {
+            return 0 === (int) $ffi->fchownat(
+                self::AT_FDCWD,
+                $path,
+                $uid,
+                $gid,
+                self::AT_SYMLINK_NOFOLLOW
+            );
+        }
+
+        return 0 === (int) $ffi->chown($path, $uid, $gid);
+    }
+
+    private static function ffiEnabled(): bool
+    {
+        $v = getenv('PHP_COMPILER_DISABLE_FFI');
+        if (false !== $v && '' !== $v && '0' !== $v && 'false' !== strtolower($v)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function ffi(): ?\FFI
+    {
+        if (!self::ffiEnabled()) {
+            return null;
+        }
+        if (null !== self::$ffi) {
+            return self::$ffi;
+        }
+        if (!\extension_loaded('ffi')) {
+            return null;
+        }
+
+        $cdef = <<<'CDEF'
+typedef unsigned int mode_t;
+typedef unsigned int uid_t;
+typedef unsigned int gid_t;
+
+int mkdir(const char *pathname, mode_t mode);
+int rmdir(const char *pathname);
+int chmod(const char *pathname, mode_t mode);
+int chown(const char *pathname, uid_t owner, gid_t group);
+int fchownat(int dirfd, const char *pathname, uid_t owner, gid_t group, int flags);
+CDEF;
+
+        foreach (['libc.so.6', 'libc.so'] as $lib) {
+            try {
+                self::$ffi = \FFI::cdef($cdef, $lib);
+
+                return self::$ffi;
+            } catch (\Throwable) {
+            }
+        }
+
+        return null;
     }
 }
