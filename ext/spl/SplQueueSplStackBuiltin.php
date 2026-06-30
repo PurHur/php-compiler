@@ -107,6 +107,8 @@ final class SplStackBuiltin
         $entry->methods['getiteratormode'] = new SplStackGetIteratorMode();
         $entry->methodVisibility['getiteratormode'] = $pub;
         $entry->methodNames['getiteratormode'] = 'getIteratorMode';
+        $entry->methods['top'] = new SplStackTop();
+        $entry->methodVisibility['top'] = $pub;
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -114,7 +116,7 @@ final class SplStackBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['__construct'], $entry->methods['getiteratormode']);
+        return isset($entry->methods['__construct'], $entry->methods['getiteratormode'], $entry->methods['top']);
     }
 }
 
@@ -269,5 +271,23 @@ final class SplStackGetIteratorMode extends VmClassMethod
             return;
         }
         $frame->returnVar->int(SplStackBuiltin::IT_MODE_LIFO);
+    }
+}
+
+final class SplStackTop extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('top');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplStackBuiltin::CLASS_LC,
+            'SplStack::top()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::top($object));
     }
 }

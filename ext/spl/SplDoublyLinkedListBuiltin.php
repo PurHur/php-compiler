@@ -162,6 +162,19 @@ final class SplDoublyLinkedListBuiltin
         return $result;
     }
 
+    public static function top(ObjectEntry $object): Variable
+    {
+        $state = self::state($object);
+        if ([] === $state) {
+            throw new \RuntimeException("Can't peek at an empty datastructure");
+        }
+        $last = $state[\count($state) - 1];
+        $result = new Variable();
+        $result->copyFrom($last);
+
+        return $result;
+    }
+
     public static function shift(ObjectEntry $object): Variable
     {
         $state = self::state($object);
