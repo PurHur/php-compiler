@@ -75,6 +75,11 @@ final class ClosureState
         return $this->staticVars[$varName];
     }
 
+    public function peekStatic(string $varName): ?Variable
+    {
+        return $this->staticVars[$varName] ?? null;
+    }
+
     public function isStaticInitialized(string $varName): bool
     {
         return isset($this->staticInitialized[$varName]);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Block;
 use PHPCompiler\Compiler\AttributeEntry;
 use PHPCompiler\Compiler\AttributeNames;
 use PHPCompiler\Compiler\CompileTimeEnumCase;
@@ -13,6 +14,8 @@ use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\Func\PHP as PhpFunc;
+use PHPCompiler\OpCode;
 use PHPCfg\Op\Type as CfgType;
 use PHPCompiler\VM as VmEngine;
 use PHPCompiler\VM\Builtin\AttributeConstruct;
@@ -1790,5 +1793,185 @@ final class ReflectionSupport
         }
 
         return [null, null];
+    }
+
+    /** php-src: ReflectionFunctionAbstract::getStaticVariables() (#14166). */
+    public static function returnStaticVariablesFromFunctionReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?Variable $returnVar
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        if ($reflection->reflectionIsInternalFunction) {
+            $returnVar->newArray();
+
+            return;
+        }
+        $closure = $reflection->reflectionClosureState;
+        if (null !== $closure) {
+            self::returnFunctionStaticVariables($ctx, $returnVar, $closure->func, $closure);
+
+            return;
+        }
+        try {
+            $func = self::resolveFunctionFromReflection($ctx, $reflection);
+        } catch (\ReflectionException) {
+            $returnVar->newArray();
+
+            return;
+        }
+        self::returnFunctionStaticVariables($ctx, $returnVar, $func, null);
+    }
+
+    /** php-src: ReflectionMethod::getStaticVariables() (#14166). */
+    public static function returnStaticVariablesFromMethodReflection(
+        Context $ctx,
+        ObjectEntry $reflection,
+        ?Variable $returnVar
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        $func = self::resolvePhpFuncFromReflectionMethod($ctx, $reflection);
+        if (null === $func) {
+            $returnVar->newArray();
+
+            return;
+        }
+        self::returnFunctionStaticVariables($ctx, $returnVar, $func, null);
+    }
+
+    public static function returnFunctionStaticVariables(
+        Context $ctx,
+        ?Variable $returnVar,
+        PhpFunc $func,
+        ?ClosureState $closureState
+    ): void {
+        if (null === $returnVar) {
+            return;
+        }
+        $returnVar->newArray();
+        $ht = $returnVar->toArray();
+        foreach (self::collectFunctionStaticVarDeclarations($func->block) as $varName => $info) {
+            $copy = self::resolveStaticVarReflectionValue(
+                $ctx,
+                $info['storageKey'],
+                $info['defaultSlot'],
+                $info['block'],
+                $closureState
+            );
+            $ht->add($varName, $copy);
+        }
+    }
+
+    /**
+     * @return array<string, array{storageKey: string, defaultSlot: ?int, block: Block}>
+     */
+    private static function collectFunctionStaticVarDeclarations(Block $entry): array
+    {
+        $decls = [];
+        foreach (self::collectBlocksForStaticReflection($entry) as $block) {
+            foreach ($block->opCodes as $op) {
+                if (OpCode::TYPE_DECLARE_FUNCTION_STATIC !== $op->type) {
+                    continue;
+                }
+                $varName = $op->functionStaticVarName;
+                if (null === $varName || '' === $varName || !isset($block->constants[$op->arg2])) {
+                    continue;
+                }
+                if (!isset($decls[$varName])) {
+                    $decls[$varName] = [
+                        'storageKey' => $block->constants[$op->arg2]->toString(),
+                        'defaultSlot' => null !== $op->arg3 ? (int) $op->arg3 : null,
+                        'block' => $block,
+                    ];
+                }
+            }
+        }
+
+        return $decls;
+    }
+
+    /** @return list<Block> */
+    private static function collectBlocksForStaticReflection(Block $block): array
+    {
+        $seen = new \SplObjectStorage();
+        $out = [];
+        self::collectBlocksForStaticReflectionInternal($block, $seen, $out);
+
+        return $out;
+    }
+
+    /** @param list<Block> $out */
+    private static function collectBlocksForStaticReflectionInternal(
+        Block $block,
+        \SplObjectStorage $seen,
+        array &$out
+    ): void {
+        if ($seen->contains($block)) {
+            return;
+        }
+        $seen->attach($block);
+        $out[] = $block;
+        foreach ($block->blocks as $nested) {
+            self::collectBlocksForStaticReflectionInternal($nested, $seen, $out);
+        }
+        foreach ($block->opCodes as $op) {
+            foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                if ($sub instanceof Block) {
+                    self::collectBlocksForStaticReflectionInternal($sub, $seen, $out);
+                }
+            }
+        }
+    }
+
+    private static function resolveStaticVarReflectionValue(
+        Context $ctx,
+        string $storageKey,
+        ?int $defaultSlot,
+        Block $block,
+        ?ClosureState $closureState
+    ): Variable {
+        $copy = new Variable();
+        $initialized = false;
+        $source = null;
+        if (null !== $closureState && !str_contains($storageKey, "\0")) {
+            $source = $closureState->peekStatic($storageKey);
+            $initialized = $closureState->isStaticInitialized($storageKey);
+        } else {
+            $source = $ctx->peekFunctionStatic($storageKey);
+            $initialized = $ctx->isFunctionStaticInitialized($storageKey);
+        }
+        if ($initialized && null !== $source) {
+            $copy->copyFrom($source->resolveIndirect());
+
+            return $copy;
+        }
+        if (null !== $defaultSlot && isset($block->constants[$defaultSlot])) {
+            $copy->copyFrom($block->constants[$defaultSlot]);
+
+            return $copy;
+        }
+        $copy->null();
+
+        return $copy;
+    }
+
+    private static function resolvePhpFuncFromReflectionMethod(Context $ctx, ObjectEntry $reflection): ?PhpFunc
+    {
+        $className = self::classNameFromReflection($reflection);
+        $method = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return null;
+        }
+        $func = $entry->methods[strtolower($method)] ?? null;
+        if (!$func instanceof PhpFunc) {
+            return null;
+        }
+
+        return $func;
     }
 }
