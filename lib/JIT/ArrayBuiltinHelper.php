@@ -22,6 +22,7 @@ use PHPCompiler\ext\standard\strtoupper;
 use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
@@ -976,9 +977,16 @@ final class ArrayBuiltinHelper
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
             return self::buildMapClosureZipFromMultiple($context, $callback, $arrays);
         }
+        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        ) && null !== $callback->compileTimeString) {
+            return ArrayMapRuntime::mapMultipleWithBuiltin($context, $arrays, $callback->compileTimeString);
+        }
 
         throw new \LogicException(
-            'array_map() with multiple arrays requires a null or closure callback for JIT/AOT in this compiler build'
+            'array_map() with multiple arrays requires a null, closure, or compile-time string builtin callback for JIT/AOT in this compiler build'
         );
     }
 

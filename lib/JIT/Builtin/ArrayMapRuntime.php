@@ -9,6 +9,7 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -31,10 +32,13 @@ final class ArrayMapRuntime
 
     private const MAP_BUILTIN = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithBuiltin';
 
+    private const MAP_BUILTIN_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithBuiltinMultiple';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::MAP_NULL,
         self::MAP_BUILTIN,
+        self::MAP_BUILTIN_MULTIPLE,
     ];
 
     public static function mapSingle(Context $context, JITVariable $callback, JITVariable $array): Value
@@ -60,6 +64,24 @@ final class ArrayMapRuntime
         }
 
         return self::callMapBuiltin($context, $ht, $context->constantFromString($name));
+    }
+
+    /**
+     * @param list<JITVariable> $arrays
+     */
+    public static function mapMultipleWithBuiltin(Context $context, array $arrays, string $builtinName): Value
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
+            throw new \LogicException('array_map() multi-array string builtin standalone LLVM path not implemented');
+        }
+        self::ensureLinked($context);
+        $sources = [];
+        foreach ($arrays as $array) {
+            $sources[] = self::argToHashtable($context, $array);
+        }
+        $packed = self::packHashtablePtrArray($context, $sources);
+
+        return self::callMapBuiltinMultiple($context, $packed, $context->constantFromString($builtinName));
     }
 
     public static function ensureLinked(Context $context): void
@@ -89,6 +111,7 @@ final class ArrayMapRuntime
         self::ensureJitHelperCompiled($context);
         self::implementIfMissing($context, '__array_map__null', self::implementMapNullBridge(...));
         self::implementIfMissing($context, '__array_map__builtin', self::implementMapBuiltinBridge(...));
+        self::implementIfMissing($context, '__array_map__builtin_multi', self::implementMapBuiltinMultipleBridge(...));
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -135,6 +158,7 @@ final class ArrayMapRuntime
                 ...match ($name) {
                     '__array_map__null' => [$htPtr],
                     '__array_map__builtin' => [$htPtr, $strPtr],
+                    '__array_map__builtin_multi' => [$htPtr, $strPtr],
                     default => throw new \LogicException('unknown array_map bridge: '.$name),
                 }
             )
@@ -165,6 +189,18 @@ final class ArrayMapRuntime
         $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
     }
 
+    private static function implementMapBuiltinMultipleBridge(Context $context, LlvmFunction $fn): void
+    {
+        $entry = $fn->appendBasicBlock('array_map_builtin_multi_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $htRaw = JitNestedHelperCoerce::callHelper(
+            $context,
+            self::helperFunction($context, self::MAP_BUILTIN_MULTIPLE),
+            [$fn->getParam(0), $fn->getParam(1)]
+        );
+        $context->builder->returnValue(JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw));
+    }
+
     private static function callMapNull(Context $context, Value $ht): Value
     {
         self::ensureLinked($context);
@@ -184,6 +220,30 @@ final class ArrayMapRuntime
             $ht,
             $namePtr
         );
+    }
+
+    private static function callMapBuiltinMultiple(Context $context, JITVariable $sources, Value $namePtr): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__array_map__builtin_multi'),
+            HashTableHelper::loadHashtablePointer($context, $sources),
+            $namePtr
+        );
+    }
+
+    /**
+     * @param list<Value> $sources
+     */
+    private static function packHashtablePtrArray(Context $context, array $sources): JITVariable
+    {
+        $vars = [];
+        foreach ($sources as $source) {
+            $vars[] = new JITVariable($context, JITVariable::TYPE_HASHTABLE, JITVariable::KIND_VALUE, $source);
+        }
+
+        return HashTableHelper::packVariables($context, $vars);
     }
 
     private static function argToHashtable(Context $context, JITVariable $arg): Value
@@ -240,7 +300,7 @@ final class ArrayMapRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__array_map__null', '__array_map__builtin'] as $name) {
+        foreach (['__array_map__null', '__array_map__builtin', '__array_map__builtin_multi'] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
                 throw new \LogicException($name.' missing after ArrayMapRuntime bridge (#10183)');
