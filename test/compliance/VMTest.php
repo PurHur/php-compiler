@@ -90,6 +90,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'json_validate_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current')
+                && !str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsSortingEnum()
                 && str_contains($name, 'sort_sorting_enum')
                 && !str_contains($name, 'sorting_enum_phantom')) {
