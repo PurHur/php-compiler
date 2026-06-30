@@ -64,4 +64,12 @@ final class PasswordCryptoRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('\\password_hash(', $source);
         $this->assertStringNotContainsString('\\password_verify(', $source);
     }
+
+    public function testStringPasswordCryptoHasNoLibcryptDlopen(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringPasswordCrypto.php');
+        $this->assertStringNotContainsString('preloadLibcrypt', $source);
+        $this->assertStringNotContainsString('FFI::cdef', $source);
+        $this->assertStringNotContainsString('dlopen', $source);
+    }
 }

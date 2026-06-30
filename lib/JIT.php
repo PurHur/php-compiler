@@ -14500,7 +14500,7 @@ class JIT {
 
                 return;
             }
-            // Zend FFI is not lowered in self-host AOT bundles (#2633, StringPasswordCrypto::preloadLibcrypt).
+            // Zend FFI is not lowered in self-host AOT bundles (#2633).
             if ($this->shouldUseSelfHostJitStubs() && 'ffi' === $declaringClassLc) {
                 $this->context->scope->toCall = $this->context->resolveFunctionProxy(
                     $className.'::'.$nameOp->value
