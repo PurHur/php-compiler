@@ -14,6 +14,8 @@ final class VmHash
 {
     public const HASH_UNKNOWN_ALGO_MSG = 'hash(): Argument #1 ($algo) must be a valid hashing algorithm';
 
+    public const HASH_HMAC_UNKNOWN_ALGO_MSG = 'hash_hmac(): Argument #1 ($algo) must be a valid cryptographic hashing algorithm';
+
     public static function hash(string $algo, string $data, bool $raw = false): string
     {
         self::ensureDigestAlgo($algo);
@@ -49,14 +51,39 @@ final class VmHash
         throw new \ValueError(self::HASH_UNKNOWN_ALGO_MSG);
     }
 
-    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string|false
+    /** @throws \ValueError ext/hash/hash.c unknown HMAC algo (issue #4408). */
+    public static function ensureHmacAlgo(string $algo): void
     {
+        if (VmHashNative::supports($algo)) {
+            return;
+        }
         $lower = \strtolower($algo);
         if (VmHashHostFallback::supportsHmac($lower)) {
-            return VmHashHostFallback::hashHmac($lower, $data, $key, $raw);
+            return;
         }
 
-        return VmHashNative::hashHmac($algo, $data, $key, $raw);
+        throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+    }
+
+    public static function hashHmac(string $algo, string $data, string $key, bool $raw = false): string
+    {
+        self::ensureHmacAlgo($algo);
+        $lower = \strtolower($algo);
+        if (VmHashHostFallback::supportsHmac($lower)) {
+            $digest = VmHashHostFallback::hashHmac($lower, $data, $key, $raw);
+            if (false === $digest) {
+                throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+            }
+
+            return $digest;
+        }
+
+        $native = VmHashNative::hashHmac($algo, $data, $key, $raw);
+        if (false === $native) {
+            throw new \ValueError(self::HASH_HMAC_UNKNOWN_ALGO_MSG);
+        }
+
+        return $native;
     }
 
     /**
