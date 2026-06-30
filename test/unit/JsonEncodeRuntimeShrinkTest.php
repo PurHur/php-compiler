@@ -34,5 +34,15 @@ final class JsonEncodeRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ensureStandaloneBodies', $source);
         $this->assertStringContainsString('self::implement($context)', $source);
         $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $source);
+        $this->assertStringContainsString('BasicBlockHelper::tryGetInsertBlock', $source);
+    }
+
+    public function testUserScriptAotFoldsInlineArrayLiterals(): void
+    {
+        $this->assertFileExists(__DIR__.'/../../ext/standard/JitJsonEncodeCompileTime.php');
+        $encode = (string) file_get_contents(__DIR__.'/../../ext/standard/json_encode.php');
+        $this->assertStringContainsString('JitJsonEncodeCompileTime::tryEncode', $encode);
+        $jit = (string) file_get_contents(__DIR__.'/../../lib/JIT.php');
+        $this->assertStringContainsString('jitJsonEncodeValueOperand', $jit);
     }
 }

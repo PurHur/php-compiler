@@ -72,6 +72,9 @@ class Context {
     /** Operand for unserialize() options arg during FUNCCALL lowering (#3300). */
     public ?Operand $jitUnserializeOptionsOperand = null;
 
+    /** Operand for json_encode() value arg during FUNCCALL lowering (#14040). */
+    public ?Operand $jitJsonEncodeValueOperand = null;
+
     /** Operand for call_user_func_array() $args during FUNCCALL lowering (#10359). */
     public ?Operand $jitCallUserFuncArrayParamsOperand = null;
 
