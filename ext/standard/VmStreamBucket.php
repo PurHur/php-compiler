@@ -22,6 +22,8 @@ final class VmStreamBucket
 
     public const PROP_DATA = 'data';
 
+    public const PROP_DATALEN = 'datalen';
+
     /** @var array<int, list<int>> */
     private static array $brigades = [];
 
@@ -116,7 +118,8 @@ final class VmStreamBucket
                 VmStreamArg::debugTypeName($v)
             ));
         }
-        if (!$v->object->hasProperty(self::PROP_BUCKET)) {
+        $entry = $v->toObject();
+        if (!$entry->hasProperty(self::PROP_BUCKET)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($%s) must be an object that has a "bucket" property',
                 $functionName,
@@ -125,7 +128,7 @@ final class VmStreamBucket
             ));
         }
         try {
-            self::bucketIdFromObject($v->object);
+            self::bucketIdFromObject($entry);
         } catch (\LogicException) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($%s) must be an object that has a "bucket" property',
@@ -135,7 +138,7 @@ final class VmStreamBucket
             ));
         }
 
-        return $v->object;
+        return $entry;
     }
 
     public static function requireBufferString(Variable $v, string $functionName, int $argNum = 2): string
@@ -200,12 +203,28 @@ final class VmStreamBucket
 
     public static function append(int $brigadeId, ObjectEntry $bucketObj): void
     {
-        self::$brigades[$brigadeId][] = self::bucketIdFromObject($bucketObj);
+        $bucketId = self::bucketIdFromObject($bucketObj);
+        self::syncBucketDataFromObject($bucketObj, $bucketId);
+        self::$brigades[$brigadeId][] = $bucketId;
     }
 
     public static function prepend(int $brigadeId, ObjectEntry $bucketObj): void
     {
-        array_unshift(self::$brigades[$brigadeId], self::bucketIdFromObject($bucketObj));
+        $bucketId = self::bucketIdFromObject($bucketObj);
+        self::syncBucketDataFromObject($bucketObj, $bucketId);
+        array_unshift(self::$brigades[$brigadeId], $bucketId);
+    }
+
+    private static function syncBucketDataFromObject(ObjectEntry $entry, int $bucketId): void
+    {
+        if (!$entry->hasProperty(self::PROP_DATA)) {
+            return;
+        }
+        $data = $entry->getProperty(self::PROP_DATA)->resolveIndirect()->toString();
+        self::$bucketData[$bucketId] = $data;
+        if ($entry->hasProperty(self::PROP_DATALEN)) {
+            $entry->getProperty(self::PROP_DATALEN)->int(\strlen($data));
+        }
     }
 
     public static function bucketObjectForFrame(Context $ctx, int $bucketId, ?string $data = null): Variable
@@ -231,6 +250,7 @@ final class VmStreamBucket
 
         self::bucketHandle($entry->allocateProperty(self::PROP_BUCKET), $bucketId);
         $entry->allocateProperty(self::PROP_DATA)->string($data);
+        $entry->allocateProperty(self::PROP_DATALEN)->int(\strlen($data));
 
         return $obj;
     }
