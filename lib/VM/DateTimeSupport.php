@@ -1063,27 +1063,28 @@ final class DateTimeSupport
     /**
      * @param array<string, mixed> $data Zend DateTime unserialize payload
      */
-    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ?ObjectEntry
+    public static function restoreFromZendSerialize(Context $ctx, string $classKey, array $data): ObjectEntry
     {
         $dateWire = $data['date'] ?? null;
-        if (!\is_string($dateWire)) {
-            return null;
+        $timezoneType = $data['timezone_type'] ?? null;
+        $timezone = $data['timezone'] ?? null;
+        if (!\is_string($dateWire)
+            || !\is_int($timezoneType)
+            || !\is_string($timezone)) {
+            throw new \Error('Invalid serialization data for DateTime object');
         }
-        $tzName = isset($data['timezone']) && \is_string($data['timezone'])
-            ? $data['timezone']
-            : VmDate::defaultTimezoneGet();
         try {
-            VmDateTimeNative::validateTimezoneId($tzName);
-            $parsed = VmDateTimeNative::parseDateTime($dateWire, $tzName);
+            VmDateTimeNative::validateTimezoneId($timezone);
+            $parsed = VmDateTimeNative::parseDateTime($dateWire, $timezone);
         } catch (NativeDateInvalidTimeZoneException|NativeDateMalformedStringException) {
-            return null;
+            throw new \Error('Invalid serialization data for DateTime object');
         }
         $class = $ctx->classes[$classKey] ?? null;
         if (null === $class) {
-            return null;
+            throw new \Error('Invalid serialization data for DateTime object');
         }
         $entry = new ObjectEntry($class);
-        self::applyParsedState($entry, $parsed, $tzName);
+        self::applyParsedState($entry, $parsed, $timezone);
         $entry->constructed = true;
         self::markDateTimeLikeInitialized($entry);
 
