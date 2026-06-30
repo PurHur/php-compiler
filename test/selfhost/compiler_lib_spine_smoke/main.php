@@ -3072,6 +3072,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ClosureCall.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureDebugInfo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureFromCallable.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureFromStatic.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ClosureGetCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ClosureGetUsedVariables.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateIntervalConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateIntervalCreateFromDateString.php';
