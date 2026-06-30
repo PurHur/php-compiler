@@ -68,7 +68,7 @@ final class LimitIteratorBuiltin
 /** @internal */
 final class SplLimitIteratorStorage
 {
-    /** @var array<int, array{inner: ObjectEntry, offset: int, limit: int, pos: int}> */
+    /** @var array<int, array{inner: ObjectEntry, offset: int, limit: int, pos: int, rewound: bool}> */
     private static array $store = [];
 
     public static function init(ObjectEntry $object, ObjectEntry $inner, int $offset, int $limit): void
@@ -78,6 +78,7 @@ final class SplLimitIteratorStorage
             'offset' => $offset,
             'limit' => $limit,
             'pos' => 0,
+            'rewound' => false,
         ];
     }
 
@@ -89,6 +90,7 @@ final class SplLimitIteratorStorage
     public static function rewind(Frame $frame, ObjectEntry $object): void
     {
         $state = &self::$store[$object->id];
+        $state['rewound'] = true;
         $state['pos'] = 0;
         SplDualIteratorStorage::callInner($frame, $state['inner'], 'rewind');
         for ($i = 0; $i < $state['offset']; ++$i) {
@@ -104,6 +106,9 @@ final class SplLimitIteratorStorage
     public static function valid(Frame $frame, ObjectEntry $object): bool
     {
         $state = self::state($object);
+        if (!$state['rewound']) {
+            return false;
+        }
         if (-1 !== $state['limit'] && self::relativePos($state) >= $state['limit']) {
             return false;
         }
@@ -114,11 +119,25 @@ final class SplLimitIteratorStorage
 
     public static function current(Frame $frame, ObjectEntry $object): Variable
     {
+        if (!self::state($object)['rewound']) {
+            $null = new Variable(Variable::TYPE_NULL);
+            $null->null();
+
+            return $null;
+        }
+
         return SplDualIteratorStorage::callInner($frame, self::state($object)['inner'], 'current');
     }
 
     public static function key(Frame $frame, ObjectEntry $object): Variable
     {
+        if (!self::state($object)['rewound']) {
+            $null = new Variable(Variable::TYPE_NULL);
+            $null->null();
+
+            return $null;
+        }
+
         return SplDualIteratorStorage::callInner($frame, self::state($object)['inner'], 'key');
     }
 
@@ -132,13 +151,13 @@ final class SplLimitIteratorStorage
         ++$state['pos'];
     }
 
-    /** @param array{inner: ObjectEntry, offset: int, limit: int, pos: int} $state */
+    /** @param array{inner: ObjectEntry, offset: int, limit: int, pos: int, rewound: bool} $state */
     private static function relativePos(array $state): int
     {
         return $state['pos'] - $state['offset'];
     }
 
-    /** @return array{inner: ObjectEntry, offset: int, limit: int, pos: int} */
+    /** @return array{inner: ObjectEntry, offset: int, limit: int, pos: int, rewound: bool} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
