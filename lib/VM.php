@@ -3115,13 +3115,15 @@ restart:
                         goto restart;
                     }
                     if (
-                        $op->arg2 !== $op->arg3
+                        !$this->shouldDeferVmDeadTempRelease($frame)
+                        && $op->arg2 !== $op->arg3
                         && $frame->block->assignTempSlotIsDead((int) $op->arg3)
                     ) {
                         $this->releaseVmDeadScopeSlot($frame, (int) $op->arg3);
                     }
                     if (
-                        $op->arg1 !== $op->arg2
+                        !$this->shouldDeferVmDeadTempRelease($frame)
+                        && $op->arg1 !== $op->arg2
                         && $op->arg1 !== $op->arg3
                         && $frame->block->assignTempSlotIsDead((int) $op->arg1)
                     ) {
@@ -3451,6 +3453,7 @@ restart:
                             $frame = $catchFrame;
                             goto restart;
                         }
+                        $frame->listUnpackAssignMergeBlock = $op->block1;
                         break;
                     }
                     break;
@@ -4278,6 +4281,12 @@ restart:
                     if (null !== $finallyFrame) {
                         $frame = $finallyFrame;
                         goto restart;
+                    }
+                    if (
+                        null !== $frame->listUnpackAssignMergeBlock
+                        && $op->block1 === $frame->listUnpackAssignMergeBlock
+                    ) {
+                        $frame->listUnpackAssignMergeBlock = null;
                     }
                     $frame = $this->frameForBranch($frame, $op->block1);
                     goto restart;
@@ -15172,8 +15181,16 @@ restart:
      *
      * @param int ...$keepSlots scope slots still needed by the current opcode
      */
+    private function shouldDeferVmDeadTempRelease(Frame $frame): bool
+    {
+        return null !== $frame->listUnpackAssignMergeBlock;
+    }
+
     private function releaseVmStatementDeadTemps(Frame $frame, int ...$keepSlots): void
     {
+        if ($this->shouldDeferVmDeadTempRelease($frame)) {
+            return;
+        }
         $keep = array_fill_keys($keepSlots, true);
         $cfg = $frame->block->orig;
         if (null === $cfg) {

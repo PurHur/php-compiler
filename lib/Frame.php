@@ -92,6 +92,12 @@ class Frame {
     public bool $suppressNextEcho = false;
 
     /**
+     * Merge block for an in-flight guarded list destructuring assign (#13932).
+     * While set, VM defers dead-temp release so nested dim-fetch temps stay alive.
+     */
+    public ?Block $listUnpackAssignMergeBlock = null;
+
+    /**
      * Foreach iterator container cache keyed by scope slot.
      * php-cfg SSA temps may alias (issue #1885); ITER_* must not rely on rereading the slot.
      *
