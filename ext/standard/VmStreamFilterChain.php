@@ -25,6 +25,8 @@ final class VmStreamFilterChain
 
     /** @var array<string, true> */
     private const BUILTIN_FILTERS = [
+        'zlib.deflate' => true,
+        'zlib.inflate' => true,
         'string.rot13' => true,
         'string.toupper' => true,
         'string.tolower' => true,
@@ -132,7 +134,7 @@ final class VmStreamFilterChain
     public static function applyReadFilters(int $streamHandle, string $data): string
     {
         foreach (self::$readChains[$streamHandle] ?? [] as $filterId) {
-            $data = self::applyFilter($filterId, $data);
+            $data = self::applyFilter($filterId, $data, self::READ);
         }
 
         return $data;
@@ -141,7 +143,7 @@ final class VmStreamFilterChain
     public static function applyWriteFilters(int $streamHandle, string $data): string
     {
         foreach (self::$writeChains[$streamHandle] ?? [] as $filterId) {
-            $data = self::applyFilter($filterId, $data);
+            $data = self::applyFilter($filterId, $data, self::WRITE);
         }
 
         return $data;
@@ -218,7 +220,7 @@ final class VmStreamFilterChain
         return $filterId;
     }
 
-    private static function applyFilter(int $filterId, string $data): string
+    private static function applyFilter(int $filterId, string $data, int $direction): string
     {
         if (!isset(self::$filters[$filterId]) || !self::$filters[$filterId]['active']) {
             return $data;
@@ -228,7 +230,7 @@ final class VmStreamFilterChain
             return self::applyUserFilter($filterId, $data);
         }
 
-        return self::transform($meta['name'], $data);
+        return self::transform($meta['name'], $data, $direction);
     }
 
     private static function applyUserFilter(int $filterId, string $data): string
@@ -339,9 +341,11 @@ final class VmStreamFilterChain
         return $object;
     }
 
-    private static function transform(string $filterName, string $data): string
+    private static function transform(string $filterName, string $data, int $direction): string
     {
         return match ($filterName) {
+            'zlib.deflate' => VmZlibStreamFilter::deflate($data, $direction),
+            'zlib.inflate' => VmZlibStreamFilter::inflate($data, $direction),
             'string.rot13' => VmString::strRot13($data),
             'string.toupper' => VmString::asciiUpper($data),
             'string.tolower' => VmString::asciiLower($data),
