@@ -30,14 +30,13 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipartStandaloneLlvm.php');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/ParseStrNativeLlvm.php');
     }
 
-    public function testUserScriptRefreshUsesParseStrRuntimeNotNativeLlvm(): void
+    public function testUserScriptRefreshUsesNativeParseStrLlvmForSgTables(): void
     {
+        $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $source);
-        $this->assertStringNotContainsString('ParseStrNativeLlvm', $source);
-        $this->assertStringNotContainsString('__phpc_parse_str_', $source);
+        $this->assertStringContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
+        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $source);
     }
 }

@@ -13,6 +13,8 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
     define('PHP_COMPILER_LIB_SPINE_SMOKE', true);
 }
 
+
+require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../bin/vm.php';
 require_once __DIR__.'/../../../ext/bcmath/BcMathNumberMethod.php';
 require_once __DIR__.'/../../../ext/bcmath/BcmathFunction.php';
@@ -2533,6 +2535,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/Output.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PackArgvSerialize.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PackJitRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/PadTypeJit.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrNativeLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseStrRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrl.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ParseUrlComponentJit.php';
@@ -3300,7 +3303,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueConstruct.
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueDebugInfo.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/SensitiveParameterValueGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ThrowableGetMessage.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/VmClassMethod.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapCount.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetExists.php';
