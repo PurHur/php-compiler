@@ -48,7 +48,7 @@ final class mb_stripos extends Internal
             'needle'
         );
         $offset = $argc >= 3
-            ? VmMbstring::coerceOffsetArg($frame->calledArgs[2], 'mb_stripos', 2)
+            ? VmMbstring::coerceOffsetArg($frame, 'mb_stripos', 2)
             : 0;
         $encoding = $argc >= 4
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_stripos', 3)
