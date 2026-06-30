@@ -1327,6 +1327,24 @@ class Compiler {
         if (null === $branch->orig) {
             return null;
         }
+        if (
+            $this->mergeCfgBlockUsesLogicalShortCircuit($branch->orig)
+            && \count($branch->orig->parents) >= 2
+        ) {
+            $recorded = $this->ternaryMergePhiRhsSlot($branch->orig);
+            if (null !== $recorded) {
+                return $recorded;
+            }
+            foreach ($branch->orig->parents as $parentCfg) {
+                if (!$this->seen->contains($parentCfg)) {
+                    continue;
+                }
+                $phi = $this->logicalShortCircuitTailPhiSlot($this->seen[$parentCfg]);
+                if (null !== $phi) {
+                    return $phi;
+                }
+            }
+        }
         foreach ($this->ternaryMergeTargets($branch->orig) as $mergeCfg) {
             if (!$this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
                 continue;
@@ -10679,6 +10697,14 @@ class Compiler {
         }
         $producer = $this->findHoistedIssetOrEmptyProducerForCallArg($block, $cfgCallOp, $argIndex);
         if (null === $producer) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+        if (
+            $this->callArgIsDeadInlineTemporary($callArg)
+            && !$this->operandsReferToSameVariable($producer->result, $callArg)
+        ) {
+            // isset() && … as call arg — php-cfg dead temp is && merge, not hoisted Isset_ (#10704).
             return null;
         }
         if ($producer instanceof Op\Expr\Isset_ && !$this->issetExprLoweringEmitted($block, $producer)) {
@@ -21875,10 +21901,15 @@ class Compiler {
                 $logicalPhi = $this->logicalShortCircuitOrPhiMergeSlot($block);
                 if (null !== $logicalPhi) {
                     $valueSlot = (string) $logicalPhi;
-                } elseif (\in_array(strtolower($calleeName ?? ''), ['exit', 'die'], true)) {
-                    $exitPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
-                    if (null !== $exitPhi) {
-                        $valueSlot = $exitPhi;
+                } else {
+                    $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
+                    if (null !== $andPhi) {
+                        $valueSlot = (string) $andPhi;
+                    } elseif (\in_array(strtolower($calleeName ?? ''), ['exit', 'die'], true)) {
+                        $exitPhi = $this->resolveExitLogicalShortCircuitCallArgSlot($block);
+                        if (null !== $exitPhi) {
+                            $valueSlot = $exitPhi;
+                        }
                     }
                 }
             }
