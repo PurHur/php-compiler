@@ -41,10 +41,10 @@ final class mb_substr extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $start = VmMbstring::coerceStartArg($frame->calledArgs[1], 'mb_substr', 1);
+        $start = VmMbstring::coerceStartArg($frame, 'mb_substr', 1);
         $length = null;
         if ($argc >= 3) {
-            $length = VmMbstring::coerceOptionalLengthArg($frame->calledArgs[2], 'mb_substr', 2);
+            $length = VmMbstring::coerceOptionalLengthArg($frame, 'mb_substr', 2);
         }
         $encoding = $argc >= 4
             ? VmMbstring::coerceEncodingArg($frame->calledArgs[3], 'mb_substr', 3)

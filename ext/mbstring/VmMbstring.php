@@ -232,9 +232,9 @@ final class VmMbstring
         return ucwords(self::asciiLower($source));
     }
 
-    public static function coerceOffsetArg(Variable $var, string $function, int $argIndex = 2): int
+    public static function coerceOffsetArg(Frame $frame, string $function, int $argIndex): int
     {
-        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'offset');
+        return VmMath::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $argIndex + 1, 'offset');
     }
 
     public static function coercePartArg(Variable $var, string $function, int $argIndex = 2): bool
@@ -584,24 +584,24 @@ final class VmMbstring
         );
     }
 
-    public static function coerceStartArg(Variable $var, string $function, int $argIndex = 1): int
+    public static function coerceStartArg(Frame $frame, string $function, int $argIndex): int
     {
-        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'start');
+        return VmMath::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $argIndex + 1, 'start');
     }
 
-    public static function coerceLengthArg(Variable $var, string $function, int $argIndex = 2): int
+    public static function coerceLengthArg(Frame $frame, string $function, int $argIndex): int
     {
-        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, 'length');
+        return VmMath::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $argIndex + 1, 'length');
     }
 
-    public static function coerceOptionalLengthArg(Variable $var, string $function, int $argIndex = 2): ?int
+    public static function coerceOptionalLengthArg(Frame $frame, string $function, int $argIndex): ?int
     {
-        $var = $var->resolveIndirect();
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
             return null;
         }
 
-        return self::coerceLengthArg($var, $function, $argIndex);
+        return VmMath::parseIntBuiltinArgForFrame($frame, $argIndex, $function, $argIndex + 1, 'length');
     }
 
     /**
