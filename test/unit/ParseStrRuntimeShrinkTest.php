@@ -58,13 +58,12 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('parseCookieHeaderInto', $source);
     }
 
-    public function testParseStrNativeLlvmDeleted(): void
+    public function testParseStrNativeLlvmRequiredForUserScriptSuperglobalRefresh(): void
     {
-        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $userScript);
-        $this->assertStringNotContainsString('ParseStrNativeLlvm', $userScript);
-        $this->assertStringNotContainsString('__phpc_parse_str_', $userScript);
+        $this->assertStringContainsString('ParseStrNativeLlvm::ensureSubhelpers', $userScript);
+        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $userScript);
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
@@ -73,7 +72,7 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseStrJitHelper.php', $spine);
         $this->assertStringContainsString('ParseStrRuntime.php', $spine);
         $this->assertStringContainsString('StringParseStr.php', $spine);
-        $this->assertStringNotContainsString('ParseStrNativeLlvm.php', $spine);
+        $this->assertStringContainsString('ParseStrNativeLlvm.php', $spine);
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
     }
 
