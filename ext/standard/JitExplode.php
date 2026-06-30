@@ -5,7 +5,7 @@ declare(strict_types=1);
 /**
  * LLVM JIT helper for explode() — builds a packed __hashtable__ of string parts.
  *
- * Mirrors VmString::explode() / php-src ext/standard/string.c (#4077 negative limit).
+ * Mirrors VmString::explode() / php-src ext/standard/string.c (#4077 negative limit, #14019 binary-safe search).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -127,7 +127,6 @@ final class JitExplode
         $hayLen = $context->builder->load(
             $context->builder->structGep($haystack, $map['length'])
         );
-        $delimPtr = $context->builder->structGep($delimiter, $map['value']);
         $hayPtr = $context->builder->structGep($haystack, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
@@ -151,20 +150,12 @@ final class JitExplode
 
         $context->builder->positionAtEnd($loopHead);
         $offset = $context->builder->load($offsetSlot);
-        $searchPtr = $context->builder->gep($hayPtr, $offset);
-        $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $searchPtr,
-            $delimPtr
-        );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+        $foundI32 = self::findDelimiterOffsetI32($context, $haystack, $delimiter, $offset);
+        $notFound = self::isDelimiterNotFound($context, $foundI32);
         $context->builder->branchIf($notFound, $tailBlock, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
+        $pos = self::delimiterOffsetToI64($context, $foundI32);
         $partLen = $context->builder->sub($pos, $offset);
         $part = string_trim::jitCopySlice($context, $haystack, $hayPtr, $offset, $partLen);
         $idx = $context->builder->load($idxSlot);
@@ -210,7 +201,6 @@ final class JitExplode
         $hayLen = $context->builder->load(
             $context->builder->structGep($haystack, $map['length'])
         );
-        $delimPtr = $context->builder->structGep($delimiter, $map['value']);
         $hayPtr = $context->builder->structGep($haystack, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
@@ -218,9 +208,7 @@ final class JitExplode
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
         $sizeOne = $sizeT->constInt(1, false);
-        $null = $context->getTypeFromString('int8*')->constNull();
         $setString = $context->lookupFunction('__hashtable__setStringAt');
-        $strstr = $context->lookupFunction('strstr');
 
         $foundSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $offsetSlot = BasicBlockHelper::entryAlloca($context, $i64);
@@ -242,17 +230,14 @@ final class JitExplode
 
         $context->builder->positionAtEnd($countHead);
         $offset = $context->builder->load($offsetSlot);
-        $searchPtr = $context->builder->gep($hayPtr, $offset);
-        $match = $context->builder->call($strstr, $searchPtr, $delimPtr);
-        $notFound = $context->builder->icmp(Builder::INT_EQ, $match, $null);
+        $foundI32 = self::findDelimiterOffsetI32($context, $haystack, $delimiter, $offset);
+        $notFound = self::isDelimiterNotFound($context, $foundI32);
         $context->builder->branchIf($notFound, $afterCount, $countBody);
 
         $context->builder->positionAtEnd($countBody);
         $foundVal = $context->builder->load($foundSlot);
         $context->builder->store($context->builder->addNoSignedWrap($foundVal, $one), $foundSlot);
-        $matchInt = $context->builder->ptrToInt($match, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($matchInt, $baseInt);
+        $pos = self::delimiterOffsetToI64($context, $foundI32);
         $context->builder->store($context->builder->add($pos, $delimLen), $offsetSlot);
         $context->builder->branch($countHead);
 
@@ -288,8 +273,9 @@ final class JitExplode
         $segIdx = $context->builder->load($segIdxSlot);
         self::emitDelimiterWalkOffset(
             $context,
+            $haystack,
+            $delimiter,
             $hayPtr,
-            $delimPtr,
             $delimLen,
             $segIdx,
             $startSlot,
@@ -307,8 +293,9 @@ final class JitExplode
         $context->builder->positionAtEnd($endBlock);
         self::emitDelimiterWalkOffset(
             $context,
+            $haystack,
+            $delimiter,
             $hayPtr,
-            $delimPtr,
             $delimLen,
             $nextIdx,
             $endSlot,
@@ -345,8 +332,9 @@ final class JitExplode
      */
     private static function emitDelimiterWalkOffset(
         Context $context,
+        Value $haystack,
+        Value $delimiter,
         Value $hayPtr,
-        Value $delimPtr,
         Value $delimLen,
         Value $walkCount,
         Value $resultSlot,
@@ -357,8 +345,6 @@ final class JitExplode
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $one = $i64->constInt(1, false);
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $strstr = $context->lookupFunction('strstr');
 
         $offsetSlot = BasicBlockHelper::entryAlloca($context, $i64);
         $counterSlot = BasicBlockHelper::entryAlloca($context, $i64);
@@ -388,11 +374,8 @@ final class JitExplode
 
         $context->builder->positionAtEnd($body);
         $offset = $context->builder->load($offsetSlot);
-        $searchPtr = $context->builder->gep($hayPtr, $offset);
-        $match = $context->builder->call($strstr, $searchPtr, $delimPtr);
-        $matchInt = $context->builder->ptrToInt($match, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($matchInt, $baseInt);
+        $foundI32 = self::findDelimiterOffsetI32($context, $haystack, $delimiter, $offset);
+        $pos = self::delimiterOffsetToI64($context, $foundI32);
         $context->builder->store($context->builder->add($pos, $delimLen), $offsetSlot);
         $context->builder->store(
             $context->builder->addNoSignedWrap($counter, $one),
@@ -422,7 +405,6 @@ final class JitExplode
         $hayLen = $context->builder->load(
             $context->builder->structGep($haystack, $map['length'])
         );
-        $delimPtr = $context->builder->structGep($delimiter, $map['value']);
         $hayPtr = $context->builder->structGep($haystack, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
@@ -478,20 +460,12 @@ final class JitExplode
 
         $context->builder->positionAtEnd($loopHead);
         $offset = $context->builder->load($offsetSlot);
-        $searchPtr = $context->builder->gep($hayPtr, $offset);
-        $found = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $searchPtr,
-            $delimPtr
-        );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+        $foundI32 = self::findDelimiterOffsetI32($context, $haystack, $delimiter, $offset);
+        $notFound = self::isDelimiterNotFound($context, $foundI32);
         $context->builder->branchIf($notFound, $tailBlock, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($hayPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
+        $pos = self::delimiterOffsetToI64($context, $foundI32);
         $partLen = $context->builder->sub($pos, $offset);
         $part = string_trim::jitCopySlice($context, $haystack, $hayPtr, $offset, $partLen);
         $idx = $context->builder->load($idxSlot);
@@ -540,5 +514,32 @@ final class JitExplode
         }
 
         return $ht;
+    }
+
+    private static function findDelimiterOffsetI32(
+        Context $context,
+        Value $haystack,
+        Value $delimiter,
+        Value $offset
+    ): Value {
+        return JitStringSearch::findOffsetI32($context, $haystack, $delimiter, $offset, false);
+    }
+
+    private static function isDelimiterNotFound(Context $context, Value $foundI32): Value
+    {
+        $i32 = $context->getTypeFromString('int32');
+
+        return $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundI32,
+            $i32->constInt(JitStringSearch::NOT_FOUND, true)
+        );
+    }
+
+    private static function delimiterOffsetToI64(Context $context, Value $foundI32): Value
+    {
+        $i64 = $context->getTypeFromString('int64');
+
+        return $context->builder->zExt($foundI32, $i64);
     }
 }
