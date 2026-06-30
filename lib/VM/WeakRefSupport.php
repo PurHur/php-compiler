@@ -273,56 +273,20 @@ final class WeakRefSupport
         if (null === $vm) {
             return false;
         }
-        $matches = static function (Variable $var) use ($objectId): bool {
+        $found = false;
+        $vm->visitNamedStrongRefRoots(static function (Variable $var) use ($objectId, &$found): void {
+            if ($found) {
+                return;
+            }
             $resolved = $var->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $resolved->type) {
-                return false;
+                return;
             }
             try {
-                return $resolved->toObject()->id === $objectId;
+                if ($resolved->toObject()->id === $objectId) {
+                    $found = true;
+                }
             } catch (\LogicException) {
-                return false;
-            }
-        };
-        $scanFrameLocals = static function (\PHPCompiler\Frame $frame) use ($matches): bool {
-            if (null !== $frame->block) {
-                foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
-                    if (!isset($frame->scope[$slot])) {
-                        continue;
-                    }
-                    if ($matches($frame->scope[$slot])) {
-                        return true;
-                    }
-                }
-            }
-            foreach ($frame->dynamicLocals as $var) {
-                if ($matches($var)) {
-                    return true;
-                }
-            }
-
-            return false;
-        };
-
-        // Active opcode frame is not on runStack (only suspended callers are) — closures need it (#14132).
-        $executing = $vm->currentExecutingFrame();
-        if (
-            null !== $executing
-            && (null !== $executing->closureCall || null !== $executing->parent)
-            && $scanFrameLocals($executing)
-        ) {
-            return true;
-        }
-        foreach ($vm->context->runStackFrames() as $frame) {
-            if ($scanFrameLocals($frame)) {
-                return true;
-            }
-        }
-
-        $found = false;
-        $vm->context->visitGlobalVariables(function (Variable $var) use (&$found, $matches): void {
-            if (!$found && $matches($var)) {
-                $found = true;
             }
         });
 
