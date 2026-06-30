@@ -11,15 +11,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_flip/values/reverse JIT routes through JitHelper PHP not ArrayBuiltinHelper LLVM (#12329). */
+/** array_flip/values/reverse JIT routes through JitHelper PHP not ArrayBuiltinHelper LLVM (#12329, #14244). */
 final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
 {
     public function testArrayFlipRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFlipRuntime.php');
         $this->assertStringContainsString('ArrayFlipJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildFlipArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_flip.php');
         $this->assertStringContainsString('ArrayFlipRuntime::flip', $builtin);
@@ -30,7 +31,9 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayValuesRuntime.php');
         $this->assertStringContainsString('ArrayValuesJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildValuesArray', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_values.php');
         $this->assertStringContainsString('ArrayValuesRuntime::values', $builtin);
@@ -41,7 +44,9 @@ final class ArrayFlipValuesReverseRuntimeShrinkTest extends TestCase
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReverseRuntime.php');
         $this->assertStringContainsString('ArrayReverseJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildReverseArray', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_reverse.php');
         $this->assertStringContainsString('ArrayReverseRuntime::reverse', $builtin);
