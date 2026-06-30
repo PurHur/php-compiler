@@ -13149,6 +13149,80 @@ class Compiler {
     }
 
     /**
+     * Dead inline array call arg: prefer nested FUNCCALL_EXEC_RETURN over sibling INIT_ARRAY (#14042).
+     *
+     * When php-cfg marks a nested FuncCall result temp dead, compileCallArgSends must not wire the
+     * consumer to the nested call's INIT_ARRAY argument slot.
+     */
+    private function slotForDeadInlineArrayOrCallResultCallArg(Block $block, Op $cfgCallOp, int $argIndex): ?string
+    {
+        if (!$this->callArgIsNestedFuncCallResult($cfgCallOp, $argIndex, $block)) {
+            return $this->slotForRecentInitArrayCallArg($block);
+        }
+        if (null !== $block->orig) {
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+            $immediate = $producers[0] ?? null;
+            if ($immediate instanceof Op\Expr\FuncCall || $immediate instanceof Op\Expr\NsFuncCall) {
+                $producerSlot = $block->slotForOperand($immediate->result);
+                if (null !== $producerSlot) {
+                    return (string) $producerSlot;
+                }
+            }
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return $this->slotForRecentInitArrayCallArg($block);
+    }
+
+    /** True when a hoisted nested FuncCall feeds this dead inline call arg (#14042). */
+    private function callArgIsNestedFuncCallResult(Op $cfgCallOp, int $argIndex, Block $block): bool
+    {
+        if (!is_array($cfgCallOp->args ?? null) || null === $block->orig) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (null === $callArg) {
+            return false;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        foreach ($producers as $producer) {
+            if (
+                $producer instanceof Op\Expr\Array_
+                && $this->inlineCallArgProducerFeedsCallArgOp($producer, $cfgCallOp, $callArg)
+            ) {
+                return false;
+            }
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            if ($this->inlineCallArgProducerFeedsCallArgOp($producer, $cfgCallOp, $callArg)) {
+                return true;
+            }
+        }
+        $immediate = $producers[0] ?? null;
+        if (
+            ($immediate instanceof Op\Expr\FuncCall || $immediate instanceof Op\Expr\NsFuncCall)
+            && (int) $argIndex > 0
+            && $this->callArgIsDeadInlineTemporary($callArg)
+            && $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * FUNCCALL_EXEC_RETURN immediately before hoisted ConstFetch prelude — nested subject (#13617).
      *
      * compileCallArgSends runs before FUNCCALL_INIT is appended, so the tail is often CONST_FETCH
@@ -22220,9 +22294,9 @@ class Compiler {
                             $valueSlot = (string) $immediateSlot;
                         }
                     } else {
-                        $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
-                        if (null !== $initArraySlot) {
-                            $valueSlot = $initArraySlot;
+                        $resolvedSlot = $this->slotForDeadInlineArrayOrCallResultCallArg($block, $cfgCallOp, (int) $argIndex);
+                        if (null !== $resolvedSlot) {
+                            $valueSlot = $resolvedSlot;
                         }
                     }
                 }
