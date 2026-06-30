@@ -2346,6 +2346,25 @@ PHP;
         self::assertSame("next=3\n", $out);
     }
 
+    /** Issue #13903 — var_export(prev($a), true) in concat after prior next($a). */
+    public function testVarExportNestedPrevUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+next($a);
+$concat = 'prev=' . var_export(prev($a), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_prev.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("prev=1\n", $out);
+    }
+
     /** Issue #13831 — var_export(end($a), true) in concat when pointer already at end. */
     public function testVarExportNestedEndSecondCallUsesFuncCallProducerSlot(): void
     {
