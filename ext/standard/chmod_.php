@@ -25,7 +25,7 @@ final class chmod_ extends Internal
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'chmod');
-        $mode = VmFilestatArg::requireIntArg($frame->calledArgs[1], 'chmod', 1, 'permissions');
+        $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'chmod', 'permissions');
         if (null === $frame->returnVar) {
             return;
         }
@@ -41,12 +41,9 @@ final class chmod_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('chmod() requires exactly two arguments in this compiler build');
         }
-        JitFilestatArg::guardInt($context, $args[1], 'chmod', 1, 'permissions');
+        $modeI64 = JitFilestatArg::lowerFileMode($context, $args[1], 'chmod', 1, 'permissions');
         $i32 = $context->getTypeFromString('int32');
-        $mode = $context->builder->truncOrBitCast(
-            $context->helper->loadValue($args[1]),
-            $i32
-        );
+        $mode = $context->builder->truncOrBitCast($modeI64, $i32);
 
         $path = JitFilestatArg::lowerFilename($context, $args[0], 'chmod');
 

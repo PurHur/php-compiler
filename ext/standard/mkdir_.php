@@ -7,12 +7,10 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\NamedOptionalCallArgs;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** mkdir() — VM via VmFs; JIT/AOT via __compiler_mkdir (libc mkdir(2), recursive in C). */
@@ -36,11 +34,7 @@ final class mkdir_ extends Internal
         $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'mkdir', 0, 'directory');
         $mode = 0777;
         if (isset($frame->calledArgs[1])) {
-            $modeVar = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $modeVar->type) {
-                throw new \LogicException('mkdir() mode must be an integer in this compiler build');
-            }
-            $mode = $modeVar->toInt();
+            $mode = VmFilestatArg::parseFileModeArgForFrame($frame, 1, 'mkdir', 'permissions');
         }
         $recursive = false;
         if (isset($frame->calledArgs[2])) {
@@ -74,7 +68,7 @@ final class mkdir_ extends Internal
         $i64 = $context->getTypeFromString('int64');
         $mode = $i64->constInt(0777, false);
         if (isset($args[1]) && !NamedOptionalCallArgs::isOmittedOptional($args[1])) {
-            $mode = JitLongArg::lower($context, $args[1], 'mkdir() argument #2');
+            $mode = JitFilestatArg::lowerFileMode($context, $args[1], 'mkdir', 1, 'permissions');
         }
         $recursive = $context->constantFromBool(false);
         if (isset($args[2]) && !NamedOptionalCallArgs::isOmittedOptional($args[2])) {
