@@ -2357,6 +2357,7 @@
         "lib/DnfType.php",
         "lib/Doctor.php",
         "lib/EnumCaseListRewriter.php",
+        "lib/ExitFunctionSyntaxRejector.php",
         "lib/Frame.php",
         "lib/Func.php",
         "lib/Func/Internal.php",
@@ -3748,9 +3749,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3518,
+        "inventory_files": 3519,
         "excluded": 0,
-        "eligible": 3518,
+        "eligible": 3519,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
