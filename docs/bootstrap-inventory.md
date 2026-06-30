@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3536 |
-| Phase A inventory files (M2 ratio SSOT) | 3536 |
+| PHP files on vm.php path | 3537 |
+| Phase A inventory files (M2 ratio SSOT) | 3537 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9618 |
+| Source constructs flagged (warnings) | 9619 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1277,6 +1277,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmParseUrl.php` | 0 | 1 |
 | `ext/standard/VmPassword.php` | 0 | 5 |
 | `ext/standard/VmPasswordNative.php` | 0 | 1 |
+| `ext/standard/VmPasswordPure.php` | 0 | 1 |
 | `ext/standard/VmPersistentSocket.php` | 0 | 1 |
 | `ext/standard/VmPhpCoreConstants.php` | 0 | 5 |
 | `ext/standard/VmPhpFdStream.php` | 0 | 2 |
@@ -11145,12 +11146,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 99)
-- new RecursiveIteratorIterator (line 1940)
-- new RecursiveDirectoryIterator (line 1941)
-- new RecursiveIteratorIterator (line 2042)
-- new RecursiveDirectoryIterator (line 2043)
-- 72 class method(s)
-- 10 closure(s)
+- new RecursiveIteratorIterator (line 1992)
+- new RecursiveDirectoryIterator (line 1993)
+- new RecursiveIteratorIterator (line 2094)
+- new RecursiveDirectoryIterator (line 2095)
+- 74 class method(s)
+- 11 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
 
@@ -12022,7 +12023,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPasswordNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 17 class method(s)
+
+### `ext/standard/VmPasswordPure.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmPersistentSocket.php`
 
@@ -13915,7 +13921,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/debug_zval_dump.php`
 
 **Warnings** (review for bootstrap subset):
-- 6 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/decbin.php`
 
@@ -26009,7 +26015,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/InternalStrictArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- 15 class method(s)
 
 ### `lib/VM/IterableCheck.php`
 
