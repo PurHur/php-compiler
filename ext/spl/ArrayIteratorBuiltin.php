@@ -42,6 +42,9 @@ final class ArrayIteratorBuiltin
         if (isset($ctx->classes['seekableiterator'])) {
             $entry->interfaces[] = 'seekableiterator';
         }
+        if (isset($ctx->classes['serializable'])) {
+            $entry->interfaces[] = 'serializable';
+        }
 
         $entry->constructor = new ArrayIteratorConstruct();
         $entry->methods['__construct'] = $entry->constructor;

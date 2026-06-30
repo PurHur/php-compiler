@@ -39,6 +39,9 @@ final class ArrayObjectBuiltin
         if (isset($ctx->classes['arrayaccess'])) {
             $entry->interfaces[] = 'arrayaccess';
         }
+        if (isset($ctx->classes['serializable'])) {
+            $entry->interfaces[] = 'serializable';
+        }
 
         foreach ([
             'STD_PROP_LIST' => 1,
