@@ -105,6 +105,28 @@ final class ParseStrEngine
     }
 
     /**
+     * Bracket key structure for native parse_str materializers (#13900).
+     *
+     * @return array{parts: list<string>, append: bool}|null
+     */
+    public static function parseKeyStructure(string $key): ?array
+    {
+        return self::parseKeyBrackets($key);
+    }
+
+    /** URL-decode a query component (shared with native streaming parsers). */
+    public static function urlDecodeComponent(string $value): string
+    {
+        return self::urlDecode($value);
+    }
+
+    /** Trim whitespace from a cookie segment. */
+    public static function trimCookieSegment(string $value): string
+    {
+        return self::trimWs($value);
+    }
+
+    /**
      * @return array{parts: list<string>, append: bool}|null
      */
     private static function parseKeyBrackets(string $key): ?array
