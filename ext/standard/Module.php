@@ -1038,14 +1038,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('strpbrk', $fn);
         }
         try {
-            $context->lookupFunction('strstr');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strstr', $ft);
-            $context->registerFunction('strstr', $fn);
-        }
-        try {
             $context->lookupFunction('strrchr');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');

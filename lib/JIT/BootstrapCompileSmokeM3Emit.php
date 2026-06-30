@@ -8,6 +8,7 @@ require_once __DIR__.'/EmitTuMode.php';
 require_once __DIR__.'/RuntimeEmitTuAlloc.php';
 require_once __DIR__.'/RuntimeEmitTuInit.php';
 
+use PHPCompiler\ext\standard\JitStringSearch;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -357,29 +358,18 @@ final class BootstrapCompileSmokeM3Emit
     private static function emitPutenvM3CompileDriverMainForBootstrapSelfhost(Context $context, Value $sourceFile): void
     {
         $charPtr = $context->getTypeFromString('char*');
-        $i8p = $context->getTypeFromString('int8*');
-        $strMap = $context->structFieldMap['__string__'];
-        $srcChars = $context->builder->structGep($sourceFile, $strMap['value']);
-        $selfhostNeedle = $context->builder->pointerCast(
-            $context->constantFromString('/test/selfhost/'),
-            $charPtr
+        $i32 = $context->getTypeFromString('int32');
+        $notFound = $i32->constInt(JitStringSearch::NOT_FOUND, true);
+        $selfhostNeedle = $context->builder->load(
+            $context->constantStringFromString('/test/selfhost/')
         );
-        $spineNeedle = $context->builder->pointerCast(
-            $context->constantFromString('/test/selfhost/compiler_lib_spine_smoke/main.php'),
-            $charPtr
+        $spineNeedle = $context->builder->load(
+            $context->constantStringFromString('/test/selfhost/compiler_lib_spine_smoke/main.php')
         );
-        $foundSelfhost = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $srcChars,
-            $selfhostNeedle
-        );
-        $foundSpine = $context->builder->call(
-            $context->lookupFunction('strstr'),
-            $srcChars,
-            $spineNeedle
-        );
-        $hasSelfhost = $context->builder->icmp(Builder::INT_NE, $foundSelfhost, $i8p->constNull());
-        $isSpine = $context->builder->icmp(Builder::INT_NE, $foundSpine, $i8p->constNull());
+        $foundSelfhost = JitStringSearch::findOffsetI32($context, $sourceFile, $selfhostNeedle);
+        $foundSpine = JitStringSearch::findOffsetI32($context, $sourceFile, $spineNeedle);
+        $hasSelfhost = $context->builder->icmp(Builder::INT_NE, $foundSelfhost, $notFound);
+        $isSpine = $context->builder->icmp(Builder::INT_NE, $foundSpine, $notFound);
         $shouldSet = $context->builder->and($hasSelfhost, $context->builder->not($isSpine));
         $setBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_set');
         $skipBb = BasicBlockHelper::append($context, 'csm3_putenv_m3main_skip');
