@@ -185,4 +185,18 @@ final class VmDatePure
 
         return \is_string($text) ? $text : '';
     }
+
+    /** Push default timezone for host date/mktime wrappers in VmDateTimeNative::withTimezone (#13857). */
+    public static function pushProcessTimezone(string $tzName): string
+    {
+        $previous = \date_default_timezone_get();
+        \date_default_timezone_set($tzName);
+
+        return $previous;
+    }
+
+    public static function popProcessTimezone(string $previous): void
+    {
+        \date_default_timezone_set($previous);
+    }
 }

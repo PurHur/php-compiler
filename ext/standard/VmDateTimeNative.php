@@ -10,19 +10,17 @@ use PHPCompiler\VM\Variable;
 
 /**
  * Native DateTime/DateTimeZone semantics without host Zend \\DateTime (issue #6164).
- * TZ switching via {@see VmEnv} libc FFI — no host Zend env builtins (#8086).
+ * TZ switching via {@see VmEnv} — no host Zend env builtins (#8086).
  * zone.tab reads via {@see VmFs::file()} / {@see VmFsReadNative} — no host \\file() (#8529).
  *
  * php-src ref: ext/date/php_datetime.c, ext/date/lib/timelib.c — parsing, formatting, offsets.
- * Thin libc FFI for mktime/localtime/timegm; timezone IDs validated via zoneinfo files.
+ * Time libc via {@see VmDatePure} host wrappers (#13765, #13857); timezone IDs validated via zoneinfo files.
  */
 final class VmDateTimeNative
 {
     private const ZONEINFO_ROOT = '/usr/share/zoneinfo';
 
     private const FORMAT_OUT_BYTES = 256;
-
-    private static ?\FFI $ffi = null;
 
     /** @var list<string>|null */
     private static ?array $zoneIdentifiers = null;
@@ -37,7 +35,7 @@ final class VmDateTimeNative
     /** @var string|false */
     private static string|false $withTimezoneSavedVmEnvTz = false;
 
-    private static ?string $activeLibcTimezone = null;
+    private static ?string $withTimezoneSavedHostTz = null;
 
     /**
      * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
@@ -782,12 +780,12 @@ final class VmDateTimeNative
         }
 
         return self::parseResultFromComponents([
-            'year' => (int) $tm->tm_year + 1900,
-            'month' => (int) $tm->tm_mon + 1,
-            'day' => (int) $tm->tm_mday,
-            'hour' => (int) $tm->tm_hour,
-            'minute' => (int) $tm->tm_min,
-            'second' => (int) $tm->tm_sec,
+            'year' => (self::tmInt($tm, 'tm_year') + 1900),
+            'month' => (self::tmInt($tm, 'tm_mon') + 1),
+            'day' => self::tmInt($tm, 'tm_mday'),
+            'hour' => self::tmInt($tm, 'tm_hour'),
+            'minute' => self::tmInt($tm, 'tm_min'),
+            'second' => self::tmInt($tm, 'tm_sec'),
             'fraction' => $microsecond / 1_000_000,
         ]);
     }
@@ -1056,12 +1054,12 @@ final class VmDateTimeNative
                     if (null === $tm) {
                         return false;
                     }
-                    $components['year'] = (int) $tm->tm_year + 1900;
-                    $components['month'] = (int) $tm->tm_mon + 1;
-                    $components['day'] = (int) $tm->tm_mday;
-                    $components['hour'] = (int) $tm->tm_hour;
-                    $components['minute'] = (int) $tm->tm_min;
-                    $components['second'] = (int) $tm->tm_sec;
+                    $components['year'] = (self::tmInt($tm, 'tm_year') + 1900);
+                    $components['month'] = (self::tmInt($tm, 'tm_mon') + 1);
+                    $components['day'] = self::tmInt($tm, 'tm_mday');
+                    $components['hour'] = self::tmInt($tm, 'tm_hour');
+                    $components['minute'] = self::tmInt($tm, 'tm_min');
+                    $components['second'] = self::tmInt($tm, 'tm_sec');
 
                     break;
                 case 'e':
@@ -1372,7 +1370,7 @@ final class VmDateTimeNative
         if ($target < 0) {
             return false;
         }
-        $current = (int) $tm->tm_wday;
+        $current = self::tmInt($tm, 'tm_wday');
         $days = ($target - $current + 7) % 7;
         if (0 === $days) {
             $days = 7;
@@ -1492,12 +1490,12 @@ final class VmDateTimeNative
             if (null === $tm) {
                 self::throwModifyMalformed($modifier);
             }
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
+            $year = (self::tmInt($tm, 'tm_year') + 1900);
+            $month = (self::tmInt($tm, 'tm_mon') + 1);
+            $day = self::tmInt($tm, 'tm_mday');
+            $hour = self::tmInt($tm, 'tm_hour');
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
             $delta = self::parseSignedRelativeDelta($modifier);
             switch ($delta['unit']) {
                 case 'second':
@@ -1560,12 +1558,7 @@ final class VmDateTimeNative
         }
 
         return self::withTimezone($tzName, static function () use ($timestamp): int {
-            $tm = self::localtime($timestamp);
-            if (null === $tm) {
-                return 0;
-            }
-
-            return (int) $tm->tm_gmtoff;
+            return self::offsetSecondsForTimestamp($timestamp);
         });
     }
 
@@ -1667,20 +1660,8 @@ final class VmDateTimeNative
             $minute,
             $second
         ): int {
-            $ffi = self::ffi();
-            if (null === $ffi) {
-                self::throwMalformedDateTime("{$year}-{$month}-{$day}");
-            }
-            $tm = $ffi->new('struct tm');
-            $tm->tm_sec = $second;
-            $tm->tm_min = $minute;
-            $tm->tm_hour = $hour;
-            $tm->tm_mday = $day;
-            $tm->tm_mon = $month - 1;
-            $tm->tm_year = $year - 1900;
-            $tm->tm_isdst = -1;
-            $result = (int) $ffi->mktime(\FFI::addr($tm));
-            if (-1 === $result) {
+            $result = VmDatePure::mktime($hour, $minute, $second, $month, $day, $year);
+            if (false === $result) {
                 self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
             }
 
@@ -1696,20 +1677,8 @@ final class VmDateTimeNative
         int $minute,
         int $second
     ): int {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            self::throwMalformedDateTime("{$year}-{$month}-{$day}");
-        }
-        $tm = $ffi->new('struct tm');
-        $tm->tm_sec = $second;
-        $tm->tm_min = $minute;
-        $tm->tm_hour = $hour;
-        $tm->tm_mday = $day;
-        $tm->tm_mon = $month - 1;
-        $tm->tm_year = $year - 1900;
-        $tm->tm_isdst = 0;
-        $result = (int) $ffi->timegm(\FFI::addr($tm));
-        if (-1 === $result) {
+        $result = VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $year);
+        if (false === $result) {
             self::throwMalformedDateTime("{$year}-{$month}-{$day} {$hour}:{$minute}:{$second}");
         }
 
@@ -1721,42 +1690,25 @@ final class VmDateTimeNative
      */
     private static function readNow(): array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return ['timestamp' => 0, 'microsecond' => 0];
-        }
-        $tv = $ffi->new('struct timeval');
-        if (0 !== (int) $ffi->gettimeofday(\FFI::addr($tv), null)) {
-            return ['timestamp' => 0, 'microsecond' => 0];
-        }
+        $tv = VmDatePure::readTimeval();
 
-        return ['timestamp' => (int) $tv->tv_sec, 'microsecond' => (int) $tv->tv_usec];
+        return ['timestamp' => $tv['sec'], 'microsecond' => $tv['usec']];
     }
 
-    private static function localtime(int $timestamp): ?\FFI\CData
+    /**
+     * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
+     */
+    private static function localtime(int $timestamp): ?array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $ts = $ffi->new('time_t');
-        $ts->cdata = $timestamp;
-        $buf = $ffi->new('struct tm');
-
-        return null === $ffi->localtime_r(\FFI::addr($ts), \FFI::addr($buf)) ? null : $buf;
+        return VmDatePure::localtime($timestamp);
     }
 
-    private static function gmtime(int $timestamp): ?\FFI\CData
+    /**
+     * @return array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int}|null
+     */
+    private static function gmtime(int $timestamp): ?array
     {
-        $ffi = self::ffi();
-        if (null === $ffi) {
-            return null;
-        }
-        $ts = $ffi->new('time_t');
-        $ts->cdata = $timestamp;
-        $buf = $ffi->new('struct tm');
-
-        return null === $ffi->gmtime_r(\FFI::addr($ts), \FFI::addr($buf)) ? null : $buf;
+        return VmDatePure::gmtime($timestamp);
     }
 
     private static function formatOffset(int $offsetSeconds): string
@@ -1864,9 +1816,9 @@ final class VmDateTimeNative
             if (null === $tm) {
                 return ['offset' => 0, 'isdst' => false];
             }
-            $isdst = 1 === (int) $tm->tm_isdst;
+            $isdst = self::tmInt($tm, 'tm_isdst') > 0;
 
-            return ['offset' => (int) $tm->tm_gmtoff, 'isdst' => $isdst];
+            return ['offset' => self::offsetSecondsForTimestamp($timestamp), 'isdst' => $isdst];
         });
     }
 
@@ -1889,18 +1841,7 @@ final class VmDateTimeNative
     private static function timezoneAbbreviation(string $tzName, int $timestamp): string
     {
         return self::withTimezone($tzName, static function () use ($timestamp): string {
-            $ffi = self::ffi();
-            $tm = self::localtime($timestamp);
-            if (null === $ffi || null === $tm) {
-                return '';
-            }
-            $buf = $ffi->new('char[16]');
-            $len = (int) $ffi->strftime(\FFI::addr($buf[0]), 16, '%Z', \FFI::addr($tm));
-            if ($len <= 0) {
-                return '';
-            }
-
-            return \rtrim(\FFI::string($buf), "\0");
+            return VmDatePure::strftime('%Z', $timestamp, false);
         });
     }
 
@@ -2083,17 +2024,12 @@ final class VmDateTimeNative
      */
     private static function withTimezone(string $tzName, callable $fn): mixed
     {
-        $ffi = self::ffi();
         if (0 === self::$withTimezoneDepth) {
             self::$withTimezoneSavedVmEnvTz = VmEnv::getenv('TZ');
+            self::$withTimezoneSavedHostTz = VmDatePure::pushProcessTimezone($tzName);
         }
         ++self::$withTimezoneDepth;
         VmEnv::putenv('TZ='.$tzName);
-        if (null !== $ffi && self::$activeLibcTimezone !== $tzName) {
-            $ffi->setenv('TZ', $tzName, 1);
-            $ffi->tzset();
-            self::$activeLibcTimezone = $tzName;
-        }
         try {
             return $fn();
         } finally {
@@ -2104,6 +2040,8 @@ final class VmDateTimeNative
                 } else {
                     VmEnv::putenv('TZ='.self::$withTimezoneSavedVmEnvTz);
                 }
+                VmDatePure::popProcessTimezone((string) self::$withTimezoneSavedHostTz);
+                self::$withTimezoneSavedHostTz = null;
             }
         }
     }
@@ -2155,9 +2093,9 @@ final class VmDateTimeNative
             if (null === $tm) {
                 throw new \LogicException('Invalid timestamp for DateTime::setDate()');
             }
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
+            $hour = self::tmInt($tm, 'tm_hour');
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
 
             return [
                 'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
@@ -2192,9 +2130,9 @@ final class VmDateTimeNative
             if (null === $tm) {
                 throw new \LogicException('Invalid timestamp for DateTime::setTime()');
             }
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
+            $year = (self::tmInt($tm, 'tm_year') + 1900);
+            $month = (self::tmInt($tm, 'tm_mon') + 1);
+            $day = self::tmInt($tm, 'tm_mday');
 
             return [
                 'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
@@ -2232,12 +2170,12 @@ final class VmDateTimeNative
             if (null === $tm) {
                 throw new \LogicException('Invalid timestamp for DateInterval application');
             }
-            $year = (int) $tm->tm_year + 1900;
-            $month = (int) $tm->tm_mon + 1;
-            $day = (int) $tm->tm_mday;
-            $hour = (int) $tm->tm_hour;
-            $minute = (int) $tm->tm_min;
-            $second = (int) $tm->tm_sec;
+            $year = (self::tmInt($tm, 'tm_year') + 1900);
+            $month = (self::tmInt($tm, 'tm_mon') + 1);
+            $day = self::tmInt($tm, 'tm_mday');
+            $hour = self::tmInt($tm, 'tm_hour');
+            $minute = self::tmInt($tm, 'tm_min');
+            $second = self::tmInt($tm, 'tm_sec');
 
             $year += $sign * $state['y'];
             $month += $sign * $state['m'];
@@ -2286,19 +2224,19 @@ final class VmDateTimeNative
                 throw new \LogicException('Invalid timestamp for date_diff()');
             }
 
-            $y1 = (int) $tm1->tm_year + 1900;
-            $m1 = (int) $tm1->tm_mon + 1;
-            $d1 = (int) $tm1->tm_mday;
-            $h1 = (int) $tm1->tm_hour;
-            $i1 = (int) $tm1->tm_min;
-            $s1 = (int) $tm1->tm_sec;
+            $y1 = self::tmInt($tm1, 'tm_year') + 1900;
+            $m1 = self::tmInt($tm1, 'tm_mon') + 1;
+            $d1 = self::tmInt($tm1, 'tm_mday');
+            $h1 = self::tmInt($tm1, 'tm_hour');
+            $i1 = self::tmInt($tm1, 'tm_min');
+            $s1 = self::tmInt($tm1, 'tm_sec');
 
-            $y2 = (int) $tm2->tm_year + 1900;
-            $m2 = (int) $tm2->tm_mon + 1;
-            $d2 = (int) $tm2->tm_mday;
-            $h2 = (int) $tm2->tm_hour;
-            $i2 = (int) $tm2->tm_min;
-            $s2 = (int) $tm2->tm_sec;
+            $y2 = self::tmInt($tm2, 'tm_year') + 1900;
+            $m2 = self::tmInt($tm2, 'tm_mon') + 1;
+            $d2 = self::tmInt($tm2, 'tm_mday');
+            $h2 = self::tmInt($tm2, 'tm_hour');
+            $i2 = self::tmInt($tm2, 'tm_min');
+            $s2 = self::tmInt($tm2, 'tm_sec');
 
             $s = $s2 - $s1;
             $i = $i2 - $i1;
@@ -2382,52 +2320,20 @@ final class VmDateTimeNative
         return ['amount' => $amount, 'unit' => $unit];
     }
 
-    private static function ffi(): ?\FFI
+    /**
+     * @param array{tm_sec:int,tm_min:int,tm_hour:int,tm_mday:int,tm_mon:int,tm_year:int,tm_wday:int,tm_yday:int,tm_isdst:int} $tm
+     */
+    private static function tmInt(array $tm, string $field): int
     {
-        if (null !== self::$ffi) {
-            return self::$ffi;
-        }
-        if (!\extension_loaded('ffi')) {
-            return null;
-        }
-        $cdef = <<<'CDEF'
-typedef long time_t;
-struct timeval {
-    time_t tv_sec;
-    long tv_usec;
-};
-struct tm {
-    int tm_sec;
-    int tm_min;
-    int tm_hour;
-    int tm_mday;
-    int tm_mon;
-    int tm_year;
-    int tm_wday;
-    int tm_yday;
-    int tm_isdst;
-    long tm_gmtoff;
-    const char *tm_zone;
-};
-int setenv(const char *name, const char *value, int overwrite);
-void tzset(void);
-time_t mktime(struct tm *tm);
-time_t timegm(struct tm *tm);
-struct tm *localtime_r(const time_t *timep, struct tm *result);
-struct tm *gmtime_r(const time_t *timep, struct tm *result);
-int gettimeofday(struct timeval *tv, void *tz);
-size_t strftime(char *s, size_t max, const char *format, const struct tm *tm);
-CDEF;
+        return (int) ($tm[$field] ?? 0);
+    }
 
-        foreach (['libc.so.6', 'libc.so'] as $lib) {
-            try {
-                self::$ffi = \FFI::cdef($cdef, $lib);
-
-                return self::$ffi;
-            } catch (\Throwable) {
-            }
+    private static function offsetSecondsForTimestamp(int $timestamp): int
+    {
+        if (!\function_exists('date')) {
+            return 0;
         }
 
-        return null;
+        return (int) \date('Z', $timestamp);
     }
 }
