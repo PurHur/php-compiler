@@ -3087,6 +3087,7 @@
         "lib/VM/Builtin/DateTimeFormat.php",
         "lib/VM/Builtin/DateTimeGetLastErrors.php",
         "lib/VM/Builtin/DateTimeGetMicrosecond.php",
+        "lib/VM/Builtin/DateTimeGetOffset.php",
         "lib/VM/Builtin/DateTimeGetTimestamp.php",
         "lib/VM/Builtin/DateTimeGetTimezone.php",
         "lib/VM/Builtin/DateTimeImmutableConstruct.php",
@@ -3240,6 +3241,7 @@
         "lib/VM/Builtin/ReflectionFunctionGetNumberOfParameters.php",
         "lib/VM/Builtin/ReflectionFunctionGetParameters.php",
         "lib/VM/Builtin/ReflectionFunctionGetReturnType.php",
+        "lib/VM/Builtin/ReflectionFunctionGetStaticVariables.php",
         "lib/VM/Builtin/ReflectionFunctionHasReturnType.php",
         "lib/VM/Builtin/ReflectionFunctionInvoke.php",
         "lib/VM/Builtin/ReflectionFunctionIsAnonymous.php",
@@ -3264,6 +3266,7 @@
         "lib/VM/Builtin/ReflectionMethodGetPrototype.php",
         "lib/VM/Builtin/ReflectionMethodGetReturnType.php",
         "lib/VM/Builtin/ReflectionMethodGetStartLine.php",
+        "lib/VM/Builtin/ReflectionMethodGetStaticVariables.php",
         "lib/VM/Builtin/ReflectionMethodHasPrototype.php",
         "lib/VM/Builtin/ReflectionMethodHasReturnType.php",
         "lib/VM/Builtin/ReflectionMethodHasTentativeReturnType.php",
@@ -3763,9 +3766,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3533,
+        "inventory_files": 3536,
         "excluded": 0,
-        "eligible": 3533,
+        "eligible": 3536,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
