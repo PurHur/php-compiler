@@ -287,6 +287,7 @@ final class ErrorReporter
                 return;
             }
         }
+        // Zend records error_get_last() even when error_reporting(0) or @ silences display.
         $this->recordLastError(self::E_NOTICE, $message, $file, $line);
         if (!$this->shouldWriteCliStderr(self::E_NOTICE)) {
             return;
@@ -308,6 +309,7 @@ final class ErrorReporter
                 return;
             }
         }
+        // Zend records error_get_last() even when error_reporting(0) or @ silences display.
         $this->recordLastError(self::E_WARNING, $message, $file, $line);
         if (!$this->shouldWriteCliStderr(self::E_WARNING)) {
             return;
