@@ -13,7 +13,9 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
 use PHPCompiler\ext\spl\SplArraySerializeSupport;
+use PHPCompiler\ext\spl\SplDllistSerializeSupport;
 use PHPCompiler\ext\spl\SplFixedArraySerializeSupport;
+use PHPCompiler\ext\spl\SplObjectStorageSerializeSupport;
 use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -60,6 +62,17 @@ final class VmSerialize
             }
             if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
                 return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+                return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
+            }
+            if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+                return SplObjectStorageSerializeSupport::encodeZendSerializeWire(
+                    $ctx,
+                    $entry,
+                    new VmSerializeRefState(),
+                    $frame
+                );
             }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
@@ -161,6 +174,17 @@ final class VmSerialize
 
                 return self::instantiateIncompleteObject($ctx, $className, $parsed[1]);
             }
+            $lcEarly = strtolower($className);
+            if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcEarly)) {
+                $restored = SplObjectStorageSerializeSupport::restoreFromWire($ctx, $payload, $options, $frame);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
             $class = self::resolveClassEntryForUnserialize($ctx, $className);
             if (null !== $class && self::hasInstanceMethod($class, '__unserialize')) {
                 $magicData = self::decodeMagicSerializePropertyBag($ctx, $payload, $options, $frame);
@@ -206,6 +230,26 @@ final class VmSerialize
             }
             if (\is_array($data) && SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
                 $restored = SplFixedArraySerializeSupport::restoreFromZendSerialize($ctx, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+                $restored = SplDllistSerializeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
+                if (null === $restored) {
+                    return false;
+                }
+                $var = new Variable(Variable::TYPE_OBJECT);
+                $var->object($restored);
+
+                return $var;
+            }
+            if (\is_array($data) && SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+                $restored = SplObjectStorageSerializeSupport::restoreFromWire($ctx, $payload, $options, $frame);
                 if (null === $restored) {
                     return false;
                 }
@@ -392,6 +436,16 @@ final class VmSerialize
         return VmSerializeFormat::encodeExported(VmJson::export($value, $ctx, $ctx->runtime->vm));
     }
 
+    /** Public wrapper for SPL/custom serializers embedding nested values (#14164). */
+    public static function encodeVariableWire(
+        Context $ctx,
+        Variable $value,
+        VmSerializeRefState $state,
+        ?Frame $frame = null
+    ): string {
+        return self::encodeWireVariable($ctx, $value, $state, $frame);
+    }
+
     private static function encodeWireArray(
         Context $ctx,
         Variable $value,
@@ -442,6 +496,12 @@ final class VmSerialize
         }
         if (SplFixedArraySerializeSupport::isSplFixedArrayClass($lcClass)) {
             return SplFixedArraySerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplDllistSerializeSupport::isSplDllistClass($lcClass)) {
+            return SplDllistSerializeSupport::encodeZendSerializeWire($entry);
+        }
+        if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
+            return SplObjectStorageSerializeSupport::encodeZendSerializeWire($ctx, $entry, $state, $frame);
         }
         if (self::hasInstanceMethod($entry->class, '__serialize')) {
             $magicData = self::invokeSerialize($ctx, $entry);

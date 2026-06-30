@@ -27,8 +27,8 @@ final class SplQueueBuiltin
 {
     public const CLASS_LC = 'splqueue';
 
-    /** php-src IT_MODE_FIFO | IT_MODE_KEEP */
-    public const IT_MODE_FIFO = 0;
+    /** php-src SPL_DLLIST_IT_MODE_FIFO | SPL_DLLIST_IT_MODE_KEEP */
+    public const IT_MODE_FIFO = 4;
 
     public static function registerClass(Context $ctx): void
     {
@@ -77,8 +77,8 @@ final class SplStackBuiltin
 {
     public const CLASS_LC = 'splstack';
 
-    /** php-src IT_MODE_LIFO | IT_MODE_KEEP */
-    public const IT_MODE_LIFO = 2;
+    /** php-src SPL_DLLIST_IT_MODE_LIFO | SPL_DLLIST_IT_MODE_KEEP */
+    public const IT_MODE_LIFO = 6;
 
     public static function registerClass(Context $ctx): void
     {
@@ -132,7 +132,7 @@ final class SplQueueConstruct extends VmClassMethod
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::__construct()'
         );
-        SplDoublyLinkedListBuiltin::init($object);
+        SplDoublyLinkedListBuiltin::init($object, SplQueueBuiltin::IT_MODE_FIFO);
     }
 }
 
@@ -150,7 +150,7 @@ final class SplStackConstruct extends VmClassMethod
             SplStackBuiltin::CLASS_LC,
             'SplStack::__construct()'
         );
-        SplDoublyLinkedListBuiltin::init($object);
+        SplDoublyLinkedListBuiltin::init($object, SplStackBuiltin::IT_MODE_LIFO);
     }
 }
 
