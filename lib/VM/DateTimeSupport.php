@@ -562,6 +562,57 @@ final class DateTimeSupport
         return $epoch;
     }
 
+    /** php-src zim_DateTime_getTimezone — returns DateTimeZone for stored tz id (#10946). */
+    public static function getTimezoneObject(ObjectEntry $dt, Context $ctx): ObjectEntry
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::getTimezone()");
+        $tzName = self::requireStringProperty($dt, self::TZ_PROPERTY, $label)->toString();
+
+        return self::newDateTimeZoneVariable($ctx, $tzName)->toObject();
+    }
+
+    /** php-src zim_DateTime_setTimestamp — mutable in-place (#10946). */
+    public static function setTimestamp(ObjectEntry $dt, int $timestamp): void
+    {
+        $label = self::classLabel($dt);
+        self::requireInitializedDateTimeLike($dt, "{$label}::setTimestamp()");
+        if (4 === \PHP_INT_SIZE) {
+            if ($timestamp > \PHP_INT_MAX || $timestamp < \PHP_INT_MIN) {
+                self::throwDateRangeError('Epoch doesn\'t fit in a PHP integer');
+            }
+        }
+        self::requireIntProperty($dt, self::TS_PROPERTY, $label)->int($timestamp);
+        self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, $label)->int(0);
+    }
+
+    /** php-src zim_DateTimeImmutable_setTimestamp — returns new instance (#10946). */
+    public static function withTimestamp(ObjectEntry $dt, int $timestamp): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::setTimestamp($clone, $timestamp);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTimeImmutable_add — returns new instance (#10946). */
+    public static function withAddInterval(ObjectEntry $dt, ObjectEntry $interval): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::addInterval($clone, $interval);
+
+        return $clone;
+    }
+
+    /** php-src zim_DateTimeImmutable_sub — returns new instance (#10946). */
+    public static function withSubInterval(ObjectEntry $dt, ObjectEntry $interval): ObjectEntry
+    {
+        $clone = self::cloneDateTimeObject($dt);
+        self::subInterval($clone, $interval);
+
+        return $clone;
+    }
+
     public static function getMicrosecond(ObjectEntry $dt): int
     {
         return self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
