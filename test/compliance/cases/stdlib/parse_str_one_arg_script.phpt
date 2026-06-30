@@ -1,10 +1,12 @@
 --TEST--
-stdlib parse_str() one-arg populates script scope (PHP 8+, #12533)
+stdlib parse_str() one-arg at script scope throws ArgumentCountError (#14112, ext/standard/basic_functions.c)
 --FILE--
 <?php
-parse_str('route=home&page=3');
-echo $GLOBALS['route'], "\n";
-echo $GLOBALS['page'], "\n";
+try {
+    parse_str('route=home&page=3');
+    echo "no throw\n";
+} catch (ArgumentCountError $e) {
+    echo $e->getMessage(), "\n";
+}
 --EXPECT--
-home
-3
+parse_str() expects exactly 2 arguments, 1 given
