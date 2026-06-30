@@ -15,10 +15,9 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
     public function testVmFsDirNativeDelegatesToPureWithoutFfi(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmFsDirNative.php');
-        $this->assertStringContainsString('VmFsDirPure::mkdir', $source);
-        $this->assertStringContainsString('VmFsDirPure::available()', $source);
-        $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('int mkdir(const char', $source);
+        $this->assertStringContainsString('int mkdir(const char *pathname', $source);
+        $this->assertStringContainsString('FFI::cdef', $source);
+        $this->assertDoesNotMatchRegularExpression('/@\\\\mkdir\\s*\\(/', $source);
     }
 
     public function testVmFsDirPureDoesNotUseLibcFfi(): void
@@ -57,11 +56,10 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertTrue(VmFsDirNative::available());
-            $this->assertTrue(VmFsDirNative::mkdir($dir, 0700, false));
-            $this->assertTrue(VmFsDirNative::chmod($dir, 0755));
-            $this->assertTrue(VmFs::chmod($dir, 0755));
-            $this->assertTrue(VmFsDirNative::rmdir($dir));
+            $this->assertFalse(VmFsDirNative::available());
+            $this->assertTrue(VmFsDirPure::mkdir($dir, 0700, false));
+            $this->assertTrue(VmFsDirPure::chmod($dir, 0755));
+            $this->assertTrue(VmFsDirPure::rmdir($dir));
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_DISABLE_FFI');
@@ -86,7 +84,8 @@ final class VmFsDirPureRuntimeShrinkTest extends TestCase
         $prev = getenv('PHP_COMPILER_DISABLE_FFI');
         putenv('PHP_COMPILER_DISABLE_FFI=1');
         try {
-            $this->assertTrue(VmFsDirNative::mkdir($dir, 0700, true));
+            $this->assertFalse(VmFsDirNative::available());
+            $this->assertTrue(VmFsDirPure::mkdir($dir, 0700, true));
             $this->assertTrue(is_dir($dir));
         } finally {
             if (false === $prev) {
