@@ -14,14 +14,33 @@ final class EncapsedCoalesceDesugarTest extends TestCase
         $code = '<?php echo "{$a[\'b\'] ?? 0}";';
         $out = EncapsedCoalesceDesugar::desugar($code);
         $this->assertStringNotContainsString('"{$a', $out);
-        $this->assertStringContainsString("(\$a['b'] ?? 0)", $out);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($a[\'b\'] ?? 0);', $out);
+        $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
     }
 
     public function testDesugarsSuperglobalCoalesce(): void
     {
         $code = '<?php echo "{$_SERVER[\'PHP_SELF\'] ?? \'fallback\'}";';
         $out = EncapsedCoalesceDesugar::desugar($code);
-        $this->assertStringContainsString("(\$_SERVER['PHP_SELF'] ?? 'fallback')", $out);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($_SERVER[\'PHP_SELF\'] ?? \'fallback\');', $out);
+        $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
+    }
+
+    public function testDesugarsMultipleCoalesceInOneString(): void
+    {
+        $code = '<?php echo "x{$a[\'k1\'] ?? \'1\'}y{$a[\'k2\'] ?? \'2\'}z";';
+        $out = EncapsedCoalesceDesugar::desugar($code);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($a[\'k1\'] ?? \'1\');', $out);
+        $this->assertStringContainsString('$__encapsedCoalesce1 = ($a[\'k2\'] ?? \'2\');', $out);
+        $this->assertStringContainsString("'x' . \$__encapsedCoalesce0 . 'y' . \$__encapsedCoalesce1 . 'z'", $out);
+    }
+
+    public function testDesugarsNullsafeWithCoalesce(): void
+    {
+        $code = '<?php echo "{$obj?->prop ?? \'def\'}";';
+        $out = EncapsedCoalesceDesugar::desugar($code);
+        $this->assertStringContainsString('$__encapsedCoalesce0 = ($obj?->prop ?? \'def\');', $out);
+        $this->assertStringContainsString('echo $__encapsedCoalesce0;', $out);
     }
 
     public function testNoOpWithoutCoalesce(): void
