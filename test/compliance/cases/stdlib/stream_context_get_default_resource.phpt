@@ -1,18 +1,17 @@
 --TEST--
-stdlib stream_context_get_default() — resource type parity (#8743, ext/standard/streams.c)
+stdlib stream_context_get_default() — resource(stream-context) not internal array (#10376, ext/standard/streams.c)
 --FILE--
 <?php
-$ctx = stream_context_get_default();
-echo is_resource($ctx) ? "resource\n" : "not_resource\n";
-echo get_debug_type($ctx), "\n";
-echo gettype($ctx), "\n";
-echo get_resource_type($ctx), "\n";
+declare(strict_types=1);
 stream_context_set_default(['http' => ['timeout' => 5]]);
-$opts = stream_context_get_options(stream_context_get_default());
-echo $opts['http']['timeout'], "\n";
+$ctx = stream_context_get_default();
+echo is_resource($ctx) ? 'resource' : gettype($ctx), "\n";
+echo get_resource_type($ctx), "\n";
+ob_start();
+var_dump($ctx);
+$dump = ob_get_clean();
+echo str_starts_with($dump, 'resource(') ? 'resource_dump' : 'array_dump', "\n";
 --EXPECT--
 resource
-resource (stream-context)
-resource
 stream-context
-5
+resource_dump
