@@ -3169,6 +3169,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetDeprecatedMessa
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetDeprecatedVersion.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetDocComment.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetEndLine.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetExtension.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetExtensionName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetFileName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetLazyInitializationException.php';
@@ -3225,6 +3226,8 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseGetAttribut
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionEnumUnitCaseIsBacked.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionConstruct.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFiberGetExecutingFiber.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionFunctionCreateFromCallable.php';
