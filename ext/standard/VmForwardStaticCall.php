@@ -26,6 +26,9 @@ final class VmForwardStaticCall
             );
         }
         $callable = $callable->resolveIndirect();
+        if ('forward_static_call' === $builtinName && !self::hasActiveClassScope($frame)) {
+            throw new \Error("Cannot call {$builtinName}() when no class scope is active");
+        }
         if (self::isPlainFunctionNameCallable($callable)) {
             return VmCallable::invoke($frame->vmContext, $callable, ...$extraArgs);
         }
