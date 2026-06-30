@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3541 |
-| Phase A inventory files (M2 ratio SSOT) | 3541 |
+| PHP files on vm.php path | 3540 |
+| Phase A inventory files (M2 ratio SSOT) | 3540 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9641 |
+| Source constructs flagged (warnings) | 9640 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2503,7 +2503,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/PadTypeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrNativeOpsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseStrRuntime.php` | 0 | 6 |
-| `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrl.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlComponentJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/ParseUrlRuntime.php` | 0 | 3 |
@@ -11405,11 +11404,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 245)
 - new HashTable (line 1425)
 - new Variable (line 1427)
-- new HashTable (line 2242)
-- new Variable (line 2245)
+- new HashTable (line 2248)
 - new Variable (line 2251)
 - new Variable (line 2257)
 - new Variable (line 2263)
+- new Variable (line 2269)
 - 126 class method(s)
 
 ### `ext/standard/VmFsAccessNative.php`
@@ -12095,7 +12094,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new PhpMemoryStreamState (line 36)
 - new PhpMemoryStreamState (line 55)
-- 23 class method(s)
+- 24 class method(s)
 
 ### `ext/standard/VmPhpcRunCommandNative.php`
 
@@ -20037,17 +20036,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ParseStrRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new phpc_native_ht_alloc (line 218)
-- new phpc_native_ht_set_string_key (line 219)
-- new phpc_native_ht_set_string_key_ht (line 220)
-- new phpc_native_ht_set_string_at (line 221)
-- new phpc_native_ht_set_hashtable_at (line 222)
-- 11 class method(s)
-
-### `lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php`
-
-**Warnings** (review for bootstrap subset):
-- 25 class method(s)
+- new phpc_native_ht_alloc (line 202)
+- new phpc_native_ht_set_string_key (line 203)
+- new phpc_native_ht_set_string_key_ht (line 204)
+- new phpc_native_ht_set_string_at (line 205)
+- new phpc_native_ht_set_hashtable_at (line 206)
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ParseUrl.php`
 
@@ -21425,7 +21419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 24 class method(s)
 
 ### `lib/JIT/Builtin/SysGetTempDirRuntime.php`
 
@@ -26880,23 +26874,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/Web/Superglobals.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 163)
-- new Variable (line 167)
-- new HashTable (line 373)
-- new HashTable (line 384)
-- new HashTable (line 394)
-- new HashTable (line 402)
+- new Variable (line 164)
+- new Variable (line 168)
+- new HashTable (line 374)
+- new HashTable (line 385)
+- new HashTable (line 395)
 - new HashTable (line 403)
-- new HashTable (line 421)
-- new HashTable (line 532)
-- new HashTable (line 533)
-- new HashTable (line 545)
-- new HashTable (line 546)
-- new Variable (line 617)
-- new Variable (line 845)
-- new Variable (line 852)
-- new Variable (line 854)
-- 47 class method(s)
+- new HashTable (line 404)
+- new HashTable (line 423)
+- new HashTable (line 582)
+- new HashTable (line 583)
+- new HashTable (line 595)
+- new HashTable (line 596)
+- new Variable (line 669)
+- new Variable (line 897)
+- new Variable (line 904)
+- new Variable (line 906)
+- 49 class method(s)
 
 ### `lib/Web/UploadTemp.php`
 
