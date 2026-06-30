@@ -92,6 +92,22 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
     }
 
+    public function testParseStrRuntimeRegistersNativeHtProxiesBeforeNestedCompile(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringContainsString('ensureNativeHtInternalProxies', $source);
+        $this->assertStringContainsString('phpc_native_ht_set_string_key', $source);
+        $this->assertStringContainsString('Call\\ExternalMethod', $source);
+    }
+
+    public function testParseStrNativeOpsJitUsesVariableValueField(): void
+    {
+        $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
+        $this->assertStringContainsString('->value', $source);
+        $this->assertStringNotContainsString('->getValue()', $source);
+        $this->assertStringContainsString('JitLongArg::lower', $source);
+    }
+
     public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');

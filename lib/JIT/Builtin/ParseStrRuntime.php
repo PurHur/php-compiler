@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\ext\standard\phpc_native_ht_alloc;
+use PHPCompiler\ext\standard\phpc_native_ht_set_hashtable_at;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_at;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_key;
+use PHPCompiler\ext\standard\phpc_native_ht_set_string_key_ht;
 use PHPCompiler\JIT\Builtin;
+use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -63,15 +69,16 @@ final class ParseStrRuntime
         } catch (\Throwable) {
         }
 
+        self::ensureNativeHtInternalProxies($context);
+        if (self::isUserScriptStandaloneAot()) {
+            ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
+        }
         JitVmHelperLink::ensureCompiled(
             $context,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
             '#9299'
         );
-        if (self::isUserScriptStandaloneAot()) {
-            ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
-        }
         self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
         self::implementIfMissing($context, '__compiler_parse_cookie_header', self::implementCookieBridge(...));
         self::registerLinkedRuntime($context);
@@ -202,6 +209,25 @@ final class ParseStrRuntime
         }
 
         return true;
+    }
+
+    /** Register phpc_native_ht_* Internal JIT handlers before nested ParseStrJitHelper compile (#13900). */
+    private static function ensureNativeHtInternalProxies(Context $context): void
+    {
+        $internals = [
+            new phpc_native_ht_alloc(),
+            new phpc_native_ht_set_string_key(),
+            new phpc_native_ht_set_string_key_ht(),
+            new phpc_native_ht_set_string_at(),
+            new phpc_native_ht_set_hashtable_at(),
+        ];
+        foreach ($internals as $internal) {
+            $lc = strtolower($internal->getName());
+            $existing = $context->functionProxies[$lc] ?? null;
+            if (null === $existing || $existing instanceof Call\ExternalMethod) {
+                $context->functionProxies[$lc] = $internal;
+            }
+        }
     }
 
     private static function isUserScriptStandaloneAot(): bool
