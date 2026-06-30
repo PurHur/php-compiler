@@ -73,6 +73,14 @@ final class JitFilestatArg
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return;
         }
+        if (JITVariable::TYPE_STRING === $arg->type) {
+            self::emitTypeErrorAndAbort(
+                $context,
+                self::intTypeError($function, $argIndex, $paramName, 'string')
+            );
+
+            return;
+        }
         $enumClass = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
         if (null !== $enumClass) {
             self::emitTypeErrorAndAbort(
@@ -88,7 +96,14 @@ final class JitFilestatArg
                 $arg,
                 self::intTypeError($function, $argIndex, $paramName, 'object')
             );
+
+            return;
         }
+        $given = JitOperandTypeLabel::givenLabel($context, $arg);
+        self::emitTypeErrorAndAbort(
+            $context,
+            self::intTypeError($function, $argIndex, $paramName, $given)
+        );
     }
 
     public static function valuePtrAfterIntOrStringGuard(
