@@ -194,6 +194,10 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'bz2_phantom')) {
                 continue;
             }
+            if (CompilerVersion::supportsBz2()
+                && str_contains($name, 'bz2_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsBcmath()
                 && (str_contains($name, 'bcadd')
                     || str_contains($name, 'bcsub')
