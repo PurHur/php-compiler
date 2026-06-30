@@ -336,6 +336,9 @@ final class VmDns
      */
     public static function dnsGetRecord(string $hostname, int $type = 1)
     {
+        if ('' === $hostname) {
+            return new HashTable();
+        }
         if (!self::isValidDnsHostname($hostname)) {
             return false;
         }
