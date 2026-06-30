@@ -29,23 +29,13 @@ final class parse_str extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (1 !== $argc && 2 !== $argc) {
+        if (2 !== $argc) {
             throw new ArgumentCountError(\sprintf(
                 'parse_str() expects exactly 2 arguments, %d given',
                 $argc
             ));
         }
         $encodedStr = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'parse_str', 0, 'string');
-
-        if (1 === $argc) {
-            $params = ParseStrEngine::parse($encodedStr);
-            VmParseStr::importIntoCaller($frame->parent ?? $frame, $params);
-            if (null !== $frame->returnVar) {
-                $frame->returnVar->null();
-            }
-
-            return;
-        }
 
         $resultArg = $frame->calledArgs[1];
         $resolved = $resultArg->resolveIndirect();
@@ -75,7 +65,7 @@ final class parse_str extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if (1 !== $argc && 2 !== $argc) {
+        if (2 !== $argc) {
             TypeErrorRaise::registerDeclarations($context);
             TypeErrorRaise::ensureLinked($context);
             TypeErrorRaise::emitArgumentCountError(
@@ -86,17 +76,10 @@ final class parse_str extends Internal
             return $context->getTypeFromString('int32')->constInt(0, false);
         }
 
-        if (1 === $argc) {
-            if (null === JitStringArg::compileTimeLiteral($args[0])) {
-                StringParseStr::ensureLinked($context);
-            }
-            JitParseStr::parseIntoScope($context, $args[0]);
-        } else {
-            if (null === JitStringArg::compileTimeLiteral($args[0])) {
-                StringParseStr::ensureLinked($context);
-            }
-            JitParseStr::parse($context, $args[0], $args[1]);
+        if (null === JitStringArg::compileTimeLiteral($args[0])) {
+            StringParseStr::ensureLinked($context);
         }
+        JitParseStr::parse($context, $args[0], $args[1]);
 
         $nullSlot = JitValueBox::alloc($context);
         $nullPtr = JitValueBox::pointer($context, $nullSlot);

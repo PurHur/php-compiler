@@ -1,14 +1,15 @@
 --TEST--
-stdlib parse_str() one-arg populates function scope locals (PHP 8+, #12533)
+stdlib parse_str() one-arg inside function throws ArgumentCountError (#14112, ext/standard/basic_functions.c)
 --FILE--
 <?php
 function t(): void {
-    parse_str('a=1&b=2');
-    echo $a, "\n";
-    echo $b, "\n";
+    try {
+        parse_str('a=1&b=2');
+        echo "no throw\n";
+    } catch (ArgumentCountError $e) {
+        echo $e->getMessage(), "\n";
+    }
 }
 t();
 --EXPECT--
-1
-2
-
+parse_str() expects exactly 2 arguments, 1 given
