@@ -47,21 +47,17 @@ final class StatArrayJitHelper
                 $values[$i] = 0;
             }
         }
-        foreach ($values as $val) {
-            $ht->append(self::intVariable($val));
+        foreach ($values as $i => $val) {
+            $indexed = new Variable();
+            $indexed->int($val);
+            $ht->updateIndex($i, $indexed);
         }
         foreach ($keys as $i => $key) {
-            $ht->add($key, self::intVariable($values[$i]));
+            $named = new Variable();
+            $named->int($values[$i]);
+            $ht->add($key, $named);
         }
 
         return $ht;
-    }
-
-    private static function intVariable(int $value): Variable
-    {
-        $var = new Variable(Variable::TYPE_INTEGER);
-        $var->int($value);
-
-        return $var;
     }
 }
