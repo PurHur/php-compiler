@@ -307,9 +307,9 @@ final class VmMath
             return null;
         }
         if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireInt($frame, $argIndex, $function, $paramName);
+            InternalStrictArg::requireNullableInt($frame, $argIndex, $function, $paramName);
 
-            return $resolved->toInt();
+            return Variable::TYPE_NULL === $resolved->type ? null : $resolved->toInt();
         }
         if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
             self::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);

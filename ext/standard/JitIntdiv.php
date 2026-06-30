@@ -71,6 +71,19 @@ final class JitIntdiv
         return self::lowerIntOperand($context, $arg, $argIndex, $paramName, $function, true);
     }
 
+    /** Z_PARAM_LONG_OR_NULL with caller strict_types parity (#13859, #13851). */
+    public static function lowerNullableIntBuiltinArgForCaller(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireNullableInt($context, $arg, $function, $paramName, $argIndex);
+
+        return self::lowerNullableIntBuiltinArg($context, $arg, $function, $argIndex, $paramName);
+    }
+
     /**
      * array_splice() length: explicit null means "to end" (hasLength=false), not zero (php-src array.c; #11209).
      *

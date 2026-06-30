@@ -24,6 +24,19 @@ final class InternalStrictArg
         return $arg;
     }
 
+    public static function requireNullableInt(Frame $frame, int $argIndex, string $function, string $paramName): Variable
+    {
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (!self::callerStrict($frame)) {
+            return $arg;
+        }
+        if (Variable::TYPE_INTEGER === $arg->type || Variable::TYPE_NULL === $arg->type) {
+            return $arg;
+        }
+
+        throw new \TypeError(self::message($function, $argIndex, $paramName, '?int', $arg));
+    }
+
     /**
      * Builtin signature int — always reject non-int operands (php-src ZEND_ARG_INFO IS_LONG; #12215).
      */
