@@ -4,15 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\bz2;
 
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\ModuleAbstract;
 
 /**
  * bz2 extension module (php-src ext/bz2/bz2.c; issue #3402, #11840, #11992).
  *
  * Register under {@see standard}; advertise logical {@code bz2} extension and
- * bzcompress()/bzdecompress() only when {@see CompilerVersion::supportsBz2()} and
- * {@see VmBz2Native} is available (pure PHP via {@see VmBz2Core}) — withheld on reference profile (#11992).
+ * bzcompress()/bzdecompress() only when {@see Bz2ExtensionPolicy::advertisesExtension()}
+ * (pure PHP via {@see VmBz2Core}) — withheld on reference profile (#11992, #14219).
  */
 class Module extends ModuleAbstract
 {
@@ -26,7 +25,7 @@ class Module extends ModuleAbstract
      */
     public function getAdditionalExtensionNames(): array
     {
-        if (!CompilerVersion::supportsBz2() || !VmBz2Native::available()) {
+        if (!Bz2ExtensionPolicy::advertisesExtension()) {
             return [];
         }
 
@@ -35,7 +34,7 @@ class Module extends ModuleAbstract
 
     public function getFunctions(): array
     {
-        if (!CompilerVersion::supportsBz2() || !VmBz2Native::available()) {
+        if (!Bz2ExtensionPolicy::advertisesExtension()) {
             return [];
         }
 

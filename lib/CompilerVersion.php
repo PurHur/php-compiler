@@ -617,10 +617,10 @@ final class CompilerVersion
         return false;
     }
 
-    /** ext/bz2 via pure PHP {@see \PHPCompiler\ext\bz2\VmBz2Core} — no libbz2 FFI (#14198). */
+    /** ext/bz2 via pure PHP {@see \PHPCompiler\ext\bz2\VmBz2Core} — withheld on reference profile (#11992, #14219). */
     public static function supportsBz2(): bool
     {
-        return true;
+        return false;
     }
 
     /** ext/bcmath not on Docker Zend 8.2 reference profile — withhold phantom registration (#12131). */

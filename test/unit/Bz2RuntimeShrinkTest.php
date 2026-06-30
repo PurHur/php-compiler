@@ -21,6 +21,7 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmBz2Native', $runtime);
         $this->assertStringNotContainsString('Bz2StandaloneLlvm', $runtime);
         $this->assertStringContainsString('VmBz2Core', (string) file_get_contents(__DIR__.'/../../ext/bz2/VmBz2Native.php'));
+        $this->assertFileExists(__DIR__.'/../../ext/bz2/Bz2ExtensionPolicy.php');
         $this->assertStringNotContainsString('BZ2_bzBuffToBuffCompress', $runtime);
 
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringBz2Jit.php');
@@ -28,10 +29,11 @@ final class Bz2RuntimeShrinkTest extends TestCase
         $this->assertFileExists(__DIR__.'/../../ext/bz2/Bz2JitHelper.php');
     }
 
-    public function testSupportsBz2GateEnabledWhenVmBz2CoreAvailable(): void
+    public function testSupportsBz2WithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsBz2());
+        $this->assertFalse(CompilerVersion::supportsBz2());
         $this->assertTrue(\PHPCompiler\ext\bz2\VmBz2Core::available());
+        $this->assertFalse(\PHPCompiler\ext\bz2\Bz2ExtensionPolicy::advertisesExtension());
     }
 
     public function testBz2JitHelperDelegatesToVmBz2Native(): void
