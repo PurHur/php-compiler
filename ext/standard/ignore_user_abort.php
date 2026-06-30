@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /** ignore_user_abort() — continue after client disconnect (ext/standard/basic_functions.c; #3242, JIT #8078). */
@@ -32,7 +31,7 @@ final class ignore_user_abort extends Internal
         }
         $setting = null;
         if (1 === $argc) {
-            $setting = InternalStrictArg::parseBuiltinNullableBoolArg(
+            $setting = VmMath::parseNullableBoolBuiltinArg(
                 $frame->calledArgs[0],
                 'ignore_user_abort',
                 0,

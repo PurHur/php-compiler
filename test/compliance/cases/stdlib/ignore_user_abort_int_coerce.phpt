@@ -1,6 +1,5 @@
 --TEST--
-stdlib ignore_user_abort() — int return coerces to bool operand JIT (#14174, ext/standard/basic_functions.c)
---JIT--
+stdlib ignore_user_abort() — int return coerces to bool operand (#14174, ext/standard/basic_functions.c)
 --FILE--
 <?php
 $prev = ignore_user_abort(true);
