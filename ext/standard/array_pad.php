@@ -33,7 +33,7 @@ final class array_pad extends Internal
         $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_pad', 1, 'array');
         $length = $frame->calledArgs[1]->resolveIndirect();
         $value = $frame->calledArgs[2]->resolveIndirect();
-        $lengthInt = VmMath::parseIntBuiltinArg($length, 'array_pad', 2, 'length');
+        $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_pad', 2, 'length');
         $frame->returnVar->array(
             VmArray::pad($ht, $lengthInt, $value)
         );
@@ -51,7 +51,7 @@ final class array_pad extends Internal
                 $this->jitString($context, $arg, 'array_pad() argument #'.((int) $i + 1));
             }
         }
-        $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_pad', 2, 'length');
+        $length = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'array_pad', 2, 'length');
 
         return ArrayPadRuntime::pad($context, $args[0], $length, $args[2]);
     }
