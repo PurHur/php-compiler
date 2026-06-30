@@ -1958,6 +1958,17 @@ class VM {
                     if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
                         continue;
                     }
+                } elseif (
+                    Variable::TYPE_UNDEFINED === $value->type
+                    && (
+                        $meta->prototype->hasDeclaredTypeConstraint()
+                        || null !== $meta->default
+                        || $meta->hasRuntimeDefaultInit()
+                        || !$meta->prototype->isUndefined()
+                    )
+                ) {
+                    // unset($obj->prop) — omit; never-set untyped falls through to null below (#1370).
+                    continue;
                 } elseif (VM\TypedPropertyCheck::isUninitialized($value)) {
                     if ($meta->prototype->hasDeclaredTypeConstraint()) {
                         continue;
