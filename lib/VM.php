@@ -11962,9 +11962,15 @@ restart:
         return (($func->flags ?? 0) & \PHPCfg\Func::FLAG_CLOSURE) !== 0;
     }
 
+    /** Closure-local statics use bare names; enclosing user-function statics use "func\0var" (#14077). */
+    protected function functionStaticStorageIsClosureLocal(Frame $frame, string $storageKey): bool
+    {
+        return $this->frameUsesClosureStaticStorage($frame) && !str_contains($storageKey, "\0");
+    }
+
     protected function ensureFunctionStaticForFrame(Frame $frame, string $storageKey): Variable
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if ($this->functionStaticStorageIsClosureLocal($frame, $storageKey)) {
             return $frame->closureCall->ensureStatic($storageKey);
         }
 
@@ -11973,7 +11979,7 @@ restart:
 
     protected function isFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): bool
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if ($this->functionStaticStorageIsClosureLocal($frame, $storageKey)) {
             return $frame->closureCall->isStaticInitialized($storageKey);
         }
 
@@ -11982,7 +11988,7 @@ restart:
 
     protected function markFunctionStaticInitializedForFrame(Frame $frame, string $storageKey): void
     {
-        if ($this->frameUsesClosureStaticStorage($frame)) {
+        if ($this->functionStaticStorageIsClosureLocal($frame, $storageKey)) {
             $frame->closureCall->markStaticInitialized($storageKey);
 
             return;
