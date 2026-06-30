@@ -11634,6 +11634,16 @@ class Compiler {
             $this->callArgIsDeadInlineTemporary($positionalCallArg)
             && $this->callArgOperandExpectsArrayProducer($positionalCallArg)
         ) {
+            // array_reverse([...], true) — nested FuncCall feeds the dead temp, not hoisted Array_ (#14042).
+            $directCall = $this->matchDirectResultInlineCallArgProducer($producers, $positionalCallArg);
+            if (
+                $directCall instanceof Op\Expr\FuncCall
+                || $directCall instanceof Op\Expr\NsFuncCall
+                || $directCall instanceof Op\Expr\StaticCall
+                || $directCall instanceof Op\Expr\MethodCall
+            ) {
+                return null;
+            }
             $unassigned = $this->findUnassignedInlineArrayProducerForDeadCallArg(
                 $producers,
                 $callOp,
@@ -12360,7 +12370,8 @@ class Compiler {
                     }
                 }
             }
-            if (1 === $funcCallProducerCount && 0 === $arrayProducerCount) {
+            // array_reverse([...], true) hoists Array_/ConstFetch preludes — still one nested FuncCall (#14042).
+            if (1 === $funcCallProducerCount) {
                 $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
                 if ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall
                     || $matched instanceof Op\Expr\StaticCall || $matched instanceof Op\Expr\MethodCall) {
@@ -13837,6 +13848,18 @@ class Compiler {
                 ) {
                     // Nested inline array consumed multiple Array_ slots — do not wire trailing int arg (#12008, #13697).
                     $byIndex = null;
+                }
+                if ($byIndex instanceof Op\Expr\Array_ && null !== $callArg) {
+                    // array_reverse([...], true) — nested FuncCall feeds the dead temp, not hoisted Array_ (#14042).
+                    $directCall = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
+                    if (
+                        $directCall instanceof Op\Expr\FuncCall
+                        || $directCall instanceof Op\Expr\NsFuncCall
+                        || $directCall instanceof Op\Expr\StaticCall
+                        || $directCall instanceof Op\Expr\MethodCall
+                    ) {
+                        return $directCall;
+                    }
                 }
                 if (
                     null !== $byIndex
