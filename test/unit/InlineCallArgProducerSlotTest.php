@@ -2251,6 +2251,25 @@ PHP;
         self::assertSame('true', $out);
     }
 
+    /** Issue #13829 — var_export(key($a), true) in concat wires hoisted key() sibling, not ConstFetch true. */
+    public function testVarExportNestedArrayPointerBuiltinUsesFuncCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$a = [1, 2, 3];
+next($a);
+$concat = 'key=' . var_export(key($a), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_array_pointer.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("key=1\n", $out);
+    }
+
     /** Issue #11400 — print_r(in_array(..., true), true) wires nested FuncCall + dual ConstFetch true slots. */
     public function testPrintRNestedBuiltinDualTrueLiteralUsesFuncCallProducerSlot(): void
     {
