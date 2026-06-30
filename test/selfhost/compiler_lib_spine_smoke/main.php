@@ -2302,7 +2302,7 @@ require_once __DIR__.'/../../../lib/Ast/StaticClassAnnotator.php';
 require_once __DIR__.'/../../../lib/Ast/StaticClassPreprocessor.php';
 require_once __DIR__.'/../../../lib/Ast/TypedFunctionStaticRewriter.php';
 require_once __DIR__.'/../../../lib/Ast/VoidCastDesugar.php';
-require_once __DIR__.'/../../../lib/Ast/EncapsedCoalesceDesugar.php';
+require_once __DIR__.'/../../../lib/EncapsedCoalesceRejector.php';
 require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';

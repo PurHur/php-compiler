@@ -2,47 +2,43 @@
 
 declare(strict_types=1);
 
-namespace PHPCompiler\Ast;
+namespace PHPCompiler;
+
+use PHPCompiler\Compiler\CompileFatal;
 
 /**
- * Desugar PHP 8.3+ null coalesce inside encapsed "${... ?? ...}" for nikic/php-parser 4.x (#14024).
+ * Reject null coalesce (??) inside encapsed/complex double-quoted interpolation (#14032).
  *
- * php-src: Zend/zend_compile.c — zend_compile_encapsed_string complex-variable expressions.
+ * php-src: Zend/zend_language_scanner.l — encapsed variable grammar allows ->, ?->, [, { but not ??.
  */
-final class EncapsedCoalesceDesugar
+final class EncapsedCoalesceRejector
 {
-    public static function desugar(string $code): string
+    private const MESSAGE = 'syntax error, unexpected token "??", expecting "->" or "?->" or "{" or "["';
+
+    public static function reject(string $code, string $filename = 'unknown'): string
     {
         if (false === strpos($code, '??') || false === strpos($code, '"')) {
             return $code;
         }
 
+        if (!\function_exists('token_get_all')) {
+            return $code;
+        }
+
         $tokens = token_get_all($code);
-        $replacements = [];
 
         for ($i = 0, $c = \count($tokens); $i < $c; ++$i) {
             $closeIdx = null;
             if (!self::isDoubleQuotedInterpolationStart($tokens, $i, $closeIdx)) {
                 continue;
             }
-            $rewrite = self::tryRewriteEncapsedString($tokens, $i, $closeIdx, $code);
-            if (null === $rewrite) {
-                $i = $closeIdx;
-                continue;
+
+            $coalesceLine = self::findEncapsedCoalesceLine($tokens, $i, $closeIdx);
+            if (null !== $coalesceLine) {
+                throw new CompileFatal($filename, $coalesceLine, self::MESSAGE);
             }
-            $replacements[] = $rewrite;
+
             $i = $closeIdx;
-        }
-
-        if ([] === $replacements) {
-            return $code;
-        }
-
-        \usort($replacements, static fn (array $a, array $b): int => $b['start'] <=> $a['start']);
-        foreach ($replacements as $replacement) {
-            $code = \substr($code, 0, $replacement['start'])
-                .$replacement['text']
-                .\substr($code, $replacement['end']);
         }
 
         return $code;
@@ -82,78 +78,36 @@ final class EncapsedCoalesceDesugar
 
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
-     *
-     * @return array{start: int, end: int, text: string}|null
      */
-    private static function tryRewriteEncapsedString(array $tokens, int $openIdx, int $closeIdx, string $code): ?array
+    private static function findEncapsedCoalesceLine(array $tokens, int $openIdx, int $closeIdx): ?int
     {
-        $parts = [];
-        $hasCoalesce = false;
-
         for ($j = $openIdx + 1; $j < $closeIdx; ++$j) {
             $token = $tokens[$j];
             if (\is_array($token) && \T_ENCAPSED_AND_WHITESPACE === $token[0]) {
-                $parts[] = ['literal', $token[1]];
                 continue;
             }
             if (\is_array($token) && \T_VARIABLE === $token[0]) {
-                $parts[] = ['expr', $token[1]];
                 continue;
             }
             if (self::isCurlyOpen($token)) {
                 $innerStart = $j + 1;
                 $afterClose = self::consumeBalancedCurly($tokens, $j);
                 $innerTokens = \array_slice($tokens, $innerStart, $afterClose - $innerStart - 1);
-                if (self::containsTopLevelCoalesce($innerTokens)) {
-                    $hasCoalesce = true;
+                $line = self::findTopLevelCoalesceLine($innerTokens);
+                if (null !== $line) {
+                    return $line;
                 }
-                $exprStart = self::tokenByteOffset($tokens, $innerStart);
-                $exprEnd = self::tokenByteOffset($tokens, $afterClose - 1);
-                if (null === $exprStart || null === $exprEnd) {
-                    return null;
-                }
-                $parts[] = ['expr', \substr($code, $exprStart, $exprEnd - $exprStart)];
                 $j = $afterClose - 1;
                 continue;
             }
             if (\is_array($token) && \defined('T_DOLLAR_OPEN_CURLY_BRACES') && \T_DOLLAR_OPEN_CURLY_BRACES === $token[0]) {
-                $parts[] = ['expr', $token[1]];
                 continue;
             }
 
             return null;
         }
 
-        if (!$hasCoalesce) {
-            return null;
-        }
-
-        $exprs = [];
-        foreach ($parts as $part) {
-            if ('literal' === $part[0]) {
-                if ('' !== $part[1]) {
-                    $exprs[] = \var_export($part[1], true);
-                }
-                continue;
-            }
-            $exprs[] = '('.$part[1].')';
-        }
-
-        if ([] === $exprs) {
-            return null;
-        }
-
-        $start = self::tokenByteOffset($tokens, $openIdx);
-        $end = self::tokenByteOffset($tokens, $closeIdx + 1);
-        if (null === $start || null === $end) {
-            return null;
-        }
-
-        return [
-            'start' => $start,
-            'end' => $end,
-            'text' => \implode(' . ', $exprs),
-        ];
+        return null;
     }
 
     /**
@@ -191,7 +145,7 @@ final class EncapsedCoalesceDesugar
     /**
      * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
      */
-    private static function containsTopLevelCoalesce(array $tokens): bool
+    private static function findTopLevelCoalesceLine(array $tokens): ?int
     {
         $depth = 0;
         foreach ($tokens as $token) {
@@ -204,34 +158,10 @@ final class EncapsedCoalesceDesugar
                 continue;
             }
             if (0 === $depth && \T_COALESCE === $token[0]) {
-                return true;
+                return isset($token[2]) ? (int) $token[2] : 1;
             }
         }
 
-        return false;
-    }
-
-    /**
-     * @param array<int, array{0: int, 1: string, 2: int}|string> $tokens
-     */
-    private static function tokenByteOffset(array $tokens, int $index): ?int
-    {
-        if (!isset($tokens[$index])) {
-            return null;
-        }
-        $offset = 0;
-        for ($i = 0; $i < $index; ++$i) {
-            $offset += \strlen(self::tokenText($tokens[$i]));
-        }
-
-        return $offset;
-    }
-
-    /**
-     * @param array{0: int, 1: string, 2: int}|string $token
-     */
-    private static function tokenText($token): string
-    {
-        return \is_array($token) ? $token[1] : $token;
+        return null;
     }
 }
