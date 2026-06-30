@@ -25,7 +25,7 @@ final class JitUnpack
         $data = JitStringBuiltinArg::lower($context, $args[1], 'unpack', 1, 'string');
         $offset = $context->getTypeFromString('int64')->constInt(0, false);
         if (3 === $argc) {
-            $offset = JitSleep::zParamLong($context, $args[2], 'unpack', 3, 'offset');
+            $offset = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'unpack', 3, 'offset');
         }
 
         $slot = JitValueBox::alloc($context);
