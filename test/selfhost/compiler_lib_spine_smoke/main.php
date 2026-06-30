@@ -443,6 +443,7 @@ require_once __DIR__.'/../../../ext/spl/VmSplRegistry.php';
 require_once __DIR__.'/../../../ext/spl/spl_classes.php';
 require_once __DIR__.'/../../../ext/standard/ArrayChangeKeyCaseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayChunkJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/ArrayColumnJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayCombineJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayCountJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayCountRecursiveJitHelper.php';
