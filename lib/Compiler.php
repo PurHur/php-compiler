@@ -18134,15 +18134,47 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
-        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg($callOp->args, $argIndex);
-        if (null === $producerSlotIndex) {
-            return null;
-        }
+        $callArgs = $callOp->args;
+        $callArg = $callArgs[$argIndex] ?? null;
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
             if ($child === $callOp) {
                 $callIndex = $i;
                 break;
+            }
+        }
+        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg($callOp->args, $argIndex);
+        if (null === $producerSlotIndex) {
+            return null;
+        }
+        if (
+            null !== $callIndex
+            && $callIndex > 0
+            && 0 === $producerSlotIndex
+            && \count($producers) >= 2
+            && \is_array($callArgs)
+            && $argIndex === \count($callArgs) - 1
+            && $callArg instanceof Operand
+            && $this->callArgIsDeadInlineTemporary($callArg)
+        ) {
+            $immediate = $cfgChildren[$callIndex - 1] ?? null;
+            $positional = $producers[0] ?? null;
+            if (
+                $immediate instanceof Op\Expr\ConstFetch
+                && $positional instanceof Op\Expr\ConstFetch
+                && $immediate !== $positional
+                && \in_array($immediate, $producers, true)
+            ) {
+                $immName = $this->staticNameFromOperand($immediate->name);
+                $posName = $this->staticNameFromOperand($positional->name);
+                if (
+                    null !== $immName
+                    && null !== $posName
+                    && \in_array(strtolower($immName), ['true', 'false', 'null'], true)
+                    && \in_array(strtolower($posName), ['true', 'false', 'null'], true)
+                ) {
+                    return $immediate;
+                }
             }
         }
         if (null === $callIndex) {
