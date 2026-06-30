@@ -151,7 +151,10 @@ final class JitWordwrap
         $context->builder->branchIf($cutOn, $cutBlock, $nonCutBlock);
 
         $context->builder->positionAtEnd($cutBlock);
-        $context->builder->store(self::emitCut($context, $strPtr, $width, $breakPtr, $len, $brkLen, $id), $resultSlot);
+        $context->builder->store(
+            self::emitGeneral($context, $strPtr, $width, $breakPtr, $len, $brkLen, $id, true),
+            $resultSlot
+        );
         $context->builder->branch($done);
 
         $context->builder->positionAtEnd($nonCutBlock);
@@ -180,102 +183,6 @@ final class JitWordwrap
         $context->builder->positionAtEnd($done);
 
         return $context->builder->load($resultSlot);
-    }
-
-    private static function emitCut(
-        Context $context,
-        Value $strPtr,
-        Value $width,
-        Value $breakPtr,
-        Value $len,
-        Value $brkLen,
-        string $id
-    ): Value {
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $widthLt1 = $context->builder->icmp(Builder::INT_SLT, $width, $one);
-        $returnOrig = BasicBlockHelper::append($context, 'ww_cut_orig_'.$id);
-        $work = BasicBlockHelper::append($context, 'ww_cut_work_'.$id);
-        $context->builder->branchIf($widthLt1, $returnOrig, $work);
-
-        $context->builder->positionAtEnd($returnOrig);
-        $orig = $context->builder->call($context->lookupFunction('__string__separate'), $strPtr);
-        $done = BasicBlockHelper::append($context, 'ww_cut_done_'.$id);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($work);
-        $textPtr = self::stringCharsPtr($context, $strPtr);
-        $brkPtr = self::stringCharsPtr($context, $breakPtr);
-        $numBreaks = $context->builder->signedDiv($len, $width);
-        $outLen = $context->builder->addNoSignedWrap(
-            $len,
-            $context->builder->mulNoSignedWrap($numBreaks, $brkLen)
-        );
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
-        $map = $context->structFieldMap['__string__'];
-        $context->builder->store($outLen, $context->builder->structGep($dest, $map['length']));
-        $destPtr = self::stringCharsPtr($context, $dest);
-
-        $iSlot = $context->builder->alloca($i64, 1, 'ww_cut_i_'.$id);
-        $posSlot = $context->builder->alloca($i64, 1, 'ww_cut_pos_'.$id);
-        $context->builder->store($zero, $iSlot);
-        $context->builder->store($zero, $posSlot);
-
-        $head = BasicBlockHelper::append($context, 'ww_cut_head_'.$id);
-        $body = BasicBlockHelper::append($context, 'ww_cut_body_'.$id);
-        $appendBrk = BasicBlockHelper::append($context, 'ww_cut_brk_'.$id);
-        $copyChunk = BasicBlockHelper::append($context, 'ww_cut_copy_'.$id);
-        $loopDone = BasicBlockHelper::append($context, 'ww_cut_loop_done_'.$id);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $loopDone, $body);
-
-        $context->builder->positionAtEnd($body);
-        $needsBrk = $context->builder->icmp(Builder::INT_SGT, $i, $zero);
-        $context->builder->branchIf($needsBrk, $appendBrk, $copyChunk);
-
-        $context->builder->positionAtEnd($appendBrk);
-        $pos = $context->builder->load($posSlot);
-        $context->intrinsic->memcpy(
-            $context->builder->inBoundsGEP($destPtr, $pos),
-            $brkPtr,
-            $brkLen,
-            false
-        );
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $brkLen), $posSlot);
-        $context->builder->branch($copyChunk);
-
-        $context->builder->positionAtEnd($copyChunk);
-        $pos = $context->builder->load($posSlot);
-        $remaining = $context->builder->subNoSignedWrap($len, $i);
-        $chunk = $context->builder->select(
-            $context->builder->icmp(Builder::INT_SGT, $width, $remaining),
-            $remaining,
-            $width
-        );
-        $context->intrinsic->memcpy(
-            $context->builder->inBoundsGEP($destPtr, $pos),
-            $context->builder->inBoundsGEP($textPtr, $i),
-            $chunk,
-            false
-        );
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $chunk), $posSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $width), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($loopDone);
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
-        $result = $context->builder->phi($dest->typeOf());
-        $result->addIncoming($orig, $returnOrig);
-        $result->addIncoming($dest, $loopDone);
-
-        return $result;
     }
 
     private static function emitFastSingleByteBreak(
@@ -386,7 +293,8 @@ final class JitWordwrap
         Value $breakPtr,
         Value $len,
         Value $brkLen,
-        string $id
+        string $id,
+        bool $cut = false
     ): Value {
         $textPtr = self::stringCharsPtr($context, $strPtr);
         $brkPtr = self::stringCharsPtr($context, $breakPtr);
@@ -524,12 +432,46 @@ final class JitWordwrap
         $tooWide = $context->builder->icmp(Builder::INT_SGE, $span, $width);
         $canWrap = $context->builder->icmp(Builder::INT_SLT, $laststart, $lastspace);
         $doWrap = BasicBlockHelper::append($context, 'ww_gen_dowrap_'.$id);
+        $forceCut = BasicBlockHelper::append($context, 'ww_gen_fcut_'.$id);
         $skipWrap = BasicBlockHelper::append($context, 'ww_gen_skipwrap_'.$id);
-        $context->builder->branchIf(
-            $context->builder->and($tooWide, $canWrap),
-            $doWrap,
-            $skipWrap
+        if ($cut) {
+            $noSpaceWrap = $context->builder->icmp(Builder::INT_SGE, $laststart, $lastspace);
+            $forcedCut = $context->builder->and($tooWide, $noSpaceWrap);
+            $maybeWrap = $context->builder->and($tooWide, $canWrap);
+            $afterBranch = BasicBlockHelper::append($context, 'ww_gen_after_plain_'.$id);
+            $context->builder->branchIf($forcedCut, $forceCut, $afterBranch);
+            $context->builder->positionAtEnd($afterBranch);
+            $context->builder->branchIf($maybeWrap, $doWrap, $skipWrap);
+        } else {
+            $context->builder->branchIf(
+                $context->builder->and($tooWide, $canWrap),
+                $doWrap,
+                $skipWrap
+            );
+        }
+
+        $context->builder->positionAtEnd($forceCut);
+        $pos = $context->builder->load($posSlot);
+        $segLen = $context->builder->subNoSignedWrap($current, $laststart);
+        $context->intrinsic->memcpy(
+            $context->builder->inBoundsGEP($destPtr, $pos),
+            $context->builder->inBoundsGEP($textPtr, $laststart),
+            $segLen,
+            false
         );
+        $pos = $context->builder->addNoSignedWrap($pos, $segLen);
+        $context->intrinsic->memcpy(
+            $context->builder->inBoundsGEP($destPtr, $pos),
+            $brkPtr,
+            $brkLen,
+            false
+        );
+        $pos = $context->builder->addNoSignedWrap($pos, $brkLen);
+        $context->builder->store($pos, $posSlot);
+        $context->builder->store($current, $laststartSlot);
+        $context->builder->store($current, $lastspaceSlot);
+        $context->builder->store($context->builder->addNoSignedWrap($current, $one), $currentSlot);
+        $context->builder->branch($head);
 
         $context->builder->positionAtEnd($doWrap);
         $pos = $context->builder->load($posSlot);
