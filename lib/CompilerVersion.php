@@ -510,11 +510,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward 8.4.0-dev registers the family via {@see builtinAdvertisementVersion()} (#13919).
      */
     public static function supportsPhp84ArraySearchFunctions(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
