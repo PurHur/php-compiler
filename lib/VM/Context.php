@@ -881,6 +881,11 @@ class Context {
         return $this->functionStaticVars[$storageKey];
     }
 
+    public function peekFunctionStatic(string $storageKey): ?Variable
+    {
+        return $this->functionStaticVars[$storageKey] ?? null;
+    }
+
     public function isFunctionStaticInitialized(string $storageKey): bool
     {
         return VmFunctionStatic::isInitialized($storageKey, $this->functionStaticInitialized);

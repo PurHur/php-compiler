@@ -158,6 +158,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetNumberOfParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionFunctionGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionFunctionGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionFunctionHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
@@ -175,6 +176,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodGetParameters;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasPrototype;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetReturnType;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetStaticVariables;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
@@ -508,6 +510,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getattributes'] = $pub;
         $rm->methods['getparameters'] = new ReflectionMethodGetParameters();
         $rm->methodVisibility['getparameters'] = $pub;
+        $rm->methods['getstaticvariables'] = new ReflectionMethodGetStaticVariables();
+        $rm->methodVisibility['getstaticvariables'] = $pub;
         $rm->methods['getnumberofparameters'] = new ReflectionMethodGetNumberOfParameters();
         $rm->methodVisibility['getnumberofparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
@@ -761,6 +765,7 @@ final class BuiltinClasses
                 'getclosurescopeclass' => new ReflectionFunctionGetClosureScopeClass(),
                 'getclosurecalledclass' => new ReflectionFunctionGetClosureCalledClass(),
                 'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),
+                'getstaticvariables' => new ReflectionFunctionGetStaticVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
             ] as $name => $method
         ) {
