@@ -17126,7 +17126,13 @@ class Compiler {
         if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
             return false;
         }
-        if (!$this->callArgsAreDistinctInlineTemporaries($consumer->args)) {
+        $hoistedArgs = [];
+        foreach ($consumer->args as $callArg) {
+            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                $hoistedArgs[] = $callArg;
+            }
+        }
+        if (!$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
@@ -17264,8 +17270,16 @@ class Compiler {
             || !property_exists($consumer, 'args')
             || !is_array($consumer->args)
             || \count($consumer->args) < 2
-            || !$this->callArgsAreDistinctInlineTemporaries($consumer->args)
         ) {
+            return false;
+        }
+        $hoistedArgs = [];
+        foreach ($consumer->args as $callArg) {
+            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                $hoistedArgs[] = $callArg;
+            }
+        }
+        if (\count($hoistedArgs) < 2 || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
         }
         $arrayPreludeChain = $this->siblingFuncCallChainHasArrayPrelude(
@@ -17297,7 +17311,9 @@ class Compiler {
             return false;
         }
 
-        return $producerFuncCalls >= 2 && $producerFuncCalls === \count($consumer->args);
+        $hoistedArgCount = \count($hoistedArgs);
+
+        return $producerFuncCalls >= 2 && $producerFuncCalls === $hoistedArgCount;
     }
 
     /** True when FuncCall callee is a variable/closure slot, not a literal name (#13969). */
