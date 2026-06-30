@@ -6706,9 +6706,7 @@ restart:
                     }
                     $gen->hasCurrent = true;
                     $gen->frame = $frame;
-                    if ($gen->foreachAdvance || !$this->generatorFrameHasImmediateThrowAfterYield($frame)) {
-                        $frame->generatorYield = true;
-                    }
+                    $frame->generatorYield = true;
                     break;
                 case OpCode::TYPE_YIELD_FROM:
                     $gen = $this->findGeneratorState($frame);
@@ -11586,39 +11584,6 @@ restart:
         }
 
         return false;
-    }
-
-    /**
-     * Zend zend_generators.c: yield immediately followed by throw runs on the same
-     * resume (Generator::next / ::send) without returning to the caller first (#13366).
-     * Return-after-yield still suspends normally (foreach must observe the yielded value).
-     */
-    private function generatorFrameHasImmediateThrowAfterYield(Frame $frame): bool
-    {
-        $ops = $frame->block->opCodes;
-        $count = \count($ops);
-        for ($i = $frame->pos; $i < $count; ++$i) {
-            $type = $ops[$i]->type;
-            if (OpCode::TYPE_THROW === $type) {
-                return true;
-            }
-            if (
-                OpCode::TYPE_RETURN === $type
-                || OpCode::TYPE_RETURN_VOID === $type
-                || $this->generatorYieldImmediateTerminationBlocked($type)
-            ) {
-                return false;
-            }
-        }
-
-        return false;
-    }
-
-    private function generatorYieldImmediateTerminationBlocked(int $type): bool
-    {
-        return OpCode::TYPE_YIELD === $type
-            || OpCode::TYPE_YIELD_FROM === $type
-            || OpCode::TYPE_ECHO === $type;
     }
 
     /**
