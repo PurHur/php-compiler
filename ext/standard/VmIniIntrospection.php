@@ -105,6 +105,10 @@ final class VmIniIntrospection
 
     private static function envString(string $name): string
     {
+        $val = VmEnv::getenv($name);
+        if (false !== $val && '' !== $val) {
+            return $val;
+        }
         $val = \getenv($name);
         if (false === $val || '' === $val) {
             return '';
