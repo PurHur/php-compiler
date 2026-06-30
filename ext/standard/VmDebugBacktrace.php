@@ -385,6 +385,10 @@ final class VmDebugBacktrace
 
     private static function frameLine(Frame $frame): int
     {
+        // Zend: frame line is where the function was invoked (parent call site), not decl/opline (#14238).
+        if (null !== $frame->parent && $frame->parent->callSiteLine > 0) {
+            return $frame->parent->callSiteLine;
+        }
         if ($frame->callSiteLine > 0) {
             return $frame->callSiteLine;
         }
