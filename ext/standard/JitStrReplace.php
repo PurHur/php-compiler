@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * LLVM JIT/AOT helper for str_replace() — strstr loop with slice + concat (byte-safe subset).
+ * LLVM JIT/AOT helper for str_replace() — JitStringSearch loop with slice + concat (#4146, #14017).
  */
 
 namespace PHPCompiler\ext\standard;
@@ -34,7 +34,6 @@ final class JitStrReplace
             $context->builder->structGep($subject, $map['length'])
         );
         $subjectPtr = $context->builder->structGep($subject, $map['value']);
-        $searchPtr = $context->builder->structGep($search, $map['value']);
 
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
@@ -62,22 +61,25 @@ final class JitStrReplace
         $context->builder->branchIf($pastEnd, $doneBlock, $loopBody);
 
         $context->builder->positionAtEnd($loopBody);
-        $searchFrom = $context->builder->gep($subjectPtr, $offset);
-        $searchFn = $caseInsensitive ? 'strcasestr' : 'strstr';
-        $found = $context->builder->call(
-            $context->lookupFunction($searchFn),
-            $searchFrom,
-            $searchPtr
+        $offset = $context->builder->load($offsetSlot);
+        $foundI32 = JitStringSearch::findOffsetI32(
+            $context,
+            $subject,
+            $search,
+            $offset,
+            $caseInsensitive
         );
-        $null = $context->getTypeFromString('int8*')->constNull();
-        $notFound = $context->builder->icmp(Builder::INT_EQ, $found, $null);
+        $i32 = $context->getTypeFromString('int32');
+        $notFound = $context->builder->icmp(
+            Builder::INT_EQ,
+            $foundI32,
+            $i32->constInt(JitStringSearch::NOT_FOUND, true)
+        );
         $matchBlock = BasicBlockHelper::append($context, 'str_'.$tag.'_match_'.$id);
         $context->builder->branchIf($notFound, $tailBlock, $matchBlock);
 
         $context->builder->positionAtEnd($matchBlock);
-        $foundInt = $context->builder->ptrToInt($found, $i64);
-        $baseInt = $context->builder->ptrToInt($subjectPtr, $i64);
-        $pos = $context->builder->sub($foundInt, $baseInt);
+        $pos = $context->builder->zExt($foundI32, $i64);
         $prefixLen = $context->builder->sub($pos, $offset);
         $prefix = string_trim::jitCopySlice($context, $subject, $subjectPtr, $offset, $prefixLen);
         $acc = $context->builder->load($resultSlot);
