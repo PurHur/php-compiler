@@ -22,10 +22,11 @@ declare(strict_types=1);
  * $_REQUEST merges $_GET then $_POST (POST wins on duplicate keys). See lib/Web/Superglobals.php
  * and SuperglobalRefreshRuntime LLVM for runtime refresh per request (#5330).
  */
-$name = (string) $_REQUEST['name'];
+$name = $_REQUEST['name'] ?? '';
+$safeName = htmlspecialchars($name);
 header('Content-Type: text/html; charset=UTF-8');
 echo '<!DOCTYPE html><html><head><link rel="stylesheet" href="/style.css"></head><body>';
-echo '<h1>Hello ', htmlspecialchars($name), "</h1>\n";
-echo '<form method="post"><label>Name <input name="name" value="', htmlspecialchars($name), '"></label> ';
+echo '<h1>Hello ', $safeName, "</h1>\n";
+echo '<form method="post"><label>Name <input name="name" value="', $safeName, '"></label> ';
 echo '<button type="submit">Save</button></form>';
 echo '</body></html>';
