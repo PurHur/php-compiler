@@ -9210,6 +9210,14 @@ class JIT {
                     ) {
                         $this->context->jitUnserializeOptionsOperand = $callOperands[1];
                     }
+                    $savedJsonEncodeValueOperand = $this->context->jitJsonEncodeValueOperand;
+                    if (
+                        $this->context->scope->toCall instanceof CoreFunc\Internal
+                        && 'json_encode' === strtolower($this->context->scope->toCall->getName())
+                        && isset($callOperands[0])
+                    ) {
+                        $this->context->jitJsonEncodeValueOperand = $callOperands[0];
+                    }
                     $savedCallUserFuncArrayOperand = $this->context->jitCallUserFuncArrayParamsOperand;
                     if (
                         $this->context->scope->toCall instanceof CoreFunc\Internal
@@ -9224,6 +9232,7 @@ class JIT {
                     }
                     $result = $this->context->scope->toCall->call($this->context, ...$callArgs);
                     $this->context->jitUnserializeOptionsOperand = $savedUnserializeOptionsOperand;
+                    $this->context->jitJsonEncodeValueOperand = $savedJsonEncodeValueOperand;
                     $this->context->jitCallUserFuncArrayParamsOperand = $savedCallUserFuncArrayOperand;
                     $this->markNewObjectConstructedAfterCall($this->context->scope->toCall, $callArgs);
                     $this->context->callerStrictTypes = $prevStrict;

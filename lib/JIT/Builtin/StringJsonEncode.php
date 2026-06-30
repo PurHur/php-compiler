@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\NestedContextMethodLlvm;
@@ -208,6 +209,7 @@ final class StringJsonEncode
     /** Return null __string__* — inventory emit only needs linkable ABI symbols (#13245). */
     private static function implementDeferredInventoryStubs(Context $context): void
     {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         $strPtr = $context->getTypeFromString('__string__*');
         $nullStr = $strPtr->constNull();
 
@@ -233,6 +235,10 @@ final class StringJsonEncode
             $context->registerFunction($abiName, $fn);
         }
 
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 }
