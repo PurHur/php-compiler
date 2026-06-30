@@ -2327,6 +2327,47 @@ PHP;
         self::assertSame("key=1\n", $out);
     }
 
+    /** Issue #13899 — var_export($g->current(), true) in concat after next() (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorCurrentUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g() { yield 10; yield 20; yield 30; }
+$g = g();
+$g->next();
+$g->next();
+$concat = 'val=' . var_export($g->current(), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_current.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("val=30\n", $out);
+    }
+
+    /** Issue #13899 — var_export($g->key(), true) in concat after next() (Zend/zend_generators.c). */
+    public function testVarExportNestedGeneratorKeyUsesMethodCallProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+function g() { yield 10; yield 20; yield 30; }
+$g = g();
+$g->next();
+$concat = 'key=' . var_export($g->key(), true);
+echo $concat, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_generator_key.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("key=1\n", $out);
+    }
+
     /** Issue #13830 — var_export(next($a), true) in concat after prior next($a). */
     public function testVarExportNestedNextUsesFuncCallProducerSlot(): void
     {
