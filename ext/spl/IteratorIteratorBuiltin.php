@@ -150,7 +150,17 @@ final class RecursiveIteratorIteratorBuiltin
 /** @internal */
 final class SplDualIteratorStorage
 {
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>, maxDepth: int}> */
+    private const RS_START = 0;
+
+    private const RS_TEST = 1;
+
+    private const RS_SELF = 2;
+
+    private const RS_CHILD = 3;
+
+    private const RS_NEXT = 4;
+
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int}> */
     private static array $store = [];
 
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
@@ -212,16 +222,15 @@ final class SplDualIteratorStorage
             throw new \OutOfBoundsException('Level '.$level.' not found');
         }
 
-        return $stack[$level];
+        return $stack[$level]['iterator'];
     }
 
     public static function callHasChildren(Frame $frame, ObjectEntry $object): bool
     {
-        $stack = self::state($object)['stack'];
-        if ([] === $stack) {
+        $top = self::stackTop($object);
+        if (null === $top) {
             return false;
         }
-        $top = $stack[\count($stack) - 1];
         $result = self::invokeInner($frame, $top, 'hasChildren')->resolveIndirect();
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
@@ -229,11 +238,10 @@ final class SplDualIteratorStorage
 
     public static function callGetChildren(Frame $frame, ObjectEntry $object): ObjectEntry
     {
-        $stack = self::state($object)['stack'];
-        if ([] === $stack) {
+        $top = self::stackTop($object);
+        if (null === $top) {
             throw new \RuntimeException('Cannot fetch children on invalid RecursiveIteratorIterator position');
         }
-        $top = $stack[\count($stack) - 1];
 
         return self::getChildren($frame, $top);
     }
@@ -246,7 +254,10 @@ final class SplDualIteratorStorage
     /** @return list<ObjectEntry> Active iterator stack for recursive wrappers (#13223). */
     public static function iteratorStack(ObjectEntry $object): array
     {
-        return self::state($object)['stack'];
+        return array_map(
+            static fn (array $frame): ObjectEntry => $frame['iterator'],
+            self::state($object)['stack']
+        );
     }
 
     public static function rewindSimple(Frame $frame, ObjectEntry $object): void
@@ -279,52 +290,50 @@ final class SplDualIteratorStorage
     public static function rewindRecursive(Frame $frame, ObjectEntry $object): void
     {
         $state = &self::$store[$object->id];
-        $state['stack'] = [];
+        $state['stack'] = [
+            ['iterator' => $state['inner'], 'state' => self::RS_START],
+        ];
         self::invokeInner($frame, $state['inner'], 'rewind');
-        $state['stack'][] = $state['inner'];
-        self::nextElement($frame, $object);
+        self::advanceToYield($frame, $object);
     }
 
     public static function validRecursive(Frame $frame, ObjectEntry $object): bool
     {
-        $stack = self::state($object)['stack'];
-        if ([] === $stack) {
+        $top = self::stackTop($object);
+        if (null === $top) {
             return false;
         }
-        $top = $stack[\count($stack) - 1];
 
-        return self::invokeInner($frame, $top, 'valid')->resolveIndirect()->toBool();
+        return self::isIteratorValid($frame, $top);
     }
 
     public static function currentRecursive(Frame $frame, ObjectEntry $object): Variable
     {
-        $stack = self::state($object)['stack'];
-        if ([] === $stack) {
+        $top = self::stackTop($object);
+        if (null === $top) {
             throw new \RuntimeException('Cannot fetch current() on invalid RecursiveIteratorIterator position');
         }
 
-        return self::invokeInner($frame, $stack[\count($stack) - 1], 'current');
+        return self::invokeInner($frame, $top, 'current');
     }
 
     public static function keyRecursive(Frame $frame, ObjectEntry $object): Variable
     {
-        $stack = self::state($object)['stack'];
-        if ([] === $stack) {
+        $top = self::stackTop($object);
+        if (null === $top) {
             throw new \RuntimeException('Cannot fetch key() on invalid RecursiveIteratorIterator position');
         }
 
-        return self::invokeInner($frame, $stack[\count($stack) - 1], 'key');
+        return self::invokeInner($frame, $top, 'key');
     }
 
     public static function nextRecursive(Frame $frame, ObjectEntry $object): void
     {
-        $stack = &self::$store[$object->id]['stack'];
-        if ([] === $stack) {
+        if ([] === self::state($object)['stack']) {
             return;
         }
-        $top = $stack[\count($stack) - 1];
-        self::invokeInner($frame, $top, 'next');
-        self::nextElement($frame, $object);
+        self::advanceFromYield($frame, $object);
+        self::advanceToYield($frame, $object);
     }
 
     public static function resolveIterator(Context $ctx, Frame $frame, Variable $traversable): ObjectEntry
@@ -373,36 +382,149 @@ final class SplDualIteratorStorage
         return self::$store[$object->id];
     }
 
-    private static function nextElement(Frame $frame, ObjectEntry $object): void
+    private static function advanceFromYield(Frame $frame, ObjectEntry $object): void
     {
-        if (null === $frame->vmContext) {
-            throw new \LogicException('Iterator wrapper requires VM context');
-        }
         $state = &self::$store[$object->id];
-        while ([] !== $state['stack']) {
-            $top = $state['stack'][\count($state['stack']) - 1];
-            $valid = self::invokeInner($frame, $top, 'valid')->resolveIndirect();
-            if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
-                \array_pop($state['stack']);
-                if ([] !== $state['stack']) {
-                    $parent = $state['stack'][\count($state['stack']) - 1];
-                    self::invokeInner($frame, $parent, 'next');
-                }
-                continue;
-            }
-            if (self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $top)) {
-                self::invokeInner($frame, $top, 'next');
-                continue;
-            }
-            if (self::shouldRecurse($frame->vmContext, $frame, $object, $top, $state['mode'])) {
-                $child = self::getChildren($frame, $top);
-                self::invokeInner($frame, $child, 'rewind');
-                $state['stack'][] = $child;
-                continue;
-            }
+        if ([] === $state['stack']) {
+            return;
+        }
+        $level = \count($state['stack']) - 1;
+        $entry = &$state['stack'][$level];
+        if (self::RS_CHILD === $entry['state']) {
+            self::descendIntoChildren($frame, $object, $level);
 
             return;
         }
+        $entry['state'] = self::RS_NEXT;
+    }
+
+    private static function advanceToYield(Frame $frame, ObjectEntry $object): void
+    {
+        $state = &self::$store[$object->id];
+        while ([] !== $state['stack']) {
+            $level = \count($state['stack']) - 1;
+            $entry = &$state['stack'][$level];
+            $iterator = $entry['iterator'];
+            switch ($entry['state']) {
+                case self::RS_START:
+                case self::RS_NEXT:
+                    if (self::RS_NEXT === $entry['state']) {
+                        self::invokeInner($frame, $iterator, 'next');
+                    }
+                    if (!self::isIteratorValid($frame, $iterator)) {
+                        \array_pop($state['stack']);
+                        if ([] !== $state['stack']) {
+                            $parentLevel = \count($state['stack']) - 1;
+                            if (self::RS_SELF !== $state['stack'][$parentLevel]['state']) {
+                                $state['stack'][$parentLevel]['state'] = self::RS_NEXT;
+                            }
+                        }
+                        continue 2;
+                    }
+                    $entry['state'] = self::RS_TEST;
+                    // fall through
+                case self::RS_TEST:
+                    $mode = self::traversalMode($state['mode']);
+                    if (self::iteratorHasChildren($frame, $object, $iterator, $level, $state)) {
+                        if (self::canDescend($state, $level)) {
+                            if (IteratorIteratorBuiltin::SELF_FIRST === $mode) {
+                                $entry['state'] = self::RS_CHILD;
+
+                                return;
+                            }
+                            self::descendIntoChildren($frame, $object, $level);
+                            continue 2;
+                        }
+                        if (IteratorIteratorBuiltin::LEAVES_ONLY === $mode) {
+                            $entry['state'] = self::RS_NEXT;
+                            continue 2;
+                        }
+                    }
+                    $entry['state'] = self::RS_NEXT;
+
+                    return;
+                case self::RS_SELF:
+                    if (IteratorIteratorBuiltin::SELF_FIRST === self::traversalMode($state['mode'])) {
+                        $entry['state'] = self::RS_CHILD;
+                    } else {
+                        $entry['state'] = self::RS_NEXT;
+                    }
+
+                    return;
+                case self::RS_CHILD:
+                    self::descendIntoChildren($frame, $object, $level);
+                    continue 2;
+            }
+        }
+    }
+
+    private static function descendIntoChildren(Frame $frame, ObjectEntry $object, int $level): void
+    {
+        $state = &self::$store[$object->id];
+        $entry = &$state['stack'][$level];
+        $child = self::getChildren($frame, $entry['iterator']);
+        self::invokeInner($frame, $child, 'rewind');
+        $mode = self::traversalMode($state['mode']);
+        if (IteratorIteratorBuiltin::CHILD_FIRST === $mode) {
+            $entry['state'] = self::RS_SELF;
+        } else {
+            $entry['state'] = self::RS_NEXT;
+        }
+        $state['stack'][] = ['iterator' => $child, 'state' => self::RS_START];
+    }
+
+    private static function traversalMode(int $mode): int
+    {
+        return $mode & 0x0F;
+    }
+
+    private static function stackTop(ObjectEntry $object): ?ObjectEntry
+    {
+        $stack = self::state($object)['stack'];
+        if ([] === $stack) {
+            return null;
+        }
+
+        return $stack[\count($stack) - 1]['iterator'];
+    }
+
+    private static function isIteratorValid(Frame $frame, ObjectEntry $iterator): bool
+    {
+        $valid = self::invokeInner($frame, $iterator, 'valid')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $valid->type && $valid->toBool();
+    }
+
+    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
+    private static function iteratorHasChildren(
+        Frame $frame,
+        ObjectEntry $object,
+        ObjectEntry $iterator,
+        int $level,
+        array $state
+    ): bool {
+        if (self::mustSkipForMaxDepth($frame->vmContext, $frame, $object, $iterator)) {
+            return false;
+        }
+        if (null === $frame->vmContext) {
+            return false;
+        }
+        if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $frame->vmContext)) {
+            return false;
+        }
+        $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    /** @param array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int} $state */
+    private static function canDescend(array $state, int $level): bool
+    {
+        if ($state['maxDepth'] < 0) {
+            return true;
+        }
+
+        return $level < $state['maxDepth'];
     }
 
     private static function mustSkipForMaxDepth(Context $ctx, Frame $frame, ObjectEntry $wrapper, ObjectEntry $iterator): bool
@@ -416,24 +538,6 @@ final class SplDualIteratorStorage
             return false;
         }
         if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $ctx)) {
-            return false;
-        }
-        $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
-
-        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
-    }
-
-    private static function shouldRecurse(Context $ctx, Frame $frame, ObjectEntry $wrapper, ObjectEntry $iterator, int $mode): bool
-    {
-        if (IteratorIteratorBuiltin::LEAVES_ONLY !== $mode) {
-            return false;
-        }
-        if (!InterfaceCheck::entryImplements($iterator->class, 'recursiveiterator', $ctx)) {
-            return false;
-        }
-        $wrapperState = self::state($wrapper);
-        $depth = max(0, \count($wrapperState['stack']) - 1);
-        if ($wrapperState['maxDepth'] >= 0 && $depth >= $wrapperState['maxDepth']) {
             return false;
         }
         $result = self::invokeInner($frame, $iterator, 'hasChildren')->resolveIndirect();
