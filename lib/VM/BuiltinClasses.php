@@ -9,6 +9,7 @@ use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
+use PHPCompiler\VM\Builtin\DateTimeAdd;
 use PHPCompiler\VM\Builtin\DateTimeConstruct;
 use PHPCompiler\VM\Builtin\DateTimeDiff;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromFormat;
@@ -17,6 +18,7 @@ use PHPCompiler\VM\Builtin\DateTimeCreateFromInterface;
 use PHPCompiler\VM\Builtin\DateTimeCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeImmutableCreateFromTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeFormat;
+use PHPCompiler\VM\Builtin\DateTimeGetTimezone;
 use PHPCompiler\VM\Builtin\DateTimeGetLastErrors;
 use PHPCompiler\VM\Builtin\DateTimeGetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeGetTimestamp;
@@ -28,7 +30,9 @@ use PHPCompiler\VM\Builtin\DateTimeModify;
 use PHPCompiler\VM\Builtin\DateTimeSetDate;
 use PHPCompiler\VM\Builtin\DateTimeSetMicrosecond;
 use PHPCompiler\VM\Builtin\DateTimeSetTime;
+use PHPCompiler\VM\Builtin\DateTimeSetTimestamp;
 use PHPCompiler\VM\Builtin\DateTimeSetTimezone;
+use PHPCompiler\VM\Builtin\DateTimeSub;
 use PHPCompiler\VM\Builtin\DateTimeZoneConstruct;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetLocation;
 use PHPCompiler\VM\Builtin\DateTimeZoneGetName;
@@ -976,12 +980,16 @@ final class BuiltinClasses
         $dateTimeMethods = [
             'format' => new DateTimeFormat(),
             'gettimestamp' => new DateTimeGetTimestamp(),
+            'gettimezone' => new DateTimeGetTimezone(),
             'getmicrosecond' => new DateTimeGetMicrosecond(),
             'modify' => new DateTimeModify(),
+            'add' => new DateTimeAdd(),
+            'sub' => new DateTimeSub(),
             'diff' => new DateTimeDiff(),
             'setdate' => new DateTimeSetDate(),
             'settime' => new DateTimeSetTime(),
             'setmicrosecond' => new DateTimeSetMicrosecond(),
+            'settimestamp' => new DateTimeSetTimestamp(),
             'settimezone' => new DateTimeSetTimezone(),
         ];
 
