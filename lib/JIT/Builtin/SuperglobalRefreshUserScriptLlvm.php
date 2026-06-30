@@ -17,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
  * Form/cookie parsing routes through {@see ParseStrRuntime} + {@see __compiler_parse_str}
- * (init-safe native delimited LLVM for user-script AOT — #13900).
+ * ({@see ParseStrJitHelper::parseIntoNative} streaming materializer — #13900).
  * php-src: main/php_variables.c
  */
 final class SuperglobalRefreshUserScriptLlvm

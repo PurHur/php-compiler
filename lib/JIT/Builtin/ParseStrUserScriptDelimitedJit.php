@@ -13,14 +13,13 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * Native LLVM form-urlencoded parse helpers for user-script AOT superglobal refresh (#13717).
+ * Init-safe LLVM delimited-pair parser for user-script AOT superglobal refresh (#13571, #13900).
  *
- * Restores delimited-pair lowering removed in #13429 for paths that must write native
- * {@see __hashtable__*} at runtime (libc getenv + parse). Main parse_str entry remains
- * {@see ParseStrRuntime} + {@see ParseStrJitHelper} PHP.
+ * Nested {@see ParseStrJitHelper::parseIntoNative} segfaults at {@code main_after_init}; this
+ * hand-lowering mirrors {@see ParseStrEngine} for runtime libc getenv strings.
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
-final class ParseStrNativeLlvm
+final class ParseStrUserScriptDelimitedJit
 {
     private const MAX_KEY_PARTS = 16;
 
@@ -33,13 +32,7 @@ final class ParseStrNativeLlvm
 
     private const APPEND_OFF = 136;
 
-    /** Standalone AOT: bracket/delimited-pair helpers for superglobals_refresh.c (#7302). */
-    public static function ensureStandaloneBodies(Context $context): void
-    {
-        self::ensureSubhelpers($context);
-    }
-
-    /** User-script AOT: native parse helpers for {@see SuperglobalRefreshUserScriptLlvm} (#13717). */
+    /** User-script AOT: init-safe native delimited LLVM subhelpers (#13717, #13900). */
     public static function ensureSubhelpers(Context $context): void
     {
         $restore = self::captureInsertBlock($context);
@@ -129,10 +122,6 @@ final class ParseStrNativeLlvm
             '__phpc_parse_str_parse_delimited_pairs' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($void, false, $htPtr, $i8p, $i8, $i32)
-            ),
-            '__compiler_parse_str' => $context->module->addFunction(
-                $name,
-                $context->context->functionType($void, false, $htPtr, $strPtr)
             ),
             default => throw new \LogicException('Unknown parse_str JIT helper: '.$name),
         };
