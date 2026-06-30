@@ -61,6 +61,9 @@ final class SplFileObjectBuiltin
             'key' => SplFileObjectKey::class,
             'current' => SplFileObjectCurrent::class,
             'eof' => SplFileObjectEof::class,
+            'seek' => SplFileObjectSeek::class,
+            'fseek' => SplFileObjectFseek::class,
+            'getcurrentline' => SplFileObjectGetCurrentLine::class,
             'fgetcsv' => SplFileObjectFgetcsv::class,
             'fputcsv' => SplFileObjectFputcsv::class,
             'setcsvcontrol' => SplFileObjectSetCsvControl::class,
@@ -72,6 +75,7 @@ final class SplFileObjectBuiltin
         }
         $entry->methodNames['setcsvcontrol'] = 'setCsvControl';
         $entry->methodNames['getcsvcontrol'] = 'getCsvControl';
+        $entry->methodNames['getcurrentline'] = 'getCurrentLine';
         $entry->methodNames['__tostring'] = '__toString';
 
         $entry->isInternal = true;
@@ -87,6 +91,9 @@ final class SplFileObjectBuiltin
             $entry->methods['valid'],
             $entry->methods['current'],
             $entry->methods['eof'],
+            $entry->methods['seek'],
+            $entry->methods['fseek'],
+            $entry->methods['getcurrentline'],
             $entry->methods['fgetcsv'],
             $entry->methods['fputcsv'],
         );
@@ -312,6 +319,104 @@ final class SplFileObjectEof extends VmClassMethod
             return;
         }
         SplIteratorSupport::setReturnBool($frame, SplFileObjectStorage::eof($object));
+    }
+}
+
+final class SplFileObjectSeek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('seek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::seek()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::seek() expects exactly 1 argument, '.\count($frame->calledArgs).' given'
+            );
+        }
+        $line = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::seek',
+            1,
+            'line'
+        );
+        SplFileObjectStorage::seek($object, $line);
+    }
+}
+
+final class SplFileObjectFseek extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('fseek');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::fseek()'
+        );
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::fseek() expects at least 1 argument, '.$argc.' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $offset = VmMath::parseIntBuiltinArg(
+            $frame->calledArgs[1],
+            'SplFileObject::fseek',
+            1,
+            'offset'
+        );
+        $whence = \SEEK_SET;
+        if ($argc >= 3) {
+            $whence = VmMath::parseIntBuiltinArg(
+                $frame->calledArgs[2],
+                'SplFileObject::fseek',
+                2,
+                'whence'
+            );
+        }
+        $frame->returnVar->int(SplFileObjectStorage::fseek($object, $offset, $whence));
+    }
+}
+
+final class SplFileObjectGetCurrentLine extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getCurrentLine');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::getCurrentLine()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $line = SplFileObjectStorage::getCurrentLine($object);
+        if (false === $line) {
+            $frame->returnVar->bool(false);
+
+            return;
+        }
+        $frame->returnVar->string($line);
     }
 }
 
