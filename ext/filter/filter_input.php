@@ -26,8 +26,8 @@ final class filter_input extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
+        if ($argc < 2 || $argc > 4) {
+            throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
         }
         $typeInt = VmFilter::resolveInputType($frame->calledArgs[0], 'filter_input');
         $keyStr = VmString::coerceStringBuiltinArg(
@@ -36,7 +36,12 @@ final class filter_input extends Internal
             1,
             'variable_name'
         );
-        $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input', 'filter');
+        if ($argc >= 3) {
+            $filter = InternalStrictArg::requireBuiltinTypedInt($frame, 2, 'filter_input', 'filter');
+        } else {
+            $filter = new Variable();
+            $filter->int(VmFilter::FILTER_DEFAULT);
+        }
         if (4 === $argc) {
             $options = $frame->calledArgs[3]->resolveIndirect();
             if (!$options->isUndefined() && Variable::TYPE_NULL !== $options->type) {
@@ -81,10 +86,22 @@ final class filter_input extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 3 || \count($args) > 4) {
-            throw new \LogicException('filter_input() requires three or four arguments in this compiler build');
+        if (\count($args) < 2 || \count($args) > 4) {
+            throw new \LogicException('filter_input() requires two to four arguments in this compiler build');
         }
-        JitInternalStrictArg::requireBuiltinTypedInt($context, $args[2], 'filter_input', 'filter', 3);
+        if (\count($args) >= 3) {
+            JitInternalStrictArg::requireBuiltinTypedInt($context, $args[2], 'filter_input', 'filter', 3);
+            $filterArg = $args[2];
+        } else {
+            $i64 = $context->getTypeFromString('int64');
+            $defaultFilter = $i64->constInt(VmFilter::FILTER_DEFAULT, false);
+            $filterArg = new JITVariable(
+                $context,
+                JITVariable::TYPE_NATIVE_LONG,
+                JITVariable::KIND_VALUE,
+                $defaultFilter
+            );
+        }
         if (\count($args) > 3 && JITVariable::TYPE_NULL !== $args[3]->type) {
             throw new \LogicException('filter_input() options are not supported in this compiler build');
         }
@@ -148,28 +165,28 @@ final class filter_input extends Internal
         $context->builder->positionAtEnd($cookieBlock);
         $context->builder->branchIf($isCookie, $cookieBodyBlock, $envBlock);
         $context->builder->positionAtEnd($cookieBodyBlock);
-        $cookieResult = self::filterFromSuperglobal($context, '_COOKIE', $keyVar, $args[2]);
+        $cookieResult = self::filterFromSuperglobal($context, '_COOKIE', $keyVar, $filterArg);
         $cookieTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($envBlock);
         $context->builder->branchIf($isEnv, $envBodyBlock, $serverBlock);
         $context->builder->positionAtEnd($envBodyBlock);
-        $envResult = self::filterFromSuperglobal($context, '_ENV', $keyVar, $args[2]);
+        $envResult = self::filterFromSuperglobal($context, '_ENV', $keyVar, $filterArg);
         $envTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($serverBlock);
         $context->builder->branchIf($isServer, $serverBodyBlock, $sessionBlock);
         $context->builder->positionAtEnd($serverBodyBlock);
-        $serverResult = self::filterFromSuperglobal($context, '_SERVER', $keyVar, $args[2]);
+        $serverResult = self::filterFromSuperglobal($context, '_SERVER', $keyVar, $filterArg);
         $serverTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($sessionBlock);
         $context->builder->branchIf($isSession, $sessionBodyBlock, $badTypeBlock);
         $context->builder->positionAtEnd($sessionBodyBlock);
-        $sessionResult = self::filterFromSuperglobal($context, '_SESSION', $keyVar, $args[2]);
+        $sessionResult = self::filterFromSuperglobal($context, '_SESSION', $keyVar, $filterArg);
         $sessionTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -178,12 +195,12 @@ final class filter_input extends Internal
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($getBlock);
-        $getResult = self::filterFromSuperglobal($context, '_GET', $keyVar, $args[2]);
+        $getResult = self::filterFromSuperglobal($context, '_GET', $keyVar, $filterArg);
         $getTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($postBlock);
-        $postResult = self::filterFromSuperglobal($context, '_POST', $keyVar, $args[2]);
+        $postResult = self::filterFromSuperglobal($context, '_POST', $keyVar, $filterArg);
         $postTail = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
