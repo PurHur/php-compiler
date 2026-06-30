@@ -2276,6 +2276,7 @@
         "lib/Ast/AsymmetricVisibilityRewriter.php",
         "lib/Ast/CloneWithDesugar.php",
         "lib/Ast/DnfParenTypeRewriter.php",
+        "lib/Ast/EncapsedCoalesceDesugar.php",
         "lib/Ast/EnumCaseImportRewriter.php",
         "lib/Ast/EnumCaseMatchSwitchRewriter.php",
         "lib/Ast/EnumPropertyCompileCheck.php",
@@ -3068,6 +3069,7 @@
         "lib/VM/Builtin/ClosureDebugInfo.php",
         "lib/VM/Builtin/ClosureFromCallable.php",
         "lib/VM/Builtin/ClosureFromStatic.php",
+        "lib/VM/Builtin/ClosureGetCurrent.php",
         "lib/VM/Builtin/ClosureGetUsedVariables.php",
         "lib/VM/Builtin/DateIntervalConstruct.php",
         "lib/VM/Builtin/DateIntervalCreateFromDateString.php",
@@ -3749,9 +3751,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3519,
+        "inventory_files": 3521,
         "excluded": 0,
-        "eligible": 3519,
+        "eligible": 3521,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

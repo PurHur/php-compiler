@@ -598,6 +598,7 @@ function syntaxRowDefinitions(): array
             'construct' => 'PHP 8.5 pipe operator (`|>`)',
             'opcodes' => ['TYPE_FUNCCALL_INIT', 'TYPE_FUNCCALL_EXEC_RETURN'],
             'issue' => 7219,
+            'aot' => false,
             'notes' => [
                 'Ast\\PipeOperatorDesugar before php-parser (#3243); lowers $lhs |> f(...) to f($lhs, ...)',
                 'Bare callable names: $lhs |> strlen → strlen($lhs) (#7219)',
