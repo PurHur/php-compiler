@@ -65,6 +65,22 @@ final class VmLibxml
         return $ht;
     }
 
+    /**
+     * php-src libxml_get_last_error() — tail of the internal error buffer, or false when empty.
+     */
+    public static function getLastError(Context $ctx): Variable
+    {
+        $var = new Variable();
+        if ([] === self::$errors) {
+            $var->bool(false);
+
+            return $var;
+        }
+        $var->copyFrom(self::createErrorObject($ctx, self::$errors[\count(self::$errors) - 1]));
+
+        return $var;
+    }
+
     public static function clearErrors(): void
     {
         self::$errors = [];

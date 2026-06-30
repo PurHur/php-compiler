@@ -21,7 +21,7 @@ final class LibxmlInternalErrorsTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['libxml_use_internal_errors', 'libxml_get_errors', 'libxml_clear_errors'] as $fn) {
+        foreach (['libxml_use_internal_errors', 'libxml_get_errors', 'libxml_get_last_error', 'libxml_clear_errors'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         self::assertTrue(VmReflection::classExists($ctx, 'LibXMLError'));
@@ -30,6 +30,7 @@ final class LibxmlInternalErrorsTest extends TestCase
 <?php
 echo (int) function_exists('libxml_use_internal_errors');
 echo (int) function_exists('libxml_get_errors');
+echo (int) function_exists('libxml_get_last_error');
 echo (int) function_exists('libxml_clear_errors');
 echo (int) class_exists('LibXMLError');
 echo (int) extension_loaded('libxml');
@@ -37,7 +38,34 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'libxml_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('11111', ob_get_clean());
+        self::assertSame('111111', ob_get_clean());
+    }
+
+    public function test_libxml_get_last_error_returns_tail_or_false(): void
+    {
+        VmLibxml::clearErrors();
+        VmLibxml::useInternalErrors(true);
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+libxml_use_internal_errors(true);
+libxml_clear_errors();
+echo (int) (false === libxml_get_last_error()), "\n";
+$parser = xml_parser_create();
+xml_parse($parser, '<broken', true);
+$last = libxml_get_last_error();
+echo is_object($last) ? get_class($last)."\n" : "notobj\n";
+echo $last->code > 0 ? "code\n" : "nocode\n";
+$errors = libxml_get_errors();
+echo $last->code === $errors[0]->code ? "match\n" : "nomatch\n";
+libxml_clear_errors();
+echo (int) (false === libxml_get_last_error()), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'libxml_last_error.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nLibXMLError\ncode\nmatch\n1\n", ob_get_clean());
     }
 
     public function test_internal_errors_buffer_malformed_xml_via_xml_parse(): void

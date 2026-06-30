@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
         return [
             new libxml_use_internal_errors(),
             new libxml_get_errors(),
+            new libxml_get_last_error(),
             new libxml_clear_errors(),
         ];
     }
