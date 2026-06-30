@@ -179,9 +179,6 @@ final class VmSerialize
             if (\is_array($data)
                 && (DateTimeSupport::CLASS_DATETIME === $lcClass || DateTimeSupport::CLASS_DATETIMEIMMUTABLE === $lcClass)) {
                 $restored = DateTimeSupport::restoreFromZendSerialize($ctx, $lcClass, $data);
-                if (null === $restored) {
-                    return false;
-                }
                 $var = new Variable(Variable::TYPE_OBJECT);
                 $var->object($restored);
 
