@@ -26,7 +26,7 @@ final class unpack extends Internal
         $data = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'unpack', 1, 'string');
         $offset = 0;
         if (3 === $argc) {
-            $offset = VmMath::parseIntBuiltinArg($frame->calledArgs[2], 'unpack', 3, 'offset');
+            $offset = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'unpack', 3, 'offset');
             $dataLen = \strlen($data);
             if ($offset < 0 || $offset > $dataLen) {
                 throw new \ValueError('unpack(): Argument #3 ($offset) must be contained in argument #2 ($data)');
