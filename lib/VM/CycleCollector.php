@@ -403,7 +403,7 @@ final class CycleCollector
     }
 
     /** @param callable(Variable): void $visitVar */
-    public static function markFrameRoots(Frame $frame, callable $visitVar): void
+    public static function markFrameRoots(Frame $frame, callable $visitVar, bool $includeParents = true): void
     {
         foreach ($frame->scope as $slot) {
             $visitVar($slot);
@@ -426,8 +426,8 @@ final class CycleCollector
         if (null !== $frame->generatorState) {
             self::markGeneratorState($frame->generatorState, $visitVar);
         }
-        if (null !== $frame->parent) {
-            self::markFrameRoots($frame->parent, $visitVar);
+        if ($includeParents && null !== $frame->parent) {
+            self::markFrameRoots($frame->parent, $visitVar, true);
         }
     }
 }

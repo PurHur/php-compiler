@@ -263,48 +263,24 @@ final class WeakRefSupport
         if (null === $vm) {
             return false;
         }
-        $ctx = $vm->context;
-        foreach ($ctx->runStackFrames() as $frame) {
-            if (self::scopeReferencesObject($frame->scope, $objectId)) {
-                return true;
-            }
-        }
         $found = false;
-        $ctx->visitGlobalVariables(function (Variable $global) use ($objectId, &$found): void {
+        $vm->visitStrongRefRoots(function (Variable $var) use ($objectId, &$found): void {
             if ($found) {
                 return;
             }
-            $resolved = $global->resolveIndirect();
-            if (Variable::TYPE_OBJECT === $resolved->type && $resolved->toObject()->id === $objectId) {
-                $found = true;
-            }
-        });
-        if ($found) {
-            return true;
-        }
-
-        return false;
-    }
-
-    /**
-     * @param array<int, Variable> $scope
-     */
-    private static function scopeReferencesObject(array $scope, int $objectId): bool
-    {
-        foreach ($scope as $slot) {
-            $resolved = $slot->resolveIndirect();
+            $resolved = $var->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $resolved->type) {
-                continue;
+                return;
             }
             try {
                 if ($resolved->toObject()->id === $objectId) {
-                    return true;
+                    $found = true;
                 }
             } catch (\LogicException) {
             }
-        }
+        });
 
-        return false;
+        return $found;
     }
 
     /** Stable WeakMap hash key for enum case operands — identity is class+name, not ephemeral object id (#5629). */
