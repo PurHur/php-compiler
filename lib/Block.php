@@ -793,6 +793,7 @@ class Block {
     /**
      * One-level JUMPIF target scan — enough to drop cond-expression temps without
      * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
+     * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133).
      */
     public function scopeSlotReadInDirectJumpTargets(int $slot): bool
     {
@@ -804,8 +805,27 @@ class Block {
                 if (!$target instanceof self) {
                     continue;
                 }
-                foreach ($target->opCodes as $branchOp) {
-                    if ($target->opCodeReadsScopeSlot($branchOp, $slot)) {
+                if ($this->branchOrJumpMergeReadsScopeSlot($target, $slot)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function branchOrJumpMergeReadsScopeSlot(self $branch, int $slot): bool
+    {
+        foreach ($branch->opCodes as $branchOp) {
+            if ($this->opCodeReadsScopeSlot($branchOp, $slot)) {
+                return true;
+            }
+            if (
+                OpCode::TYPE_JUMP === $branchOp->type
+                && $branchOp->block1 instanceof self
+            ) {
+                foreach ($branchOp->block1->opCodes as $mergeOp) {
+                    if ($this->opCodeReadsScopeSlot($mergeOp, $slot)) {
                         return true;
                     }
                 }
