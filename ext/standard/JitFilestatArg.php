@@ -108,7 +108,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — strict int or weak numeric-string zend_strtol (#4207). */
+    /** chmod()/mkdir() mode — strict int or weak numeric-string Z_PARAM_LONG decimal (#14060). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -130,7 +130,7 @@ final class JitFilestatArg
             }
         }
 
-        return JitLongArg::lowerZendLong($context, $arg, $function.'() '.$paramName);
+        return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
     }
 
     public static function valuePtrAfterIntOrStringGuard(
