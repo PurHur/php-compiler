@@ -33,9 +33,7 @@ class is_type extends Internal {
     }
 
     public function execute(Frame $frame): void {
-        if (count($frame->calledArgs) !== 1) {
-            throw new \LogicException("Expecting exactly a single argument to {$this->name}()");
-        }
+        $this->requireExactArgCount($frame, $this->name, 1);
         $var = $frame->calledArgs[0]->resolveIndirect();
         TypedPropertyCheck::assertReadable($var);
         if (!is_null($frame->returnVar)) {
@@ -57,8 +55,8 @@ class is_type extends Internal {
 
     public function call(Context $context, JITVariable ... $args): Value {
         $this->context = $context;
-        if (count($args) !== 1) {
-            throw new \LogicException('Too few args passed to ' . $this->name . '()');
+        if (!$this->requireExactJitArgCount($context, $args, $this->name, 1)) {
+            return $context->constantFromBool(false);
         }
         if (JITVariable::TYPE_VALUE === $args[0]->type) {
             TypedPropertyUninitGuard::emitBeforeRead($context, $args[0]);

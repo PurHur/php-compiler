@@ -431,7 +431,7 @@ final class ArrayFindHelper
         [$kind, $target] = $handler;
         if ('builtin' === $kind) {
             /** @var Internal $target */
-            $mapped = $target->call($context, $elem);
+            $mapped = $target->call($context, $elem, $key);
 
             return self::jitCallResultTruthy($context, $mapped);
         }
