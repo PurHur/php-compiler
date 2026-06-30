@@ -189,6 +189,44 @@ final class SplArrayStorage
             && 0 !== (self::getFlags($object) & self::FLAG_ARRAY_AS_PROPS);
     }
 
+    /**
+     * php-src spl_array_get_properties — internal storage keys as object properties for json_encode (#13924).
+     *
+     * @return array<string, Variable>
+     */
+    public static function collectJsonEncodeProperties(ObjectEntry $object): array
+    {
+        if (!self::hasState($object)) {
+            return [];
+        }
+        $state = self::state($object);
+        if (0 !== ($state['flags'] & self::FLAG_ARRAY_AS_PROPS)) {
+            /** @var array<string, Variable> $result */
+            $result = [];
+            foreach ($state['propList'] as $name => $value) {
+                if ($value instanceof Variable) {
+                    $copy = new Variable();
+                    $copy->copyFrom($value);
+                    $result[(string) $name] = $copy;
+                }
+            }
+
+            return $result;
+        }
+        /** @var array<string, Variable> $result */
+        $result = [];
+        foreach ($state['table']->iterateKeyed(true) as [$keyVar, $valVar]) {
+            $name = Variable::TYPE_INTEGER === $keyVar->type
+                ? (string) $keyVar->toInt()
+                : $keyVar->toString();
+            $copy = new Variable();
+            $copy->copyFrom($valVar);
+            $result[$name] = $copy;
+        }
+
+        return $result;
+    }
+
     public static function createIterator(Context $ctx, ObjectEntry $object): Variable
     {
         $className = self::getIteratorClass($object);
