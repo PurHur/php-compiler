@@ -58,12 +58,21 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('parseCookieHeaderInto', $source);
     }
 
-    public function testParseStrNativeLlvmRequiredForUserScriptSuperglobalRefresh(): void
+    public function testParseStrNativeMergeBridgeUsesNativeHelpers(): void
     {
+        $runtime = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', $runtime);
+        $this->assertStringContainsString('ptrToI64', $runtime);
+
+        $helper = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrJitHelper.php');
+        $this->assertStringContainsString('parseIntoNative', $helper);
+        $this->assertStringContainsString('phpc_native_ht_set_string_key', $helper);
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
+
+        // User-script superglobal refresh still uses native LLVM delimited parser (#13886).
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
         $this->assertStringContainsString('ParseStrNativeLlvm::ensureSubhelpers', $userScript);
-        $this->assertStringContainsString('__phpc_parse_str_parse_delimited_pairs', $userScript);
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
@@ -72,13 +81,17 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseStrJitHelper.php', $spine);
         $this->assertStringContainsString('ParseStrRuntime.php', $spine);
         $this->assertStringContainsString('StringParseStr.php', $spine);
+        $this->assertStringContainsString('ParseStrNativeOpsJit.php', $spine);
         $this->assertStringContainsString('ParseStrNativeLlvm.php', $spine);
+        $this->assertStringContainsString('phpc_native_ht_alloc.php', $spine);
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
     }
 
     public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
+        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', $source);
+        $this->assertStringContainsString('ptrToI64', $source);
         $this->assertStringContainsString('$early = $fn->appendBasicBlock', $source);
         $this->assertStringNotContainsString('BasicBlockHelper::append($context, \'parse_str_bridge', $source);
         $this->assertStringContainsString('JitNestedHelperCoerce::coerceArgForHelper', $source);

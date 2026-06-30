@@ -32,7 +32,7 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringMultipart.php');
     }
 
-    public function testUserScriptRefreshUsesNativeParseStrLlvmForSgTables(): void
+    public function testUserScriptRefreshUsesNativeParseStrLlvmUntilPhpBridgeGreen(): void
     {
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
