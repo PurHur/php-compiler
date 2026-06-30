@@ -12,6 +12,18 @@ final class VmIniIntrospection
     private const ENV_SCANNED_FILES = 'PHP_COMPILER_INI_SCANNED_FILES';
 
     /**
+     * Registered string ini directives mirrored from host Zend ini_get() (#14187).
+     *
+     * php-src: ext/standard/ini.c — compile-time / php.ini defaults (extension_dir, sendmail_path, …)
+     *
+     * @var list<string>
+     */
+    public const MIRRORED_HOST_INI_KEYS = [
+        'extension_dir',
+        'sendmail_path',
+    ];
+
+    /**
      * Mirror host Zend ini introspection into process env before VM/JIT run (#9175).
      * Skips when test harness already set PHP_COMPILER_INI_* overrides.
      */
@@ -32,6 +44,49 @@ final class VmIniIntrospection
                 \putenv(self::ENV_SCANNED_FILES.'='.$scanned);
             }
         }
+        foreach (self::MIRRORED_HOST_INI_KEYS as $key) {
+            $envName = self::mirroredIniEnvName($key);
+            if ('' !== self::envString($envName)) {
+                continue;
+            }
+            if (!\function_exists('ini_get')) {
+                continue;
+            }
+            $host = @\ini_get($key);
+            if (\is_string($host)) {
+                \putenv($envName.'='.$host);
+            }
+        }
+    }
+
+    /**
+     * Host-mirrored ini_get() for registered directives outside VmIni::SUPPORTED_KEYS (#14187).
+     *
+     * @return string|null null when $key is not mirrored
+     */
+    public static function mirroredHostIniGet(string $key): ?string
+    {
+        $normalized = strtolower($key);
+        if (!\in_array($normalized, self::MIRRORED_HOST_INI_KEYS, true)) {
+            return null;
+        }
+        $env = self::envString(self::mirroredIniEnvName($normalized));
+        if ('' !== $env) {
+            return $env;
+        }
+        if (\function_exists('ini_get')) {
+            $host = @\ini_get($normalized);
+            if (\is_string($host)) {
+                return $host;
+            }
+        }
+
+        return '';
+    }
+
+    private static function mirroredIniEnvName(string $key): string
+    {
+        return 'PHP_COMPILER_INI_'.strtoupper(str_replace('.', '_', $key));
     }
 
     public static function loadedFile(): string|false

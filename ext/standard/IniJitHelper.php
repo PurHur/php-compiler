@@ -78,6 +78,7 @@ final class IniJitHelper
     private const EMPTY_STRING_INI_KEYS = [
         'auto_prepend_file',
         'auto_append_file',
+        'browscap',
         'error_log',
         'doc_root',
         'user_dir',
@@ -87,6 +88,8 @@ final class IniJitHelper
         'mail.add_x_header',
         'error_append_string',
         'error_prepend_string',
+        'upload_tmp_dir',
+        'sys_temp_dir',
     ];
 
     private const CFG_DISPLAY_ERRORS = '';
@@ -208,6 +211,10 @@ final class IniJitHelper
         }
         if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
+        }
+        $mirrored = VmIniIntrospection::mirroredHostIniGet($key);
+        if (null !== $mirrored) {
+            return $mirrored;
         }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
