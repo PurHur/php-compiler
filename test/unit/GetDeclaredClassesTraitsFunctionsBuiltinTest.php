@@ -26,6 +26,7 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
             'get_declared_classes_includes_internal_jit.phpt',
             'get_declared_traits.phpt',
             'get_declared_traits_jit.phpt',
+            'get_declared_traits_nested_probe_arg.phpt',
             'get_declared_functions.phpt',
             'get_declared_functions_jit.phpt',
             'get_defined_functions.phpt',
