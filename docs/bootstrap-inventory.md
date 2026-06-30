@@ -11059,7 +11059,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDatePure.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 13 class method(s)
 
 ### `ext/standard/VmDateSunFunc.php`
 
@@ -11076,12 +11076,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmDateTimeNative.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 101)
-- new RecursiveIteratorIterator (line 1954)
-- new RecursiveDirectoryIterator (line 1955)
-- new RecursiveIteratorIterator (line 2056)
-- new RecursiveDirectoryIterator (line 2057)
-- 68 class method(s)
+- new Variable (line 99)
+- new RecursiveIteratorIterator (line 1895)
+- new RecursiveDirectoryIterator (line 1896)
+- new RecursiveIteratorIterator (line 1997)
+- new RecursiveDirectoryIterator (line 1998)
+- 69 class method(s)
 - 10 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -13655,8 +13655,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/count_chars.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 59)
-- new Variable (line 68)
+- new HashTable (line 55)
+- new Variable (line 64)
 - 2 class method(s)
 
 ### `ext/standard/crc32.php`
@@ -16406,8 +16406,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_split.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 52)
-- new Variable (line 54)
+- new HashTable (line 47)
+- new Variable (line 49)
 - 2 class method(s)
 
 ### `ext/standard/str_starts_with.php`
@@ -19521,7 +19521,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GzStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 325)
+- new JIT (line 324)
 - 12 class method(s)
 - 8 closure(s)
 
@@ -21200,7 +21200,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringZlib.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 2 class method(s)
 
 ### `lib/JIT/Builtin/StringZstd.php`
 
