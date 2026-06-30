@@ -14,9 +14,9 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295).
  *
- * Replaces legacy LLVM parse_str lowering; user-script AOT refresh routes through
- * init-safe native delimited LLVM until nested {@see ParseStrJitHelper::parseIntoNative}
- * is init-safe (#13900). php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
+ * Embed AOT uses {@see ParseStrJitHelper::parseIntoNative} nested JIT materializer.
+ * User-script AOT uses {@see ParseStrUserScriptDelimitedJit} init-safe LLVM (#13571, #13900).
+ * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
 {
@@ -70,7 +70,7 @@ final class ParseStrRuntime
             '#9299'
         );
         if (self::isUserScriptStandaloneAot()) {
-            ParseStrNativeLlvm::ensureSubhelpers($context);
+            ParseStrUserScriptDelimitedJit::ensureSubhelpers($context);
         }
         self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
         self::implementIfMissing($context, '__compiler_parse_cookie_header', self::implementCookieBridge(...));
@@ -116,7 +116,6 @@ final class ParseStrRuntime
     private static function implementParseBridge(Context $context, LlvmFunction $fn): void
     {
         $entry = $fn->appendBasicBlock('parse_str_bridge_entry');
-        // Append on $fn directly — defineBuiltins() has no insert block yet (#1492 inventory argv).
         $early = $fn->appendBasicBlock('parse_str_bridge_early');
         $work = $fn->appendBasicBlock('parse_str_bridge_work');
         $context->builder->positionAtEnd($entry);

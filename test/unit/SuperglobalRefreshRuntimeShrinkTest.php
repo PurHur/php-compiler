@@ -39,5 +39,6 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('__compiler_parse_str', $source);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
         $this->assertStringNotContainsString('ParseStrNativeLlvm::ensureSubhelpers', $source);
+        $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit::ensureSubhelpers', $source);
     }
 }

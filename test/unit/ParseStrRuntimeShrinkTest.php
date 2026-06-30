@@ -74,6 +74,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $userScript);
         $this->assertStringContainsString('__compiler_parse_str', $userScript);
         $this->assertStringContainsString('emitUserScriptDelimitedParse', (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php'));
+        $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
+        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
@@ -83,7 +85,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ParseStrRuntime.php', $spine);
         $this->assertStringContainsString('StringParseStr.php', $spine);
         $this->assertStringContainsString('ParseStrNativeOpsJit.php', $spine);
-        $this->assertStringContainsString('ParseStrNativeLlvm.php', $spine);
+        $this->assertStringContainsString('ParseStrUserScriptDelimitedJit.php', $spine);
+        $this->assertStringNotContainsString('ParseStrNativeLlvm.php', $spine);
         $this->assertStringContainsString('phpc_native_ht_alloc.php', $spine);
         $this->assertStringNotContainsString('StringParseStrJit.php', $spine);
     }
