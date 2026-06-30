@@ -3336,6 +3336,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/WeakMapOffsetUnset.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceCreate.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/WeakReferenceGet.php';
+require_once __DIR__.'/../../../lib/VM/BuiltinCallbackCatchRedirect.php';
 require_once __DIR__.'/../../../lib/VM/BuiltinClasses.php';
 require_once __DIR__.'/../../../lib/VM/BuiltinExceptionSupport.php';
 require_once __DIR__.'/../../../lib/VM/BuiltinExecute.php';
@@ -3546,9 +3547,6 @@ require_once __DIR__.'/../../../src/yay-php8-compat.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/cli_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/llvm_env_spine_shim.php';
 require_once __DIR__.'/../../../test/bootstrap-aot/macro_functions_spine_shim.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionClassGetExtension.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionConstruct.php';
-require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionExtensionGetName.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
