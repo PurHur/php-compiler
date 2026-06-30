@@ -26,7 +26,39 @@ final class JitLongArg {
         return self::lowerStringToLong($context, $strPtr);
     }
 
-    private static function lowerValueBoxToLong(Context $context, Variable $arg): Value
+    /** zend_strtol(..., 0) for file mode numeric strings (#4207). */
+    public static function lowerZendLongString(Context $context, Value $strPtr): Value
+    {
+        return self::lowerStringToLong($context, $strPtr, 0);
+    }
+
+    public static function lowerZendLong(Context $context, Variable $arg, string $contextLabel = 'argument'): Value
+    {
+        if (Variable::TYPE_NATIVE_LONG === $arg->type) {
+            return $context->helper->loadValue($arg);
+        }
+        if (Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            return $context->builder->fpToSi($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+        }
+        if (Variable::TYPE_NATIVE_BOOL === $arg->type) {
+            return $context->builder->zExt($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+        }
+        if (JitValueBox::isValueOperand($arg)) {
+            return self::lowerValueBoxToLong($context, $arg, 0);
+        }
+        if (Variable::TYPE_NULL === $arg->type) {
+            return $context->getTypeFromString('int64')->constInt(0, false);
+        }
+        if (Variable::TYPE_OBJECT === $arg->type) {
+            return $context->builder->ptrToInt($context->helper->loadValue($arg), $context->getTypeFromString('int64'));
+        }
+        if (Variable::TYPE_STRING === $arg->type) {
+            return self::lowerZendLongString($context, $context->helper->loadValue($arg));
+        }
+        throw new \LogicException("{$contextLabel} must be an integer in this compiler build");
+    }
+
+    private static function lowerValueBoxToLong(Context $context, Variable $arg, int $base = 10): Value
     {
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $arg);
         $map = $context->structFieldMap['__value__'];
@@ -46,7 +78,7 @@ final class JitLongArg {
             $context->lookupFunction('__value__readString'),
             $valuePtr
         );
-        $stringLong = self::lowerStringToLong($context, $strPtr);
+        $stringLong = self::lowerStringToLong($context, $strPtr, $base);
         $stringEnd = $context->builder->getInsertBlock();
         $context->builder->branch($doneBlock);
 
@@ -67,7 +99,7 @@ final class JitLongArg {
         return $phi;
     }
 
-    private static function lowerStringToLong(Context $context, Value $strPtr): Value
+    private static function lowerStringToLong(Context $context, Value $strPtr, int $base = 10): Value
     {
         $map = $context->structFieldMap['__string__'];
         $i8p = $context->getTypeFromString('int8*');
@@ -78,7 +110,7 @@ final class JitLongArg {
             $context->lookupFunction('strtol'),
             $charPtr,
             $endPtrSlot,
-            $context->getTypeFromString('int32')->constInt(10, false)
+            $context->getTypeFromString('int32')->constInt($base, false)
         );
         $i64 = $context->getTypeFromString('int64');
 

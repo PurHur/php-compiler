@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
@@ -104,6 +106,31 @@ final class JitFilestatArg
             $context,
             self::intTypeError($function, $argIndex, $paramName, $given)
         );
+    }
+
+    /** chmod()/mkdir() mode — strict int or weak numeric-string zend_strtol (#4207). */
+    public static function lowerFileMode(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): Value {
+        JitInternalStrictArg::requireInt($context, $arg, $function, $paramName, $argIndex + 1);
+        if ($context->callerStrictTypes) {
+            return $context->helper->loadValue($arg);
+        }
+        if (JITVariable::TYPE_STRING === $arg->type && null !== $arg->compileTimeString) {
+            $raw = $arg->compileTimeString;
+            if ('' === $raw || !is_numeric($raw)) {
+                self::emitTypeErrorAndAbort(
+                    $context,
+                    self::intTypeError($function, $argIndex, $paramName, 'string')
+                );
+            }
+        }
+
+        return JitLongArg::lowerZendLong($context, $arg, $function.'() '.$paramName);
     }
 
     public static function valuePtrAfterIntOrStringGuard(
