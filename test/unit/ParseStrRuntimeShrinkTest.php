@@ -69,10 +69,11 @@ final class ParseStrRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('phpc_native_ht_set_string_key', $helper);
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
 
-        // User-script superglobal refresh still uses native LLVM delimited parser (#13886).
-        $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
+        // User-script refresh routes via ParseStrRuntime init-safe bridge (#13900).
         $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrNativeLlvm::ensureSubhelpers', $userScript);
+        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $userScript);
+        $this->assertStringContainsString('__compiler_parse_str', $userScript);
+        $this->assertStringContainsString('emitUserScriptDelimitedParse', (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php'));
     }
 
     public function testSpineBundleIncludesParseStrPhpJitPath(): void
