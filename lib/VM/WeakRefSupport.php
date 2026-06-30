@@ -266,47 +266,27 @@ final class WeakRefSupport
         $dst->copyFrom($target);
     }
 
-    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103). */
+    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103, #14132). */
     public static function hasStrongScopeBinding(int $objectId): bool
     {
         $vm = \PHPCompiler\VM::running();
         if (null === $vm) {
             return false;
         }
-        $matches = static function (Variable $var) use ($objectId): bool {
+        $found = false;
+        $vm->visitNamedStrongRefRoots(static function (Variable $var) use ($objectId, &$found): void {
+            if ($found) {
+                return;
+            }
             $resolved = $var->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $resolved->type) {
-                return false;
+                return;
             }
             try {
-                return $resolved->toObject()->id === $objectId;
+                if ($resolved->toObject()->id === $objectId) {
+                    $found = true;
+                }
             } catch (\LogicException) {
-                return false;
-            }
-        };
-
-        foreach ($vm->context->runStackFrames() as $frame) {
-            if (null !== $frame->block) {
-                foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
-                    if (!isset($frame->scope[$slot])) {
-                        continue;
-                    }
-                    if ($matches($frame->scope[$slot])) {
-                        return true;
-                    }
-                }
-            }
-            foreach ($frame->dynamicLocals as $var) {
-                if ($matches($var)) {
-                    return true;
-                }
-            }
-        }
-
-        $found = false;
-        $vm->context->visitGlobalVariables(function (Variable $var) use (&$found, $matches): void {
-            if (!$found && $matches($var)) {
-                $found = true;
             }
         });
 

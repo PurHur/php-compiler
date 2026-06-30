@@ -71,6 +71,45 @@ class VM {
     }
 
     /**
+     * Named locals, dynamic locals, globals, and in-flight builtin args — not compiler temps (#14103).
+     *
+     * @param callable(Variable): void $visitVar
+     */
+    public function visitNamedStrongRefRoots(callable $visitVar): void
+    {
+        if (null !== $this->executingFrame) {
+            $frame = $this->executingFrame;
+            if (null !== $frame->closureCall || null !== $frame->parent) {
+                self::visitFrameNamedStrongRefRoots($frame, $visitVar);
+            }
+        }
+        if (null !== $this->builtinHandlerFrameForTrace) {
+            foreach ($this->builtinHandlerFrameForTrace->calledArgs as $arg) {
+                $visitVar($arg);
+            }
+        }
+        foreach ($this->context->runStackFrames() as $frame) {
+            self::visitFrameNamedStrongRefRoots($frame, $visitVar);
+        }
+        $this->context->visitGlobalVariables($visitVar);
+    }
+
+    /** @param callable(Variable): void $visitVar */
+    private static function visitFrameNamedStrongRefRoots(Frame $frame, callable $visitVar): void
+    {
+        if (null !== $frame->block) {
+            foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
+                if (isset($frame->scope[$slot])) {
+                    $visitVar($frame->scope[$slot]);
+                }
+            }
+        }
+        foreach ($frame->dynamicLocals as $var) {
+            $visitVar($var);
+        }
+    }
+
+    /**
      * Visit slots that may strongly retain weak-ref targets — active opcode frame,
      * in-flight builtin args, suspended callers, globals (#13923).
      *
