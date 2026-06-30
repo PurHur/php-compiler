@@ -2009,6 +2009,54 @@ PHP;
         self::assertStringNotContainsString('NULL', $out);
     }
 
+    /** Issue #10733 — var_export([bool, $dt->format(...)]) wires Array_ producer, not hoisted MethodCall element. */
+    public function testVarExportInlineArrayWithMethodCallElementUsesArrayProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$dt = new DateTime('2020-01-01');
+var_export([true, $dt->format('Y-m-d')]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_inline_array_method_element.php');
+
+        $initArraySlot = null;
+        $methodReturnSlot = null;
+        $varExportSendSlot = null;
+        $pendingMethod = false;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $pendingMethod = true;
+            }
+            if ($pendingMethod && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $methodReturnSlot = $op->arg1;
+                $pendingMethod = false;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSendSlot = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($initArraySlot);
+        self::assertNotNull($methodReturnSlot);
+        self::assertNotNull($varExportSendSlot);
+        self::assertSame($initArraySlot, $varExportSendSlot, 'var_export must send array slot, not method return');
+        self::assertNotSame($methodReturnSlot, $varExportSendSlot);
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('array (', $out);
+        self::assertStringContainsString("'2020-01-01'", $out);
+    }
+
     /** Issue #12450 — array_merge(array_keys($src), [...]) wires FuncCall + sibling Array_ producer slots. */
     public function testArrayMergeInlineArrayKeysRuntime(): void
     {
