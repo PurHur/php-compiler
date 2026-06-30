@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -45,12 +44,14 @@ final class stream_copy_to_stream extends Internal
         }
         $maxlength = -1;
         if ($argc >= 3) {
-            $maxVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_NULL === $maxVar->type) {
-                $maxlength = -1;
-            } else {
-                $maxlength = VmMath::parseIntBuiltinArg($maxVar, 'stream_copy_to_stream', 3, 'maxlength');
-            }
+            $parsed = VmMath::parseNullableIntBuiltinArgForFrame(
+                $frame,
+                2,
+                'stream_copy_to_stream',
+                3,
+                'maxlength'
+            );
+            $maxlength = null === $parsed ? -1 : $parsed;
         }
         $offset = 0;
         if (4 === $argc) {
@@ -92,10 +93,17 @@ final class stream_copy_to_stream extends Internal
             $i64
         );
         if ($argc >= 3) {
-            $maxlength = $context->builder->truncOrBitCast(
-                JitLongArg::lower($context, $args[2], 'stream_copy_to_stream() maxlength'),
-                $i64
-            );
+            if (JITVariable::TYPE_VALUE === $args[2]->type && $args[2]->isNullConstant) {
+                $maxlength = $i64->constInt(-1, true);
+            } else {
+                $maxlength = JitIntdiv::lowerNullableIntBuiltinArgForCaller(
+                    $context,
+                    $args[2],
+                    'stream_copy_to_stream',
+                    3,
+                    'maxlength'
+                );
+            }
         } else {
             $maxlength = $i64->constInt(-1, true);
         }

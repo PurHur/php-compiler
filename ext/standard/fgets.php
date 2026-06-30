@@ -34,8 +34,7 @@ final class fgets extends Internal
         }
         $length = null;
         if (2 === $argc) {
-            $lenVar = $frame->calledArgs[1]->resolveIndirect();
-            $length = VmMath::parseIntBuiltinArg($lenVar, 'fgets', 2, 'length');
+            $length = VmMath::parseNullableIntBuiltinArgForFrame($frame, 1, 'fgets', 2, 'length');
             if ($length <= 0) {
                 throw new \ValueError(self::LENGTH_ERROR);
             }
@@ -61,7 +60,7 @@ final class fgets extends Internal
             $i64
         );
         if (2 === $argc) {
-            $length = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'fgets', 2, 'length');
+            $length = JitIntdiv::lowerNullableIntBuiltinArgForCaller($context, $args[1], 'fgets', 2, 'length');
             JitFgets::emitRuntimeLengthGuard($context, $length);
         } else {
             $length = $i64->constInt(-1, true);
