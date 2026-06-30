@@ -9722,6 +9722,12 @@ restart:
         return $this->executingFrame;
     }
 
+    /** Active user opcode frame during runFrames (not on runStack — see #14132). */
+    public function currentExecutingFrame(): ?Frame
+    {
+        return $this->executingFrame;
+    }
+
     /**
      * Builtin serialize/unserialize invoke property hooks with a user PHP frame parent (#6474).
      */
