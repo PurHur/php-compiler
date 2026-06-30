@@ -448,6 +448,15 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'property_hook_reference_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
+            if (CompilerVersion::supportsEncapsedCoalesce()
+                && str_contains($name, 'encapsed_coalesce_parse_error')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsEncapsedCoalesce()
+                && str_contains($name, 'encapsed_coalesce_interpolation')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when clone-with syntax enabled (#12987).
             if (CompilerVersion::supportsCloneWithSyntax()
                 && str_contains($name, 'clone_with_reference_profile')) {
