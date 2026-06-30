@@ -791,6 +791,31 @@ class Block {
     }
 
     /**
+     * One-level JUMPIF target scan — enough to drop cond-expression temps without
+     * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
+     */
+    public function scopeSlotReadInDirectJumpTargets(int $slot): bool
+    {
+        foreach ($this->opCodes as $op) {
+            if (OpCode::TYPE_JUMPIF !== $op->type) {
+                continue;
+            }
+            foreach ([$op->block1, $op->block2] as $target) {
+                if (!$target instanceof self) {
+                    continue;
+                }
+                foreach ($target->opCodes as $branchOp) {
+                    if ($target->opCodeReadsScopeSlot($branchOp, $slot)) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * @param array<int, true> $seen
      */
     private function blockReadsScopeSlotTree(int $slot, array &$seen): bool

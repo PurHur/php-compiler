@@ -42,8 +42,14 @@ final class WeakRefSupport
         if (Variable::TYPE_ARRAY !== $slot->resolveIndirect()->type) {
             $slot->newArray();
         }
+        $key = $key->resolveIndirect();
         $copy = new Variable();
-        $copy->copyFrom($key);
+        if (Variable::TYPE_OBJECT === $key->type) {
+            // GC mark list only — must not retain a strong ref (zend_weakrefs.c, #14103).
+            $copy->weakObject($key->toObject());
+        } else {
+            $copy->copyFrom($key);
+        }
         $slot->toArray()->append($copy);
     }
 
@@ -228,7 +234,11 @@ final class WeakRefSupport
                 continue;
             }
             $objectId = (int) substr($storedKey, 2);
-            if (!ObjectRegistry::isRegistered($objectId)) {
+            if (
+                !ObjectRegistry::isRegistered($objectId)
+                || WeakRefRegistry::isReferentInvalidated($objectId)
+                || !self::hasStrongScopeBinding($objectId)
+            ) {
                 $keyVar->string($storedKey);
                 $ht->offsetUnset($keyVar);
                 WeakRefRegistry::unregisterWeakMapEntry($objectId, $weakMap->id, $storedKey);
@@ -256,27 +266,47 @@ final class WeakRefSupport
         $dst->copyFrom($target);
     }
 
-    /** True when a run-stack slot or global still holds a strong ref to $objectId (#13474). */
+    /** True when a named local, dynamic local, or global still holds a strong ref (#13474, #14103). */
     public static function hasStrongScopeBinding(int $objectId): bool
     {
         $vm = \PHPCompiler\VM::running();
         if (null === $vm) {
             return false;
         }
-        $found = false;
-        $vm->visitStrongRefRoots(function (Variable $var) use ($objectId, &$found): void {
-            if ($found) {
-                return;
-            }
+        $matches = static function (Variable $var) use ($objectId): bool {
             $resolved = $var->resolveIndirect();
             if (Variable::TYPE_OBJECT !== $resolved->type) {
-                return;
+                return false;
             }
             try {
-                if ($resolved->toObject()->id === $objectId) {
-                    $found = true;
-                }
+                return $resolved->toObject()->id === $objectId;
             } catch (\LogicException) {
+                return false;
+            }
+        };
+
+        foreach ($vm->context->runStackFrames() as $frame) {
+            if (null !== $frame->block) {
+                foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
+                    if (!isset($frame->scope[$slot])) {
+                        continue;
+                    }
+                    if ($matches($frame->scope[$slot])) {
+                        return true;
+                    }
+                }
+            }
+            foreach ($frame->dynamicLocals as $var) {
+                if ($matches($var)) {
+                    return true;
+                }
+            }
+        }
+
+        $found = false;
+        $vm->context->visitGlobalVariables(function (Variable $var) use (&$found, $matches): void {
+            if (!$found && $matches($var)) {
+                $found = true;
             }
         });
 

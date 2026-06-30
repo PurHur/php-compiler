@@ -3852,6 +3852,8 @@ restart:
                     $arg2 = $frame->scope[$op->arg2];
                     $arg3 = $frame->scope[$op->arg3];
                     $arg1->bool(!$arg2->identicalTo($arg3));
+                    $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg2, (int) $op->arg1, (int) $op->arg3);
+                    $this->releaseVmBinaryOpOperandTemp($frame, (int) $op->arg3, (int) $op->arg1, (int) $op->arg2);
                     break;
                 case OpCode::TYPE_EQUAL:
                     $arg1 = $frame->scope[$op->arg1];
@@ -4308,7 +4310,10 @@ restart:
                     $frame = $this->frameForBranch($frame, $op->block1);
                     goto restart;
                 case OpCode::TYPE_JUMPIF:
-                    $arg1 = $frame->scope[$op->arg1]->toBool();
+                    $condSlot = (int) $op->arg1;
+                    $arg1 = $frame->scope[$condSlot]->toBool();
+                    $this->releaseVmStatementDeadTemps($frame, $condSlot);
+                    $this->releaseVmJumpIfCondTemps($frame, $condSlot);
                     $branchTarget = $arg1 ? $op->block1 : $op->block2;
                     $frame = $this->frameForBranch($frame, $branchTarget);
                     goto restart;
@@ -15217,8 +15222,43 @@ restart:
             if ($this->isVmScopeSlotUsedByFollowingOps($frame, $slot)) {
                 continue;
             }
+            if ($frame->block->scopeSlotReadInJumpTargets($slot)) {
+                continue;
+            }
             $this->releaseVmDeadScopeSlot($frame, $slot);
         }
+    }
+
+    /**
+     * Drop compiler temps after a conditional branch — e.g. WeakReference::get() in `if ($wr->get() !== $o)` (#14103).
+     */
+    private function releaseVmJumpIfCondTemps(Frame $frame, int $keepSlot): void
+    {
+        foreach ($frame->scope as $slot => $_var) {
+            if ($slot === $keepSlot || $frame->block->isNamedVariableSlot($slot)) {
+                continue;
+            }
+            if (isset($frame->block->constants[$slot])) {
+                continue;
+            }
+            if ($frame->block->scopeSlotReadInDirectJumpTargets($slot)) {
+                continue;
+            }
+            $this->releaseVmDeadScopeSlot($frame, $slot);
+        }
+    }
+
+    /** @param int ...$keepSlots result + other operand slots to preserve */
+    private function releaseVmBinaryOpOperandTemp(Frame $frame, int $operandSlot, int ...$keepSlots): void
+    {
+        $keep = array_fill_keys($keepSlots, true);
+        if (isset($keep[$operandSlot]) || $frame->block->isNamedVariableSlot($operandSlot)) {
+            return;
+        }
+        if (isset($frame->block->constants[$operandSlot])) {
+            return;
+        }
+        $this->releaseVmDeadScopeSlot($frame, $operandSlot);
     }
 
     private function releaseVmDeadScopeSlot(Frame $frame, int $slot): void
