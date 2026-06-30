@@ -278,4 +278,49 @@ PHP;
         $runtime->run($runtime->parseAndCompile($code, 'weakmap_gc.php'));
         $this->assertSame('0', ob_get_clean());
     }
+
+    /** Zend clears weak-map keys when the last strong ref drops — no gc_collect_cycles() (#14103). */
+    public function testWeakMapEntryRemovedImmediatelyOnKeyNull(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$k = new stdClass();
+$wm = new WeakMap();
+$wm[$k] = 42;
+$k = null;
+echo count($wm);
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'weakmap_immediate_gc.php'));
+        $this->assertSame('0', ob_get_clean());
+    }
+
+    /** probe_weakreference: get() in if() must not leak a strong ref to the referent (#14103). */
+    public function testWeakReferenceClearedAfterIfGetComparison(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$o = new stdClass();
+$wr = WeakReference::create($o);
+if ($wr->get() !== $o) {
+    fwrite(STDERR, "live referent mismatch\n");
+    exit(1);
+}
+$o = null;
+if (null !== $wr->get()) {
+    fwrite(STDERR, "collected referent must be null\n");
+    exit(1);
+}
+echo "ok\n";
+PHP;
+        ob_start();
+        try {
+            $runtime->run($runtime->parseAndCompile($code, 'probe_weakreference.php'));
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            $this->fail('probe_weakreference must not exit: '.$e->getMessage());
+        }
+        $this->assertSame("ok\n", ob_get_clean());
+    }
 }
