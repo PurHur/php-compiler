@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #6164: DateTimeSupport must not delegate to host \\DateTime / \\DateTimeZone.
+ * Issue #6164 / #13857: DateTimeSupport must not delegate to host \\DateTime / \\DateTimeZone.
  */
 final class DateTimeSupportRuntimeShrinkTest extends TestCase
 {
@@ -28,6 +28,10 @@ final class DateTimeSupportRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('VmEnv::putenv', $native);
         $this->assertStringContainsString('VmEnv::getenv', $native);
         $this->assertStringContainsString('VmFs::file', $native);
+        $this->assertStringContainsString('VmDatePure::', $native);
         $this->assertDoesNotMatchRegularExpression('/@\\\\file\\s*\\(/', $native);
+        $this->assertStringNotContainsString('FFI::cdef', $native);
+        $this->assertStringNotContainsString('libc.so', $native);
+        $this->assertStringNotContainsString('private static function ffi(', $native);
     }
 }
