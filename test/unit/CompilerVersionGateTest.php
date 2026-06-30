@@ -89,9 +89,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsArrayReplaceKey());
     }
 
-    public function testSupportsHttpLastResponseHeadersTrueOn84DevForwardProfile(): void
+    public function testSupportsHttpLastResponseHeadersWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsHttpLastResponseHeaders());
+        $this->assertFalse(CompilerVersion::supportsHttpLastResponseHeaders());
     }
 
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
@@ -240,13 +240,16 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
     }
 
-    public function testVmRegistersHttpLastResponseHeadersOnForwardProfile(): void
+    public function testSupportsClosureGetCurrentWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
+    }
+
+    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $ctx = $runtime->vmContext;
-        foreach (['http_get_last_response_headers', 'get_last_response_headers', 'http_clear_last_response_headers'] as $fn) {
-            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
-        }
-        $this->assertTrue(isset($ctx->functions['get_headers']));
+        $closure = $runtime->vmContext->classes['closure'] ?? null;
+        $this->assertNotNull($closure);
+        $this->assertFalse(isset($closure->methods['getcurrent']));
     }
 }

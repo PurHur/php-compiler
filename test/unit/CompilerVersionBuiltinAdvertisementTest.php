@@ -74,9 +74,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsTrueOn84DevForwardProfile(): void
+    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
     public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
@@ -165,12 +165,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
-    public function testVmRegistersArrayFindFamilyOn84DevForwardProfile(): void
+    public function testVmDoesNotRegisterArrayFindFamilyOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last'] as $fn) {
-            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
     }
 
@@ -215,14 +215,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
-    public function testVmRegistersOverrideAttributeClassOnReferenceProfile(): void
+    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $ctx = $runtime->vmContext;
-        $this->assertTrue(isset($ctx->classes['override']));
-        $this->assertFalse(isset($ctx->classes['deprecated']));
-        $this->assertFalse(isset($ctx->classes['nodiscard']));
-        $this->assertFalse(isset($ctx->classes['delayedtargetvalidation']));
-        $this->assertFalse(isset($ctx->classes['compiletime']));
+        $closure = $runtime->vmContext->classes['closure'] ?? null;
+        $this->assertNotNull($closure);
+        $this->assertFalse(isset($closure->methods['getcurrent']));
     }
 }

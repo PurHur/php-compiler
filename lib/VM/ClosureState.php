@@ -6,6 +6,7 @@ namespace PHPCompiler\VM;
 
 use PHPCompiler\Block;
 use PHPCompiler\Compiler\SourceLocation;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Func;
 
 /**
@@ -270,9 +271,11 @@ final class ClosureState
         $entry->methods['getusedvariables'] = new Builtin\ClosureGetUsedVariables();
         $entry->methodVisibility['getusedvariables'] = \PHPCfg\Func::FLAG_PUBLIC;
         $entry->methodNames['getusedvariables'] = 'getUsedVariables';
-        $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
-        $entry->methodVisibility['getcurrent'] = $pubStatic;
-        $entry->methodNames['getcurrent'] = 'getCurrent';
+        if (CompilerVersion::supportsClosureGetCurrent()) {
+            $entry->methods['getcurrent'] = new Builtin\ClosureGetCurrent();
+            $entry->methodVisibility['getcurrent'] = $pubStatic;
+            $entry->methodNames['getcurrent'] = 'getCurrent';
+        }
         $ctx->classes['closure'] = $entry;
     }
 
