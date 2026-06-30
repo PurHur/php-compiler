@@ -18,6 +18,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -40,6 +41,7 @@ final class intval extends Internal
             $base = self::parseBase($frame->calledArgs[1]->resolveIndirect());
         }
         $v = $frame->calledArgs[0]->resolveIndirect();
+        TypedPropertyCheck::assertReadable($v);
         if (null === $frame->returnVar) {
             return;
         }
