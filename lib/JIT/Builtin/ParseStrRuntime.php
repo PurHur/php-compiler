@@ -23,12 +23,18 @@ final class ParseStrRuntime
 
     private const PARSE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseInto';
 
+    private const PARSE_INTO_NATIVE_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseIntoNative';
+
     private const PARSE_COOKIE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderInto';
+
+    private const PARSE_COOKIE_INTO_NATIVE_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderIntoNative';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::PARSE_INTO_HELPER,
+        self::PARSE_INTO_NATIVE_HELPER,
         self::PARSE_COOKIE_INTO_HELPER,
+        self::PARSE_COOKIE_INTO_NATIVE_HELPER,
     ];
 
     /** @var list<string> */
@@ -121,18 +127,14 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_INTO_HELPER, '#9295');
-        $destArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $dest,
-            $helperFn->getParam(0)->typeOf()
-        );
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_INTO_NATIVE_HELPER, '#13827');
+        $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $encodedArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $encoded,
             $helperFn->getParam(1)->typeOf()
         );
-        $context->builder->call($helperFn, $destArg, $encodedArg);
+        $context->builder->call($helperFn, $destI64, $encodedArg);
         $context->builder->returnVoid();
     }
 
@@ -153,18 +155,14 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_COOKIE_INTO_HELPER, '#13827');
-        $destArg = JitNestedHelperCoerce::coerceArgForHelper(
-            $context,
-            $dest,
-            $helperFn->getParam(0)->typeOf()
-        );
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_COOKIE_INTO_NATIVE_HELPER, '#13827');
+        $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $headerArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
             $header,
             $helperFn->getParam(1)->typeOf()
         );
-        $context->builder->call($helperFn, $destArg, $headerArg);
+        $context->builder->call($helperFn, $destI64, $headerArg);
         $context->builder->returnVoid();
     }
 
