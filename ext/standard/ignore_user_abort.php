@@ -32,12 +32,25 @@ final class ignore_user_abort extends Internal
         }
         $setting = null;
         if (1 === $argc) {
-            $setting = InternalStrictArg::parseBuiltinNullableBoolArg(
-                $frame->calledArgs[0],
-                'ignore_user_abort',
-                0,
-                'enable'
-            );
+            $arg = $frame->calledArgs[0];
+            $callerStrict = null !== $frame->parent
+                && null !== $frame->parent->block
+                && $frame->parent->block->strictTypes;
+            if ($callerStrict) {
+                $setting = InternalStrictArg::parseBuiltinNullableBoolArg(
+                    $arg,
+                    'ignore_user_abort',
+                    0,
+                    'enable'
+                );
+            } else {
+                $setting = InternalStrictArg::parseBuiltinNullableBoolArgCoerceInt(
+                    $arg,
+                    'ignore_user_abort',
+                    0,
+                    'enable'
+                );
+            }
         }
         if (null === $frame->returnVar) {
             return;
