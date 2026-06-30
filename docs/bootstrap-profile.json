@@ -2521,7 +2521,6 @@
         "lib/JIT/Builtin/MemoryUsageJit.php",
         "lib/JIT/Builtin/MetaTagsRuntime.php",
         "lib/JIT/Builtin/MimeContentTypeRuntime.php",
-        "lib/JIT/Builtin/NativeDlopen.php",
         "lib/JIT/Builtin/NaturalSortRuntime.php",
         "lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php",
         "lib/JIT/Builtin/ObGzhandler.php",
@@ -3736,9 +3735,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3506,
+        "inventory_files": 3505,
         "excluded": 0,
-        "eligible": 3506,
+        "eligible": 3505,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

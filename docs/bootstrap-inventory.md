@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3506 |
-| Phase A inventory files (M2 ratio SSOT) | 3506 |
+| PHP files on vm.php path | 3505 |
+| Phase A inventory files (M2 ratio SSOT) | 3505 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9495 |
+| Source constructs flagged (warnings) | 9494 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2467,7 +2467,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MemoryUsageJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/MetaTagsRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/MimeContentTypeRuntime.php` | 0 | 2 |
-| `lib/JIT/Builtin/NativeDlopen.php` | 0 | 1 |
 | `lib/JIT/Builtin/NaturalSortRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ObGzhandler.php` | 0 | 1 |
@@ -19761,11 +19760,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 98)
 - 5 class method(s)
-
-### `lib/JIT/Builtin/NativeDlopen.php`
-
-**Warnings** (review for bootstrap subset):
-- 6 class method(s)
 
 ### `lib/JIT/Builtin/NaturalSortRuntime.php`
 

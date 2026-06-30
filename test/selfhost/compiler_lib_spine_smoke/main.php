@@ -2518,7 +2518,6 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MemoryUsageJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MetaTagsRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MimeContentTypeRuntime.php';
-require_once __DIR__.'/../../../lib/JIT/Builtin/NativeDlopen.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NaturalSortRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ObGzhandler.php';
