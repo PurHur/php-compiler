@@ -162,6 +162,10 @@ class ObjectEntry {
 
     public function hasProperty(string $name): bool
     {
+        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
+            return true;
+        }
+
         return isset($this->properties[$name]);
     }
 
@@ -178,6 +182,9 @@ class ObjectEntry {
     public function getProperty(string $name): Variable {
         if ($this->isEnumCase) {
             return EnumCaseSupport::getProperty($this, $name);
+        }
+        if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
+            return \PHPCompiler\ext\dom\DomNodePropertySupport::getProperty($this, $name);
         }
         if (!isset($this->properties[$name])) {
             throw new \LogicException('Undefined property access');

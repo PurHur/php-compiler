@@ -16,7 +16,7 @@ final class DocumentCreateElement extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createElement()');
+        $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createElement()');
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::createElement() expects at least 1 argument');
         }
@@ -24,7 +24,7 @@ final class DocumentCreateElement extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createElement() requires VM context in this compiler build');
         }
-        $element = VmDom::createElement($frame->vmContext, $name);
+        $element = VmDom::createElement($frame->vmContext, $name, $document);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($element);
         }

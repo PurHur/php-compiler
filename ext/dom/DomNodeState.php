@@ -36,6 +36,12 @@ final class DomNodeState
     /** Parent node object id, or null for detached roots. */
     public ?int $parentId = null;
 
+    /** Owning document object id (php-src dom_object ownerDocument). */
+    public ?int $documentId = null;
+
+    /** Text node payload when {@see DomConstants::XML_TEXT_NODE}. */
+    public ?string $textContent = null;
+
     /**
      * Member node ids when {@see DomConstants::XML_NODELIST}.
      *

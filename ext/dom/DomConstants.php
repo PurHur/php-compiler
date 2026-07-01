@@ -9,6 +9,8 @@ final class DomConstants
 {
     public const XML_ELEMENT_NODE = 1;
 
+    public const XML_TEXT_NODE = 3;
+
     public const XML_DOCUMENT_NODE = 9;
 
     public const XML_DOCUMENT_TYPE_NODE = 10;
