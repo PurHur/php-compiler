@@ -112,6 +112,10 @@ final class CliArgvRuntime
 
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__phpc_cli_refresh_argv_global');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -121,8 +125,9 @@ final class CliArgvRuntime
 
         self::ensureGlobals($context);
         self::ensureExternals($context);
-        self::ensureJitHelperCompiled($context);
 
+        // Thin CLI argv ABI before nested CliArgvJitHelper compile — nested JIT during
+        // bridge emission corrupts the parent insert block (LLVM 9; #8559, #14470).
         self::implementStoreArgv($context, self::declareAbi($context, '__phpc_cli_store_argv', $context->context->functionType(
             $context->getTypeFromString('void'),
             false,
@@ -144,6 +149,9 @@ final class CliArgvRuntime
             $context->getTypeFromString('int8*'),
             $context->getTypeFromString('int8*')
         )));
+
+        self::ensureJitHelperCompiled($context);
+
         self::implementRefreshArgvGlobal($context, self::declareAbi($context, '__phpc_cli_refresh_argv_global', $context->context->functionType(
             $context->getTypeFromString('void'),
             false,
