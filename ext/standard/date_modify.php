@@ -9,6 +9,7 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\DateTimeSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /**
@@ -42,7 +43,26 @@ final class date_modify extends Internal
             2,
             'modifier'
         );
-        DateTimeSupport::modify($dt, $modifier);
+        if (!DateTimeSupport::tryModify($dt, $modifier)) {
+            $pos = '' !== $modifier ? $modifier[0] : 'n';
+            $frame->vmContext->errors->triggerError(
+                \sprintf(
+                    'date_modify(): Failed to parse time string (%s) at position 0 (%s): The timezone could not be found in the database',
+                    $modifier,
+                    $pos
+                ),
+                ErrorReporter::E_WARNING,
+                '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                $frame->vmContext,
+                $frame
+            );
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->bool(false);
+
+            return;
+        }
         if (null === $frame->returnVar) {
             return;
         }
