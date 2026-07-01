@@ -8293,8 +8293,11 @@ class Compiler {
                 $return[] = $this->compileFuncCallExecOpcode(
                     $expr->result,
                     $block,
-                    $line > 0 ? $line : 0
+                    $line > 0 ? $line : 0,
+                    $expr
                 );
+                $this->markInlineNewProducerKeepSlotForSiblingConsumer($expr, $block, (int) $resultSlot);
+
                 return $return;
             case Op\Expr\MethodCall::class:
                 $mergeEcho = $this->mergeEchoSlotForBranch($block);
@@ -18705,6 +18708,59 @@ class Compiler {
         return $matched instanceof Op\Expr\New_;
     }
 
+    /**
+     * Hoisted inline `new` feeding a sibling `new` ctor arg must survive stmt dead-temp release (#14483).
+     */
+    private function markInlineNewProducerKeepSlotForSiblingConsumer(
+        Op\Expr\New_ $producer,
+        Block $block,
+        int $resultSlot
+    ): void {
+        if (null === $block->orig) {
+            return;
+        }
+        $children = $block->orig->children;
+        $producerIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $producer) {
+                $producerIndex = $i;
+                break;
+            }
+        }
+        if (null === $producerIndex) {
+            return;
+        }
+        for ($i = $producerIndex + 1, $n = \count($children); $i < $n; ++$i) {
+            $consumer = $children[$i];
+            if (!$this->isInlineExprCallArgConsumer($consumer)) {
+                break;
+            }
+            if (!property_exists($consumer, 'args') || !\is_array($consumer->args)) {
+                continue;
+            }
+            foreach (\array_keys($consumer->args) as $argIndex) {
+                if (!$this->callArgInlineProducerIsNew($consumer, (int) $argIndex, $block)) {
+                    continue;
+                }
+                $matched = $this->matchInlineCallArgProducer(
+                    $this->precedingInlineCallArgProducersBeforeCfgOp($children, $consumer),
+                    $consumer->args,
+                    (int) $argIndex,
+                    $consumer,
+                    $block
+                );
+                if ($matched === $producer) {
+                    $block->markDeferredArrayLiteralKeepSlot($resultSlot);
+
+                    return;
+                }
+            }
+            if ($consumer instanceof Op\Expr\New_) {
+                break;
+            }
+        }
+    }
+
     /** Slot for hoisted inline `new` when php-cfg dead temps omit result→slot mapping (#11321). */
     private function slotForInlineNewProducer(Block $block, Op\Expr\New_ $new): ?string
     {
@@ -22103,6 +22159,9 @@ class Compiler {
                             }
                         }
                         $valueSlot = $this->slotForInlineNewProducer($block, $newProducer);
+                        if (null !== $valueSlot) {
+                            $block->markDeferredArrayLiteralKeepSlot((int) $valueSlot);
+                        }
                     }
                     if (null === $valueSlot) {
                         $valueSlot = $this->compileOperand($arg, $block, true);

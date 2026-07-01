@@ -72,7 +72,7 @@ final class DatePeriodConstruct extends VmClassMethod
                 'end'
             );
             DateTimeSupport::requireInitializedDateTimeLike($end, $end->class->name);
-            DatePeriodSupport::initFromEndDate($receiver, $start, $interval, $end, $options);
+            DatePeriodSupport::initFromEndDate($receiver, $start, $interval, $end, $options, $frame->vmContext);
 
             return;
         }
@@ -82,6 +82,6 @@ final class DatePeriodConstruct extends VmClassMethod
             'DatePeriod::__construct',
             'recurrences'
         )->toInt();
-        DatePeriodSupport::initFromRecurrenceCount($receiver, $start, $interval, $recurrences, $options);
+        DatePeriodSupport::initFromRecurrenceCount($receiver, $start, $interval, $recurrences, $options, $frame->vmContext);
     }
 }

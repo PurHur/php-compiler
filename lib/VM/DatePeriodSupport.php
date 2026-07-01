@@ -42,7 +42,8 @@ final class DatePeriodSupport
         ObjectEntry $start,
         ObjectEntry $interval,
         int $recurrences,
-        int $options = 0
+        int $options = 0,
+        ?Context $ctx = null
     ): void {
         if ($recurrences < 1) {
             throw new \Exception('DatePeriod::__construct(): Recurrence count must be greater than 0');
@@ -50,7 +51,7 @@ final class DatePeriodSupport
         self::setObjectProperty($period, 'start', $start);
         self::setNullProperty($period, 'current');
         self::setNullProperty($period, 'end');
-        self::setObjectProperty($period, 'interval', $interval);
+        self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
         self::requireIntProperty($period, 'recurrences')->int($recurrences + 1);
         self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
         self::requireBoolProperty($period, 'include_end_date')->bool(false);
@@ -64,12 +65,13 @@ final class DatePeriodSupport
         ObjectEntry $start,
         ObjectEntry $interval,
         ObjectEntry $end,
-        int $options = 0
+        int $options = 0,
+        ?Context $ctx = null
     ): void {
         self::setObjectProperty($period, 'start', $start);
         self::setNullProperty($period, 'current');
         self::setObjectProperty($period, 'end', $end);
-        self::setObjectProperty($period, 'interval', $interval);
+        self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
         self::requireIntProperty($period, 'recurrences')->int(self::RECURRENCES_END_DATE);
         self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
         self::requireBoolProperty($period, 'include_end_date')->bool(0 !== ($options & self::OPTION_INCLUDE_END_DATE));
@@ -157,6 +159,15 @@ final class DatePeriodSupport
         }
         $interval = self::requireObjectProperty($period, 'interval');
         DateTimeSupport::addInterval($current, $interval);
+    }
+
+    private static function cloneIntervalForStorage(ObjectEntry $interval, ?Context $ctx): ObjectEntry
+    {
+        if (!$interval->constructed || null === $ctx) {
+            return $interval;
+        }
+
+        return DateIntervalSupport::createFromState($ctx, DateIntervalSupport::readState($interval));
     }
 
     private static function requireDatePeriodFromObject(ObjectEntry $period): void
