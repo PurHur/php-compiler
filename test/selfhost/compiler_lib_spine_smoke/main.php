@@ -1136,6 +1136,7 @@ require_once __DIR__.'/../../../ext/standard/ShuffleJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SimilarTextJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SleepJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SortJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/QuotemetaJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SoundexJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SplAutoloadJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SprintfJitHelper.php';

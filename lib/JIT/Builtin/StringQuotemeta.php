@@ -4,175 +4,110 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __string__quotemeta (mirrors VmString::quotemeta).
+ * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper PHP (#14705).
+ *
+ * Replaces ~165 LOC inline LLVM in StringQuotemeta.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * php-src: ext/standard/string.c — PHP_FUNCTION(quotemeta)
  */
 final class StringQuotemeta
 {
-    /** @var list<int> */
-    private const ESCAPE_ORDS = [
-        46, 92, 43, 42, 63, 91, 93, 94, 40, 41, 36,
+    private const HELPER_PATH = '/ext/standard/QuotemetaJitHelper.php';
+
+    private const QUOTEMETA_HELPER = 'PHPCompiler\\ext\\standard\\QuotemetaJitHelper::quotemetaArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::QUOTEMETA_HELPER,
     ];
 
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__string__quotemeta');
-        $entry = $fn->appendBasicBlock('main');
-        $context->builder->positionAtEnd($entry);
+        $probe = $context->module->getNamedFunction('__string__quotemeta');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction('__string__quotemeta', $probe);
 
-        $string = $fn->getParam(0);
-
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $two = $i64->constInt(2, false);
-        $backslash = $i8->constInt(92, false);
-
-        $src = $context->builder->call($context->lookupFunction('__string__separate'), $string);
-        $len = $context->builder->load($context->builder->structGep($src, $map['length']));
-        $srcChars = $context->builder->structGep($src, $map['value']);
-
-        $outLenSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $outLenSlot);
-        $iSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $iSlot);
-
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $i64, $zero, $one, $two);
-
-        $outLen = $context->builder->load($outLenSlot);
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
-        $context->builder->store($outLen, $context->builder->structGep($dest, $map['length']));
-        $destChars = $context->builder->structGep($dest, $map['value']);
-
-        $posSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $posSlot);
-        $context->builder->store($zero, $iSlot);
-
-        self::writeLoop(
-            $context,
-            $fn,
-            $srcChars,
-            $len,
-            $destChars,
-            $iSlot,
-            $posSlot,
-            $i64,
-            $zero,
-            $one,
-            $two,
-            $backslash
-        );
-
-        $context->builder->returnValue($dest);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function countLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $iSlot,
-        Value $outLenSlot,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $two
-    ): void {
-        $head = $fn->appendBasicBlock('quotemeta_count_head');
-        $body = $fn->appendBasicBlock('quotemeta_count_body');
-        $done = $fn->appendBasicBlock('quotemeta_count_done');
-
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $chI64 = $context->builder->zExt($ch, $i64);
-        $escape = self::shouldEscape($context, $chI64);
-        $add = $context->builder->select($escape, $two, $one);
-        $outLen = $context->builder->load($outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($outLen, $add), $outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function writeLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $destChars,
-        Value $iSlot,
-        Value $posSlot,
-        $i64,
-        Value $zero,
-        Value $one,
-        Value $two,
-        Value $backslash
-    ): void {
-        $head = $fn->appendBasicBlock('quotemeta_write_head');
-        $body = $fn->appendBasicBlock('quotemeta_write_body');
-        $done = $fn->appendBasicBlock('quotemeta_write_done');
-
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $chI64 = $context->builder->zExt($ch, $i64);
-        $pos = $context->builder->load($posSlot);
-        $destAt = $context->builder->gep($destChars, $pos);
-        $escape = self::shouldEscape($context, $chI64);
-
-        $escapedBlock = $fn->appendBasicBlock('quotemeta_write_escaped');
-        $plainBlock = $fn->appendBasicBlock('quotemeta_write_plain');
-        $afterBlock = $fn->appendBasicBlock('quotemeta_write_after');
-        $context->builder->branchIf($escape, $escapedBlock, $plainBlock);
-
-        $context->builder->positionAtEnd($escapedBlock);
-        $context->builder->store($backslash, $destAt);
-        $context->builder->store($ch, $context->builder->gep($destChars, $context->builder->addNoSignedWrap($pos, $one)));
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $two), $posSlot);
-        $context->builder->branch($afterBlock);
-
-        $context->builder->positionAtEnd($plainBlock);
-        $context->builder->store($ch, $destAt);
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
-        $context->builder->branch($afterBlock);
-
-        $context->builder->positionAtEnd($afterBlock);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $one), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function shouldEscape(Context $context, Value $chI64): Value
-    {
-        $i64 = $chI64->typeOf();
-        $escape = $context->getTypeFromString('int1')->constInt(0, false);
-        foreach (self::ESCAPE_ORDS as $ord) {
-            $match = $context->builder->icmp(Builder::INT_EQ, $chI64, $i64->constInt($ord, false));
-            $escape = $context->builder->or($escape, $match);
+            return;
         }
 
-        return $escape;
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementBridge($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    private static function implementBridge(Context $context): void
+    {
+        $abiName = '__string__quotemeta';
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $fn = $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('quotemeta_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::QUOTEMETA_HELPER),
+            $fn->getParam(0)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after QuotemetaJitHelper compile (#14705)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'QuotemetaJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('QuotemetaJitHelper.php parseAndCompile failed (#14705)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#14705)');
+            }
+        }
     }
 }
