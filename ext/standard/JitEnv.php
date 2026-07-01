@@ -94,6 +94,20 @@ final class JitEnv
         );
     }
 
+    public static function apacheSetenv(Context $context, Value $variableStr, Value $valueStr): Value
+    {
+        StringGetenv::ensureLinked($context);
+
+        return $context->builder->call(
+            StringGetenv::helperFunction(
+                $context,
+                'PHPCompiler\\ext\\standard\\GetenvJitHelper::apacheSetenv'
+            ),
+            $variableStr,
+            $valueStr
+        );
+    }
+
     private static function emitPutenvSyntaxGuard(Context $context, Value $assignmentStr): void
     {
         TypeErrorRaise::ensureLinked($context);

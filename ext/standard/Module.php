@@ -487,6 +487,8 @@ class Module extends ModuleAbstract
             ...(VmHead::registersRequestHeaderFunctions() ? [
                 new getallheaders_(),
                 new getallheaders_('apache_request_headers'),
+                new apache_getenv_(),
+                new apache_setenv_(),
             ] : []),
             ...(CompilerVersion::supportsHttpLastResponseHeaders() ? [
                 new http_get_last_response_headers(),

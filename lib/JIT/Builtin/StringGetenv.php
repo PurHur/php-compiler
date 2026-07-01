@@ -26,12 +26,15 @@ final class StringGetenv
 
     private const PUTENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::putenv';
 
+    private const APACHE_SETENV_HELPER = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::apacheSetenv';
+
     private const ABI_NAME = '__compiler_getenv';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::GETENV_HELPER,
         self::PUTENV_HELPER,
+        self::APACHE_SETENV_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
