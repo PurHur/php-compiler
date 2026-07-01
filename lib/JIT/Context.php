@@ -966,7 +966,7 @@ class Context {
             Builtin\DefineRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
             Builtin\SuperglobalNameRuntime::ensureLinked($this);
-            \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
+            Builtin\StringStrspn::ensureStandaloneBodies($this);
             Builtin\TokenGetAll::ensureStandaloneBodies($this);
             Builtin\Highlight::ensureStandaloneBodies($this);
             Builtin\Hebrev::ensureStandaloneBodies($this);
