@@ -24,6 +24,9 @@ final class ModuleRegistry
     /** @var array<string, string> lowercase extension name => module version */
     private static array $extensionVersions = [];
 
+    /** @var array<string, true> lowercase registered internal function names */
+    private static array $registeredFunctionLookup = [];
+
     /** @var list<string> */
     private const DATE_EXTENSION_FUNCTIONS = [
         'checkdate',
@@ -47,6 +50,7 @@ final class ModuleRegistry
         self::$loaded = [];
         self::$extensionFunctions = [];
         self::$extensionVersions = [];
+        self::$registeredFunctionLookup = [];
     }
 
     public static function register(string $extensionName, ?string $version = null): void
@@ -171,9 +175,16 @@ final class ModuleRegistry
         return self::$extensionFunctions;
     }
 
+    public static function isRegisteredBuiltinFunction(string $functionName): bool
+    {
+        return isset(self::$registeredFunctionLookup[strtolower($functionName)]);
+    }
+
     private static function registerModuleFunction(string $extension, string $functionName): void
     {
         $ext = strtolower($extension);
+        $fnLc = strtolower($functionName);
+        self::$registeredFunctionLookup[$fnLc] = true;
         if (!isset(self::$extensionFunctions[$ext])) {
             self::$extensionFunctions[$ext] = [];
         }
