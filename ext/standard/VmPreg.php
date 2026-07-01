@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\RuntimeStrictness;
+use PHPCompiler\VM;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InternalStrictArg;
@@ -144,6 +145,16 @@ final class VmPreg
         }
         if (Variable::TYPE_STRING === $var->type || Variable::TYPE_ARRAY === $var->type) {
             return $var;
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $vm = VM::running();
+            $object = $var->toObject();
+            if (null !== $vm && $vm->hasInstanceMethod($object->class, '__tostring')) {
+                $coerced = new Variable();
+                $coerced->string($vm->coerceVariableToString($var));
+
+                return $coerced;
+            }
         }
 
         throw new \TypeError(
