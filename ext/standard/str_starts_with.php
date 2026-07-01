@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -60,6 +61,6 @@ final class str_starts_with extends Internal
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_starts_with', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_starts_with', 1, 'needle');
 
-        return JitStringSearch::startsWith($context, $hay, $needle);
+        return StringStrContains::invokeStartsWith($context, $hay, $needle);
     }
 }

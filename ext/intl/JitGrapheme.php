@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\intl;
 
-use PHPCompiler\ext\standard\JitStringSearch;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Builtin\StringUtf8Runtime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -183,7 +183,7 @@ final class JitGrapheme
             $context->builder->icmp(Builder::INT_NE, $hayValid, $zeroI64),
             $context->builder->icmp(Builder::INT_NE, $needleValid, $zeroI64)
         );
-        $found = JitStringSearch::contains($context, $haystack, $needle);
+        $found = StringStrContains::invokeContains($context, $haystack, $needle);
 
         return $context->builder->select(
             $isEmptyNeedle,

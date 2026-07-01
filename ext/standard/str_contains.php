@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrContains;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -70,6 +71,6 @@ final class str_contains extends Internal
         $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack');
         $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle');
 
-        return JitStringSearch::contains($context, $hay, $needle);
+        return StringStrContains::invokeContains($context, $hay, $needle);
     }
 }
