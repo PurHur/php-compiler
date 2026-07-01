@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_fill() JIT routes through ArrayFillJitHelper PHP not HashTableHelper LLVM (#13501). */
+/** array_fill() JIT routes through ArrayFillJitHelper PHP not HashTableHelper LLVM (#13501, #14297). */
 final class ArrayFillRuntimeShrinkTest extends TestCase
 {
     public function testArrayFillRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFillRuntime.php');
         $this->assertStringContainsString('ArrayFillJitHelper', $runtime);
-        $this->assertStringContainsString('HashTableHelper::buildArrayFill', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('HashTableHelper::buildArrayFill', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_fill.php');
         $this->assertStringContainsString('ArrayFillRuntime::fill', $builtin);
