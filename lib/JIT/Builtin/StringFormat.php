@@ -6,9 +6,9 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
-use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
@@ -29,6 +29,15 @@ final class StringFormat
     private const COMPILED_HELPERS = [
         self::SPRINTF_HELPER,
         self::NUMBER_FORMAT_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const COMPILED_PATHS = [
+        '/ext/standard/VmString.php',
+        '/ext/standard/VmNumberFormat.php',
+        '/ext/standard/VmSprintf.php',
+        '/ext/standard/PackJitHelper.php',
+        self::HELPER_PATH,
     ];
 
     /** @var list<string> */
@@ -54,7 +63,7 @@ final class StringFormat
         if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             return;
         }
-        self::implementDeferredInventoryStubs($context);
+        StringFormatInventoryStubs::implement($context);
     }
 
     public static function implement(Context $context): void
@@ -240,13 +249,8 @@ final class StringFormat
     private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
         self::ensureJitHelperCompiled($context);
-        $lc = \strtolower($logical);
-        $fn = $context->functions[$lc] ?? null;
-        if (null === $fn) {
-            throw new \LogicException($logical.' missing after SprintfJitHelper compile (#9131)');
-        }
 
-        return $fn;
+        return JitVmHelperLink::lookupCompiled($context, $logical, '#9131');
     }
 
     private static function ensureJitHelperCompiled(Context $context): void
@@ -264,13 +268,7 @@ final class StringFormat
 
         $runtime = $context->runtime;
         $root = \dirname(__DIR__, 3);
-        $paths = [
-            $root.'/ext/standard/VmString.php',
-            $root.'/ext/standard/VmNumberFormat.php',
-            $root.'/ext/standard/VmSprintf.php',
-            $root.'/ext/standard/PackJitHelper.php',
-            $root.self::HELPER_PATH,
-        ];
+        $paths = \array_map(static fn (string $rel): string => $root.$rel, self::COMPILED_PATHS);
         NestedJitCompileScope::run($context, static function () use ($context, $runtime, $paths): void {
             $jit = new JIT($context);
             foreach ($paths as $includePath) {
@@ -290,9 +288,7 @@ final class StringFormat
             }
         });
         foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                throw new \LogicException($logical.' was not compiled for JIT (#9131)');
-            }
+            JitVmHelperLink::lookupCompiled($context, $logical, '#9131');
         }
     }
 
@@ -305,86 +301,5 @@ final class StringFormat
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    private static function implementDeferredInventoryStubs(Context $context): void
-    {
-        self::implementDeferredSprintfStub($context);
-        self::implementDeferredPrintfStub($context);
-        self::implementDeferredNumberFormatStub($context);
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function implementDeferredSprintfStub(Context $context): void
-    {
-        $abiName = '__compiler_sprintf';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $valuePtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('sprintf_inv_stub');
-        $context->builder->positionAtEnd($entry);
-        $fmt = $fn->getParam(0);
-        $out = $context->builder->call($context->lookupFunction('__string__separate'), $fmt);
-        $context->builder->returnValue($out);
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementDeferredPrintfStub(Context $context): void
-    {
-        $abiName = '__compiler_printf';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $ft = $context->context->functionType($i64, false, $strPtr, $i64, $valuePtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('printf_inv_stub');
-        $context->builder->positionAtEnd($entry);
-        $context->builder->returnValue($i64->constInt(0, false));
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementDeferredNumberFormatStub(Context $context): void
-    {
-        $abiName = '__compiler_number_format';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            return;
-        }
-
-        $strPtr = $context->getTypeFromString('__string__*');
-        $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($strPtr, false, $strPtr, $i64, $i64, $i64, $strPtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('number_format_inv_stub');
-        $context->builder->positionAtEnd($entry);
-        $empty = $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $context->getTypeFromString('size_t')->constInt(0, false),
-            $context->getTypeFromString('int8*')->constNull()
-        );
-        $context->builder->returnValue($empty);
-        $context->registerFunction($abiName, $fn);
     }
 }
