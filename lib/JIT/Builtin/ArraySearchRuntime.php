@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_search() via ArraySearchJitHelper PHP (#12514).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arraySearch()}.
+ * Standalone AOT compiles {@see ArraySearchJitHelper} via JitVmHelperLink bridge (#14373); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arraySearch()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::searchKey()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_search)
  */
@@ -38,8 +37,7 @@ final class ArraySearchRuntime
         JITVariable $haystack,
         Value $strict
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($haystack->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($haystack->type)) {
             return ArrayBuiltinHelper::arraySearch($context, $needle, $haystack, $strict);
         }
 
@@ -60,12 +58,13 @@ final class ArraySearchRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_SEARCH);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
