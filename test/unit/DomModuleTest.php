@@ -60,6 +60,45 @@ PHP;
         self::assertSame("1\n0\n0\n", ob_get_clean());
     }
 
+    public function test_dom_node_has_child_nodes(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/></root>');
+$root = $doc->documentElement;
+$leaf = $doc->createElement('leaf');
+echo (int) $root->hasChildNodes(), "\n";
+echo (int) $leaf->hasChildNodes(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_has_child_nodes.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n0\n", ob_get_clean());
+    }
+
+    public function test_dom_node_introspection_properties(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/></root>');
+$root = $doc->documentElement;
+echo $root->nodeType, "\n";
+echo ($root->ownerDocument === $doc) ? "doc\n" : "other\n";
+echo var_export($root->nodeValue, true), "\n";
+$root->nodeValue = 'hello';
+echo var_export($root->nodeValue, true), "\n";
+echo $root->childNodes->length, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_introspection.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\ndoc\n''\n'hello'\n1\n", ob_get_clean());
+    }
+
     public function test_dom_document_savexml_node_subtree(): void
     {
         $runtime = new Runtime();

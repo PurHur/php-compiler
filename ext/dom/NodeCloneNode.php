@@ -17,7 +17,7 @@ final class NodeCloneNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = $this->domNodeReceiver($frame, 'DOMNode::cloneNode()');
+        $receiver = $this->cloneableNodeReceiver($frame, 'DOMNode::cloneNode()');
         $deep = isset($frame->calledArgs[1])
             ? VmMath::parseBoolBuiltinArg($frame->calledArgs[1], 'DOMNode::cloneNode', 1, 'deep')
             : false;
@@ -30,7 +30,7 @@ final class NodeCloneNode extends DomClassMethod
         $frame->returnVar->copyFrom(VmDom::cloneNode($frame->vmContext, $receiver, $deep));
     }
 
-    private function domNodeReceiver(Frame $frame, string $label): \PHPCompiler\VM\ObjectEntry
+    private function cloneableNodeReceiver(Frame $frame, string $label): \PHPCompiler\VM\ObjectEntry
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException($label.' called without $this');

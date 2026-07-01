@@ -8419,6 +8419,17 @@ restart:
     private function assignCopyFrom(Variable $dst, Variable $src, Frame $frame): ?Frame
     {
         try {
+            $resolved = $dst->resolveIndirect();
+            if (null !== $resolved->objectPropertyOwner && null !== $resolved->objectPropertyName) {
+                if (ext\dom\DomNodePropertySupport::tryAssign(
+                    $resolved->objectPropertyOwner,
+                    $resolved->objectPropertyName,
+                    $src,
+                    $this->context
+                )) {
+                    return null;
+                }
+            }
             $dst->copyFrom($src);
 
             return null;

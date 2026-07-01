@@ -17,7 +17,7 @@ final class NodeIsSameNode extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = $this->domNodeReceiver($frame, 'DOMNode::isSameNode()');
+        $receiver = $this->domRegistryNodeReceiver($frame, 'DOMNode::isSameNode()');
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMNode::isSameNode() expects exactly 1 argument');
         }
@@ -26,30 +26,6 @@ final class NodeIsSameNode extends DomClassMethod
             return;
         }
         $frame->returnVar->bool(VmDom::isSameNode($receiver, $other));
-    }
-
-    private function domNodeReceiver(Frame $frame, string $label): \PHPCompiler\VM\ObjectEntry
-    {
-        if (\count($frame->calledArgs) < 1) {
-            throw new \LogicException($label.' called without $this');
-        }
-        $var = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_OBJECT !== $var->type) {
-            throw new \TypeError(sprintf(
-                '%s must be called on an object, %s given',
-                $label,
-                VmDom::typeLabel($var)
-            ));
-        }
-        $object = $var->toObject();
-        if (!VmDom::isDomNode($object)) {
-            throw new \TypeError(sprintf(
-                '%s must be called on a DOMNode instance',
-                $label
-            ));
-        }
-
-        return $object;
     }
 
     private function otherNodeArg(Variable $var, string $label, int $index): \PHPCompiler\VM\ObjectEntry
