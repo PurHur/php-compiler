@@ -22,7 +22,9 @@ final class get_defined_vars_ extends Internal
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) > 0) {
-            throw new \LogicException('get_defined_vars() takes no arguments');
+            throw new \ArgumentCountError(
+                'get_defined_vars() expects exactly 0 arguments, '.\count($frame->calledArgs).' given'
+            );
         }
         if (null === $frame->returnVar) {
             return;
@@ -33,7 +35,9 @@ final class get_defined_vars_ extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         if (\count($args) > 0) {
-            throw new \LogicException('get_defined_vars() takes no arguments');
+            throw new \ArgumentCountError(
+                'get_defined_vars() expects exactly 0 arguments, '.\count($args).' given'
+            );
         }
 
         return ScopeBuiltinHelper::getDefinedVars($context);
