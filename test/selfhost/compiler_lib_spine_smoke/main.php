@@ -3031,6 +3031,7 @@ require_once __DIR__.'/../../../lib/JIT/HashTableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableNestedExportLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableReadLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/HashTableWriteLlvm.php';
+require_once __DIR__.'/../../../lib/JIT/HeaderCallbackPolicy.php';
 require_once __DIR__.'/../../../lib/JIT/Helper.php';
 require_once __DIR__.'/../../../lib/JIT/InOperatorHelper.php';
 require_once __DIR__.'/../../../lib/JIT/IncludeBindingEmitHelper.php';
