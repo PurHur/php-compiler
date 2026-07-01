@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_keys() via ArrayKeysJitHelper PHP (#12340).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildKeysArray*}.
+ * Standalone AOT compiles {@see ArrayKeysJitHelper} via JitVmHelperLink bridge (#14387); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildKeysArray*}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::keysCopy()}
  * php-src: ext/standard/array.c — php_array_keys()
  */
@@ -39,8 +38,7 @@ final class ArrayKeysRuntime
 
     public static function keys(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildKeysArrayFromVariable($context, $array);
         }
 
@@ -59,8 +57,7 @@ final class ArrayKeysRuntime
         JITVariable $searchValue,
         Value $strict
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildKeysArrayFiltered($context, $array, $searchValue, $strict);
         }
 
@@ -87,12 +84,14 @@ final class ArrayKeysRuntime
         self::implementKeysFiltered($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implementKeys($context);
+        self::implementKeysFiltered($context);
+    }
+
     private static function implementKeys(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_KEYS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinked($context, self::ABI_KEYS);
@@ -120,10 +119,6 @@ final class ArrayKeysRuntime
 
     private static function implementKeysFiltered(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_KEYS_FILTERED);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinked($context, self::ABI_KEYS_FILTERED);

@@ -9,16 +9,17 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_keys() JIT routes through ArrayKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12340). */
+/** array_keys() JIT routes through ArrayKeysJitHelper PHP not ArrayBuiltinHelper LLVM (#12340, #14387). */
 final class ArrayKeysRuntimeShrinkTest extends TestCase
 {
     public function testArrayKeysRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayKeysRuntime.php');
         $this->assertStringContainsString('ArrayKeysJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildKeysArrayFromVariable', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildKeysArrayFiltered', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_keys.php');
         $this->assertStringContainsString('ArrayKeysRuntime::keys', $builtin);
