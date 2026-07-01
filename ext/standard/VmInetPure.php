@@ -167,6 +167,16 @@ final class VmInetPure
         if (16 !== \strlen($in_addr)) {
             return false;
         }
+
+        $mapped = self::ipv4MappedTailDottedQuad($in_addr);
+        if (null !== $mapped) {
+            return '::ffff:'.$mapped;
+        }
+        $compat = self::ipv4CompatibleTailDottedQuad($in_addr);
+        if (null !== $compat) {
+            return '::'.$compat;
+        }
+
         $groups = [];
         for ($i = 0; $i < 16; $i += 2) {
             $unpacked = \unpack('n', $in_addr[$i].$in_addr[$i + 1]);
@@ -219,5 +229,61 @@ final class VmInetPure
         }
 
         return \implode(':', $groups);
+    }
+
+    /**
+     * RFC 4291 IPv4-mapped tail — php-src/php_inet_ntop6() IN6_IS_ADDR_V4MAPPED.
+     */
+    private static function ipv4MappedTailDottedQuad(string $in_addr): ?string
+    {
+        if (16 !== \strlen($in_addr)) {
+            return null;
+        }
+        for ($i = 0; $i < 10; ++$i) {
+            if ("\0" !== $in_addr[$i]) {
+                return null;
+            }
+        }
+        if ("\xff" !== $in_addr[10] || "\xff" !== $in_addr[11]) {
+            return null;
+        }
+
+        return self::dottedQuadFromPackedIpv4(\substr($in_addr, 12, 4));
+    }
+
+    /**
+     * Deprecated IPv4-compatible tail — php-src IN6_IS_ADDR_V4COMPAT (ntohl(last4) > 1).
+     */
+    private static function ipv4CompatibleTailDottedQuad(string $in_addr): ?string
+    {
+        if (16 !== \strlen($in_addr)) {
+            return null;
+        }
+        for ($i = 0; $i < 12; ++$i) {
+            if ("\0" !== $in_addr[$i]) {
+                return null;
+            }
+        }
+        $unpacked = \unpack('N', \substr($in_addr, 12, 4));
+        if (false === $unpacked) {
+            return null;
+        }
+        $host = (int) $unpacked[1];
+        // Match BSD IN6_IS_ADDR_V4COMPAT: exclude :: and ::0.0.0.1 (::1 loopback).
+        if ($host <= 1) {
+            return null;
+        }
+
+        return self::dottedQuadFromPackedIpv4(\substr($in_addr, 12, 4));
+    }
+
+    private static function dottedQuadFromPackedIpv4(string $packed): string
+    {
+        $unpacked = \unpack('C4', $packed);
+        if (false === $unpacked) {
+            return '0.0.0.0';
+        }
+
+        return \sprintf('%d.%d.%d.%d', $unpacked[1], $unpacked[2], $unpacked[3], $unpacked[4]);
     }
 }
