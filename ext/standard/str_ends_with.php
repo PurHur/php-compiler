@@ -32,13 +32,13 @@ final class str_ends_with extends Internal
         $this->requireExactArgCount($frame, 'str_ends_with', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_ends_with', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_ends_with', 'needle', 1, $frame);
-        $haystackStr = VmString::coerceStringBuiltinArg(
+        $haystackStr = VmString::coerceStringBuiltinArgNoObject(
             $frame->calledArgs[0],
             'str_ends_with',
             0,
             'haystack'
         );
-        $needleStr = VmString::coerceStringBuiltinArg(
+        $needleStr = VmString::coerceStringBuiltinArgNoObject(
             $frame->calledArgs[1],
             'str_ends_with',
             1,
@@ -57,8 +57,8 @@ final class str_ends_with extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_ends_with', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_ends_with', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_ends_with', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_ends_with', 1, 'needle');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_ends_with', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_ends_with', 1, 'needle');
 
         return JitStringSearch::endsWith($context, $hay, $needle);
     }
