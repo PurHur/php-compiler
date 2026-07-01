@@ -16,6 +16,9 @@ final class MktimeJitHelper
 
     public const TAG_INT = 1;
 
+    /** JIT bridge sentinel — optional mktime arg explicitly null or omitted (#14675). */
+    public const ARG_NULL = PHP_INT_MIN;
+
     private static int $lastTimestamp = 0;
 
     public static function mktimeArgv(
@@ -30,7 +33,14 @@ final class MktimeJitHelper
         if (0 !== $useCurrentLocal) {
             $result = VmDate::mktime($hour);
         } else {
-            $result = VmDate::mktime($hour, $minute, $second, $month, $day, $year);
+            $result = VmDate::mktime(
+                $hour,
+                self::decodeOptionalArg($minute),
+                self::decodeOptionalArg($second),
+                self::decodeOptionalArg($month),
+                self::decodeOptionalArg($day),
+                self::decodeOptionalArg($year),
+            );
         }
         if (false === $result) {
             return self::TAG_FALSE;
@@ -43,5 +53,16 @@ final class MktimeJitHelper
     public static function lastTimestamp(): int
     {
         return self::$lastTimestamp;
+    }
+
+    private static function decodeOptionalArg(int $value): ?int
+    {
+        return self::ARG_NULL === $value ? null : $value;
+    }
+
+    /** @internal shared with {@see GmmktimeJitHelper} */
+    public static function decodeOptionalArgForGmmktime(int $value): ?int
+    {
+        return self::decodeOptionalArg($value);
     }
 }

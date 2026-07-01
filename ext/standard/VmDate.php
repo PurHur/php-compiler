@@ -672,10 +672,22 @@ final class VmDate
             $day = self::tmInt($tm, 'tm_mday');
             $year = self::tmInt($tm, 'tm_year') + 1900;
         } else {
-            $second ??= 0;
-            $month ??= 0;
-            $day ??= 0;
-            $year ??= 0;
+            $tm = self::localtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            if (null === $second) {
+                $second = self::tmInt($tm, 'tm_sec');
+            }
+            if (null === $month) {
+                $month = self::tmInt($tm, 'tm_mon') + 1;
+            }
+            if (null === $day) {
+                $day = self::tmInt($tm, 'tm_mday');
+            }
+            if (null === $year) {
+                $year = self::tmInt($tm, 'tm_year') + 1900;
+            }
         }
 
         return VmDatePure::mktime($hour, $minute, $second, $month, $day, $year);
@@ -703,10 +715,22 @@ final class VmDate
             $day = self::tmInt($tm, 'tm_mday');
             $year = self::tmInt($tm, 'tm_year') + 1900;
         } else {
-            $second ??= 0;
-            $month ??= 0;
-            $day ??= 0;
-            $year ??= 0;
+            $tm = self::gmtime(self::time());
+            if (null === $tm) {
+                return false;
+            }
+            if (null === $second) {
+                $second = self::tmInt($tm, 'tm_sec');
+            }
+            if (null === $month) {
+                $month = self::tmInt($tm, 'tm_mon') + 1;
+            }
+            if (null === $day) {
+                $day = self::tmInt($tm, 'tm_mday');
+            }
+            if (null === $year) {
+                $year = self::tmInt($tm, 'tm_year') + 1900;
+            }
         }
 
         return VmDatePure::gmmktime($hour, $minute, $second, $month, $day, $year);
