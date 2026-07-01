@@ -240,7 +240,7 @@ final class ScopeBuiltinEmitHelper
     public static function buildCompact(Context $context, Variable ...$nameArgs): Value
     {
         if ([] === $nameArgs) {
-            throw new \LogicException('compact() requires at least one argument in this compiler build');
+            throw new \ArgumentCountError('compact() expects at least 1 argument, 0 given');
         }
 
         $result = HashTableHelper::alloc($context);
