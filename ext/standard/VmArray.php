@@ -1065,43 +1065,70 @@ final class VmArray
     }
 
     /**
-     * array_rand() — pick {@param $num} unique keys (CSPRNG; issue #2321, #4460).
+     * array_rand() — pick {@param $num} unique keys (php-src php_array_pick_keys / MT19937; #2321, #14271).
      */
     public static function arrayRandPacked(HashTable $ht, int $num): Variable
     {
-        $n = $ht->getNumElements();
-        if (0 === $n) {
+        $numAvail = $ht->getNumElements();
+        if (0 === $numAvail) {
             throw new \ValueError('array_rand(): Argument #1 ($array) cannot be empty');
         }
-        if ($num < 1 || $num > $n) {
+        if ($num < 1 || $num > $numAvail) {
             throw new \ValueError(
                 'array_rand(): Argument #2 ($num) must be between 1 and the number of elements in argument #1 ($array)'
             );
         }
+
         $keys = [];
         foreach ($ht->iterateKeyed() as $pair) {
             $keyCopy = new Variable();
             $keyCopy->copyFrom($pair[0]);
             $keys[] = $keyCopy;
         }
-        for ($i = 0; $i < $num; ++$i) {
-            $j = $i + (self::randomIndexBelow($n - $i));
-            $tmp = $keys[$i];
-            $keys[$i] = $keys[$j];
-            $keys[$j] = $tmp;
-        }
-        $picked = \array_slice($keys, 0, $num);
-        $result = new Variable();
+
         if (1 === $num) {
-            $result->copyFrom($picked[0]);
+            $idx = VmMt19937::range(0, $numAvail - 1);
+            $result = new Variable();
+            $result->copyFrom($keys[$idx]);
 
             return $result;
         }
+
+        $numReq = $num;
+        $negativeBitset = false;
+        if ($numReq > ($numAvail >> 1)) {
+            $negativeBitset = true;
+            $numReq = $numAvail - $numReq;
+        }
+
+        /** @var list<bool> $bitset */
+        $bitset = \array_fill(0, $numAvail, false);
+        $remaining = $numReq;
+        $failures = 0;
+        while ($remaining > 0) {
+            $randval = VmMt19937::range(0, $numAvail - 1);
+            if ($bitset[$randval]) {
+                if (++$failures > 50) {
+                    throw new \Random\BrokenRandomEngineError(
+                        'Failed to generate an acceptable random number in 50 attempts'
+                    );
+                }
+                continue;
+            }
+            $bitset[$randval] = true;
+            --$remaining;
+            $failures = 0;
+        }
+
+        $result = new Variable();
         $arr = new HashTable();
-        foreach ($picked as $pos => $key) {
-            $v = new Variable();
-            $v->copyFrom($key);
-            $arr->addIndex($pos, $v);
+        $outIdx = 0;
+        for ($i = 0; $i < $numAvail; ++$i) {
+            if ($bitset[$i] xor $negativeBitset) {
+                $v = new Variable();
+                $v->copyFrom($keys[$i]);
+                $arr->addIndex($outIdx++, $v);
+            }
         }
         $result->array($arr);
 
