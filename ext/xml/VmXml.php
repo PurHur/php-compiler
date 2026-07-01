@@ -81,6 +81,21 @@ final class VmXml
     }
 
     /**
+     * Validate XML well-formedness and record libxml errors when invalid (#14185).
+     */
+    public static function validateAndReport(Context $ctx, string $data, ?Frame $frame = null): bool
+    {
+        $error = self::validateWellFormed($data);
+        if (null === $error) {
+            return true;
+        }
+
+        \PHPCompiler\ext\libxml\VmLibxml::handleError($ctx, $error, $frame);
+
+        return false;
+    }
+
+    /**
      * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
      */
     private static function validateWellFormed(string $data): ?array

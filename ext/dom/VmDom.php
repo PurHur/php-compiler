@@ -292,14 +292,14 @@ final class VmDom
         return $var;
     }
 
-    public static function loadXML(Context $ctx, ObjectEntry $document, string $xml): bool
+    public static function loadXML(Context $ctx, ObjectEntry $document, string $xml, ?\PHPCompiler\Frame $frame = null): bool
     {
         self::ensureDocument($document);
 
         $trimmed = trim($xml);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $elementXml = self::stripDoctype($trimmed);
-        if (!VmXml::isWellFormed($elementXml)) {
+        if (!VmXml::validateAndReport($ctx, $elementXml, $frame)) {
             return false;
         }
         $root = self::parseElementTree($ctx, $elementXml);
