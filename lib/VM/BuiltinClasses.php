@@ -1002,14 +1002,18 @@ final class BuiltinClasses
             'gettimestamp' => new DateTimeGetTimestamp(),
             'getoffset' => new DateTimeGetOffset(),
             'gettimezone' => new DateTimeGetTimezone(),
-            'getmicrosecond' => new DateTimeGetMicrosecond(),
+            ...(CompilerVersion::supportsDateTimeMicrosecond() ? [
+                'getmicrosecond' => new DateTimeGetMicrosecond(),
+            ] : []),
             'modify' => new DateTimeModify(),
             'add' => new DateTimeAdd(),
             'sub' => new DateTimeSub(),
             'diff' => new DateTimeDiff(),
             'setdate' => new DateTimeSetDate(),
             'settime' => new DateTimeSetTime(),
-            'setmicrosecond' => new DateTimeSetMicrosecond(),
+            ...(CompilerVersion::supportsDateTimeMicrosecond() ? [
+                'setmicrosecond' => new DateTimeSetMicrosecond(),
+            ] : []),
             'settimestamp' => new DateTimeSetTimestamp(),
             'settimezone' => new DateTimeSetTimezone(),
         ];

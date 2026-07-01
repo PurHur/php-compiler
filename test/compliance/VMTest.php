@@ -135,6 +135,18 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'php84_array_search_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsDateTimeMicrosecond()
+                && (str_contains($name, 'datetime_microsecond')
+                    || str_contains($name, 'datetime_create_from_interface')
+                    || str_contains($name, 'datetime_immutable_create_from_mutable')
+                    || str_contains($name, 'datetime_create_from_immutable'))
+                && !str_contains($name, 'datetime_microsecond_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsDateTimeMicrosecond()
+                && str_contains($name, 'datetime_microsecond_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsArrayReplaceKey()
                 && str_contains($name, 'array_replace_key')
                 && !str_contains($name, 'array_replace_key_phantom')) {
