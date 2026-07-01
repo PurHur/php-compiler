@@ -13,7 +13,19 @@ final class DomNodeState
 
     public string $nodeName;
 
+    public ?string $localName = null;
+
+    /** Empty string when unprefixed (php-src dom_object prefix). */
+    public ?string $prefix = null;
+
     public ?string $namespaceUri = null;
+
+    /**
+     * xmlns / xmlns:prefix declarations on this element (php-src dom_namespace_decl).
+     *
+     * @var array<string, string>
+     */
+    public array $namespaceDeclarations = [];
 
     public ?string $publicId = null;
 

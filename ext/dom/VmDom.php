@@ -60,6 +60,14 @@ final class VmDom
 
     public const PROP_TEXT_CONTENT = 'textContent';
 
+    public const PROP_BASE_URI = 'baseURI';
+
+    public const PROP_NAMESPACE_URI = 'namespaceURI';
+
+    public const PROP_LOCAL_NAME = 'localName';
+
+    public const PROP_PREFIX = 'prefix';
+
     public const PROP_PREVIOUS_SIBLING = 'previousSibling';
 
     public const PROP_FIRST_CHILD = 'firstChild';
@@ -114,6 +122,10 @@ final class VmDom
         $node->methodVisibility['haschildnodes'] = $pub;
         $node->methods['contains'] = new NodeContains();
         $node->methodVisibility['contains'] = $pub;
+        $node->methods['lookupprefix'] = new NodeLookupPrefix();
+        $node->methodVisibility['lookupprefix'] = $pub;
+        $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
+        $node->methodVisibility['lookupnamespaceuri'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -158,6 +170,8 @@ final class VmDom
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
+        $document->methods['createelementns'] = new DocumentCreateElementNS();
+        $document->methodVisibility['createelementns'] = $pub;
         $document->methods['createdocumentfragment'] = new DocumentCreateDocumentFragment();
         $document->methodVisibility['createdocumentfragment'] = $pub;
         $document->methods['appendchild'] = new DocumentAppendChild();
@@ -176,6 +190,12 @@ final class VmDom
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
+        $element->methods['getattributens'] = new ElementGetAttributeNS();
+        $element->methodVisibility['getattributens'] = $pub;
+        $element->methods['hasattributens'] = new ElementHasAttributeNS();
+        $element->methodVisibility['hasattributens'] = $pub;
+        $element->methods['setattributens'] = new ElementSetAttributeNS();
+        $element->methodVisibility['setattributens'] = $pub;
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -298,6 +318,8 @@ final class VmDom
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
         $state->nodeName = $name;
+        $state->localName = $name;
+        $state->prefix = null;
         if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
             $state->documentId = $ownerDocument->id;
         }
@@ -307,6 +329,252 @@ final class VmDom
         $var->object($entry);
 
         return $var;
+    }
+
+    public static function createElementNS(
+        Context $ctx,
+        ?string $namespace,
+        string $qualifiedName,
+        ?ObjectEntry $ownerDocument = null,
+        string $value = ''
+    ): Variable {
+        $class = $ctx->classes[self::CLASS_ELEMENT] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMElement is not registered in this compiler build');
+        }
+
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ELEMENT_NODE;
+        $state->nodeName = $qualifiedName;
+        $state->localName = $localName;
+        $state->prefix = '' !== $prefix ? $prefix : null;
+        $state->namespaceUri = $namespace;
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+        if ('' !== $value) {
+            self::writeTextContent($ctx, $entry, $value);
+        }
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function getAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): string
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($element);
+        foreach ($state->attributes as $qName => $value) {
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            [$prefix, $local] = self::splitQualifiedName($qName);
+            if ($local !== $localName) {
+                continue;
+            }
+            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            if ($attrNs === $wantNs) {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+
+    public static function hasAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): bool
+    {
+        return self::hasAttributeNSExact($element, $namespace, $localName);
+    }
+
+    private static function hasAttributeNSExact(ObjectEntry $element, ?string $namespace, string $localName): bool
+    {
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($element);
+        foreach ($state->attributes as $qName => $value) {
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            [$prefix, $local] = self::splitQualifiedName($qName);
+            if ($local !== $localName) {
+                continue;
+            }
+            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+
+            return $attrNs === $wantNs;
+        }
+
+        return false;
+    }
+
+    public static function setAttributeNS(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $qualifiedName,
+        string $value
+    ): void {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        $state->attributes[$qualifiedName] = $value;
+        if (self::isXmlnsAttributeName($qualifiedName)) {
+            $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        }
+    }
+
+    public static function lookupPrefix(ObjectEntry $node, ?string $namespace): ?string
+    {
+        if (null === $namespace || '' === $namespace) {
+            return null;
+        }
+        $current = $node;
+        while (DomRegistry::has($current)) {
+            $state = DomRegistry::state($current);
+            foreach ($state->namespaceDeclarations as $prefix => $uri) {
+                if ($uri === $namespace) {
+                    return '' === $prefix ? null : $prefix;
+                }
+            }
+            $parentId = $state->parentId;
+            if (null === $parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
+    }
+
+    public static function lookupNamespaceURI(ObjectEntry $node, ?string $prefix): ?string
+    {
+        $wantPrefix = $prefix ?? '';
+        $current = $node;
+        while (DomRegistry::has($current)) {
+            $state = DomRegistry::state($current);
+            if (isset($state->namespaceDeclarations[$wantPrefix])) {
+                return $state->namespaceDeclarations[$wantPrefix];
+            }
+            $parentId = $state->parentId;
+            if (null === $parentId) {
+                break;
+            }
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                break;
+            }
+            $current = $parent;
+        }
+
+        return null;
+    }
+
+    public static function readBaseUri(ObjectEntry $node): string
+    {
+        $doc = self::ownerDocumentEntry($node);
+        if (null === $doc) {
+            return '';
+        }
+        $docState = DomRegistry::state($doc);
+        if (null !== $docState->documentUri && '' !== $docState->documentUri) {
+            return $docState->documentUri;
+        }
+
+        return '';
+    }
+
+    public static function readNamespaceUri(ObjectEntry $node): ?string
+    {
+        if (!self::isElement($node)) {
+            return null;
+        }
+
+        return DomRegistry::state($node)->namespaceUri;
+    }
+
+    public static function readLocalName(ObjectEntry $node): string
+    {
+        if (!DomRegistry::has($node)) {
+            return '';
+        }
+        $state = DomRegistry::state($node);
+
+        return $state->localName ?? $state->nodeName;
+    }
+
+    public static function readPrefix(ObjectEntry $node): string
+    {
+        if (!DomRegistry::has($node)) {
+            return '';
+        }
+
+        return DomRegistry::state($node)->prefix ?? '';
+    }
+
+    /**
+     * @return array{0: string, 1: string} prefix, localName
+     */
+    private static function splitQualifiedName(string $qualifiedName): array
+    {
+        $pos = strpos($qualifiedName, ':');
+        if (false === $pos) {
+            return ['', $qualifiedName];
+        }
+
+        return [substr($qualifiedName, 0, $pos), substr($qualifiedName, $pos + 1)];
+    }
+
+    private static function isXmlnsAttributeName(string $name): bool
+    {
+        return 'xmlns' === $name || str_starts_with($name, 'xmlns:');
+    }
+
+    /**
+     * @param array<string, string> $attributes
+     *
+     * @return array<string, string>
+     */
+    private static function extractNamespaceDeclarations(array $attributes): array
+    {
+        $declarations = [];
+        foreach ($attributes as $name => $value) {
+            if ('xmlns' === $name) {
+                $declarations[''] = $value;
+            } elseif (str_starts_with($name, 'xmlns:')) {
+                $declarations[substr($name, 6)] = $value;
+            }
+        }
+
+        return $declarations;
+    }
+
+    private static function resolveElementNamespaceUri(ObjectEntry $element): void
+    {
+        if (!self::isElement($element)) {
+            return;
+        }
+        $state = DomRegistry::state($element);
+        $prefix = $state->prefix ?? '';
+        if ('' === $prefix) {
+            $state->namespaceUri = self::lookupNamespaceURI($element, '');
+        } else {
+            $state->namespaceUri = self::lookupNamespaceURI($element, $prefix);
+        }
     }
 
     public static function createTextNode(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
@@ -664,7 +932,10 @@ final class VmDom
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
             $entry = self::createElement($ctx, $selfClose[1])->toObject();
-            DomRegistry::state($entry)->attributes = self::parseAttributes($selfClose[2] ?? '');
+            $state = DomRegistry::state($entry);
+            $state->attributes = self::parseAttributes($selfClose[2] ?? '');
+            self::applyQualifiedElementNames($state, $selfClose[1]);
+            $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
 
             return $entry;
         }
@@ -675,6 +946,8 @@ final class VmDom
         $entry = self::createElement($ctx, $matches[1])->toObject();
         $state = DomRegistry::state($entry);
         $state->attributes = self::parseAttributes($matches[2] ?? '');
+        self::applyQualifiedElementNames($state, $matches[1]);
+        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
         $pos = 0;
         $inner = $matches[3];
         $len = \strlen($inner);
@@ -704,12 +977,20 @@ final class VmDom
             }
             $state->childIds[] = $child->id;
             self::linkChildToParent($child, $entry);
+            self::resolveElementNamespaceUri($child);
             $pos = $end;
         }
 
         self::syncSubtree($ctx, $entry);
 
         return $entry;
+    }
+
+    private static function applyQualifiedElementNames(DomNodeState $state, string $qualifiedName): void
+    {
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $state->localName = $localName;
+        $state->prefix = '' !== $prefix ? $prefix : null;
     }
 
     /** @return null|int byte offset after one element starting at $pos */

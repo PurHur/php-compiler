@@ -25,6 +25,18 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/domdocument_loadxml.phpt',
             'domdocument_loadxml.phpt'
         );
+        yield 'dom_node_base_uri.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_node_base_uri.phpt',
+            'dom_node_base_uri.phpt'
+        );
+        yield 'dom_create_element_ns.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_create_element_ns.phpt',
+            'dom_create_element_ns.phpt'
+        );
+        yield 'dom_namespace_attributes.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_namespace_attributes.phpt',
+            'dom_namespace_attributes.phpt'
+        );
     }
 
     public function setUp(): void

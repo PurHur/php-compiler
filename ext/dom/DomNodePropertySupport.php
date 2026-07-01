@@ -25,7 +25,11 @@ final class DomNodePropertySupport
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
-            || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc;
+            || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
+            || strtolower(VmDom::PROP_BASE_URI) === $lc
+            || strtolower(VmDom::PROP_NAMESPACE_URI) === $lc
+            || strtolower(VmDom::PROP_LOCAL_NAME) === $lc
+            || strtolower(VmDom::PROP_PREFIX) === $lc;
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -61,6 +65,31 @@ final class DomNodePropertySupport
         }
         if (strtolower(VmDom::PROP_TEXT_CONTENT) === $lc) {
             $var->string(VmDom::readTextContent($object));
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_BASE_URI) === $lc) {
+            $var->string(VmDom::readBaseUri($object));
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_NAMESPACE_URI) === $lc) {
+            $ns = VmDom::readNamespaceUri($object);
+            if (null === $ns) {
+                $var->null();
+            } else {
+                $var->string($ns);
+            }
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_LOCAL_NAME) === $lc) {
+            $var->string(VmDom::readLocalName($object));
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_PREFIX) === $lc) {
+            $var->string(VmDom::readPrefix($object));
 
             return $var;
         }
