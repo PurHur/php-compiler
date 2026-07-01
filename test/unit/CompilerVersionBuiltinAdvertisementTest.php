@@ -79,6 +79,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
+    public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDateTimeMicrosecond());
+    }
+
     public function testConvertCyrStringNotAdvertisedOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsConvertCyrString());
@@ -172,6 +177,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last'] as $fn) {
             $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
+    }
+
+    public function testVmDoesNotRegisterDateTimeMicrosecondOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $dt = $runtime->vmContext->classes['datetime'] ?? null;
+        $this->assertNotNull($dt);
+        $this->assertFalse(isset($dt->methods['getmicrosecond']));
+        $this->assertFalse(isset($dt->methods['setmicrosecond']));
     }
 
     public function testVmDoesNotRegisterConvertCyrStringOnReferenceProfile(): void
