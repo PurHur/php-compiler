@@ -20,7 +20,7 @@ final class file_put_contents extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
             );
         }
         $dataVar = $frame->calledArgs[1]->resolveIndirect();
@@ -58,7 +58,7 @@ final class file_put_contents extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 4) {
             throw new \ArgumentCountError(
-                'file_put_contents() expects at least 2 arguments, '.\max(0, $argc - 2).' given'
+                'file_put_contents() expects at least 2 arguments, '.$argc.' given'
             );
         }
         $flags = 0;
