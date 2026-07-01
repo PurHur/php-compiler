@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3626 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9879 |
+| Source constructs flagged (warnings) | 9882 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -390,7 +390,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/FilterIteratorBuiltin.php` | 0 | 9 |
 | `ext/spl/GlobIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/InfiniteIteratorBuiltin.php` | 0 | 7 |
-| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 13 |
+| `ext/spl/IteratorIteratorBuiltin.php` | 0 | 14 |
 | `ext/spl/JitSplClasses.php` | 0 | 2 |
 | `ext/spl/LimitIteratorBuiltin.php` | 0 | 10 |
 | `ext/spl/Module.php` | 0 | 2 |
@@ -662,7 +662,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitFileowner.php` | 0 | 1 |
 | `ext/standard/JitFileperms.php` | 0 | 1 |
 | `ext/standard/JitFilesize.php` | 0 | 1 |
-| `ext/standard/JitFilestatArg.php` | 0 | 1 |
+| `ext/standard/JitFilestatArg.php` | 0 | 2 |
 | `ext/standard/JitFiletype.php` | 0 | 1 |
 | `ext/standard/JitFlock.php` | 0 | 1 |
 | `ext/standard/JitFlush.php` | 0 | 1 |
@@ -1206,7 +1206,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmExecutionLimits.php` | 0 | 2 |
 | `ext/standard/VmExif.php` | 0 | 1 |
 | `ext/standard/VmExit.php` | 0 | 6 |
-| `ext/standard/VmFilestatArg.php` | 0 | 1 |
+| `ext/standard/VmFilestatArg.php` | 0 | 2 |
 | `ext/standard/VmFilestatFailure.php` | 0 | 1 |
 | `ext/standard/VmFloatDtoa.php` | 0 | 1 |
 | `ext/standard/VmFminMax.php` | 0 | 2 |
@@ -6148,13 +6148,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IteratorIteratorGetInnerIterator (line 53)
 - new ClassEntry (line 99)
 - new RecursiveIteratorIteratorConstruct (line 108)
-- new OutOfBoundsException (line 215)
-- new OutOfBoundsException (line 222)
-- new UnexpectedValueException (line 352)
-- new UnexpectedValueException (line 552)
-- new ArgumentCountError (line 614)
-- new ArgumentCountError (line 646)
-- 59 class method(s)
+- new OutOfBoundsException (line 217)
+- new OutOfBoundsException (line 224)
+- new UnexpectedValueException (line 367)
+- new Variable (line 413)
+- new UnexpectedValueException (line 586)
+- new ArgumentCountError (line 648)
+- new ArgumentCountError (line 680)
+- 61 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -7867,7 +7868,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- new JITVariable (line 159)
+- 11 class method(s)
 
 ### `ext/standard/JitFiletype.php`
 
@@ -11751,7 +11753,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 14 class method(s)
+- new Variable (line 149)
+- 15 class method(s)
 
 ### `ext/standard/VmFilestatFailure.php`
 
