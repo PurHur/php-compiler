@@ -12,7 +12,8 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __string__quotemeta via QuotemetaJitHelper PHP (#14705).
  *
- * Replaces ~165 LOC LLVM. SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * Replaces ~165 LOC inline LLVM in StringQuotemeta.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
  * php-src: ext/standard/string.c — PHP_FUNCTION(quotemeta)
  */
 final class StringQuotemeta
@@ -50,10 +51,21 @@ final class StringQuotemeta
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void

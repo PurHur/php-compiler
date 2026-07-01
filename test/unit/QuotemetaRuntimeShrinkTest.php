@@ -11,10 +11,12 @@ use PHPUnit\Framework\TestCase;
 /** quotemeta() JIT routes through QuotemetaJitHelper PHP not inline LLVM (#14705). */
 final class QuotemetaRuntimeShrinkTest extends TestCase
 {
-    public function testStringQuotemetaUsesJitHelperNotLlvmMonolith(): void
+    public function testStringQuotemetaUsesJitHelperNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringQuotemeta.php');
         $this->assertStringContainsString('QuotemetaJitHelper', $source);
+        $this->assertStringNotContainsString('quotemeta_count_head', $source);
+        $this->assertStringNotContainsString('shouldEscape', $source);
         $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitQuotemeta.php');
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/quotemeta.php');
@@ -28,8 +30,9 @@ final class QuotemetaRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/QuotemetaJitHelper.php');
         $this->assertStringContainsString('VmString::quotemeta', $source);
 
-        $this->assertSame('\.\*\+', QuotemetaJitHelper::quotemetaArgv('.*+'));
-        $this->assertSame('\.\*\+', VmString::quotemeta('.*+'));
+        $expected = VmString::quotemeta('$a.b');
+        $this->assertSame($expected, QuotemetaJitHelper::quotemetaArgv('$a.b'));
+        $this->assertSame($expected, VmString::quotemeta('$a.b'));
     }
 
     public function testSpineBundleOmitsDeletedJitQuotemeta(): void

@@ -12,8 +12,8 @@ namespace PHPCompiler\ext\standard;
  */
 final class QuotemetaJitHelper
 {
-    public static function quotemetaArgv(string $string): string
+    public static function quotemetaArgv(string $str): string
     {
-        return VmString::quotemeta($string);
+        return VmString::quotemeta($str);
     }
 }
