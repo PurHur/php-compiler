@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_merge_recursive() C runtime shrink (#6021, #6177). */
+/** array_merge_recursive() JIT routes through ArrayMergeRecursiveJitHelper PHP (#10183, #14423). */
 final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -33,8 +33,8 @@ final class ArrayMergeRecursiveRuntimeShrinkTest extends TestCase
         $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayMergeRecursiveRuntime.php');
         $this->assertIsString($runtime);
         $this->assertStringContainsString('ArrayMergeRecursiveJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::mergeRecursive', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::mergeRecursive', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_merge_recursive.php');
         $this->assertIsString($builtin);
