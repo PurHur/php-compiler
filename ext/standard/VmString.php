@@ -4627,7 +4627,7 @@ final class VmString
     public static function count_chars(string $string, int $mode = 0): array|string
     {
         if ($mode < 0 || $mode > 4) {
-            throw new \LogicException('count_chars(): Argument #2 ($mode) must be between 0 and 4 (inclusive)');
+            throw new \ValueError('count_chars(): Argument #2 ($mode) must be between 0 and 4 (inclusive)');
         }
         $counts = array_fill(0, 256, 0);
         $len = self::byteLength($string);
