@@ -256,8 +256,9 @@ final class VmFilestatArg
                 if ('' === $s || !is_numeric($s)) {
                     throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
                 }
-                // Z_PARAM_LONG weak coercion — decimal string, not base-0 octal (#14060, ext/standard/filestat.c).
-                return (int) $s;
+                $base = VmMath::autodetectBase($s);
+
+                return (int) VmMath::baseToZval($s, $base);
             default:
                 throw new \TypeError(self::intTypeError(
                     $function,
