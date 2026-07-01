@@ -3054,7 +3054,6 @@ require_once __DIR__.'/../../../lib/JIT/NamedArgs.php';
 require_once __DIR__.'/../../../lib/JIT/NamedOptionalCallArgs.php';
 require_once __DIR__.'/../../../lib/JIT/NestedContextMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedJitCompileScope.php';
-require_once __DIR__.'/../../../lib/JIT/NestedVmHashTableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NestedVmVariableMethodLlvm.php';
 require_once __DIR__.'/../../../lib/JIT/NoDiscardCallGuard.php';
 require_once __DIR__.'/../../../lib/JIT/NonObjectPropertyFetchHelper.php';
