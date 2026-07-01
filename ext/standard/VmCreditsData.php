@@ -41,6 +41,83 @@ final class VmCreditsData
     ];
 
     /**
+     * php-src credits_modules[] static table (ext/standard/info.c, #14295).
+     *
+     * @var array<string, string>
+     */
+    public const CREDITS_MODULE_AUTHORS = [
+        'BC Math' => 'Andi Gutmans',
+        'Bzip2' => 'Sterling Hughes',
+        'Calendar' => 'Shane Caraveo, Colin Viebrock, Hartmut Holzgraefe, Wez Furlong',
+        'COM and .Net' => 'Wez Furlong',
+        'ctype' => 'Hartmut Holzgraefe',
+        'cURL' => 'Sterling Hughes',
+        'Date/Time Support' => 'Derick Rethans',
+        'DB-LIB (MS SQL, Sybase)' => 'Wez Furlong, Frank M. Kromann, Adam Baratz',
+        'DBA' => 'Sascha Schumann, Marcus Boerger',
+        'DOM' => 'Christian Stocker, Rob Richards, Marcus Boerger',
+        'enchant' => 'Pierre-Alain Joye, Ilia Alshanetsky',
+        'EXIF' => 'Rasmus Lerdorf, Marcus Boerger',
+        'FFI' => 'Dmitry Stogov',
+        'fileinfo' => 'Ilia Alshanetsky, Pierre Alain Joye, Scott MacVicar, Derick Rethans, Anatol Belski',
+        'Firebird driver for PDO' => 'Ard Biesheuvel',
+        'FTP' => 'Stefan Esser, Andrew Skalski',
+        'GD imaging' => 'Rasmus Lerdorf, Stig Bakken, Jim Winstead, Jouni Ahto, Ilia Alshanetsky, Pierre-Alain Joye, Marcus Boerger, Mark Randall',
+        'GetText' => 'Alex Plotnick',
+        'GNU GMP support' => 'Stanislav Malyshev',
+        'Iconv' => 'Rui Hirokawa, Stig Bakken, Moriyoshi Koizumi',
+        'IMAP' => 'Rex Logan, Mark Musone, Brian Wang, Kaj-Michael Lang, Antoni Pamies Olive, Rasmus Lerdorf, Andrew Skalski, Chuck Hagenbuch, Daniel R Kalowsky',
+        'Input Filter' => 'Rasmus Lerdorf, Derick Rethans, Pierre-Alain Joye, Ilia Alshanetsky',
+        'Internationalization' => 'Ed Batutis, Vladimir Iordanov, Dmitry Lakhtyuk, Stanislav Malyshev, Vadim Savchuk, Kirti Velankar',
+        'JSON' => 'Jakub Zelenka, Omar Kilani, Scott MacVicar',
+        'LDAP' => 'Amitay Isaacs, Eric Warnke, Rasmus Lerdorf, Gerrit Thomson, Stig Venaas',
+        'LIBXML' => 'Christian Stocker, Rob Richards, Marcus Boerger, Wez Furlong, Shane Caraveo',
+        'Multibyte String Functions' => 'Tsukada Takuya, Rui Hirokawa',
+        'MySQL driver for PDO' => 'George Schlossnagle, Wez Furlong, Ilia Alshanetsky, Johannes Schlueter',
+        'MySQLi' => 'Zak Greant, Georg Richter, Andrey Hristov, Ulf Wendel',
+        'MySQLnd' => 'Andrey Hristov, Ulf Wendel, Georg Richter, Johannes Schlüter',
+        'OCI8' => 'Stig Bakken, Thies C. Arntzen, Andy Sautins, David Benson, Maxim Maletsky, Harald Radi, Antony Dovgal, Andi Gutmans, Wez Furlong, Christopher Jones, Oracle Corporation',
+        'ODBC driver for PDO' => 'Wez Furlong',
+        'ODBC' => 'Stig Bakken, Andreas Karajannis, Frank M. Kromann, Daniel R. Kalowsky',
+        'Opcache' => 'Andi Gutmans, Zeev Suraski, Stanislav Malyshev, Dmitry Stogov, Xinchen Hui',
+        'OpenSSL' => 'Stig Venaas, Wez Furlong, Sascha Kettler, Scott MacVicar, Eliot Lear',
+        'Oracle (OCI) driver for PDO' => 'Wez Furlong',
+        'pcntl' => 'Jason Greene, Arnaud Le Blanc',
+        'Perl Compatible Regexps' => 'Andrei Zmievski',
+        'PHP Archive' => 'Gregory Beaver, Marcus Boerger',
+        'PHP Data Objects' => 'Wez Furlong, Marcus Boerger, Sterling Hughes, George Schlossnagle, Ilia Alshanetsky',
+        'PHP hash' => 'Sara Golemon, Rasmus Lerdorf, Stefan Esser, Michael Wallner, Scott MacVicar',
+        'Posix' => 'Kristian Koehntopp',
+        'PostgreSQL driver for PDO' => 'Edin Kadribasic, Ilia Alshanetsky',
+        'PostgreSQL' => 'Jouni Ahto, Zeev Suraski, Yasuo Ohgaki, Chris Kings-Lynne',
+        'Pspell' => 'Vlad Krupin',
+        'random' => 'Go Kudo, Tim Düsterhus, Guilliam Xavier, Christoph M. Becker, Jakub Zelenka, Bob Weinand, Máté Kocsis, and Original RNG implementators',
+        'Readline' => 'Thies C. Arntzen',
+        'Reflection' => 'Marcus Boerger, Timm Friebe, George Schlossnagle, Andrei Zmievski, Johannes Schlueter',
+        'Sessions' => 'Sascha Schumann, Andrei Zmievski',
+        'Shared Memory Operations' => 'Slava Poliakov, Ilia Alshanetsky',
+        'SimpleXML' => 'Sterling Hughes, Marcus Boerger, Rob Richards',
+        'SNMP' => 'Rasmus Lerdorf, Harrie Hazewinkel, Mike Jackson, Steven Lawrance, Johann Hanne, Boris Lytochkin',
+        'SOAP' => 'Brad Lafountain, Shane Caraveo, Dmitry Stogov',
+        'Sockets' => 'Chris Vandomelen, Sterling Hughes, Daniel Beulshausen, Jason Greene',
+        'Sodium' => 'Frank Denis',
+        'SPL' => 'Marcus Boerger, Etienne Kneuss',
+        'SQLite 3.x driver for PDO' => 'Wez Furlong',
+        'SQLite3' => 'Scott MacVicar, Ilia Alshanetsky, Brad Dewar',
+        'System V Message based IPC' => 'Wez Furlong',
+        'System V Semaphores' => 'Tom May',
+        'System V Shared Memory' => 'Christian Cartus',
+        'tidy' => 'John Coggeshall, Ilia Alshanetsky',
+        'tokenizer' => 'Andrei Zmievski, Johannes Schlueter',
+        'XML' => 'Stig Bakken, Thies C. Arntzen, Sterling Hughes',
+        'XMLReader' => 'Rob Richards',
+        'XMLWriter' => 'Rob Richards, Pierre-Alain Joye',
+        'XSL' => 'Christian Stocker, Rob Richards',
+        'Zip' => 'Pierre-Alain Joye, Remi Collet',
+        'Zlib' => 'Rasmus Lerdorf, Stefan Roehrich, Zeev Suraski, Jade Nicoletti, Michael Wallner',
+    ];
+
+    /**
      * php-src module author map (ext/standard/info.c credits_modules) — subset for bundled extensions.
      *
      * @var array<string, string>
@@ -99,6 +176,16 @@ final class VmCreditsData
     public const DOCS_TEAM =
         'Mehdi Achour, Vincent Gevers, Stig Bakken, Rasmus Lerdorf, '
         .'Gabor Egressy, Hartmut Holzgraefe, Jouni Ahto';
+
+    /**
+     * Full php-src credits_modules table for phpcredits(CREDITS_MODULES) (#14295).
+     *
+     * @return array<string, string>
+     */
+    public static function allModuleAuthors(): array
+    {
+        return self::CREDITS_MODULE_AUTHORS;
+    }
 
     /**
      * @return array<string, string> extension => authors for loaded modules

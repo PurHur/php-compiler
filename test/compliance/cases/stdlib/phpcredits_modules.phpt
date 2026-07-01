@@ -1,14 +1,16 @@
 --TEST--
-stdlib phpcredits(CREDITS_MODULES) lists loaded module authors (#13618)
+stdlib phpcredits(CREDITS_MODULES) lists php-src static module authors (#14295)
 --FILE--
 <?php
 ob_start();
 phpcredits(CREDITS_MODULES);
 $out = ob_get_clean();
 echo str_contains($out, 'Module Authors') ? "heading-ok\n" : "heading-missing\n";
-echo str_contains($out, 'Standard PHP Library') ? "standard-ok\n" : "standard-missing\n";
-echo strlen($out) > 0 ? "nonempty-ok\n" : "nonempty-bad\n";
+echo str_contains($out, 'cURL') ? "curl-ok\n" : "curl-missing\n";
+echo str_contains($out, 'Multibyte String Functions') ? "mbstring-ok\n" : "mbstring-missing\n";
+echo strlen($out) >= 3900 ? "size-ok\n" : "size-bad\n";
 --EXPECT--
 heading-ok
-standard-ok
-nonempty-ok
+curl-ok
+mbstring-ok
+size-ok
