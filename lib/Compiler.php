@@ -24212,7 +24212,7 @@ class Compiler {
                 $methodName
             ),
         ];
-        foreach ($this->compileCallArgSends($args, $block) as $send) {
+        foreach ($this->compileCallArgSends($args, $block, null, $cfgCallOp) as $send) {
             $return[] = $send;
         }
         $return[] = $this->compileFuncCallExecOpcode($result, $block, $startLine, $cfgCallOp);
