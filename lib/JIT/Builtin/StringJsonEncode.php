@@ -85,7 +85,7 @@ final class StringJsonEncode
         self::emitArrayBridge($context);
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
-            $context->builder->positionAtEnd($savedInsert);
+            BasicBlockHelper::restoreInsertBlock($context, $savedInsert);
         } else {
             $context->builder->clearInsertionPosition();
         }

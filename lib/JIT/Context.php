@@ -384,6 +384,14 @@ class Context {
         if ($this->isBootstrapNonSpineSelfhostEntry()) {
             return true;
         }
+        $entry = $this->resolveJitAotEntryScriptPath();
+        if ('' !== $entry && str_contains($entry, 'bootstrap-aot/')) {
+            return true;
+        }
+        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
+            return true;
+        }
         $flag = getenv('PHP_COMPILER_M3_COMPILE_DRIVER_MAIN');
 
         return '1' === $flag || 'true' === strtolower((string) $flag);
@@ -904,47 +912,58 @@ class Context {
 
     private function ensureFullStandaloneBodies(): void
     {
-        ExceptionBridge::ensureStandaloneBodies($this);
-        ErrorBridge::ensureStandaloneBodies($this);
-        Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\AssertFail::ensureStandaloneBodies($this);
-        Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
-        Builtin\JitReturnPending::ensureStandaloneBodies($this);
-        Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
-        Builtin\StringSoundex::ensureStandaloneBodies($this);
-        Builtin\StringMetaphone::ensureStandaloneBodies($this);
-        Builtin\StringStripTags::ensureStandaloneBodies($this);
-        Builtin\StringStrtr::ensureStandaloneBodies($this);
-        Builtin\StringParseStr::ensureStandaloneBodies($this);
-        Builtin\StringJsonEncode::ensureStandaloneBodies($this);
-        Builtin\StringJsonDecode::ensureStandaloneBodies($this);
-        Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StringGetenv::ensureStandaloneBodies($this);
-        Builtin\StringGetenvAll::ensureStandaloneBodies($this);
-        Builtin\StringTriggerError::ensureStandaloneBodies($this);
-        Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
-        Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
-        // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
-        // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
-        Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
-        Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
-        Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
-        Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
-        Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
-        Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
-        Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
-        Builtin\DefineRuntime::ensureStandaloneBodies($this);
-        Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
-        Builtin\SuperglobalNameRuntime::ensureLinked($this);
-        \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
-        Builtin\TokenGetAll::ensureStandaloneBodies($this);
-        Builtin\Highlight::ensureStandaloneBodies($this);
-        Builtin\Hebrev::ensureStandaloneBodies($this);
-        Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+        Builtin\StreamIoRuntime::beginStandaloneInitPhase();
+        try {
+            ExceptionBridge::ensureStandaloneBodies($this);
+            ErrorBridge::ensureStandaloneBodies($this);
+            Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamReadRuntime::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\AssertFail::ensureStandaloneBodies($this);
+            Builtin\AssertOptionsRuntime::ensureStandaloneBodies($this);
+            Builtin\JitReturnPending::ensureStandaloneBodies($this);
+            Builtin\ObOutputRuntime::ensureLinked($this);
+            Builtin\ValueEchoRuntime::ensureLinked($this);
+            Builtin\CliArgvRuntime::ensureStandaloneBodies($this);
+            // Nested-JIT string helpers: lazy via ensureLinked during spine init (#14472).
+            if (!Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($this)) {
+                Builtin\StringSoundex::ensureStandaloneBodies($this);
+                Builtin\StringMetaphone::ensureStandaloneBodies($this);
+                Builtin\StringStripTags::ensureStandaloneBodies($this);
+                Builtin\StringStrtr::ensureStandaloneBodies($this);
+                Builtin\StringParseStr::ensureStandaloneBodies($this);
+            }
+            Builtin\StringJsonEncode::ensureStandaloneBodies($this);
+            Builtin\StringJsonDecode::ensureStandaloneBodies($this);
+            Builtin\StringGetenv::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringGetenv::ensureStandaloneBodies($this);
+            Builtin\StringGetenvAll::ensureStandaloneBodies($this);
+            Builtin\StringTriggerError::ensureStandaloneBodies($this);
+            Builtin\StringRandomBytes::implement($this);
+            Builtin\ScalarDimFetchRuntime::ensureStandaloneBodies($this);
+            Builtin\StringOffsetRuntime::ensureStandaloneBodies($this);
+            // UndefinedVariableRuntime: ensureLinked only — emitWarningForName uses __compiler_trigger_error
+            // (StringTriggerError already linked above; avoid duplicate standalone bodies — #10524).
+            Builtin\StringFormat::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\StreamFilterJit::ensureDeferredStubsForInventoryEmit($this);
+            Builtin\GcToggleRuntime::ensureStandaloneBodies($this);
+            Builtin\FunctionStaticRuntime::ensureStandaloneBodies($this);
+            Builtin\GcCollectCyclesRuntime::ensureStandaloneBodies($this);
+            Builtin\ProgressNoteRuntime::ensureStandaloneBodies($this);
+            Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
+            Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
+            Builtin\DefineRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
+            Builtin\SuperglobalNameRuntime::ensureLinked($this);
+            \PHPCompiler\ext\standard\JitStrspn::ensureStandaloneBodies($this);
+            Builtin\TokenGetAll::ensureStandaloneBodies($this);
+            Builtin\Highlight::ensureStandaloneBodies($this);
+            Builtin\Hebrev::ensureStandaloneBodies($this);
+            Builtin\StreamBucketRuntime::ensureStandaloneBodies($this);
+        } finally {
+            Builtin\StreamIoRuntime::endStandaloneInitPhase();
+        }
     }
 
     public function compileToFile(string $file) {

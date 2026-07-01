@@ -20,6 +20,19 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  */
 final class StreamIoRuntime
 {
+    /** True while Context::ensureFullStandaloneBodies runs — defer nested-JIT helpers (#14472). */
+    private static bool $standaloneInitPhase = false;
+
+    public static function beginStandaloneInitPhase(): void
+    {
+        self::$standaloneInitPhase = true;
+    }
+
+    public static function endStandaloneInitPhase(): void
+    {
+        self::$standaloneInitPhase = false;
+    }
+
     private static int $implementDepth = 0;
 
     private const HELPER_PATH = '/ext/standard/StreamIoJitHelper.php';
@@ -348,6 +361,9 @@ final class StreamIoRuntime
     public static function shouldDeferHeavyStreamIoEmitters(Context $context): bool
     {
         unset($context);
+        if (self::$standaloneInitPhase) {
+            return true;
+        }
         foreach (
             [
                 'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER',
