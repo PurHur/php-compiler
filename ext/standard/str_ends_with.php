@@ -32,8 +32,6 @@ final class str_ends_with extends Internal
         $this->requireExactArgCount($frame, 'str_ends_with', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_ends_with', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_ends_with', 'needle', 1, $frame);
-        InternalStrictArg::requireString($frame, 0, 'str_ends_with', 'haystack');
-        InternalStrictArg::requireString($frame, 1, 'str_ends_with', 'needle');
         $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_ends_with',
