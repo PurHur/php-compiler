@@ -21,7 +21,7 @@ final class DocumentAppendChild extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::appendChild() expects exactly 1 argument');
         }
-        $child = $this->elementArg($frame->calledArgs[1], 'DOMDocument::appendChild()', 0);
+        $child = $this->nodeChildArg($frame->calledArgs[1], 'DOMDocument::appendChild()', 0);
         VmDom::ensureDocument($receiver);
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::appendChild() requires VM context in this compiler build');
@@ -32,7 +32,7 @@ final class DocumentAppendChild extends DomClassMethod
         }
     }
 
-    private function elementArg(Variable $var, string $label, int $index): \PHPCompiler\VM\ObjectEntry
+    private function nodeChildArg(Variable $var, string $label, int $index): \PHPCompiler\VM\ObjectEntry
     {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
@@ -44,7 +44,7 @@ final class DocumentAppendChild extends DomClassMethod
             ));
         }
         $object = $var->toObject();
-        if (!VmDom::isElement($object)) {
+        if (!VmDom::isAppendableNode($object)) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type DOMNode, %s given',
                 $label,

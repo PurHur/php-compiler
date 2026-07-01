@@ -28,6 +28,8 @@ final class VmDom
 
     public const CLASS_ELEMENT = 'domelement';
 
+    public const CLASS_DOCUMENT_FRAGMENT = 'domdocumentfragment';
+
     public const CLASS_NODE = 'domnode';
 
     public const CLASS_NODE_LIST = 'domnodelist';
@@ -114,6 +116,8 @@ final class VmDom
         $document->methodVisibility['loadxml'] = $pub;
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
+        $document->methods['createdocumentfragment'] = new DocumentCreateDocumentFragment();
+        $document->methodVisibility['createdocumentfragment'] = $pub;
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -129,6 +133,14 @@ final class VmDom
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
         $ctx->classes[self::CLASS_ELEMENT] = $element;
+
+        $fragment = new ClassEntry('DOMDocumentFragment');
+        $fragment->isInternal = true;
+        $fragment->parentLc = self::CLASS_NODE;
+        $fragment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $fragment->methods['appendchild'] = new FragmentAppendChild();
+        $fragment->methodVisibility['appendchild'] = $pub;
+        $ctx->classes[self::CLASS_DOCUMENT_FRAGMENT] = $fragment;
     }
 
     public static function createDocumentType(
@@ -250,6 +262,29 @@ final class VmDom
         return $var;
     }
 
+    public static function createDocumentFragment(Context $ctx): Variable
+    {
+        $class = $ctx->classes[self::CLASS_DOCUMENT_FRAGMENT] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMDocumentFragment is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string('#document-fragment');
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_DOCUMENT_FRAG_NODE;
+        $state->nodeName = '#document-fragment';
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
     public static function loadXML(Context $ctx, ObjectEntry $document, string $xml): bool
     {
         self::ensureDocument($document);
@@ -275,6 +310,10 @@ final class VmDom
 
     public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
     {
+        if (self::isDocumentFragment($child)) {
+            return self::appendFragmentChildren($ctx, $parent, $child);
+        }
+
         if (!self::isElement($child)) {
             throw new \DOMException('Hierarchy request error');
         }
@@ -283,19 +322,23 @@ final class VmDom
         if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
             $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
             if (Variable::TYPE_NULL !== $existing->type) {
-                $parent = $existing->toObject();
-                $parentState = DomRegistry::state($parent);
-            } else {
-                $parentState->documentElementName = DomRegistry::state($child)->nodeName;
-                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
-                self::linkChildToParent($child, null);
-                self::syncSubtree($ctx, $child);
+                $parentState->childIds[] = $child->id;
+                self::linkChildToParent($child, $parent);
+                self::syncSubtree($ctx, $parent);
 
                 return $child;
             }
+            $parentState->documentElementName = DomRegistry::state($child)->nodeName;
+            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
+            self::linkChildToParent($child, null);
+            self::syncSubtree($ctx, $child);
+
+            return $child;
         }
 
-        if (DomConstants::XML_ELEMENT_NODE !== $parentState->nodeType) {
+        if (DomConstants::XML_ELEMENT_NODE !== $parentState->nodeType
+            && DomConstants::XML_DOCUMENT_FRAG_NODE !== $parentState->nodeType
+        ) {
             throw new \DOMException('Hierarchy request error');
         }
 
@@ -304,6 +347,31 @@ final class VmDom
         self::syncSubtree($ctx, $parent);
 
         return $child;
+    }
+
+    private static function appendFragmentChildren(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $fragment
+    ): ObjectEntry {
+        if (!self::isDocumentFragment($fragment)) {
+            throw new \LogicException('appendFragmentChildren() expects a DOMDocumentFragment');
+        }
+
+        $fragState = DomRegistry::state($fragment);
+        $childIds = $fragState->childIds;
+        $fragState->childIds = [];
+        foreach ($childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            self::linkChildToParent($child, null);
+            self::appendChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $fragment);
+
+        return $fragment;
     }
 
     public static function saveXML(ObjectEntry $document): string
@@ -638,7 +706,11 @@ final class VmDom
                 return;
             }
         }
-        if (null === $node->class->parentLc && !self::isElement($node) && !self::isDocument($node)) {
+        if (null === $node->class->parentLc
+            && !self::isElement($node)
+            && !self::isDocument($node)
+            && !self::isDocumentFragment($node)
+        ) {
             return;
         }
         $listVar = self::createNodeList($ctx, $state->childIds);
@@ -717,6 +789,18 @@ final class VmDom
             && DomConstants::XML_DOCUMENT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function isDocumentFragment(ObjectEntry $entry): bool
+    {
+        return self::CLASS_DOCUMENT_FRAGMENT === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_DOCUMENT_FRAG_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isAppendableNode(ObjectEntry $entry): bool
+    {
+        return self::isElement($entry) || self::isDocumentFragment($entry);
+    }
+
     private static function serializeDoctype(string $name, string $publicId, string $systemId): string
     {
         if ('' !== $publicId || '' !== $systemId) {
@@ -791,6 +875,7 @@ final class VmDom
             self::CLASS_DOCUMENT => 'DOMDocument',
             self::CLASS_DOCUMENT_TYPE => 'DOMDocumentType',
             self::CLASS_ELEMENT => 'DOMElement',
+            self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
             default => $lc,
         };
     }

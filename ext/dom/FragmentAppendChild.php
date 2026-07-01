@@ -7,8 +7,8 @@ namespace PHPCompiler\ext\dom;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
-/** DOMElement::appendChild() — VM (#11895, php-src ext/dom/node.c). */
-final class ElementAppendChild extends DomClassMethod
+/** DOMDocumentFragment::appendChild() — VM (#6317, php-src ext/dom/node.c). */
+final class FragmentAppendChild extends DomClassMethod
 {
     public function __construct()
     {
@@ -17,13 +17,13 @@ final class ElementAppendChild extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $receiver = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::appendChild()');
+        $receiver = $this->receiver($frame, VmDom::CLASS_DOCUMENT_FRAGMENT, 'DOMDocumentFragment::appendChild()');
         if (\count($frame->calledArgs) < 2) {
-            throw new \LogicException('DOMElement::appendChild() expects exactly 1 argument');
+            throw new \LogicException('DOMDocumentFragment::appendChild() expects exactly 1 argument');
         }
-        $child = $this->nodeChildArg($frame->calledArgs[1], 'DOMElement::appendChild()', 0);
+        $child = $this->nodeChildArg($frame->calledArgs[1], 'DOMDocumentFragment::appendChild()', 0);
         if (null === $frame->vmContext) {
-            throw new \LogicException('DOMElement::appendChild() requires VM context in this compiler build');
+            throw new \LogicException('DOMDocumentFragment::appendChild() requires VM context in this compiler build');
         }
         $appended = VmDom::appendChild($frame->vmContext, $receiver, $child);
         if (null !== $frame->returnVar) {
@@ -43,7 +43,7 @@ final class ElementAppendChild extends DomClassMethod
             ));
         }
         $object = $var->toObject();
-        if (!VmDom::isAppendableNode($object)) {
+        if (!VmDom::isElement($object)) {
             throw new \TypeError(sprintf(
                 '%s expects argument #%d to be of type DOMNode, %s given',
                 $label,
