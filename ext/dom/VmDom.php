@@ -79,6 +79,8 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_CHILD_NODES, null, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_NEXT_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        $node->methods['clonenode'] = new NodeCloneNode();
+        $node->methodVisibility['clonenode'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $nodeList = new ClassEntry('DOMNodeList');
@@ -799,6 +801,55 @@ final class VmDom
     public static function isAppendableNode(ObjectEntry $entry): bool
     {
         return self::isElement($entry) || self::isDocumentFragment($entry);
+    }
+
+    public static function isCloneableNode(ObjectEntry $entry): bool
+    {
+        return self::isElement($entry) || self::isDocumentFragment($entry);
+    }
+
+    public static function cloneNode(Context $ctx, ObjectEntry $source, bool $deep): Variable
+    {
+        if (!self::isCloneableNode($source)) {
+            throw new \TypeError('DOMNode::cloneNode() must be called on a DOMNode instance');
+        }
+
+        $cloned = self::cloneNodeEntry($ctx, $source, $deep);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($cloned);
+
+        return $var;
+    }
+
+    private static function cloneNodeEntry(Context $ctx, ObjectEntry $source, bool $deep): ObjectEntry
+    {
+        $sourceState = DomRegistry::state($source);
+        if (self::isElement($source)) {
+            $cloned = self::createElement($ctx, $sourceState->nodeName)->toObject();
+        } elseif (self::isDocumentFragment($source)) {
+            $cloned = self::createDocumentFragment($ctx)->toObject();
+        } else {
+            throw new \DOMException('Not supported cloneNode for this node type in this compiler build');
+        }
+
+        self::linkChildToParent($cloned, null);
+        if ($deep) {
+            $cloneState = DomRegistry::state($cloned);
+            foreach ($sourceState->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null === $child || !self::isCloneableNode($child)) {
+                    continue;
+                }
+                $clonedChild = self::cloneNodeEntry($ctx, $child, true);
+                $cloneState->childIds[] = $clonedChild->id;
+                self::linkChildToParent($clonedChild, $cloned);
+            }
+            self::syncSubtree($ctx, $cloned);
+        } else {
+            self::syncSubtree($ctx, $cloned);
+        }
+
+        return $cloned;
     }
 
     private static function serializeDoctype(string $name, string $publicId, string $systemId): string
