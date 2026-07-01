@@ -14,6 +14,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringExplode;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -74,8 +75,10 @@ final class explode extends Internal
 
             return HashTableHelper::alloc($context);
         }
+        StringExplode::ensureLinked($context);
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
         $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
+        $i64 = $context->getTypeFromString('int64');
         if (3 === $argc) {
             $limitLit = self::compileTimeLimit($context, $args[2]);
             $delimLit = $args[0]->compileTimeString ?? null;
@@ -87,10 +90,15 @@ final class explode extends Internal
                 ? $context->constantFromInteger($limitLit, 'int64')
                 : JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'explode', 3, 'limit');
 
-            return JitExplode::explode($context, $delimiter, $haystack, $limit);
+            return StringExplode::invoke($context, $delimiter, $haystack, $limit);
         }
 
-        return JitExplode::explode($context, $delimiter, $haystack);
+        return StringExplode::invoke(
+            $context,
+            $delimiter,
+            $haystack,
+            $i64->constInt(\PHP_INT_MAX, false)
+        );
     }
 
     private static function compileTimeLimit(Context $context, JITVariable $arg): ?int
