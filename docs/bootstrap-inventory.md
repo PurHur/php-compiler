@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3617 |
-| Phase A inventory files (M2 ratio SSOT) | 3617 |
+| PHP files on vm.php path | 3620 |
+| Phase A inventory files (M2 ratio SSOT) | 3620 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9852 |
+| Source constructs flagged (warnings) | 9857 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -358,7 +358,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/random/Module.php` | 0 | 1 |
 | `ext/random/Mt19937Instance.php` | 0 | 1 |
 | `ext/random/RandomizerBuiltin.php` | 0 | 22 |
-| `ext/session/Module.php` | 0 | 18 |
+| `ext/session/Module.php` | 0 | 19 |
 | `ext/session/SessionFileStorage.php` | 0 | 1 |
 | `ext/sockets/BuiltinClasses.php` | 0 | 1 |
 | `ext/sockets/BuiltinEnums.php` | 0 | 3 |
@@ -886,6 +886,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitScalarTypeCoerce.php` | 0 | 2 |
 | `ext/standard/JitSerialize.php` | 0 | 1 |
 | `ext/standard/JitSessionAbort.php` | 0 | 1 |
+| `ext/standard/JitSessionCacheExpire.php` | 0 | 1 |
 | `ext/standard/JitSessionCreateId.php` | 0 | 1 |
 | `ext/standard/JitSessionDecode.php` | 0 | 1 |
 | `ext/standard/JitSessionDestroy.php` | 0 | 1 |
@@ -2020,6 +2021,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/scandir.php` | 0 | 2 |
 | `ext/standard/serialize.php` | 0 | 1 |
 | `ext/standard/session_abort.php` | 0 | 2 |
+| `ext/standard/session_cache_expire_.php` | 0 | 3 |
 | `ext/standard/session_create_id.php` | 0 | 2 |
 | `ext/standard/session_decode.php` | 0 | 2 |
 | `ext/standard/session_destroy.php` | 0 | 1 |
@@ -5844,6 +5846,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new session_decode (line 48)
 - new session_unset (line 49)
 - new session_gc (line 50)
+- new session_cache_expire (line 51)
 - 2 class method(s)
 
 ### `ext/session/SessionFileStorage.php`
@@ -9020,6 +9023,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/JitSessionCacheExpire.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/JitSessionCreateId.php`
 
@@ -12302,7 +12310,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 47 class method(s)
+- 48 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -12919,16 +12927,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 80)
-- new HashTable (line 253)
-- new HashTable (line 319)
-- new HashTable (line 341)
-- new HashTable (line 446)
-- new HashTable (line 452)
-- new HashTable (line 458)
-- new HashTable (line 464)
-- new HashTable (line 491)
-- 35 class method(s)
+- new Variable (line 101)
+- new HashTable (line 274)
+- new HashTable (line 340)
+- new HashTable (line 362)
+- new HashTable (line 467)
+- new HashTable (line 473)
+- new HashTable (line 479)
+- new HashTable (line 485)
+- new HashTable (line 512)
+- 37 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
 
@@ -16705,6 +16713,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 24)
+- 2 class method(s)
+
+### `ext/standard/session_cache_expire_.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 49)
 - 2 class method(s)
 
 ### `ext/standard/session_create_id.php`
