@@ -26,6 +26,15 @@ final class VmForwardStaticCall
             );
         }
         $callable = $callable->resolveIndirect();
+        // php-src basic_functions.c — zend_is_callable() before class-scope guard (#14788).
+        if (!VmCallableInvoke::isInvokable($callable)) {
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #1 ($callback) must be a valid callback, no array or string given',
+                    $builtinName
+                )
+            );
+        }
         if ('forward_static_call' === $builtinName && !self::hasActiveClassScope($frame)) {
             throw new \Error("Cannot call {$builtinName}() when no class scope is active");
         }
