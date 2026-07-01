@@ -18,6 +18,9 @@ final class VmXml
     /** libxml/xmlerror.h — XML_ERR_TAG_NOT_FINISHED (php-src ext/libxml/libxml.c). */
     private const XML_ERR_TAG_NOT_FINISHED = 73;
 
+    /** libxml/xmlerror.h — XML_ERR_UNCLOSED_NODE_TAG (php-src ext/libxml/libxml.c; #14467). */
+    private const XML_ERR_UNCLOSED_NODE_TAG = 77;
+
     /** @var array<int, array{errorCode: int}> */
     private static array $parsers = [];
 
@@ -121,10 +124,40 @@ final class VmXml
         }
 
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/s', $trimmed, $matches)) {
+            $premature = self::detectPrematureEnd($trimmed);
+            if (null !== $premature) {
+                return $premature;
+            }
+
             return self::errorRecord(1, 1, 'Malformed XML document', 4);
         }
 
         return self::validateFragment($matches[3]);
+    }
+
+    /**
+     * Match libxml "Premature end of data in tag …" (XML_ERR_UNCLOSED_NODE_TAG; #14467).
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function detectPrematureEnd(string $data): ?array
+    {
+        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/s', $data, $open)) {
+            return null;
+        }
+        $tag = $open[1];
+        if (preg_match('/<\/'.preg_quote($tag, '/').'>\s*$/s', $data)) {
+            return null;
+        }
+        $line = 1;
+
+        return self::errorRecord(
+            $line,
+            1,
+            "Premature end of data in tag {$tag} line {$line}",
+            self::XML_ERR_UNCLOSED_NODE_TAG,
+            LibxmlConstants::LIBXML_ERR_FATAL
+        );
     }
 
     /**
