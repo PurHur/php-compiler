@@ -20,7 +20,13 @@ final class NodeIsDefaultNamespace extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMNode::isDefaultNamespace() expects exactly 1 argument');
         }
-        $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMNode::isDefaultNamespace()', 0);
+        $namespace = $this->stringArg(
+            $frame->calledArgs[1],
+            'DOMNode::isDefaultNamespace()',
+            0,
+            $frame,
+            'namespace'
+        );
         if (null === $frame->returnVar) {
             return;
         }

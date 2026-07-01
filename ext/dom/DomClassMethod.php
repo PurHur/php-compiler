@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -21,8 +22,16 @@ abstract class DomClassMethod extends VmClassMethod
         return VmDom::requireReceiver($frame->calledArgs[0], $classLc, $label);
     }
 
-    protected function stringArg(Variable $var, string $label, int $index): string
-    {
+    protected function stringArg(
+        Variable $var,
+        string $label,
+        int $index,
+        ?Frame $frame = null,
+        string $paramName = 'value'
+    ): string {
+        if (null !== $frame) {
+            InternalStrictArg::rejectNullString($var, $label, $paramName, $index, $frame);
+        }
         $var = $var->resolveIndirect();
         if (Variable::TYPE_STRING !== $var->type && Variable::TYPE_NULL !== $var->type) {
             throw new \TypeError(sprintf(
