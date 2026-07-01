@@ -150,6 +150,8 @@ require_once __DIR__.'/../../../ext/dom/Module.php';
 require_once __DIR__.'/../../../ext/dom/NodeCloneNode.php';
 require_once __DIR__.'/../../../ext/dom/NodeContains.php';
 require_once __DIR__.'/../../../ext/dom/NodeGetLineNo.php';
+require_once __DIR__.'/../../../ext/dom/NodeGetNodePath.php';
+require_once __DIR__.'/../../../ext/dom/NodeGetRootNode.php';
 require_once __DIR__.'/../../../ext/dom/NodeHasChildNodes.php';
 require_once __DIR__.'/../../../ext/dom/NodeIsDefaultNamespace.php';
 require_once __DIR__.'/../../../ext/dom/NodeIsSameNode.php';
