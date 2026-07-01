@@ -10,7 +10,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_change_key_case() JIT routes through ArrayChangeKeyCaseJitHelper PHP (#12371). */
+/** array_change_key_case() JIT routes through ArrayChangeKeyCaseJitHelper PHP (#12371, #14530). */
 final class ArrayChangeKeyCaseRuntimeShrinkTest extends TestCase
 {
     public function testArrayChangeKeyCaseRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -18,7 +18,7 @@ final class ArrayChangeKeyCaseRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseJitHelper', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildChangeKeyCaseArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_change_key_case.php');
         $this->assertStringContainsString('ArrayChangeKeyCaseRuntime::changeKeyCase', $builtin);
