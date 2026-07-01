@@ -794,7 +794,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
 | `ext/standard/JitNetGetInterfaces.php` | 0 | 1 |
 | `ext/standard/JitNetworkServices.php` | 0 | 1 |
-| `ext/standard/JitNl2br.php` | 0 | 1 |
+| `ext/standard/Nl2brJitHelper.php` | 0 | 1 |
 | `ext/standard/JitNlLanginfo.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitObClean.php` | 0 | 1 |
@@ -8578,7 +8578,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
-### `ext/standard/JitNl2br.php`
+### `ext/standard/Nl2brJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)

@@ -928,6 +928,7 @@ class Context {
             if (!Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($this)) {
                 Builtin\StringSoundex::ensureStandaloneBodies($this);
                 Builtin\StringQuotemeta::ensureStandaloneBodies($this);
+                Builtin\StringNl2br::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);

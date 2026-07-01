@@ -1254,9 +1254,7 @@
         "ext/standard/JitNetworkServices.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],
-        "ext/standard/JitNl2br.php": [
-            "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 11"
-        ],
+        "ext/standard/Nl2brJitHelper.php": [],
         "ext/standard/JitNlLanginfo.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],

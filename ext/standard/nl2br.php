@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringNl2br;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -24,7 +25,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * nl2br() for strings (subset of PHP; JIT/AOT via __string__nl2br LLVM lowering).
+ * nl2br() for strings (subset of PHP; JIT/AOT via StringNl2br + Nl2brJitHelper).
  */
 final class nl2br extends Internal
 {
@@ -83,7 +84,13 @@ final class nl2br extends Internal
             );
         }
 
-        return JitNl2br::nl2br($context, $str, $useXhtmlI8);
+        StringNl2br::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__nl2br'),
+            $str,
+            $useXhtmlI8
+        );
     }
 
     private static function resolveUseXhtmlBool(Frame $frame, int $argIndex): bool
