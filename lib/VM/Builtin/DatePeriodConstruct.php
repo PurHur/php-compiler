@@ -9,8 +9,9 @@ use PHPCompiler\VM\DateIntervalSupport;
 use PHPCompiler\VM\DatePeriodSupport;
 use PHPCompiler\VM\DateTimeSupport;
 use PHPCompiler\VM\InternalStrictArg;
+use PHPCompiler\VM\Variable;
 
-/** DatePeriod::__construct(DateTimeInterface, DateInterval, int) — VM (#14144, ext/date/php_date.c). */
+/** DatePeriod::__construct(DateTimeInterface, DateInterval, int|DateTimeInterface) — VM (#14144, #14228). */
 final class DatePeriodConstruct extends VmClassMethod
 {
     public function __construct()
@@ -52,12 +53,35 @@ final class DatePeriodConstruct extends VmClassMethod
             2,
             'interval'
         );
+        $options = 0;
+        if ($argc >= 5) {
+            $options = InternalStrictArg::requireBuiltinTypedInt(
+                $frame,
+                4,
+                'DatePeriod::__construct',
+                'options'
+            )->toInt();
+        }
+        $third = $frame->calledArgs[3]->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $third->type) {
+            $end = DateTimeSupport::requireDateTimeInterface(
+                $frame->calledArgs[3],
+                'DatePeriod::__construct()',
+                $frame->vmContext,
+                3,
+                'end'
+            );
+            DateTimeSupport::requireInitializedDateTimeLike($end, $end->class->name);
+            DatePeriodSupport::initFromEndDate($receiver, $start, $interval, $end, $options);
+
+            return;
+        }
         $recurrences = InternalStrictArg::requireBuiltinTypedInt(
             $frame,
             3,
             'DatePeriod::__construct',
             'recurrences'
         )->toInt();
-        DatePeriodSupport::initFromRecurrenceCount($receiver, $start, $interval, $recurrences);
+        DatePeriodSupport::initFromRecurrenceCount($receiver, $start, $interval, $recurrences, $options);
     }
 }

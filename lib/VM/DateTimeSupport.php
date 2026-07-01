@@ -970,6 +970,22 @@ final class DateTimeSupport
         return $clone;
     }
 
+    /** Clone DateTime/DateTimeImmutable for DatePeriod iteration (#14228). */
+    public static function cloneDateTimeLike(ObjectEntry $source): ObjectEntry
+    {
+        return self::cloneDateTimeObject($source);
+    }
+
+    public static function readTimestamp(ObjectEntry $dt): int
+    {
+        return self::requireIntProperty($dt, self::TS_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
+    public static function readMicrosecond(ObjectEntry $dt): int
+    {
+        return self::requireIntProperty($dt, self::MICROSECOND_PROPERTY, self::classLabel($dt))->toInt();
+    }
+
     private static function copyDateTimeState(ObjectEntry $source, ObjectEntry $target): void
     {
         $sourceLabel = self::classLabel($source);
