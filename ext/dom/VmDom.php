@@ -133,6 +133,8 @@ final class VmDom
         $node->methodVisibility['lookupnamespaceuri'] = $pub;
         $node->methods['getlineno'] = new NodeGetLineNo();
         $node->methodVisibility['getlineno'] = $pub;
+        $node->methods['getnodepath'] = new NodeGetNodePath();
+        $node->methodVisibility['getnodepath'] = $pub;
         $node->methods['hasattributes'] = new NodeHasAttributes();
         $node->methodVisibility['hasattributes'] = $pub;
         $node->methods['isdefaultnamespace'] = new NodeIsDefaultNamespace();
@@ -581,6 +583,59 @@ final class VmDom
         }
 
         return DomRegistry::state($node)->lineNo;
+    }
+
+    public static function getNodePath(ObjectEntry $node): ?string
+    {
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_DOCUMENT_FRAG_NODE === $state->nodeType) {
+            return null;
+        }
+        if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
+            return '/';
+        }
+
+        $segments = [];
+        $current = $node;
+        while (null !== $current) {
+            $currentState = DomRegistry::state($current);
+            if (DomConstants::XML_DOCUMENT_NODE === $currentState->nodeType) {
+                break;
+            }
+            $segment = self::nodePathSegment($current);
+            if (null !== $segment && '' !== $segment) {
+                array_unshift($segments, $segment);
+            }
+            if (null === $currentState->parentId) {
+                break;
+            }
+            $current = DomRegistry::entry($currentState->parentId);
+            if (null === $current) {
+                break;
+            }
+        }
+
+        if ([] === $segments) {
+            return '/';
+        }
+
+        return '/'.implode('/', $segments);
+    }
+
+    private static function nodePathSegment(ObjectEntry $node): ?string
+    {
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+            return 'text()';
+        }
+        if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
+            return $state->nodeName;
+        }
+
+        return $state->nodeName;
     }
 
     /**
