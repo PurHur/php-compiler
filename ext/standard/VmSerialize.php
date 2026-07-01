@@ -975,7 +975,7 @@ final class VmSerialize
                     continue;
                 }
                 $value = $entry->getProperty($meta->name)->resolveIndirect();
-                if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                if (TypedPropertyCheck::omitFromSerialize($value)) {
                     continue;
                 }
                 $copy = new Variable();
@@ -988,7 +988,7 @@ final class VmSerialize
                 continue;
             }
             $value = $prop->resolveIndirect();
-            if (TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+            if (TypedPropertyCheck::omitFromSerialize($value)) {
                 continue;
             }
             $copy = new Variable();
