@@ -44,8 +44,8 @@ final class strncasecmp extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'strncasecmp', 3)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncasecmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 JitLongArg::lower($context, $args[2], 'strncasecmp() length'),

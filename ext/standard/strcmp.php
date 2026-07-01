@@ -43,8 +43,8 @@ final class strcmp extends Internal
         if (2 !== count($args)) {
             throw new \LogicException('strcmp() requires exactly two arguments');
         }
-        $left = JitStringBuiltinArg::lower($context, $args[0], 'strcmp', 0, 'string1');
-        $right = JitStringBuiltinArg::lower($context, $args[1], 'strcmp', 1, 'string2');
+        $left = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strcmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strcmp', 1, 'string2');
 
         return JitStringCompare::strcmp($context, $left, $right);
     }
@@ -55,7 +55,7 @@ final class strcmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strcmp', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArgNoObject(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strcmp',
             $argIndex,

@@ -45,8 +45,8 @@ final class strncmp extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'strncmp', 3)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strncmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strncmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncmp', 1, 'string2'));
         $length = $context->builder->zExt(
             $context->builder->trunc(
                 JitLongArg::lower($context, $args[2], 'strncmp() length'),
@@ -66,7 +66,7 @@ final class strncmp extends Internal
             return InternalStrictArg::requireString($frame, $argIndex, 'strncmp', $paramName)->toString();
         }
 
-        return VmString::coerceStringBuiltinArgNoObject(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'strncmp',
             $argIndex,
