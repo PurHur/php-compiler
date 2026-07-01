@@ -78,6 +78,48 @@ PHP;
         self::assertSame("1\n0\n", ob_get_clean());
     }
 
+    public function test_dom_document_xml_metadata_properties(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+echo var_export($doc->encoding, true), "\n";
+echo $doc->xmlVersion, "\n";
+echo (int) $doc->xmlStandalone, "\n";
+echo var_export($doc->documentURI, true), "\n";
+$doc->encoding = 'UTF-8';
+$doc->loadXML('<?xml version="1.0" encoding="ISO-8859-1" standalone="yes"?><root/>');
+echo $doc->encoding, "\n";
+echo (int) $doc->xmlStandalone, "\n";
+echo (int) str_contains($doc->saveXML(), 'encoding="ISO-8859-1"'), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_xml_props.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("NULL\n1.0\n0\nNULL\nISO-8859-1\n1\n1\n", ob_get_clean());
+    }
+
+    public function test_dom_node_contains_descendant_check(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><parent><child/></parent></root>');
+$root = $doc->documentElement;
+$child = $root->firstChild->firstChild;
+echo (int) $root->contains($child), "\n";
+echo (int) $child->contains($root), "\n";
+echo (int) $root->contains($root), "\n";
+echo (int) $root->contains(null), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_contains.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n0\n1\n0\n", ob_get_clean());
+    }
+
     public function test_dom_node_introspection_properties(): void
     {
         $runtime = new Runtime();

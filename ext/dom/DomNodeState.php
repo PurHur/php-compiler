@@ -60,4 +60,13 @@ final class DomNodeState
 
     /** @var array<string, int> */
     public array $elementIds = [];
+
+    /** XML declaration metadata (php-src ext/dom/document.c; #14420). */
+    public string $xmlVersion = '1.0';
+
+    public ?string $encoding = null;
+
+    public bool $xmlStandalone = false;
+
+    public ?string $documentUri = null;
 }
