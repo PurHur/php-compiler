@@ -20,7 +20,7 @@ final class is_dir extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_dir() requires exactly one argument');
         }
-        $path = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'is_dir', 0, 'filename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_dir');
         if (null === $frame->returnVar) {
             return;
         }
