@@ -843,7 +843,7 @@ require_once __DIR__.'/../../../ext/standard/JitMktime.php';
 require_once __DIR__.'/../../../ext/standard/JitMoveUploadedFile.php';
 require_once __DIR__.'/../../../ext/standard/JitNetGetInterfaces.php';
 require_once __DIR__.'/../../../ext/standard/JitNetworkServices.php';
-require_once __DIR__.'/../../../ext/standard/JitNl2br.php';
+require_once __DIR__.'/../../../ext/standard/Nl2brJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitNlLanginfo.php';
 require_once __DIR__.'/../../../ext/standard/JitNumberFormat.php';
 require_once __DIR__.'/../../../ext/standard/JitObClean.php';

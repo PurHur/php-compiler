@@ -836,7 +836,7 @@
         "ext/standard/JitMoveUploadedFile.php",
         "ext/standard/JitNetGetInterfaces.php",
         "ext/standard/JitNetworkServices.php",
-        "ext/standard/JitNl2br.php",
+        "ext/standard/Nl2brJitHelper.php",
         "ext/standard/JitNlLanginfo.php",
         "ext/standard/JitNumberFormat.php",
         "ext/standard/JitObClean.php",
