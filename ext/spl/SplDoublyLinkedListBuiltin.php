@@ -20,11 +20,28 @@ final class SplDoublyLinkedListBuiltin
 {
     public const CLASS_LC = 'spldoublylinkedlist';
 
+    /** php-src SPL_DLLIST_IT_* (ext/spl/spl_dllist.h). */
+    public const IT_MODE_FIFO = 0;
+
+    public const IT_MODE_DELETE = 1;
+
+    public const IT_MODE_LIFO = 2;
+
+    public const IT_MODE_KEEP = 0;
+
+    /** php-src SPL_DLLIST_IT_FIX — frozen LIFO/FIFO for SplQueue/SplStack. */
+    public const IT_MODE_FIX = 4;
+
+    private const IT_MODE_MASK = 3;
+
     /** @var array<int, list<Variable>> */
     private static array $store = [];
 
     /** @var array<int, int> */
     private static array $iteratorModes = [];
+
+    /** @var array<int, int> iterator position per object (-1 = invalid) */
+    private static array $iteratorPositions = [];
 
     public static function registerClass(Context $ctx): void
     {
@@ -56,6 +73,13 @@ final class SplDoublyLinkedListBuiltin
             'offsetset' => SplDoublyLinkedListOffsetSet::class,
             'offsetexists' => SplDoublyLinkedListOffsetExists::class,
             'offsetunset' => SplDoublyLinkedListOffsetUnset::class,
+            'rewind' => SplDoublyLinkedListRewind::class,
+            'valid' => SplDoublyLinkedListValid::class,
+            'current' => SplDoublyLinkedListCurrent::class,
+            'key' => SplDoublyLinkedListKey::class,
+            'next' => SplDoublyLinkedListNext::class,
+            'setiteratormode' => SplDoublyLinkedListSetIteratorMode::class,
+            'getiteratormode' => SplDoublyLinkedListGetIteratorMode::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
             $entry->methodVisibility[$lc] = $pub;
@@ -64,6 +88,8 @@ final class SplDoublyLinkedListBuiltin
         $entry->methodNames['offsetset'] = 'offsetSet';
         $entry->methodNames['offsetexists'] = 'offsetExists';
         $entry->methodNames['offsetunset'] = 'offsetUnset';
+        $entry->methodNames['setiteratormode'] = 'setIteratorMode';
+        $entry->methodNames['getiteratormode'] = 'getIteratorMode';
 
         $entry->isInternal = true;
         $ctx->classes[self::CLASS_LC] = $entry;
@@ -71,7 +97,13 @@ final class SplDoublyLinkedListBuiltin
 
     private static function classIsComplete(ClassEntry $entry): bool
     {
-        return isset($entry->methods['push'], $entry->methods['pop'], $entry->methods['offsetget']);
+        return isset(
+            $entry->methods['push'],
+            $entry->methods['pop'],
+            $entry->methods['offsetget'],
+            $entry->methods['rewind'],
+            $entry->methods['valid']
+        );
     }
 
     public static function init(ObjectEntry $object, int $iteratorMode = 0): void
@@ -89,9 +121,86 @@ final class SplDoublyLinkedListBuiltin
         return self::$iteratorModes[$object->id];
     }
 
-    public static function setIteratorMode(ObjectEntry $object, int $mode): void
+    public static function setIteratorMode(ObjectEntry $object, int $mode): int
     {
-        self::$iteratorModes[$object->id] = $mode;
+        $current = self::getIteratorMode($object);
+        if (
+            0 !== ($current & self::IT_MODE_FIX)
+            && ($current & self::IT_MODE_LIFO) !== ($mode & self::IT_MODE_LIFO)
+        ) {
+            throw new \RuntimeException(
+                "Iterators' LIFO/FIFO modes for SplStack/SplQueue objects are frozen"
+            );
+        }
+        self::$iteratorModes[$object->id] = ($mode & self::IT_MODE_MASK) | ($current & self::IT_MODE_FIX);
+
+        return self::$iteratorModes[$object->id];
+    }
+
+    public static function rewind(ObjectEntry $object): void
+    {
+        $mode = self::getIteratorMode($object);
+        $count = self::count($object);
+        if ($mode & self::IT_MODE_LIFO) {
+            self::$iteratorPositions[$object->id] = $count > 0 ? $count - 1 : -1;
+        } else {
+            self::$iteratorPositions[$object->id] = $count > 0 ? 0 : -1;
+        }
+    }
+
+    public static function valid(ObjectEntry $object): bool
+    {
+        $pos = self::iteratorPosition($object);
+
+        return $pos >= 0 && $pos < self::count($object);
+    }
+
+    public static function current(ObjectEntry $object): Variable
+    {
+        if (!self::valid($object)) {
+            throw new \RuntimeException('Called current() on invalid iterator position');
+        }
+        $pos = self::iteratorPosition($object);
+        $result = new Variable();
+        $result->copyFrom(self::state($object)[$pos]);
+
+        return $result;
+    }
+
+    public static function key(ObjectEntry $object): int
+    {
+        return self::iteratorPosition($object);
+    }
+
+    public static function next(ObjectEntry $object): void
+    {
+        if (!self::valid($object)) {
+            return;
+        }
+        $mode = self::getIteratorMode($object);
+        if ($mode & self::IT_MODE_DELETE) {
+            if ($mode & self::IT_MODE_LIFO) {
+                self::pop($object);
+                $count = self::count($object);
+                self::$iteratorPositions[$object->id] = $count > 0 ? $count - 1 : -1;
+            } else {
+                self::shift($object);
+                self::$iteratorPositions[$object->id] = self::count($object) > 0 ? 0 : -1;
+            }
+        } elseif ($mode & self::IT_MODE_LIFO) {
+            --self::$iteratorPositions[$object->id];
+        } else {
+            ++self::$iteratorPositions[$object->id];
+        }
+    }
+
+    private static function iteratorPosition(ObjectEntry $object): int
+    {
+        if (!isset(self::$iteratorPositions[$object->id])) {
+            self::rewind($object);
+        }
+
+        return self::$iteratorPositions[$object->id];
     }
 
     /**
@@ -498,5 +607,151 @@ final class SplDoublyLinkedListOffsetUnset extends VmClassMethod
             );
         }
         SplDoublyLinkedListBuiltin::offsetUnset($object, $frame->calledArgs[1]);
+    }
+}
+
+final class SplDoublyLinkedListRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::rewind()'
+        );
+        SplDoublyLinkedListBuiltin::rewind($object);
+    }
+}
+
+final class SplDoublyLinkedListValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::valid()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->bool(SplDoublyLinkedListBuiltin::valid($object));
+    }
+}
+
+final class SplDoublyLinkedListCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::current()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplDoublyLinkedListBuiltin::current($object));
+    }
+}
+
+final class SplDoublyLinkedListKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::key()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplDoublyLinkedListBuiltin::key($object));
+    }
+}
+
+final class SplDoublyLinkedListNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::next()'
+        );
+        SplDoublyLinkedListBuiltin::next($object);
+    }
+}
+
+final class SplDoublyLinkedListSetIteratorMode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setIteratorMode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::setIteratorMode()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplDoublyLinkedList::setIteratorMode() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int($newMode);
+    }
+}
+
+final class SplDoublyLinkedListGetIteratorMode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getIteratorMode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplDoublyLinkedListBuiltin::CLASS_LC,
+            'SplDoublyLinkedList::getIteratorMode()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplDoublyLinkedListBuiltin::getIteratorMode($object));
     }
 }
