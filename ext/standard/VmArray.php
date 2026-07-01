@@ -830,9 +830,10 @@ final class VmArray
     public static function contains(Variable $needle, HashTable $haystack, bool $strict): bool
     {
         $needle = $needle->resolveIndirect();
+        $vm = \PHPCompiler\VM::running();
         foreach ($haystack->iterate(true) as $value) {
             $stored = $value->resolveIndirect();
-            if ($strict ? $needle->identicalTo($stored) : $needle->equals($stored)) {
+            if ($strict ? $needle->identicalTo($stored) : $needle->equals($stored, $vm)) {
                 return true;
             }
         }
