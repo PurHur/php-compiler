@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
 use PHPCompiler\VM;
@@ -1039,14 +1040,7 @@ class Module extends ModuleAbstract
                 $context->registerFunction($name, $fn);
             }
         }
-        try {
-            $context->lookupFunction('strpbrk');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $ft = $context->context->functionType($i8p, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strpbrk', $ft);
-            $context->registerFunction('strpbrk', $fn);
-        }
+        StringStrpbrk::ensureLinked($context);
         try {
             $context->lookupFunction('strrchr');
         } catch (\Throwable $e) {
