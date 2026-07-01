@@ -4,341 +4,150 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __string__urldecode and __string__rawurldecode.
+ * JIT/AOT link for __string__urldecode / __string__rawurldecode via UrldecodeJitHelper PHP (#14726).
+ *
+ * Replaces ~344 LOC inline LLVM in StringUrldecode.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * php-src: ext/standard/url.c — PHP_FUNCTION(urldecode), PHP_FUNCTION(rawurldecode)
  */
 final class StringUrldecode
 {
+    private const HELPER_PATH = '/ext/standard/UrldecodeJitHelper.php';
+
+    private const URLDECODE_HELPER = 'PHPCompiler\\ext\\standard\\UrldecodeJitHelper::urldecodeArgv';
+
+    private const RAWURLDECODE_HELPER = 'PHPCompiler\\ext\\standard\\UrldecodeJitHelper::rawurldecodeArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::URLDECODE_HELPER,
+        self::RAWURLDECODE_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__string__urldecode',
+        '__string__rawurldecode',
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        self::implementFunction($context, '__string__urldecode', true);
-        self::implementFunction($context, '__string__rawurldecode', false);
+        $probe = $context->module->getNamedFunction('__string__urldecode');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementBridge($context, '__string__urldecode', self::URLDECODE_HELPER);
+        self::implementBridge($context, '__string__rawurldecode', self::RAWURLDECODE_HELPER);
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
-    private static function implementFunction(Context $context, string $name, bool $formDecoding): void
+    private static function implementBridge(Context $context, string $abiName, string $helperLogical): void
     {
-        $fn = $context->lookupFunction($name);
-        $entry = $fn->appendBasicBlock('main');
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $ft = $context->context->functionType($strPtr, false, $strPtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('urldecode_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $string = $fn->getParam(0);
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i8 = $context->getTypeFromString('int8');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $two = $i64->constInt(2, false);
-        $three = $i64->constInt(3, false);
-
-        $src = $context->builder->call($context->lookupFunction('__string__separate'), $string);
-        $len = $context->builder->load($context->builder->structGep($src, $map['length']));
-        $srcChars = $context->builder->structGep($src, $map['value']);
-
-        $outLenSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $outLenSlot);
-        $iSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $iSlot);
-
-        self::countLoop($context, $fn, $srcChars, $len, $iSlot, $outLenSlot, $i64, $i8, $zero, $one, $two, $three, $formDecoding);
-
-        $outLen = $context->builder->load($outLenSlot);
-        $dest = $context->builder->call($context->lookupFunction('__string__alloc'), $outLen);
-        $context->builder->store($outLen, $context->builder->structGep($dest, $map['length']));
-        $destChars = $context->builder->structGep($dest, $map['value']);
-
-        $posSlot = $context->builder->alloca($i64, 1);
-        $context->builder->store($zero, $posSlot);
-        $context->builder->store($zero, $iSlot);
-
-        self::writeLoop($context, $fn, $srcChars, $len, $destChars, $iSlot, $posSlot, $i64, $i8, $zero, $one, $two, $three, $formDecoding);
-
-        $context->builder->returnValue($dest);
-        $context->builder->clearInsertionPosition();
-    }
-
-    private static function countLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $iSlot,
-        Value $outLenSlot,
-        $i64,
-        $i8,
-        Value $zero,
-        Value $one,
-        Value $two,
-        Value $three,
-        bool $formDecoding
-    ): void {
-        $head = $fn->appendBasicBlock('urldecode_count_head');
-        $body = $fn->appendBasicBlock('urldecode_count_body');
-        $done = $fn->appendBasicBlock('urldecode_count_done');
-
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $step = self::decodedStep($context, $fn, $srcChars, $len, $i, $ch, $one, $two, $three, $i64, $i8, $formDecoding);
-        $outLen = $context->builder->load($outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($outLen, $one), $outLenSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $step), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function writeLoop(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $destChars,
-        Value $iSlot,
-        Value $posSlot,
-        $i64,
-        $i8,
-        Value $zero,
-        Value $one,
-        Value $two,
-        Value $three,
-        bool $formDecoding
-    ): void {
-        $head = $fn->appendBasicBlock('urldecode_write_head');
-        $body = $fn->appendBasicBlock('urldecode_write_body');
-        $done = $fn->appendBasicBlock('urldecode_write_done');
-
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($head);
-        $i = $context->builder->load($iSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $i, $len);
-        $context->builder->branchIf($atEnd, $done, $body);
-
-        $context->builder->positionAtEnd($body);
-        $ch = $context->builder->load($context->builder->gep($srcChars, $i));
-        $pos = $context->builder->load($posSlot);
-        $destAt = $context->builder->gep($destChars, $pos);
-        $step = self::writeDecoded($context, $fn, $srcChars, $len, $i, $destAt, $ch, $one, $two, $three, $i64, $i8, $formDecoding);
-        $context->builder->store($context->builder->addNoSignedWrap($pos, $one), $posSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($i, $step), $iSlot);
-        $context->builder->branch($head);
-
-        $context->builder->positionAtEnd($done);
-    }
-
-    private static function decodedStep(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $i,
-        Value $ch,
-        Value $one,
-        Value $two,
-        Value $three,
-        $i64,
-        $i8,
-        bool $formDecoding
-    ): Value {
-        $merge = $fn->appendBasicBlock('urldecode_step_merge');
-
-        if ($formDecoding) {
-            $plus = $fn->appendBasicBlock('urldecode_step_plus');
-            $afterPlus = $fn->appendBasicBlock('urldecode_step_after_plus');
-            $isPlus = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('+'), false));
-            $context->builder->branchIf($isPlus, $plus, $afterPlus);
-            $context->builder->positionAtEnd($plus);
-            $context->builder->branch($merge);
-            $context->builder->positionAtEnd($afterPlus);
-        }
-
-        $isPct = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('%'), false));
-        $pct = $fn->appendBasicBlock('urldecode_step_pct');
-        $plain = $fn->appendBasicBlock('urldecode_step_plain');
-        $context->builder->branchIf($isPct, $pct, $plain);
-
-        $context->builder->positionAtEnd($pct);
-        $hasRoom = $context->builder->icmp(
-            Builder::INT_SLT,
-            $context->builder->addNoSignedWrap($i, $two),
-            $len
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            $fn->getParam(0)
         );
-        $tri = $fn->appendBasicBlock('urldecode_step_tri');
-        $oneByte = $fn->appendBasicBlock('urldecode_step_one');
-        $context->builder->branchIf($hasRoom, $tri, $oneByte);
-
-        $context->builder->positionAtEnd($tri);
-        $hiCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $one)));
-        $loCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $two)));
-        $isHex = self::isHexPair($context, $hiCh, $loCh, $i64, $i8);
-        $triOk = $fn->appendBasicBlock('urldecode_step_tri_ok');
-        $triBad = $fn->appendBasicBlock('urldecode_step_tri_bad');
-        $context->builder->branchIf($isHex, $triOk, $triBad);
-
-        $context->builder->positionAtEnd($triOk);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($triBad);
-        $context->builder->branch($merge);
-        $context->builder->positionAtEnd($oneByte);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($plain);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($merge);
-        $step = $context->builder->phi($i64);
-        if ($formDecoding) {
-            $step->addIncoming($one, $plus);
-        }
-        $step->addIncoming($three, $triOk);
-        $step->addIncoming($one, $triBad);
-        $step->addIncoming($one, $oneByte);
-        $step->addIncoming($one, $plain);
-
-        return $step;
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
     }
 
-    private static function writeDecoded(
-        Context $context,
-        Value $fn,
-        Value $srcChars,
-        Value $len,
-        Value $i,
-        Value $destAt,
-        Value $ch,
-        Value $one,
-        Value $two,
-        Value $three,
-        $i64,
-        $i8,
-        bool $formDecoding
-    ): Value {
-        $merge = $fn->appendBasicBlock('urldecode_write_merge');
-
-        if ($formDecoding) {
-            $plus = $fn->appendBasicBlock('urldecode_write_plus');
-            $afterPlus = $fn->appendBasicBlock('urldecode_write_after_plus');
-            $isPlus = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('+'), false));
-            $context->builder->branchIf($isPlus, $plus, $afterPlus);
-            $context->builder->positionAtEnd($plus);
-            $context->builder->store($i8->constInt(ord(' '), false), $destAt);
-            $context->builder->branch($merge);
-            $context->builder->positionAtEnd($afterPlus);
-        }
-
-        $isPct = $context->builder->icmp(Builder::INT_EQ, $ch, $i8->constInt(ord('%'), false));
-        $pct = $fn->appendBasicBlock('urldecode_write_pct');
-        $plain = $fn->appendBasicBlock('urldecode_write_plain');
-        $context->builder->branchIf($isPct, $pct, $plain);
-
-        $context->builder->positionAtEnd($pct);
-        $hasRoom = $context->builder->icmp(
-            Builder::INT_SLT,
-            $context->builder->addNoSignedWrap($i, $two),
-            $len
-        );
-        $tri = $fn->appendBasicBlock('urldecode_write_tri');
-        $oneByte = $fn->appendBasicBlock('urldecode_write_one');
-        $context->builder->branchIf($hasRoom, $tri, $oneByte);
-
-        $context->builder->positionAtEnd($tri);
-        $hiCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $one)));
-        $loCh = $context->builder->load($context->builder->gep($srcChars, $context->builder->addNoSignedWrap($i, $two)));
-        $isHex = self::isHexPair($context, $hiCh, $loCh, $i64, $i8);
-        $triOk = $fn->appendBasicBlock('urldecode_write_tri_ok');
-        $triBad = $fn->appendBasicBlock('urldecode_write_tri_bad');
-        $context->builder->branchIf($isHex, $triOk, $triBad);
-
-        $context->builder->positionAtEnd($triOk);
-        $byte = self::decodeHexPair($context, $hiCh, $loCh, $i64, $i8);
-        $context->builder->store($byte, $destAt);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($triBad);
-        $context->builder->store($ch, $destAt);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($oneByte);
-        $context->builder->store($ch, $destAt);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($plain);
-        $context->builder->store($ch, $destAt);
-        $context->builder->branch($merge);
-
-        $context->builder->positionAtEnd($merge);
-        $step = $context->builder->phi($i64);
-        if ($formDecoding) {
-            $step->addIncoming($one, $plus);
-        }
-        $step->addIncoming($three, $triOk);
-        $step->addIncoming($one, $triBad);
-        $step->addIncoming($one, $oneByte);
-        $step->addIncoming($one, $plain);
-
-        return $step;
-    }
-
-    private static function isHexPair(Context $context, Value $hiCh, Value $loCh, $i64, $i8): Value
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
     {
-        $invalid = $i64->constInt(-1, true);
-        $hi = self::hexNibbleValue($context, $hiCh, $i64, $i8);
-        $lo = self::hexNibbleValue($context, $loCh, $i64, $i8);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after UrldecodeJitHelper compile (#14726)');
+        }
 
-        return $context->builder->and(
-            $context->builder->icmp(Builder::INT_NE, $hi, $invalid),
-            $context->builder->icmp(Builder::INT_NE, $lo, $invalid)
-        );
+        return $fn;
     }
 
-    private static function decodeHexPair(Context $context, Value $hiCh, Value $loCh, $i64, $i8): Value
+    private static function ensureJitHelperCompiled(Context $context): void
     {
-        $hi = self::hexNibbleValue($context, $hiCh, $i64, $i8);
-        $lo = self::hexNibbleValue($context, $loCh, $i64, $i8);
-        $combined = $context->builder->or(
-            $context->builder->shl($hi, $i64->constInt(4, false)),
-            $lo
-        );
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
 
-        return $context->builder->truncOrBitCast($combined, $i8);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UrldecodeJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('UrldecodeJitHelper.php parseAndCompile failed (#14726)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#14726)');
+            }
+        }
     }
 
-    private static function hexNibbleValue(Context $context, Value $ch, $i64, $i8): Value
+    private static function registerLinkedRuntime(Context $context): void
     {
-        $ord = $context->builder->zExt($ch, $i64);
-        $invalid = $i64->constInt(-1, true);
-
-        $isDigit = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $ord, $i64->constInt(ord('0'), false)),
-            $context->builder->icmp(Builder::INT_SLE, $ord, $i64->constInt(ord('9'), false))
-        );
-        $digitVal = $context->builder->subNoSignedWrap($ord, $i64->constInt(ord('0'), false));
-
-        $isUpper = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $ord, $i64->constInt(ord('A'), false)),
-            $context->builder->icmp(Builder::INT_SLE, $ord, $i64->constInt(ord('F'), false))
-        );
-        $upperVal = $context->builder->subNoSignedWrap($ord, $i64->constInt(55, false));
-
-        $isLower = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $ord, $i64->constInt(ord('a'), false)),
-            $context->builder->icmp(Builder::INT_SLE, $ord, $i64->constInt(ord('f'), false))
-        );
-        $lowerVal = $context->builder->subNoSignedWrap($ord, $i64->constInt(87, false));
-
-        $alnum = $context->builder->select($isDigit, $digitVal, $invalid);
-        $mixed = $context->builder->select($isUpper, $upperVal, $alnum);
-
-        return $context->builder->select($isLower, $lowerVal, $mixed);
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StringUrldecode bridge (#14726)');
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 }
