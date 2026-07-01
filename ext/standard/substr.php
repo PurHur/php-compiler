@@ -28,8 +28,17 @@ final class substr extends Internal
     public function execute(Frame $frame): void
     {
         $argc = count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('substr() requires two or three arguments');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'substr() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'substr() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'substr', 0, 'string');
         $offset = $frame->calledArgs[1]->resolveIndirect();
@@ -58,8 +67,17 @@ final class substr extends Internal
     {
         $this->context = $context;
         $argc = count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('substr() requires two or three arguments');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'substr() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'substr() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $str = JitStringBuiltinArg::lower($context, $args[0], 'substr', 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
