@@ -16,7 +16,7 @@ echo phpversion('core') !== false ? "core_lower_ver\n" : "no_core_lower_ver\n";
 --EXPECT--
 std_loaded
 spl_loaded
-ossl_loaded
+ossl_missing
 pcre_loaded
 zlib_loaded
 unknown_funcs_ok
