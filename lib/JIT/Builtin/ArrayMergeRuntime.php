@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -17,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_merge() via ArrayMergeJitHelper PHP (#10183).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::merge()}.
+ * Standalone AOT compiles {@see ArrayMergeJitHelper} via nested JIT bridges (#14276); embed uses same PHP path.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — php_array_merge()
  */
@@ -40,12 +39,13 @@ final class ArrayMergeRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function merge(Context $context, JITVariable ...$args): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::merge($context, ...$args);
-        }
-
         self::ensureLinked($context);
 
         $count = \count($args);
@@ -69,10 +69,6 @@ final class ArrayMergeRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_merge__single');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
