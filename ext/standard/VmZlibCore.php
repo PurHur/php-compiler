@@ -162,7 +162,7 @@ final class VmZlibCore
 
     private static function normalizeLevel(int $level): int
     {
-        if ($level < self::Z_DEFAULT_COMPRESSION) {
+        if ($level < 0) {
             return 6;
         }
         if ($level > 9) {
