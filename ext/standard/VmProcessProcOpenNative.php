@@ -18,7 +18,7 @@ final class VmProcessProcOpenNative
 
     private const WNOHANG = 1;
 
-    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool}> */
+    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles: list<int>}> */
     private static array $slots = [];
 
     private static int $nextHandleId = 0;
@@ -168,6 +168,7 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
             ];
 
             return [$slot, $pipeHandles];
@@ -300,6 +301,7 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
             ];
 
             return [$slot, $pipeHandles];
@@ -323,6 +325,7 @@ final class VmProcessProcOpenNative
         }
 
         $slot['active'] = false;
+        self::closeRemainingPipeHandles($slot);
         self::$slots[$handle] = $slot;
 
         if ($slot['statusKnown']) {
@@ -471,6 +474,22 @@ final class VmProcessProcOpenNative
         }
 
         return $lowByte;
+    }
+
+    /**
+     * php-src proc_open_rsrc_dtor — close pipe streams before waitpid (ext/standard/proc_open.c).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>} $slot
+     */
+    private static function closeRemainingPipeHandles(array &$slot): void
+    {
+        foreach ($slot['pipeHandles'] ?? [] as $pipeHandle) {
+            if (!\is_int($pipeHandle) || !VmPhpFdStream::isValidHandle($pipeHandle)) {
+                continue;
+            }
+            VmFs::fclose($pipeHandle);
+        }
+        $slot['pipeHandles'] = [];
     }
 
     /**

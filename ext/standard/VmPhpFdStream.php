@@ -20,6 +20,9 @@ final class VmPhpFdStream
 
     private const CHUNK = 8192;
 
+  /** Linux EAGAIN / EWOULDBLOCK — non-blocking read with no data (php-src streams.c). */
+    private const EAGAIN = 11;
+
     /** PHP LOCK_* operands (ext/standard/flock.c). */
     private const PHP_LOCK_SH = 1;
 
@@ -200,6 +203,10 @@ final class VmPhpFdStream
                 $chunk = min(self::CHUNK, $remaining);
                 $n = (int) $ffi->read($state->fd, \FFI::addr($buf[0]), $chunk);
                 if ($n < 0) {
+                    if (!VmFs::handleBlocked($handle) && self::EAGAIN === \FFI::errno()) {
+                        return '';
+                    }
+
                     return false;
                 }
                 if (0 === $n) {
