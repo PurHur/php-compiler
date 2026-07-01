@@ -10,6 +10,7 @@
 namespace PHPCompiler\ext\types;
 
 use PHPCompiler\ext\standard\JitStreamContextRepresentation;
+use PHPCompiler\ext\standard\VmStreamContext;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\Frame;
 use PHPCompiler\JIT\Context;
@@ -47,6 +48,15 @@ class is_type extends Internal {
 
                 return;
             }
+            if (Variable::TYPE_ARRAY === $this->type) {
+                // Zend is_array(): stream-context resources are not arrays (ext/standard/type.c, #14631).
+                $frame->returnVar->bool(
+                    Variable::TYPE_ARRAY === $var->type
+                    && !VmStreamContext::isRepresentation($var)
+                );
+
+                return;
+            }
             $frame->returnVar->bool($var->type === $this->type);
         }
     }
@@ -76,7 +86,16 @@ class is_type extends Internal {
             case JITVariable::TYPE_NULL:
                 return $this->context->constantFromBool($this->type === Variable::TYPE_NULL);
             case JITVariable::TYPE_HASHTABLE:
-                return $this->context->constantFromBool($this->type === Variable::TYPE_ARRAY);
+                if (Variable::TYPE_ARRAY !== $this->type) {
+                    return $this->context->constantFromBool(false);
+                }
+
+                return $context->builder->not(
+                    JitStreamContextRepresentation::isRepresentation(
+                        $context,
+                        $context->helper->loadValue($args[0])
+                    )
+                );
             case JITVariable::TYPE_OBJECT:
                 if (Variable::TYPE_NULL === $this->type) {
                     $ptr = JITVariable::KIND_VALUE === $args[0]->kind
@@ -132,6 +151,11 @@ class is_type extends Internal {
                     );
 
                     return $context->builder->or($matchFull, $matchTag);
+                }
+                if (Variable::TYPE_ARRAY === $this->type) {
+                    $streamCtx = JitStreamContextRepresentation::isRepresentationArg($context, $args[0]);
+
+                    return $context->builder->and($matchFull, $context->builder->not($streamCtx));
                 }
 
                 return $matchFull;
