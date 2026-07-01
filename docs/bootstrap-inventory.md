@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3595 |
-| Phase A inventory files (M2 ratio SSOT) | 3595 |
+| PHP files on vm.php path | 3598 |
+| Phase A inventory files (M2 ratio SSOT) | 3598 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9808 |
+| Source constructs flagged (warnings) | 9815 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1003,7 +1003,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitVfscanf.php` | 0 | 2 |
 | `ext/standard/JitVsprintf.php` | 0 | 1 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
-| `ext/standard/JitWordwrap.php` | 0 | 1 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
 | `ext/standard/JsonDecodeJitHelper.php` | 0 | 2 |
@@ -1107,6 +1106,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
+| `ext/standard/StrrevJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtrArrayJitHelper.php` | 0 | 1 |
@@ -1436,6 +1436,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmZlibLibzReference.php` | 0 | 1 |
 | `ext/standard/VmZlibStreamFilter.php` | 0 | 1 |
 | `ext/standard/WeakRefRegistryJitHelper.php` | 0 | 1 |
+| `ext/standard/WordwrapJitHelper.php` | 0 | 1 |
 | `ext/standard/ZendSort.php` | 0 | 1 |
 | `ext/standard/ZlibEncodeJitHelper.php` | 0 | 1 |
 | `ext/standard/ZlibJitHelper.php` | 0 | 1 |
@@ -2751,6 +2752,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrtotime.php` | 0 | 3 |
@@ -2775,6 +2777,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringVersionCompare.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringVersionCompareJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringVfscanf.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringWordwrap.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringZlib.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringZstd.php` | 0 | 2 |
 | `lib/JIT/Builtin/StripWhitespace.php` | 0 | 2 |
@@ -9627,11 +9630,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new strcmp (line 234)
 - 6 class method(s)
 
-### `ext/standard/JitWordwrap.php`
-
-**Warnings** (review for bootstrap subset):
-- 9 class method(s)
-
 ### `ext/standard/JitZendScalarCast.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10979,6 +10977,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/StrptimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/StrrevJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -13357,6 +13360,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 16 class method(s)
+
+### `ext/standard/WordwrapJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/ZendSort.php`
 
@@ -17698,7 +17706,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/wordwrap.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/zend_thread_id.php`
 
@@ -19183,86 +19191,86 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT\Call\Native (line 5853)
 - new JIT\Call\Native (line 6325)
 - new JIT\Call\Native (line 6391)
-- new Variable (line 6940)
-- new Variable (line 6973)
-- new Variable (line 7347)
-- new Variable (line 7491)
-- new Variable (line 7499)
-- new Operand\Literal (line 7660)
-- new JIT\Variable (line 7695)
-- new Operand\Literal (line 7802)
-- new Variable (line 8106)
-- new Variable (line 8220)
-- new VM\Variable (line 8280)
-- new OpCode (line 8364)
-- new Variable (line 8803)
-- new Variable (line 8864)
-- new JIT\Call\ClosureWithBinding (line 8893)
-- new JIT\Call\RuntimeVariableFunction (line 8948)
-- new Variable (line 9060)
-- new VM\Variable (line 9249)
-- new VM (line 9255)
-- new VM\Variable (line 9268)
-- new Variable (line 9468)
-- new Type (line 9475)
-- new Variable (line 9496)
-- new Type (line 9504)
-- new Variable (line 9526)
-- new Type (line 9534)
-- new Variable (line 9631)
-- new Variable (line 9652)
-- new Variable (line 10644)
-- new CompileError (line 11359)
-- new CompileError (line 11463)
-- new Variable (line 11508)
-- new Variable (line 11702)
-- new Variable (line 11723)
-- new Variable (line 11757)
-- new Variable (line 11842)
-- new Variable (line 11863)
+- new Variable (line 6950)
+- new Variable (line 6983)
+- new Variable (line 7357)
+- new Variable (line 7501)
+- new Variable (line 7509)
+- new Operand\Literal (line 7670)
+- new JIT\Variable (line 7705)
+- new Operand\Literal (line 7812)
+- new Variable (line 8116)
+- new Variable (line 8230)
+- new VM\Variable (line 8290)
+- new OpCode (line 8374)
+- new Variable (line 8813)
+- new Variable (line 8874)
+- new JIT\Call\ClosureWithBinding (line 8903)
+- new JIT\Call\RuntimeVariableFunction (line 8958)
+- new Variable (line 9070)
+- new VM\Variable (line 9259)
+- new VM (line 9265)
+- new VM\Variable (line 9278)
+- new Variable (line 9478)
+- new Type (line 9485)
+- new Variable (line 9506)
+- new Type (line 9514)
+- new Variable (line 9536)
+- new Type (line 9544)
+- new Variable (line 9641)
+- new Variable (line 9662)
+- new Variable (line 10654)
+- new CompileError (line 11369)
+- new CompileError (line 11473)
+- new Variable (line 11518)
+- new Variable (line 11712)
+- new Variable (line 11733)
+- new Variable (line 11767)
+- new Variable (line 11852)
 - new Variable (line 11873)
-- new Variable (line 12025)
-- new Variable (line 12043)
-- new Variable (line 12076)
-- new Variable (line 12716)
-- new Variable (line 12736)
-- new Variable (line 12806)
-- new VM\Variable (line 13149)
-- new Variable (line 13183)
-- new Variable (line 13234)
-- new Variable (line 13250)
-- new Variable (line 13269)
-- new Variable (line 13276)
-- new OpCode (line 13296)
-- new Variable (line 13297)
-- new Variable (line 13467)
-- new Variable (line 13505)
-- new OpCode (line 13519)
-- new Variable (line 13520)
-- new Variable (line 13579)
-- new OpCode (line 13600)
-- new Variable (line 13601)
-- new Variable (line 13698)
-- new Variable (line 13720)
-- new Variable (line 13788)
-- new Operand\Literal (line 13797)
-- new Variable (line 13812)
-- new Variable (line 13946)
-- new VM\PropertyIsInitializedHandler (line 13977)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14017)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14071)
-- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14132)
-- new JIT\Call\VmCoerceVariableToString (line 14207)
-- new Variable (line 15364)
-- new VM (line 15408)
-- new VM\Variable (line 15415)
-- new Operand\Literal (line 15429)
-- new Operand\Literal (line 15433)
-- new Operand\Literal (line 15437)
-- new Variable (line 15441)
-- new Variable (line 15465)
+- new Variable (line 11883)
+- new Variable (line 12035)
+- new Variable (line 12053)
+- new Variable (line 12086)
+- new Variable (line 12726)
+- new Variable (line 12746)
+- new Variable (line 12816)
+- new VM\Variable (line 13159)
+- new Variable (line 13193)
+- new Variable (line 13244)
+- new Variable (line 13260)
+- new Variable (line 13279)
+- new Variable (line 13286)
+- new OpCode (line 13306)
+- new Variable (line 13307)
+- new Variable (line 13477)
+- new Variable (line 13515)
+- new OpCode (line 13529)
+- new Variable (line 13530)
+- new Variable (line 13589)
+- new OpCode (line 13610)
+- new Variable (line 13611)
+- new Variable (line 13708)
+- new Variable (line 13730)
+- new Variable (line 13798)
+- new Operand\Literal (line 13807)
+- new Variable (line 13822)
+- new Variable (line 13956)
+- new VM\PropertyIsInitializedHandler (line 13987)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14027)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14081)
+- new JIT\Call\RuntimeIndirectInstanceMethodCall (line 14142)
+- new JIT\Call\VmCoerceVariableToString (line 14217)
+- new Variable (line 15400)
+- new VM (line 15444)
+- new VM\Variable (line 15451)
+- new Operand\Literal (line 15465)
+- new Operand\Literal (line 15469)
+- new Operand\Literal (line 15473)
 - new Variable (line 15477)
-- new Variable (line 15910)
+- new Variable (line 15501)
+- new Variable (line 15513)
+- new Variable (line 15946)
 - 344 class method(s)
 - 7 closure(s)
 
@@ -21629,6 +21637,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 6 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringStrrev.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 118)
+- 7 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringStrtok.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21773,6 +21788,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 151)
 - 6 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/StringWordwrap.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 128)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringZlib.php`
@@ -22538,19 +22560,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1112)
-- new Result (line 1133)
-- new Variable (line 1405)
-- new Variable (line 1725)
-- new Variable (line 1856)
-- new Variable (line 2042)
-- new VMVariable (line 2200)
-- new VMVariable (line 2216)
-- new VMVariable (line 2222)
-- new VMVariable (line 2228)
-- new VMVariable (line 2239)
-- new Variable (line 2269)
-- new Variable (line 2308)
+- new Result (line 1114)
+- new Result (line 1135)
+- new Variable (line 1407)
+- new Variable (line 1727)
+- new Variable (line 1858)
+- new Variable (line 2044)
+- new VMVariable (line 2202)
+- new VMVariable (line 2218)
+- new VMVariable (line 2224)
+- new VMVariable (line 2230)
+- new VMVariable (line 2241)
+- new Variable (line 2271)
+- new Variable (line 2310)
 - 98 class method(s)
 - 28 closure(s)
 
@@ -23754,122 +23776,122 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 5301)
 - new Variable (line 5310)
 - new GeneratorState (line 5375)
-- new Variable (line 5677)
-- new VM\ClassEntry (line 5780)
-- new ClassEntry (line 5806)
-- new Variable (line 5820)
-- new Variable (line 5823)
-- new ClassEntry (line 5847)
-- new ClassEntry (line 5873)
-- new ObjectEntry (line 6006)
-- new Variable (line 6193)
-- new Variable (line 6212)
-- new Variable (line 6249)
-- new Variable (line 6301)
-- new Variable (line 6546)
-- new WeakMapIterator (line 6904)
-- new ObjectPropertyIterator (line 6909)
-- new Variable (line 7116)
-- new Variable (line 7543)
-- new Variable (line 7555)
-- new Variable (line 7661)
-- new Variable (line 7799)
-- new Variable (line 7858)
-- new Variable (line 7882)
-- new Variable (line 8164)
-- new Variable (line 8171)
-- new Variable (line 8188)
-- new Variable (line 8195)
-- new Variable (line 8212)
-- new VM\NativeFiberStackOverflow (line 8730)
-- new VM\BuiltinCallbackCatchRedirect (line 8781)
-- new VM\BuiltinCallbackCatchRedirect (line 8799)
-- new Variable (line 8902)
-- new Variable (line 8996)
-- new Variable (line 9129)
-- new ScriptExit (line 9234)
-- new Exception (line 9247)
-- new ScriptExit (line 9255)
-- new Error (line 9511)
-- new VM\PropertyHookRefWriteSignal (line 9559)
-- new Variable (line 9583)
-- new VM\PropertyHookRefWriteSignal (line 9588)
-- new VM\PropertyHookFiberSuspendSignal (line 9591)
-- new VM\PropertyHookRefWriteSignal (line 9707)
-- new Variable (line 9724)
-- new VM\PropertyHookRefWriteSignal (line 9738)
-- new VM\PropertyHookRefWriteSignal (line 9750)
-- new Variable (line 9981)
-- new Variable (line 10004)
+- new Variable (line 5678)
+- new VM\ClassEntry (line 5790)
+- new ClassEntry (line 5816)
+- new Variable (line 5830)
+- new Variable (line 5833)
+- new ClassEntry (line 5857)
+- new ClassEntry (line 5883)
+- new ObjectEntry (line 6016)
+- new Variable (line 6203)
+- new Variable (line 6222)
+- new Variable (line 6259)
+- new Variable (line 6311)
+- new Variable (line 6556)
+- new WeakMapIterator (line 6914)
+- new ObjectPropertyIterator (line 6919)
+- new Variable (line 7126)
+- new Variable (line 7553)
+- new Variable (line 7565)
+- new Variable (line 7671)
+- new Variable (line 7809)
+- new Variable (line 7868)
+- new Variable (line 7892)
+- new Variable (line 8174)
+- new Variable (line 8181)
+- new Variable (line 8198)
+- new Variable (line 8205)
+- new Variable (line 8222)
+- new VM\NativeFiberStackOverflow (line 8740)
+- new VM\BuiltinCallbackCatchRedirect (line 8791)
+- new VM\BuiltinCallbackCatchRedirect (line 8809)
+- new Variable (line 8912)
+- new Variable (line 9006)
+- new Variable (line 9139)
+- new ScriptExit (line 9244)
+- new Exception (line 9257)
+- new ScriptExit (line 9265)
+- new Error (line 9521)
+- new VM\PropertyHookRefWriteSignal (line 9569)
+- new Variable (line 9593)
+- new VM\PropertyHookRefWriteSignal (line 9598)
+- new VM\PropertyHookFiberSuspendSignal (line 9601)
+- new VM\PropertyHookRefWriteSignal (line 9717)
+- new Variable (line 9734)
+- new VM\PropertyHookRefWriteSignal (line 9748)
+- new VM\PropertyHookRefWriteSignal (line 9760)
+- new Variable (line 9991)
 - new Variable (line 10014)
 - new Variable (line 10024)
-- new VM\PropertyHookRefWriteSignal (line 10030)
-- new VM\PropertyHookRefWriteSignal (line 10038)
-- new VM\PropertyHookRefWriteSignal (line 10041)
-- new Variable (line 10056)
-- new VM\PropertyHookRefWriteSignal (line 10062)
-- new Variable (line 10090)
-- new VM\PropertyHookRefWriteSignal (line 10095)
-- new VM\PropertyHookFiberSuspendSignal (line 10098)
-- new ClassEntry (line 11284)
-- new Variable (line 11285)
-- new VM\ClassProperty (line 11286)
-- new ObjectEntry (line 11289)
-- new Variable (line 11292)
-- new Variable (line 11373)
-- new Error (line 11459)
-- new Variable (line 11538)
-- new VM\GeneratorUncaughtThrow (line 11540)
-- new Variable (line 11565)
+- new Variable (line 10034)
+- new VM\PropertyHookRefWriteSignal (line 10040)
+- new VM\PropertyHookRefWriteSignal (line 10048)
+- new VM\PropertyHookRefWriteSignal (line 10051)
+- new Variable (line 10066)
+- new VM\PropertyHookRefWriteSignal (line 10072)
+- new Variable (line 10100)
+- new VM\PropertyHookRefWriteSignal (line 10105)
+- new VM\PropertyHookFiberSuspendSignal (line 10108)
+- new ClassEntry (line 11294)
+- new Variable (line 11295)
+- new VM\ClassProperty (line 11296)
+- new ObjectEntry (line 11299)
+- new Variable (line 11302)
+- new Variable (line 11383)
+- new Error (line 11469)
+- new Variable (line 11548)
+- new VM\GeneratorUncaughtThrow (line 11550)
 - new Variable (line 11575)
-- new VM\GeneratorUncaughtThrow (line 11595)
-- new Variable (line 11666)
-- new VM\GeneratorUncaughtThrow (line 11686)
-- new Variable (line 11723)
-- new Variable (line 11725)
-- new Variable (line 11729)
-- new Variable (line 11844)
-- new Variable (line 11863)
-- new Variable (line 12013)
-- new Variable (line 12029)
-- new Variable (line 12160)
-- new Variable (line 12226)
-- new Variable (line 12372)
-- new VM\PropertyIsInitializedHandler (line 12381)
-- new Error (line 12442)
-- new VM\EnumFromHandler (line 12467)
-- new CompileError (line 13189)
-- new VM\ClassProperty (line 13300)
-- new Variable (line 13590)
-- new Variable (line 13772)
-- new Variable (line 13774)
-- new VM\ClassProperty (line 13899)
-- new Func\PHP (line 14018)
-- new Variable (line 14094)
-- new Variable (line 14101)
-- new Variable (line 14107)
-- new Variable (line 14144)
-- new Variable (line 14173)
-- new Variable (line 14357)
-- new Variable (line 14403)
-- new VM\ClassProperty (line 14465)
-- new Error (line 14502)
-- new Error (line 14534)
-- new Error (line 14537)
-- new Error (line 14540)
-- new Error (line 14559)
-- new ObjectEntry (line 14563)
-- new Variable (line 14565)
-- new Variable (line 14579)
-- new Error (line 14704)
-- new Error (line 14709)
-- new VM\ObjectEntry (line 14713)
-- new Variable (line 14853)
-- new Variable (line 14871)
-- new NoDiscardMetadata (line 14992)
-- new Variable (line 15149)
-- new Variable (line 15151)
-- new Variable (line 15243)
+- new Variable (line 11585)
+- new VM\GeneratorUncaughtThrow (line 11605)
+- new Variable (line 11676)
+- new VM\GeneratorUncaughtThrow (line 11696)
+- new Variable (line 11733)
+- new Variable (line 11735)
+- new Variable (line 11739)
+- new Variable (line 11854)
+- new Variable (line 11873)
+- new Variable (line 12043)
+- new Variable (line 12059)
+- new Variable (line 12190)
+- new Variable (line 12256)
+- new Variable (line 12402)
+- new VM\PropertyIsInitializedHandler (line 12411)
+- new Error (line 12472)
+- new VM\EnumFromHandler (line 12497)
+- new CompileError (line 13219)
+- new VM\ClassProperty (line 13330)
+- new Variable (line 13620)
+- new Variable (line 13802)
+- new Variable (line 13804)
+- new VM\ClassProperty (line 13929)
+- new Func\PHP (line 14048)
+- new Variable (line 14124)
+- new Variable (line 14131)
+- new Variable (line 14137)
+- new Variable (line 14174)
+- new Variable (line 14203)
+- new Variable (line 14387)
+- new Variable (line 14433)
+- new VM\ClassProperty (line 14495)
+- new Error (line 14532)
+- new Error (line 14564)
+- new Error (line 14567)
+- new Error (line 14570)
+- new Error (line 14589)
+- new ObjectEntry (line 14593)
+- new Variable (line 14595)
+- new Variable (line 14609)
+- new Error (line 14734)
+- new Error (line 14739)
+- new VM\ObjectEntry (line 14743)
+- new Variable (line 14883)
+- new Variable (line 14901)
+- new NoDiscardMetadata (line 15022)
+- new Variable (line 15179)
+- new Variable (line 15181)
+- new Variable (line 15273)
 - 437 class method(s)
 - 14 closure(s)
 
@@ -26697,8 +26719,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/ReferencableCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 162)
-- 16 class method(s)
+- new Error (line 256)
+- 19 class method(s)
 
 ### `lib/VM/ReflectionPropertyHookSupport.php`
 
