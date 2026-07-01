@@ -36,6 +36,8 @@ final class VmDom
 
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
+    public const PROP_VALIDATE_ON_PARSE = 'validateOnParse';
+
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
     public const PROP_NODE_NAME = 'nodeName';
@@ -113,6 +115,7 @@ final class VmDom
         $document->isInternal = true;
         $document->parentLc = self::CLASS_NODE;
         $document->properties[] = new ClassProperty(self::PROP_FORMAT_OUTPUT, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_VALIDATE_ON_PARSE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
@@ -126,6 +129,8 @@ final class VmDom
         $document->methodVisibility['savexml'] = $pub;
         $document->methods['getelementsbytagname'] = new DocumentGetElementsByTagName();
         $document->methodVisibility['getelementsbytagname'] = $pub;
+        $document->methods['getelementbyid'] = new DocumentGetElementById();
+        $document->methodVisibility['getelementbyid'] = $pub;
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -290,24 +295,138 @@ final class VmDom
     public static function loadXML(Context $ctx, ObjectEntry $document, string $xml): bool
     {
         self::ensureDocument($document);
-        if (!VmXml::isWellFormed($xml)) {
-            return false;
-        }
 
         $trimmed = trim($xml);
-        $root = self::parseElementTree($ctx, $trimmed);
+        $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
+        $elementXml = self::stripDoctype($trimmed);
+        if (!VmXml::isWellFormed($elementXml)) {
+            return false;
+        }
+        $root = self::parseElementTree($ctx, $elementXml);
         if (null === $root) {
             return false;
         }
 
         $state = DomRegistry::state($document);
         $state->childIds = [];
+        $state->idAttrByElement = $idAttrByElement;
+        $state->elementIds = [];
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
         self::linkChildToParent($root, null);
         self::syncSubtree($ctx, $root);
+        self::reindexDocumentIds($document, $root);
 
         return true;
+    }
+
+    public static function getElementById(ObjectEntry $document, string $elementId): ?ObjectEntry
+    {
+        self::ensureDocument($document);
+        $state = DomRegistry::state($document);
+        $objectId = $state->elementIds[$elementId] ?? null;
+        if (null === $objectId) {
+            return null;
+        }
+
+        return DomRegistry::entry($objectId);
+    }
+
+    private static function reindexDocumentIds(ObjectEntry $document, ObjectEntry $root): void
+    {
+        $docState = DomRegistry::state($document);
+        $docState->elementIds = [];
+        if (!self::documentValidateOnParse($document)) {
+            return;
+        }
+        if ([] === $docState->idAttrByElement) {
+            return;
+        }
+        self::indexElementIdsRecursive($document, $root);
+    }
+
+    private static function documentValidateOnParse(ObjectEntry $document): bool
+    {
+        if (!$document->hasProperty(self::PROP_VALIDATE_ON_PARSE)) {
+            return false;
+        }
+        $prop = $document->getProperty(self::PROP_VALIDATE_ON_PARSE)->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $prop->type) {
+            return false;
+        }
+        try {
+            return $prop->toBool();
+        } catch (\Error) {
+            return false;
+        }
+    }
+
+    private static function indexElementIdsRecursive(ObjectEntry $document, ObjectEntry $node): void
+    {
+        if (!self::isElement($node)) {
+            return;
+        }
+        $docState = DomRegistry::state($document);
+        $nodeState = DomRegistry::state($node);
+        $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+        if (null !== $idAttr) {
+            $value = $nodeState->attributes[$idAttr] ?? null;
+            if (null !== $value && '' !== $value) {
+                $docState->elementIds[$value] = $node->id;
+            }
+        }
+        foreach ($nodeState->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::indexElementIdsRecursive($document, $child);
+            }
+        }
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parseDoctypeIdAttributes(string $xml): array
+    {
+        $idAttrs = [];
+        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $doctype)) {
+            return $idAttrs;
+        }
+        if (!preg_match_all('/<!ATTLIST\s+(\S+)\s+(\S+)\s+ID\b/', $doctype[1], $matches, PREG_SET_ORDER)) {
+            return $idAttrs;
+        }
+        foreach ($matches as $match) {
+            $idAttrs[$match[1]] = $match[2];
+        }
+
+        return $idAttrs;
+    }
+
+    private static function stripDoctype(string $xml): string
+    {
+        $stripped = preg_replace('/^\s*<\?xml[^?]*\?>\s*/s', '', $xml) ?? $xml;
+        $stripped = preg_replace('/^\s*<!DOCTYPE\s+\S+\s*\[[^\]]*\]\s*>\s*/s', '', $stripped) ?? $stripped;
+        $stripped = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/s', '', $stripped) ?? $stripped;
+
+        return trim($stripped);
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function parseAttributes(string $attrString): array
+    {
+        $attrs = [];
+        if ('' === $attrString) {
+            return $attrs;
+        }
+        if (preg_match_all('/\s([A-Za-z_][\w:.-]*)\s*=\s*"([^"]*)"/', $attrString, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $attrs[$match[1]] = $match[2];
+            }
+        }
+
+        return $attrs;
     }
 
     public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
@@ -415,7 +534,10 @@ final class VmDom
     {
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
-            return self::createElement($ctx, $selfClose[1])->toObject();
+            $entry = self::createElement($ctx, $selfClose[1])->toObject();
+            DomRegistry::state($entry)->attributes = self::parseAttributes($selfClose[2] ?? '');
+
+            return $entry;
         }
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/s', $trimmed, $matches)) {
             return null;
@@ -423,6 +545,7 @@ final class VmDom
 
         $entry = self::createElement($ctx, $matches[1])->toObject();
         $state = DomRegistry::state($entry);
+        $state->attributes = self::parseAttributes($matches[2] ?? '');
         $pos = 0;
         $inner = $matches[3];
         $len = \strlen($inner);

@@ -45,4 +45,13 @@ final class DomNodeState
 
     /** Persistent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
+
+    /** @var array<string, string> */
+    public array $attributes = [];
+
+    /** @var array<string, string> */
+    public array $idAttrByElement = [];
+
+    /** @var array<string, int> */
+    public array $elementIds = [];
 }
