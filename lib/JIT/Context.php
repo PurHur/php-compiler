@@ -927,6 +927,7 @@ class Context {
             // Nested-JIT string helpers: lazy via ensureLinked during spine init (#14472).
             if (!Builtin\StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($this)) {
                 Builtin\StringSoundex::ensureStandaloneBodies($this);
+                Builtin\StringQuotemeta::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);

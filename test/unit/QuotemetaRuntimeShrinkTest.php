@@ -1,0 +1,42 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\QuotemetaJitHelper;
+use PHPCompiler\ext\standard\VmString;
+use PHPUnit\Framework\TestCase;
+
+/** quotemeta() JIT routes through QuotemetaJitHelper PHP not inline LLVM (#14705). */
+final class QuotemetaRuntimeShrinkTest extends TestCase
+{
+    public function testStringQuotemetaUsesJitHelperNotLlvmMonolith(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringQuotemeta.php');
+        $this->assertStringContainsString('QuotemetaJitHelper', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitQuotemeta.php');
+
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/quotemeta.php');
+        $this->assertStringContainsString('StringQuotemeta::ensureLinked', $builtin);
+        $this->assertStringContainsString('__string__quotemeta', $builtin);
+        $this->assertStringNotContainsString('JitQuotemeta', $builtin);
+    }
+
+    public function testQuotemetaJitHelperDelegatesToVmString(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/QuotemetaJitHelper.php');
+        $this->assertStringContainsString('VmString::quotemeta', $source);
+
+        $this->assertSame('\.\*\+', QuotemetaJitHelper::quotemetaArgv('.*+'));
+        $this->assertSame('\.\*\+', VmString::quotemeta('.*+'));
+    }
+
+    public function testSpineBundleOmitsDeletedJitQuotemeta(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('JitQuotemeta.php', $spine);
+        $this->assertStringContainsString('QuotemetaJitHelper.php', $spine);
+        $this->assertStringContainsString('StringQuotemeta.php', $spine);
+    }
+}

@@ -6,12 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringQuotemeta;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** quotemeta() — escape regex metacharacters (subset of PHP; native LLVM in JIT/AOT). */
+/**
+ * quotemeta() — escape regex metacharacters (subset of PHP).
+ *
+ * VM: {@see VmString::quotemeta()}; JIT/AOT: {@see StringQuotemeta} + {@see QuotemetaJitHelper}.
+ */
 final class quotemeta extends Internal
 {
     public function execute(Frame $frame): void
@@ -32,8 +37,10 @@ final class quotemeta extends Internal
             throw new \LogicException('quotemeta() requires exactly one argument in this compiler build');
         }
 
-        return JitQuotemeta::quote(
-            $context,
+        StringQuotemeta::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__quotemeta'),
             JitStringBuiltinArg::lower($context, $args[0], 'quotemeta', 0, 'str')
         );
     }
