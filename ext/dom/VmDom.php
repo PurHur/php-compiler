@@ -126,6 +126,8 @@ final class VmDom
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
         $node->methodVisibility['lookupnamespaceuri'] = $pub;
+        $node->methods['getlineno'] = new NodeGetLineNo();
+        $node->methodVisibility['getlineno'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -524,6 +526,15 @@ final class VmDom
         }
 
         return DomRegistry::state($node)->prefix ?? '';
+    }
+
+    public static function getLineNo(ObjectEntry $node): int
+    {
+        if (!DomRegistry::has($node)) {
+            return 0;
+        }
+
+        return DomRegistry::state($node)->lineNo;
     }
 
     /**

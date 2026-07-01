@@ -81,4 +81,7 @@ final class DomNodeState
     public bool $xmlStandalone = false;
 
     public ?string $documentUri = null;
+
+    /** libxml line number (php-src dom_node_line_no; #14407). */
+    public int $lineNo = 1;
 }
