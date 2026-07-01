@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3631 |
-| Phase A inventory files (M2 ratio SSOT) | 3631 |
+| PHP files on vm.php path | 3632 |
+| Phase A inventory files (M2 ratio SSOT) | 3632 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9893 |
+| Source constructs flagged (warnings) | 9906 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1060,6 +1060,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ProcessSlotJitHelper.php` | 0 | 1 |
 | `ext/standard/ProgressJitHelper.php` | 0 | 1 |
 | `ext/standard/QuotPrintJitHelper.php` | 0 | 1 |
+| `ext/standard/QuotemetaJitHelper.php` | 0 | 1 |
 | `ext/standard/RandJitHelper.php` | 0 | 1 |
 | `ext/standard/RandomBytesJitHelper.php` | 0 | 1 |
 | `ext/standard/RangeIntJitHelper.php` | 0 | 1 |
@@ -1461,7 +1462,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_all.php` | 0 | 1 |
 | `ext/standard/array_any.php` | 0 | 1 |
 | `ext/standard/array_change_key_case.php` | 0 | 1 |
-| `ext/standard/array_chunk.php` | 0 | 1 |
+| `ext/standard/array_chunk.php` | 0 | 5 |
 | `ext/standard/array_column.php` | 0 | 1 |
 | `ext/standard/array_combine.php` | 0 | 1 |
 | `ext/standard/array_count.php` | 0 | 1 |
@@ -1493,7 +1494,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_merge.php` | 0 | 2 |
 | `ext/standard/array_merge_recursive.php` | 0 | 3 |
 | `ext/standard/array_multisort.php` | 0 | 9 |
-| `ext/standard/array_pad.php` | 0 | 1 |
+| `ext/standard/array_pad.php` | 0 | 3 |
 | `ext/standard/array_pop.php` | 0 | 1 |
 | `ext/standard/array_product.php` | 0 | 2 |
 | `ext/standard/array_push.php` | 0 | 3 |
@@ -2161,7 +2162,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/strtr.php` | 0 | 2 |
 | `ext/standard/strval.php` | 0 | 1 |
 | `ext/standard/strxfrm.php` | 0 | 1 |
-| `ext/standard/substr.php` | 0 | 1 |
+| `ext/standard/substr.php` | 0 | 5 |
 | `ext/standard/substr_compare.php` | 0 | 1 |
 | `ext/standard/substr_count.php` | 0 | 1 |
 | `ext/standard/substr_replace.php` | 0 | 3 |
@@ -2753,7 +2754,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringPregQuote.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPrintR.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 3 |
@@ -10765,6 +10766,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/QuotemetaJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/RandJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11073,7 +11079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StrspnJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/StrtokJitHelper.php`
 
@@ -13552,6 +13558,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_chunk.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 33)
+- new ArgumentCountError (line 58)
+- new ArgumentCountError (line 64)
 - 2 class method(s)
 
 ### `ext/standard/array_column.php`
@@ -13763,6 +13773,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_pad.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- new ArgumentCountError (line 50)
 - 2 class method(s)
 
 ### `ext/standard/array_pop.php`
@@ -17516,6 +17528,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/substr.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 38)
+- new ArgumentCountError (line 71)
+- new ArgumentCountError (line 77)
 - 2 class method(s)
 
 ### `ext/standard/substr_compare.php`
@@ -21689,7 +21705,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringQuotemeta.php`
 
 **Warnings** (review for bootstrap subset):
+- new JIT (line 104)
 - 4 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringRandomBytes.php`
 
@@ -21833,7 +21851,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringStrspn.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 206)
+- new JIT (line 217)
 - 9 class method(s)
 - 1 closure(s)
 
