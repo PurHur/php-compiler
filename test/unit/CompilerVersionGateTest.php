@@ -59,9 +59,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
-    public function testSupportsGcStatusPhp84SchemaTrueOn84DevForwardProfile(): void
+    public function testSupportsGcStatusPhp84SchemaFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsGcStatusPhp84Schema());
+        $this->assertFalse(CompilerVersion::supportsGcStatusPhp84Schema());
     }
 
     public function testSupportsReflectionPropertyAccessProbesTrueOn84DevForwardProfile(): void
