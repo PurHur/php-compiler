@@ -6,7 +6,21 @@ ob_start();
 phpcredits(CREDITS_MODULES);
 $out = ob_get_clean();
 
-foreach (['cURL', 'Multibyte String Functions', 'OpenSSL', 'JSON'] as $row) {
+$expected = [
+    'curl' => 'cURL',
+    'mbstring' => 'Multibyte String Functions',
+    'openssl' => 'OpenSSL',
+    'json' => 'JSON',
+];
+
+foreach ($expected as $ext => $row) {
+    if (!extension_loaded($ext)) {
+        if (str_contains($out, $row)) {
+            fwrite(STDERR, "FAIL: CREDITS_MODULES lists {$row} but extension_loaded('{$ext}') is false\n");
+            exit(1);
+        }
+        continue;
+    }
     if (!str_contains($out, $row)) {
         fwrite(STDERR, "FAIL: CREDITS_MODULES missing {$row} row\n");
         exit(1);
@@ -14,8 +28,9 @@ foreach (['cURL', 'Multibyte String Functions', 'OpenSSL', 'JSON'] as $row) {
 }
 
 $len = \strlen($out);
-if ($len < 3900) {
-    fwrite(STDERR, "FAIL: CREDITS_MODULES output too short ({$len} bytes, expected >=3900)\n");
+$minLen = extension_loaded('curl') ? 3900 : 2000;
+if ($len < $minLen) {
+    fwrite(STDERR, "FAIL: CREDITS_MODULES output too short ({$len} bytes, expected >={$minLen})\n");
     exit(1);
 }
 
