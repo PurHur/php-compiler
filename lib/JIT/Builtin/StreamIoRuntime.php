@@ -364,7 +364,13 @@ final class StreamIoRuntime
         if (self::$standaloneInitPhase) {
             return true;
         }
-        foreach (['PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER', 'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER'] as $key) {
+        foreach (
+            [
+                'PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER',
+                'BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER',
+                'PHP_COMPILER_BOOTSTRAP_AOT_LINK',
+            ] as $key
+        ) {
             $flag = getenv($key);
             if ('1' === $flag || 'true' === strtolower((string) $flag)) {
                 return true;

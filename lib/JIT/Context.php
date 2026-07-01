@@ -374,7 +374,11 @@ class Context {
      */
     private function shouldSkipStandaloneMainEnvProbeGate(): bool
     {
-        if ($this->isUserScriptAot()) {
+        if ($this->isThinStandaloneAotMain()) {
+            return true;
+        }
+        $entry = $this->resolveJitAotEntryScriptPath();
+        if ('' !== $entry && str_contains($entry, '/bootstrap-aot/')) {
             return true;
         }
         if ($this->isBootstrapNonSpineSelfhostEntry()) {
@@ -508,6 +512,7 @@ class Context {
     }
 
     public function __construct(Runtime $runtime, int $loadType) {
+        $runtime->claimJitContextSlot($this);
         $this->runtime = $runtime;
         $this->scope = new Scope;
         $this->tryCatch = TryCatchState::create();
@@ -792,6 +797,8 @@ class Context {
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
             if ($this->isUserScriptAot()) {
                 $this->ensureMinimalUserStandaloneBodies();
+            } elseif ($this->shouldUseBootstrapAotStandaloneBodies()) {
+                $this->ensureBootstrapAotStandaloneBodies();
             } else {
                 $this->ensureFullStandaloneBodies();
             }
@@ -846,10 +853,27 @@ class Context {
         ClosureBindHelper::registerJitMethods($this);
     }
 
+    /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
+    private function isThinStandaloneAotMain(): bool
+    {
+        return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
+    }
+
     private function isUserScriptAot(): bool
     {
         $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
         if ('1' === $userScript || 'true' === strtolower((string) $userScript)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /** bootstrap-aot-link: thin LLVM during Context init — defer nested php-in-PHP JIT (#14459, #13245). */
+    private function shouldUseBootstrapAotStandaloneBodies(): bool
+    {
+        $bootstrapLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        if ('1' === $bootstrapLink || 'true' === strtolower((string) $bootstrapLink)) {
             return true;
         }
 
@@ -874,6 +898,16 @@ class Context {
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
+    }
+
+    /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
+    private function ensureBootstrapAotStandaloneBodies(): void
+    {
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+        $this->ensureMinimalUserStandaloneBodies();
+        Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
+        Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
     }
 
     private function ensureFullStandaloneBodies(): void
@@ -957,7 +991,7 @@ class Context {
             ));
         }
 
-        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isUserScriptAot()) {
+        if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
             Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
             Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefresh($this);
         }
@@ -984,7 +1018,7 @@ class Context {
             $emitInStandaloneMain(fn () => $this->builder->call($this->initFunc));
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_init'));
             if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType) {
-                if (!$this->isUserScriptAot()) {
+                if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => Builtin\HttpResponseCode::emitResetForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\SessionId::emitResetForStandaloneMain($this));
                     $emitInStandaloneMain(fn () => Builtin\SessionName::emitResetForStandaloneMain($this));
@@ -992,7 +1026,7 @@ class Context {
                     $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitResetForStandaloneMain($this));
                 }
                 $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('__superglobals__refresh')));
-                if (!$this->isUserScriptAot()) {
+                if (!$this->isThinStandaloneAotMain()) {
                     $emitInStandaloneMain(fn () => Builtin\JitThrow::registerDeclarations($this));
                     $emitInStandaloneMain(fn () => $this->builder->call($this->lookupFunction('phpc_jit_clear_throw_pending')));
                     $emitInStandaloneMain(fn () => Builtin\JitReturnPending::registerDeclarations($this));
@@ -1009,13 +1043,13 @@ class Context {
                 $emitInStandaloneMain(fn () => $this->builder->call($this->main));
             }
             $emitInStandaloneMain(fn () => Progress::emitNativeNote($this, 'c:main_after_php'));
-            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isUserScriptAot()) {
+            if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && !$this->isThinStandaloneAotMain()) {
                 $emitInStandaloneMain(fn () => ErrorBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => ExceptionBridge::emitAbortIfPendingForStandaloneMain($this));
                 $emitInStandaloneMain(fn () => Builtin\PendingHeaders::emitFlushForStandalone($this));
                 $emitInStandaloneMain(fn () => Builtin\ObOutput::emitEndAllForStandalone($this));
             }
-            if (!$this->isUserScriptAot()) {
+            if (!$this->isThinStandaloneAotMain()) {
                 // User __destruct before __shutdown__ frees compile-time strings / sg_* (#4013).
                 $emitInStandaloneMain(fn () => $this->type->object->emitShutdownDestructorsCall());
             }

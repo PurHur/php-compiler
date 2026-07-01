@@ -20,12 +20,19 @@ final class ObOutputUserScriptLlvm
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return false;
         }
-        $userScript = getenv('PHP_COMPILER_AOT_USER_SCRIPT');
-        if ('1' !== $userScript && 'true' !== strtolower((string) $userScript)) {
-            return false;
+        foreach (
+            [
+                'PHP_COMPILER_AOT_USER_SCRIPT',
+                'PHP_COMPILER_BOOTSTRAP_AOT_LINK',
+            ] as $key
+        ) {
+            $flag = getenv($key);
+            if ('1' === $flag || 'true' === strtolower((string) $flag)) {
+                return true;
+            }
         }
 
-        return true;
+        return false;
     }
 
     public static function implement(Context $context): void

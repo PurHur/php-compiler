@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPLLVM\Builder;
@@ -35,13 +36,28 @@ final class StringGetenvAll
     public static function ensureStandaloneBodies(Context $context): void
     {
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureDeferredStubsForInventoryEmit($context);
+
             return;
         }
         self::implement($context);
     }
 
+    /** Inventory argv emit: link getenv_all ABI without nested GetenvJitHelper JIT (#14470). */
+    public static function ensureDeferredStubsForInventoryEmit(Context $context): void
+    {
+        if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
+        self::implementDeferredInventoryStub($context);
+    }
+
     public static function implement(Context $context): void
     {
+        if (NestedJitCompileScope::isActive()) {
+            return;
+        }
+
         $probe = $context->module->getNamedFunction('__compiler_getenv_all');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -49,11 +65,22 @@ final class StringGetenvAll
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredInventoryStub($context);
+
+            return;
+        }
+
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureHashtableHelpers($context);
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
         self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function implementBridge(Context $context): void
@@ -172,6 +199,32 @@ final class StringGetenvAll
         }
 
         return $fn;
+    }
+
+    /** Inventory emit only needs a linkable ABI symbol (#14470). */
+    private static function implementDeferredInventoryStub(Context $context): void
+    {
+        $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
+        $probe = $context->module->getNamedFunction('__compiler_getenv_all');
+        if (null === $probe || 0 === $probe->countBasicBlocks()) {
+            $voidTy = $context->getTypeFromString('void');
+            $valuePtr = $context->getTypeFromString('__value__*');
+            $ft = $context->context->functionType($voidTy, false, $valuePtr);
+            $fn = null !== $probe
+                ? $probe
+                : $context->module->addFunction('__compiler_getenv_all', $ft);
+            $entry = $fn->appendBasicBlock('getenv_all_inv_stub');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnVoid();
+            $context->registerFunction('__compiler_getenv_all', $fn);
+        }
+
+        self::registerLinkedRuntime($context);
+        if (null !== $savedInsert) {
+            $context->builder->positionAtEnd($savedInsert);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     private static function registerLinkedRuntime(Context $context): void
