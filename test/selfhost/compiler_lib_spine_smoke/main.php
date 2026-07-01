@@ -3126,7 +3126,6 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DateIntervalFormat.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodCurrent.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodIteratorMethod.php';
-require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorState.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodKey.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodNext.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DatePeriodRewind.php';
