@@ -169,16 +169,26 @@ final class VmRange
         }
         if (Variable::TYPE_INTEGER !== $stepVar->type) {
             if (Variable::TYPE_FLOAT === $stepVar->type) {
-                return VmMath::floatToZendLong($stepVar->toFloat());
+                $step = VmMath::floatToZendLong($stepVar->toFloat());
+                if (0 === $step) {
+                    throw new \ValueError(self::ZERO_STEP_ERROR);
+                }
+
+                return self::normalizeIntStepSign($start, $end, $step);
             }
             if (Variable::TYPE_STRING === $stepVar->type) {
                 $s = $stepVar->toString();
                 if ('' !== $s && is_numeric($s)) {
                     if (str_contains($s, '.') || str_contains($s, 'e') || str_contains($s, 'E')) {
-                        return VmMath::floatToZendLong((float) $s);
+                        $step = VmMath::floatToZendLong((float) $s);
+                    } else {
+                        $step = (int) $s;
+                    }
+                    if (0 === $step) {
+                        throw new \ValueError(self::ZERO_STEP_ERROR);
                     }
 
-                    return (int) $s;
+                    return self::normalizeIntStepSign($start, $end, $step);
                 }
             }
             throw new \TypeError(
@@ -191,6 +201,18 @@ final class VmRange
         $step = $stepVar->toInt();
         if (0 === $step) {
             throw new \ValueError(self::ZERO_STEP_ERROR);
+        }
+
+        return self::normalizeIntStepSign($start, $end, $step);
+    }
+
+    private static function normalizeIntStepSign(int $start, int $end, int $step): int
+    {
+        if ($start <= $end && $step < 0) {
+            return abs($step);
+        }
+        if ($start > $end && $step > 0) {
+            return -abs($step);
         }
 
         return $step;
@@ -226,6 +248,18 @@ final class VmRange
         }
         if (0.0 === $step) {
             throw new \ValueError(self::ZERO_STEP_ERROR);
+        }
+
+        return self::normalizeFloatStepSign($start, $end, $step);
+    }
+
+    private static function normalizeFloatStepSign(float $start, float $end, float $step): float
+    {
+        if ($start <= $end && $step < 0.0) {
+            return abs($step);
+        }
+        if ($start > $end && $step > 0.0) {
+            return -abs($step);
         }
 
         return $step;
@@ -267,12 +301,17 @@ final class VmRange
             throw new \ValueError(self::ZERO_STEP_ERROR);
         }
 
-        return $step;
+        return self::normalizeIntStepSign(ord($startChar), ord($endChar), $step);
     }
 
     /** Int range list for JIT/AOT helpers (#13502). */
     public static function intRangeTable(int $start, int $end, int $step): HashTable
     {
+        if (0 === $step) {
+            throw new \ValueError(self::ZERO_STEP_ERROR);
+        }
+        $step = self::normalizeIntStepSign($start, $end, $step);
+
         return self::buildIntRange($start, $end, $step);
     }
 
