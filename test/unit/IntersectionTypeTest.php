@@ -123,4 +123,40 @@ PHP;
         $this->assertSame(\PHPTypes\Type::TYPE_INTERSECTION, $type->type);
         $this->assertCount(2, $type->subTypes);
     }
+
+    /** @covers issue #14542 */
+    public function testIntersectionClassAndInterfaceMembersAcceptConcreteSubclass(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+interface IntersectionIface {}
+class IntersectionBase {}
+class IntersectionConcrete extends IntersectionBase implements IntersectionIface {}
+
+function accepts_intersection(IntersectionBase&IntersectionIface $value): void {}
+
+function returns_intersection(): IntersectionBase&IntersectionIface {
+    return new IntersectionConcrete();
+}
+
+class Holder {
+    public IntersectionBase&IntersectionIface $prop;
+
+    public function __construct() {
+        $this->prop = new IntersectionConcrete();
+    }
+}
+
+$c = new IntersectionConcrete();
+accepts_intersection($c);
+echo get_class(returns_intersection()), "\n";
+$h = new Holder();
+echo get_class($h->prop), "\n";
+echo "ok\n";
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'intersection_class_interface.php'));
+        $this->assertSame("IntersectionConcrete\nIntersectionConcrete\nok\n", ob_get_clean());
+    }
 }

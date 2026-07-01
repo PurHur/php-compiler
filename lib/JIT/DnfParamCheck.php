@@ -302,8 +302,8 @@ final class DnfParamCheck
             $context->builder->branch($resume);
             $context->builder->positionAtEnd($ok);
             $acc = $i1->constInt(1, false);
-            foreach ($interfaceLcs as $ifaceLc) {
-                $okIface = self::emitImplements($context, $objectType, $arg, $ifaceLc);
+            foreach ($interfaceLcs as $memberLc) {
+                $okIface = self::emitMemberSatisfies($context, $objectType, $arg, $memberLc);
                 $acc = $context->builder->and($acc, $context->helper->loadValue($okIface));
             }
             $context->builder->branch($resume);
@@ -319,8 +319,8 @@ final class DnfParamCheck
             return new Variable($context, Variable::TYPE_NATIVE_BOOL, Variable::KIND_VALUE, $i1->constInt(0, false));
         }
         $acc = $i1->constInt(1, false);
-        foreach ($interfaceLcs as $ifaceLc) {
-            $ok = self::emitImplements($context, $objectType, $arg, $ifaceLc);
+        foreach ($interfaceLcs as $memberLc) {
+            $ok = self::emitMemberSatisfies($context, $objectType, $arg, $memberLc);
             $acc = $context->builder->and($acc, $context->helper->loadValue($ok));
         }
 
@@ -344,6 +344,20 @@ final class DnfParamCheck
             Variable::KIND_VALUE,
             $isTy
         );
+    }
+
+    private static function emitMemberSatisfies(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg,
+        string $memberLc
+    ): Variable {
+        $memberLc = strtolower(ltrim($memberLc, '\\'));
+        if ($objectType->isInterfaceClassLc($memberLc)) {
+            return self::emitImplements($context, $objectType, $arg, $memberLc);
+        }
+
+        return $objectType->emitInstanceOf($arg, $memberLc);
     }
 
     private static function emitImplements(
