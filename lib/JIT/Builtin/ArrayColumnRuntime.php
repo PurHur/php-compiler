@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_column() via ArrayColumnJitHelper PHP (#14256, #14264).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildColumnArray*} cluster.
+ * Standalone AOT compiles {@see ArrayColumnJitHelper} via JitVmHelperLink (#14275); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildColumnArray*} cluster.
  * SSOT: {@see \PHPCompiler\ext\standard\array_column}
  * php-src: ext/standard/array.c — php_array_column()
  */
@@ -270,12 +269,13 @@ final class ArrayColumnRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         if (self::bridgeReady($context, self::ABI_COLUMN)) {
             self::registerAll($context);
 
@@ -402,8 +402,7 @@ final class ArrayColumnRuntime
 
     private static function useLlvm(Context $context, JITVariable $array): bool
     {
-        return Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type);
+        return ArrayBuiltinHelper::isNativeArray($array->type);
     }
 
     private static function bridgeReady(Context $context, string $abi): bool
