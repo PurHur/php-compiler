@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_pad() JIT routes through ArrayPadJitHelper PHP not ArrayBuiltinHelper LLVM (#12476). */
+/** array_pad() JIT routes through ArrayPadJitHelper PHP not ArrayBuiltinHelper LLVM (#12476, #14286). */
 final class ArrayPadRuntimeShrinkTest extends TestCase
 {
     public function testArrayPadRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPadRuntime.php');
         $this->assertStringContainsString('ArrayPadJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::pad', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pad.php');
         $this->assertStringContainsString('ArrayPadRuntime::pad', $builtin);
