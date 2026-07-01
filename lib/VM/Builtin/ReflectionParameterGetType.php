@@ -55,10 +55,7 @@ final class ReflectionParameterGetType extends VmClassMethod
             return $func->block->paramDeclaredTypes[$index] ?? null;
         }
 
-        $func = ReflectionSupport::resolveUserFunction(
-            $ctx,
-            ReflectionSupport::functionNameFromReflection($receiver)
-        );
+        $func = ReflectionSupport::resolveFunctionForReflectionParameter($ctx, $receiver);
         $index = ReflectionSupport::paramIndexFromReflection($receiver);
 
         return $func->block->paramDeclaredTypes[$index] ?? null;

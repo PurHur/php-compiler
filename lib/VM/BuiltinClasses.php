@@ -202,6 +202,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodIsProtected;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsPublic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsStatic;
 use PHPCompiler\VM\Builtin\ReflectionMethodIsUserDefined;
+use PHPCompiler\VM\Builtin\ReflectionCompositeTypeGetTypes;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeGetName;
 use PHPCompiler\VM\Builtin\ReflectionNamedTypeIsBuiltin;
 use PHPCompiler\VM\Builtin\ReflectionParameterConstruct;
@@ -917,7 +918,9 @@ final class BuiltinClasses
             $boolProto,
             $arrayProto,
             $pub,
-            []
+            [
+                'gettypes' => new ReflectionCompositeTypeGetTypes(),
+            ]
         );
         self::registerReflectionTypeClass(
             $ctx,
@@ -927,7 +930,9 @@ final class BuiltinClasses
             $boolProto,
             $arrayProto,
             $pub,
-            []
+            [
+                'gettypes' => new ReflectionCompositeTypeGetTypes(),
+            ]
         );
 
         $objProto = new Variable(Variable::TYPE_OBJECT);
