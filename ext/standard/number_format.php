@@ -28,13 +28,18 @@ final class number_format extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (!isset($frame->calledArgs[0])) {
-            throw new \LogicException('number_format() requires at least one argument');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
+            ));
         }
-        foreach (array_keys($frame->calledArgs) as $idx) {
-            if ($idx < 0 || $idx > 3) {
-                throw new \LogicException('number_format() requires one to four arguments');
-            }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -81,8 +86,17 @@ final class number_format extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 4) {
-            throw new \LogicException('number_format() requires one to four arguments');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 4) {
+            throw new \ArgumentCountError(\sprintf(
+                'number_format() expects at most 4 arguments, %d given',
+                $argc
+            ));
         }
 
         return JitNumberFormat::format($context, ...$args);

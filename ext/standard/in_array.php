@@ -27,8 +27,18 @@ final class in_array extends Internal
 {
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs) && 3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('in_array() requires two or three arguments');
+        $argc = \count($frame->calledArgs);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $needle = $frame->calledArgs[0]->resolveIndirect();
         $haystack = VmArray::requireArrayParam(
@@ -56,8 +66,18 @@ final class in_array extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args) && 3 !== \count($args)) {
-            throw new \LogicException('in_array() requires two or three arguments');
+        $argc = \count($args);
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'in_array() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $strict = $context->constantFromBool(false);
         if (3 === \count($args)) {

@@ -32,8 +32,17 @@ final class explode extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $delimiter = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'explode', 0, 'separator');
         $string = VmString::coerceStringBuiltinArg($frame->calledArgs[1], 'explode', 1, 'string');
@@ -59,8 +68,17 @@ final class explode extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('explode() expects 2 or 3 arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'explode() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         if ('' === ($args[0]->compileTimeString ?? null)) {
             TypeErrorRaise::registerDeclarations($context);

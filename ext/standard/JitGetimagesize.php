@@ -22,8 +22,17 @@ final class JitGetimagesize
     public static function fromPath(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 1 || $argc > 2) {
-            throw new \LogicException('getimagesize() expects one or two arguments in this compiler build');
+        if ($argc < 1) {
+            throw new \ArgumentCountError(\sprintf(
+                'getimagesize() expects at least 1 argument, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'getimagesize() expects at most 2 arguments, %d given',
+                $argc
+            ));
         }
         if ($argc >= 2) {
             throw new \LogicException('getimagesize() imageinfo by-ref is VM-only in this compiler build (#3271)');
