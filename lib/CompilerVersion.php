@@ -320,6 +320,7 @@ final class CompilerVersion
      * PHP 8.4+ property hooks (`$prop { get; set; }`, default initializer + hook block).
      *
      * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14432, #14062).
+     * Reference-profile rejection tests skip when this returns true (#14062).
      * php-src: Zend/zend_language_parser.y / Zend/zend_compile.c property hooks.
      */
     public static function supportsPropertyHooks(): bool

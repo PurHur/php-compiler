@@ -7,7 +7,7 @@ namespace PHPCompiler;
 use PHPCompiler\SourcePreprocessor\PropertyHooks;
 use PHPUnit\Framework\TestCase;
 
-/** Property-hook syntax rejected on Zend 8.2 reference profile (#14062). */
+/** Property-hook syntax rejected on Zend 8.2 reference profile (#14062); forward profile #14432. */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
     private function skipWhenForwardProfile(): void
@@ -17,10 +17,9 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
+    public function testSupportsPropertyHooksTrueOnForwardProfile(): void
     {
-        $this->skipWhenForwardProfile();
-        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
