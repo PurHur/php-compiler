@@ -22,14 +22,28 @@ final class CallArgv
     /** @var Value|null */
     public static $htGlobal = null;
 
+    /** @var object|null LLVM module identity — static Value must not leak across Context instances */
+    private static $htModule = null;
+
     public static function implement(Context $context): void
     {
-        if (null !== self::$htGlobal) {
+        $module = $context->module;
+        if (null !== self::$htGlobal && self::$htModule === $module) {
             return;
         }
+
+        $existing = $module->getNamedGlobal(self::GLOBAL_HT);
+        if (null !== $existing) {
+            self::$htGlobal = $existing;
+            self::$htModule = $module;
+
+            return;
+        }
+
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        self::$htGlobal = $context->module->addGlobal($htPtr, self::GLOBAL_HT);
+        self::$htGlobal = $module->addGlobal($htPtr, self::GLOBAL_HT);
         self::$htGlobal->setInitializer($htPtr->constNull());
+        self::$htModule = $module;
     }
 
     public static function emitStore(Context $context, Variable $packedArgv): void
