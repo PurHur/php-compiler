@@ -123,6 +123,25 @@ PHP;
         self::assertSame("1\n0\n1\n0\n", ob_get_clean());
     }
 
+    public function test_dom_node_get_node_path(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><child><leaf/></child></root>');
+$root = $doc->documentElement;
+$leaf = $root->firstChild->firstChild;
+echo $doc->getNodePath(), "\n";
+echo $root->getNodePath(), "\n";
+echo $leaf->getNodePath(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_get_node_path.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("/\n/root\n/root/child/leaf\n", ob_get_clean());
+    }
+
     public function test_dom_node_introspection_properties(): void
     {
         $runtime = new Runtime();
