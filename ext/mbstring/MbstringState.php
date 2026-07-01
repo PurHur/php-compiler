@@ -46,6 +46,12 @@ final class MbstringState
         if (null === $encoding) {
             return self::$httpOutput;
         }
+        // php-src mbfl_no_encoding "pass" — identity HTTP output mode (ext/mbstring/mbstring.c).
+        if (0 === strcasecmp($encoding, 'pass')) {
+            self::$httpOutput = 'pass';
+
+            return true;
+        }
         $canonical = MbstringEncodingRegistry::assertValid($encoding, 'mb_http_output', 0);
         self::$httpOutput = $canonical;
 
