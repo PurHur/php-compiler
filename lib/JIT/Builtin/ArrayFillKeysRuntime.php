@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_fill_keys() via ArrayFillKeysJitHelper PHP (#12487).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::fillKeys()}.
+ * Standalone AOT compiles {@see ArrayFillKeysJitHelper} via JitVmHelperLink bridge (#14439); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::fillKeys()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::fillKeys()}
  * php-src: ext/standard/array.c — php_array_fill_keys()
  */
@@ -34,8 +33,7 @@ final class ArrayFillKeysRuntime
 
     public static function fillKeys(Context $context, JITVariable $keys, JITVariable $value): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($keys->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($keys->type)) {
             return ArrayBuiltinHelper::fillKeys($context, $keys, $value);
         }
 
@@ -55,12 +53,13 @@ final class ArrayFillKeysRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FILL_KEYS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
