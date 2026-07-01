@@ -1,0 +1,120 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\VM;
+
+use PHPCompiler\ext\standard\boolval;
+use PHPCompiler\Frame;
+
+/**
+ * empty($container[$dim]) — Zend zend_check_empty / zend_isset_dim parity (#14798).
+ *
+ * php-src: Zend/zend_operators.c — ArrayAccess uses offsetExists then value truthiness;
+ * native arrays use key presence then value truthiness (not isset() semantics).
+ */
+final class VmEmptyDimension
+{
+    /**
+     * @return ?Frame catch frame when user code handles a throw
+     */
+    public static function evaluate(
+        \PHPCompiler\VM $vm,
+        Variable $container,
+        Variable $dim,
+        Frame $frame,
+        Variable $dst
+    ): ?Frame {
+        $container = $container->resolveIndirect();
+        if (Variable::TYPE_ARRAY === $container->type) {
+            if ($vm->context->isGlobalsTable($container)) {
+                $dst->bool(self::emptyGlobalsOffset($vm, $dim));
+
+                return null;
+            }
+            $table = $container->toArray();
+            try {
+                if (!$table->keyExists($dim)) {
+                    $dst->bool(true);
+
+                    return null;
+                }
+                $stored = $table->findVariable($dim, false);
+                $dst->bool(!boolval::isTruthy($stored->resolveIndirect()));
+            } catch (\TypeError $e) {
+                return $vm->propagateEmptyDimensionTypeError($e, $frame);
+            }
+
+            return null;
+        }
+        if (Variable::TYPE_OBJECT === $container->type) {
+            $object = $container->toObject();
+            if (EnumCaseSupport::isEnumCase($object)) {
+                throw new \TypeError('Illegal offset type in isset or empty');
+            }
+            if (!$vm->objectImplementsArrayAccess($object)) {
+                $className = $object->class->name;
+                $catchFrame = $vm->propagateEmptyDimensionError(
+                    'Cannot use object of type ' . $className . ' as array',
+                    $frame
+                );
+
+                return $catchFrame;
+            }
+            $existsOut = new Variable();
+            $catchFrame = $vm->invokeArrayAccessOffsetExists($object, $dim, $frame, $existsOut);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            if (!$existsOut->toBool()) {
+                $dst->bool(true);
+
+                return null;
+            }
+            $valueOut = new Variable();
+            $catchFrame = $vm->invokeArrayAccessOffsetGet($object, $dim, $frame, $valueOut);
+            if (null !== $catchFrame) {
+                return $catchFrame;
+            }
+            $dst->bool(!boolval::isTruthy($valueOut->resolveIndirect()));
+
+            return null;
+        }
+        if (Variable::TYPE_STRING === $container->type) {
+            $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+            if (!Variable::stringOffsetIsSetFromDim(
+                $container,
+                $dim,
+                $vm->context->errors,
+                $vm->context,
+                $frame,
+                $scriptFile
+            )) {
+                $dst->bool(true);
+
+                return null;
+            }
+            $index = Variable::stringOffsetIndexFromDim(
+                $dim,
+                $vm->context->errors,
+                $vm->context,
+                $frame,
+                $scriptFile
+            );
+            $char = $container->string[$index] ?? '';
+            $charVar = new Variable();
+            $charVar->string($char);
+            $dst->bool(!boolval::isTruthy($charVar));
+
+            return null;
+        }
+        $dst->bool(true);
+
+        return null;
+    }
+
+    private static function emptyGlobalsOffset(\PHPCompiler\VM $vm, Variable $dim): bool
+    {
+        return $vm->context->globalsTableOffsetIsEmpty($dim);
+    }
+}

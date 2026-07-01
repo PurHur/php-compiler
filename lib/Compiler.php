@@ -2112,7 +2112,7 @@ class Compiler {
                         && $i + 1 < $opCount
                         && $this->isArrayDimFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
                     ) {
-                        // Lowered by compileExpr Empty_ via TYPE_ISSET + TYPE_BOOLEAN_NOT (#5307).
+                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_DIMENSION (#5307, #14798).
                         break;
                     } elseif (
                         $child instanceof Op\Expr\PropertyFetch
@@ -8107,15 +8107,14 @@ class Compiler {
                 if (null !== $dimFetch) {
                     $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
                     $resultSlot = $this->compileOperand($expr->result, $block, false);
-                    $checkSlot = $this->compileBoolTemporary($block);
                     [$containerSlot, $dimSlot] = $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block);
                     if (null !== $containerSlot) {
                         return [
-                            $this->makeIssetOpCode($checkSlot, $containerSlot, $dimSlot, false),
                             new OpCode(
-                                OpCode::TYPE_BOOLEAN_NOT,
+                                OpCode::TYPE_EMPTY_DIMENSION,
                                 $resultSlot,
-                                $checkSlot
+                                $containerSlot,
+                                $dimSlot
                             ),
                         ];
                     }
@@ -10813,7 +10812,9 @@ class Compiler {
         if ($producer instanceof Op\Expr\Empty_) {
             for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
                 $op = $block->opCodes[$i];
-                if (OpCode::TYPE_EMPTY === $op->type || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type) {
+                if (OpCode::TYPE_EMPTY === $op->type
+                    || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type
+                    || OpCode::TYPE_EMPTY_DIMENSION === $op->type) {
                     return $op->arg1;
                 }
             }
@@ -10832,7 +10833,9 @@ class Compiler {
             if ($op->arg1 !== $slot) {
                 continue;
             }
-            if (OpCode::TYPE_EMPTY === $op->type || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type) {
+            if (OpCode::TYPE_EMPTY === $op->type
+                || OpCode::TYPE_EMPTY_OBJECT_PROPERTY === $op->type
+                || OpCode::TYPE_EMPTY_DIMENSION === $op->type) {
                 return true;
             }
         }

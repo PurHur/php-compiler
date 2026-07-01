@@ -246,6 +246,8 @@ function opcode_type_name(int $type): string
             return 'TYPE_CAST_VOID';
         case 128:
             return 'TYPE_PROPERTY_FETCH_WRITE';
+        case 129:
+            return 'TYPE_EMPTY_DIMENSION';
         default:
             return 'unknown opcode';
     }

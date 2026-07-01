@@ -42,6 +42,15 @@ final class ArrayAccessHelper
         return VmArrayAccess::tryCompileOffsetIsSet($context, $container, $dim, $containerOp);
     }
 
+    public static function tryCompileOffsetIsEmpty(
+        Context $context,
+        Variable $container,
+        Variable $dim,
+        ?Operand $containerOp
+    ): ?Value {
+        return VmArrayAccess::tryCompileOffsetIsEmpty($context, $container, $dim, $containerOp);
+    }
+
     public static function tryCompileOffsetUnset(
         Context $context,
         Variable $container,

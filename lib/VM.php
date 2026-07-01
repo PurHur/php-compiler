@@ -743,6 +743,32 @@ class VM {
     }
 
     /**
+     * empty($container[$dim]) — Zend zend_check_empty dimension parity (#14798).
+     *
+     * @return ?Frame catch frame when user code handles a throw
+     */
+    public function evaluateEmptyDimension(
+        Variable $container,
+        Variable $dim,
+        Frame $frame,
+        Variable $dst
+    ): ?Frame {
+        return VM\VmEmptyDimension::evaluate($this, $container, $dim, $frame, $dst);
+    }
+
+    /** @internal VmEmptyDimension error propagation */
+    public function propagateEmptyDimensionTypeError(\TypeError $error, Frame $frame): ?Frame
+    {
+        return $this->dispatchVmTypeError($error, $frame);
+    }
+
+    /** @internal VmEmptyDimension error propagation */
+    public function propagateEmptyDimensionError(string $message, Frame $frame): ?Frame
+    {
+        return $this->dispatchVmError($message, $frame);
+    }
+
+    /**
      * Invoke a VM builtin class method; return catch frame when user code handles the throw.
      *
      * @param Variable ...$args
@@ -6476,6 +6502,19 @@ restart:
                     $catchFrame = $this->emptyObjectProperty(
                         $object,
                         $propName,
+                        $frame,
+                        $dst
+                    );
+                    if (null !== $catchFrame) {
+                        $frame = $catchFrame;
+                        goto restart;
+                    }
+                    break;
+                case OpCode::TYPE_EMPTY_DIMENSION:
+                    $dst = $frame->scope[$op->arg1];
+                    $catchFrame = $this->evaluateEmptyDimension(
+                        $frame->scope[$op->arg2],
+                        $frame->scope[$op->arg3],
                         $frame,
                         $dst
                     );

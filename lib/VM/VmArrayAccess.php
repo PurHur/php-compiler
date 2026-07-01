@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Call;
 use PHPCompiler\JIT\Call\RuntimeIndirectInstanceMethodCall;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\EmptyObjectPropertyLlvm;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JitVariable;
 use PHPCfg\Operand;
@@ -99,6 +101,45 @@ final class VmArrayAccess
         $boxed->addref();
 
         return (new \PHPCompiler\ext\standard\boolval())->call($context, $boxed);
+    }
+
+    public static function tryCompileOffsetIsEmpty(
+        Context $context,
+        JitVariable $container,
+        JitVariable $dim,
+        ?Operand $containerOp
+    ): ?Value {
+        if (!self::canUseArrayAccess($context, $container, $containerOp)) {
+            return null;
+        }
+        $exists = self::tryCompileOffsetIsSet($context, $container, $dim, $containerOp);
+        if (null === $exists) {
+            return null;
+        }
+
+        $tag = 'aa_empty_'.(string) spl_object_id($context);
+        $missingBlock = BasicBlockHelper::append($context, $tag.'_missing');
+        $presentBlock = BasicBlockHelper::append($context, $tag.'_present');
+        $doneBlock = BasicBlockHelper::append($context, $tag.'_done');
+        $i1 = $context->getTypeFromString('int1');
+
+        $context->builder->branchIf($exists, $presentBlock, $missingBlock);
+
+        $context->builder->positionAtEnd($missingBlock);
+        $missingEmpty = $i1->constInt(1, false);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($presentBlock);
+        $fetched = self::offsetGet($context, $container, $dim);
+        $valueEmpty = EmptyObjectPropertyLlvm::compileEmptyFromValue($context, $fetched);
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming([$missingEmpty, $missingBlock]);
+        $phi->addIncoming([$valueEmpty, $presentBlock]);
+
+        return $phi;
     }
 
     public static function tryCompileOffsetUnset(
