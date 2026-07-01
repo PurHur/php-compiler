@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3585 |
-| Phase A inventory files (M2 ratio SSOT) | 3585 |
+| PHP files on vm.php path | 3586 |
+| Phase A inventory files (M2 ratio SSOT) | 3586 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9788 |
+| Source constructs flagged (warnings) | 9789 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1375,6 +1375,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmStreamBlockingPure.php` | 0 | 1 |
 | `ext/standard/VmStreamBucket.php` | 0 | 3 |
 | `ext/standard/VmStreamContext.php` | 0 | 12 |
+| `ext/standard/VmStreamContextOptions.php` | 0 | 1 |
 | `ext/standard/VmStreamFilterChain.php` | 0 | 8 |
 | `ext/standard/VmStreamFilters.php` | 0 | 3 |
 | `ext/standard/VmStreamFstat.php` | 0 | 1 |
@@ -10815,14 +10816,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StreamContextJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 25)
-- new HashTable (line 50)
-- new Variable (line 60)
-- new Variable (line 105)
-- new HashTable (line 123)
-- new Variable (line 125)
-- new HashTable (line 132)
-- new Variable (line 134)
+- new HashTable (line 26)
+- new HashTable (line 55)
+- new Variable (line 65)
+- new Variable (line 110)
+- new HashTable (line 128)
+- new Variable (line 130)
+- new HashTable (line 137)
+- new Variable (line 139)
 - 13 class method(s)
 
 ### `ext/standard/StreamFilterJitHelper.php`
@@ -12954,18 +12955,23 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmStreamContext.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 81)
-- new Variable (line 82)
-- new HashTable (line 101)
-- new Variable (line 103)
-- new Variable (line 247)
-- new HashTable (line 341)
-- new Variable (line 350)
-- new HashTable (line 367)
-- new Variable (line 369)
-- new HashTable (line 379)
-- new Variable (line 381)
+- new HashTable (line 82)
+- new Variable (line 83)
+- new HashTable (line 102)
+- new Variable (line 104)
+- new Variable (line 248)
+- new HashTable (line 343)
+- new Variable (line 352)
+- new HashTable (line 369)
+- new Variable (line 371)
+- new HashTable (line 381)
+- new Variable (line 383)
 - 18 class method(s)
+
+### `ext/standard/VmStreamContextOptions.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/VmStreamFilterChain.php`
 
@@ -18637,34 +18643,34 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 21863)
 - new Operand\Literal (line 22439)
 - new Variable (line 22441)
-- new Operand\Temporary (line 23040)
-- new Operand\Temporary (line 23072)
-- new OpCode (line 23097)
-- new OpCode (line 23289)
-- new OpCode (line 23570)
-- new OpCode (line 23771)
-- new OpCode (line 23781)
-- new OpCode (line 23784)
-- new Operand\Temporary (line 23821)
-- new OpCode (line 23823)
-- new OpCode (line 23834)
-- new Operand\Temporary (line 23837)
-- new OpCode (line 23839)
-- new OpCode (line 23847)
-- new OpCode (line 23854)
-- new OpCode (line 23862)
-- new OpCode (line 23865)
-- new OpCode (line 23882)
-- new OpCode (line 23910)
-- new OpCode (line 23917)
-- new OpCode (line 24189)
-- new Literal (line 24221)
-- new OpCode (line 24320)
-- new Variable (line 24327)
-- new Temporary (line 24329)
-- new OpCode (line 24332)
-- new CompileFatal (line 24630)
-- new CompileFatal (line 24885)
+- new Operand\Temporary (line 23041)
+- new Operand\Temporary (line 23073)
+- new OpCode (line 23098)
+- new OpCode (line 23290)
+- new OpCode (line 23571)
+- new OpCode (line 23772)
+- new OpCode (line 23782)
+- new OpCode (line 23785)
+- new Operand\Temporary (line 23822)
+- new OpCode (line 23824)
+- new OpCode (line 23835)
+- new Operand\Temporary (line 23838)
+- new OpCode (line 23840)
+- new OpCode (line 23848)
+- new OpCode (line 23855)
+- new OpCode (line 23863)
+- new OpCode (line 23866)
+- new OpCode (line 23883)
+- new OpCode (line 23911)
+- new OpCode (line 23918)
+- new OpCode (line 24190)
+- new Literal (line 24222)
+- new OpCode (line 24321)
+- new Variable (line 24328)
+- new Temporary (line 24330)
+- new OpCode (line 24333)
+- new CompileFatal (line 24631)
+- new CompileFatal (line 24886)
 - 676 class method(s)
 - 21 closure(s)
 
