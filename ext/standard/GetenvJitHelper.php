@@ -77,6 +77,15 @@ final class GetenvJitHelper
         return true;
     }
 
+    public static function apacheSetenv(?string $variable, ?string $value): bool
+    {
+        if (null === $variable || null === $value) {
+            return false;
+        }
+
+        return self::putenv($variable.'='.$value);
+    }
+
     /** Merge process-local putenv overlay into a hashtable (JIT getenv argc==0, #13431). */
     public static function mergeLocalOverlayInto(HashTable $ht): void
     {
