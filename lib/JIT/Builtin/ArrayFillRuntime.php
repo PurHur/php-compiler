@@ -4,9 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -15,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_fill() via ArrayFillJitHelper PHP (#13501).
  *
- * Standalone AOT keeps LLVM in {@see HashTableHelper::buildArrayFill()}.
+ * Standalone AOT compiles {@see ArrayFillJitHelper} via JitVmHelperLink (#14297).
  * SSOT: {@see \PHPCompiler\ext\standard\array_fill}
  * php-src: ext/standard/array.c — php_array_fill()
  */
@@ -38,17 +36,6 @@ final class ArrayFillRuntime
         Value $count,
         JITVariable $value
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $sizeT = $context->getTypeFromString('size_t');
-
-            return HashTableHelper::buildArrayFill(
-                $context,
-                $context->builder->truncOrBitCast($startIndex, $sizeT),
-                $context->builder->truncOrBitCast($count, $sizeT),
-                $value
-            );
-        }
-
         self::ensureLinked($context);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
 
@@ -65,12 +52,13 @@ final class ArrayFillRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FILL);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
