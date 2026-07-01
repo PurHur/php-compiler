@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayColumnRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -90,10 +89,10 @@ final class array_column extends Internal
         }
         if (JITVariable::TYPE_VALUE === $args[1]->type) {
             if (2 === $argc) {
-                return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKey($context, $args[0], $args[1]);
+                return ArrayColumnRuntime::columnWithRuntimeKey($context, $args[0], $args[1]);
             }
             if (JITVariable::TYPE_NULL === $args[2]->type || $args[2]->isNullConstant) {
-                return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKey($context, $args[0], $args[1]);
+                return ArrayColumnRuntime::columnWithRuntimeKey($context, $args[0], $args[1]);
             }
             if (!JitArrayColumnArg::guardStrIntNullOperand($context, $args[2], 'array_column', 2, 'index_key')) {
                 return HashTableHelper::alloc($context);
@@ -101,7 +100,7 @@ final class array_column extends Internal
             if (null !== JitStringArg::compileTimeLiteral($args[2])) {
                 $indexKey = $this->jitString($context, $args[2], 'array_column() index_key');
 
-                return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKeyAndIndex(
+                return ArrayColumnRuntime::columnWithRuntimeKeyAndIndex(
                     $context,
                     $args[0],
                     $args[1],
@@ -120,7 +119,7 @@ final class array_column extends Internal
                 return HashTableHelper::alloc($context);
             }
             if (JITVariable::TYPE_VALUE === $args[2]->type) {
-                return ArrayBuiltinHelper::buildColumnArrayWithRuntimeColumnKeyAndRuntimeIndex(
+                return ArrayColumnRuntime::columnWithRuntimeKeyAndRuntimeIndex(
                     $context,
                     $args[0],
                     $args[1],
@@ -180,7 +179,7 @@ final class array_column extends Internal
             return HashTableHelper::alloc($context);
         }
         if (JITVariable::TYPE_VALUE === $indexKey->type) {
-            return ArrayBuiltinHelper::buildColumnArrayNullColumnWithRuntimeIndex($context, $array, $indexKey);
+            return ArrayColumnRuntime::columnNullWithRuntimeIndex($context, $array, $indexKey);
         }
         throw new \LogicException(
             'array_column() index_key must be a string or integer in this compiler build'
@@ -210,7 +209,7 @@ final class array_column extends Internal
             return HashTableHelper::alloc($context);
         }
         if (JITVariable::TYPE_VALUE === $indexKey->type) {
-            return ArrayBuiltinHelper::buildColumnArrayWithRuntimeIndexKey($context, $array, $columnKey, $indexKey);
+            return ArrayColumnRuntime::columnWithKeyAndRuntimeIndex($context, $array, $columnKey, $indexKey);
         }
         throw new \LogicException(
             'array_column() index_key must be a string or integer in this compiler build'

@@ -100,6 +100,51 @@ final class ArrayColumnJitHelper
         return $out;
     }
 
+    public static function columnWithRuntimeKey(HashTable $ht, Variable $columnKey): HashTable
+    {
+        $field = VmArrayColumnArg::requireStrIntArg($columnKey, 'array_column', 1, 'column_key');
+
+        return self::columnWithKey($ht, $field);
+    }
+
+    public static function columnWithRuntimeKeyAndIndex(
+        HashTable $ht,
+        Variable $columnKey,
+        string|int $indexKey
+    ): HashTable {
+        $field = VmArrayColumnArg::requireStrIntArg($columnKey, 'array_column', 1, 'column_key');
+
+        return self::columnWithKeyAndIndex($ht, $field, $indexKey);
+    }
+
+    public static function columnWithKeyAndRuntimeIndex(
+        HashTable $ht,
+        string|int $columnKey,
+        Variable $indexKey
+    ): HashTable {
+        $indexField = VmArrayColumnArg::requireStrIntArg($indexKey, 'array_column', 2, 'index_key');
+
+        return self::columnWithKeyAndIndex($ht, $columnKey, $indexField);
+    }
+
+    public static function columnWithRuntimeKeyAndRuntimeIndex(
+        HashTable $ht,
+        Variable $columnKey,
+        Variable $indexKey
+    ): HashTable {
+        $columnField = VmArrayColumnArg::requireStrIntArg($columnKey, 'array_column', 1, 'column_key');
+        $indexField = VmArrayColumnArg::requireStrIntArg($indexKey, 'array_column', 2, 'index_key');
+
+        return self::columnWithKeyAndIndex($ht, $columnField, $indexField);
+    }
+
+    public static function columnNullWithRuntimeIndex(HashTable $ht, Variable $indexKey): HashTable
+    {
+        $indexField = VmArrayColumnArg::requireStrIntArg($indexKey, 'array_column', 2, 'index_key');
+
+        return self::columnNullWithIndex($ht, $indexField);
+    }
+
     private static function readColumnFromRow(Variable $row, string|int $field): ?Variable
     {
         if (Variable::TYPE_ARRAY === $row->type) {
