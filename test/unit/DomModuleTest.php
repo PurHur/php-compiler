@@ -184,6 +184,26 @@ PHP;
         self::assertSame("<a id=\"1\"/>\nattrs\nnull\n", ob_get_clean());
     }
 
+    public function test_dom_element_set_attribute_on_create_element(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$el = $doc->createElement('item');
+$el->setAttribute('id', 'x');
+echo $el->tagName, "\n";
+echo $el->getAttribute('id'), "\n";
+echo $el->getAttribute('missing'), "\n";
+$doc->appendChild($el);
+echo (int) str_contains($doc->saveXML(), 'id="x"'), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_element_set_attribute.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("item\nx\n\n1\n", ob_get_clean());
+    }
+
     public function test_dom_node_has_attributes(): void
     {
         $runtime = new Runtime();
