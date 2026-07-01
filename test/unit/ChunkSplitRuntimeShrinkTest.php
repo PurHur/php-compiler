@@ -1,0 +1,44 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\ChunkSplitJitHelper;
+use PHPCompiler\ext\standard\VmString;
+use PHPUnit\Framework\TestCase;
+
+/** chunk_split() JIT routes through ChunkSplitJitHelper PHP not inline LLVM (#14626). */
+final class ChunkSplitRuntimeShrinkTest extends TestCase
+{
+    public function testStringChunkSplitUsesJitHelperNotInlineLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringChunkSplit.php');
+        $this->assertStringContainsString('ChunkSplitJitHelper', $source);
+
+        $jitChunk = (string) file_get_contents(__DIR__.'/../../ext/standard/JitChunkSplit.php');
+        $this->assertStringNotContainsString('chunksplit_head', $jitChunk);
+        $this->assertStringNotContainsString('function split', $jitChunk);
+
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/chunk_split.php');
+        $this->assertStringContainsString('StringChunkSplit::ensureLinked', $builtin);
+        $this->assertStringContainsString('__compiler_chunk_split', $builtin);
+        $this->assertStringNotContainsString('JitChunkSplit::split', $builtin);
+    }
+
+    public function testChunkSplitJitHelperDelegatesToVmString(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ChunkSplitJitHelper.php');
+        $this->assertStringContainsString('VmString::chunkSplit', $source);
+
+        $expected = VmString::chunkSplit('1234567890', 3, '-');
+        $this->assertSame($expected, ChunkSplitJitHelper::chunkSplitArgv('1234567890', 3, '-'));
+    }
+
+    public function testSpineBundleIncludesChunkSplitJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('ChunkSplitJitHelper.php', $spine);
+        $this->assertStringContainsString('StringChunkSplit.php', $spine);
+    }
+}

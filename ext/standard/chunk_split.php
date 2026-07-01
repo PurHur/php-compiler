@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringChunkSplit;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -62,6 +63,8 @@ final class chunk_split extends Internal
         $workBlock = BasicBlockHelper::append($context, 'chunksplit_call_work');
         $context->builder->branch($workBlock);
         $context->builder->positionAtEnd($workBlock);
+        StringChunkSplit::ensureLinked($context);
+        $context->builder->positionAtEnd($workBlock);
         $input = JitChunkSplit::lowerStringSubject($context, $args[0]);
         $i64 = $context->getTypeFromString('int64');
         $chunkLen = $i64->constInt(76, false);
@@ -76,6 +79,11 @@ final class chunk_split extends Internal
             $separator = $context->builder->load($context->constantStringFromString("\r\n"));
         }
 
-        return JitChunkSplit::split($context, $input, $chunkLen, $separator);
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_chunk_split'),
+            $input,
+            $chunkLen,
+            $separator
+        );
     }
 }

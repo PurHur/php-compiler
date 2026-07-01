@@ -932,6 +932,7 @@ class Context {
                 Builtin\StringBin2hex::ensureStandaloneBodies($this);
                 Builtin\StringStrrev::ensureStandaloneBodies($this);
                 Builtin\StringStrRepeat::ensureStandaloneBodies($this);
+                Builtin\StringChunkSplit::ensureStandaloneBodies($this);
                 Builtin\StringStripTags::ensureStandaloneBodies($this);
                 Builtin\StringStrtr::ensureStandaloneBodies($this);
                 Builtin\StringParseStr::ensureStandaloneBodies($this);
