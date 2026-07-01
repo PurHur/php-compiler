@@ -43,6 +43,7 @@ final class VmStreamContext
                     'stream_context_create() argument #1 must be an array in this compiler build'
                 );
             } else {
+                VmStreamContextOptions::validateOptionsVariable($optionsVar, 'stream_context_create');
                 $exported = VmHttpBuildQuery::export($resolved);
                 if (!\is_array($exported)) {
                     throw new \LogicException(
@@ -259,6 +260,7 @@ final class VmStreamContext
         $context = self::requireRepresentation($context, 'stream_context_set_options');
         $context->separateArrayForWrite();
         $options = self::requireOptionsArray($options, 'stream_context_set_options');
+        VmStreamContextOptions::validateOptionsVariable($options, 'stream_context_set_options');
 
         $exported = VmHttpBuildQuery::export($options);
         if (!\is_array($exported)) {
