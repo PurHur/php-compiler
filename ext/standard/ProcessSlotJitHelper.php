@@ -157,11 +157,15 @@ final class ProcessSlotJitHelper
 
     private static function exitCodeFromStatus(int $statusVal): int
     {
-        if (0 === ($statusVal & 0xff)) {
+        $lowByte = $statusVal & 0xff;
+        if (0 === $lowByte) {
             return ($statusVal >> 8) & 0xff;
         }
+        if (0x7f === $lowByte) {
+            return -1;
+        }
 
-        return self::EXIT_127;
+        return $lowByte;
     }
 
     private static function ffi(): ?\FFI
