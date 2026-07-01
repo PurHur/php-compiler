@@ -18,6 +18,7 @@ final class NestedVmHashTableMethodLlvm
         'padcopy' => Call\HashTablePadCopy::class,
         'valuescopy' => Call\HashTableValuesCopy::class,
         'keyscopy' => Call\HashTableKeysCopy::class,
+        'keysmatchingcopy' => Call\HashTableKeysMatchingCopy::class,
         'exportkeyvaluepairs' => Call\HashTableExportKeyValuePairs::class,
     ];
 

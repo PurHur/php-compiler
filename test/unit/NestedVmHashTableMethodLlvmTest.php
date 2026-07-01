@@ -17,6 +17,7 @@ final class NestedVmHashTableMethodLlvmTest extends TestCase
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('exportkeyvaluepairs'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('valuescopy'));
         $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('keyscopy'));
+        $this->assertTrue(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('keysmatchingcopy'));
         $this->assertFalse(NestedVmHashTableMethodLlvm::isNestedHashTableMethod('iteratekeyed'));
     }
 }
