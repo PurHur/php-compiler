@@ -49,6 +49,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    public function testClassHasFunctionsWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+    }
+
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());

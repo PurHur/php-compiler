@@ -19,6 +19,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
+    public function testSupportsClassHasFunctionsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+    }
+
     public function testSupportsClassUsesRecursiveFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
@@ -160,6 +165,15 @@ final class CompilerVersionGateTest extends TestCase
         $ctx = $runtime->vmContext;
         $this->assertFalse(isset($ctx->functions['str_decrement']));
         $this->assertFalse(isset($ctx->functions['str_increment']));
+    }
+
+    public function testVmDoesNotRegisterClassHasFunctionsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['class_has_method', 'class_has_property', 'class_has_constant'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
     }
 
     public function testVmDoesNotRegisterMbStrPadOnReferenceProfile(): void
