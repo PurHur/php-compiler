@@ -28,6 +28,82 @@ PHP;
         $this->assertCompileExitZero($source, 'Runtime::MODE_AOT class const fetch');
     }
 
+    /** Issue #14472: standalone AOT init must not segfault on JsonEncode nested-JIT during loadJitContext. */
+    public function testEchoHelloBootstrapAotCompileDoesNotSegfault(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/test/bootstrap-aot/echo_hello.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_echo_hello_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'echo_hello bootstrap AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('Segmentation fault', $stderr);
+    }
+
+    public function testLoadJitContextStandaloneInitCompletes(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+        $script = <<<'PHP'
+<?php
+require 'vendor/autoload.php';
+$r = new PHPCompiler\Runtime(PHPCompiler\Runtime::MODE_AOT);
+$r->loadJitContext();
+echo "ok\n";
+PHP;
+        $tmp = tempnam(sys_get_temp_dir(), 'load_jit_ctx_');
+        $this->assertNotFalse($tmp);
+        $path = $tmp.'.php';
+        rename($tmp, $path);
+        file_put_contents($path, $script);
+        $argv = array_merge(LlvmToolchain::envPrefix($repoRoot), [PHP_BINARY, $path]);
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $proc = proc_open($argv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($proc);
+        fclose($pipes[0]);
+        $stdout = stream_get_contents($pipes[1]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exit = proc_close($proc);
+        @unlink($path);
+        $this->assertSame(0, $exit, trim($stderr !== false ? $stderr : ''));
+        $this->assertSame("ok\n", $stdout !== false ? $stdout : '');
+    }
+
     public function testNativeStringArrayIntoMixedValueBoxCompiles(): void
     {
         $this->skipUnlessLlvmReady();

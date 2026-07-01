@@ -51,6 +51,11 @@ final class CliArgvRuntime
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::ensureUserScriptMainStubs($context);
+
+            return;
+        }
         self::implement($context);
     }
 

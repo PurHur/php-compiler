@@ -34,6 +34,9 @@ final class StringGetenvAll
 
     public static function ensureStandaloneBodies(Context $context): void
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            return;
+        }
         self::implement($context);
     }
 
