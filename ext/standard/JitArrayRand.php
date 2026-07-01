@@ -28,6 +28,7 @@ final class JitArrayRand
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_rand() accepts one or two arguments');
         }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_rand', 1, 'array');
         if (ArrayBuiltinHelper::isNativeArray($args[0]->type)) {
             throw new \LogicException(
                 'array_rand() cannot compile fixed-size literal arrays in JIT/AOT yet; use bin/vm.php or bin/serve.php, or build the list with [] append'
