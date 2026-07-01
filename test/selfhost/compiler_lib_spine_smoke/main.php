@@ -1432,6 +1432,7 @@ require_once __DIR__.'/../../../ext/standard/VmStreamBlockingNative.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBlockingPure.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamBucket.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamContext.php';
+require_once __DIR__.'/../../../ext/standard/VmStreamContextOptions.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilterChain.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFilters.php';
 require_once __DIR__.'/../../../ext/standard/VmStreamFstat.php';
