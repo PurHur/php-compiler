@@ -4841,6 +4841,9 @@ restart:
                             }
                         }
                     }
+                    if (!$mutates) {
+                        VM\TypedPropertyCheck::assertReadable($storage);
+                    }
                     $dest->indirect($storage);
                     $dest->staticPropertyClassLc = $lcClass;
                     $dest->objectPropertyName = $propNameRaw;
@@ -6267,17 +6270,16 @@ restart:
                                 goto restart;
                             }
                             $propSlot = $propertyObject->getProperty($name);
-                            if ($op->nullsafeFetchPropertyRead) {
-                                if (
-                                    $op->nullsafeUninitNullableToNull
-                                    && VM\TypedPropertyCheck::isUninitialized($propSlot)
-                                    && VM\TypedPropertyCheck::propertyAllowsNull($propSlot)
-                                ) {
-                                    $result->null();
-                                    break;
-                                }
-                                VM\TypedPropertyCheck::assertReadable($propSlot);
+                            if (
+                                $op->nullsafeFetchPropertyRead
+                                && $op->nullsafeUninitNullableToNull
+                                && VM\TypedPropertyCheck::isUninitialized($propSlot)
+                                && VM\TypedPropertyCheck::propertyAllowsNull($propSlot)
+                            ) {
+                                $result->null();
+                                break;
                             }
+                            VM\TypedPropertyCheck::assertReadable($propSlot);
                             $result->indirect($propSlot);
                         }
                         break;
