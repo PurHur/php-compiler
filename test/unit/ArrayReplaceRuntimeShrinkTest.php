@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_replace() JIT routes through ArrayReplaceJitHelper PHP not ArrayBuiltinHelper LLVM (#12516). */
+/** array_replace() JIT routes through ArrayReplaceJitHelper PHP not ArrayBuiltinHelper LLVM (#12516, #14341). */
 final class ArrayReplaceRuntimeShrinkTest extends TestCase
 {
     public function testArrayReplaceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayReplaceRuntime.php');
         $this->assertStringContainsString('ArrayReplaceJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayReplace', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplace', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_replace.php');
         $this->assertStringContainsString('ArrayReplaceRuntime::replace', $builtin);

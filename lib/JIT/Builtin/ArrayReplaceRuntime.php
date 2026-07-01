@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -17,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_replace() via ArrayReplaceJitHelper PHP (#12516).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayReplace()}.
+ * Standalone AOT compiles {@see ArrayReplaceJitHelper} via nested JIT bridges (#14341); embed uses same PHP path.
  * SSOT: {@see \PHPCompiler\VM\HashTable::replaceCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace)
  */
@@ -40,28 +39,23 @@ final class ArrayReplaceRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function replace(Context $context, JITVariable $first, JITVariable ...$others): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::arrayReplace($context, $first, ...$others);
-        }
-
-        foreach ([$first, ...$others] as $arg) {
-            if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
-                return ArrayBuiltinHelper::arrayReplace($context, $first, ...$others);
-            }
-        }
-
         self::ensureLinked($context);
 
-        $firstHt = ArrayBuiltinHelper::loadHashTable($context, $first);
+        $firstHt = self::argToHashtable($context, $first);
         if ([] === $others) {
             return self::callReplaceSingle($context, $firstHt);
         }
 
         $result = self::callReplaceSingle($context, $firstHt);
         foreach ($others as $other) {
-            $nextHt = ArrayBuiltinHelper::loadHashTable($context, $other);
+            $nextHt = self::argToHashtable($context, $other);
             $result = self::callReplaceTwo($context, $result, $nextHt);
         }
 
@@ -70,10 +64,6 @@ final class ArrayReplaceRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_replace__single');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -184,6 +174,15 @@ final class ArrayReplaceRuntime
             $left,
             $right
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction
