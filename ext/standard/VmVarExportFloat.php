@@ -22,8 +22,8 @@ final class VmVarExportFloat
         if (\is_infinite($f)) {
             return $f < 0 ? '-INF' : 'INF';
         }
-        $s = (string) $f;
-        if (false === \strpos($s, '.')) {
+        $s = VmFloatDtoa::formatH($f);
+        if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
         }
 
