@@ -32,13 +32,13 @@ final class str_contains extends Internal
         $this->requireExactArgCount($frame, 'str_contains', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_contains', 'needle', 1, $frame);
-        $haystackStr = VmString::coerceStringBuiltinArg(
+        $haystackStr = VmString::coerceStringBuiltinArgNoObject(
             $frame->calledArgs[0],
             'str_contains',
             0,
             'haystack'
         );
-        $needleStr = VmString::coerceStringBuiltinArg(
+        $needleStr = VmString::coerceStringBuiltinArgNoObject(
             $frame->calledArgs[1],
             'str_contains',
             1,
@@ -67,8 +67,8 @@ final class str_contains extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_contains', 'needle', 2);
-        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle');
 
         return JitStringSearch::contains($context, $hay, $needle);
     }
