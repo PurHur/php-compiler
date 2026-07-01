@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3626 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9876 |
+| Source constructs flagged (warnings) | 9879 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1717,7 +1717,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/get_declared_variables_.php` | 0 | 1 |
 | `ext/standard/get_defined_constants_.php` | 0 | 3 |
 | `ext/standard/get_defined_functions_.php` | 0 | 1 |
-| `ext/standard/get_defined_vars_.php` | 0 | 1 |
+| `ext/standard/get_defined_vars_.php` | 0 | 3 |
 | `ext/standard/get_extension_funcs.php` | 0 | 1 |
 | `ext/standard/get_headers.php` | 0 | 2 |
 | `ext/standard/get_html_translation_table.php` | 0 | 1 |
@@ -2196,7 +2196,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/unitenum_exists_.php` | 0 | 1 |
 | `ext/standard/unlink.php` | 0 | 5 |
 | `ext/standard/unpack.php` | 0 | 2 |
-| `ext/standard/unserialize.php` | 0 | 2 |
+| `ext/standard/unserialize.php` | 0 | 3 |
 | `ext/standard/urldecode.php` | 0 | 2 |
 | `ext/standard/urlencode.php` | 0 | 1 |
 | `ext/standard/user_error.php` | 0 | 3 |
@@ -13771,10 +13771,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_reduce.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 54)
-- new Variable (line 80)
-- new Variable (line 86)
-- new Variable (line 91)
+- new Variable (line 52)
+- new Variable (line 78)
+- new Variable (line 84)
+- new Variable (line 89)
 - 3 class method(s)
 
 ### `ext/standard/array_replace.php`
@@ -15020,6 +15020,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/get_defined_vars_.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- new ArgumentCountError (line 38)
 - 2 class method(s)
 
 ### `ext/standard/get_extension_funcs.php`
@@ -16225,7 +16227,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/php_strip_whitespace.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 31)
 - 2 class method(s)
 
 ### `ext/standard/php_uname.php`
@@ -17716,7 +17718,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/unserialize.php`
 
 **Warnings** (review for bootstrap subset):
-- new JITVariable (line 113)
+- new JITVariable (line 114)
+- new JITVariable (line 132)
 - 6 class method(s)
 
 ### `ext/standard/urldecode.php`
