@@ -13,7 +13,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * strcspn() — length of initial segment not matching a character mask (LLVM via JitStrspn).
+ * strcspn() — length of initial segment not matching a character mask (JIT via StrspnJitHelper PHP).
  *
  * PHP 8.4 (GH-12592): empty $characters returns the full byte length of the segment,
  * including bytes after an embedded NUL — see VmString::strcspn.
@@ -53,6 +53,6 @@ final class strcspn extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'strcspn', 'string', 1);
 
-        return JitStrspn::extended($context, $args, false, 'strcspn');
+        return SpnJitLowering::extended($context, $args, false, 'strcspn');
     }
 }

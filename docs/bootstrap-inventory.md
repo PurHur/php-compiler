@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3629 |
-| Phase A inventory files (M2 ratio SSOT) | 3629 |
+| PHP files on vm.php path | 3631 |
+| Phase A inventory files (M2 ratio SSOT) | 3631 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9889 |
+| Source constructs flagged (warnings) | 9893 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -968,7 +968,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrptime.php` | 0 | 2 |
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
 | `ext/standard/JitStrrpos.php` | 0 | 1 |
-| `ext/standard/JitStrspn.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
 | `ext/standard/JitStrtok.php` | 0 | 1 |
 | `ext/standard/JitStrtotime.php` | 0 | 1 |
@@ -1084,6 +1083,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/SortJitHelper.php` | 0 | 1 |
 | `ext/standard/SoundexJitHelper.php` | 0 | 1 |
 | `ext/standard/SplAutoloadJitHelper.php` | 0 | 1 |
+| `ext/standard/SpnJitLowering.php` | 0 | 1 |
 | `ext/standard/SprintfJitHelper.php` | 0 | 3 |
 | `ext/standard/SscanfJitHelper.php` | 0 | 2 |
 | `ext/standard/StatArrayJitHelper.php` | 0 | 4 |
@@ -1114,6 +1114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrrevJitHelper.php` | 0 | 1 |
+| `ext/standard/StrspnJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtrArrayJitHelper.php` | 0 | 1 |
@@ -2775,6 +2776,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrspn.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrtotime.php` | 0 | 3 |
@@ -9465,11 +9467,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
-### `ext/standard/JitStrspn.php`
-
-**Warnings** (review for bootstrap subset):
-- 12 class method(s)
-
 ### `ext/standard/JitStrstr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10894,6 +10891,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
+### `ext/standard/SpnJitLowering.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/SprintfJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11067,6 +11069,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/StrspnJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/StrtokJitHelper.php`
 
@@ -21821,6 +21828,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 118)
 - 7 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/StringStrspn.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 206)
+- 9 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringStrtok.php`
