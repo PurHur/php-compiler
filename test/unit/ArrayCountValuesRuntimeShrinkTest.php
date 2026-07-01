@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_count_values() JIT routes through ArrayCountValuesJitHelper PHP not ArrayBuiltinHelper LLVM (#12331). */
+/** array_count_values() JIT routes through ArrayCountValuesJitHelper PHP not ArrayBuiltinHelper LLVM (#12331, #14485). */
 final class ArrayCountValuesRuntimeShrinkTest extends TestCase
 {
     public function testArrayCountValuesRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -17,7 +17,7 @@ final class ArrayCountValuesRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCountValuesRuntime.php');
         $this->assertStringContainsString('ArrayCountValuesJitHelper', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::arrayCountValues', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_count_values.php');
         $this->assertStringContainsString('ArrayCountValuesRuntime::countValues', $builtin);
