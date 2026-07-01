@@ -98,7 +98,7 @@ final class JitStringBuiltinArg
     }
 
     /**
-     * Z_PARAM_PATH — null coerces to "" even under caller strict_types (#14563, ext/standard/filestat.c).
+     * Z_PARAM_PATH — null coerces to "" when caller is not strict; TypeError under strict_types (#13419).
      */
     public static function lowerPath(
         Context $context,
@@ -111,6 +111,11 @@ final class JitStringBuiltinArg
     ): Value {
         if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
             JitNativeString::ensureInsertBlock($context);
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'null', $expectedType);
+
+                return self::unreachableStringPtr($context);
+            }
 
             return $context->builder->load($context->constantStringFromString(''));
         }

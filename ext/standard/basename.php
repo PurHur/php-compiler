@@ -20,7 +20,7 @@ final class basename extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'basename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'basename', 'path');
         if (null === $frame->returnVar) {
             return;
         }

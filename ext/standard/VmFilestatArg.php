@@ -17,13 +17,22 @@ final class VmFilestatArg
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
-    public static function coerceFilenameArg(Variable $var, string $function): string
-    {
-        return VmString::coerceStringBuiltinArg($var, $function, 0, 'filename');
+    public static function coerceFilenameArg(
+        Variable $var,
+        string $function,
+        int $argIndex = 0,
+        string $paramName = 'filename',
+        ?Frame $frame = null
+    ): string {
+        if (null !== $frame) {
+            InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
+        }
+
+        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
     /**
-     * Z_PARAM_PATH for compiled call sites — null coerces to "" even under caller strict_types (#14563, filestat.c).
+     * Z_PARAM_PATH for compiled call sites — TypeError on null under strict_types (#13419).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -33,7 +42,13 @@ final class VmFilestatArg
         string $function,
         string $paramName = 'filename'
     ): string {
-        return self::coerceFilenameArg($frame->calledArgs[$argIndex], $function);
+        return self::coerceFilenameArg(
+            $frame->calledArgs[$argIndex],
+            $function,
+            $argIndex,
+            $paramName,
+            $frame
+        );
     }
 
     /**

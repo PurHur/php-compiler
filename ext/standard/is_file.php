@@ -20,7 +20,7 @@ final class is_file extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('is_file() requires exactly one argument');
         }
-        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'is_file');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'is_file');
         if (null === $frame->returnVar) {
             return;
         }
