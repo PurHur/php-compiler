@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\openssl;
 
 use PHPCompiler\ext\standard\VmHash;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -20,11 +22,11 @@ final class VmOpenssl
      *
      * @return int|false
      */
-    public static function cipher_iv_length(string $cipherAlgo): int|false
+    public static function cipher_iv_length(string $cipherAlgo, ?Frame $frame = null): int|false
     {
         $length = OpensslCipherRegistry::cipherIvLength($cipherAlgo);
         if (false === $length) {
-            trigger_error('openssl_cipher_iv_length(): Unknown cipher algorithm', E_USER_WARNING);
+            self::userWarning('openssl_cipher_iv_length(): Unknown cipher algorithm', $frame);
         }
 
         return $length;
@@ -35,11 +37,11 @@ final class VmOpenssl
      *
      * @return int|false
      */
-    public static function cipher_key_length(string $cipherAlgo): int|false
+    public static function cipher_key_length(string $cipherAlgo, ?Frame $frame = null): int|false
     {
         $length = OpensslCipherRegistry::cipherKeyLength($cipherAlgo);
         if (false === $length) {
-            trigger_error('openssl_cipher_key_length(): Unknown cipher algorithm', E_USER_WARNING);
+            self::userWarning('openssl_cipher_key_length(): Unknown cipher algorithm', $frame);
         }
 
         return $length;
@@ -60,17 +62,17 @@ final class VmOpenssl
      *
      * @return string|false
      */
-    public static function digest(string $data, string $method, bool $rawOutput = false): string|false
+    public static function digest(string $data, string $method, bool $rawOutput = false, ?Frame $frame = null): string|false
     {
         if (!OpensslCipherRegistry::digestImplemented($method)) {
-            trigger_error('openssl_digest(): Unknown digest algorithm', E_USER_WARNING);
+            self::userWarning('openssl_digest(): Unknown digest algorithm', $frame);
 
             return false;
         }
         try {
             return VmHash::hash(strtolower($method), $data, $rawOutput);
         } catch (\ValueError) {
-            trigger_error('openssl_digest(): Unknown digest algorithm', E_USER_WARNING);
+            self::userWarning('openssl_digest(): Unknown digest algorithm', $frame);
 
             return false;
         }
@@ -111,5 +113,21 @@ final class VmOpenssl
         }
 
         return $ht;
+    }
+
+    private static function userWarning(string $message, ?Frame $frame): void
+    {
+        if (null === $frame?->vmContext) {
+            trigger_error($message, E_USER_WARNING);
+
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_USER_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
