@@ -22794,6 +22794,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
                 && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
+                && !$this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
             ) {
                 $closureSlot = $this->slotForRecentClosureCallArg($block);
                 if (null !== $closureSlot) {
