@@ -257,4 +257,17 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertNotNull($closure);
         $this->assertFalse(isset($closure->methods['getcurrent']));
     }
+
+    public function testSupportsDomNodeContainsTrueOnForwardProfile(): void
+    {
+        $this->assertTrue(CompilerVersion::supportsDomNodeContains());
+    }
+
+    public function testVmRegistersDomNodeContainsOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $node = $runtime->vmContext->classes['domnode'] ?? null;
+        $this->assertNotNull($node);
+        $this->assertTrue(isset($node->methods['contains']));
+    }
 }

@@ -655,10 +655,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0.
+     * Reference-profile phantom gate (php84_dom_node_contains_phantom.phpt) skips when true.
      */
     public static function supportsDomNodeContains(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 }
