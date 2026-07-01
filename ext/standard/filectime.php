@@ -7,7 +7,6 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -19,7 +18,7 @@ final class filectime extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filectime() requires exactly one argument in this compiler build');
         }
-        $path = VmString::coerceTypedStringBuiltinArg($frame->calledArgs[0], 'filectime', 0, 'filename');
+        $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filectime');
         if (null === $frame->returnVar) {
             return;
         }
@@ -37,7 +36,7 @@ final class filectime extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('filectime() requires exactly one argument in this compiler build');
         }
-        $path = JitStringBuiltinArg::lowerTypedString($context, $args[0], 'filectime', 0, 'filename');
+        $path = JitFilestatArg::lowerFilename($context, $args[0], 'filectime');
 
         return JitFilectime::invoke($context, $path);
     }
