@@ -1803,6 +1803,7 @@ class Compiler {
         // Register file-level `const` / literal define() before class bodies and
         // FUNCDEF defaults so zend_compile_default_value can fold ConstFetch (#6542).
         $this->prescanCompileTimeGlobalConsts($ops, $block);
+        $this->rejectListDestructDefaultValueSlotsInOps($ops);
 
         // Hoist class-like definitions before functions so JIT/AOT see member
         // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
@@ -24637,6 +24638,42 @@ class Compiler {
             max(1, $spread->getLine()),
             'Spread operator is not supported in assignments'
         );
+    }
+
+    /**
+     * Zend zend_compile_list_assign — destructuring slots with default-value expressions compile-fatal (#14325).
+     *
+     * php-cfg lowers `[$a = 1] = $rhs` to dim fetch + assign($a, default) + assign($aTemp, fetch).
+     *
+     * @param Op[] $ops
+     *
+     * @return never
+     */
+    private function rejectListDestructDefaultValueSlotsInOps(array $ops): void
+    {
+        $count = count($ops);
+        for ($i = 0; $i < $count; ++$i) {
+            $op = $ops[$i];
+            if (!$op instanceof Op\Expr\ArrayDimFetch || $i + 1 >= $count) {
+                continue;
+            }
+            $defaultInit = $ops[$i + 1];
+            if (!$defaultInit instanceof Op\Expr\Assign || $defaultInit->expr === $op->result) {
+                continue;
+            }
+            if (!$this->isNamedVariableOperand($defaultInit->var)) {
+                continue;
+            }
+            if ($i + 2 < $count && $ops[$i + 2] instanceof Op\Expr\Assign) {
+                $chain = $ops[$i + 2];
+                if (
+                    $chain->expr === $op->result
+                    && $this->unwrapOperandChain($chain->var) === $this->unwrapOperandChain($defaultInit->result)
+                ) {
+                    $this->throwListDestructNonWritableWriteFatalFromOp($defaultInit);
+                }
+            }
+        }
     }
 
     /**
