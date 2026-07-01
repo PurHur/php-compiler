@@ -42,6 +42,14 @@ final class VmDom
 
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
+    public const PROP_ENCODING = 'encoding';
+
+    public const PROP_XML_VERSION = 'xmlVersion';
+
+    public const PROP_XML_STANDALONE = 'xmlStandalone';
+
+    public const PROP_DOCUMENT_URI = 'documentURI';
+
     public const PROP_NODE_NAME = 'nodeName';
 
     public const PROP_NODE_TYPE = 'nodeType';
@@ -351,6 +359,7 @@ final class VmDom
         self::ensureDocument($document);
 
         $trimmed = trim($xml);
+        $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         $elementXml = self::stripDoctype($trimmed);
         if (!VmXml::validateAndReport($ctx, $elementXml, $frame)) {
@@ -365,6 +374,9 @@ final class VmDom
         $state->childIds = [];
         $state->idAttrByElement = $idAttrByElement;
         $state->elementIds = [];
+        $state->xmlVersion = $decl['version'];
+        $state->encoding = $decl['encoding'];
+        $state->xmlStandalone = $decl['standalone'];
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
         self::linkChildToParent($root, null);
@@ -436,6 +448,58 @@ final class VmDom
                 self::indexElementIdsRecursive($document, $child);
             }
         }
+    }
+
+    /**
+     * @return array{version: string, encoding: ?string, standalone: bool}
+     */
+    private static function parseXmlDeclaration(string $xml): array
+    {
+        $version = '1.0';
+        $encoding = null;
+        $standalone = false;
+        if (!preg_match('/^\s*<\?xml\s+([^?]*)\?>/s', $xml, $match)) {
+            return [
+                'version' => $version,
+                'encoding' => $encoding,
+                'standalone' => $standalone,
+            ];
+        }
+        $attrs = $match[1];
+        if (preg_match('/version\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $versionMatch)) {
+            $version = $versionMatch[2];
+        }
+        if (preg_match('/encoding\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $encodingMatch)) {
+            $encoding = $encodingMatch[2];
+        }
+        if (preg_match('/standalone\s*=\s*(["\'])([^"\']*)\1/i', $attrs, $standaloneMatch)) {
+            $standalone = 'yes' === strtolower($standaloneMatch[2]);
+        }
+
+        return [
+            'version' => $version,
+            'encoding' => $encoding,
+            'standalone' => $standalone,
+        ];
+    }
+
+    private static function serializeXmlDeclaration(DomNodeState $state): string
+    {
+        $decl = '<?xml version="'.self::escapeAttribute($state->xmlVersion).'"';
+        if (null !== $state->encoding && '' !== $state->encoding) {
+            $decl .= ' encoding="'.self::escapeAttribute($state->encoding).'"';
+        }
+        if ($state->xmlStandalone) {
+            $decl .= ' standalone="yes"';
+        }
+        $decl .= '?>';
+
+        return $decl;
+    }
+
+    private static function escapeAttribute(string $value): string
+    {
+        return str_replace(['&', '"', '<'], ['&amp;', '&quot;', '&lt;'], $value);
     }
 
     /**
@@ -565,7 +629,7 @@ final class VmDom
             return self::serializeNode($node);
         }
 
-        $lines = ['<?xml version="1.0"?>'];
+        $lines = [self::serializeXmlDeclaration($state)];
 
         if (null !== $state->doctypeName) {
             $lines[] = self::serializeDoctype(

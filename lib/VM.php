@@ -8429,6 +8429,14 @@ restart:
                 )) {
                     return null;
                 }
+                if (ext\dom\DomDocumentPropertySupport::tryAssign(
+                    $resolved->objectPropertyOwner,
+                    $resolved->objectPropertyName,
+                    $src,
+                    $this->context
+                )) {
+                    return null;
+                }
             }
             $dst->copyFrom($src);
 

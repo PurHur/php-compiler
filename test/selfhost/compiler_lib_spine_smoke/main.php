@@ -130,6 +130,7 @@ require_once __DIR__.'/../../../ext/dom/DocumentLoadXML.php';
 require_once __DIR__.'/../../../ext/dom/DocumentSaveXML.php';
 require_once __DIR__.'/../../../ext/dom/DomConstants.php';
 require_once __DIR__.'/../../../ext/dom/DomNodeState.php';
+require_once __DIR__.'/../../../ext/dom/DomDocumentPropertySupport.php';
 require_once __DIR__.'/../../../ext/dom/DomNodePropertySupport.php';
 require_once __DIR__.'/../../../ext/dom/DomRegistry.php';
 require_once __DIR__.'/../../../ext/dom/ElementAppendChild.php';
