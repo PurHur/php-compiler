@@ -32,7 +32,7 @@ final class is_dir extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('is_dir() requires exactly one argument');
         }
-        $path = JitStringBuiltinArg::lower($context, $args[0], 'is_dir', 0, 'filename');
+        $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'is_dir', 0, 'filename');
 
         return JitStat::pathIsDir($context, $path);
     }

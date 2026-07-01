@@ -18,7 +18,7 @@ final class file_exists extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('file_exists() requires exactly one argument');
         }
-        $path = VmString::stringBuiltinArgForFrame($frame, 0, 'file_exists', 0, 'filename');
+        $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'file_exists');
         if (null === $frame->returnVar) {
             return;
         }

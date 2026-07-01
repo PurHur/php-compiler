@@ -23,9 +23,9 @@ final class VmFilestatArg
     }
 
     /**
-     * Z_PARAM_PATH with caller strict_types parity (#13419, ext/standard/filestat.c).
+     * Z_PARAM_PATH for compiled call sites — null coerces to "" even under caller strict_types (#14563, filestat.c).
      *
-     * @throws \TypeError when caller strict_types rejects null operands
+     * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
     public static function filenameArgForFrame(
         Frame $frame,
@@ -33,12 +33,6 @@ final class VmFilestatArg
         string $function,
         string $paramName = 'filename'
     ): string {
-        if (InternalStrictArg::isCallerStrict($frame)) {
-            InternalStrictArg::requireString($frame, $argIndex, $function, $paramName);
-
-            return $frame->calledArgs[$argIndex]->resolveIndirect()->toString();
-        }
-
         return self::coerceFilenameArg($frame->calledArgs[$argIndex], $function);
     }
 

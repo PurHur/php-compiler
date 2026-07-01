@@ -98,6 +98,27 @@ final class JitStringBuiltinArg
     }
 
     /**
+     * Z_PARAM_PATH — null coerces to "" even under caller strict_types (#14563, ext/standard/filestat.c).
+     */
+    public static function lowerPath(
+        Context $context,
+        Variable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName,
+        string $expectedType = 'string',
+        ?string $arrayExpectedType = null
+    ): Value {
+        if (Variable::TYPE_NULL === $arg->type || $arg->isNullConstant) {
+            JitNativeString::ensureInsertBlock($context);
+
+            return $context->builder->load($context->constantStringFromString(''));
+        }
+
+        return self::lower($context, $arg, $function, $argIndex, $paramName, $expectedType, $arrayExpectedType);
+    }
+
+    /**
      * Lower typed string builtin operands (php-src IS_STRING; rejects null, #12640).
      */
     public static function lowerTypedString(
