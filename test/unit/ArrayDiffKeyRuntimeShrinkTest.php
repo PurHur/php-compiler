@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_diff_key() JIT routes through ArrayDiffKeyJitHelper PHP not ArrayBuiltinHelper LLVM (#12553). */
+/** array_diff_key() JIT routes through ArrayDiffKeyJitHelper PHP not ArrayBuiltinHelper LLVM (#12553, #14422). */
 final class ArrayDiffKeyRuntimeShrinkTest extends TestCase
 {
     public function testArrayDiffKeyRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayDiffKeyRuntime.php');
         $this->assertStringContainsString('ArrayDiffKeyJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayDiffKey', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffKey', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_diff_key.php');
         $this->assertStringContainsString('ArrayDiffKeyRuntime::diffKey', $builtin);
