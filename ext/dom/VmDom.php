@@ -173,6 +173,8 @@ final class VmDom
         $impl->methodVisibility['createdocument'] = $pub;
         $impl->methods['createdocumenttype'] = new ImplementationCreateDocumentType();
         $impl->methodVisibility['createdocumenttype'] = $pub;
+        $impl->methods['getfeature'] = new ImplementationGetFeature();
+        $impl->methodVisibility['getfeature'] = $pub;
         $impl->methods['hasfeature'] = new ImplementationHasFeature();
         $impl->methodVisibility['hasfeature'] = $pub;
         $ctx->classes[self::CLASS_IMPLEMENTATION] = $impl;

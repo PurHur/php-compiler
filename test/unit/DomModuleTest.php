@@ -184,6 +184,26 @@ PHP;
         self::assertSame("<a id=\"1\"/>\nattrs\nnull\n", ob_get_clean());
     }
 
+    public function test_dom_implementation_get_feature_registered(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$impl = new DOMImplementation();
+echo (int) method_exists($impl, 'getFeature'), "\n";
+try {
+    $impl->getFeature('Core', '2.0');
+    echo "no_throw\n";
+} catch (Error $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_get_feature.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\nNot yet implemented\n", ob_get_clean());
+    }
+
     public function test_dom_node_is_supported_and_default_namespace(): void
     {
         $runtime = new Runtime();
