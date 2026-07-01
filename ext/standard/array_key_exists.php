@@ -83,12 +83,6 @@ final class array_key_exists extends Internal
         return ArrayKeyExistsRuntime::keyExists($context, $key, $array, $fn);
     }
 
-    /** Public bridge for {@see ArrayKeyExistsRuntime} standalone LLVM string keys (#13735). */
-    public static function jitKeyString(Context $context, JITVariable $key, string $label): Value
-    {
-        return (new self('array_key_exists'))->jitString($context, $key, $label);
-    }
-
     private static function jitArgTypeLabel(JITVariable $arg): string
     {
         switch ($arg->type) {
