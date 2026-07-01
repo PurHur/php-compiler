@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringCountChars;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringArg;
@@ -18,7 +19,7 @@ use PHPLLVM\Value;
 /**
  * count_chars() — byte-frequency histogram (PHP 8 modes 0–4; ext/standard/string.c).
  *
- * VM: {@see VmString::count_chars()}; JIT/AOT: {@see JitCountChars}.
+ * VM: {@see VmString::count_chars()}; JIT/AOT: {@see StringCountChars} → CountCharsJitHelper PHP (#14692).
  */
 final class count_chars extends Internal
 {
@@ -95,6 +96,6 @@ final class count_chars extends Internal
 
         $str = JitStringBuiltinArg::lower($context, $args[0], 'count_chars', 0, 'string');
 
-        return JitCountChars::invoke($context, $str, $mode);
+        return StringCountChars::invoke($context, $str, $mode);
     }
 }

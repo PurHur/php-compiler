@@ -936,6 +936,7 @@ class Context {
                 Builtin\StringHex2bin::ensureStandaloneBodies($this);
                 Builtin\StringLevenshtein::ensureStandaloneBodies($this);
                 Builtin\StringSubstrCount::ensureStandaloneBodies($this);
+                Builtin\StringCountChars::ensureStandaloneBodies($this);
                 Builtin\StringStrWordCount::ensureStandaloneBodies($this);
                 Builtin\StringStripTags::ensureStandaloneBodies($this);
                 Builtin\StringStrtr::ensureStandaloneBodies($this);
