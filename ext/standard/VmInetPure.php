@@ -167,6 +167,12 @@ final class VmInetPure
         if (16 !== \strlen($in_addr)) {
             return false;
         }
+
+        $embeddedV4 = self::extractEmbeddedIpv4Tail($in_addr);
+        if (null !== $embeddedV4) {
+            return $embeddedV4;
+        }
+
         $groups = [];
         for ($i = 0; $i < 16; $i += 2) {
             $unpacked = \unpack('n', $in_addr[$i].$in_addr[$i + 1]);
@@ -219,5 +225,56 @@ final class VmInetPure
         }
 
         return \implode(':', $groups);
+    }
+
+    /**
+     * php-src basic_functions.c php_inet_ntop6 — IPv4-mapped (::ffff:) and compat (::) tails.
+     *
+     * @return string|null dotted-quad tail form or null when not embedded IPv4
+     */
+    private static function extractEmbeddedIpv4Tail(string $in_addr): ?string
+    {
+        if (16 !== \strlen($in_addr)) {
+            return null;
+        }
+
+        $prefix10 = \substr($in_addr, 0, 10);
+        if ($prefix10 !== \str_repeat("\0", 10)) {
+            return null;
+        }
+
+        $v4 = \substr($in_addr, 12, 4);
+        $mappedMarker = \substr($in_addr, 10, 2);
+        if ($mappedMarker === "\xff\xff") {
+            $dotted = self::long2ip(self::unpackIpv4NetworkLong($v4));
+            if (false === $dotted) {
+                return null;
+            }
+
+            return '::ffff:'.$dotted;
+        }
+
+        if ($mappedMarker === "\0\0" && \substr($in_addr, 0, 12) === \str_repeat("\0", 12)) {
+            $v4Long = self::unpackIpv4NetworkLong($v4);
+            // php-src IN6_IS_ADDR_V4COMPAT — skip :: and ::1 (last dword <= 1).
+            if ($v4Long <= 1) {
+                return null;
+            }
+            $dotted = self::long2ip($v4Long);
+            if (false === $dotted) {
+                return null;
+            }
+
+            return '::'.$dotted;
+        }
+
+        return null;
+    }
+
+    private static function unpackIpv4NetworkLong(string $fourBytes): int
+    {
+        $unpacked = \unpack('N', $fourBytes);
+
+        return false === $unpacked ? 0 : (int) $unpacked[1];
     }
 }
