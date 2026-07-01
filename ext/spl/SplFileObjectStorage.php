@@ -126,6 +126,12 @@ final class SplFileObjectStorage
             return -1;
         }
         self::freeLine($state);
+        if (\SEEK_END === $whence) {
+            // php-src ext/spl/spl_directory.c — SEEK_END keeps iterator line index; EOF current is '' (#14253).
+            $state['currentLine'] = '';
+
+            return 0;
+        }
         self::syncLineNumFromHandle($state);
         if (self::hasFlag($state, self::FLAG_READ_AHEAD)) {
             self::readLineForIterator($object, true);
