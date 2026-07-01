@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Builtin\VmClassMethod;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\Context;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 use PHPCompiler\VM\WeakRefSupport;
@@ -142,7 +143,7 @@ final class SplObjectStorageBuiltin
 
     public static function attach(ObjectEntry $storage, Variable $object, ?Variable $info = null): void
     {
-        $key = WeakRefSupport::objectKey($object);
+        $key = self::storageObjectKey($object, 'attach');
         $state = self::state($storage);
         if (!isset($state['entries'][$key])) {
             self::$store[$storage->id]['order'][] = $key;
@@ -160,9 +161,9 @@ final class SplObjectStorageBuiltin
         self::$store[$storage->id]['entries'][$key] = $stored;
     }
 
-    public static function contains(ObjectEntry $storage, Variable $object): bool
+    public static function contains(ObjectEntry $storage, Variable $object, string $method = 'contains'): bool
     {
-        $key = WeakRefSupport::objectKey($object);
+        $key = self::storageObjectKey($object, $method);
 
         return isset(self::state($storage)['entries'][$key]);
     }
@@ -195,7 +196,7 @@ final class SplObjectStorageBuiltin
 
     public static function offsetGet(ObjectEntry $storage, Variable $object): Variable
     {
-        $key = WeakRefSupport::objectKey($object);
+        $key = self::storageObjectKey($object, 'offsetGet');
         $entries = self::state($storage)['entries'];
         if (!isset($entries[$key])) {
             throw new \UnexpectedValueException('Object not found');
@@ -213,17 +214,17 @@ final class SplObjectStorageBuiltin
 
     public static function offsetExists(ObjectEntry $storage, Variable $object): bool
     {
-        return self::contains($storage, $object);
+        return self::contains($storage, $object, 'offsetExists');
     }
 
     public static function detach(ObjectEntry $storage, Variable $object): void
     {
-        self::offsetUnset($storage, $object);
+        self::offsetUnset($storage, $object, 'detach');
     }
 
-    public static function offsetUnset(ObjectEntry $storage, Variable $object): void
+    public static function offsetUnset(ObjectEntry $storage, Variable $object, string $method = 'offsetUnset'): void
     {
-        $key = WeakRefSupport::objectKey($object);
+        $key = self::storageObjectKey($object, $method);
         if (!isset(self::state($storage)['entries'][$key])) {
             return;
         }
@@ -319,10 +320,49 @@ final class SplObjectStorageBuiltin
 
     public static function getHash(Variable $object): string
     {
-        $resolved = WeakRefSupport::requireWeakMapKey($object);
+        $resolved = self::requireStorageObject($object, 'getHash');
         $id = WeakRefSupport::targetObjectId($resolved);
 
         return \sprintf('%016x%016x', $id, 0);
+    }
+
+    private static function storageObjectKey(Variable $object, string $method): string
+    {
+        self::requireStorageObject($object, $method);
+
+        return WeakRefSupport::objectKey($object);
+    }
+
+    private static function requireStorageObject(Variable $object, string $method): Variable
+    {
+        $resolved = $object->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $resolved->type || EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            return $object;
+        }
+
+        throw new \TypeError(\sprintf(
+            'SplObjectStorage::%s(): Argument #1 ($object) must be of type object, %s given',
+            $method,
+            self::storageObjectTypeName($resolved)
+        ));
+    }
+
+    private static function storageObjectTypeName(Variable $resolved): string
+    {
+        if (EnumCaseSupport::isEnumCaseVariable($resolved)) {
+            return EnumCaseSupport::typeNameForVariable($resolved);
+        }
+
+        return match ($resolved->type) {
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_FLOAT => 'float',
+            Variable::TYPE_BOOLEAN => 'bool',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_RESOURCE => 'resource',
+            default => 'unknown type',
+        };
     }
 
     private static function nullVariable(): Variable
