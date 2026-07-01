@@ -35,7 +35,7 @@ final class mb_http_output extends Internal
 
             return;
         }
-        $encoding = VmMbstring::coerceMbEncodingNameArg(
+        $encoding = VmMbstring::coerceEncodingString(
             $frame->calledArgs[0],
             'mb_http_output',
             0
