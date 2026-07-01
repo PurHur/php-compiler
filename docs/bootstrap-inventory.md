@@ -8,8 +8,8 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3637 |
-| Phase A inventory files (M2 ratio SSOT) | 3637 |
+| PHP files on vm.php path | 3638 |
+| Phase A inventory files (M2 ratio SSOT) | 3638 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
 | Source constructs flagged (warnings) | 9931 |
@@ -961,7 +961,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStripWhitespace.php` | 0 | 1 |
 | `ext/standard/JitStripcslashes.php` | 0 | 1 |
 | `ext/standard/JitStrpbrk.php` | 0 | 1 |
-| `ext/standard/JitStrpos.php` | 0 | 1 |
+| `ext/standard/StrposJitHelper.php` | 0 | 2 |
 | `ext/standard/JitStrptime.php` | 0 | 2 |
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
@@ -2781,6 +2781,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrpos.php` | 0 | 5 |
 | `lib/JIT/Builtin/StringStrrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrspn.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
@@ -9439,10 +9440,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/standard/JitStrpos.php`
+### `ext/standard/StrposJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/JitStrptime.php`
 
@@ -21886,6 +21887,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 118)
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringStrpos.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringStrrpos.php`
 
