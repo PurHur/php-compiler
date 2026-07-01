@@ -129,6 +129,29 @@ final class VmMath
     }
 
     /**
+     * IS_BOOL internal params without coercion (php-src ZEND_ARG_INFO; #12585, #14763 array_slice preserve_keys).
+     *
+     * @throws \TypeError when operand is not boolean
+     */
+    public static function requireBuiltinBoolArg(
+        Variable $var,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): bool {
+        $var = $var->resolveIndirect();
+        self::rejectEnumCaseBoolBuiltinArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_BOOLEAN !== $var->type) {
+            $given = Variable::TYPE_OBJECT === $var->type
+                ? $var->toObject()->class->name
+                : self::vmTypeName($var->type);
+            throw new \TypeError(self::boolBuiltinTypeError($function, $argIndex, $paramName, $given));
+        }
+
+        return $var->toBool();
+    }
+
+    /**
      * ?bool internal params that coerce like Z_PARAM_BOOL (php-src basic_functions.c; #12677).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
