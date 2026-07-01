@@ -82,6 +82,8 @@ final class ArrayObjectBuiltin
         $entry->methods['exchangearray'] = new ArrayObjectExchangeArray();
         $entry->methodVisibility['exchangearray'] = $pub;
 
+        SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayObject');
+
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 }
@@ -95,7 +97,7 @@ final class ArrayObjectConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayObjectBuiltin::CLASS_LC,
             'ArrayObject::__construct()'

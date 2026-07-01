@@ -129,7 +129,7 @@ final class SplQueueConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::__construct()'
@@ -147,7 +147,7 @@ final class SplStackConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplStackBuiltin::CLASS_LC,
             'SplStack::__construct()'
