@@ -331,11 +331,8 @@ final class VmDom
         return false;
     }
 
-    public static function isDefaultNamespace(ObjectEntry $node, ?string $namespaceUri): bool
+    public static function isDefaultNamespace(ObjectEntry $node, string $namespaceUri): bool
     {
-        if (null === $namespaceUri) {
-            return false;
-        }
         $defaultNs = self::lookupNamespaceURI($node, null);
         if (null === $defaultNs) {
             return false;

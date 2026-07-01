@@ -27,9 +27,11 @@ if ($root->isDefaultNamespace('http://other.example.com')) {
     fwrite(STDERR, "fail: other namespace should be false\n");
     exit(1);
 }
-if ($root->isDefaultNamespace(null)) {
-    fwrite(STDERR, "fail: isDefaultNamespace(null) should be false\n");
+try {
+    $root->isDefaultNamespace(null);
+    fwrite(STDERR, "fail: isDefaultNamespace(null) should throw TypeError under strict_types\n");
     exit(1);
+} catch (TypeError) {
 }
 
 echo "ok\n";
