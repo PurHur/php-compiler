@@ -12,6 +12,9 @@ final class AsymmetricVisibilityReferenceProfileTest extends TestCase
 {
     public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
     {
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $this->markTestSkipped('asymmetric visibility enabled on PHP 8.4.0+ forward profile (#14554)');
+        }
         $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
     }
 
