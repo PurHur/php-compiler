@@ -87,6 +87,8 @@ final class ArrayIteratorBuiltin
             $entry->methodVisibility[$lc] = $pub;
         }
 
+        SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayIterator');
+
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -140,7 +142,7 @@ final class ArrayIteratorConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             ArrayIteratorBuiltin::CLASS_LC,
             'ArrayIterator::__construct()'

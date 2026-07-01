@@ -168,6 +168,11 @@ final class VmSplRegistry
                 $entry->interfaces[] = $iface;
             }
         }
+        if ('splheap' === $lc) {
+            $entry->isAbstract = true;
+            $entry->abstractMethods['compare'] = true;
+            $entry->methodNames['compare'] = 'compare';
+        }
         $entry->isInternal = true;
         $ctx->classes[$lc] = $entry;
     }

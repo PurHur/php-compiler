@@ -92,6 +92,7 @@ final class SplDoublyLinkedListBuiltin
         $entry->methodNames['getiteratormode'] = 'getIteratorMode';
 
         $entry->isInternal = true;
+        SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplDoublyLinkedList');
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 

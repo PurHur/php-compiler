@@ -80,6 +80,7 @@ final class SplObjectStorageBuiltin
         $entry->methodNames['addall'] = 'addAll';
 
         $entry->isInternal = true;
+        SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'SplObjectStorage');
         $ctx->classes[self::CLASS_LC] = $entry;
     }
 
@@ -383,7 +384,7 @@ final class SplObjectStorageConstruct extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        $object = SplIteratorSupport::receiver(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplObjectStorageBuiltin::CLASS_LC,
             'SplObjectStorage::__construct()'
