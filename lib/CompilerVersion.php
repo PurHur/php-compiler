@@ -662,4 +662,12 @@ final class CompilerVersion
     {
         return self::advertisesBuiltinSince('8.4.0');
     }
+
+    /**
+     * PHP 8.4+ DOMNode::getRootNode() (ext/dom/node.c, #14449).
+     */
+    public static function supportsDomNodeGetRootNode(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
 }
