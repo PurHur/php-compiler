@@ -68,7 +68,7 @@ final class StringJsonDecode
         if (!StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
             return;
         }
-        self::implementDeferredInventoryStubs($context);
+        StringJsonDecodeInventoryStubs::implement($context);
     }
 
     public static function implement(Context $context): void
@@ -85,17 +85,14 @@ final class StringJsonDecode
         }
 
         if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
-            self::implementDeferredInventoryStubs($context);
+            StringJsonDecodeInventoryStubs::implement($context);
 
             return;
         }
 
         $savedInsert = BasicBlockHelper::tryGetInsertBlock($context);
         self::ensureJitHelperCompiled($context);
-        self::implementDecodeBridge($context);
-        self::implementValidateBridge($context);
-        self::implementLastErrorBridge($context);
-        self::implementLastErrorMsgBridge($context);
+        self::implementBridges($context);
         self::registerLinkedRuntime($context);
         if (null !== $savedInsert) {
             $context->builder->positionAtEnd($savedInsert);
@@ -104,9 +101,20 @@ final class StringJsonDecode
         }
     }
 
-    private static function implementDecodeBridge(Context $context): void
+    private static function implementBridges(Context $context): void
     {
-        $abiName = '__compiler_json_decode';
+        self::implementVoidValueOutBridge($context, '__compiler_json_decode', 'json_decode_bridge_entry', self::DECODE_HELPER);
+        self::implementInt64Bridge($context, '__compiler_json_validate', 'json_validate_bridge_entry', self::VALIDATE_HELPER, true);
+        self::implementInt64Bridge($context, '__compiler_json_last_error', 'json_last_error_bridge_entry', self::LAST_ERROR_HELPER, false);
+        self::implementStringPtrBridge($context, '__compiler_json_last_error_msg', 'json_last_error_msg_bridge_entry', self::LAST_ERROR_MSG_HELPER);
+    }
+
+    private static function implementVoidValueOutBridge(
+        Context $context,
+        string $abiName,
+        string $blockName,
+        string $helper
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -118,24 +126,23 @@ final class StringJsonDecode
         $valuePtr = $context->getTypeFromString('__value__*');
         $voidTy = $context->getTypeFromString('void');
         $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('json_decode_bridge_entry');
+        $entry = $fn->appendBasicBlock($blockName);
         $context->builder->positionAtEnd($entry);
-        $decoded = $context->builder->call(
-            self::helperFunction($context, self::DECODE_HELPER),
-            $fn->getParam(0)
-        );
+        $decoded = $context->builder->call(self::helperFunction($context, $helper), $fn->getParam(0));
         JitValueBox::copyIntoPointer($context, $fn->getParam(1), $decoded);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementValidateBridge(Context $context): void
-    {
-        $abiName = '__compiler_json_validate';
+    private static function implementInt64Bridge(
+        Context $context,
+        string $abiName,
+        string $blockName,
+        string $helper,
+        bool $withDepthArg
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -145,52 +152,24 @@ final class StringJsonDecode
 
         $strPtr = $context->getTypeFromString('__string__*');
         $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($i64, false, $strPtr, $i64);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
+        $params = $withDepthArg ? [$strPtr, $i64] : [];
+        $ft = $context->context->functionType($i64, false, ...$params);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('json_validate_bridge_entry');
+        $entry = $fn->appendBasicBlock($blockName);
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(
-            self::helperFunction($context, self::VALIDATE_HELPER),
-            $fn->getParam(0),
-            $fn->getParam(1)
-        );
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
-        );
+        $args = $withDepthArg ? [$fn->getParam(0), $fn->getParam(1)] : [];
+        $raw = $context->builder->call(self::helperFunction($context, $helper), ...$args);
+        $context->builder->returnValue(JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64));
         $context->registerFunction($abiName, $fn);
     }
 
-    private static function implementLastErrorBridge(Context $context): void
-    {
-        $abiName = '__compiler_json_last_error';
-        $probe = $context->module->getNamedFunction($abiName);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction($abiName, $probe);
-
-            return;
-        }
-
-        $i64 = $context->getTypeFromString('int64');
-        $ft = $context->context->functionType($i64, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
-
-        $entry = $fn->appendBasicBlock('json_last_error_bridge_entry');
-        $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(self::helperFunction($context, self::LAST_ERROR_HELPER));
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::coerceBridgeResult($context, $raw, $i64)
-        );
-        $context->registerFunction($abiName, $fn);
-    }
-
-    private static function implementLastErrorMsgBridge(Context $context): void
-    {
-        $abiName = '__compiler_json_last_error_msg';
+    private static function implementStringPtrBridge(
+        Context $context,
+        string $abiName,
+        string $blockName,
+        string $helper
+    ): void {
         $probe = $context->module->getNamedFunction($abiName);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction($abiName, $probe);
@@ -200,16 +179,12 @@ final class StringJsonDecode
 
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($strPtr, false);
-        $fn = null !== $probe
-            ? $probe
-            : $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
 
-        $entry = $fn->appendBasicBlock('json_last_error_msg_bridge_entry');
+        $entry = $fn->appendBasicBlock($blockName);
         $context->builder->positionAtEnd($entry);
-        $raw = $context->builder->call(self::helperFunction($context, self::LAST_ERROR_MSG_HELPER));
-        $context->builder->returnValue(
-            JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw)
-        );
+        $raw = $context->builder->call(self::helperFunction($context, $helper));
+        $context->builder->returnValue(JitNestedHelperCoerce::extractStringPtrFromHelperResult($context, $raw));
         $context->registerFunction($abiName, $fn);
     }
 
@@ -264,70 +239,5 @@ final class StringJsonDecode
             }
             $context->registerFunction($name, $fn);
         }
-    }
-
-    private static function implementDeferredInventoryStubs(Context $context): void
-    {
-        $strPtr = $context->getTypeFromString('__string__*');
-        $valuePtr = $context->getTypeFromString('__value__*');
-        $voidTy = $context->getTypeFromString('void');
-        $i64 = $context->getTypeFromString('int64');
-        $nullStr = $strPtr->constNull();
-        $zero = $i64->constInt(0, false);
-
-        $decodeProbe = $context->module->getNamedFunction('__compiler_json_decode');
-        if (null === $decodeProbe || 0 === $decodeProbe->countBasicBlocks()) {
-            $ft = $context->context->functionType($voidTy, false, $strPtr, $valuePtr);
-            $fn = null !== $decodeProbe
-                ? $decodeProbe
-                : $context->module->addFunction('__compiler_json_decode', $ft);
-            $entry = $fn->appendBasicBlock('json_decode_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->call(
-                $context->lookupFunction('__value__writeNull'),
-                $fn->getParam(1)
-            );
-            $context->builder->returnVoid();
-            $context->registerFunction('__compiler_json_decode', $fn);
-        }
-
-        $validateProbe = $context->module->getNamedFunction('__compiler_json_validate');
-        if (null === $validateProbe || 0 === $validateProbe->countBasicBlocks()) {
-            $ft = $context->context->functionType($i64, false, $strPtr, $i64);
-            $fn = null !== $validateProbe
-                ? $validateProbe
-                : $context->module->addFunction('__compiler_json_validate', $ft);
-            $entry = $fn->appendBasicBlock('json_validate_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($zero);
-            $context->registerFunction('__compiler_json_validate', $fn);
-        }
-
-        $errProbe = $context->module->getNamedFunction('__compiler_json_last_error');
-        if (null === $errProbe || 0 === $errProbe->countBasicBlocks()) {
-            $ft = $context->context->functionType($i64, false);
-            $fn = null !== $errProbe
-                ? $errProbe
-                : $context->module->addFunction('__compiler_json_last_error', $ft);
-            $entry = $fn->appendBasicBlock('json_last_error_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($zero);
-            $context->registerFunction('__compiler_json_last_error', $fn);
-        }
-
-        $msgProbe = $context->module->getNamedFunction('__compiler_json_last_error_msg');
-        if (null === $msgProbe || 0 === $msgProbe->countBasicBlocks()) {
-            $ft = $context->context->functionType($strPtr, false);
-            $fn = null !== $msgProbe
-                ? $msgProbe
-                : $context->module->addFunction('__compiler_json_last_error_msg', $ft);
-            $entry = $fn->appendBasicBlock('json_last_error_msg_inv_stub');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($nullStr);
-            $context->registerFunction('__compiler_json_last_error_msg', $fn);
-        }
-
-        self::registerLinkedRuntime($context);
-        $context->builder->clearInsertionPosition();
     }
 }
