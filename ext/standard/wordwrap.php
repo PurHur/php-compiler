@@ -6,15 +6,21 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringWordwrap;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** wordwrap() — wrap string to width (subset of PHP; JIT/AOT via __string__wordwrap). */
+/**
+ * wordwrap() — wrap string to width (subset of PHP).
+ *
+ * VM: {@see VmString::wordwrap()}; JIT/AOT: {@see StringWordwrap} + {@see WordwrapJitHelper}.
+ */
 final class wordwrap extends Internal
 {
     public function __construct()
@@ -71,7 +77,18 @@ final class wordwrap extends Internal
             throw new \LogicException('wordwrap() requires one to four arguments in this compiler build');
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'wordwrap', 'string', 1);
-        $input = JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string');
+        $literal = JitStringArg::compileTimeLiteral($args[0]);
+        if (null !== $literal) {
+            $width = self::compileTimeWidth($args, $argc);
+            $break = self::compileTimeBreak($args, $argc);
+            $cut = self::compileTimeCut($args, $argc);
+            if (null !== $width && null !== $break) {
+                return $context->builder->load(
+                    $context->constantStringFromString(VmString::wordwrap($literal, $width, $break, $cut))
+                );
+            }
+        }
+
         $i64 = $context->getTypeFromString('int64');
         $width = $i64->constInt(75, false);
         if ($argc >= 2) {
@@ -91,6 +108,70 @@ final class wordwrap extends Internal
             $cutI8 = $context->builder->zExt($context->helper->loadValue($args[3]), $i8);
         }
 
-        return JitWordwrap::wrap($context, $input, $width, $break, $cutI8, $args[0], $argc >= 2 ? $args[1] : null, $argc >= 3 ? $args[2] : null, 4 === $argc ? $args[3] : null);
+        StringWordwrap::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_wordwrap'),
+            JitStringBuiltinArg::lower($context, $args[0], 'wordwrap', 0, 'string'),
+            $width,
+            $break,
+            $cutI8
+        );
+    }
+
+    private static function compileTimeWidth(array $args, int $argc): ?int
+    {
+        if ($argc < 2) {
+            return 75;
+        }
+
+        return self::compileTimeInt($args[1], null);
+    }
+
+    private static function compileTimeBreak(array $args, int $argc): ?string
+    {
+        if ($argc < 3) {
+            return "\n";
+        }
+
+        return JitStringArg::compileTimeLiteral($args[2]);
+    }
+
+    private static function compileTimeCut(array $args, int $argc): bool
+    {
+        if ($argc < 4) {
+            return false;
+        }
+        if (JITVariable::TYPE_NATIVE_BOOL !== $args[3]->type) {
+            return false;
+        }
+        $const = $args[3]->value ?? null;
+        if ($const instanceof Value && $const->isConstant()) {
+            return 0 !== (int) $const->constInt();
+        }
+
+        return false;
+    }
+
+    private static function compileTimeInt(JITVariable $arg, ?int $default): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return (int) $const->constInt();
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+        $literal = JitStringArg::compileTimeLiteral($arg);
+        if (null !== $literal && '' !== $literal && is_numeric($literal)) {
+            return (int) $literal;
+        }
+
+        return $default;
     }
 }
