@@ -46,7 +46,12 @@ final class ExceptionTrace
         if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
             return;
         }
-        $traceProp->duplicateFrom(self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame)));
+        $built = VmDebugBacktrace::build($frame);
+        if (0 === $built->toArray()->getNumElements()) {
+            // #14369 / #14132: bridge throws (return-type TypeError) run off runStack — anchor throw-site frame.
+            $built = VmDebugBacktrace::buildFromFrames([$frame]);
+        }
+        $traceProp->duplicateFrom(self::sanitizeCapturedTrace($built));
     }
 
     /**
