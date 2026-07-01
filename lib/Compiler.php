@@ -18232,7 +18232,18 @@ class Compiler {
                 break;
             }
         }
-        if (null === $callIndex || $callIndex < 1) {
+        if (null === $callIndex) {
+            return null;
+        }
+        if ($callIndex < 1) {
+            if (1 !== \count($args)) {
+                return null;
+            }
+            $recent = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+            if (null !== $recent) {
+                return (string) $recent;
+            }
+
             return null;
         }
         $probeIndex = $callIndex - 1;
@@ -18277,6 +18288,56 @@ class Compiler {
         if (
             null !== $callArg
             && !$this->operandsReferToSameVariable($prev->result, $callArg)
+        ) {
+            return null;
+        }
+        if (null === $block->slotForOperand($prev->result)) {
+            foreach ($this->compileExpr($prev, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($prev->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Sole dead call-arg temp fed by immediately preceding MethodCall/StaticCall (#14555).
+     *
+     * Scoped to compileCallArgs ARG_SEND override — not resolveAdjacentNestedFuncCallArgSlot.
+     */
+    private function resolveImmediatePrecedingCallProducerArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg
+    ): ?string {
+        if (null === $block->orig || !$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $args = $cfgCallOp->args;
+        if (1 !== \count($args) || 0 !== $argIndex) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return null;
+        }
+        $prev = $block->orig->children[$callIndex - 1] ?? null;
+        if (
+            !($prev instanceof Op\Expr\MethodCall
+                || $prev instanceof Op\Expr\NullsafeMethodCall
+                || $prev instanceof Op\Expr\StaticCall)
+            || !$this->isAdjacentNestedFuncCallProducer($prev, $cfgCallOp, $callIndex - 1, $callIndex)
         ) {
             return null;
         }
@@ -21087,8 +21148,17 @@ class Compiler {
         if (!isset($dimFetches[$dimIndex])) {
             return null;
         }
+        $opcodeDimIndex = $dimIndex;
         $fetch = $dimFetches[$dimIndex];
-        $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $dimIndex);
+        if (
+            1 === \count($callArgs)
+            && \count($dimFetches) > 1
+            && $this->arrayDimFetchesFormProducerChain($dimFetches)
+        ) {
+            $opcodeDimIndex = \count($dimFetches) - 1;
+            $fetch = $dimFetches[$opcodeDimIndex];
+        }
+        $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex);
         if (null === $slot) {
             $slot = $block->slotForOperand($fetch->result);
         }
@@ -21096,11 +21166,36 @@ class Compiler {
             foreach ($this->compileExpr($fetch, $block) as $op) {
                 $block->addOpCode($op);
             }
-            $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $dimIndex)
+            $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex)
                 ?? $block->slotForOperand($fetch->result);
         }
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Consecutive hoisted dim-fetch preludes before one call arg — $a[0]['k'] (#14555).
+     *
+     * @param list<Op\Expr\ArrayDimFetch> $dimFetches
+     */
+    private function arrayDimFetchesFormProducerChain(array $dimFetches): bool
+    {
+        if (\count($dimFetches) < 2) {
+            return false;
+        }
+        for ($i = 1; $i < \count($dimFetches); ++$i) {
+            $inner = $dimFetches[$i];
+            $outer = $dimFetches[$i - 1];
+            if (
+                null === $inner->var
+                || null === $outer->result
+                || !$this->operandsReferToSameVariable($inner->var, $outer->result)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
@@ -21129,6 +21224,20 @@ class Compiler {
         }
 
         return $dimFetchOpcodes[$dimIndex]->arg1;
+    }
+
+    /**
+     * Nested inline consumer — last FUNCCALL_EXEC_RETURN before trailing FUNCCALL_INIT (#14555).
+     */
+    private function slotForLastEmittedInlineCallResultBeforePendingFuncCall(Block $block): ?int
+    {
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $block->opCodes[$i]->type) {
+                return (int) $block->opCodes[$i]->arg1;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -23284,6 +23393,26 @@ class Compiler {
             );
             if (null !== $dimFetchArgSlot) {
                 $valueSlot = $dimFetchArgSlot;
+            } elseif (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+            ) {
+                $adjacentArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null === $adjacentArgSlot) {
+                    $adjacentArgSlot = $this->resolveImmediatePrecedingCallProducerArgSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $arg
+                    );
+                }
+                if (null !== $adjacentArgSlot) {
+                    $valueSlot = $adjacentArgSlot;
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
