@@ -21,13 +21,14 @@ if ([] === $errors) {
 $found = false;
 foreach ($errors as $error) {
     $msg = $error->message;
-    if (str_contains($msg, 'Premature end of data')) {
+    if (str_contains($msg, "Couldn't find end of Start Tag unclosed")
+        || str_contains($msg, 'Premature end of data')) {
         echo 'ok message=', $msg, "\n";
         $found = true;
         break;
     }
 }
 if (!$found) {
-    fwrite(STDERR, "fail: no Premature end of data error in buffer\n");
+    fwrite(STDERR, "fail: no unclosed start-tag error in buffer\n");
     exit(1);
 }

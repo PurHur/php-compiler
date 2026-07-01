@@ -15,6 +15,9 @@ use PHPCompiler\VM\Context;
  */
 final class VmXml
 {
+    /** libxml/xmlerror.h — XML_ERR_TAG_NOT_FINISHED (php-src ext/libxml/libxml.c). */
+    private const XML_ERR_TAG_NOT_FINISHED = 73;
+
     /** @var array<int, array{errorCode: int}> */
     private static array $parsers = [];
 
@@ -108,20 +111,92 @@ final class VmXml
             return self::errorRecord(1, 1, 'Start tag expected, \'<\' not found', 4);
         }
 
+        $unclosed = self::detectUnclosedStartTag($trimmed);
+        if (null !== $unclosed) {
+            return $unclosed;
+        }
+
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed)) {
             return null;
         }
 
         if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/s', $trimmed, $matches)) {
-            if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/', $trimmed, $open)
-                && !str_contains($trimmed, '</'.$open[1].'>')) {
-                return self::errorRecord(1, \strlen($trimmed), 'Premature end of data in tag '.$open[1], 76);
-            }
-
             return self::errorRecord(1, 1, 'Malformed XML document', 4);
         }
 
         return self::validateFragment($matches[3]);
+    }
+
+    /**
+     * Match libxml fatal "Couldn't find end of Start Tag …" (php-src xmlerror.c; #14396).
+     *
+     * @return null|array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function detectUnclosedStartTag(string $data): ?array
+    {
+        $len = \strlen($data);
+        for ($pos = 0; $pos < $len; ++$pos) {
+            if ('<' !== $data[$pos]) {
+                continue;
+            }
+            if ($pos + 1 < $len && '/' === $data[$pos + 1]) {
+                continue;
+            }
+            if ($pos + 1 < $len && '?' === $data[$pos + 1]) {
+                $end = strpos($data, '?>', $pos + 2);
+                $pos = false === $end ? $len : $end + 1;
+
+                continue;
+            }
+            if ($pos + 1 < $len && '!' === $data[$pos + 1]) {
+                if (str_starts_with(substr($data, $pos), '<!--')) {
+                    $end = strpos($data, '-->', $pos + 4);
+                    $pos = false === $end ? $len : $end + 2;
+
+                    continue;
+                }
+                if (str_starts_with(substr($data, $pos), '<![CDATA[')) {
+                    $end = strpos($data, ']]>', $pos + 9);
+                    $pos = false === $end ? $len : $end + 2;
+
+                    continue;
+                }
+            }
+            if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?/s', $data, $open, 0, $pos)) {
+                continue;
+            }
+            $tag = $open[1];
+            $after = $pos + \strlen($open[0]);
+            if ($after < $len && '/' === $data[$after]) {
+                if ($after + 1 >= $len || '>' !== $data[$after + 1]) {
+                    return self::unclosedStartTagError($data, $pos, $tag);
+                }
+
+                continue;
+            }
+            if ($after >= $len || '>' !== $data[$after]) {
+                return self::unclosedStartTagError($data, $pos, $tag);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{level: int, code: int, column: int, message: string, file: string, line: int}
+     */
+    private static function unclosedStartTagError(string $data, int $tagPos, string $tag): array
+    {
+        $line = 1 + substr_count(substr($data, 0, $tagPos), "\n");
+        $message = \sprintf("Couldn't find end of Start Tag %s line %d", $tag, $line);
+
+        return self::errorRecord(
+            $line,
+            $tagPos + 1,
+            $message,
+            self::XML_ERR_TAG_NOT_FINISHED,
+            LibxmlConstants::LIBXML_ERR_FATAL
+        );
     }
 
     /**
@@ -150,6 +225,11 @@ final class VmXml
             }
             $end = self::findElementEnd($content, $pos);
             if (null === $end) {
+                $unclosed = self::detectUnclosedStartTag(substr($content, $pos));
+                if (null !== $unclosed) {
+                    return $unclosed;
+                }
+
                 return self::errorRecord(1, $pos + 1, 'Malformed XML document', 4);
             }
             $element = substr($content, $pos, $end - $pos);
@@ -214,10 +294,15 @@ final class VmXml
     /**
      * @return array{level: int, code: int, column: int, message: string, file: string, line: int}
      */
-    private static function errorRecord(int $line, int $column, string $message, int $code): array
-    {
+    private static function errorRecord(
+        int $line,
+        int $column,
+        string $message,
+        int $code,
+        int $level = LibxmlConstants::LIBXML_ERR_FATAL
+    ): array {
         return [
-            'level' => LibxmlConstants::LIBXML_ERR_FATAL,
+            'level' => $level,
             'code' => $code,
             'column' => $column,
             'message' => $message,

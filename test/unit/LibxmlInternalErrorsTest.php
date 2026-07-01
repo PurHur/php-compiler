@@ -107,16 +107,17 @@ $ok = $doc->loadXML('<root><unclosed');
 echo $ok ? "loaded\n" : "failed\n";
 $errors = libxml_get_errors();
 echo count($errors), "\n";
+echo $errors[0]->level === LIBXML_ERR_FATAL ? "fatal\n" : "nofatal\n";
+echo $errors[0]->code === 73 ? "code73\n" : "nocode73\n";
 $msg = $errors[0]->message;
-echo str_contains($msg, 'Premature end of data') ? "message\n" : "nomessage\n";
-echo $errors[0]->level === LIBXML_ERR_FATAL ? "level\n" : "nolevel\n";
+echo str_contains($msg, "Couldn't find end of Start Tag unclosed") ? "message\n" : "nomessage\n";
 libxml_clear_errors();
 echo count(libxml_get_errors()), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'libxml_dom_loadxml.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("failed\n1\nmessage\nlevel\n0\n", ob_get_clean());
+        self::assertSame("failed\n1\nfatal\ncode73\nmessage\n0\n", ob_get_clean());
     }
 
     public function test_no_runtime_c_growth_for_libxml(): void
