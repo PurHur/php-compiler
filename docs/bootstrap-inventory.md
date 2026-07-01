@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3624 |
-| Phase A inventory files (M2 ratio SSOT) | 3624 |
+| PHP files on vm.php path | 3625 |
+| Phase A inventory files (M2 ratio SSOT) | 3625 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9868 |
+| Source constructs flagged (warnings) | 9871 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -778,7 +778,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitJsonLastError.php` | 0 | 1 |
 | `ext/standard/JitJsonLastErrorMsg.php` | 0 | 1 |
 | `ext/standard/JitJsonValidate.php` | 0 | 1 |
-| `ext/standard/JitLevenshtein.php` | 0 | 1 |
 | `ext/standard/JitLink.php` | 0 | 1 |
 | `ext/standard/JitLinkinfo.php` | 0 | 1 |
 | `ext/standard/JitLocale.php` | 0 | 6 |
@@ -1014,6 +1013,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JsonDecodeJitHelper.php` | 0 | 2 |
 | `ext/standard/JsonEncodeJitHelper.php` | 0 | 1 |
 | `ext/standard/KeySortJitHelper.php` | 0 | 3 |
+| `ext/standard/LevenshteinJitHelper.php` | 0 | 1 |
 | `ext/standard/LocaltimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MathBaseConvertJitHelper.php` | 0 | 1 |
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
@@ -2727,6 +2727,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringLevenshtein.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringMetaphone.php` | 0 | 3 |
@@ -8481,11 +8482,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `ext/standard/JitLevenshtein.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
 ### `ext/standard/JitLink.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9720,6 +9716,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 43)
 - new Variable (line 45)
 - 4 class method(s)
+
+### `ext/standard/LevenshteinJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/LocaltimeJitHelper.php`
 
@@ -15824,10 +15825,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/levenshtein.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 33)
-- new ArgumentCountError (line 39)
-- new ArgumentCountError (line 71)
-- new ArgumentCountError (line 77)
+- new ArgumentCountError (line 34)
+- new ArgumentCountError (line 40)
+- new ArgumentCountError (line 72)
+- new ArgumentCountError (line 78)
 - 6 class method(s)
 
 ### `ext/standard/link_.php`
@@ -21514,6 +21515,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 10 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringLevenshtein.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 158)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringLocaltime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22734,19 +22742,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1118)
-- new Result (line 1139)
-- new Variable (line 1411)
-- new Variable (line 1731)
-- new Variable (line 1862)
-- new Variable (line 2048)
-- new VMVariable (line 2206)
-- new VMVariable (line 2222)
-- new VMVariable (line 2228)
-- new VMVariable (line 2234)
-- new VMVariable (line 2245)
-- new Variable (line 2275)
-- new Variable (line 2314)
+- new Result (line 1119)
+- new Result (line 1140)
+- new Variable (line 1412)
+- new Variable (line 1732)
+- new Variable (line 1863)
+- new Variable (line 2049)
+- new VMVariable (line 2207)
+- new VMVariable (line 2223)
+- new VMVariable (line 2229)
+- new VMVariable (line 2235)
+- new VMVariable (line 2246)
+- new Variable (line 2276)
+- new Variable (line 2315)
 - 98 class method(s)
 - 28 closure(s)
 
