@@ -19266,22 +19266,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayIntersectAssocRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 221)
-- 12 class method(s)
+- new JIT (line 220)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayIntersectKeyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 221)
-- 12 class method(s)
+- new JIT (line 220)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayIntersectRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 221)
-- 12 class method(s)
+- new JIT (line 220)
+- 14 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/ArrayIsListRuntime.php`
