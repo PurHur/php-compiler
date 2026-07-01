@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_shift() JIT routes through ArrayShiftJitHelper PHP not ArrayBuiltinHelper LLVM (#12672). */
+/** array_shift() JIT routes through ArrayShiftJitHelper PHP not ArrayBuiltinHelper LLVM (#12672, #14318). */
 final class ArrayShiftRuntimeShrinkTest extends TestCase
 {
     public function testArrayShiftRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayShiftRuntime.php');
         $this->assertStringContainsString('ArrayShiftJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::shiftFirst', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_shift.php');
         $this->assertStringContainsString('ArrayShiftRuntime::shift', $builtin);

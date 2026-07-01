@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_shift() via ArrayShiftJitHelper PHP (#12672).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::shiftFirst()}.
+ * Standalone AOT compiles {@see ArrayShiftJitHelper} via JitVmHelperLink bridge (#14318); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::shiftFirst()}.
  * SSOT: {@see \PHPCompiler\ext\standard\array_shift}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_shift)
  */
@@ -33,8 +32,7 @@ final class ArrayShiftRuntime
 
     public static function shift(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::shiftFirst($context, $array);
         }
 
@@ -52,12 +50,13 @@ final class ArrayShiftRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_SHIFT);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
