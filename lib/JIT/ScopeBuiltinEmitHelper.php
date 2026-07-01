@@ -13,6 +13,7 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\ext\standard\VmScope;
 use PHPCompiler\JIT\Builtin\ScopeBuiltinRuntime;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -266,14 +267,14 @@ final class ScopeBuiltinEmitHelper
         $local = ScopeBuiltinHelper::findVariableByName($context, $name);
         if (null !== $local) {
             $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableAtStringKey($context, $result, $keyStr, $local);
+            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $local);
 
             return;
         }
         if (Superglobals::isSuperglobalName($name)) {
             $source = SuperglobalInit::load($context, $name);
             $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableAtStringKey($context, $result, $keyStr, $source);
+            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $source);
 
             return;
         }
@@ -296,7 +297,7 @@ final class ScopeBuiltinEmitHelper
 
         $context->builder->positionAtEnd($okBlock);
         $keyStr = $context->builder->load($context->constantStringFromString($name));
-        self::storeVariableAtStringKey($context, $result, $keyStr, $global);
+        self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $global);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($missBlock);
@@ -376,8 +377,15 @@ final class ScopeBuiltinEmitHelper
             $context->lookupFunction('__value__readHashtable'),
             $valuePtr
         );
+        $namesHt = HashTableHelper::alloc($context);
         $htResume = self::captureInsertBlock($context);
-        self::collectCompactFromHashtable($context, $result, $ht, $named, $argNum);
+        ScopeBuiltinRuntime::collectCompactNamesFromHashtable(
+            $context,
+            $namesHt,
+            $ht,
+            $context->getTypeFromString('int64')->constInt($argNum, false)
+        );
+        self::importCompactNamesFromHashtable($context, $result, $namesHt, $named);
         self::restoreInsertBlock($context, $htResume);
         $context->builder->branch($done);
 
@@ -391,63 +399,23 @@ final class ScopeBuiltinEmitHelper
     /**
      * @param array<string, Variable> $named
      */
-    private static function collectCompactFromHashtable(
+    private static function importCompactNamesFromHashtable(
         Context $context,
         Value $result,
-        Value $ht,
+        Value $namesHt,
         array $named,
-        int $argNum
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
-        $sizeT = $context->getTypeFromString('size_t');
-        $zero = $sizeT->constInt(0, false);
-        $one = $sizeT->constInt(1, false);
-        $nextFree = $context->builder->load($context->builder->structGep($ht, $map['nextFreeElement']));
-        $idxSlot = $context->builder->alloca($sizeT, 1, 'compact_packed_idx');
-        $context->builder->store($zero, $idxSlot);
-
-        $packedHead = BasicBlockHelper::append($context, 'compact_packed_head');
-        $packedBody = BasicBlockHelper::append($context, 'compact_packed_body');
-        $packedCollect = BasicBlockHelper::append($context, 'compact_packed_collect');
-        $packedNext = BasicBlockHelper::append($context, 'compact_packed_next');
-        $packedDone = BasicBlockHelper::append($context, 'compact_packed_done');
-        $context->builder->branch($packedHead);
-
-        $context->builder->positionAtEnd($packedHead);
-        $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $nextFree);
-        $context->builder->branchIf($atEnd, $packedDone, $packedBody);
-
-        $context->builder->positionAtEnd($packedBody);
-        $isSet = $context->builder->call(
-            $context->lookupFunction('__hashtable__offsetIsSet'),
-            $ht,
-            $idx
-        );
-        $context->builder->branchIf($isSet, $packedCollect, $packedNext);
-
-        $context->builder->positionAtEnd($packedCollect);
-        $entryPtr = self::compactValueEntryAt($context, $ht, $idx);
-        $packedResume = self::captureInsertBlock($context);
-        self::collectCompactValue($context, $result, $entryPtr, $named, $argNum);
-        self::restoreInsertBlock($context, $packedResume);
-        $context->builder->branch($packedNext);
-
-        $context->builder->positionAtEnd($packedNext);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-        $context->builder->branch($packedHead);
-
         $nodePtrType = $context->getTypeFromString('__strkey_node__*');
-        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'compact_str_walk');
-        $context->builder->positionAtEnd($packedDone);
-        $head = $context->builder->load($context->builder->structGep($ht, $map['strKeys']));
+        $walkSlot = $context->builder->alloca($nodePtrType, 1, 'compact_names_walk');
+        $head = $context->builder->load($context->builder->structGep($namesHt, $map['strKeys']));
         $context->builder->store($head, $walkSlot);
 
-        $strHead = BasicBlockHelper::append($context, 'compact_str_head');
-        $strBody = BasicBlockHelper::append($context, 'compact_str_body');
-        $strNext = BasicBlockHelper::append($context, 'compact_str_next');
-        $strDone = BasicBlockHelper::append($context, 'compact_str_done');
+        $strHead = BasicBlockHelper::append($context, 'compact_names_str_head');
+        $strBody = BasicBlockHelper::append($context, 'compact_names_str_body');
+        $strNext = BasicBlockHelper::append($context, 'compact_names_str_next');
+        $strDone = BasicBlockHelper::append($context, 'compact_names_str_done');
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strHead);
@@ -456,10 +424,15 @@ final class ScopeBuiltinEmitHelper
         $context->builder->branchIf($nodeNull, $strDone, $strBody);
 
         $context->builder->positionAtEnd($strBody);
-        $valEntry = $context->builder->structGep($node, $nodeMap['value']);
-        $strResume = self::captureInsertBlock($context);
-        self::collectCompactValue($context, $result, $valEntry, $named, $argNum);
-        self::restoreInsertBlock($context, $strResume);
+        $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
+        $nameResume = self::captureInsertBlock($context);
+        self::compactApplyNameFromCstr(
+            $context,
+            $result,
+            self::stringDataPtr($context, $keyStr),
+            $named
+        );
+        self::restoreInsertBlock($context, $nameResume);
         $context->builder->branch($strNext);
 
         $context->builder->positionAtEnd($strNext);
@@ -468,14 +441,6 @@ final class ScopeBuiltinEmitHelper
         $context->builder->branch($strHead);
 
         $context->builder->positionAtEnd($strDone);
-    }
-
-    private static function compactValueEntryAt(Context $context, Value $ht, Value $index): Value
-    {
-        $map = $context->structFieldMap['__hashtable__'];
-        $values = $context->builder->load($context->builder->structGep($ht, $map['values']));
-
-        return $context->builder->inBoundsGep($values, $index);
     }
 
     /**
@@ -525,7 +490,7 @@ final class ScopeBuiltinEmitHelper
 
             $context->builder->positionAtEnd($onMatch);
             $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeVariableAtStringKey($context, $result, $keyStr, $named[$name]);
+            self::storeVariableSnapshotAtStringKey($context, $result, $keyStr, $named[$name]);
             $context->builder->branch($emptyDone);
         }
 
@@ -580,130 +545,27 @@ final class ScopeBuiltinEmitHelper
         return $ptr;
     }
 
-    private static function storeVariableAtStringKey(
+    private static function storeVariableSnapshotAtStringKey(
         Context $context,
         Value $ht,
         Value $keyStr,
         Variable $element
     ): void {
-        switch ($element->type) {
-            case Variable::TYPE_STRING:
-                HashTableHelper::setAtStringKey(
-                    $context,
-                    $ht,
-                    $keyStr,
-                    $element
-                );
+        if (JitValueBox::isValueOperand($element)) {
+            ScopeBuiltinRuntime::storeVarSnapshotAtStringKey(
+                $context,
+                $ht,
+                $keyStr,
+                JitValueBox::valuePtrFromVariable($context, $element)
+            );
 
-                return;
-            case Variable::TYPE_NATIVE_LONG:
-            case Variable::TYPE_NATIVE_BOOL:
-                HashTableHelper::setAtStringKey(
-                    $context,
-                    $ht,
-                    $keyStr,
-                    $element
-                );
-
-                return;
-            case Variable::TYPE_NATIVE_DOUBLE:
-                HashTableHelper::setAtStringKey(
-                    $context,
-                    $ht,
-                    $keyStr,
-                    $element
-                );
-
-                return;
-            case Variable::TYPE_VALUE:
-                $valuePtr = $context->helper->loadValue($element);
-                $valueMap = $context->structFieldMap['__value__'];
-                $typeByte = $context->builder->load(
-                    $context->builder->structGep($valuePtr, $valueMap['type'])
-                );
-                $i8 = $context->getTypeFromString('int8');
-                $tag = 'c'.(string) ++self::$blockSeq;
-                $isString = $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(Variable::TYPE_STRING, false)
-                );
-                $stringBlock = BasicBlockHelper::append($context, 'compact_val_string_'.$tag);
-                $longBlock = BasicBlockHelper::append($context, 'compact_val_long_'.$tag);
-                $doubleBlock = BasicBlockHelper::append($context, 'compact_val_double_'.$tag);
-                $done = BasicBlockHelper::append($context, 'compact_val_done_'.$tag);
-                $afterString = BasicBlockHelper::append($context, 'compact_val_after_string_'.$tag);
-                $afterLong = BasicBlockHelper::append($context, 'compact_val_after_long_'.$tag);
-                $context->builder->branchIf($isString, $stringBlock, $afterString);
-
-                $context->builder->positionAtEnd($stringBlock);
-                $str = $context->builder->call(
-                    $context->lookupFunction('__value__readString'),
-                    $valuePtr
-                );
-                $owned = $context->builder->call(
-                    $context->lookupFunction('__string__separate'),
-                    $str
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyString'),
-                    $ht,
-                    $keyStr,
-                    $owned
-                );
-                $context->builder->branch($done);
-
-                $context->builder->positionAtEnd($afterString);
-                $isLong = $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-                );
-                $context->builder->branchIf($isLong, $longBlock, $afterLong);
-
-                $context->builder->positionAtEnd($longBlock);
-                $longVal = $context->builder->call(
-                    $context->lookupFunction('__value__readLong'),
-                    $valuePtr
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyLong'),
-                    $ht,
-                    $keyStr,
-                    $longVal
-                );
-                $context->builder->branch($done);
-
-                $context->builder->positionAtEnd($afterLong);
-                $isDouble = $context->builder->icmp(
-                    Builder::INT_EQ,
-                    $typeByte,
-                    $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
-                );
-                $context->builder->branchIf($isDouble, $doubleBlock, $done);
-
-                $context->builder->positionAtEnd($doubleBlock);
-                $doubleVal = $context->builder->call(
-                    $context->lookupFunction('__value__readDouble'),
-                    $valuePtr
-                );
-                $context->builder->call(
-                    $context->lookupFunction('__hashtable__setStringKeyDouble'),
-                    $ht,
-                    $keyStr,
-                    $doubleVal
-                );
-                $context->builder->branch($done);
-
-                $context->builder->positionAtEnd($done);
-
-                return;
-            default:
-                throw new \LogicException(
-                    'compact() variable type not supported for JIT: '
-                    .Variable::getStringType($element->type)
-                );
+            return;
         }
+
+        $slot = JitValueBox::alloc($context);
+        $ptr = JitValueBox::pointer($context, $slot);
+        JitValueBox::assignToPointer($context, $ptr, $element);
+        ScopeBuiltinRuntime::storeVarSnapshotAtStringKey($context, $ht, $keyStr, $ptr);
     }
 
     private static function assignFromValueEntry(Context $context, Variable $dest, Value $entryPtr): void
@@ -800,7 +662,7 @@ final class ScopeBuiltinEmitHelper
 
             $context->builder->positionAtEnd($storeBlock);
             $keyStr = $context->builder->load($context->constantStringFromString($name));
-            self::storeDefinedVarAtStringKey($context, $ht, $keyStr, $dest);
+            self::storeVariableSnapshotAtStringKey($context, $ht, $keyStr, $dest);
             $context->builder->branch($nextBlock);
         }
 
@@ -855,140 +717,6 @@ final class ScopeBuiltinEmitHelper
         $context->builder->positionAtEnd($done);
 
         return self::wrapHashTableValue($context, $ht);
-    }
-
-    private static function storeDefinedVarAtStringKey(
-        Context $context,
-        Value $ht,
-        Value $keyStr,
-        Variable $element
-    ): void {
-        if (Variable::TYPE_VALUE !== $element->type) {
-            HashTableHelper::setAtStringKey($context, $ht, $keyStr, $element);
-
-            return;
-        }
-
-        $valuePtr = JitValueBox::valuePtrFromVariable($context, $element);
-        $typeByte = $context->builder->load(
-            $context->builder->structGep(
-                $valuePtr,
-                $context->structFieldMap['__value__']['type']
-            )
-        );
-        $i8 = $context->getTypeFromString('int8');
-        $tag = 'dv'.(string) ++self::$blockSeq;
-        $stringBlock = BasicBlockHelper::append($context, 'gdv_val_string_'.$tag);
-        $longBlock = BasicBlockHelper::append($context, 'gdv_val_long_'.$tag);
-        $doubleBlock = BasicBlockHelper::append($context, 'gdv_val_double_'.$tag);
-        $boolBlock = BasicBlockHelper::append($context, 'gdv_val_bool_'.$tag);
-        $htBlock = BasicBlockHelper::append($context, 'gdv_val_ht_'.$tag);
-        $done = BasicBlockHelper::append($context, 'gdv_val_done_'.$tag);
-        $afterString = BasicBlockHelper::append($context, 'gdv_val_after_string_'.$tag);
-        $afterLong = BasicBlockHelper::append($context, 'gdv_val_after_long_'.$tag);
-        $afterDouble = BasicBlockHelper::append($context, 'gdv_val_after_double_'.$tag);
-        $afterBool = BasicBlockHelper::append($context, 'gdv_val_after_bool_'.$tag);
-
-        $isString = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_STRING, false)
-        );
-        $context->builder->branchIf($isString, $stringBlock, $afterString);
-
-        $context->builder->positionAtEnd($stringBlock);
-        $str = $context->builder->call(
-            $context->lookupFunction('__value__readString'),
-            $valuePtr
-        );
-        $owned = $context->builder->call(
-            $context->lookupFunction('__string__separate'),
-            $str
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyString'),
-            $ht,
-            $keyStr,
-            $owned
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterString);
-        $isLong = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_LONG, false)
-        );
-        $context->builder->branchIf($isLong, $longBlock, $afterLong);
-
-        $context->builder->positionAtEnd($longBlock);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyLong'),
-            $ht,
-            $keyStr,
-            $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr)
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterLong);
-        $isDouble = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_DOUBLE, false)
-        );
-        $context->builder->branchIf($isDouble, $doubleBlock, $afterDouble);
-
-        $context->builder->positionAtEnd($doubleBlock);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyDouble'),
-            $ht,
-            $keyStr,
-            $context->builder->call($context->lookupFunction('__value__readDouble'), $valuePtr)
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterDouble);
-        $isBool = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_NATIVE_BOOL, false)
-        );
-        $context->builder->branchIf($isBool, $boolBlock, $afterBool);
-
-        $context->builder->positionAtEnd($boolBlock);
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyBool'),
-            $ht,
-            $keyStr,
-            $context->builder->truncOrBitCast(
-                $context->builder->call($context->lookupFunction('__value__readLong'), $valuePtr),
-                $context->getTypeFromString('int1')
-            )
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($afterBool);
-        $isHt = $context->builder->icmp(
-            Builder::INT_EQ,
-            $typeByte,
-            $i8->constInt(Variable::TYPE_HASHTABLE, false)
-        );
-        $context->builder->branchIf($isHt, $htBlock, $done);
-
-        $context->builder->positionAtEnd($htBlock);
-        $childHt = $context->builder->call(
-            $context->lookupFunction('__value__readHashtable'),
-            $valuePtr
-        );
-        $context->builder->call(
-            $context->lookupFunction('__hashtable__setStringKeyHashtable'),
-            $ht,
-            $keyStr,
-            $childHt
-        );
-        $context->builder->branch($done);
-
-        $context->builder->positionAtEnd($done);
     }
 
     private static function wrapHashTableValue(Context $context, Value $ht): Value

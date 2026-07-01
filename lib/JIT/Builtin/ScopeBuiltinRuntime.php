@@ -34,19 +34,31 @@ final class ScopeBuiltinRuntime
 
     private const RESOLVE_EXTRACT_TARGET_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::resolveExtractTargetName';
 
+    private const COLLECT_COMPACT_NAMES_HT_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::collectCompactNamesFromHashtable';
+
+    private const STORE_VAR_SNAPSHOT_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::storeVarSnapshotAtStringKey';
+
     private const ABI_RESOLVE_EXTRACT_TARGET = '__scope_extract_resolve_target';
+
+    private const ABI_COLLECT_COMPACT_NAMES_HT = '__scope_compact_collect_names_ht';
+
+    private const ABI_STORE_VAR_SNAPSHOT = '__scope_store_var_snapshot';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::COMPACT_UNDEF_HELPER,
         self::COMPACT_INVALID_ARG_HELPER,
         self::RESOLVE_EXTRACT_TARGET_HELPER,
+        self::COLLECT_COMPACT_NAMES_HT_HELPER,
+        self::STORE_VAR_SNAPSHOT_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
         self::ensureExtractResolveLinked($context);
+        self::ensureCompactCollectLinked($context);
+        self::ensureStoreSnapshotLinked($context);
     }
 
     public static function resolveExtractTargetName(
@@ -100,6 +112,117 @@ final class ScopeBuiltinRuntime
         $context->registerFunction(
             self::ABI_RESOLVE_EXTRACT_TARGET,
             $context->module->getNamedFunction(self::ABI_RESOLVE_EXTRACT_TARGET)
+        );
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    public static function collectCompactNamesFromHashtable(
+        Context $context,
+        Value $destHt,
+        Value $srcHt,
+        Value $argNum
+    ): void {
+        self::ensureCompactCollectLinked($context);
+        $context->builder->call(
+            $context->lookupFunction(self::ABI_COLLECT_COMPACT_NAMES_HT),
+            $destHt,
+            $srcHt,
+            $argNum
+        );
+    }
+
+    public static function ensureCompactCollectLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_COLLECT_COMPACT_NAMES_HT);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_COLLECT_COMPACT_NAMES_HT, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_COLLECT_COMPACT_NAMES_HT,
+            'scope_compact_collect_names_ht_entry',
+            [$htPtr, $htPtr, $i64],
+            $context->getTypeFromString('void'),
+            self::COLLECT_COMPACT_NAMES_HT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14507'
+        );
+        $context->registerFunction(
+            self::ABI_COLLECT_COMPACT_NAMES_HT,
+            $context->module->getNamedFunction(self::ABI_COLLECT_COMPACT_NAMES_HT)
+        );
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
+    }
+
+    public static function storeVarSnapshotAtStringKey(
+        Context $context,
+        Value $destHt,
+        Value $keyStr,
+        Value $valuePtr
+    ): void {
+        self::ensureStoreSnapshotLinked($context);
+        $context->builder->call(
+            $context->lookupFunction(self::ABI_STORE_VAR_SNAPSHOT),
+            $destHt,
+            $keyStr,
+            $valuePtr
+        );
+    }
+
+    public static function ensureStoreSnapshotLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_STORE_VAR_SNAPSHOT);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_STORE_VAR_SNAPSHOT, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $strPtr = $context->getTypeFromString('__string__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_STORE_VAR_SNAPSHOT,
+            'scope_store_var_snapshot_entry',
+            [$htPtr, $strPtr, $valuePtr],
+            $context->getTypeFromString('void'),
+            self::STORE_VAR_SNAPSHOT_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14507'
+        );
+        $context->registerFunction(
+            self::ABI_STORE_VAR_SNAPSHOT,
+            $context->module->getNamedFunction(self::ABI_STORE_VAR_SNAPSHOT)
         );
 
         if (null !== $savedBlock) {
