@@ -10,7 +10,7 @@ use PHPCompiler\VM\ObjectEntry;
 /** Stream + iterator state for SplFileObject / SplTempFileObject (php-src ext/spl/spl_directory.c). */
 final class SplFileObjectStorage
 {
-    public const FLAG_READ_AHEAD = 2;
+    private const FLAG_READ_AHEAD = SplFileObjectBuiltin::READ_AHEAD;
 
     /** @var array<int, array{handle: int, currentLine: string|null, lineNum: int, flags: int, maxLineLen: int, separator: string, enclosure: string, escape: string}> */
     private static array $state = [];
@@ -182,6 +182,16 @@ final class SplFileObjectStorage
         $state['separator'] = $separator;
         $state['enclosure'] = $enclosure;
         $state['escape'] = $escape;
+    }
+
+    public static function getFlags(ObjectEntry $object): int
+    {
+        return self::state($object)['flags'];
+    }
+
+    public static function setFlags(ObjectEntry $object, int $flags): void
+    {
+        self::$state[$object->id]['flags'] = $flags;
     }
 
     /** @return string|false */
