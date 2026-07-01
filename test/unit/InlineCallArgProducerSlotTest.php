@@ -217,6 +217,9 @@ PHP;
     /** Issue #11153 — vacuous array_all on inline [] matches Zend. */
     public function testArrayAllInlineEmptyArrayRuntime(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         $code = <<<'PHP'
 <?php
 echo array_all([], fn ($v) => (bool) $v) ? 'all' : 'notall', "\n";
