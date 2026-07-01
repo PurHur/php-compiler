@@ -6199,8 +6199,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 77)
 - new Variable (line 81)
 - new Variable (line 91)
-- new Variable (line 129)
-- 6 class method(s)
+- new Variable (line 174)
+- 11 class method(s)
 
 ### `ext/standard/ArrayCombineJitHelper.php`
 
@@ -12990,7 +12990,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmVarExport.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmVarExportFloat.php`
 
@@ -19112,7 +19112,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayColumnRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 14 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 
