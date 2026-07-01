@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3573 |
-| Phase A inventory files (M2 ratio SSOT) | 3573 |
+| PHP files on vm.php path | 3585 |
+| Phase A inventory files (M2 ratio SSOT) | 3585 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9759 |
+| Source constructs flagged (warnings) | 9788 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -104,26 +104,36 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/DocumentAppendChild.php` | 0 | 1 |
 | `ext/dom/DocumentCreateDocumentFragment.php` | 0 | 1 |
 | `ext/dom/DocumentCreateElement.php` | 0 | 1 |
+| `ext/dom/DocumentCreateElementNS.php` | 0 | 1 |
 | `ext/dom/DocumentGetElementById.php` | 0 | 1 |
 | `ext/dom/DocumentGetElementsByTagName.php` | 0 | 1 |
 | `ext/dom/DocumentLoadXML.php` | 0 | 1 |
 | `ext/dom/DocumentSaveXML.php` | 0 | 1 |
+| `ext/dom/DomClassConstants.php` | 0 | 2 |
 | `ext/dom/DomClassMethod.php` | 0 | 1 |
 | `ext/dom/DomDocumentPropertySupport.php` | 0 | 2 |
 | `ext/dom/DomNodePropertySupport.php` | 0 | 2 |
 | `ext/dom/DomRegistry.php` | 0 | 1 |
 | `ext/dom/ElementAppendChild.php` | 0 | 1 |
+| `ext/dom/ElementGetAttributeNS.php` | 0 | 1 |
+| `ext/dom/ElementHasAttributeNS.php` | 0 | 1 |
+| `ext/dom/ElementSetAttributeNS.php` | 0 | 1 |
 | `ext/dom/FragmentAppendChild.php` | 0 | 1 |
 | `ext/dom/ImplementationCreateDocument.php` | 0 | 1 |
 | `ext/dom/ImplementationCreateDocumentType.php` | 0 | 1 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/Module.php` | 0 | 1 |
 | `ext/dom/NodeCloneNode.php` | 0 | 1 |
+| `ext/dom/NodeCompareDocumentPosition.php` | 0 | 1 |
 | `ext/dom/NodeContains.php` | 0 | 1 |
+| `ext/dom/NodeGetLineNo.php` | 0 | 1 |
+| `ext/dom/NodeHasAttributes.php` | 0 | 1 |
 | `ext/dom/NodeHasChildNodes.php` | 0 | 1 |
 | `ext/dom/NodeIsSameNode.php` | 0 | 1 |
 | `ext/dom/NodeListItem.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 77 |
+| `ext/dom/NodeLookupNamespaceURI.php` | 0 | 1 |
+| `ext/dom/NodeLookupPrefix.php` | 0 | 1 |
+| `ext/dom/VmDom.php` | 0 | 91 |
 | `ext/filter/BuiltinEnums.php` | 0 | 3 |
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterConstants.php` | 0 | 2 |
@@ -1068,6 +1078,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StatFieldsJitHelper.php` | 0 | 1 |
 | `ext/standard/StatPathJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamBufferJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamCapsJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamContextJitHelper.php` | 0 | 9 |
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
@@ -2601,6 +2612,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamBucketRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamBuffer.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamBufferJit.php` | 0 | 1 |
+| `lib/JIT/Builtin/StreamBufferRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamCaps.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamCapsRuntime.php` | 0 | 3 |
@@ -4025,6 +4037,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/DocumentCreateElementNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/DocumentGetElementById.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4045,6 +4062,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/dom/DomClassConstants.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 20)
+- 1 class method(s)
+
 ### `ext/dom/DomClassMethod.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4059,7 +4082,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 34)
+- new Variable (line 39)
 - 3 class method(s)
 
 ### `ext/dom/DomRegistry.php`
@@ -4071,6 +4094,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/dom/ElementGetAttributeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/ElementHasAttributeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/ElementSetAttributeNS.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/dom/FragmentAppendChild.php`
 
@@ -4102,10 +4140,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/dom/NodeCompareDocumentPosition.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/NodeContains.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
+
+### `ext/dom/NodeGetLineNo.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NodeHasAttributes.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/dom/NodeHasChildNodes.php`
 
@@ -4122,86 +4175,110 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/NodeLookupNamespaceURI.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/dom/NodeLookupPrefix.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/VmDom.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 89)
-- new Variable (line 90)
-- new Variable (line 91)
-- new Variable (line 92)
-- new Variable (line 93)
-- new ClassEntry (line 96)
-- new ClassProperty (line 98)
-- new ClassProperty (line 99)
-- new ClassProperty (line 100)
-- new ClassProperty (line 101)
-- new ClassProperty (line 102)
-- new ClassProperty (line 103)
-- new ClassProperty (line 104)
-- new ClassProperty (line 105)
+- new Variable (line 97)
+- new Variable (line 98)
+- new Variable (line 99)
+- new Variable (line 100)
+- new Variable (line 101)
+- new ClassEntry (line 104)
 - new ClassProperty (line 106)
 - new ClassProperty (line 107)
 - new ClassProperty (line 108)
-- new NodeCloneNode (line 109)
-- new NodeIsSameNode (line 111)
-- new NodeHasChildNodes (line 113)
-- new NodeContains (line 115)
-- new ClassEntry (line 119)
-- new ClassProperty (line 122)
-- new ClassEntry (line 125)
-- new ClassProperty (line 127)
-- new NodeListItem (line 128)
-- new ClassEntry (line 132)
-- new ImplementationCreateDocument (line 134)
-- new ImplementationCreateDocumentType (line 136)
-- new ImplementationHasFeature (line 138)
-- new ClassEntry (line 142)
-- new ClassProperty (line 145)
-- new ClassProperty (line 146)
-- new ClassProperty (line 147)
+- new ClassProperty (line 109)
+- new ClassProperty (line 110)
+- new ClassProperty (line 111)
+- new ClassProperty (line 112)
+- new ClassProperty (line 113)
+- new ClassProperty (line 114)
+- new ClassProperty (line 115)
+- new ClassProperty (line 116)
+- new NodeCloneNode (line 117)
+- new NodeIsSameNode (line 119)
+- new NodeHasChildNodes (line 121)
+- new NodeContains (line 123)
+- new NodeLookupPrefix (line 125)
+- new NodeLookupNamespaceURI (line 127)
+- new NodeGetLineNo (line 129)
+- new NodeHasAttributes (line 131)
+- new NodeCompareDocumentPosition (line 133)
+- new ClassEntry (line 145)
 - new ClassProperty (line 148)
 - new ClassEntry (line 151)
-- new ClassProperty (line 154)
-- new ClassProperty (line 155)
-- new ClassProperty (line 156)
-- new DocumentLoadXML (line 157)
-- new DocumentCreateElement (line 159)
-- new DocumentCreateDocumentFragment (line 161)
-- new DocumentAppendChild (line 163)
-- new DocumentSaveXML (line 165)
-- new DocumentGetElementsByTagName (line 167)
-- new DocumentGetElementById (line 169)
-- new ClassEntry (line 173)
-- new ClassProperty (line 176)
-- new ElementAppendChild (line 177)
-- new ClassEntry (line 181)
-- new ClassProperty (line 184)
-- new FragmentAppendChild (line 185)
-- new ObjectEntry (line 201)
-- new DomNodeState (line 203)
-- new Variable (line 211)
-- new ObjectEntry (line 234)
-- new DomNodeState (line 239)
-- new Variable (line 252)
+- new ClassProperty (line 153)
+- new NodeListItem (line 154)
+- new ClassEntry (line 158)
+- new ImplementationCreateDocument (line 160)
+- new ImplementationCreateDocumentType (line 162)
+- new ImplementationHasFeature (line 164)
+- new ClassEntry (line 168)
+- new ClassProperty (line 171)
+- new ClassProperty (line 172)
+- new ClassProperty (line 173)
+- new ClassProperty (line 174)
+- new ClassEntry (line 177)
+- new ClassProperty (line 180)
+- new ClassProperty (line 181)
+- new ClassProperty (line 182)
+- new DocumentLoadXML (line 183)
+- new DocumentCreateElement (line 185)
+- new DocumentCreateElementNS (line 187)
+- new DocumentCreateDocumentFragment (line 189)
+- new DocumentAppendChild (line 191)
+- new DocumentSaveXML (line 193)
+- new DocumentGetElementsByTagName (line 195)
+- new DocumentGetElementById (line 197)
+- new ClassEntry (line 201)
+- new ClassProperty (line 204)
+- new ElementAppendChild (line 205)
+- new ElementGetAttributeNS (line 207)
+- new ElementHasAttributeNS (line 209)
+- new ElementSetAttributeNS (line 211)
+- new ClassEntry (line 215)
+- new ClassProperty (line 218)
+- new FragmentAppendChild (line 219)
+- new ObjectEntry (line 235)
+- new DomNodeState (line 237)
+- new Variable (line 245)
+- new ObjectEntry (line 268)
 - new DomNodeState (line 273)
-- new ObjectEntry (line 293)
-- new DomNodeState (line 298)
-- new Variable (line 306)
-- new ObjectEntry (line 319)
-- new DomNodeState (line 324)
-- new ObjectEntry (line 343)
-- new DomNodeState (line 348)
-- new Variable (line 353)
-- new DOMException (line 560)
-- new DOMException (line 584)
-- new Variable (line 656)
-- new DOMException (line 772)
-- new ObjectEntry (line 854)
-- new DomNodeState (line 858)
-- new Variable (line 864)
-- new Variable (line 1281)
-- new DOMException (line 1295)
-- 66 class method(s)
+- new Variable (line 286)
+- new DomNodeState (line 307)
+- new ObjectEntry (line 327)
+- new DomNodeState (line 332)
+- new Variable (line 342)
+- new ObjectEntry (line 361)
+- new DomNodeState (line 366)
+- new Variable (line 380)
+- new DOMException (line 389)
+- new DOMException (line 442)
+- new ObjectEntry (line 610)
+- new DomNodeState (line 615)
+- new ObjectEntry (line 634)
+- new DomNodeState (line 639)
+- new Variable (line 644)
+- new DOMException (line 863)
+- new DOMException (line 889)
+- new Variable (line 961)
+- new DOMException (line 1090)
+- new ObjectEntry (line 1172)
+- new DomNodeState (line 1176)
+- new Variable (line 1182)
+- new Variable (line 1715)
+- new DOMException (line 1729)
+- 90 class method(s)
 
 ### `ext/filter/BuiltinEnums.php`
 
@@ -10724,6 +10801,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 8 class method(s)
+
+### `ext/standard/StreamBufferJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `ext/standard/StreamCapsJitHelper.php`
 
@@ -17793,7 +17875,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 13 class method(s)
 
 ### `ext/xml/xml_get_error_code.php`
 
@@ -19311,17 +19393,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCountRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCountValuesRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayDiffAssocRuntime.php`
 
@@ -19588,7 +19670,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CallArgv.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/CallUnpackRuntime.php`
 
@@ -19649,7 +19731,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/CliArgvRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 472)
+- new JIT (line 487)
 - 19 class method(s)
 - 1 closure(s)
 
@@ -20706,7 +20788,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamBufferJit.php`
 
 **Warnings** (review for bootstrap subset):
-- 16 class method(s)
+- 3 class method(s)
+
+### `lib/JIT/Builtin/StreamBufferRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 203)
+- 10 class method(s)
+- 4 closure(s)
 
 ### `lib/JIT/Builtin/StreamCaps.php`
 
@@ -20779,8 +20868,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StreamIoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 326)
-- 20 class method(s)
+- new JIT (line 339)
+- 22 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StreamLibcHandleRuntime.php`
@@ -21078,8 +21167,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringGetenvAll.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 152)
-- 8 class method(s)
+- new JIT (line 182)
+- 10 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringGetrusage.php`
@@ -21203,14 +21292,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringJsonDecode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 238)
+- new JIT (line 248)
 - 12 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringJsonEncode.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 188)
+- new JIT (line 197)
 - 10 class method(s)
 - 1 closure(s)
 
@@ -22280,8 +22369,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/CliArgvGlobalInit.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 65)
 - new Variable (line 81)
+- new Variable (line 97)
 - 4 class method(s)
 
 ### `lib/JIT/ClosureBindHelper.php`
@@ -22328,71 +22417,71 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Context.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 442)
-- new Scope (line 504)
-- new Analyzer (line 525)
-- new Helper (line 526)
-- new Builtin\Refcount (line 528)
-- new Builtin\Output (line 530)
-- new Builtin\Type (line 531)
-- new Builtin\Internal (line 532)
-- new Builtin\VarArg (line 533)
-- new Builtin\ErrorHandler (line 534)
-- new Scope (line 554)
-- new Call\ExternalMethod (line 602)
-- new Builtin\IsNullFn (line 792)
-- new Builtin\IsNullFn (line 793)
-- new Call\SplObjectStorageMethod (line 794)
-- new Call\SplObjectStorageMethod (line 795)
-- new Call\SplObjectStorageMethod (line 796)
-- new Call\SplObjectStorageMethod (line 797)
-- new Call\SplObjectStorageMethod (line 798)
-- new Call\SplObjectStorageMethod (line 799)
-- new Call\WeakReferenceCreate (line 801)
-- new Call\WeakReferenceGet (line 802)
-- new Call\WeakMapMethod (line 803)
-- new Call\WeakMapMethod (line 804)
-- new Call\WeakMapMethod (line 805)
-- new Call\WeakMapMethod (line 806)
-- new Call\WeakMapMethod (line 807)
-- new Call\ReflectionClassConstruct (line 809)
-- new Call\ReflectionClassGetName (line 810)
-- new Call\ReflectionClassGetAttributes (line 811)
-- new Call\ReflectionClassGetMethod (line 812)
-- new Call\ReflectionClassGetReflectionConstant (line 813)
-- new Call\ReflectionClassNewLazyProxy (line 815)
-- new Call\ReflectionClassNewLazyGhost (line 816)
-- new Call\ReflectionClassCreateLazyGhost (line 817)
-- new Call\ReflectionClassCreateLazyProxy (line 818)
-- new Call\ReflectionPropertyConstruct (line 820)
-- new Call\ReflectionPropertyGetAttributes (line 821)
-- new Call\ReflectionConstantConstruct (line 822)
-- new Call\ReflectionConstantGetAttributes (line 823)
-- new Call\ReflectionMethodGetAttributes (line 824)
-- new Call\ReflectionAttributeGetName (line 825)
-- new Call\ReflectionAttributeNewInstance (line 826)
-- new Call\ReflectionEnumConstruct (line 827)
-- new Call\ReflectionEnumGetName (line 828)
-- new Call\ReflectionEnumHasCase (line 829)
-- new Call\ReflectionEnumGetCase (line 830)
-- new Call\ReflectionEnumIsBacked (line 831)
-- new Call\ReflectionEnumUnitCaseGetName (line 832)
-- new Call\ReflectionEnumUnitCaseGetName (line 833)
-- new Call\ExceptionGetMessage (line 834)
-- new Result (line 1059)
-- new Result (line 1080)
-- new Variable (line 1352)
-- new Variable (line 1672)
-- new Variable (line 1803)
-- new Variable (line 1989)
-- new VMVariable (line 2147)
-- new VMVariable (line 2163)
-- new VMVariable (line 2169)
-- new VMVariable (line 2175)
-- new VMVariable (line 2186)
-- new Variable (line 2216)
-- new Variable (line 2255)
-- 95 class method(s)
+- new Variable (line 454)
+- new Scope (line 517)
+- new Analyzer (line 538)
+- new Helper (line 539)
+- new Builtin\Refcount (line 541)
+- new Builtin\Output (line 543)
+- new Builtin\Type (line 544)
+- new Builtin\Internal (line 545)
+- new Builtin\VarArg (line 546)
+- new Builtin\ErrorHandler (line 547)
+- new Scope (line 567)
+- new Call\ExternalMethod (line 615)
+- new Builtin\IsNullFn (line 807)
+- new Builtin\IsNullFn (line 808)
+- new Call\SplObjectStorageMethod (line 809)
+- new Call\SplObjectStorageMethod (line 810)
+- new Call\SplObjectStorageMethod (line 811)
+- new Call\SplObjectStorageMethod (line 812)
+- new Call\SplObjectStorageMethod (line 813)
+- new Call\SplObjectStorageMethod (line 814)
+- new Call\WeakReferenceCreate (line 816)
+- new Call\WeakReferenceGet (line 817)
+- new Call\WeakMapMethod (line 818)
+- new Call\WeakMapMethod (line 819)
+- new Call\WeakMapMethod (line 820)
+- new Call\WeakMapMethod (line 821)
+- new Call\WeakMapMethod (line 822)
+- new Call\ReflectionClassConstruct (line 824)
+- new Call\ReflectionClassGetName (line 825)
+- new Call\ReflectionClassGetAttributes (line 826)
+- new Call\ReflectionClassGetMethod (line 827)
+- new Call\ReflectionClassGetReflectionConstant (line 828)
+- new Call\ReflectionClassNewLazyProxy (line 830)
+- new Call\ReflectionClassNewLazyGhost (line 831)
+- new Call\ReflectionClassCreateLazyGhost (line 832)
+- new Call\ReflectionClassCreateLazyProxy (line 833)
+- new Call\ReflectionPropertyConstruct (line 835)
+- new Call\ReflectionPropertyGetAttributes (line 836)
+- new Call\ReflectionConstantConstruct (line 837)
+- new Call\ReflectionConstantGetAttributes (line 838)
+- new Call\ReflectionMethodGetAttributes (line 839)
+- new Call\ReflectionAttributeGetName (line 840)
+- new Call\ReflectionAttributeNewInstance (line 841)
+- new Call\ReflectionEnumConstruct (line 842)
+- new Call\ReflectionEnumGetName (line 843)
+- new Call\ReflectionEnumHasCase (line 844)
+- new Call\ReflectionEnumGetCase (line 845)
+- new Call\ReflectionEnumIsBacked (line 846)
+- new Call\ReflectionEnumUnitCaseGetName (line 847)
+- new Call\ReflectionEnumUnitCaseGetName (line 848)
+- new Call\ExceptionGetMessage (line 849)
+- new Result (line 1112)
+- new Result (line 1133)
+- new Variable (line 1405)
+- new Variable (line 1725)
+- new Variable (line 1856)
+- new Variable (line 2042)
+- new VMVariable (line 2200)
+- new VMVariable (line 2216)
+- new VMVariable (line 2222)
+- new VMVariable (line 2228)
+- new VMVariable (line 2239)
+- new Variable (line 2269)
+- new Variable (line 2308)
+- 98 class method(s)
 - 28 closure(s)
 
 ### `lib/JIT/DnfParamCheck.php`
@@ -23421,15 +23510,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ext\standard\Module (line 242)
 - new JIT (line 318)
 - new JITContext (line 332)
-- new SealedClassPreprocessor (line 361)
-- new StaticClassPreprocessor (line 364)
-- new SourcePreprocessor\PropertyHooks (line 367)
-- new State (line 490)
-- new ReflectionProperty (line 517)
-- new ReflectionProperty (line 520)
-- new LintCompiler (line 911)
-- new Variable (line 1038)
-- 52 class method(s)
+- new SealedClassPreprocessor (line 375)
+- new StaticClassPreprocessor (line 378)
+- new SourcePreprocessor\PropertyHooks (line 381)
+- new State (line 504)
+- new ReflectionProperty (line 531)
+- new ReflectionProperty (line 534)
+- new LintCompiler (line 925)
+- new Variable (line 1052)
+- 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`
 
