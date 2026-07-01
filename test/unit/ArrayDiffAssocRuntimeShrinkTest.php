@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_diff_assoc() JIT routes through ArrayDiffAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12552). */
+/** array_diff_assoc() JIT routes through ArrayDiffAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12552, #14343). */
 final class ArrayDiffAssocRuntimeShrinkTest extends TestCase
 {
     public function testArrayDiffAssocRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayDiffAssocRuntime.php');
         $this->assertStringContainsString('ArrayDiffAssocJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayDiffAssoc', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffAssoc', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_diff_assoc.php');
         $this->assertStringContainsString('ArrayDiffAssocRuntime::diffAssoc', $builtin);
