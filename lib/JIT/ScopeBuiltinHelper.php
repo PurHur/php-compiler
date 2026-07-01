@@ -13,6 +13,8 @@ namespace PHPCompiler\JIT;
 
 use PHPCompiler\Block as CompilerBlock;
 use PHPCompiler\ext\standard\VmScope;
+use PHPCompiler\JIT\JitLongArg;
+use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\Web\Superglobals;
 use PHPLLVM\Value;
 
@@ -73,7 +75,12 @@ final class ScopeBuiltinHelper
         $countSlot = $context->builder->alloca($i64, 1, 'extract_count');
         $context->builder->store($i64->constInt(0, false), $countSlot);
 
-        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot, $prefixArg);
+        $prefixStr = $context->builder->load($context->constantStringFromString(''));
+        if (null !== $prefixArg) {
+            $prefixStr = JitStringArg::lower($context, $prefixArg, 'extract() prefix');
+        }
+
+        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, $countSlot, $prefixStr);
 
         return $context->builder->load($countSlot);
     }
@@ -87,7 +94,8 @@ final class ScopeBuiltinHelper
         }
         $i64 = $context->getTypeFromString('int64');
         $flags = $i64->constInt(0, false);
-        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null);
+        $emptyPrefix = $context->builder->load($context->constantStringFromString(''));
+        ScopeBuiltinEmitHelper::walkStringKeyNodes($context, $ht, $named, $flags, null, $emptyPrefix);
     }
 
     public static function compact(Context $context, Variable ...$nameArgs): Value

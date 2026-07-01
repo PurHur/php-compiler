@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\standard\ScopeBuiltinJitHelper;
 use PHPCompiler\ext\standard\VmScope;
 use PHPUnit\Framework\TestCase;
 
@@ -12,8 +13,17 @@ final class VmScopeExtractFlagsTest extends TestCase
 {
     public function testPrefixVarNameInsertsUnderscore(): void
     {
+        $this->assertSame('all_foo', ScopeBuiltinJitHelper::prefixVarName('all', 'foo'));
+        $this->assertSame('all__foo', ScopeBuiltinJitHelper::prefixVarName('all_', 'foo'));
         $this->assertSame('all_foo', VmScope::prefixVarName('all', 'foo'));
-        $this->assertSame('all__foo', VmScope::prefixVarName('all_', 'foo'));
+    }
+
+    public function testResolveExtractFinalNamePrefixAll(): void
+    {
+        $this->assertSame(
+            'all_foo',
+            ScopeBuiltinJitHelper::resolveExtractFinalName('foo', false, VmScope::EXTR_PREFIX_ALL, 'all')
+        );
     }
 
     public function testExtrConstantsMatchStdlib(): void

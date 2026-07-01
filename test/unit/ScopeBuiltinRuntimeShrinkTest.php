@@ -24,8 +24,18 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ScopeBuiltinEmitHelper.php');
         $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning', $source);
         $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactInvalidArgumentWarning', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::resolveExtractTargetName', $source);
         $this->assertStringNotContainsString('snprintf', $source);
         $this->assertStringNotContainsString('emitCompactInvalidArgumentWarningMessage', $source);
+        $this->assertStringNotContainsString('importKeyIntoScope', $source);
+    }
+
+    public function testScopeBuiltinJitHelperExtractNameResolution(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ScopeBuiltinJitHelper.php');
+        $this->assertStringContainsString('resolveExtractFinalName', $source);
+        $this->assertStringContainsString('resolveExtractTargetName', $source);
+        $this->assertStringContainsString('prefixVarName', $source);
     }
 
     public function testScopeBuiltinJitHelperExists(): void
