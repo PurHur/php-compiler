@@ -300,6 +300,17 @@ final class VmDateTimeNative
                 'microsecond' => 0,
             ];
         }
+        if (1 === preg_match('/^(first|last) day of (next|this|last) month$/i', $time, $matches)) {
+            return self::monthBoundaryParseResult(
+                strtolower($matches[1]),
+                strtolower($matches[2]),
+                $base,
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^(next|last|this) month$/i', $time, $matches)) {
+            return self::monthOffsetParseResult(strtolower($matches[1]), $base, $tzName);
+        }
         if (1 === preg_match(
             '/^(.+?)\s+([+-]\s*\d+\s+(?:second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years))$/i',
             $time,
@@ -1516,6 +1527,88 @@ final class VmDateTimeNative
         return ['timestamp' => $timestamp, 'microsecond' => 0];
     }
 
+    /**
+     * php-src timelib — first/last day of next|this|last month (#14326).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthBoundaryParseResult(string $which, string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $monthDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $monthDelta) {
+            return null;
+        }
+        [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
+        $day = 'first' === $which ? 1 : self::daysInMonth($year, $month);
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src timelib — next|last|this month preserving day/time (#14326).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function monthOffsetParseResult(string $when, int $base, string $tzName): ?array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return null;
+        }
+        $year = self::tmInt($tm, 'tm_year') + 1900;
+        $month = self::tmInt($tm, 'tm_mon') + 1;
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+        $monthDelta = match ($when) {
+            'next' => 1,
+            'last' => -1,
+            'this' => 0,
+            default => 999,
+        };
+        if (999 === $monthDelta) {
+            return null;
+        }
+        [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
+        $day = min($day, self::daysInMonth($year, $month));
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /** @return array{0: int, 1: int} */
+    private static function shiftYearMonth(int $year, int $month, int $monthDelta): array
+    {
+        $month += $monthDelta;
+        while ($month < 1) {
+            --$year;
+            $month += 12;
+        }
+        while ($month > 12) {
+            ++$year;
+            $month -= 12;
+        }
+
+        return [$year, $month];
+    }
+
     /** php-src timelib relative weekday modifiers — next/last/this/bare (#14151). */
     private static function weekdayRelativeTimestamp(
         string $modifier,
@@ -1664,7 +1757,7 @@ final class VmDateTimeNative
     }
 
     /**
-     * php-src date_modify() / timelib_strtotime relative branch — common signed units only (#6132).
+     * php-src date_modify() / timelib_strtotime relative branch (#6132, #14326).
      */
     public static function modifyRelative(int $timestamp, string $modifier, string $tzName): int
     {
@@ -1674,45 +1767,68 @@ final class VmDateTimeNative
         }
 
         return self::withTimezone($tzName, static function () use ($timestamp, $modifier, $tzName): int {
-            $tm = self::localtime($timestamp);
-            if (null === $tm) {
-                self::throwModifyMalformed($modifier);
-            }
-            $year = (self::tmInt($tm, 'tm_year') + 1900);
-            $month = (self::tmInt($tm, 'tm_mon') + 1);
-            $day = self::tmInt($tm, 'tm_mday');
-            $hour = self::tmInt($tm, 'tm_hour');
-            $minute = self::tmInt($tm, 'tm_min');
-            $second = self::tmInt($tm, 'tm_sec');
-            $delta = self::parseSignedRelativeDelta($modifier);
-            switch ($delta['unit']) {
-                case 'second':
-                    $second += $delta['amount'];
-                    break;
-                case 'minute':
-                    $minute += $delta['amount'];
-                    break;
-                case 'hour':
-                    $hour += $delta['amount'];
-                    break;
-                case 'day':
-                    $day += $delta['amount'];
-                    break;
-                case 'week':
-                    $day += 7 * $delta['amount'];
-                    break;
-                case 'month':
-                    $month += $delta['amount'];
-                    break;
-                case 'year':
-                    $year += $delta['amount'];
-                    break;
-                default:
-                    self::throwModifyMalformed($modifier);
+            $signed = self::tryApplySignedRelativeDelta($timestamp, $modifier, $tzName);
+            if (null !== $signed) {
+                return $signed;
             }
 
-            return self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
+            $extended = self::tryParseExtendedDateTimeString($modifier, $tzName, $timestamp);
+            if (null !== $extended) {
+                return $extended['timestamp'];
+            }
+
+            self::throwModifyMalformed($modifier);
         });
+    }
+
+    /**
+     * Signed unit deltas only (+1 day, -2 weeks, …) — fast path for date_modify().
+     */
+    private static function tryApplySignedRelativeDelta(int $timestamp, string $modifier, string $tzName): ?int
+    {
+        try {
+            $delta = self::parseSignedRelativeDelta($modifier);
+        } catch (NativeDateMalformedStringException) {
+            return null;
+        }
+
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return null;
+        }
+        $year = (self::tmInt($tm, 'tm_year') + 1900);
+        $month = (self::tmInt($tm, 'tm_mon') + 1);
+        $day = self::tmInt($tm, 'tm_mday');
+        $hour = self::tmInt($tm, 'tm_hour');
+        $minute = self::tmInt($tm, 'tm_min');
+        $second = self::tmInt($tm, 'tm_sec');
+        switch ($delta['unit']) {
+            case 'second':
+                $second += $delta['amount'];
+                break;
+            case 'minute':
+                $minute += $delta['amount'];
+                break;
+            case 'hour':
+                $hour += $delta['amount'];
+                break;
+            case 'day':
+                $day += $delta['amount'];
+                break;
+            case 'week':
+                $day += 7 * $delta['amount'];
+                break;
+            case 'month':
+                $month += $delta['amount'];
+                break;
+            case 'year':
+                $year += $delta['amount'];
+                break;
+            default:
+                return null;
+        }
+
+        return self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName);
     }
 
     public static function format(int $timestamp, int $microsecond, string $tzName, string $format): string
