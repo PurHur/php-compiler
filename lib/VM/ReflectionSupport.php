@@ -1074,7 +1074,7 @@ final class ReflectionSupport
         if (Variable::TYPE_STRING !== $funcNameVar->type) {
             return [];
         }
-        $func = self::resolveUserFunction($ctx, $funcNameVar->toString());
+        $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
         $index = self::paramIndexFromReflection($reflection);
         if (!isset($func->block->paramSensitive[$index])) {
             return [];
@@ -1106,6 +1106,21 @@ final class ReflectionSupport
         }
 
         return $func;
+    }
+
+    /**
+     * Resolve declaring function for ReflectionParameter on named or closure functions (#11545).
+     *
+     * @return \PHPCompiler\Func\PHP
+     */
+    public static function resolveFunctionForReflectionParameter(Context $ctx, ObjectEntry $parameter): \PHPCompiler\Func\PHP
+    {
+        $closure = $parameter->reflectionClosureState;
+        if (null !== $closure) {
+            return $closure->func;
+        }
+
+        return self::resolveUserFunction($ctx, self::functionNameFromReflection($parameter));
     }
 
     public static function typeStringFromReflection(ObjectEntry $reflection): string
