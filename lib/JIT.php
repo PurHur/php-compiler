@@ -14184,12 +14184,14 @@ class JIT {
         if (!JIT\NestedJitCompileScope::isActive()) {
             return false;
         }
-        if ('phpcompiler\\vm\\hashtable' === $declaringClassLc && 'exportkeyvaluepairs' === $methodLc) {
-            JIT\HashTableNestedExportLlvm::ensureLinked($this->context);
-            $proxyName = JIT\HashTableNestedExportLlvm::PROXY_NAME;
-            if (!$this->context->functionIsRegistered($proxyName)) {
+        if (
+            'phpcompiler\\vm\\hashtable' === $declaringClassLc
+            && JIT\NestedVmHashTableMethodLlvm::isNestedHashTableMethod($methodLc)
+        ) {
+            if (!JIT\NestedVmHashTableMethodLlvm::ensureMethod($this->context, $methodLc)) {
                 return false;
             }
+            $proxyName = 'phpcompiler\\vm\\hashtable::'.$methodLc;
             $this->context->scope->toCall = $this->context->resolveFunctionProxy($proxyName);
             $this->context->scope->args = [$receiverVar];
 

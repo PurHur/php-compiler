@@ -16,9 +16,6 @@ final class HashTableNestedExportLlvm
 
     public static function ensureLinked(Context $context): void
     {
-        if ($context->functionIsRegistered(self::PROXY_NAME)) {
-            return;
-        }
-        $context->functionProxies[strtolower(self::PROXY_NAME)] = new Call\HashTableExportKeyValuePairs();
+        NestedVmHashTableMethodLlvm::ensureMethod($context, 'exportkeyvaluepairs');
     }
 }
