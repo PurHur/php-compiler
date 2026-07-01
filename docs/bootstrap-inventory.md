@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3625 |
-| Phase A inventory files (M2 ratio SSOT) | 3625 |
+| PHP files on vm.php path | 3626 |
+| Phase A inventory files (M2 ratio SSOT) | 3626 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9871 |
+| Source constructs flagged (warnings) | 9875 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -924,7 +924,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrRot13.php` | 0 | 1 |
 | `ext/standard/JitStrShuffle.php` | 0 | 1 |
 | `ext/standard/JitStrSplit.php` | 0 | 1 |
-| `ext/standard/JitStrWordCount.php` | 0 | 4 |
 | `ext/standard/JitStreamBucket.php` | 0 | 3 |
 | `ext/standard/JitStreamContextCreate.php` | 0 | 1 |
 | `ext/standard/JitStreamContextGetDefault.php` | 0 | 1 |
@@ -1092,6 +1091,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StatFieldsJitHelper.php` | 0 | 1 |
 | `ext/standard/StatPathJitHelper.php` | 0 | 1 |
 | `ext/standard/StrRepeatJitHelper.php` | 0 | 1 |
+| `ext/standard/StrWordCountJitHelper.php` | 0 | 4 |
 | `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamBufferJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamCapsJitHelper.php` | 0 | 1 |
@@ -2763,6 +2763,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrGetcsv.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrRepeat.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrWordCount.php` | 0 | 4 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStripTags.php` | 0 | 3 |
@@ -9230,14 +9231,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
 
-### `ext/standard/JitStrWordCount.php`
-
-**Warnings** (review for bootstrap subset):
-- new HashTable (line 373)
-- new Variable (line 376)
-- new Variable (line 382)
-- 9 class method(s)
-
 ### `ext/standard/JitStreamBucket.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10934,6 +10927,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/StrWordCountJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 26)
+- new Variable (line 29)
+- new Variable (line 35)
+- 2 class method(s)
 
 ### `ext/standard/StreamBucketJitHelper.php`
 
@@ -17065,9 +17066,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/str_word_count.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 57)
-- new Variable (line 60)
-- new Variable (line 66)
+- new HashTable (line 58)
+- new Variable (line 61)
+- new Variable (line 67)
 - 2 class method(s)
 
 ### `ext/standard/strcasecmp.php`
@@ -21739,6 +21740,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringStrWordCount.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 111)
+- new Variable (line 114)
+- new Variable (line 120)
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/StringStreamCsv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22742,19 +22751,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1119)
-- new Result (line 1140)
-- new Variable (line 1412)
-- new Variable (line 1732)
-- new Variable (line 1863)
-- new Variable (line 2049)
-- new VMVariable (line 2207)
-- new VMVariable (line 2223)
-- new VMVariable (line 2229)
-- new VMVariable (line 2235)
-- new VMVariable (line 2246)
-- new Variable (line 2276)
-- new Variable (line 2315)
+- new Result (line 1120)
+- new Result (line 1141)
+- new Variable (line 1413)
+- new Variable (line 1733)
+- new Variable (line 1864)
+- new Variable (line 2050)
+- new VMVariable (line 2208)
+- new VMVariable (line 2224)
+- new VMVariable (line 2230)
+- new VMVariable (line 2236)
+- new VMVariable (line 2247)
+- new Variable (line 2277)
+- new Variable (line 2316)
 - 98 class method(s)
 - 28 closure(s)
 
