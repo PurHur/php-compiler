@@ -212,10 +212,14 @@ final class VmDom
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
+        $element->methods['getattribute'] = new ElementGetAttribute();
+        $element->methodVisibility['getattribute'] = $pub;
         $element->methods['getattributens'] = new ElementGetAttributeNS();
         $element->methodVisibility['getattributens'] = $pub;
         $element->methods['hasattributens'] = new ElementHasAttributeNS();
         $element->methodVisibility['hasattributens'] = $pub;
+        $element->methods['setattribute'] = new ElementSetAttribute();
+        $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
         $ctx->classes[self::CLASS_ELEMENT] = $element;
