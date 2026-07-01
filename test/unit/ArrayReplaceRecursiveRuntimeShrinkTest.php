@@ -6,7 +6,7 @@ namespace PHPCompiler;
 
 use PHPUnit\Framework\TestCase;
 
-/** array_replace_recursive() C runtime shrink (#5252, #6022). */
+/** array_replace_recursive() JIT routes through ArrayReplaceRecursiveJitHelper PHP (#12638, #14424). */
 final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
 {
     private string $repoRoot;
@@ -30,8 +30,8 @@ final class ArrayReplaceRecursiveRuntimeShrinkTest extends TestCase
         $runtime = file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ArrayReplaceRecursiveRuntime.php');
         $this->assertIsString($runtime);
         $this->assertStringContainsString('ArrayReplaceRecursiveJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayReplaceRecursive', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = file_get_contents($this->repoRoot.'/ext/standard/array_replace_recursive.php');
         $this->assertIsString($builtin);
