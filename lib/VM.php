@@ -8323,7 +8323,7 @@ restart:
         return null;
     }
 
-    /** Attach builtin throw trace then dispatch to user catch / fatal (#11677). */
+    /** Attach builtin throw trace then dispatch to user catch / fatal (#11677, #14369). */
     private function dispatchBuiltinThrowable(Frame $callerFrame, Variable $thrown): ?Frame
     {
         if (null !== $this->builtinHandlerFrameForTrace) {
@@ -8333,6 +8333,8 @@ restart:
                 $this->builtinHandlerFrameForTrace,
                 $thrown
             );
+        } else {
+            VM\ExceptionTrace::captureOnThrow($this->context, $callerFrame, $thrown);
         }
         $catchFrame = $this->findCatchFrameForThrow($callerFrame, $thrown);
         if (null !== $catchFrame) {
