@@ -144,6 +144,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'array_replace_key_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current')
+                && !str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbStrPad()
                 && str_contains($name, 'mb_str_pad')
                 && !str_contains($name, 'mb_str_pad_phantom')) {

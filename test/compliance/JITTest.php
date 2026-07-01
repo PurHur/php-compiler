@@ -149,6 +149,19 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'array_replace_key_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current')
+                && !str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsClosureGetCurrent()
+                && str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
+            // JIT: method_exists(Closure::class, …) segfaults; phantom is VM-only (#14504).
+            if (str_contains($name, 'closure_get_current_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
