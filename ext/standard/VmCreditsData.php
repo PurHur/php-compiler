@@ -77,6 +77,24 @@ final class VmCreditsData
     public const SAPI_AUTHORS =
         'Andi Gutmans, Shane Caraveo, Zeev Suraski';
 
+    /**
+     * php-src credits_sapi — SAPI handler author rows (ext/standard/info.c, #14294).
+     *
+     * @var array<string, string>
+     */
+    public const SAPI_MODULES = [
+        'Apache 2.0 Handler' => 'Ian Holsman, Justin Erenkrantz (based on Apache 2.0 Filter code)',
+        'CGI / FastCGI' => 'Rasmus Lerdorf, Stig Bakken, Shane Caraveo, Dmitry Stogov',
+        'CLI' => 'Edin Kadribasic, Marcus Boerger, Johannes Schlueter, Moriyoshi Koizumi, Xinchen Hui',
+        'Embed' => 'Edin Kadribasic',
+        'FastCGI Process Manager' => 'Andrei Nigmatulin, dreamcat4, Antony Dovgal, Jerome Loyet',
+        'litespeed' => 'George Wang',
+        'phpdbg' => 'Felipe Pena, Joe Watkins, Bob Weinand',
+    ];
+
+    /** php-src Debian Packaging credits row bundled under CREDITS_SAPI (ext/standard/info.c). */
+    public const DEBIAN_PACKAGING_AUTHOR = 'Ondřej Surý';
+
     /** php-src PHP_CREDITS_DOCS — documentation team. */
     public const DOCS_TEAM =
         'Mehdi Achour, Vincent Gevers, Stig Bakken, Rasmus Lerdorf, '
