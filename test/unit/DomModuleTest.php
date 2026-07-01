@@ -181,6 +181,25 @@ PHP;
         self::assertSame("<a id=\"1\"/>\nattrs\nnull\n", ob_get_clean());
     }
 
+    public function test_dom_node_has_attributes(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<r a="1"/>');
+echo (int) $doc->documentElement->hasAttributes(), "\n";
+$doc->loadXML('<r/>');
+echo (int) $doc->documentElement->hasAttributes(), "\n";
+$doc->loadXML('<r xmlns="http://example.com"/>');
+echo (int) $doc->documentElement->hasAttributes(), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_has_attributes.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n0\n0\n", ob_get_clean());
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');

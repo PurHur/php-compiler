@@ -128,6 +128,8 @@ final class VmDom
         $node->methodVisibility['lookupnamespaceuri'] = $pub;
         $node->methods['getlineno'] = new NodeGetLineNo();
         $node->methodVisibility['getlineno'] = $pub;
+        $node->methods['hasattributes'] = new NodeHasAttributes();
+        $node->methodVisibility['hasattributes'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -1419,6 +1421,21 @@ final class VmDom
         }
 
         return [] !== DomRegistry::state($node)->childIds;
+    }
+
+    public static function hasAttributes(ObjectEntry $node): bool
+    {
+        if (!self::isElement($node)) {
+            return false;
+        }
+        $state = DomRegistry::state($node);
+        foreach ($state->attributes as $qName => $value) {
+            if (!self::isXmlnsAttributeName($qName)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     public static function contains(ObjectEntry $node, ?ObjectEntry $other): bool
