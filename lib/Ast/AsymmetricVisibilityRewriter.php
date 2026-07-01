@@ -293,7 +293,7 @@ final class AsymmetricVisibilityRewriter
             $line
         )
             || 1 === preg_match(
-                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
+                '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
                 $line
             )
             || 1 === preg_match(
@@ -352,8 +352,8 @@ final class AsymmetricVisibilityRewriter
         $patterns = [
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\1\s*\(\s*set\s*\)/i',
             '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?!\()(public|protected|private)\s*\(\s*set\s*\)/i',
-            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*(public|protected|private)\s*\(\s*set\s*\)\s*\)/i',
-        ]; // third pattern: reference profile + parenthesized dual modifiers
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+\(\s*\1\s*\(\s*set\s*\)\s*\)/i',
+        ];
         foreach ($patterns as $pattern) {
             if (preg_match($pattern, $paramsText, $m, PREG_OFFSET_CAPTURE)) {
                 return (int) $m[0][1];
