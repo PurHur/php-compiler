@@ -455,4 +455,26 @@ final class BuiltinParamNamesAliasTest extends TestCase
         self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($splice, 'length', 'array_splice'));
         self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($splice, 'replacement', 'array_splice'));
     }
+
+    /** @covers issue #10047 */
+    public function testArrayMapFilterReduceNamedParameters(): void
+    {
+        $map = BuiltinParamNames::forFunction('array_map');
+        self::assertSame(['callback', 'array', 'arrays'], $map);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($map, 'callback', 'array_map'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($map, 'array', 'array_map'));
+        self::assertSame(2, BuiltinParamNames::variadicParamIndexForFunction('array_map'));
+
+        $filter = BuiltinParamNames::forFunction('array_filter');
+        self::assertSame(['array', 'callback', 'mode'], $filter);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($filter, 'array', 'array_filter'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($filter, 'callback', 'array_filter'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($filter, 'mode', 'array_filter'));
+
+        $reduce = BuiltinParamNames::forFunction('array_reduce');
+        self::assertSame(['array', 'callback', 'initial'], $reduce);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($reduce, 'array', 'array_reduce'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($reduce, 'callback', 'array_reduce'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($reduce, 'initial', 'array_reduce'));
+    }
 }

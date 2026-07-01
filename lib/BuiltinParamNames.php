@@ -94,6 +94,12 @@ final class BuiltinParamNames
                 return ['array', 'offset', 'length', 'replacement'];
             case 'array_multisort':
                 return ['array', 'rest'];
+            case 'array_map':
+                return ['callback', 'array', 'arrays'];
+            case 'array_filter':
+                return ['array', 'callback', 'mode'];
+            case 'array_reduce':
+                return ['array', 'callback', 'initial'];
             case 'array_pad':
                 return ['array', 'length', 'value'];
             case 'array_combine':
@@ -323,6 +329,7 @@ final class BuiltinParamNames
     {
         return match (strtolower($name)) {
             'call_user_func' => 1,
+            'array_map' => 2,
             'array_multisort' => 1,
             default => null,
         };
