@@ -63,7 +63,7 @@ for rel in "${targets[@]}"; do
     failures+=("${rel}: file not found")
     continue
   fi
-  if ! PHP_COMPILER_BOOTSTRAP_AOT_LINK=1 PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 "$PHP_BIN" "${PHP_OPTS[@]}" "$compile_bin" -o "$binary" "$source" >&2; then
+  if ! PHP_COMPILER_BOOTSTRAP_AOT_LINK=1 PHP_COMPILER_SELFHOST_AOT=1 PHP_COMPILER_M3_COMPILE_DRIVER=1 PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1 BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1 "$PHP_BIN" "${PHP_OPTS[@]}" "$compile_bin" -o "$binary" "$source" >&2; then
     failures+=("${rel}: compile failed")
     continue
   fi
