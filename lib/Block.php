@@ -811,7 +811,8 @@ class Block {
     /**
      * One-level JUMPIF target scan — enough to drop cond-expression temps without
      * treating distant merge/successor blocks as live (#14103 vs #13955 fcall keep).
-     * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133).
+     * ?: arms that JUMP to a shared merge must still preserve prefix temps (#14133);
+     * nested ?: arms may chain through inner JUMPIF + JUMP blocks (#14260).
      */
     public function scopeSlotReadInDirectJumpTargets(int $slot): bool
     {
@@ -823,7 +824,8 @@ class Block {
                 if (!$target instanceof self) {
                     continue;
                 }
-                if ($this->branchOrJumpMergeReadsScopeSlot($target, $slot)) {
+                $seen = [];
+                if ($this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)) {
                     return true;
                 }
             }
@@ -832,8 +834,17 @@ class Block {
         return false;
     }
 
-    private function branchOrJumpMergeReadsScopeSlot(self $branch, int $slot): bool
+    /**
+     * @param array<int, true> $seen
+     */
+    private function branchOrJumpMergeReadsScopeSlot(self $branch, int $slot, array &$seen = []): bool
     {
+        $id = spl_object_id($branch);
+        if (isset($seen[$id])) {
+            return false;
+        }
+        $seen[$id] = true;
+
         foreach ($branch->opCodes as $branchOp) {
             if ($this->opCodeReadsScopeSlot($branchOp, $slot)) {
                 return true;
@@ -841,9 +852,16 @@ class Block {
             if (
                 OpCode::TYPE_JUMP === $branchOp->type
                 && $branchOp->block1 instanceof self
+                && $this->branchOrJumpMergeReadsScopeSlot($branchOp->block1, $slot, $seen)
             ) {
-                foreach ($branchOp->block1->opCodes as $mergeOp) {
-                    if ($this->opCodeReadsScopeSlot($mergeOp, $slot)) {
+                return true;
+            }
+            if (OpCode::TYPE_JUMPIF === $branchOp->type) {
+                foreach ([$branchOp->block1, $branchOp->block2] as $target) {
+                    if (
+                        $target instanceof self
+                        && $this->branchOrJumpMergeReadsScopeSlot($target, $slot, $seen)
+                    ) {
                         return true;
                     }
                 }
