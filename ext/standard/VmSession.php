@@ -66,9 +66,9 @@ final class VmSession
 
     public static function setCacheExpire(int $minutes): void
     {
-        if ($minutes <= 0) {
+        if ($minutes < 0) {
             throw new \ValueError(
-                'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than 0'
+                'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than or equal to 0'
             );
         }
         self::$cacheExpire = $minutes;
