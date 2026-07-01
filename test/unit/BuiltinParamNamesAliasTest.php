@@ -439,4 +439,20 @@ final class BuiltinParamNamesAliasTest extends TestCase
             BuiltinParamNames::lookupNamedParamIndex($ctor, 'timezone', 'DateTimeImmutable::__construct')
         );
     }
+
+    /** @covers issue #10059 */
+    public function testArrayMultisortArraySpliceNamedParameters(): void
+    {
+        $multisort = BuiltinParamNames::forFunction('array_multisort');
+        self::assertSame(['array', 'rest'], $multisort);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($multisort, 'array', 'array_multisort'));
+        self::assertSame(1, BuiltinParamNames::variadicParamIndexForFunction('array_multisort'));
+
+        $splice = BuiltinParamNames::forFunction('array_splice');
+        self::assertSame(['array', 'offset', 'length', 'replacement'], $splice);
+        self::assertSame(0, BuiltinParamNames::lookupNamedParamIndex($splice, 'array', 'array_splice'));
+        self::assertSame(1, BuiltinParamNames::lookupNamedParamIndex($splice, 'offset', 'array_splice'));
+        self::assertSame(2, BuiltinParamNames::lookupNamedParamIndex($splice, 'length', 'array_splice'));
+        self::assertSame(3, BuiltinParamNames::lookupNamedParamIndex($splice, 'replacement', 'array_splice'));
+    }
 }
