@@ -203,7 +203,7 @@ final class VmPhpFdStream
                 $chunk = min(self::CHUNK, $remaining);
                 $n = (int) $ffi->read($state->fd, \FFI::addr($buf[0]), $chunk);
                 if ($n < 0) {
-                    if (!VmFs::handleBlocked($handle) && self::EAGAIN === \FFI::errno()) {
+                    if (!VmFs::handleBlocked($handle) && self::isWouldBlockErrno(self::readErrno())) {
                         return '';
                     }
 
@@ -613,6 +613,18 @@ final class VmPhpFdStream
         }
     }
 
+    private static function readErrno(): int
+    {
+        $ffi = self::ffi();
+
+        return null !== $ffi ? (int) $ffi->errno : (int) \FFI::errno();
+    }
+
+    private static function isWouldBlockErrno(int $errno): bool
+    {
+        return self::EAGAIN === $errno;
+    }
+
     private static function ffiEnabled(): bool
     {
         $v = getenv('PHP_COMPILER_DISABLE_FFI');
@@ -653,6 +665,7 @@ int flock(int fd, int operation);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, ...);
+extern int errno;
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
