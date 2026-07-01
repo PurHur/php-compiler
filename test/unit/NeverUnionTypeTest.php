@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #4970 #6967 #7414 */
+/** @covers issue #4970 #6967 #14334 */
 final class NeverUnionTypeTest extends TestCase
 {
     public function testNeverInUnionPropertyRejectedAtCompileTime(): void
@@ -24,7 +24,7 @@ PHP;
         $runtime->parseAndCompile($code, 'never_union_property.php');
     }
 
-    public function testNeverInUnionReturnTypeCompilesAndThrows(): void
+    public function testNeverInUnionReturnTypeRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -32,15 +32,10 @@ PHP;
 function f(): string|never {
     throw new Exception('x');
 }
-try {
-    f();
-} catch (Exception $e) {
-    echo $e->getMessage();
-}
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'never_union.php'));
-        $this->assertSame('x', ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_union.php');
     }
 
     public function testNeverInIntersectionReturnTypeRejectedAtCompileTime(): void

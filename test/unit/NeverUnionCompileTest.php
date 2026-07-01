@@ -8,9 +8,9 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Guard: php-types TypeReconstructor must compile int|never signatures (#7451, #7449, #7414).
+ * Guard: int|never signatures are compile-fatal per Zend (#14334).
  *
- * @covers issue #7451
+ * @covers issue #14334
  */
 final class NeverUnionCompileTest extends TestCase
 {
@@ -21,18 +21,16 @@ final class NeverUnionCompileTest extends TestCase
         self::$root = dirname(__DIR__, 2);
     }
 
-    public function testMaintainerNeverUnionReturnReproCompilesAndRuns(): void
+    public function testMaintainerNeverUnionGapReproRejectsAtCompileTime(): void
     {
-        $repro = self::$root.'/test/repro/maintainer_never_union_return.php';
+        $repro = self::$root.'/test/repro/maintainer_gap_never_union_type.php';
         self::assertFileIsReadable($repro);
 
-        $runtime = new Runtime();
-        ob_start();
-        $runtime->run($runtime->parseAndCompile((string) file_get_contents($repro), $repro));
-        $this->assertSame("ok:unreachable\ng:7\n", ob_get_clean());
+        exec('php '.escapeshellarg($repro).' 2>&1', $lines, $exitCode);
+        self::assertSame(0, $exitCode, implode("\n", $lines));
     }
 
-    public function testIntNeverReturnTypeCompilesWithoutUnionOpTypeFatal(): void
+    public function testIntNeverReturnTypeRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -41,15 +39,12 @@ function f(): int|never {
     throw new Exception('x');
 }
 PHP;
-        try {
-            $compiled = $runtime->parseAndCompile($code, 'int_never_return.php');
-        } catch (\LogicException $e) {
-            self::fail('TypeReconstructor must handle Op\\Type\\Union_: '.$e->getMessage());
-        }
-        self::assertNotNull($compiled);
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'int_never_return.php');
     }
 
-    public function testIntNeverParamTypeCompilesWithoutUnionOpTypeFatal(): void
+    public function testIntNeverParamTypeRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -57,10 +52,9 @@ PHP;
 function g(int|never $x): int {
     return $x;
 }
-echo g(3);
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'int_never_param.php'));
-        $this->assertSame('3', ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'int_never_param.php');
     }
 }
