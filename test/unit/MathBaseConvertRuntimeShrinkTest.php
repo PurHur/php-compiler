@@ -47,4 +47,16 @@ final class MathBaseConvertRuntimeShrinkTest extends TestCase
         $this->assertSame(0, $tag);
         $this->assertSame(255, MathBaseConvertJitHelper::lastLong());
     }
+
+    /** php-src ext/standard/math.c — hexdec/bindec overflow double (#10452). */
+    public function testBaseToZvalLargeOverflowMatchesZendVarExport(): void
+    {
+        $hex = VmMath::baseToZval('FFFFFFFFFFFFFFFF', 16);
+        $this->assertIsFloat($hex);
+        $this->assertSame('1.8446744073709552E+19', \var_export($hex, true));
+
+        $bin = VmMath::baseToZval(\str_repeat('1', 65), 2);
+        $this->assertIsFloat($bin);
+        $this->assertSame('3.6893488147419103E+19', \var_export($bin, true));
+    }
 }

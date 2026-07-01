@@ -921,20 +921,49 @@ final class VmMath
 
     /**
      * Parse a radix string as float when integer range is exhausted (php-src strtod overflow path).
+     *
+     * Chunked digit accumulation preserves IEEE mantissa for values > PHP_INT_MAX (#10452).
      */
     private static function baseToZvalFloat(string $str, int $start, int $end, int $base): float
     {
+        $chunkDigits = self::maxFloatParseChunkDigits($base);
         $fnum = 0.0;
-
-        for ($i = $start; $i < $end; ++$i) {
-            $digit = self::radixDigit($str[$i], $base);
-            if (null === $digit) {
+        $i = $start;
+        while ($i < $end) {
+            $chunk = 0;
+            $count = 0;
+            while ($i < $end && $count < $chunkDigits) {
+                $digit = self::radixDigit($str[$i], $base);
+                ++$i;
+                if (null === $digit) {
+                    continue;
+                }
+                $chunk = $chunk * $base + $digit;
+                ++$count;
+            }
+            if (0 === $count) {
                 continue;
             }
-            $fnum = $fnum * $base + $digit;
+            for ($k = 0; $k < $count; ++$k) {
+                $fnum *= $base;
+            }
+            $fnum += $chunk;
         }
 
         return $fnum;
+    }
+
+    /** Max digits per chunk so base^digits fits in signed int (#10452). */
+    private static function maxFloatParseChunkDigits(int $base): int
+    {
+        $digits = 1;
+        $power = $base;
+        while ($power <= intdiv(\PHP_INT_MAX, $base)) {
+            $power *= $base;
+            ++$digits;
+        }
+
+        return $digits;
     }
 
     private static function radixDigit(string $c, int $base): ?int
