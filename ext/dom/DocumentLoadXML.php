@@ -24,7 +24,7 @@ final class DocumentLoadXML extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::loadXML() requires VM context in this compiler build');
         }
-        $ok = VmDom::loadXML($frame->vmContext, $receiver, $xml);
+        $ok = VmDom::loadXML($frame->vmContext, $receiver, $xml, $frame);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($ok);
         }

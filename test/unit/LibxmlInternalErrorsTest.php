@@ -92,6 +92,32 @@ PHP;
         self::assertSame("1\ncode\nlevel\n0\n", ob_get_clean());
     }
 
+    public function test_internal_errors_buffer_malformed_xml_via_dom_loadxml(): void
+    {
+        VmLibxml::clearErrors();
+        VmLibxml::useInternalErrors(false);
+
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+libxml_use_internal_errors(true);
+libxml_clear_errors();
+$doc = new DOMDocument();
+$ok = $doc->loadXML('<root><unclosed');
+echo $ok ? "loaded\n" : "failed\n";
+$errors = libxml_get_errors();
+echo count($errors), "\n";
+$msg = $errors[0]->message;
+echo str_contains($msg, 'Premature end of data') ? "message\n" : "nomessage\n";
+libxml_clear_errors();
+echo count(libxml_get_errors()), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'libxml_dom_loadxml.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("failed\n1\nmessage\n0\n", ob_get_clean());
+    }
+
     public function test_no_runtime_c_growth_for_libxml(): void
     {
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/AOT/runtime/libxml.c');
