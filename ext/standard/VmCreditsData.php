@@ -18,6 +18,28 @@ final class VmCreditsData
         .'Dmitry Stogov, Felipe Pena, David Soria Parra, Stanislav Malyshev, Julien Pauli, '
         .'Stephen Zarkos, Anatol Belski, Remi Collet, Ferenc Kovacs';
 
+    /** php-src PHP_CREDITS_GROUP — PHP Group founders (ext/standard/credits.c). */
+    public const PHP_GROUP =
+        'Thies C. Arntzen, Stig Bakken, Shane Caraveo, Andi Gutmans, Rasmus Lerdorf, '
+        .'Sam Ruby, Sascha Schumann, Zeev Suraski, Jim Winstead, Andrei Zmievski';
+
+    /**
+     * php-src PHP Authors rows under CREDITS_GENERAL (ext/standard/credits.c).
+     *
+     * @var array<string, string>
+     */
+    public const PHP_AUTHORS = [
+        'Zend Scripting Language Engine' => 'Andi Gutmans, Zeev Suraski, Stanislav Malyshev, Marcus Boerger, Dmitry Stogov, Xinchen Hui, Nikita Popov',
+        'Extension Module API' => 'Andi Gutmans, Zeev Suraski, Andrei Zmievski',
+        'UNIX Build and Modularization' => 'Stig Bakken, Sascha Schumann, Jani Taskinen, Peter Kokot',
+        'Windows Support' => 'Shane Caraveo, Zeev Suraski, Wez Furlong, Pierre-Alain Joye, Anatol Belski, Kalle Sommer Nielsen',
+        'Server API (SAPI) Abstraction Layer' => 'Andi Gutmans, Shane Caraveo, Zeev Suraski',
+        'Streams Abstraction Layer' => 'Wez Furlong, Sara Golemon',
+        'PHP Data Objects Layer' => 'Wez Furlong, Marcus Boerger, Sterling Hughes, George Schlossnagle, Ilia Alshanetsky',
+        'Output Handler' => 'Zeev Suraski, Thies C. Arntzen, Marcus Boerger, Michael Wallner',
+        'Consistent 64 bit support' => 'Anthony Ferrara, Anatol Belski',
+    ];
+
     /**
      * php-src module author map (ext/standard/info.c credits_modules) — subset for bundled extensions.
      *

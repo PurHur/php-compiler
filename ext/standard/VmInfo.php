@@ -522,6 +522,9 @@ final class VmInfo
     private static function creditsSectionHtml(int $flags): string
     {
         $sections = '';
+        if (self::creditsFlagSelected($flags, self::CREDITS_GROUP)) {
+            $sections .= self::creditsGroupSectionHtml();
+        }
         if (self::creditsFlagSelected($flags, self::CREDITS_GENERAL)) {
             $sections .= self::creditsGeneralSectionHtml();
         }
@@ -547,12 +550,26 @@ final class VmInfo
         return $sections;
     }
 
+    private static function creditsGroupSectionHtml(): string
+    {
+        $html = '<table><tr class="h"><td colspan="2"><h2>PHP Group</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::PHP_GROUP.'</td></tr>';
+        $html .= '</table><br />';
+
+        return $html;
+    }
+
     private static function creditsGeneralSectionHtml(): string
     {
         $html = '<table><tr class="h"><td colspan="2"><h2>PHP Credits</h2></td></tr>';
         $html .= '<tr><td class="v" colspan="2">Language Design &amp; Concept<br />';
         $html .= 'Andi Gutmans, Rasmus Lerdorf, Zeev Suraski, Marcus Boerger</td></tr>';
-        $html .= '<tr><td class="v" colspan="2">PurHur/php-compiler — PHP-in-PHP compiler runtime</td></tr>';
+        $html .= '</table><br />';
+        $html .= '<table><tr class="h"><td colspan="2"><h2>PHP Authors</h2></td></tr>';
+        $html .= '<tr><td class="e">Contribution </td><td class="v">Authors </td></tr>';
+        foreach (VmCreditsData::PHP_AUTHORS as $contribution => $authors) {
+            $html .= '<tr><td class="e">'.$contribution.' </td><td class="v">'.$authors.' </td></tr>';
+        }
         $html .= '</table><br />';
 
         return $html;
