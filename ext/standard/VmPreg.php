@@ -58,9 +58,7 @@ final class VmPreg
     {
         $allowed = self::PREG_MATCH_ALLOWED_FLAGS;
         if (0 !== ($flags & ~$allowed)) {
-            throw new \LogicException(
-                'preg_match() flags must be a combination of PREG_OFFSET_CAPTURE and PREG_UNMATCHED_AS_NULL in this compiler build'
-            );
+            throw new \ValueError('preg_match(): Argument #4 ($flags) must be a PREG_* constant');
         }
     }
 
@@ -70,9 +68,7 @@ final class VmPreg
             | StdlibConstants::PREG_PATTERN_ORDER
             | StdlibConstants::PREG_SET_ORDER;
         if (0 !== ($flags & ~$allowed)) {
-            throw new \LogicException(
-                'preg_match_all() flags must be a combination of PREG_PATTERN_ORDER, PREG_SET_ORDER, PREG_OFFSET_CAPTURE, and PREG_UNMATCHED_AS_NULL in this compiler build'
-            );
+            throw new \ValueError('preg_match_all(): Argument #4 ($flags) must be a PREG_* constant');
         }
     }
 
