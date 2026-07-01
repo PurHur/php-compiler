@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for count(COUNT_RECURSIVE) via ArrayCountRecursiveJitHelper PHP (#13274).
  *
- * Standalone AOT keeps LLVM in {@see \PHPCompiler\ext\standard\JitArrayCountRecursive}.
+ * Standalone AOT compiles {@see ArrayCountRecursiveJitHelper} via JitVmHelperLink bridge (#14487); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::countRecursive()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::countRecursiveForCompiled()}
  * php-src: ext/standard/array.c — php_count_recursive
  */
@@ -33,8 +32,7 @@ final class ArrayCountRecursiveRuntime
 
     public static function countRecursive(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::countRecursive($context, $array);
         }
 
@@ -53,12 +51,13 @@ final class ArrayCountRecursiveRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_COUNT);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
