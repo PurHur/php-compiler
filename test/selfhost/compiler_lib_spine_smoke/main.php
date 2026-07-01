@@ -1169,6 +1169,7 @@ require_once __DIR__.'/../../../ext/standard/StripTagsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StripWhitespaceJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrptimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrrevJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/UrlencodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrtokJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrtotimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrtrArrayJitHelper.php';
