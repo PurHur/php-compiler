@@ -4,186 +4,159 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
-use PHPLLVM\Value;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __string__ucwords / __string__ucwords_ex (VmString::asciiUcwords / asciiUcwordsEx).
+ * JIT/AOT link for __string__ucwords / __string__ucwords_ex via UcwordsJitHelper PHP (#14717).
+ *
+ * Replaces ~189 LOC inline LLVM in StringUcwords.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmString}.
+ * php-src: ext/standard/string.c — php_ucwords() / php_ucwords_ex()
  */
 final class StringUcwords
 {
+    private const HELPER_PATH = '/ext/standard/UcwordsJitHelper.php';
+
+    private const UCWORDS_HELPER = 'PHPCompiler\\ext\\standard\\UcwordsJitHelper::ucwordsArgv';
+
+    private const UCWORDS_EX_HELPER = 'PHPCompiler\\ext\\standard\\UcwordsJitHelper::ucwordsExArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::UCWORDS_HELPER,
+        self::UCWORDS_EX_HELPER,
+    ];
+
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__string__ucwords',
+        '__string__ucwords_ex',
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__string__ucwords');
-        $entry = $fn->appendBasicBlock('ucwords_main');
-        $context->builder->positionAtEnd($entry);
+        $probe = $context->module->getNamedFunction('__string__ucwords');
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            self::registerLinkedRuntime($context);
 
-        $string = $fn->getParam(0);
-        $copy = $context->builder->call($context->lookupFunction('__string__separate'), $string);
-        self::transformInPlace($context, $copy);
-        $context->builder->returnValue($copy);
-        $context->builder->clearInsertionPosition();
-
-        $fnEx = $context->lookupFunction('__string__ucwords_ex');
-        $entryEx = $fnEx->appendBasicBlock('ucwords_ex_main');
-        $context->builder->positionAtEnd($entryEx);
-
-        $stringEx = $fnEx->getParam(0);
-        $separatorsEx = $fnEx->getParam(1);
-        $copyEx = $context->builder->call($context->lookupFunction('__string__separate'), $stringEx);
-        self::transformInPlace($context, $copyEx, $separatorsEx);
-        $context->builder->returnValue($copyEx);
-        $context->builder->clearInsertionPosition();
-    }
-
-    public static function transformInPlace(Context $context, Value $strPtr, ?Value $separatorsPtr = null): void
-    {
-        $map = $context->structFieldMap['__string__'];
-        $len = $context->builder->load(
-            $context->builder->structGep($strPtr, $map['length'])
-        );
-        $i64 = $context->getTypeFromString('int64');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $charPtr = $context->builder->structGep($strPtr, $map['value']);
-
-        $idxSlot = $context->builder->alloca($i64, 1, 'ucwords_idx');
-        $wordStartSlot = $context->builder->alloca($i64, 1, 'ucwords_word_start');
-        $foundSlot = null;
-        if (null !== $separatorsPtr) {
-            $foundSlot = $context->builder->alloca($context->getTypeFromString('int1'), 1, 'ucwords_sep_found');
+            return;
         }
-        $context->builder->store($zero, $idxSlot);
-        $context->builder->store($one, $wordStartSlot);
 
-        $done = BasicBlockHelper::append($context, 'ucwords_done');
-        $loopHead = BasicBlockHelper::append($context, 'ucwords_head');
-        $loopBody = BasicBlockHelper::append($context, 'ucwords_body');
-        $loopBodyTail = null !== $separatorsPtr
-            ? BasicBlockHelper::append($context, 'ucwords_body_tail')
-            : null;
-        $context->builder->branch($loopHead);
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
 
-        $context->builder->positionAtEnd($loopHead);
-        $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $len);
-        $context->builder->branchIf($atEnd, $done, $loopBody);
+        self::ensureJitHelperCompiled($context);
+        self::implementBridge($context, '__string__ucwords', self::UCWORDS_HELPER, 1);
+        self::implementBridge($context, '__string__ucwords_ex', self::UCWORDS_EX_HELPER, 2);
+        self::registerLinkedRuntime($context);
 
-        $context->builder->positionAtEnd($loopBody);
-        $i32 = $context->getTypeFromString('int32');
-        $atChar = $context->builder->gep($charPtr, $idx);
-        $ch = $context->builder->load($atChar);
-        $chI32 = $context->builder->zExt($ch, $i32);
-        $wordStartFlag = $context->builder->load($wordStartSlot);
-        $wordStart = $context->builder->icmp(Builder::INT_NE, $wordStartFlag, $zero);
-        $lowerMin = $i32->constInt(ord('a'), false);
-        $lowerMax = $i32->constInt(ord('z'), false);
-        $inLower = $context->builder->and(
-            $context->builder->icmp(Builder::INT_SGE, $chI32, $lowerMin),
-            $context->builder->icmp(Builder::INT_SLE, $chI32, $lowerMax)
-        );
-        $shouldUpper = $context->builder->and($wordStart, $inLower);
-        $upperCh = $context->builder->subNoSignedWrap($chI32, $i32->constInt(32, false));
-        $newCh = $context->builder->truncOrBitCast(
-            $context->builder->select($shouldUpper, $upperCh, $chI32),
-            $ch->typeOf()
-        );
-        $context->builder->store($newCh, $atChar);
-        if (null !== $separatorsPtr) {
-            $sepEntry = self::emitCharInStringCheck($context, $chI32, $separatorsPtr, $foundSlot, $loopBodyTail);
-            $context->builder->positionAtEnd($loopBody);
-            $context->builder->branch($sepEntry);
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
         } else {
-            $isSep = self::isWhitespaceByte($context, $chI32);
-            $context->builder->store($context->builder->zExt($isSep, $i64), $wordStartSlot);
-            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-            $context->builder->branch($loopHead);
+            $context->builder->clearInsertionPosition();
         }
-
-        if (null !== $loopBodyTail) {
-            $context->builder->positionAtEnd($loopBodyTail);
-            $isSep = $context->builder->load($foundSlot);
-            $context->builder->store($context->builder->zExt($isSep, $i64), $wordStartSlot);
-            $idx = $context->builder->load($idxSlot);
-            $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-            $context->builder->branch($loopHead);
-        }
-
-        $context->builder->positionAtEnd($done);
     }
 
-    private static function isWhitespaceByte(Context $context, Value $ch): Value
-    {
-        $i32 = $context->getTypeFromString('int32');
-        $checks = [];
-        foreach ([0x20, 0x09, 0x0A, 0x0D, 0x00, 0x0B] as $byte) {
-            $checks[] = $context->builder->icmp(
-                Builder::INT_EQ,
-                $ch,
-                $i32->constInt($byte, false)
-            );
-        }
-        $result = $checks[0];
-        for ($i = 1, $n = \count($checks); $i < $n; ++$i) {
-            $result = $context->builder->or($result, $checks[$i]);
-        }
-
-        return $result;
-    }
-
-    /**
-     * sep-check entry basic block (caller branches here from ucwords_body).
-     *
-     * @return mixed
-     */
-    private static function emitCharInStringCheck(
+    private static function implementBridge(
         Context $context,
-        Value $ch,
-        Value $strPtr,
-        Value $foundSlot,
-        $continueBlock
-    ) {
-        $map = $context->structFieldMap['__string__'];
-        $i64 = $context->getTypeFromString('int64');
-        $i32 = $context->getTypeFromString('int32');
-        $zero = $i64->constInt(0, false);
-        $one = $i64->constInt(1, false);
-        $sepLen = $context->builder->load(
-            $context->builder->structGep($strPtr, $map['length'])
-        );
-        $sepChars = $context->builder->structGep($strPtr, $map['value']);
+        string $abiName,
+        string $helperLogical,
+        int $paramCount
+    ): void {
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
 
-        $entry = BasicBlockHelper::append($context, 'ucwords_sep_entry');
-        $idxSlot = $context->builder->alloca($i64, 1, 'ucwords_sep_idx');
+            return;
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $params = array_fill(0, $paramCount, $strPtr);
+        $ft = $context->context->functionType($strPtr, false, ...$params);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('ucwords_bridge_entry');
         $context->builder->positionAtEnd($entry);
-        $context->builder->store($context->getTypeFromString('int1')->constInt(0, false), $foundSlot);
-        $context->builder->store($zero, $idxSlot);
+        $args = [];
+        for ($i = 0; $i < $paramCount; ++$i) {
+            $args[] = $fn->getParam($i);
+        }
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            ...$args
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+    }
 
-        $done = BasicBlockHelper::append($context, 'ucwords_sep_done');
-        $loopHead = BasicBlockHelper::append($context, 'ucwords_sep_head');
-        $loopBody = BasicBlockHelper::append($context, 'ucwords_sep_body');
-        $context->builder->branch($loopHead);
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after UcwordsJitHelper compile (#14717)');
+        }
 
-        $context->builder->positionAtEnd($loopHead);
-        $idx = $context->builder->load($idxSlot);
-        $atEnd = $context->builder->icmp(Builder::INT_SGE, $idx, $sepLen);
-        $context->builder->branchIf($atEnd, $done, $loopBody);
+        return $fn;
+    }
 
-        $context->builder->positionAtEnd($loopBody);
-        $atSepChar = $context->builder->gep($sepChars, $idx);
-        $sepCh = $context->builder->load($atSepChar);
-        $sepChI32 = $context->builder->zExt($sepCh, $i32);
-        $matches = $context->builder->icmp(Builder::INT_EQ, $ch, $sepChI32);
-        $found = $context->builder->load($foundSlot);
-        $context->builder->store($context->builder->or($found, $matches), $foundSlot);
-        $context->builder->store($context->builder->addNoSignedWrap($idx, $one), $idxSlot);
-        $context->builder->branch($loopHead);
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
 
-        $context->builder->positionAtEnd($done);
-        $context->builder->branch($continueBlock);
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'UcwordsJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('UcwordsJitHelper.php parseAndCompile failed (#14717)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                throw new \LogicException($logical.' was not compiled for JIT (#14717)');
+            }
+        }
+    }
 
-        return $entry;
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StringUcwords bridge (#14717)');
+            }
+            $context->registerFunction($name, $fn);
+        }
     }
 }

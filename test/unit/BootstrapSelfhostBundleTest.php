@@ -403,6 +403,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/substr.php',
         'ext/standard/substr_count.php',
         'ext/standard/ucfirst.php',
+        'ext/standard/UcwordsJitHelper.php',
         'ext/standard/ucwords.php',
         'ext/standard/urldecode.php',
         'ext/standard/urlencode.php',

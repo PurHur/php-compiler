@@ -2191,6 +2191,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/trigger_error_.php` | 0 | 1 |
 | `ext/standard/uasort_.php` | 0 | 4 |
 | `ext/standard/ucfirst.php` | 0 | 2 |
+| `ext/standard/UcwordsJitHelper.php` | 0 | 1 |
 | `ext/standard/ucwords.php` | 0 | 1 |
 | `ext/standard/uksort_.php` | 0 | 4 |
 | `ext/standard/umask_.php` | 0 | 1 |
@@ -17701,6 +17702,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 - 1 closure(s)
+
+### `ext/standard/UcwordsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/ucwords.php`
 
