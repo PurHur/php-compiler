@@ -9516,7 +9516,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitTempnam.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/JitTimezoneAbbreviationsList.php`
 
@@ -9753,7 +9753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/MktimeJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/Module.php`
 
@@ -11548,11 +11548,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 601)
 - new HashTable (line 605)
 - new Variable (line 609)
-- new HashTable (line 719)
-- new HashTable (line 759)
-- new Variable (line 1249)
-- new Variable (line 1256)
-- new Variable (line 1263)
+- new HashTable (line 743)
+- new HashTable (line 783)
+- new Variable (line 1273)
+- new Variable (line 1280)
+- new Variable (line 1287)
 - 67 class method(s)
 
 ### `ext/standard/VmDateInterval.php`
@@ -11908,7 +11908,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsTempnam.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `ext/standard/VmFsTempnamNative.php`
 
@@ -14017,7 +14017,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/checkdate.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 26)
+- new ArgumentCountError (line 25)
 - 2 class method(s)
 - 1 closure(s)
 
