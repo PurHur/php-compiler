@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3545 |
-| Phase A inventory files (M2 ratio SSOT) | 3545 |
+| PHP files on vm.php path | 3546 |
+| Phase A inventory files (M2 ratio SSOT) | 3546 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9657 |
+| Source constructs flagged (warnings) | 9658 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1398,6 +1398,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmZlib.php` | 0 | 1 |
 | `ext/standard/VmZlibArg.php` | 0 | 1 |
 | `ext/standard/VmZlibCore.php` | 0 | 1 |
+| `ext/standard/VmZlibLibzReference.php` | 0 | 1 |
 | `ext/standard/VmZlibStreamFilter.php` | 0 | 1 |
 | `ext/standard/WeakRefRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/ZendSort.php` | 0 | 1 |
@@ -13035,6 +13036,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 40 class method(s)
+
+### `ext/standard/VmZlibLibzReference.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/VmZlibStreamFilter.php`
 
