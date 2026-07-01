@@ -23,6 +23,7 @@ final class DomNodePropertySupport
         $lc = strtolower($name);
 
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
+            || strtolower(VmDom::PROP_NODE_NAME) === $lc
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
             || strtolower(VmDom::PROP_NODE_VALUE) === $lc
             || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc
@@ -40,6 +41,11 @@ final class DomNodePropertySupport
         $var->objectPropertyName = $lc;
         if (strtolower(VmDom::PROP_NODE_TYPE) === $lc) {
             $var->int(DomRegistry::state($object)->nodeType);
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_NODE_NAME) === $lc) {
+            $var->string(DomRegistry::state($object)->nodeName);
 
             return $var;
         }
