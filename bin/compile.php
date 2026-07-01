@@ -171,6 +171,9 @@ function run(string $filename, string $code, array $options): void
                 // bootstrap-aot-link: Runtime spine via self-host stubs; user FUNCDEF bodies stay real (#1492).
                 putenv('PHP_COMPILER_SELFHOST_AOT=1');
                 putenv('PHP_COMPILER_M3_COMPILE_DRIVER=1');
+                // Defer nested-JIT standalone bodies during inventory argv emit init (#14470).
+                putenv('PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1');
+                putenv('BOOTSTRAP_M3_USE_INVENTORY_EMIT_DRIVER=1');
             } else {
                 putenv('PHP_COMPILER_SELFHOST_AOT=0');
             }
