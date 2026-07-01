@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringLevenshtein;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitLongArg;
@@ -17,7 +18,7 @@ use PHPLLVM\Value;
 /**
  * levenshtein() — edit distance between two strings (subset of PHP; issue #2406).
  *
- * VM: {@see VmString::levenshtein()}; JIT/AOT: {@see JitLevenshtein}.
+ * VM: {@see VmString::levenshtein()}; JIT/AOT: {@see StringLevenshtein} → LevenshteinJitHelper PHP (#14648).
  */
 final class levenshtein extends Internal
 {
@@ -93,8 +94,10 @@ final class levenshtein extends Internal
             $del = self::jitCostArg($context, $args[4], 5, 'deletion_cost');
         }
 
-        return JitLevenshtein::invoke(
-            $context,
+        StringLevenshtein::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('phpc_levenshtein'),
             self::jitStringArg($context, $args[0], 1, 'string1'),
             self::jitStringArg($context, $args[1], 2, 'string2'),
             $ins,
