@@ -6826,9 +6826,19 @@ class JIT {
                     $argIdx = $thisParamOffset + $idx;
                     if ($param->variadic) {
                         $remaining = array_slice($args, $argIdx);
-                        $packed = [] === $remaining
-                            ? JIT\HashTableHelper::emptyVariable($this->context)
-                            : JIT\HashTableHelper::packVariables($this->context, $remaining);
+                        if (isset($block->paramByRef[$idx])) {
+                            $refRemaining = [];
+                            foreach ($remaining as $arg) {
+                                $refRemaining[] = JIT\ClosureHelper::referenceCapture($this->context, $arg);
+                            }
+                            $packed = [] === $refRemaining
+                                ? JIT\HashTableHelper::emptyVariable($this->context)
+                                : JIT\HashTableHelper::packVariables($this->context, $refRemaining);
+                        } else {
+                            $packed = [] === $remaining
+                                ? JIT\HashTableHelper::emptyVariable($this->context)
+                                : JIT\HashTableHelper::packVariables($this->context, $remaining);
+                        }
                         if (!$this->context->hasVariableOp($param->result)) {
                             $this->context->makeVariableFromOp($func, $basicBlock, $block, $param->result);
                         }
@@ -15137,6 +15147,9 @@ class JIT {
             return $args;
         }
         foreach ($call->paramByRefByArg as $idx => $_) {
+            if (null !== $call->variadicArgIndex && $idx === $call->variadicArgIndex) {
+                continue;
+            }
             if (!isset($args[$idx])) {
                 continue;
             }
@@ -15145,6 +15158,29 @@ class JIT {
                 continue;
             }
             $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+        }
+        if (
+            null !== $call->variadicArgIndex
+            && isset($call->paramByRefByArg[$call->variadicArgIndex])
+        ) {
+            $start = $call->variadicArgIndex;
+            $end = \count($args) - 1;
+            if (null !== $call->namedArgsVariadicIndex) {
+                $trailing = \count($call->paramNames) - $call->namedArgsVariadicIndex - 1;
+                if ($trailing > 0) {
+                    $end = \count($args) - $trailing - 1;
+                }
+            }
+            for ($idx = $start; $idx <= $end; ++$idx) {
+                if (!isset($args[$idx])) {
+                    continue;
+                }
+                $operand = $operands[$idx] ?? null;
+                if (null === $operand) {
+                    continue;
+                }
+                $args[$idx] = $this->ensureValueBoxLvalueForByRefPass($operand, $args[$idx]);
+            }
         }
 
         return $args;
