@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3626 |
-| Phase A inventory files (M2 ratio SSOT) | 3626 |
+| PHP files on vm.php path | 3627 |
+| Phase A inventory files (M2 ratio SSOT) | 3627 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9882 |
+| Source constructs flagged (warnings) | 9885 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -972,7 +972,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrtok.php` | 0 | 1 |
 | `ext/standard/JitStrtotime.php` | 0 | 1 |
 | `ext/standard/JitStrtr.php` | 0 | 1 |
-| `ext/standard/JitSubstrCount.php` | 0 | 1 |
 | `ext/standard/JitSubstrReplace.php` | 0 | 1 |
 | `ext/standard/JitSuperglobalName.php` | 0 | 1 |
 | `ext/standard/JitSymlink.php` | 0 | 1 |
@@ -1119,6 +1118,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StrtrArrayJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtrTwoStringJitHelper.php` | 0 | 1 |
 | `ext/standard/SubstrCompareJitHelper.php` | 0 | 1 |
+| `ext/standard/SubstrCountJitHelper.php` | 0 | 1 |
 | `ext/standard/SuperglobalNameJitHelper.php` | 0 | 1 |
 | `ext/standard/SuperglobalNames.php` | 0 | 1 |
 | `ext/standard/SysGetTempDirJitHelper.php` | 0 | 1 |
@@ -2778,6 +2778,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrtotime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtr.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSubstrCompare.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringSubstrCount.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSuperglobalName.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSysGetloadavg.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSyslog.php` | 0 | 3 |
@@ -9480,11 +9481,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
-### `ext/standard/JitSubstrCount.php`
-
-**Warnings** (review for bootstrap subset):
-- 4 class method(s)
-
 ### `ext/standard/JitSubstrReplace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11084,6 +11080,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/SubstrCompareJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/SubstrCountJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -21840,6 +21841,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringSubstrCount.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 166)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringSuperglobalName.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22758,19 +22766,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1120)
-- new Result (line 1141)
-- new Variable (line 1413)
-- new Variable (line 1733)
-- new Variable (line 1864)
-- new Variable (line 2050)
-- new VMVariable (line 2208)
-- new VMVariable (line 2224)
-- new VMVariable (line 2230)
-- new VMVariable (line 2236)
-- new VMVariable (line 2247)
-- new Variable (line 2277)
-- new Variable (line 2316)
+- new Result (line 1121)
+- new Result (line 1142)
+- new Variable (line 1414)
+- new Variable (line 1734)
+- new Variable (line 1865)
+- new Variable (line 2051)
+- new VMVariable (line 2209)
+- new VMVariable (line 2225)
+- new VMVariable (line 2231)
+- new VMVariable (line 2237)
+- new VMVariable (line 2248)
+- new Variable (line 2278)
+- new Variable (line 2317)
 - 98 class method(s)
 - 28 closure(s)
 
