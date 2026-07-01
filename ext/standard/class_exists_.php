@@ -28,7 +28,8 @@ final class class_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'class_exists', 0, 'class');
-        $exists = VmReflection::classExists($ctx, $name);
+        $autoload = VmReflection::autoloadFlagFromFrame($frame);
+        $exists = VmReflection::classExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
         }

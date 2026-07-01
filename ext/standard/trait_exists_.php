@@ -25,7 +25,8 @@ final class trait_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $name = VmReflection::stringArg($frame->calledArgs[0], 'trait_exists() trait name', 0);
-        $exists = VmReflection::traitExists($ctx, $name);
+        $autoload = VmReflection::autoloadFlagFromFrame($frame);
+        $exists = VmReflection::traitExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
         }
