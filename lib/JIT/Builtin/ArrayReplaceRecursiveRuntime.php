@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -17,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_replace_recursive() via ArrayReplaceRecursiveJitHelper PHP (#12638).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayReplaceRecursive()}.
+ * Standalone AOT compiles {@see ArrayReplaceRecursiveJitHelper} via nested JIT bridges (#14424); embed uses same PHP path.
  * SSOT: {@see \PHPCompiler\VM\HashTable::replaceRecursiveCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_recursive)
  */
@@ -40,10 +39,6 @@ final class ArrayReplaceRecursiveRuntime
         if (\count($args) < 1) {
             throw new \ArgumentCountError('array_replace_recursive() expects at least 1 argument, 0 given');
         }
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::arrayReplaceRecursive($context, $args[0], ...\array_slice($args, 1));
-        }
-
         self::ensureLinked($context);
 
         $count = \count($args);
@@ -66,12 +61,13 @@ final class ArrayReplaceRecursiveRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_replace_recursive__single');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
