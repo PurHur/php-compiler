@@ -39,6 +39,17 @@ final class BootstrapAotEchoCompileTest extends TestCase
             "bootstrap-aot echo_hello compile must not segfault (#14459)\n".\implode("\n", $output)
         );
         self::assertFileExists($out, 'compile.php must emit an AOT binary');
+
+        $runOut = [];
+        $runCode = 0;
+        \exec(\escapeshellarg($out).' 2>&1', $runOut, $runCode);
+        self::assertSame(0, $runCode, 'AOT binary must run without error');
+        self::assertStringContainsString(
+            'Hello Bootstrap',
+            \implode("\n", $runOut),
+            'bootstrap-aot echo must reach STDOUT via ObOutputUserScriptLlvm (#14459)'
+        );
+
         @\unlink($out);
     }
 }
