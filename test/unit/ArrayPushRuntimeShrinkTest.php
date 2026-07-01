@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_push() JIT routes through ArrayPushJitHelper PHP not ArrayBuiltinHelper LLVM (#12719). */
+/** array_push() JIT routes through ArrayPushJitHelper PHP not ArrayBuiltinHelper LLVM (#12719, #14303). */
 final class ArrayPushRuntimeShrinkTest extends TestCase
 {
     public function testArrayPushRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPushRuntime.php');
         $this->assertStringContainsString('ArrayPushJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::push', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_push.php');
         $this->assertStringContainsString('ArrayPushRuntime::push', $builtin);
