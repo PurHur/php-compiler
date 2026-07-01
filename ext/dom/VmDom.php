@@ -664,8 +664,20 @@ final class VmDom
         self::propagateDocumentId($root, $document->id);
         self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
+        $state->documentUri = self::defaultDocumentUri();
 
         return true;
+    }
+
+    /** Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468). */
+    private static function defaultDocumentUri(): string
+    {
+        $cwd = getcwd();
+        if (false === $cwd || '' === $cwd) {
+            return '/';
+        }
+
+        return str_ends_with($cwd, '/') ? $cwd : $cwd.'/';
     }
 
     public static function getElementById(ObjectEntry $document, string $elementId): ?ObjectEntry
