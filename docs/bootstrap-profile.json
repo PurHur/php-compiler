@@ -599,7 +599,7 @@
         "ext/standard/JitAttributeExists.php",
         "ext/standard/JitBase64Decode.php",
         "ext/standard/JitBase64Encode.php",
-        "ext/standard/JitBin2hex.php",
+        "ext/standard/Bin2hexJitHelper.php",
         "ext/standard/JitBuiltinWarning.php",
         "ext/standard/JitCallUserFunc.php",
         "ext/standard/JitChdir.php",

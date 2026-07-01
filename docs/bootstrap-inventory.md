@@ -461,6 +461,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayUnshiftJitHelper.php` | 0 | 3 |
 | `ext/standard/ArrayValuesJitHelper.php` | 0 | 1 |
 | `ext/standard/AssertOptionsJitHelper.php` | 0 | 1 |
+| `ext/standard/Bin2hexJitHelper.php` | 0 | 1 |
 | `ext/standard/AttributeRegistryArgsJitHelper.php` | 0 | 6 |
 | `ext/standard/AttributeRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/BuiltinAttributes.php` | 0 | 22 |
@@ -566,7 +567,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitAttributeExists.php` | 0 | 1 |
 | `ext/standard/JitBase64Decode.php` | 0 | 1 |
 | `ext/standard/JitBase64Encode.php` | 0 | 1 |
-| `ext/standard/JitBin2hex.php` | 0 | 1 |
 | `ext/standard/JitBuiltinWarning.php` | 0 | 1 |
 | `ext/standard/JitCallUserFunc.php` | 0 | 7 |
 | `ext/standard/JitChdir.php` | 0 | 1 |
@@ -2665,6 +2665,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSync.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
@@ -6726,6 +6727,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 20 class method(s)
 
+### `ext/standard/Bin2hexJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/AttributeRegistryArgsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7318,11 +7324,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/JitBase64Encode.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/standard/JitBin2hex.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -21132,6 +21133,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/StringBin2hex.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 118)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringBitwiseNot.php`
 

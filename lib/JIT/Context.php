@@ -929,6 +929,7 @@ class Context {
                 Builtin\StringSoundex::ensureStandaloneBodies($this);
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
+                Builtin\StringBin2hex::ensureStandaloneBodies($this);
                 Builtin\StringStrrev::ensureStandaloneBodies($this);
                 Builtin\StringStrRepeat::ensureStandaloneBodies($this);
                 Builtin\StringStripTags::ensureStandaloneBodies($this);
