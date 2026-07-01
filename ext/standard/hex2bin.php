@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringHex2bin;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -17,7 +18,7 @@ use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** hex2bin() for strings (subset of PHP; JIT/AOT via native LLVM lowering). */
+/** hex2bin() for strings (subset of PHP; JIT/AOT via Hex2binJitHelper PHP). */
 final class hex2bin extends Internal
 {
     private const MSG_ODD_LENGTH = 'hex2bin(): Hexadecimal input string must have an even length';
@@ -112,16 +113,23 @@ final class hex2bin extends Internal
 
             return JitValueBox::pointer($context, $slot);
         }
-        $strict = null;
+        $strictI8 = null;
         if (2 === $argc) {
-            $strict = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
+            $strictI8 = $this->jitBool($context, $args[1], 'hex2bin() argument #2 ($strict)');
+        } else {
+            $strictI8 = $context->getTypeFromString('int8')->constInt(0, false);
         }
 
-        return JitHex2bin::convert(
-            $context,
+        StringHex2bin::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        $outPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_hex2bin'),
             JitStringBuiltinArg::lower($context, $args[0], 'hex2bin', 0, 'string'),
-            $strict
+            $strictI8,
+            $outPtr
         );
-    }
 
+        return $outPtr;
+    }
 }
