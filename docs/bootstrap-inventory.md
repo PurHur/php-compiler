@@ -912,7 +912,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrIreplace.php` | 0 | 1 |
 | `ext/standard/JitStrIreplaceMulti.php` | 0 | 1 |
 | `ext/standard/JitStrPad.php` | 0 | 1 |
-| `ext/standard/JitStrRepeat.php` | 0 | 1 |
 | `ext/standard/JitStrReplace.php` | 0 | 1 |
 | `ext/standard/JitStrReplaceArray.php` | 0 | 1 |
 | `ext/standard/JitStrReplaceMulti.php` | 0 | 1 |
@@ -1106,6 +1105,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
+| `ext/standard/StrRepeatJitHelper.php` | 0 | 1 |
 | `ext/standard/StrrevJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtotimeJitHelper.php` | 0 | 1 |
@@ -2752,6 +2752,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrRepeat.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
@@ -9136,11 +9137,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
 
-### `ext/standard/JitStrRepeat.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
 ### `ext/standard/JitStrReplace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10977,6 +10973,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/StrptimeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/StrRepeatJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -21635,6 +21636,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 157)
 - 6 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/StringStrRepeat.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 118)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringStrrev.php`
