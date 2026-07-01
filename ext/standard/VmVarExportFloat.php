@@ -22,9 +22,15 @@ final class VmVarExportFloat
         if (\is_infinite($f)) {
             return $f < 0 ? '-INF' : 'INF';
         }
-        $s = VmFloatDtoa::formatH($f);
+        $precision = VmIni::parseSerializePrecision(VmIni::getSerializePrecision());
+        // php-src smart_str_append_double: zend_gcvt with serialize_precision; -1 → NDIGIT sig digits (#14707).
+        $ndigit = $precision > 0 ? $precision : 17;
+        $s = VmSerializeFormat::formatDoubleWithPrecision($f, $ndigit);
         if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
+        }
+        if (false === \strpos($s, '.') && \preg_match('/^(-?\d+)E([+-]?\d+)$/', $s, $m)) {
+            return $m[1].'.0E'.$m[2];
         }
 
         return $s;
