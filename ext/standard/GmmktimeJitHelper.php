@@ -30,7 +30,14 @@ final class GmmktimeJitHelper
         if (0 !== $useCurrentUtc) {
             $result = VmDate::gmmktime($hour);
         } else {
-            $result = VmDate::gmmktime($hour, $minute, $second, $month, $day, $year);
+            $result = VmDate::gmmktime(
+                $hour,
+                MktimeJitHelper::decodeOptionalArgForGmmktime($minute),
+                MktimeJitHelper::decodeOptionalArgForGmmktime($second),
+                MktimeJitHelper::decodeOptionalArgForGmmktime($month),
+                MktimeJitHelper::decodeOptionalArgForGmmktime($day),
+                MktimeJitHelper::decodeOptionalArgForGmmktime($year),
+            );
         }
         if (false === $result) {
             return self::TAG_FALSE;

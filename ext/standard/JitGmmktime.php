@@ -64,8 +64,8 @@ final class JitGmmktime
         bool $passed
     ): Value {
         $i64 = $context->getTypeFromString('int64');
-        if (!$passed || null === $arg) {
-            return $i64->constInt(0, false);
+        if (!$passed || null === $arg || self::isNullJitArg($arg)) {
+            return $i64->constInt(MktimeJitHelper::ARG_NULL, false);
         }
         if (JITVariable::TYPE_NATIVE_LONG === $arg->type) {
             return $context->helper->loadValue($arg);
