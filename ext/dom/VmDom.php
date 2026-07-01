@@ -112,6 +112,8 @@ final class VmDom
         $node->methodVisibility['issamenode'] = $pub;
         $node->methods['haschildnodes'] = new NodeHasChildNodes();
         $node->methodVisibility['haschildnodes'] = $pub;
+        $node->methods['contains'] = new NodeContains();
+        $node->methodVisibility['contains'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -1111,6 +1113,33 @@ final class VmDom
         }
 
         return [] !== DomRegistry::state($node)->childIds;
+    }
+
+    public static function contains(ObjectEntry $node, ?ObjectEntry $other): bool
+    {
+        if (null === $other) {
+            return false;
+        }
+        if ($node->id === $other->id) {
+            return true;
+        }
+        if (!DomRegistry::has($node) || !DomRegistry::has($other)) {
+            return false;
+        }
+        $current = $other;
+        while (null !== DomRegistry::state($current)->parentId) {
+            $parentId = DomRegistry::state($current)->parentId;
+            $parent = DomRegistry::entry($parentId);
+            if (null === $parent) {
+                return false;
+            }
+            if ($parent->id === $node->id) {
+                return true;
+            }
+            $current = $parent;
+        }
+
+        return false;
     }
 
     public static function ownerDocumentEntry(ObjectEntry $node): ?ObjectEntry
