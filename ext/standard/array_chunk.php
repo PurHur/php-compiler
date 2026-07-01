@@ -23,8 +23,17 @@ final class array_chunk extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_chunk() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_chunk() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_chunk', 1, 'array');
         $chunkSize = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_chunk', 2, 'length');
@@ -45,8 +54,17 @@ final class array_chunk extends Internal
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if ($argc < 2 || $argc > 3) {
-            throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
+        if ($argc < 2) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_chunk() expects at least 2 arguments, %d given',
+                $argc
+            ));
+        }
+        if ($argc > 3) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_chunk() expects at most 3 arguments, %d given',
+                $argc
+            ));
         }
         JitArrayElem::requireArrayParam($context, $args[0], 'array_chunk', 1, 'array');
         JitInternalStrictArg::requireInt($context, $args[1], 'array_chunk', 'length', 2);
