@@ -603,7 +603,7 @@ final class VmInfo
     {
         $html = '<table><tr class="h"><td colspan="2"><h2>Module Authors</h2></td></tr>';
         $html .= '<tr><td class="e">Module </td><td class="v">Authors </td></tr>';
-        foreach (VmCreditsData::moduleAuthorsForLoadedExtensions() as $module => $authors) {
+        foreach (VmCreditsData::allModuleAuthors() as $module => $authors) {
             $html .= '<tr><td class="e">'.$module.' </td><td class="v">'.$authors.' </td></tr>';
         }
         $html .= '</table><br />';
