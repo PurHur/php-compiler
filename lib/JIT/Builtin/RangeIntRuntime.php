@@ -4,16 +4,14 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value;
 
 /**
  * JIT/AOT link for range() int lowering via RangeIntJitHelper PHP (#13502).
  *
- * Standalone AOT keeps LLVM in {@see HashTableHelper::buildIntegerRange()}.
+ * Standalone AOT compiles {@see RangeIntJitHelper} via JitVmHelperLink (#14298).
  * SSOT: {@see \PHPCompiler\ext\standard\VmRange::intRangeTable()}
  * php-src: ext/standard/array.c — php_range()
  */
@@ -32,10 +30,6 @@ final class RangeIntRuntime
 
     public static function intRange(Context $context, Value $start, Value $end, Value $step): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return HashTableHelper::buildIntegerRange($context, $start, $end, $step);
-        }
-
         self::ensureLinked($context);
 
         return $context->builder->call(
@@ -51,12 +45,13 @@ final class RangeIntRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_RANGE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
