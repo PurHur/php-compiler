@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_combine() via ArrayCombineJitHelper PHP (#12502).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::combine()}.
+ * Standalone AOT compiles {@see ArrayCombineJitHelper} via JitVmHelperLink bridge (#14437); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::combine()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::combine()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_combine)
  */
@@ -33,8 +32,7 @@ final class ArrayCombineRuntime
 
     public static function combine(Context $context, JITVariable $keys, JITVariable $values): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($keys->type)
+        if (ArrayBuiltinHelper::isNativeArray($keys->type)
             || ArrayBuiltinHelper::isNativeArray($values->type)) {
             return ArrayBuiltinHelper::combine($context, $keys, $values);
         }
@@ -55,12 +53,13 @@ final class ArrayCombineRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_COMBINE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

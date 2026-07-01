@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_combine() JIT routes through ArrayCombineJitHelper PHP not ArrayBuiltinHelper LLVM (#12502). */
+/** array_combine() JIT routes through ArrayCombineJitHelper PHP not ArrayBuiltinHelper LLVM (#12502, #14437). */
 final class ArrayCombineRuntimeShrinkTest extends TestCase
 {
     public function testArrayCombineRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCombineRuntime.php');
         $this->assertStringContainsString('ArrayCombineJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::combine', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_combine.php');
         $this->assertStringContainsString('ArrayCombineRuntime::combine', $builtin);
