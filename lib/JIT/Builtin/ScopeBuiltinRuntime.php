@@ -8,6 +8,7 @@ use PHPCompiler\JIT;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\NestedJitCompileScope;
 use PHPCompiler\JIT\Variable;
 use PHPCompiler\VM\ErrorReporter;
@@ -16,7 +17,7 @@ use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for compact() warnings via ScopeBuiltinJitHelper PHP (#10184).
+ * JIT/AOT link for compact() warnings + extract() EXTR_* name resolution (#10184, #14499).
  *
  * Replaces libc snprintf warning formatting in {@see ScopeBuiltinEmitHelper}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmScope}
@@ -31,15 +32,81 @@ final class ScopeBuiltinRuntime
 
     private const COMPACT_INVALID_ARG_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::emitCompactInvalidArgumentWarning';
 
+    private const RESOLVE_EXTRACT_TARGET_HELPER = 'PHPCompiler\\ext\\standard\\ScopeBuiltinJitHelper::resolveExtractTargetName';
+
+    private const ABI_RESOLVE_EXTRACT_TARGET = '__scope_extract_resolve_target';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::COMPACT_UNDEF_HELPER,
         self::COMPACT_INVALID_ARG_HELPER,
+        self::RESOLVE_EXTRACT_TARGET_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
     {
         self::ensureJitHelperCompiled($context);
+        self::ensureExtractResolveLinked($context);
+    }
+
+    public static function resolveExtractTargetName(
+        Context $context,
+        Value $keyStr,
+        Value $varExists,
+        Value $extractType,
+        Value $prefixStr
+    ): Value {
+        self::ensureExtractResolveLinked($context);
+        $i64 = $context->getTypeFromString('int64');
+        $varExistsI64 = $context->builder->zext($varExists, $i64);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_RESOLVE_EXTRACT_TARGET),
+            $keyStr,
+            $varExistsI64,
+            $extractType,
+            $prefixStr
+        );
+    }
+
+    public static function ensureExtractResolveLinked(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_RESOLVE_EXTRACT_TARGET);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_RESOLVE_EXTRACT_TARGET, $probe);
+
+            return;
+        }
+
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i64 = $context->getTypeFromString('int64');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_RESOLVE_EXTRACT_TARGET,
+            'scope_extract_resolve_target_entry',
+            [$strPtr, $i64, $i64, $strPtr],
+            $strPtr,
+            self::RESOLVE_EXTRACT_TARGET_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14499'
+        );
+        $context->registerFunction(
+            self::ABI_RESOLVE_EXTRACT_TARGET,
+            $context->module->getNamedFunction(self::ABI_RESOLVE_EXTRACT_TARGET)
+        );
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     public static function emitCompactUndefinedVariableWarning(Context $context, string $name): void

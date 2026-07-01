@@ -181,7 +181,7 @@ final class VmScope
     /** php-src: php_prefix_varname — prefix and key joined by underscore. */
     public static function prefixVarName(string $prefix, string $key): string
     {
-        return $prefix.'_'.$key;
+        return ScopeBuiltinJitHelper::prefixVarName($prefix, $key);
     }
 
     /**
@@ -193,53 +193,7 @@ final class VmScope
         int $extractType,
         ?string $prefix,
     ): ?string {
-        $finalName = null;
-
-        switch ($extractType) {
-            case self::EXTR_IF_EXISTS:
-                if (!$varExists) {
-                    return null;
-                }
-                // no break — fall through to EXTR_OVERWRITE
-
-            case self::EXTR_OVERWRITE:
-                return $key;
-
-            case self::EXTR_PREFIX_IF_EXISTS:
-                if ($varExists) {
-                    return self::prefixVarName($prefix ?? '', $key);
-                }
-
-                return null;
-
-            case self::EXTR_PREFIX_SAME:
-                if (!$varExists) {
-                    $finalName = $key;
-                }
-                // no break — fall through to EXTR_PREFIX_ALL
-
-            case self::EXTR_PREFIX_ALL:
-                if (null === $finalName) {
-                    return self::prefixVarName($prefix ?? '', $key);
-                }
-
-                return $finalName;
-
-            case self::EXTR_PREFIX_INVALID:
-                if (!self::isValidVarName($key)) {
-                    return self::prefixVarName($prefix ?? '', $key);
-                }
-
-                return $key;
-
-            case self::EXTR_SKIP:
-            default:
-                if (!$varExists) {
-                    return $key;
-                }
-
-                return null;
-        }
+        return ScopeBuiltinJitHelper::resolveExtractFinalName($key, $varExists, $extractType, $prefix);
     }
 
     private static function callerNameExists(Frame $caller, string $name): bool
@@ -262,11 +216,7 @@ final class VmScope
 
     private static function isValidVarName(string $name): bool
     {
-        if ('' === $name) {
-            return false;
-        }
-
-        return 1 === \preg_match('/^[a-zA-Z_][a-zA-Z0-9_]*$/', $name);
+        return ScopeBuiltinJitHelper::isValidVarName($name);
     }
 
     private static function extractWarning(Frame $frame, string $message): void

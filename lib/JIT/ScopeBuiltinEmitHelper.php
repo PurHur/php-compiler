@@ -28,7 +28,7 @@ final class ScopeBuiltinEmitHelper
         array $named,
         Value $flags,
         ?Value $countSlot,
-        ?Variable $prefixArg = null,
+        Value $prefixStr,
     ): void {
         $map = $context->structFieldMap['__hashtable__'];
         $nodeMap = $context->structFieldMap['__strkey_node__'];
@@ -51,7 +51,7 @@ final class ScopeBuiltinEmitHelper
         $context->builder->positionAtEnd($strBody);
         $keyStr = $context->builder->load($context->builder->structGep($node, $nodeMap['key']));
         $valEntry = $context->builder->structGep($node, $nodeMap['value']);
-        self::importKeyIntoScope($context, $keyStr, $valEntry, $named, $flags, $countSlot);
+        self::importExtractKey($context, $keyStr, $valEntry, $named, $flags, $prefixStr, $countSlot);
         $context->builder->branch($strNext);
 
         $context->builder->positionAtEnd($strNext);
@@ -65,28 +65,102 @@ final class ScopeBuiltinEmitHelper
     /**
      * @param array<string, Variable> $named
      */
-    private static function importKeyIntoScope(
+    private static function importExtractKey(
         Context $context,
         Value $keyStr,
         Value $valEntry,
         array $named,
         Value $flags,
+        Value $prefixStr,
         ?Value $countSlot
     ): void {
         if ([] === $named) {
             return;
         }
 
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $ffMask = $i64->constInt(0xFF, false);
+        $extractType = $context->builder->and($flags, $ffMask);
+
+        $varExists = self::compileKeyVarExists($context, $keyStr, $named);
+        $targetStr = ScopeBuiltinRuntime::resolveExtractTargetName(
+            $context,
+            $keyStr,
+            $varExists,
+            $extractType,
+            $prefixStr
+        );
+
+        $tag = 'e'.(string) ++self::$blockSeq;
+        $emptyDone = BasicBlockHelper::append($context, 'extract_target_empty_'.$tag);
+        $nonEmpty = BasicBlockHelper::append($context, 'extract_target_nonempty_'.$tag);
+        $firstChar = $context->builder->load(self::stringDataPtr($context, $targetStr));
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $firstChar, $i8->constInt(0, false));
+        $context->builder->branchIf($isEmpty, $emptyDone, $nonEmpty);
+
         $names = array_keys($named);
         $n = \count($names);
-        $tag = 'e'.(string) ++self::$blockSeq;
-        $done = BasicBlockHelper::append($context, 'extract_import_done_'.$tag);
+        $missDone = BasicBlockHelper::append($context, 'extract_target_miss_'.$tag);
+        $checkBlocks = [];
+        for ($i = 0; $i < $n; ++$i) {
+            $checkBlocks[$i] = 0 === $i
+                ? $nonEmpty
+                : BasicBlockHelper::append($context, 'extract_target_check_'.$tag.'_'.$i);
+        }
+
+        $merge = BasicBlockHelper::append($context, 'extract_import_done_'.$tag);
+        foreach ($names as $i => $name) {
+            $dest = $named[$name];
+            $context->builder->positionAtEnd($checkBlocks[$i]);
+            $nameGlobal = $context->builder->load($context->constantStringFromString($name));
+            $cmp = $context->builder->call(
+                $context->lookupFunction('strcmp'),
+                self::stringDataPtr($context, $targetStr),
+                self::stringDataPtr($context, $nameGlobal)
+            );
+            $i32 = $context->getTypeFromString('int32');
+            $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
+            $onMatch = BasicBlockHelper::append($context, 'extract_on_match_'.$tag.'_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $missDone;
+            $context->builder->branchIf($isMatch, $onMatch, $onMiss);
+
+            $context->builder->positionAtEnd($onMatch);
+            self::maybeAssignExtract($context, $dest, $valEntry, $flags, $countSlot, $merge);
+        }
+
+        $context->builder->positionAtEnd($missDone);
+        $context->builder->branch($emptyDone);
+
+        $context->builder->positionAtEnd($emptyDone);
+    }
+
+    /**
+     * @param array<string, Variable> $named
+     */
+    private static function compileKeyVarExists(
+        Context $context,
+        Value $keyStr,
+        array $named
+    ): Value {
+        $names = array_keys($named);
+        $n = \count($names);
+        if (0 === $n) {
+            return $context->getTypeFromString('int1')->constInt(0, false);
+        }
+
+        $tag = 've'.(string) ++self::$blockSeq;
+        $falseDone = BasicBlockHelper::append($context, 'extract_key_exists_false_'.$tag);
         $checkBlocks = [];
         for ($i = 0; $i < $n; ++$i) {
             $checkBlocks[$i] = 0 === $i
                 ? $context->builder->getInsertBlock()
-                : BasicBlockHelper::append($context, 'extract_import_check_'.$tag.'_'.$i);
+                : BasicBlockHelper::append($context, 'extract_key_exists_check_'.$tag.'_'.$i);
         }
+
+        $trueBlock = BasicBlockHelper::append($context, 'extract_key_exists_true_'.$tag);
+        $phiBlock = BasicBlockHelper::append($context, 'extract_key_exists_phi_'.$tag);
+        $i1 = $context->getTypeFromString('int1');
 
         foreach ($names as $i => $name) {
             $dest = $named[$name];
@@ -99,15 +173,27 @@ final class ScopeBuiltinEmitHelper
             );
             $i32 = $context->getTypeFromString('int32');
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $onMatch = BasicBlockHelper::append($context, 'extract_on_match_'.$tag.'_'.$i);
-            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $done;
+            $onMatch = BasicBlockHelper::append($context, 'extract_key_exists_match_'.$tag.'_'.$i);
+            $onMiss = ($i < $n - 1) ? $checkBlocks[$i + 1] : $falseDone;
             $context->builder->branchIf($isMatch, $onMatch, $onMiss);
 
             $context->builder->positionAtEnd($onMatch);
-            self::maybeAssignExtract($context, $dest, $valEntry, $flags, $countSlot, $done);
+            $isSet = IssetHelper::compile($context, $dest, null);
+            $context->builder->branchIf($isSet, $trueBlock, $falseDone);
         }
 
-        $context->builder->positionAtEnd($done);
+        $context->builder->positionAtEnd($falseDone);
+        $context->builder->branch($phiBlock);
+
+        $context->builder->positionAtEnd($trueBlock);
+        $context->builder->branch($phiBlock);
+
+        $context->builder->positionAtEnd($phiBlock);
+        $phi = $context->builder->phi($i1);
+        $phi->addIncoming($i1->constInt(0, false), $falseDone);
+        $phi->addIncoming($i1->constInt(1, false), $trueBlock);
+
+        return $phi;
     }
 
     private static function maybeAssignExtract(
