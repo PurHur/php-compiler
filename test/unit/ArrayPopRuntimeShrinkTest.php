@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_pop() JIT routes through ArrayPopJitHelper PHP not ArrayBuiltinHelper LLVM (#12647). */
+/** array_pop() JIT routes through ArrayPopJitHelper PHP not ArrayBuiltinHelper LLVM (#12647, #14317). */
 final class ArrayPopRuntimeShrinkTest extends TestCase
 {
     public function testArrayPopRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayPopRuntime.php');
         $this->assertStringContainsString('ArrayPopJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::popLast', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_pop.php');
         $this->assertStringContainsString('ArrayPopRuntime::pop', $builtin);
