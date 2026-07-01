@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -44,6 +45,10 @@ final class class_uses_ extends Internal
         }
         $entry = VmReflection::resolveClassForClassUses($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
+            $operand = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_STRING === $operand->type) {
+                VmReflection::warnClassOperandNotFound($frame, 'class_uses', $operand->toString(), $autoload);
+            }
             $frame->returnVar->bool(false);
 
             return;

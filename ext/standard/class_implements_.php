@@ -44,6 +44,10 @@ final class class_implements_ extends Internal
         }
         $entry = VmReflection::resolveClassForClassImplements($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
+            $operand = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_STRING === $operand->type) {
+                VmReflection::warnClassOperandNotFound($frame, 'class_implements', $operand->toString(), $autoload);
+            }
             $frame->returnVar->bool(false);
 
             return;
