@@ -56,6 +56,10 @@ final class class_parents_ extends Internal
         }
         $entry = VmReflection::resolveClassForClassImplements($ctx, $frame->calledArgs[0], $autoload);
         if (null === $entry) {
+            $operand = $frame->calledArgs[0]->resolveIndirect();
+            if (Variable::TYPE_STRING === $operand->type) {
+                VmReflection::warnClassOperandNotFound($frame, 'class_parents', $operand->toString(), $autoload);
+            }
             $frame->returnVar->bool(false);
 
             return;

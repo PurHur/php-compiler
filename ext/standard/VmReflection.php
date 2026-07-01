@@ -16,6 +16,7 @@ use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\EnumSupport;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\LazyGhostTraitSupport;
@@ -967,6 +968,30 @@ final class VmReflection
         $ctx->autoloadClass($className);
 
         return $ctx->classes[$lc] ?? null;
+    }
+
+    /**
+     * php-src basic_functions.c / class.c — warn when class-string operand cannot be resolved (#14764).
+     */
+    public static function warnClassOperandNotFound(
+        Frame $frame,
+        string $function,
+        string $className,
+        bool $autoload
+    ): void {
+        if (null === $frame->vmContext) {
+            return;
+        }
+        $message = $autoload
+            ? \sprintf('%s(): Class %s does not exist and could not be loaded', $function, $className)
+            : \sprintf('%s(): Class %s does not exist', $function, $className);
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 
     /**
