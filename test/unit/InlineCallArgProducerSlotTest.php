@@ -4023,4 +4023,29 @@ PHP;
         self::assertStringContainsString("'c' => 3", $out);
         self::assertStringNotContainsString('NULL', $out);
     }
+
+    /** Issue #14555 — chained dim-fetch / inline method-call feed sole dead call-arg temp. */
+    public function testSingleDeadCallArgUsesImmediateHoistedProducerNotDistantPrelude(): void
+    {
+        $code = <<<'PHP'
+<?php
+function inner(): void {
+    $f = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS, 2);
+    echo is_string($f[0]['function']) ? "bt_ok\n" : "bt_bad\n";
+}
+inner();
+$ao = new ArrayObject(['a' => 1]);
+echo is_array($ao->getArrayCopy()) ? "ao_ok\n" : "ao_bad\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'inline_call_arg_chained_dim_fetch.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('bt_ok', $out);
+        self::assertStringContainsString('ao_ok', $out);
+        self::assertStringNotContainsString('bt_bad', $out);
+        self::assertStringNotContainsString('ao_bad', $out);
+    }
 }
