@@ -26,10 +26,7 @@ final class array_chunk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_chunk() first argument must be an array in this compiler build');
-        }
+        $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_chunk', 1, 'array');
         $chunkSize = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_chunk', 2, 'length');
         if ($chunkSize <= 0) {
             throw new \ValueError('array_chunk(): Argument #2 ($length) must be greater than 0');
@@ -38,7 +35,7 @@ final class array_chunk extends Internal
         if (3 === $argc) {
             $preserveKeys = $frame->calledArgs[2]->resolveIndirect()->toBool();
         }
-        $result = $array->toArray()->chunkCopy($chunkSize, $preserveKeys);
+        $result = $array->chunkCopy($chunkSize, $preserveKeys);
         if (null === $frame->returnVar) {
             return;
         }
@@ -51,6 +48,7 @@ final class array_chunk extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_chunk() requires two or three arguments in this compiler build');
         }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_chunk', 1, 'array');
         JitInternalStrictArg::requireInt($context, $args[1], 'array_chunk', 'length', 2);
         $size = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'array_chunk', 2, 'length');
         JitArrayChunk::emitRuntimeLengthGuard($context, $size);

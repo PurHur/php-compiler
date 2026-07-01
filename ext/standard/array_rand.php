@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
+use PHPCompiler\VM\HashTable;
 use PHPLLVM\Value;
 
 /**
@@ -30,15 +30,12 @@ final class array_rand extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('array_rand() accepts one or two arguments');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_rand() argument #1 must be an array in this compiler build');
-        }
+        $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_rand', 1, 'array');
         $num = 1;
         if (2 === $argc) {
             $num = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_rand', 2, 'num');
         }
-        $result = VmArray::arrayRandPacked($array->toArray(), $num);
+        $result = VmArray::arrayRandPacked($array, $num);
         if (null === $frame->returnVar) {
             return;
         }

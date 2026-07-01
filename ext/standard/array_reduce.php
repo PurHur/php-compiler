@@ -20,6 +20,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ClosureState;
 use PHPCompiler\VM\Context as VmContext;
+use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -36,10 +37,7 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_reduce() first argument must be an array in this compiler build');
-        }
+        $array = VmArray::requireArrayParam($frame->calledArgs[0], 'array_reduce', 1, 'array');
         if (null === $frame->vmContext) {
             throw new \LogicException('array_reduce() requires VM context in this compiler build');
         }
@@ -55,7 +53,7 @@ final class array_reduce extends Internal
             $nullInitial->null();
             $initialOrNull = $hasInitial ? $initial : $nullInitial;
             $frame->returnVar->copyFrom(
-                ArrayReduceJitHelper::reduceWithBuiltin($array->toArray(), $callbackFn->name, $initialOrNull)
+                ArrayReduceJitHelper::reduceWithBuiltin($array, $callbackFn->name, $initialOrNull)
             );
 
             return;
@@ -68,7 +66,7 @@ final class array_reduce extends Internal
      */
     private static function reduceVm(
         Frame $frame,
-        Variable $array,
+        HashTable $array,
         bool $hasInitial,
         ?Variable $initial,
         ?ClosureState $closureOrNull,
@@ -81,7 +79,7 @@ final class array_reduce extends Internal
             $carry->copyFrom($initial);
         }
         $empty = true;
-        foreach ($array->toArray()->iterateKeyed(true) as [, $value]) {
+        foreach ($array->iterateKeyed(true) as [, $value]) {
             $empty = false;
             $item = new Variable();
             $item->copyFrom($value);
@@ -123,6 +121,7 @@ final class array_reduce extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_reduce() requires two or three arguments in this compiler build');
         }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_reduce', 1, 'array');
         if ($args[1]->isNullConstant) {
             throw new \TypeError(ArrayReduceCallbackPolicy::invalidCallbackTypeError());
         }
