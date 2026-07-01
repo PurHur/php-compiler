@@ -8,7 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\VM\Variable;
 
 /**
- * Closure::getCurrent(): Closure — PHP 8.5+ recursive closure introspection (Zend/zend_closures.c).
+ * Closure::getCurrent(): Closure — PHP 8.4+ active closure introspection (Zend/zend_closures.c).
  */
 final class ClosureGetCurrent extends VmClassMethod
 {
@@ -24,15 +24,15 @@ final class ClosureGetCurrent extends VmClassMethod
         }
         $caller = $frame->parent;
         if (null === $caller) {
-            throw new \Error('Current function is not a closure');
+            throw new \Error('No active Closure instance to get');
         }
         $state = $caller->closureCall;
         if (null === $state) {
-            throw new \Error('Current function is not a closure');
+            throw new \Error('No active Closure instance to get');
         }
         $owner = $state->ownerObject;
         if (null === $owner) {
-            throw new \Error('Current function is not a closure');
+            throw new \Error('No active Closure instance to get');
         }
         $ret = new Variable(Variable::TYPE_OBJECT);
         $ret->object($owner);

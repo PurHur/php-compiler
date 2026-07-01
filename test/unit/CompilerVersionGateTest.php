@@ -240,9 +240,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
     }
 
-    public function testSupportsClosureGetCurrentWithheldOnReferenceProfile(): void
+    public function testSupportsClosureGetCurrentTrueOn84DevForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
+        $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
     }
 
     public function testDoesNotSupportBareRethrowOnReferenceProfile(): void
@@ -250,11 +250,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBareRethrow());
     }
 
-    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
+    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
-        $this->assertFalse(isset($closure->methods['getcurrent']));
+        $this->assertTrue(isset($closure->methods['getcurrent']));
     }
 }
