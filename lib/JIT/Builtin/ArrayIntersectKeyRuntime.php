@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
 use PHPCompiler\JIT\NestedJitCompileScope;
@@ -17,7 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_intersect_key() via ArrayIntersectKeyJitHelper PHP (#12551).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayIntersectKey()}.
+ * Standalone AOT compiles {@see ArrayIntersectKeyJitHelper} via nested JIT bridges (#14400); embed uses same PHP path.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_intersect_key)
  */
@@ -40,28 +39,23 @@ final class ArrayIntersectKeyRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function intersectKey(Context $context, JITVariable $first, JITVariable ...$others): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::arrayIntersectKey($context, $first, ...$others);
-        }
-
-        foreach ([$first, ...$others] as $arg) {
-            if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
-                return ArrayBuiltinHelper::arrayIntersectKey($context, $first, ...$others);
-            }
-        }
-
         self::ensureLinked($context);
 
-        $firstHt = ArrayBuiltinHelper::loadHashTable($context, $first);
+        $firstHt = self::argToHashtable($context, $first);
         if ([] === $others) {
             return self::callIntersectKeySingle($context, $firstHt);
         }
 
         $result = self::callIntersectKeySingle($context, $firstHt);
         foreach ($others as $other) {
-            $nextHt = ArrayBuiltinHelper::loadHashTable($context, $other);
+            $nextHt = self::argToHashtable($context, $other);
             $result = self::callIntersectKeyTwo($context, $result, $nextHt);
         }
 
@@ -70,10 +64,6 @@ final class ArrayIntersectKeyRuntime
 
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_intersect_key__single');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
@@ -184,6 +174,15 @@ final class ArrayIntersectKeyRuntime
             $left,
             $right
         );
+    }
+
+    private static function argToHashtable(Context $context, JITVariable $arg): Value
+    {
+        if (ArrayBuiltinHelper::isNativeArray($arg->type)) {
+            return ArrayBuiltinHelper::nativeListToHashTable($context, $arg);
+        }
+
+        return ArrayBuiltinHelper::loadHashTable($context, $arg);
     }
 
     private static function helperFunction(Context $context, string $logical): LlvmFunction

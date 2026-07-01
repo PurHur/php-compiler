@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_intersect_key() JIT routes through ArrayIntersectKeyJitHelper PHP not ArrayBuiltinHelper LLVM (#12551). */
+/** array_intersect_key() JIT routes through ArrayIntersectKeyJitHelper PHP not ArrayBuiltinHelper LLVM (#12551, #14400). */
 final class ArrayIntersectKeyRuntimeShrinkTest extends TestCase
 {
     public function testArrayIntersectKeyRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIntersectKeyRuntime.php');
         $this->assertStringContainsString('ArrayIntersectKeyJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayIntersectKey', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayIntersectKey', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_intersect_key.php');
         $this->assertStringContainsString('ArrayIntersectKeyRuntime::intersectKey', $builtin);
