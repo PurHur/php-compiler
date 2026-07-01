@@ -458,6 +458,7 @@ require_once __DIR__.'/../../../ext/spl/SplFileObjectStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplFixedArrayBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplFixedArraySerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplIteratorSupport.php';
+require_once __DIR__.'/../../../ext/spl/SplLegacySerializableMethods.php';
 require_once __DIR__.'/../../../ext/spl/SplObjectStorageBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplObjectStorageSerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplQueueSplStackBuiltin.php';
