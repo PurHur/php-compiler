@@ -14,8 +14,9 @@ foreach (['SAPI Modules', 'Module Authors', 'PHP Authors', 'PHP Quality Assuranc
 }
 
 $len = \strlen($out);
-if ($len < 6500) {
-    fwrite(STDERR, "FAIL: phpinfo(INFO_CREDITS) output too short ({$len} bytes, expected >=6500)\n");
+$minLen = extension_loaded('curl') ? 6500 : 5500;
+if ($len < $minLen) {
+    fwrite(STDERR, "FAIL: phpinfo(INFO_CREDITS) output too short ({$len} bytes, expected >={$minLen})\n");
     exit(1);
 }
 

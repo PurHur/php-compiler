@@ -178,7 +178,86 @@ final class VmCreditsData
         .'Gabor Egressy, Hartmut Holzgraefe, Jouni Ahto';
 
     /**
-     * Full php-src credits_modules table for phpcredits(CREDITS_MODULES) (#14295).
+     * php-src credits_modules[] extension name → display label (ext/standard/info.c, #14799).
+     *
+     * @var array<string, string>
+     */
+    private const EXTENSION_CREDITS_MODULE = [
+        'bcmath' => 'BC Math',
+        'bz2' => 'Bzip2',
+        'calendar' => 'Calendar',
+        'com_dotnet' => 'COM and .Net',
+        'ctype' => 'ctype',
+        'curl' => 'cURL',
+        'date' => 'Date/Time Support',
+        'mssql' => 'DB-LIB (MS SQL, Sybase)',
+        'pdo_dblib' => 'DB-LIB (MS SQL, Sybase)',
+        'dba' => 'DBA',
+        'dom' => 'DOM',
+        'enchant' => 'enchant',
+        'exif' => 'EXIF',
+        'ffi' => 'FFI',
+        'fileinfo' => 'fileinfo',
+        'pdo_firebird' => 'Firebird driver for PDO',
+        'ftp' => 'FTP',
+        'gd' => 'GD imaging',
+        'gettext' => 'GetText',
+        'gmp' => 'GNU GMP support',
+        'iconv' => 'Iconv',
+        'imap' => 'IMAP',
+        'filter' => 'Input Filter',
+        'intl' => 'Internationalization',
+        'json' => 'JSON',
+        'ldap' => 'LDAP',
+        'libxml' => 'LIBXML',
+        'mbstring' => 'Multibyte String Functions',
+        'pdo_mysql' => 'MySQL driver for PDO',
+        'mysqli' => 'MySQLi',
+        'mysqlnd' => 'MySQLnd',
+        'oci8' => 'OCI8',
+        'pdo_odbc' => 'ODBC driver for PDO',
+        'odbc' => 'ODBC',
+        'zend opcache' => 'Opcache',
+        'opcache' => 'Opcache',
+        'openssl' => 'OpenSSL',
+        'pdo_oci' => 'Oracle (OCI) driver for PDO',
+        'pcntl' => 'pcntl',
+        'pcre' => 'Perl Compatible Regexps',
+        'phar' => 'PHP Archive',
+        'pdo' => 'PHP Data Objects',
+        'hash' => 'PHP hash',
+        'posix' => 'Posix',
+        'pdo_pgsql' => 'PostgreSQL driver for PDO',
+        'pgsql' => 'PostgreSQL',
+        'pspell' => 'Pspell',
+        'random' => 'random',
+        'readline' => 'Readline',
+        'reflection' => 'Reflection',
+        'session' => 'Sessions',
+        'shmop' => 'Shared Memory Operations',
+        'simplexml' => 'SimpleXML',
+        'snmp' => 'SNMP',
+        'soap' => 'SOAP',
+        'sockets' => 'Sockets',
+        'sodium' => 'Sodium',
+        'spl' => 'SPL',
+        'pdo_sqlite' => 'SQLite 3.x driver for PDO',
+        'sqlite3' => 'SQLite3',
+        'sysvmsg' => 'System V Message based IPC',
+        'sysvsem' => 'System V Semaphores',
+        'sysvshm' => 'System V Shared Memory',
+        'tidy' => 'tidy',
+        'tokenizer' => 'tokenizer',
+        'xml' => 'XML',
+        'xmlreader' => 'XMLReader',
+        'xmlwriter' => 'XMLWriter',
+        'xsl' => 'XSL',
+        'zip' => 'Zip',
+        'zlib' => 'Zlib',
+    ];
+
+    /**
+     * Full php-src credits_modules table (unfiltered; tests only).
      *
      * @return array<string, string>
      */
@@ -188,7 +267,37 @@ final class VmCreditsData
     }
 
     /**
-     * @return array<string, string> extension => authors for loaded modules
+     * credits_modules rows for loaded extensions only (php-src info.c, #14799).
+     *
+     * @return array<string, string> module label => authors
+     */
+    public static function creditsModuleAuthorsForLoadedExtensions(): array
+    {
+        $rows = [];
+        $seenLabels = [];
+        foreach (ModuleRegistry::getLoadedExtensions() as $name) {
+            $key = strtolower($name);
+            if ('core' === $key || 'types' === $key || 'standard' === $key) {
+                continue;
+            }
+            $label = self::EXTENSION_CREDITS_MODULE[$key] ?? null;
+            if (null === $label || isset($seenLabels[$label])) {
+                continue;
+            }
+            $authors = self::CREDITS_MODULE_AUTHORS[$label] ?? null;
+            if (null === $authors) {
+                continue;
+            }
+            $seenLabels[$label] = true;
+            $rows[$label] = $authors;
+        }
+        ksort($rows, SORT_STRING);
+
+        return $rows;
+    }
+
+    /**
+     * @return array<string, string> extension => authors for loaded modules (phpinfo modules section)
      */
     public static function moduleAuthorsForLoadedExtensions(): array
     {
