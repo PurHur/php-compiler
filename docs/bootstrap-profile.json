@@ -946,7 +946,7 @@
         "ext/standard/JitStrIreplace.php",
         "ext/standard/JitStrIreplaceMulti.php",
         "ext/standard/JitStrPad.php",
-        "ext/standard/JitStrRepeat.php",
+        "ext/standard/StrRepeatJitHelper.php",
         "ext/standard/JitStrReplace.php",
         "ext/standard/JitStrReplaceArray.php",
         "ext/standard/JitStrReplaceMulti.php",

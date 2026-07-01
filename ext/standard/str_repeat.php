@@ -13,14 +13,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrRepeat;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * str_repeat() for strings (subset of PHP; native LLVM in JIT).
+ * str_repeat() for strings (subset of PHP).
+ *
+ * VM: {@see VmString::repeat()}; JIT/AOT: {@see StringStrRepeat} + {@see StrRepeatJitHelper}.
  */
 final class str_repeat extends Internal
 {
@@ -43,21 +45,18 @@ final class str_repeat extends Internal
         $frame->returnVar->string($result);
     }
 
-    public Context $context;
-
     public function call(Context $context, JITVariable ...$args): Value
     {
-        $this->context = $context;
         if (2 !== count($args)) {
             throw new \LogicException('str_repeat() requires exactly two arguments');
         }
-        $multiplier = JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times', true);
-        JitStrRepeat::emitRuntimeTimesGuard($context, $multiplier);
 
-        return JitStrRepeat::repeat(
-            $context,
+        StringStrRepeat::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_str_repeat'),
             JitStringBuiltinArg::lower($context, $args[0], 'str_repeat', 0, 'string'),
-            $multiplier
+            JitIntdiv::lowerIntBuiltinArg($context, $args[1], 'str_repeat', 2, 'times', true)
         );
     }
 }

@@ -930,6 +930,7 @@ class Context {
                 Builtin\StringMetaphone::ensureStandaloneBodies($this);
                 Builtin\StringWordwrap::ensureStandaloneBodies($this);
                 Builtin\StringStrrev::ensureStandaloneBodies($this);
+                Builtin\StringStrRepeat::ensureStandaloneBodies($this);
                 Builtin\StringStripTags::ensureStandaloneBodies($this);
                 Builtin\StringStrtr::ensureStandaloneBodies($this);
                 Builtin\StringParseStr::ensureStandaloneBodies($this);
