@@ -18,13 +18,14 @@ final class fileatime extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileatime() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'fileatime');
         if (null === $frame->returnVar) {
             return;
         }
         $atime = VmFs::fileAtime($path);
         if (false === $atime) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'fileatime', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'fileatime', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($atime);

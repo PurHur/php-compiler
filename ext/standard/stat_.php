@@ -23,13 +23,14 @@ final class stat_ extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('stat() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'stat');
         if (null === $frame->returnVar) {
             return;
         }
         $info = VmFs::statInfo($path, false);
         if (false === $info) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'stat', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'stat', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->array($info);

@@ -18,13 +18,14 @@ final class filegroup extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filegroup() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filegroup');
         if (null === $frame->returnVar) {
             return;
         }
         $gid = VmFs::fileGroup($path);
         if (false === $gid) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'filegroup', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'filegroup', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($gid);

@@ -51,6 +51,27 @@ final class VmFilestatArg
         );
     }
 
+    /** True when the path operand is null before Z_PARAM_PATH coercion (php-src filestat.c; #14641). */
+    public static function wasNullFilenameArg(Variable $var): bool
+    {
+        return Variable::TYPE_NULL === $var->resolveIndirect()->type;
+    }
+
+    /**
+     * Emit stat/lstat failure warning unless null was coerced to "" (#14641, php-src deprecation path).
+     */
+    public static function warnPathStatFailedForFilenameArg(
+        Frame $frame,
+        Variable $filenameArg,
+        string $function,
+        string $path,
+        bool $lstat
+    ): void {
+        if (!self::wasNullFilenameArg($filenameArg)) {
+            VmFilestatFailure::warnPathStatFailed($frame, $function, $path, $lstat);
+        }
+    }
+
     /**
      * Z_PARAM_PATH for touch() — null coerces to "" then php_touch returns false (#12878, php_touch).
      *
