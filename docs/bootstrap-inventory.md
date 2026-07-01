@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3631 |
-| Phase A inventory files (M2 ratio SSOT) | 3631 |
+| PHP files on vm.php path | 3634 |
+| Phase A inventory files (M2 ratio SSOT) | 3634 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9905 |
+| Source constructs flagged (warnings) | 9920 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -794,7 +794,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitMoveUploadedFile.php` | 0 | 1 |
 | `ext/standard/JitNetGetInterfaces.php` | 0 | 1 |
 | `ext/standard/JitNetworkServices.php` | 0 | 1 |
-| `ext/standard/Nl2brJitHelper.php` | 0 | 1 |
 | `ext/standard/JitNlLanginfo.php` | 0 | 1 |
 | `ext/standard/JitNumberFormat.php` | 0 | 1 |
 | `ext/standard/JitObClean.php` | 0 | 1 |
@@ -1003,7 +1002,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitVarExport.php` | 0 | 1 |
 | `ext/standard/JitVfprintf.php` | 0 | 5 |
 | `ext/standard/JitVfscanf.php` | 0 | 2 |
-| `ext/standard/JitVsprintf.php` | 0 | 1 |
+| `ext/standard/JitVsprintf.php` | 0 | 2 |
 | `ext/standard/JitWebParams.php` | 0 | 15 |
 | `ext/standard/JitZendScalarCast.php` | 0 | 1 |
 | `ext/standard/JitZlib.php` | 0 | 1 |
@@ -1028,6 +1027,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/NetInterfacesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesNameLookupJitHelper.php` | 0 | 1 |
+| `ext/standard/Nl2brJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerServerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObOutputJitHelper.php` | 0 | 1 |
@@ -1130,10 +1130,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/TimezoneLocationJitHelper.php` | 0 | 3 |
 | `ext/standard/TimezoneOffsetJitHelper.php` | 0 | 1 |
 | `ext/standard/TriggerErrorJitHelper.php` | 0 | 1 |
+| `ext/standard/UcwordsJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnpackJitHelper.php` | 0 | 1 |
 | `ext/standard/UnserializeJitHelper.php` | 0 | 3 |
 | `ext/standard/UploadTempJitHelper.php` | 0 | 1 |
+| `ext/standard/UrldecodeJitHelper.php` | 0 | 1 |
+| `ext/standard/UrlencodeJitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8JitHelper.php` | 0 | 1 |
 | `ext/standard/Utf8Latin1JitHelper.php` | 0 | 1 |
 | `ext/standard/ValueSortJitHelper.php` | 0 | 3 |
@@ -2191,7 +2194,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/trigger_error_.php` | 0 | 1 |
 | `ext/standard/uasort_.php` | 0 | 4 |
 | `ext/standard/ucfirst.php` | 0 | 2 |
-| `ext/standard/UcwordsJitHelper.php` | 0 | 1 |
 | `ext/standard/ucwords.php` | 0 | 1 |
 | `ext/standard/uksort_.php` | 0 | 4 |
 | `ext/standard/umask_.php` | 0 | 1 |
@@ -2212,8 +2214,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/version_compare.php` | 0 | 2 |
 | `ext/standard/vfprintf_.php` | 0 | 1 |
 | `ext/standard/vfscanf.php` | 0 | 2 |
-| `ext/standard/vprintf_.php` | 0 | 1 |
-| `ext/standard/vsprintf.php` | 0 | 1 |
+| `ext/standard/vprintf_.php` | 0 | 3 |
+| `ext/standard/vsprintf.php` | 0 | 2 |
 | `ext/standard/web_bool.php` | 0 | 1 |
 | `ext/standard/web_int.php` | 0 | 1 |
 | `ext/standard/web_string.php` | 0 | 1 |
@@ -2742,7 +2744,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringNetworkServices.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringNetworkServicesNameLookup.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringNetworkServicesStringReturn.php` | 0 | 2 |
-| `lib/JIT/Builtin/StringNl2br.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringNl2br.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringOffsetRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
@@ -2791,11 +2793,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringTriggerErrorJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringTrimMask.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTrimModeJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringUcwords.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUcwords.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserialize.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringUrldecode.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringUrlencode.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUrldecode.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringUrlencode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUtf8Latin1.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUtf8Runtime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringVarDump.php` | 0 | 3 |
@@ -8579,11 +8581,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
 
-### `ext/standard/Nl2brJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/standard/JitNlLanginfo.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9661,6 +9658,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitVsprintf.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
 - 5 class method(s)
 
 ### `ext/standard/JitWebParams.php`
@@ -10581,6 +10579,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/Nl2brJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/ObGzhandlerJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11153,6 +11156,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 9 class method(s)
 
+### `ext/standard/UcwordsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/UnpackEngine.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11174,6 +11182,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/UrldecodeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/UrlencodeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/Utf8JitHelper.php`
 
@@ -17703,11 +17721,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 - 1 closure(s)
 
-### `ext/standard/UcwordsJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
-
 ### `ext/standard/ucwords.php`
 
 **Warnings** (review for bootstrap subset):
@@ -17829,11 +17842,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/vprintf_.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
+- new ArgumentCountError (line 50)
 - 2 class method(s)
 
 ### `ext/standard/vsprintf.php`
 
 **Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
 - 2 class method(s)
 
 ### `ext/standard/web_bool.php`
@@ -18485,7 +18501,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 346)
+- new ArgumentCountError (line 358)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -21636,7 +21652,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringNl2br.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new JIT (line 131)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringOffsetRuntime.php`
 
@@ -21936,7 +21954,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUcwords.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new JIT (line 142)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringUnpack.php`
 
@@ -21955,12 +21975,16 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringUrldecode.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- new JIT (line 133)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringUrlencode.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- new JIT (line 133)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringUtf8Latin1.php`
 
@@ -22812,19 +22836,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1123)
-- new Result (line 1144)
-- new Variable (line 1416)
-- new Variable (line 1736)
-- new Variable (line 1867)
-- new Variable (line 2053)
-- new VMVariable (line 2211)
-- new VMVariable (line 2227)
-- new VMVariable (line 2233)
-- new VMVariable (line 2239)
-- new VMVariable (line 2250)
-- new Variable (line 2280)
-- new Variable (line 2319)
+- new Result (line 1125)
+- new Result (line 1146)
+- new Variable (line 1418)
+- new Variable (line 1738)
+- new Variable (line 1869)
+- new Variable (line 2055)
+- new VMVariable (line 2213)
+- new VMVariable (line 2229)
+- new VMVariable (line 2235)
+- new VMVariable (line 2241)
+- new VMVariable (line 2252)
+- new Variable (line 2282)
+- new Variable (line 2321)
 - 98 class method(s)
 - 28 closure(s)
 
