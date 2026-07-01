@@ -21,5 +21,8 @@ final class VmVarExportFloatTest extends TestCase
     public function testFiniteFloatGetsDecimalSuffix(): void
     {
         $this->assertSame('42.0', VmVarExportFloat::format(42.0));
+        $this->assertSame('150.0', VmVarExportFloat::format(150.0));
+        $this->assertSame('100.0', VmVarExportFloat::format(100.0));
+        $this->assertSame('1.0E-10', VmVarExportFloat::format(1.0E-10));
     }
 }
