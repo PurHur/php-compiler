@@ -663,6 +663,6 @@ final class CompilerVersion
      */
     public static function supportsDomNodeGetRootNode(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 }
