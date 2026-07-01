@@ -37,6 +37,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_namespace_attributes.phpt',
             'dom_namespace_attributes.phpt'
         );
+        yield 'dom_node_get_line_no.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_node_get_line_no.phpt',
+            'dom_node_get_line_no.phpt'
+        );
     }
 
     public function setUp(): void
