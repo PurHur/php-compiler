@@ -149,7 +149,8 @@ final class VmVarExport
             }
             $className = $object->class->name;
             $props = VmReflection::getVarExportObjectProperties($v, $frame);
-            $exported = self::formatArray($vm, $props->toArray(), $level, $frame, $visited, $warned);
+            // php-src var.c: __set_state / (object) use compact "array(" not "array (".
+            $exported = self::formatArray($vm, $props->toArray(), $level, $frame, $visited, $warned, true);
             if ('stdClass' === $className) {
                 return '(object) '.$exported;
             }
@@ -169,11 +170,12 @@ final class VmVarExport
         int $level,
         ?Frame $frame,
         \SplObjectStorage $visited,
-        bool &$warned
+        bool &$warned,
+        bool $compactHeader = false
     ): string {
         $indent = str_repeat('  ', $level);
         $inner = str_repeat('  ', $level + 1);
-        $lines = ["array (\n"];
+        $lines = [$compactHeader ? "array(\n" : "array (\n"];
         foreach ($ht->iterateKeyed(true) as [$key, $value]) {
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
