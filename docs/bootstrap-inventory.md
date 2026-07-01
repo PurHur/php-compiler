@@ -11210,11 +11210,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 102)
-- new RecursiveIteratorIterator (line 2203)
-- new RecursiveDirectoryIterator (line 2204)
-- new RecursiveIteratorIterator (line 2305)
-- new RecursiveDirectoryIterator (line 2306)
-- 80 class method(s)
+- new RecursiveIteratorIterator (line 2319)
+- new RecursiveDirectoryIterator (line 2320)
+- new RecursiveIteratorIterator (line 2421)
+- new RecursiveDirectoryIterator (line 2422)
+- 84 class method(s)
 - 11 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -11797,7 +11797,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmInetPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 9 class method(s)
 
 ### `ext/standard/VmInfo.php`
 
@@ -13937,7 +13937,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/date_modify.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 28)
+- new ArgumentCountError (line 29)
 - 2 class method(s)
 
 ### `ext/standard/date_offset_get.php`
