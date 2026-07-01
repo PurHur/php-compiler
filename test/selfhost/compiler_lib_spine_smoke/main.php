@@ -3422,6 +3422,7 @@ require_once __DIR__.'/../../../lib/VM/CompareStringableHelper.php';
 require_once __DIR__.'/../../../lib/VM/Context.php';
 require_once __DIR__.'/../../../lib/VM/CycleCollector.php';
 require_once __DIR__.'/../../../lib/VM/DateIntervalSupport.php';
+require_once __DIR__.'/../../../lib/VM/DatePeriodIteratorState.php';
 require_once __DIR__.'/../../../lib/VM/DatePeriodSupport.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeInterfaceSupport.php';
 require_once __DIR__.'/../../../lib/VM/DateTimeSupport.php';
