@@ -370,18 +370,9 @@ final class VmProcessProcOpenNative
             $statusVal = $slot['status'];
             $running = false;
         } else {
+            // php-src: proc_get_status() must not reap — waitpid only in proc_close() (#13079).
             try {
-                $status = $ffi->new('int');
-                $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), self::WNOHANG);
-                if ($waitRc > 0) {
-                    $statusVal = (int) $status->cdata;
-                    $slot['status'] = $statusVal;
-                    $slot['statusKnown'] = true;
-                    self::$slots[$handle] = $slot;
-                    $running = false;
-                } elseif (-1 === $waitRc) {
-                    $running = 0 === (int) $ffi->kill($slot['pid'], 0);
-                }
+                $running = 0 === (int) $ffi->kill($slot['pid'], 0);
             } catch (\Throwable) {
                 return false;
             }
