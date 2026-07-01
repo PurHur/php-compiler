@@ -8785,6 +8785,11 @@ restart:
             }
         }
         for ($handler = $frame->parent ?? $frame; null !== $handler; $handler = $handler->parent) {
+            // Only match try/catch on frames that entered TYPE_TRY — not handler opcodes on
+            // ancestors before the try body runs (#14504).
+            if (!\in_array($handler, $this->context->activeTryHandlerFrames, true)) {
+                continue;
+            }
             $catchFrame = $this->dispatchCatchForHandlerFrame($handler);
             if (null !== $catchFrame) {
                 if ($this->context->coercingObjectToString) {
@@ -12466,7 +12471,7 @@ restart:
             return;
         }
         try {
-            [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc);
+            [$class, $methodLc] = $this->resolveStaticMethod($lcClass, $methodLc, $methodName);
             $hasInstanceScope = null !== $frame->block->func
                 && !(($frame->block->func->flags ?? 0) & \PHPCfg\Func::FLAG_STATIC)
                 && (
@@ -13723,8 +13728,9 @@ restart:
     /**
      * @return array{0: ClassEntry, 1: string}
      */
-    protected function resolveStaticMethod(string $lcClass, string $methodLc): array
+    protected function resolveStaticMethod(string $lcClass, string $methodLc, ?string $displayMethodName = null): array
     {
+        $requestedLc = $lcClass;
         $visited = [];
         $abstractDecl = null;
         while (!isset($visited[$lcClass])) {
@@ -13748,6 +13754,13 @@ restart:
         if (null !== $abstractDecl) {
             $declName = $abstractDecl->methodNames[$methodLc] ?? $methodLc;
             throw new \LogicException("Cannot call abstract method {$abstractDecl->name}::{$declName}()");
+        }
+
+        if ('closure' === $requestedLc) {
+            $declClass = $this->context->classes['closure'] ?? null;
+            $classDisplay = null !== $declClass ? $declClass->name : 'Closure';
+            $methodDisplay = $displayMethodName ?? $methodLc;
+            throw new \LogicException("Call to undefined method {$classDisplay}::{$methodDisplay}()");
         }
 
         throw new \LogicException("Call to undefined static method {$lcClass}::{$methodLc}()");
