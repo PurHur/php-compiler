@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_count_values() via ArrayCountValuesJitHelper PHP (#12331).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayCountValues()}.
+ * Standalone AOT compiles {@see ArrayCountValuesJitHelper} via JitVmHelperLink bridge (#14485); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayCountValues()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::countValues()}
  * php-src: ext/standard/array.c — php_array_count_values()
  */
@@ -33,8 +32,7 @@ final class ArrayCountValuesRuntime
 
     public static function countValues(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::arrayCountValues($context, $array);
         }
 
@@ -52,12 +50,13 @@ final class ArrayCountValuesRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_COUNT);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
