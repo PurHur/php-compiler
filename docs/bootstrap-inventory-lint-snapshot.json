@@ -1101,9 +1101,6 @@
         "ext/standard/JitHebrev.php": [
             "Cannot use PHPCompiler\\JIT\\Context as Context because the name is already in use on line 8"
         ],
-        "ext/standard/JitHex2bin.php": [
-            "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 14"
-        ],
         "ext/standard/JitHighlight.php": [
             "Cannot use PHPCompiler\\JIT\\BasicBlockHelper as BasicBlockHelper because the name is already in use on line 7"
         ],

@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3622 |
-| Phase A inventory files (M2 ratio SSOT) | 3622 |
+| PHP files on vm.php path | 3623 |
+| Phase A inventory files (M2 ratio SSOT) | 3623 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9861 |
+| Source constructs flagged (warnings) | 9866 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -527,6 +527,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HashCryptoJitHelper.php` | 0 | 1 |
 | `ext/standard/HashEqualsJitHelper.php` | 0 | 1 |
 | `ext/standard/HebrevJitHelper.php` | 0 | 1 |
+| `ext/standard/Hex2binJitHelper.php` | 0 | 3 |
 | `ext/standard/HighlightEngine.php` | 0 | 2 |
 | `ext/standard/HighlightJitHelper.php` | 0 | 1 |
 | `ext/standard/HrtimeJitHelper.php` | 0 | 1 |
@@ -742,7 +743,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHeaderRegisterCallback.php` | 0 | 1 |
 | `ext/standard/JitHeadersSent.php` | 0 | 1 |
 | `ext/standard/JitHebrev.php` | 0 | 1 |
-| `ext/standard/JitHex2bin.php` | 0 | 1 |
 | `ext/standard/JitHighlight.php` | 0 | 1 |
 | `ext/standard/JitHtmlEntityDecode.php` | 0 | 1 |
 | `ext/standard/JitHtmlentities.php` | 0 | 1 |
@@ -2716,6 +2716,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHashCryptoPhp.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashEquals.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHashHmacAlgos.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringHex2bin.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHrtime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringHrtimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringHtmlspecialchars.php` | 0 | 3 |
@@ -7130,6 +7131,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/Hex2binJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Error (line 26)
+- new Error (line 36)
+- 2 class method(s)
+
 ### `ext/standard/HighlightEngine.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8282,11 +8290,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
-
-### `ext/standard/JitHex2bin.php`
-
-**Warnings** (review for bootstrap subset):
-- 7 class method(s)
 
 ### `ext/standard/JitHighlight.php`
 
@@ -15442,10 +15445,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/hex2bin.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 31)
-- new ArgumentCountError (line 34)
-- new Error (line 50)
-- new Error (line 70)
+- new ArgumentCountError (line 32)
+- new ArgumentCountError (line 35)
+- new Error (line 51)
+- new Error (line 71)
 - 2 class method(s)
 - 3 closure(s)
 
@@ -21441,6 +21444,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/StringHex2bin.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 188)
+- 7 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringHrtime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22717,19 +22727,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1117)
-- new Result (line 1138)
-- new Variable (line 1410)
-- new Variable (line 1730)
-- new Variable (line 1861)
-- new Variable (line 2047)
-- new VMVariable (line 2205)
-- new VMVariable (line 2221)
-- new VMVariable (line 2227)
-- new VMVariable (line 2233)
-- new VMVariable (line 2244)
-- new Variable (line 2274)
-- new Variable (line 2313)
+- new Result (line 1118)
+- new Result (line 1139)
+- new Variable (line 1411)
+- new Variable (line 1731)
+- new Variable (line 1862)
+- new Variable (line 2048)
+- new VMVariable (line 2206)
+- new VMVariable (line 2222)
+- new VMVariable (line 2228)
+- new VMVariable (line 2234)
+- new VMVariable (line 2245)
+- new Variable (line 2275)
+- new Variable (line 2314)
 - 98 class method(s)
 - 28 closure(s)
 
