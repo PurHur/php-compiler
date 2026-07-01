@@ -28,11 +28,27 @@ final class VmDom
 
     public const CLASS_ELEMENT = 'domelement';
 
+    public const CLASS_NODE = 'domnode';
+
+    public const CLASS_NODE_LIST = 'domnodelist';
+
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
 
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
     public const PROP_NODE_NAME = 'nodeName';
+
+    public const PROP_FIRST_CHILD = 'firstChild';
+
+    public const PROP_LAST_CHILD = 'lastChild';
+
+    public const PROP_CHILD_NODES = 'childNodes';
+
+    public const PROP_NEXT_SIBLING = 'nextSibling';
+
+    public const PROP_PARENT_NODE = 'parentNode';
+
+    public const PROP_LENGTH = 'length';
 
     public static function registerClasses(Context $ctx): void
     {
@@ -44,7 +60,25 @@ final class VmDom
         $strProto = new Variable(Variable::TYPE_STRING);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $objProto = new Variable(Variable::TYPE_OBJECT);
+        $intProto = new Variable(Variable::TYPE_INTEGER);
         $pub = CfgFunc::FLAG_PUBLIC;
+
+        $node = new ClassEntry('DOMNode');
+        $node->isInternal = true;
+        $node->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $node->properties[] = new ClassProperty(self::PROP_FIRST_CHILD, $nullProto, $objProto);
+        $node->properties[] = new ClassProperty(self::PROP_LAST_CHILD, $nullProto, $objProto);
+        $node->properties[] = new ClassProperty(self::PROP_CHILD_NODES, null, $objProto);
+        $node->properties[] = new ClassProperty(self::PROP_NEXT_SIBLING, $nullProto, $objProto);
+        $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
+        $ctx->classes[self::CLASS_NODE] = $node;
+
+        $nodeList = new ClassEntry('DOMNodeList');
+        $nodeList->isInternal = true;
+        $nodeList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
+        $nodeList->methods['item'] = new NodeListItem();
+        $nodeList->methodVisibility['item'] = $pub;
+        $ctx->classes[self::CLASS_NODE_LIST] = $nodeList;
 
         $impl = new ClassEntry('DOMImplementation');
         $impl->isInternal = true;
@@ -62,6 +96,7 @@ final class VmDom
 
         $document = new ClassEntry('DOMDocument');
         $document->isInternal = true;
+        $document->parentLc = self::CLASS_NODE;
         $document->properties[] = new ClassProperty(self::PROP_FORMAT_OUTPUT, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
@@ -72,10 +107,13 @@ final class VmDom
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
         $document->methodVisibility['savexml'] = $pub;
+        $document->methods['getelementsbytagname'] = new DocumentGetElementsByTagName();
+        $document->methodVisibility['getelementsbytagname'] = $pub;
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
         $element->isInternal = true;
+        $element->parentLc = self::CLASS_NODE;
         $element->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $element->methods['appendchild'] = new ElementAppendChild();
         $element->methodVisibility['appendchild'] = $pub;
@@ -128,6 +166,7 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_FORMAT_OUTPUT)->bool(false);
+        self::initNodePropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
@@ -166,6 +205,7 @@ final class VmDom
             if (!$document->hasProperty(self::PROP_FORMAT_OUTPUT)) {
                 $document->getProperty(self::PROP_FORMAT_OUTPUT)->bool(false);
             }
+            self::initNodePropertySlots($document);
         }
 
         return DomRegistry::state($document);
@@ -181,6 +221,7 @@ final class VmDom
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        self::initNodePropertySlots($entry);
 
         $state = new DomNodeState();
         $state->nodeType = DomConstants::XML_ELEMENT_NODE;
@@ -210,11 +251,13 @@ final class VmDom
         $state->childIds = [];
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        self::linkChildToParent($root, null);
+        self::syncSubtree($ctx, $root);
 
         return true;
     }
 
-    public static function appendChild(ObjectEntry $parent, ObjectEntry $child): ObjectEntry
+    public static function appendChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
     {
         if (!self::isElement($child)) {
             throw new \DOMException('Hierarchy request error');
@@ -229,6 +272,8 @@ final class VmDom
             } else {
                 $parentState->documentElementName = DomRegistry::state($child)->nodeName;
                 $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
+                self::linkChildToParent($child, null);
+                self::syncSubtree($ctx, $child);
 
                 return $child;
             }
@@ -239,6 +284,8 @@ final class VmDom
         }
 
         $parentState->childIds[] = $child->id;
+        self::linkChildToParent($child, $parent);
+        self::syncSubtree($ctx, $parent);
 
         return $child;
     }
@@ -318,8 +365,11 @@ final class VmDom
                 return null;
             }
             $state->childIds[] = $child->id;
+            self::linkChildToParent($child, $entry);
             $pos = $end;
         }
+
+        self::syncSubtree($ctx, $entry);
 
         return $entry;
     }
@@ -388,6 +438,240 @@ final class VmDom
         }
 
         return '<'.$name.'>'.implode('', $parts).'</'.$name.'>';
+    }
+
+    /**
+     * @return list<int> matching element object ids in document order (php-src dom_document_get_elements_by_tag_name)
+     */
+    public static function collectElementsByTagName(ObjectEntry $node, string $tagName): array
+    {
+        $matches = [];
+        $want = '*' === $tagName ? null : $tagName;
+        self::collectElementsByTagNameRecursive($node, $want, $matches);
+
+        return $matches;
+    }
+
+    public static function getElementsByTagName(Context $ctx, ObjectEntry $document, string $tagName): Variable
+    {
+        self::ensureDocument($document);
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $rootVar->type) {
+            return self::createNodeList($ctx, []);
+        }
+
+        return self::createNodeList($ctx, self::collectElementsByTagName($rootVar->toObject(), $tagName));
+    }
+
+    public static function nodeListItem(ObjectEntry $nodeList, int $index): ?ObjectEntry
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::item() called on non-nodelist in this compiler build');
+        }
+        $ids = DomRegistry::state($nodeList)->listNodeIds;
+        if (!isset($ids[$index])) {
+            return null;
+        }
+
+        return DomRegistry::entry($ids[$index]);
+    }
+
+    /**
+     * @param list<int> $nodeIds
+     */
+    public static function createNodeList(Context $ctx, array $nodeIds): Variable
+    {
+        $class = $ctx->classes[self::CLASS_NODE_LIST] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMNodeList is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_NODELIST;
+        $state->nodeName = '#nodelist';
+        $state->listNodeIds = $nodeIds;
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function isNodeList(ObjectEntry $entry): bool
+    {
+        return self::CLASS_NODE_LIST === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_NODELIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    private static function initNodePropertySlots(ObjectEntry $entry): void
+    {
+        if (!$entry->hasProperty(self::PROP_FIRST_CHILD)) {
+            $entry->allocateProperty(self::PROP_FIRST_CHILD)->null();
+        }
+        if (!$entry->hasProperty(self::PROP_LAST_CHILD)) {
+            $entry->allocateProperty(self::PROP_LAST_CHILD)->null();
+        }
+        if (!$entry->hasProperty(self::PROP_NEXT_SIBLING)) {
+            $entry->allocateProperty(self::PROP_NEXT_SIBLING)->null();
+        }
+        if (!$entry->hasProperty(self::PROP_PARENT_NODE)) {
+            $entry->allocateProperty(self::PROP_PARENT_NODE)->null();
+        }
+        if (!$entry->hasProperty(self::PROP_CHILD_NODES)) {
+            $entry->allocateProperty(self::PROP_CHILD_NODES)->null();
+        }
+    }
+
+    private static function linkChildToParent(ObjectEntry $child, ?ObjectEntry $parent): void
+    {
+        $childState = DomRegistry::state($child);
+        $childState->parentId = null !== $parent ? $parent->id : null;
+    }
+
+    private static function syncSubtree(Context $ctx, ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        self::syncNodeLinks($ctx, $node);
+        $state = DomRegistry::state($node);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::syncSubtree($ctx, $child);
+            }
+        }
+    }
+
+    private static function syncNodeLinks(Context $ctx, ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        self::initNodePropertySlots($node);
+        $state = DomRegistry::state($node);
+
+        $parentVar = $node->getProperty(self::PROP_PARENT_NODE);
+        if (null !== $state->parentId) {
+            $parent = DomRegistry::entry($state->parentId);
+            if (null !== $parent) {
+                $parentVar->object($parent);
+            } else {
+                $parentVar->null();
+            }
+        } else {
+            $parentVar->null();
+        }
+
+        $firstVar = $node->getProperty(self::PROP_FIRST_CHILD);
+        $lastVar = $node->getProperty(self::PROP_LAST_CHILD);
+        if ([] === $state->childIds) {
+            $firstVar->null();
+            $lastVar->null();
+        } else {
+            $first = DomRegistry::entry($state->childIds[0]);
+            $last = DomRegistry::entry($state->childIds[\count($state->childIds) - 1]);
+            if (null !== $first) {
+                $firstVar->object($first);
+            } else {
+                $firstVar->null();
+            }
+            if (null !== $last) {
+                $lastVar->object($last);
+            } else {
+                $lastVar->null();
+            }
+        }
+
+        $childNodesVar = $node->getProperty(self::PROP_CHILD_NODES);
+        if (null !== $state->childNodesListId) {
+            $list = DomRegistry::entry($state->childNodesListId);
+            if (null !== $list) {
+                self::updateNodeListMembers($list, $state->childIds);
+                $childNodesVar->object($list);
+
+                return;
+            }
+        }
+        if (null === $state->childNodesListId && Variable::TYPE_OBJECT === $childNodesVar->resolveIndirect()->type) {
+            $existing = $childNodesVar->resolveIndirect()->toObject();
+            if (self::isNodeList($existing)) {
+                $state->childNodesListId = $existing->id;
+                self::updateNodeListMembers($existing, $state->childIds);
+                $childNodesVar->object($existing);
+
+                return;
+            }
+        }
+        if (null === $node->class->parentLc && !self::isElement($node) && !self::isDocument($node)) {
+            return;
+        }
+        $listVar = self::createNodeList($ctx, $state->childIds);
+        $list = $listVar->toObject();
+        $state->childNodesListId = $list->id;
+        $childNodesVar->copyFrom($listVar);
+
+        foreach ($state->childIds as $index => $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            self::initNodePropertySlots($child);
+            $siblingVar = $child->getProperty(self::PROP_NEXT_SIBLING);
+            $nextId = $state->childIds[$index + 1] ?? null;
+            if (null !== $nextId) {
+                $next = DomRegistry::entry($nextId);
+                if (null !== $next) {
+                    $siblingVar->object($next);
+                } else {
+                    $siblingVar->null();
+                }
+            } else {
+                $siblingVar->null();
+            }
+        }
+    }
+
+    /** @param list<int> $nodeIds */
+    private static function updateNodeListMembers(ObjectEntry $nodeList, array $nodeIds): void
+    {
+        if (!self::isNodeList($nodeList)) {
+            return;
+        }
+        $state = DomRegistry::state($nodeList);
+        $state->listNodeIds = $nodeIds;
+        $nodeList->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
+    }
+
+    /**
+     * @param list<int> $matches
+     */
+    private static function collectElementsByTagNameRecursive(
+        ObjectEntry $node,
+        ?string $want,
+        array &$matches
+    ): void {
+        if (self::isElement($node)) {
+            $name = DomRegistry::state($node)->nodeName;
+            if (null === $want || $name === $want) {
+                $matches[] = $node->id;
+            }
+        }
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementsByTagNameRecursive($child, $want, $matches);
+            }
+        }
     }
 
     public static function isElement(ObjectEntry $entry): bool
