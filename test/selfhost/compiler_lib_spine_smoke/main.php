@@ -2807,6 +2807,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringInfo.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringLevenshtein.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrspn.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrWordCount.php';
