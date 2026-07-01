@@ -8,9 +8,9 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\StringFileGetContents;
 use PHPCompiler\JIT\Builtin\StripWhitespace;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\PathSupport;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
@@ -26,6 +26,9 @@ final class JitStripWhitespace
 
         $pathLit = $args[0]->compileTimeString ?? null;
         if (null !== $pathLit) {
+            if ('' === $pathLit) {
+                throw new \ValueError(PathSupport::EMPTY_PATH_VALUE_ERROR_MESSAGE);
+            }
             $contents = VmFsReadNative::available()
                 ? VmFsReadNative::read($pathLit)
                 : false;
@@ -39,7 +42,7 @@ final class JitStripWhitespace
         StripWhitespace::ensureLinked($context);
         StringFileGetContents::implement($context);
 
-        $pathStr = JitStringBuiltinArg::lower($context, $args[0], 'php_strip_whitespace', 0, 'file_name');
+        $pathStr = JitStreamPath::lowerNonEmptyPath($context, $args[0], 'php_strip_whitespace', 0, 'filename');
         $contents = $context->builder->call(
             $context->lookupFunction('__compiler_file_get_contents'),
             $pathStr
