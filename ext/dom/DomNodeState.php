@@ -67,6 +67,9 @@ final class DomNodeState
     /** @var array<string, string> */
     public array $attributes = [];
 
+    /** Attribute local name registered via setIdAttribute() (php-src dom_object attr->id). */
+    public ?string $idAttributeName = null;
+
     /** @var array<string, string> */
     public array $idAttrByElement = [];
 
