@@ -12,4 +12,7 @@ final class DomConstants
     public const XML_DOCUMENT_NODE = 9;
 
     public const XML_DOCUMENT_TYPE_NODE = 10;
+
+    /** Internal marker for {@see VmDom::createNodeList()} handles. */
+    public const XML_NODELIST = -1;
 }

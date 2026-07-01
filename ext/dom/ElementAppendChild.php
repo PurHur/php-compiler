@@ -22,7 +22,10 @@ final class ElementAppendChild extends DomClassMethod
             throw new \LogicException('DOMElement::appendChild() expects exactly 1 argument');
         }
         $child = $this->elementArg($frame->calledArgs[1], 'DOMElement::appendChild()', 0);
-        $appended = VmDom::appendChild($receiver, $child);
+        if (null === $frame->vmContext) {
+            throw new \LogicException('DOMElement::appendChild() requires VM context in this compiler build');
+        }
+        $appended = VmDom::appendChild($frame->vmContext, $receiver, $child);
         if (null !== $frame->returnVar) {
             $frame->returnVar->object($appended);
         }

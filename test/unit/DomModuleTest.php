@@ -24,6 +24,8 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocument'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocumentType'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
         self::assertTrue(ModuleRegistry::extensionLoaded('dom'));
 
         $code = <<<'PHP'

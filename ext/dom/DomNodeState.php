@@ -32,4 +32,17 @@ final class DomNodeState
     /** Child element object ids in document order (php-src dom_child_nodes). */
     /** @var list<int> */
     public array $childIds = [];
+
+    /** Parent node object id, or null for detached roots. */
+    public ?int $parentId = null;
+
+    /**
+     * Member node ids when {@see DomConstants::XML_NODELIST}.
+     *
+     * @var list<int>
+     */
+    public array $listNodeIds = [];
+
+    /** Persistent childNodes list object id for element/document nodes. */
+    public ?int $childNodesListId = null;
 }
