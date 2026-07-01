@@ -11,28 +11,26 @@ use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for gzwrite() via __compiler_gzwrite (#6168). */
-final class JitGzwrite
+/** LLVM lowering for gztell() via __compiler_gztell (#14585). */
+final class JitGztell
 {
     /** @return Value */
-    public static function invoke(Context $context, Value $handleLong, Value $dataStr, Value $lengthLong): Value
+    public static function invoke(Context $context, Value $handleLong): Value
     {
         GzStreamRuntime::ensureLinked($context);
-        $bytes = $context->builder->call(
-            $context->lookupFunction('__compiler_gzwrite'),
-            $handleLong,
-            $dataStr,
-            $lengthLong
-        );
         $i64 = $context->getTypeFromString('int64');
-        $failed = $context->builder->icmp(Builder::INT_SLT, $bytes, $i64->constInt(0, false));
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_gztell'),
+            $handleLong
+        );
+        $failed = $context->builder->icmp(Builder::INT_EQ, $result, $i64->constInt(-1, true));
 
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
 
-        $failBlock = BasicBlockHelper::append($context, 'gzwrite_fail');
-        $okBlock = BasicBlockHelper::append($context, 'gzwrite_ok');
-        $doneBlock = BasicBlockHelper::append($context, 'gzwrite_done');
+        $failBlock = BasicBlockHelper::append($context, 'gztell_fail');
+        $okBlock = BasicBlockHelper::append($context, 'gztell_ok');
+        $doneBlock = BasicBlockHelper::append($context, 'gztell_done');
         $context->builder->branchIf($failed, $failBlock, $okBlock);
 
         $context->builder->positionAtEnd($failBlock);
@@ -41,7 +39,7 @@ final class JitGzwrite
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($okBlock);
-        JitValueBox::writeLong($context, $slot, $bytes);
+        JitValueBox::writeLong($context, $slot, $result);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);

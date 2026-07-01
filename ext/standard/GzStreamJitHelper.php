@@ -63,6 +63,26 @@ final class GzStreamJitHelper
         return VmGzStream::gzclose($handle) ? 1 : 0;
     }
 
+    /** @return int 0 on success, -1 on failure */
+    public static function gzseekArgv(int $handle, int $offset, int $whence): int
+    {
+        return VmGzStream::gzseek($handle, $offset, $whence);
+    }
+
+    /** @return int position or -1 on failure */
+    public static function gztellArgv(int $handle): int
+    {
+        $pos = VmGzStream::gztell($handle);
+
+        return false === $pos ? -1 : $pos;
+    }
+
+    /** @return 0|1 */
+    public static function gzrewindArgv(int $handle): int
+    {
+        return VmGzStream::gzrewind($handle) ? 1 : 0;
+    }
+
     public static function gzReadAllArgv(int $handle): ?string
     {
         $out = '';

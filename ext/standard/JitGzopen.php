@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\GzStreamRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPLLVM\Builder;
@@ -16,6 +17,7 @@ final class JitGzopen
     /** @return Value boxed stream handle or boolean false */
     public static function invoke(Context $context, Value $pathStr, Value $modeStr, Value $useIncludePath): Value
     {
+        GzStreamRuntime::ensureLinked($context);
         $handle = $context->builder->call(
             $context->lookupFunction('__compiler_gzopen'),
             $pathStr,

@@ -117,6 +117,47 @@ final class VmGzStreamPure
         return $chunk;
     }
 
+    public static function gzseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        $stream = self::$streams[$handle] ?? null;
+        if (null === $stream || $stream['writing']) {
+            return -1;
+        }
+
+        $len = \strlen($stream['buffer']);
+        $pos = match ($whence) {
+            \SEEK_SET => $offset,
+            \SEEK_CUR => $stream['pos'] + $offset,
+            \SEEK_END => $len + $offset,
+            default => -1,
+        };
+        if ($pos < 0) {
+            return -1;
+        }
+        $stream['pos'] = $pos;
+        self::$streams[$handle] = $stream;
+
+        return 0;
+    }
+
+    public static function gztell(int $handle): int|false
+    {
+        $stream = self::$streams[$handle] ?? null;
+        if (null === $stream || $stream['writing']) {
+            return false;
+        }
+        if ($stream['pos'] > \strlen($stream['buffer'])) {
+            return false;
+        }
+
+        return $stream['pos'];
+    }
+
+    public static function gzrewind(int $handle): bool
+    {
+        return 0 === self::gzseek($handle, 0, \SEEK_SET);
+    }
+
     public static function gzclose(int $handle): bool
     {
         $stream = self::$streams[$handle] ?? null;
