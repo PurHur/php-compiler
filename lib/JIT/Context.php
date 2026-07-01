@@ -895,6 +895,8 @@ class Context {
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */
     private function ensureBootstrapAotStandaloneBodies(): void
     {
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         $this->ensureMinimalUserStandaloneBodies();
         Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
         Builtin\SuperglobalRefreshRuntime::ensureStandaloneBodies($this);
