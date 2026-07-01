@@ -343,6 +343,20 @@ class Runtime {
         return $this->jitContext;
     }
 
+    /**
+     * Bind the in-flight JIT Context before defineBuiltins finishes (#14459).
+     *
+     * Nested php-in-PHP helper JIT during Context construction can call
+     * {@see loadJitContext()} / {@see loadJit()} reentrantly; without an early slot,
+     * a second Context + LLVM module is created and CallArgv LLVM globals leak across modules.
+     */
+    public function claimJitContextSlot(JITContext $context): void
+    {
+        if (null === $this->jitContext) {
+            $this->jitContext = $context;
+        }
+    }
+
     public function load(Module $module): void {
         $this->modules[] = $module;
         $module->init($this);

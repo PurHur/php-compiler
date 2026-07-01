@@ -20,30 +20,12 @@ final class CallArgv
     public const GLOBAL_HT = '__phpc_call_argv_ht';
 
     /** @var Value|null */
-    private static $htGlobal = null;
+    public static $htGlobal = null;
 
     /** @var object|null LLVM module identity — static Value must not leak across Context instances */
     private static $htModule = null;
 
-    public static function implement(Context $context): void
-    {
-        self::ensureGlobal($context);
-    }
-
-    public static function emitStore(Context $context, Variable $packedArgv): void
-    {
-        $context->builder->store(
-            $context->helper->loadValue($packedArgv),
-            self::ensureGlobal($context)
-        );
-    }
-
-    public static function load(Context $context): Value
-    {
-        return $context->builder->load(self::ensureGlobal($context));
-    }
-
-    private static function ensureGlobal(Context $context): Value
+    public static function ensureGlobal(Context $context): Value
     {
         $module = $context->module;
         if (null !== self::$htGlobal && self::$htModule === $module) {
@@ -64,5 +46,24 @@ final class CallArgv
         self::$htModule = $module;
 
         return self::$htGlobal;
+    }
+
+    /** @deprecated use ensureGlobal() */
+    public static function implement(Context $context): void
+    {
+        self::ensureGlobal($context);
+    }
+
+    public static function emitStore(Context $context, Variable $packedArgv): void
+    {
+        $context->builder->store(
+            $context->helper->loadValue($packedArgv),
+            self::ensureGlobal($context)
+        );
+    }
+
+    public static function load(Context $context): Value
+    {
+        return $context->builder->load(self::ensureGlobal($context));
     }
 }
