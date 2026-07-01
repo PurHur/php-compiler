@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_slice() via ArraySliceJitHelper PHP (#12410).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildSliceArray()}.
+ * Standalone AOT compiles {@see ArraySliceJitHelper} via JitVmHelperLink (#14285); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildSliceArray()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::sliceCopy()}
  * php-src: ext/standard/array.c — php_array_slice()
  */
@@ -39,8 +38,7 @@ final class ArraySliceRuntime
         Value $length,
         ?Value $preserveKeys = null
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildSliceArray($context, $array, $offset, $hasLength, $length, $preserveKeys);
         }
 
@@ -66,12 +64,13 @@ final class ArraySliceRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_SLICE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

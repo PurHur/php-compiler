@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_slice() JIT routes through ArraySliceJitHelper PHP not ArrayBuiltinHelper LLVM (#12410). */
+/** array_slice() JIT routes through ArraySliceJitHelper PHP not ArrayBuiltinHelper LLVM (#12410, #14285). */
 final class ArraySliceRuntimeShrinkTest extends TestCase
 {
     public function testArraySliceRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArraySliceRuntime.php');
         $this->assertStringContainsString('ArraySliceJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildSliceArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_slice.php');
         $this->assertStringContainsString('ArraySliceRuntime::slice', $builtin);
