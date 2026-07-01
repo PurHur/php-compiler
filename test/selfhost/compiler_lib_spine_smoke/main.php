@@ -138,6 +138,7 @@ require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocumentType.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationHasFeature.php';
 require_once __DIR__.'/../../../ext/dom/Module.php';
 require_once __DIR__.'/../../../ext/dom/NodeCloneNode.php';
+require_once __DIR__.'/../../../ext/dom/NodeIsSameNode.php';
 require_once __DIR__.'/../../../ext/dom/NodeListItem.php';
 require_once __DIR__.'/../../../ext/dom/VmDom.php';
 require_once __DIR__.'/../../../ext/filter/BuiltinEnums.php';
