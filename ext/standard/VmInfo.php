@@ -488,11 +488,48 @@ final class VmInfo
         $html .= '<tr><td class="e">Build Date </td><td class="v">'.CompilerVersion::BUILD_DATE.' </td></tr>';
         $html .= '<tr><td class="e">Build System </td><td class="v">'.$system.' '.$machine.' </td></tr>';
         $html .= '<tr><td class="e">Server API </td><td class="v">'.$sapi.' </td></tr>';
+        foreach (self::PHPINFO_GENERAL_EXTRA_ROWS as $label) {
+            $value = VmIniIntrospection::phpinfoGeneralRow($label);
+            if ('Additional .ini files parsed' === $label) {
+                $value = self::formatPhpinfoAdditionalIniFilesHtml($value);
+            }
+            $html .= '<tr><td class="e">'.$label.' </td><td class="v">'.$value.' </td></tr>';
+        }
         $html .= '<tr><td class="e">PHP Version </td><td class="v">'.$version.' </td></tr>';
         $html .= '<tr><td class="e">Zend Engine Version </td><td class="v">'.CompilerVersion::zendVersion().' </td></tr>';
         $html .= '</table><br />';
 
         return $html;
+    }
+
+    /** php-src phpinfo(INFO_GENERAL) rows after Server API (ext/standard/info.c, #14283). */
+    private const PHPINFO_GENERAL_EXTRA_ROWS = [
+        'Virtual Directory Support',
+        'Configuration File (php.ini) Path',
+        'Loaded Configuration File',
+        'Scan this dir for additional .ini files',
+        'Additional .ini files parsed',
+        'PHP API',
+        'PHP Extension',
+        'Zend Extension',
+        'Zend Extension Build',
+        'PHP Extension Build',
+        'Debug Build',
+        'Thread Safety',
+    ];
+
+    private static function formatPhpinfoAdditionalIniFilesHtml(string $value): string
+    {
+        if ('(none)' === $value || '' === $value) {
+            return $value;
+        }
+        $parts = preg_split('/,\s*\n?/', $value) ?: [];
+        $parts = array_values(array_filter(array_map('trim', $parts), static fn (string $part): bool => '' !== $part));
+        if ([] === $parts) {
+            return $value;
+        }
+
+        return implode('<br />', $parts);
     }
 
     private static function modulesSectionHtml(): string

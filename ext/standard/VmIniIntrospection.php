@@ -11,6 +11,12 @@ final class VmIniIntrospection
 
     private const ENV_SCANNED_FILES = 'PHP_COMPILER_INI_SCANNED_FILES';
 
+    /** JSON map of phpinfo(INFO_GENERAL) label => value rows mirrored from host Zend (#14283). */
+    private const ENV_PHPINFO_GENERAL = 'PHP_COMPILER_PHPINFO_GENERAL_JSON';
+
+    /** @var array<string, string>|null */
+    private static ?array $phpinfoGeneralRows = null;
+
     /**
      * Registered string ini directives mirrored from host Zend ini_get() (#14187).
      *
@@ -57,6 +63,100 @@ final class VmIniIntrospection
                 \putenv($envName.'='.$host);
             }
         }
+        self::seedHostPhpinfoGeneralEnvFromZend();
+    }
+
+    /**
+     * Mirror host phpinfo(INFO_GENERAL) rows for phpinfo() HTML parity (#14283).
+     */
+    public static function seedHostPhpinfoGeneralEnvFromZend(): void
+    {
+        if (!\function_exists('putenv') || !\function_exists('phpinfo')) {
+            return;
+        }
+        if ('' !== self::envString(self::ENV_PHPINFO_GENERAL)) {
+            return;
+        }
+        if (!\defined('INFO_GENERAL')) {
+            return;
+        }
+        \ob_start();
+        @\phpinfo(\INFO_GENERAL);
+        $text = \ob_get_clean();
+        if (!\is_string($text) || '' === $text) {
+            return;
+        }
+        $rows = [];
+        foreach (\explode("\n", $text) as $line) {
+            $line = \rtrim($line);
+            if (\preg_match('/^(.+?) => (.*)$/', $line, $matches)) {
+                $rows[\trim($matches[1])] = \trim($matches[2]);
+            }
+        }
+        if ([] === $rows) {
+            return;
+        }
+        $encoded = \json_encode($rows, \JSON_UNESCAPED_UNICODE);
+        if (\is_string($encoded)) {
+            \putenv(self::ENV_PHPINFO_GENERAL.'='.$encoded);
+        }
+    }
+
+    /** phpinfo(INFO_GENERAL) row value; mirrors host Zend when seeded (#14283). */
+    public static function phpinfoGeneralRow(string $label, string $default = ''): string
+    {
+        $rows = self::phpinfoGeneralRows();
+
+        return $rows[$label] ?? $default;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function phpinfoGeneralRows(): array
+    {
+        if (null !== self::$phpinfoGeneralRows) {
+            return self::$phpinfoGeneralRows;
+        }
+        $json = self::envString(self::ENV_PHPINFO_GENERAL);
+        if ('' !== $json) {
+            $decoded = \json_decode($json, true);
+            if (\is_array($decoded)) {
+                /** @var array<string, string> $decoded */
+                self::$phpinfoGeneralRows = $decoded;
+
+                return self::$phpinfoGeneralRows;
+            }
+        }
+        self::$phpinfoGeneralRows = self::defaultPhpinfoGeneralRows();
+
+        return self::$phpinfoGeneralRows;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function defaultPhpinfoGeneralRows(): array
+    {
+        $loaded = self::loadedFile();
+        $scanned = self::scannedFiles();
+        $configPath = \defined('PHP_CONFIG_FILE_PATH') ? (string) \PHP_CONFIG_FILE_PATH : '';
+        $scanDir = \defined('PHP_CONFIG_FILE_SCAN_DIR') ? (string) \PHP_CONFIG_FILE_SCAN_DIR : '';
+
+        return [
+            'Virtual Directory Support' => 'disabled',
+            'Configuration File (php.ini) Path' => $configPath,
+            'Loaded Configuration File' => \is_string($loaded) ? $loaded : '(none)',
+            'Scan this dir for additional .ini files' => $scanDir,
+            'Additional .ini files parsed' => \is_string($scanned) ? $scanned : '(none)',
+            'PHP API' => '20240924',
+            'PHP Extension' => '20240924',
+            'Zend Extension' => '420240924',
+            'Zend Extension Build' => 'API420240924,NTS',
+            'PHP Extension Build' => 'API20240924,NTS',
+            'Debug Build' => 'no',
+            'Thread Safety' => 'disabled',
+        ];
     }
 
     /**
