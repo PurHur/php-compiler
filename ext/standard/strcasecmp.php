@@ -50,8 +50,8 @@ final class strcasecmp extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'strcasecmp', 'string1', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'strcasecmp', 'string2', 2);
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'strcasecmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'strcasecmp', 1, 'string2'));
+        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strcasecmp', 0, 'string1'));
+        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strcasecmp', 1, 'string2'));
         $fn = $context->lookupFunction('strcasecmp');
         $raw = $context->builder->call($fn, $p0, $p1);
         $i64 = $context->getTypeFromString('int64');
