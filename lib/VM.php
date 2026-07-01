@@ -4608,6 +4608,11 @@ restart:
                                 $frame->scope[$op->arg1]->string($builtinName);
                                 break;
                             }
+                            $builtinFn = BuiltinFunctionClassConstant::functionNameForClassOperand($className);
+                            if (null !== $builtinFn) {
+                                $frame->scope[$op->arg1]->string($builtinFn);
+                                break;
+                            }
                         }
 
                         return $this->raise("Unknown class for constant fetch: {$className}", $frame);

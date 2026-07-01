@@ -6643,6 +6643,13 @@ class Compiler {
 
                     return $value;
                 }
+                $builtinFn = BuiltinFunctionClassConstant::functionNameForClassOperand($builtinClass);
+                if (null !== $builtinFn) {
+                    $value = new Variable(Variable::TYPE_STRING);
+                    $value->string($builtinFn);
+
+                    return $value;
+                }
             }
         }
         $className = $this->staticNameFromOperand($expr->class);
