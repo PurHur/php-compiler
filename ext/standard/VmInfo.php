@@ -586,8 +586,14 @@ final class VmInfo
 
     private static function creditsSapiSectionHtml(): string
     {
-        $html = '<table><tr class="h"><td colspan="2"><h2>Server API (SAPI) Abstraction Layer</h2></td></tr>';
-        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::SAPI_AUTHORS.'</td></tr>';
+        $html = '<table><tr class="h"><td colspan="2"><h2>SAPI Modules</h2></td></tr>';
+        $html .= '<tr><td class="e">Contribution </td><td class="v">Authors </td></tr>';
+        foreach (VmCreditsData::SAPI_MODULES as $contribution => $authors) {
+            $html .= '<tr><td class="e">'.$contribution.' </td><td class="v">'.$authors.' </td></tr>';
+        }
+        $html .= '</table><br />';
+        $html .= '<table><tr class="h"><td colspan="2"><h2>Debian Packaging</h2></td></tr>';
+        $html .= '<tr><td class="v" colspan="2">'.VmCreditsData::DEBIAN_PACKAGING_AUTHOR.'</td></tr>';
         $html .= '</table><br />';
 
         return $html;
