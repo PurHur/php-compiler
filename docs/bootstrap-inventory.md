@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3570 |
-| Phase A inventory files (M2 ratio SSOT) | 3570 |
+| PHP files on vm.php path | 3571 |
+| Phase A inventory files (M2 ratio SSOT) | 3571 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9752 |
+| Source constructs flagged (warnings) | 9755 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -121,7 +121,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/NodeHasChildNodes.php` | 0 | 1 |
 | `ext/dom/NodeIsSameNode.php` | 0 | 1 |
 | `ext/dom/NodeListItem.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 74 |
+| `ext/dom/VmDom.php` | 0 | 76 |
 | `ext/filter/BuiltinEnums.php` | 0 | 3 |
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterConstants.php` | 0 | 2 |
@@ -1071,6 +1071,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StreamFilterJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamIoJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamLibcHandleJitHelper.php` | 0 | 1 |
+| `ext/standard/StreamLibcThinAbi.php` | 0 | 1 |
 | `ext/standard/StreamLifecycleJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamMetaJitHelper.php` | 0 | 1 |
 | `ext/standard/StreamModeJitHelper.php` | 0 | 1 |
@@ -4050,7 +4051,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 33)
+- new Variable (line 34)
 - 3 class method(s)
 
 ### `ext/dom/DomRegistry.php`
@@ -4111,80 +4112,82 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDom.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 77)
-- new Variable (line 78)
-- new Variable (line 79)
-- new Variable (line 80)
 - new Variable (line 81)
-- new ClassEntry (line 84)
-- new ClassProperty (line 86)
-- new ClassProperty (line 87)
-- new ClassProperty (line 88)
-- new ClassProperty (line 89)
+- new Variable (line 82)
+- new Variable (line 83)
+- new Variable (line 84)
+- new Variable (line 85)
+- new ClassEntry (line 88)
 - new ClassProperty (line 90)
 - new ClassProperty (line 91)
 - new ClassProperty (line 92)
 - new ClassProperty (line 93)
 - new ClassProperty (line 94)
-- new NodeCloneNode (line 95)
-- new NodeIsSameNode (line 97)
-- new NodeHasChildNodes (line 99)
-- new ClassEntry (line 103)
-- new ClassProperty (line 106)
+- new ClassProperty (line 95)
+- new ClassProperty (line 96)
+- new ClassProperty (line 97)
+- new ClassProperty (line 98)
+- new ClassProperty (line 99)
+- new ClassProperty (line 100)
+- new NodeCloneNode (line 101)
+- new NodeIsSameNode (line 103)
+- new NodeHasChildNodes (line 105)
 - new ClassEntry (line 109)
-- new ClassProperty (line 111)
-- new NodeListItem (line 112)
-- new ClassEntry (line 116)
-- new ImplementationCreateDocument (line 118)
-- new ImplementationCreateDocumentType (line 120)
-- new ImplementationHasFeature (line 122)
-- new ClassEntry (line 126)
-- new ClassProperty (line 129)
-- new ClassProperty (line 130)
-- new ClassProperty (line 131)
-- new ClassProperty (line 132)
-- new ClassEntry (line 135)
+- new ClassProperty (line 112)
+- new ClassEntry (line 115)
+- new ClassProperty (line 117)
+- new NodeListItem (line 118)
+- new ClassEntry (line 122)
+- new ImplementationCreateDocument (line 124)
+- new ImplementationCreateDocumentType (line 126)
+- new ImplementationHasFeature (line 128)
+- new ClassEntry (line 132)
+- new ClassProperty (line 135)
+- new ClassProperty (line 136)
+- new ClassProperty (line 137)
 - new ClassProperty (line 138)
-- new ClassProperty (line 139)
-- new ClassProperty (line 140)
-- new DocumentLoadXML (line 141)
-- new DocumentCreateElement (line 143)
-- new DocumentCreateDocumentFragment (line 145)
-- new DocumentAppendChild (line 147)
-- new DocumentSaveXML (line 149)
-- new DocumentGetElementsByTagName (line 151)
-- new DocumentGetElementById (line 153)
-- new ClassEntry (line 157)
-- new ClassProperty (line 160)
-- new ElementAppendChild (line 161)
-- new ClassEntry (line 165)
-- new ClassProperty (line 168)
-- new FragmentAppendChild (line 169)
-- new ObjectEntry (line 185)
-- new DomNodeState (line 187)
-- new Variable (line 195)
-- new ObjectEntry (line 218)
-- new DomNodeState (line 223)
-- new Variable (line 236)
-- new DomNodeState (line 257)
-- new ObjectEntry (line 277)
-- new DomNodeState (line 282)
-- new Variable (line 290)
-- new ObjectEntry (line 303)
-- new DomNodeState (line 308)
-- new ObjectEntry (line 327)
-- new DomNodeState (line 332)
-- new Variable (line 337)
-- new DOMException (line 488)
-- new DOMException (line 512)
-- new Variable (line 584)
-- new DOMException (line 700)
-- new ObjectEntry (line 782)
-- new DomNodeState (line 786)
-- new Variable (line 792)
-- new Variable (line 1142)
-- new DOMException (line 1156)
-- 60 class method(s)
+- new ClassEntry (line 141)
+- new ClassProperty (line 144)
+- new ClassProperty (line 145)
+- new ClassProperty (line 146)
+- new DocumentLoadXML (line 147)
+- new DocumentCreateElement (line 149)
+- new DocumentCreateDocumentFragment (line 151)
+- new DocumentAppendChild (line 153)
+- new DocumentSaveXML (line 155)
+- new DocumentGetElementsByTagName (line 157)
+- new DocumentGetElementById (line 159)
+- new ClassEntry (line 163)
+- new ClassProperty (line 166)
+- new ElementAppendChild (line 167)
+- new ClassEntry (line 171)
+- new ClassProperty (line 174)
+- new FragmentAppendChild (line 175)
+- new ObjectEntry (line 191)
+- new DomNodeState (line 193)
+- new Variable (line 201)
+- new ObjectEntry (line 224)
+- new DomNodeState (line 229)
+- new Variable (line 242)
+- new DomNodeState (line 263)
+- new ObjectEntry (line 283)
+- new DomNodeState (line 288)
+- new Variable (line 296)
+- new ObjectEntry (line 309)
+- new DomNodeState (line 314)
+- new ObjectEntry (line 333)
+- new DomNodeState (line 338)
+- new Variable (line 343)
+- new DOMException (line 494)
+- new DOMException (line 518)
+- new Variable (line 590)
+- new DOMException (line 706)
+- new ObjectEntry (line 788)
+- new DomNodeState (line 792)
+- new Variable (line 798)
+- new Variable (line 1188)
+- new DOMException (line 1202)
+- 62 class method(s)
 
 ### `ext/filter/BuiltinEnums.php`
 
@@ -10739,7 +10742,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/StreamLibcHandleJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 11 class method(s)
+- 9 class method(s)
+
+### `ext/standard/StreamLibcThinAbi.php`
+
+**Warnings** (review for bootstrap subset):
+- 7 class method(s)
 
 ### `ext/standard/StreamLifecycleJitHelper.php`
 
@@ -19284,7 +19292,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php`
 
@@ -19325,7 +19333,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayFillKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayFillRuntime.php`
 
@@ -19426,7 +19434,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayReduceRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayReplaceKeyRuntime.php`
 
