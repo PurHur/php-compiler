@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_change_key_case() via ArrayChangeKeyCaseJitHelper PHP (#12371).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildChangeKeyCaseArray()}.
+ * Standalone AOT compiles {@see ArrayChangeKeyCaseJitHelper} via JitVmHelperLink bridge (#14530); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildChangeKeyCaseArray()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::changeKeyCase()}
  * php-src: ext/standard/array.c — php_array_change_key_case()
  */
@@ -33,8 +32,7 @@ final class ArrayChangeKeyCaseRuntime
 
     public static function changeKeyCase(Context $context, JITVariable $array, Value $case): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildChangeKeyCaseArray($context, $array, $case);
         }
 
@@ -53,19 +51,13 @@ final class ArrayChangeKeyCaseRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction(self::ABI_CHANGE);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
