@@ -15,9 +15,9 @@ use PHPLLVM\Value;
 /** gzwrite() — write to gzip stream (ext/zlib/zlib.c parity, #6168). */
 final class gzwrite extends Internal
 {
-    public function __construct()
+    public function __construct(string $name = 'gzwrite')
     {
-        parent::__construct('gzwrite');
+        parent::__construct($name);
     }
 
     public function execute(Frame $frame): void

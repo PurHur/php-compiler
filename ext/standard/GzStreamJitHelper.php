@@ -83,6 +83,12 @@ final class GzStreamJitHelper
         return VmGzStream::gzrewind($handle) ? 1 : 0;
     }
 
+    /** @return 0|1 */
+    public static function gzeofArgv(int $handle): int
+    {
+        return VmGzStream::gzeof($handle);
+    }
+
     public static function gzReadAllArgv(int $handle): ?string
     {
         $out = '';

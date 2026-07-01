@@ -37,6 +37,8 @@ final class GzStreamRuntime
 
     private const GZREWIND = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzrewindArgv';
 
+    private const GZEOF = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzeofArgv';
+
     private const GZ_READ_ALL = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzReadAllArgv';
 
     private const GZ_PASSTHRU = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzPassthruArgv';
@@ -51,6 +53,7 @@ final class GzStreamRuntime
         self::GZSEEK,
         self::GZTELL,
         self::GZREWIND,
+        self::GZEOF,
         self::GZ_READ_ALL,
         self::GZ_PASSTHRU,
     ];
@@ -65,6 +68,7 @@ final class GzStreamRuntime
         '__compiler_gzseek',
         '__compiler_gztell',
         '__compiler_gzrewind',
+        '__compiler_gzeof',
         '__compiler_gz_read_all',
         '__compiler_gz_passthru',
     ];
@@ -107,6 +111,7 @@ final class GzStreamRuntime
         self::implementIfMissing($context, '__compiler_gzseek', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZSEEK, 3));
         self::implementIfMissing($context, '__compiler_gztell', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZTELL, 1));
         self::implementIfMissing($context, '__compiler_gzrewind', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::GZREWIND, 1));
+        self::implementIfMissing($context, '__compiler_gzeof', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::GZEOF, 1));
         self::implementIfMissing($context, '__compiler_gz_read_all', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZ_READ_ALL, 1));
         self::implementIfMissing($context, '__compiler_gz_passthru', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZ_PASSTHRU, 1));
         self::registerLinkedRuntime($context);
@@ -142,6 +147,7 @@ final class GzStreamRuntime
             '__compiler_gzseek' => $context->context->functionType($i64, false, $i64, $i64, $i64),
             '__compiler_gztell' => $context->context->functionType($i64, false, $i64),
             '__compiler_gzrewind' => $context->context->functionType($i32, false, $i64),
+            '__compiler_gzeof' => $context->context->functionType($i32, false, $i64),
             '__compiler_gz_passthru' => $context->context->functionType($i64, false, $i64),
             default => throw new \LogicException('GzStreamRuntime: unknown '.$name),
         };
