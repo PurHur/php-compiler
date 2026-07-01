@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3586 |
-| Phase A inventory files (M2 ratio SSOT) | 3586 |
+| PHP files on vm.php path | 3588 |
+| Phase A inventory files (M2 ratio SSOT) | 3588 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9791 |
+| Source constructs flagged (warnings) | 9794 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -130,10 +130,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/NodeHasAttributes.php` | 0 | 1 |
 | `ext/dom/NodeHasChildNodes.php` | 0 | 1 |
 | `ext/dom/NodeIsSameNode.php` | 0 | 1 |
+| `ext/dom/NodeListCount.php` | 0 | 1 |
 | `ext/dom/NodeListItem.php` | 0 | 1 |
 | `ext/dom/NodeLookupNamespaceURI.php` | 0 | 1 |
 | `ext/dom/NodeLookupPrefix.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 91 |
+| `ext/dom/VmDom.php` | 0 | 92 |
 | `ext/filter/BuiltinEnums.php` | 0 | 3 |
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterConstants.php` | 0 | 2 |
@@ -289,6 +290,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/openssl/Module.php` | 0 | 13 |
 | `ext/openssl/OpensslCipherRegistry.php` | 0 | 1 |
 | `ext/openssl/OpensslConstants.php` | 0 | 1 |
+| `ext/openssl/OpensslExtensionPolicy.php` | 0 | 1 |
 | `ext/openssl/OpensslFunction.php` | 0 | 1 |
 | `ext/openssl/VmOpenssl.php` | 0 | 3 |
 | `ext/openssl/VmOpensslObjects.php` | 0 | 6 |
@@ -4083,7 +4085,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/DomNodePropertySupport.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 39)
+- new Variable (line 40)
 - 3 class method(s)
 
 ### `ext/dom/DomRegistry.php`
@@ -4171,6 +4173,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/dom/NodeListCount.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/NodeListItem.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4189,15 +4196,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/dom/VmDom.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 97)
-- new Variable (line 98)
-- new Variable (line 99)
 - new Variable (line 100)
 - new Variable (line 101)
-- new ClassEntry (line 104)
-- new ClassProperty (line 106)
-- new ClassProperty (line 107)
-- new ClassProperty (line 108)
+- new Variable (line 102)
+- new Variable (line 103)
+- new Variable (line 104)
+- new ClassEntry (line 107)
 - new ClassProperty (line 109)
 - new ClassProperty (line 110)
 - new ClassProperty (line 111)
@@ -4206,79 +4210,83 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassProperty (line 114)
 - new ClassProperty (line 115)
 - new ClassProperty (line 116)
-- new NodeCloneNode (line 117)
-- new NodeIsSameNode (line 119)
-- new NodeHasChildNodes (line 121)
-- new NodeContains (line 123)
-- new NodeLookupPrefix (line 125)
-- new NodeLookupNamespaceURI (line 127)
-- new NodeGetLineNo (line 129)
-- new NodeHasAttributes (line 131)
-- new NodeCompareDocumentPosition (line 133)
-- new ClassEntry (line 145)
-- new ClassProperty (line 148)
-- new ClassEntry (line 151)
+- new ClassProperty (line 117)
+- new ClassProperty (line 118)
+- new ClassProperty (line 119)
+- new NodeCloneNode (line 120)
+- new NodeIsSameNode (line 122)
+- new NodeHasChildNodes (line 124)
+- new NodeContains (line 127)
+- new NodeLookupPrefix (line 130)
+- new NodeLookupNamespaceURI (line 132)
+- new NodeGetLineNo (line 134)
+- new NodeHasAttributes (line 136)
+- new NodeCompareDocumentPosition (line 138)
+- new ClassEntry (line 150)
 - new ClassProperty (line 153)
-- new NodeListItem (line 154)
-- new ClassEntry (line 158)
-- new ImplementationCreateDocument (line 160)
-- new ImplementationCreateDocumentType (line 162)
-- new ImplementationHasFeature (line 164)
-- new ClassEntry (line 168)
-- new ClassProperty (line 171)
-- new ClassProperty (line 172)
-- new ClassProperty (line 173)
-- new ClassProperty (line 174)
-- new ClassEntry (line 177)
+- new ClassEntry (line 156)
+- new ClassProperty (line 159)
+- new NodeListItem (line 160)
+- new NodeListCount (line 162)
+- new ClassEntry (line 166)
+- new ImplementationCreateDocument (line 168)
+- new ImplementationCreateDocumentType (line 170)
+- new ImplementationHasFeature (line 172)
+- new ClassEntry (line 176)
+- new ClassProperty (line 179)
 - new ClassProperty (line 180)
 - new ClassProperty (line 181)
 - new ClassProperty (line 182)
-- new DocumentLoadXML (line 183)
-- new DocumentCreateElement (line 185)
-- new DocumentCreateElementNS (line 187)
-- new DocumentCreateDocumentFragment (line 189)
-- new DocumentAppendChild (line 191)
-- new DocumentSaveXML (line 193)
-- new DocumentGetElementsByTagName (line 195)
-- new DocumentGetElementById (line 197)
-- new ClassEntry (line 201)
-- new ClassProperty (line 204)
-- new ElementAppendChild (line 205)
-- new ElementGetAttributeNS (line 207)
-- new ElementHasAttributeNS (line 209)
-- new ElementSetAttributeNS (line 211)
-- new ClassEntry (line 215)
-- new ClassProperty (line 218)
-- new FragmentAppendChild (line 219)
-- new ObjectEntry (line 235)
-- new DomNodeState (line 237)
-- new Variable (line 245)
-- new ObjectEntry (line 268)
-- new DomNodeState (line 273)
-- new Variable (line 286)
-- new DomNodeState (line 307)
-- new ObjectEntry (line 327)
-- new DomNodeState (line 332)
-- new Variable (line 342)
-- new ObjectEntry (line 361)
-- new DomNodeState (line 366)
-- new Variable (line 380)
-- new DOMException (line 389)
-- new DOMException (line 442)
-- new ObjectEntry (line 610)
-- new DomNodeState (line 615)
-- new ObjectEntry (line 634)
-- new DomNodeState (line 639)
-- new Variable (line 644)
-- new DOMException (line 863)
-- new DOMException (line 889)
-- new Variable (line 961)
-- new DOMException (line 1090)
-- new ObjectEntry (line 1172)
-- new DomNodeState (line 1176)
-- new Variable (line 1182)
-- new Variable (line 1715)
-- new DOMException (line 1729)
+- new ClassEntry (line 185)
+- new ClassProperty (line 188)
+- new ClassProperty (line 189)
+- new ClassProperty (line 190)
+- new DocumentLoadXML (line 191)
+- new DocumentCreateElement (line 193)
+- new DocumentCreateElementNS (line 195)
+- new DocumentCreateDocumentFragment (line 197)
+- new DocumentAppendChild (line 199)
+- new DocumentSaveXML (line 201)
+- new DocumentGetElementsByTagName (line 203)
+- new DocumentGetElementById (line 205)
+- new ClassEntry (line 209)
+- new ClassProperty (line 212)
+- new ElementAppendChild (line 213)
+- new ElementGetAttributeNS (line 215)
+- new ElementHasAttributeNS (line 217)
+- new ElementSetAttributeNS (line 219)
+- new ClassEntry (line 223)
+- new ClassProperty (line 226)
+- new FragmentAppendChild (line 227)
+- new ObjectEntry (line 243)
+- new DomNodeState (line 245)
+- new Variable (line 253)
+- new ObjectEntry (line 276)
+- new DomNodeState (line 281)
+- new Variable (line 294)
+- new DomNodeState (line 315)
+- new ObjectEntry (line 335)
+- new DomNodeState (line 340)
+- new Variable (line 350)
+- new ObjectEntry (line 369)
+- new DomNodeState (line 374)
+- new Variable (line 388)
+- new DOMException (line 397)
+- new DOMException (line 450)
+- new ObjectEntry (line 618)
+- new DomNodeState (line 623)
+- new ObjectEntry (line 642)
+- new DomNodeState (line 647)
+- new Variable (line 652)
+- new DOMException (line 871)
+- new DOMException (line 897)
+- new Variable (line 969)
+- new DOMException (line 1098)
+- new ObjectEntry (line 1180)
+- new DomNodeState (line 1184)
+- new Variable (line 1190)
+- new Variable (line 1723)
+- new DOMException (line 1737)
 - 90 class method(s)
 
 ### `ext/filter/BuiltinEnums.php`
@@ -5288,19 +5296,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/openssl/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 26)
-- new openssl_encrypt (line 35)
-- new openssl_decrypt (line 36)
-- new openssl_sign (line 37)
-- new openssl_get_cipher_methods (line 38)
-- new openssl_get_md_methods (line 39)
-- new openssl_pkey_new (line 40)
-- new openssl_cipher_iv_length (line 41)
-- new openssl_cipher_key_length (line 42)
-- new openssl_digest (line 43)
-- new openssl_x509_read (line 44)
-- new openssl_free_key (line 45)
-- 2 class method(s)
+- new VM\Variable (line 44)
+- new openssl_encrypt (line 53)
+- new openssl_decrypt (line 54)
+- new openssl_sign (line 55)
+- new openssl_get_cipher_methods (line 56)
+- new openssl_get_md_methods (line 57)
+- new openssl_pkey_new (line 58)
+- new openssl_cipher_iv_length (line 59)
+- new openssl_cipher_key_length (line 60)
+- new openssl_digest (line 61)
+- new openssl_x509_read (line 62)
+- new openssl_free_key (line 63)
+- 4 class method(s)
 
 ### `ext/openssl/OpensslCipherRegistry.php`
 
@@ -5311,6 +5319,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/openssl/OpensslExtensionPolicy.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/openssl/OpensslFunction.php`
 
@@ -18599,81 +18612,81 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 11146)
 - new Operand\Temporary (line 11148)
 - new OpCode (line 11195)
-- new CfgVariable (line 19009)
-- new Literal (line 19009)
-- new Variable (line 19041)
-- new Variable (line 19095)
-- new OpCode (line 19119)
-- new Operand\Temporary (line 19710)
-- new OpCode (line 19712)
-- new OpCode (line 19738)
-- new OpCode (line 19754)
-- new OpCode (line 19762)
-- new OpCode (line 19769)
-- new OpCode (line 19781)
-- new OpCode (line 19798)
-- new OpCode (line 19804)
-- new OpCode (line 19810)
-- new OpCode (line 19815)
-- new OpCode (line 19831)
-- new OpCode (line 19844)
-- new Variable (line 19855)
-- new Operand\Literal (line 19857)
-- new OpCode (line 19860)
-- new OpCode (line 19930)
-- new OpCode (line 19941)
-- new OpCode (line 19954)
-- new OpCode (line 20128)
-- new OpCode (line 20376)
-- new OpCode (line 20382)
-- new OpCode (line 20388)
-- new OpCode (line 20413)
-- new Variable (line 20440)
-- new Temporary (line 20442)
-- new Variable (line 20450)
-- new Temporary (line 20452)
-- new OpCode (line 20500)
-- new Operand\Temporary (line 20520)
-- new Operand\Temporary (line 20526)
-- new Operand\Temporary (line 20532)
-- new Operand\Temporary (line 20538)
-- new Operand\Temporary (line 20547)
-- new Variable (line 21661)
-- new Variable (line 21665)
-- new Variable (line 21673)
-- new Variable (line 21677)
-- new Variable (line 21919)
-- new Operand\Literal (line 22498)
-- new Variable (line 22500)
-- new Operand\Temporary (line 23100)
-- new Operand\Temporary (line 23132)
-- new OpCode (line 23157)
-- new OpCode (line 23349)
-- new OpCode (line 23630)
-- new OpCode (line 23831)
-- new OpCode (line 23841)
-- new OpCode (line 23844)
-- new Operand\Temporary (line 23881)
-- new OpCode (line 23883)
-- new OpCode (line 23894)
-- new Operand\Temporary (line 23897)
-- new OpCode (line 23899)
-- new OpCode (line 23907)
-- new OpCode (line 23914)
-- new OpCode (line 23922)
-- new OpCode (line 23925)
-- new OpCode (line 23942)
-- new OpCode (line 23970)
-- new OpCode (line 23977)
-- new OpCode (line 24249)
-- new Literal (line 24281)
+- new CfgVariable (line 19113)
+- new Literal (line 19113)
+- new Variable (line 19145)
+- new Variable (line 19199)
+- new OpCode (line 19223)
+- new Operand\Temporary (line 19814)
+- new OpCode (line 19816)
+- new OpCode (line 19842)
+- new OpCode (line 19858)
+- new OpCode (line 19866)
+- new OpCode (line 19873)
+- new OpCode (line 19885)
+- new OpCode (line 19902)
+- new OpCode (line 19908)
+- new OpCode (line 19914)
+- new OpCode (line 19919)
+- new OpCode (line 19935)
+- new OpCode (line 19948)
+- new Variable (line 19959)
+- new Operand\Literal (line 19961)
+- new OpCode (line 19964)
+- new OpCode (line 20034)
+- new OpCode (line 20045)
+- new OpCode (line 20058)
+- new OpCode (line 20232)
+- new OpCode (line 20480)
+- new OpCode (line 20486)
+- new OpCode (line 20492)
+- new OpCode (line 20517)
+- new Variable (line 20544)
+- new Temporary (line 20546)
+- new Variable (line 20554)
+- new Temporary (line 20556)
+- new OpCode (line 20604)
+- new Operand\Temporary (line 20624)
+- new Operand\Temporary (line 20630)
+- new Operand\Temporary (line 20636)
+- new Operand\Temporary (line 20642)
+- new Operand\Temporary (line 20651)
+- new Variable (line 21765)
+- new Variable (line 21769)
+- new Variable (line 21777)
+- new Variable (line 21781)
+- new Variable (line 22023)
+- new Operand\Literal (line 22629)
+- new Variable (line 22631)
+- new Operand\Temporary (line 23231)
+- new Operand\Temporary (line 23263)
+- new OpCode (line 23288)
+- new OpCode (line 23480)
+- new OpCode (line 23761)
+- new OpCode (line 23962)
+- new OpCode (line 23972)
+- new OpCode (line 23975)
+- new Operand\Temporary (line 24012)
+- new OpCode (line 24014)
+- new OpCode (line 24025)
+- new Operand\Temporary (line 24028)
+- new OpCode (line 24030)
+- new OpCode (line 24038)
+- new OpCode (line 24045)
+- new OpCode (line 24053)
+- new OpCode (line 24056)
+- new OpCode (line 24073)
+- new OpCode (line 24101)
+- new OpCode (line 24108)
 - new OpCode (line 24380)
-- new Variable (line 24387)
-- new Temporary (line 24389)
-- new OpCode (line 24392)
-- new CompileFatal (line 24690)
-- new CompileFatal (line 24945)
-- 677 class method(s)
+- new Literal (line 24412)
+- new OpCode (line 24511)
+- new Variable (line 24518)
+- new Temporary (line 24520)
+- new OpCode (line 24523)
+- new CompileFatal (line 24821)
+- new CompileFatal (line 25076)
+- 679 class method(s)
 - 21 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
@@ -18995,7 +19008,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/CompilerVersion.php`
 
 **Warnings** (review for bootstrap subset):
-- 69 class method(s)
+- 70 class method(s)
 
 ### `lib/CurlyBraceOffsetRejector.php`
 
@@ -19381,7 +19394,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayChunkRuntime.php`
 
@@ -19543,7 +19556,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayReplaceKeyRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/ArrayReplaceRecursiveRuntime.php`
 
@@ -20269,7 +20282,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/NaturalSortRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/NonObjectPropertyFetchRuntime.php`
 
@@ -22512,8 +22525,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 319)
 - new Variable (line 327)
 - new Variable (line 341)
-- new Variable (line 387)
-- 21 class method(s)
+- new Variable (line 401)
+- 22 class method(s)
 
 ### `lib/JIT/DynamicObjectReadonlyGuard.php`
 
@@ -22742,8 +22755,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/IntersectionParamCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 103)
-- 10 class method(s)
+- new Variable (line 117)
+- 11 class method(s)
 
 ### `lib/JIT/IssetHelper.php`
 
@@ -26417,7 +26430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/InterfaceCheck.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `lib/VM/InternalStrictArg.php`
 
