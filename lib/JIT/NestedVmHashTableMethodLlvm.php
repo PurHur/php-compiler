@@ -16,6 +16,8 @@ final class NestedVmHashTableMethodLlvm
     private const METHOD_HANDLERS = [
         'getnumelements' => Call\HashTableGetNumElements::class,
         'padcopy' => Call\HashTablePadCopy::class,
+        'valuescopy' => Call\HashTableValuesCopy::class,
+        'keyscopy' => Call\HashTableKeysCopy::class,
         'exportkeyvaluepairs' => Call\HashTableExportKeyValuePairs::class,
     ];
 
