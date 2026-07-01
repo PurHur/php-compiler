@@ -184,6 +184,27 @@ PHP;
         self::assertSame("<a id=\"1\"/>\nattrs\nnull\n", ob_get_clean());
     }
 
+    public function test_dom_node_is_supported_and_default_namespace(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$el = $doc->createElement('root');
+echo (int) $el->isSupported('Core', '2.0'), "\n";
+echo (int) $el->isSupported('Core', '1.0'), "\n";
+$doc->loadXML('<root xmlns="http://example.com"/>');
+$root = $doc->documentElement;
+echo (int) $root->isDefaultNamespace('http://example.com'), "\n";
+echo (int) $root->isDefaultNamespace('http://other.example.com'), "\n";
+echo (int) $root->isDefaultNamespace(null), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_is_supported.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("0\n1\n1\n0\n0\n", ob_get_clean());
+    }
+
     public function test_dom_element_set_attribute_on_create_element(): void
     {
         $runtime = new Runtime();
