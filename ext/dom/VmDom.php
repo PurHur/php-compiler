@@ -83,6 +83,8 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
+        $node->methods['issamenode'] = new NodeIsSameNode();
+        $node->methodVisibility['issamenode'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $nodeList = new ClassEntry('DOMNodeList');
@@ -495,11 +497,19 @@ final class VmDom
         return $fragment;
     }
 
-    public static function saveXML(ObjectEntry $document): string
+    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
             throw new \LogicException('DOMDocument::saveXML() called on non-document node in this compiler build');
+        }
+
+        if (null !== $node) {
+            if (!self::isDomNode($node)) {
+                throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
+            }
+
+            return self::serializeNode($node);
         }
 
         $lines = ['<?xml version="1.0"?>'];
@@ -631,22 +641,46 @@ final class VmDom
         return null;
     }
 
+    private static function serializeNode(ObjectEntry $entry): string
+    {
+        if (self::isElement($entry)) {
+            return self::serializeElement($entry);
+        }
+
+        throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
     private static function serializeElement(ObjectEntry $entry): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
+        $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.'/>';
+            return '<'.$name.$attrPart.'/>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeElement($child);
+                $parts[] = self::serializeNode($child);
             }
         }
 
-        return '<'.$name.'>'.implode('', $parts).'</'.$name.'>';
+        return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+    }
+
+    /** @return non-empty-string */
+    private static function serializeAttributes(DomNodeState $state): string
+    {
+        if ([] === $state->attributes) {
+            return '';
+        }
+        $parts = [];
+        foreach ($state->attributes as $aname => $avalue) {
+            $parts[] = self::escapeName($aname).'="'.self::escapeAttr($avalue).'"';
+        }
+
+        return ' '.implode(' ', $parts);
     }
 
     /**
@@ -898,6 +932,16 @@ final class VmDom
                 self::collectElementsByTagNameRecursive($child, $want, $matches);
             }
         }
+    }
+
+    public static function isDomNode(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry);
+    }
+
+    public static function isSameNode(ObjectEntry $node, ObjectEntry $other): bool
+    {
+        return $node->id === $other->id;
     }
 
     public static function isElement(ObjectEntry $entry): bool

@@ -12,24 +12,24 @@ libxml_clear_errors();
 $doc = new DOMDocument();
 $ok = $doc->loadXML('<root><unclosed');
 if ($ok) {
-    fwrite(STDERR, "loadXML should fail\n");
+    fwrite(STDERR, "fail: loadXML should return false\n");
     exit(1);
 }
 
 $errors = libxml_get_errors();
 if ([] === $errors) {
-    fwrite(STDERR, "expected libxml errors\n");
+    fwrite(STDERR, "fail: expected libxml errors after DOM loadXML failure\n");
     exit(1);
 }
 
 $level = $errors[0]->level;
 $code = $errors[0]->code;
-if (3 !== $level) {
-    fwrite(STDERR, "level={$level} expected 3 (LIBXML_ERR_FATAL)\n");
+if (LIBXML_ERR_FATAL !== $level) {
+    fwrite(STDERR, 'fail: expected level='.LIBXML_ERR_FATAL.", got level={$level}\n");
     exit(1);
 }
 if (73 !== $code) {
-    fwrite(STDERR, "code={$code} expected 73 (XML_ERR_TAG_NOT_FINISHED)\n");
+    fwrite(STDERR, "fail: expected code=73, got code={$code}\n");
     exit(1);
 }
 
