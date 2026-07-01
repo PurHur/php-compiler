@@ -29,6 +29,10 @@ final class VarExportVMTest extends BaseTest
             __DIR__.'/cases/stdlib/var_export_enum_array_newlines.phpt',
             'var_export_enum_array_newlines.phpt'
         );
+        yield 'var_export_set_state_empty.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/var_export_set_state_empty.phpt',
+            'var_export_set_state_empty.phpt'
+        );
     }
 
     public function setUp(): void
