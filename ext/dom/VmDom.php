@@ -652,7 +652,7 @@ final class VmDom
         }
 
         $state = DomRegistry::state($document);
-        $state->childIds = [];
+        $state->childIds = [$root->id];
         $state->idAttrByElement = $idAttrByElement;
         $state->elementIds = [];
         $state->xmlVersion = $decl['version'];
@@ -660,9 +660,9 @@ final class VmDom
         $state->xmlStandalone = $decl['standalone'];
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
-        self::linkChildToParent($root, null);
+        self::linkChildToParent($root, $document);
         self::propagateDocumentId($root, $document->id);
-        self::syncSubtree($ctx, $root);
+        self::syncSubtree($ctx, $document);
         self::reindexDocumentIds($document, $root);
 
         return true;
@@ -849,10 +849,12 @@ final class VmDom
 
                 return $child;
             }
+            $parentState->childIds = [$child->id];
             $parentState->documentElementName = DomRegistry::state($child)->nodeName;
             $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
-            self::linkChildToParent($child, null);
-            self::syncSubtree($ctx, $child);
+            self::linkChildToParent($child, $parent);
+            self::propagateDocumentId($child, $parent->id);
+            self::syncSubtree($ctx, $parent);
 
             return $child;
         }
