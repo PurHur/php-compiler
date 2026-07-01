@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3588 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9794 |
+| Source constructs flagged (warnings) | 9793 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1467,7 +1467,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_intersect_uassoc.php` | 0 | 1 |
 | `ext/standard/array_intersect_ukey.php` | 0 | 1 |
 | `ext/standard/array_is_list.php` | 0 | 3 |
-| `ext/standard/array_key_exists.php` | 0 | 2 |
+| `ext/standard/array_key_exists.php` | 0 | 1 |
 | `ext/standard/array_key_first.php` | 0 | 3 |
 | `ext/standard/array_key_last.php` | 0 | 3 |
 | `ext/standard/array_keys.php` | 0 | 1 |
@@ -13539,8 +13539,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_key_exists.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 89)
-- 4 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/array_key_first.php`
 
@@ -19496,7 +19495,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayKeyExistsRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 8 class method(s)
+- 6 class method(s)
 
 ### `lib/JIT/Builtin/ArrayKeysRuntime.php`
 
