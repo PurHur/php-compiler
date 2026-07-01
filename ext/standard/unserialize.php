@@ -10,6 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -32,10 +33,19 @@ final class unserialize extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $payloadVar = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_STRING !== $payloadVar->type) {
-            throw new \LogicException('unserialize() first argument must be a string in this compiler build');
-        }
+        InternalStrictArg::rejectNullString(
+            $frame->calledArgs[0],
+            'unserialize',
+            'data',
+            0,
+            $frame
+        );
+        $payload = VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[0],
+            'unserialize',
+            0,
+            'data'
+        );
         $options = null;
         if ($argc > 1) {
             $optionsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -44,7 +54,6 @@ final class unserialize extends Internal
             }
             $options = self::extractUnserializeOptions($optionsVar);
         }
-        $payload = $payloadVar->toString();
         $decoded = VmSerialize::unserializePayload(
             $frame->vmContext,
             $payload,
@@ -100,6 +109,16 @@ final class unserialize extends Internal
      */
     private static function compileTimeUnserialize(Context $context, JITVariable $arg, ?array $options = null): ?Value
     {
+        if (JITVariable::TYPE_NULL === $arg->type || ($arg->isNullConstant ?? false)) {
+            return $context->helper->loadValue(
+                new JITVariable(
+                    $context,
+                    JITVariable::TYPE_NATIVE_BOOL,
+                    JITVariable::KIND_VALUE,
+                    $context->getTypeFromString('int1')->constInt(0, false)
+                )
+            );
+        }
         if (JITVariable::TYPE_STRING !== $arg->type) {
             return null;
         }
