@@ -196,7 +196,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStrpbrk.php',
         'ext/standard/JitStrpos.php',
         'ext/standard/JitStrrchr.php',
-        'ext/standard/JitStrrpos.php',
+        'ext/standard/StrrposJitHelper.php',
         'ext/standard/JitStrstr.php',
         'ext/standard/SubstrCountJitHelper.php',
         'lib/JIT/Builtin/StringSubstrCount.php',

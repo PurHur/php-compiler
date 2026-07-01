@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3634 |
-| Phase A inventory files (M2 ratio SSOT) | 3634 |
+| PHP files on vm.php path | 3637 |
+| Phase A inventory files (M2 ratio SSOT) | 3637 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9926 |
+| Source constructs flagged (warnings) | 9931 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -500,6 +500,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ExceptionHandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ExceptionJitHelper.php` | 0 | 1 |
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
+| `ext/standard/ExplodeJitHelper.php` | 0 | 3 |
 | `ext/standard/FsDirJitHelper.php` | 0 | 1 |
 | `ext/standard/FsGlobJitHelper.php` | 0 | 1 |
 | `ext/standard/FstatJitHelper.php` | 0 | 1 |
@@ -963,7 +964,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStrpos.php` | 0 | 1 |
 | `ext/standard/JitStrptime.php` | 0 | 2 |
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
-| `ext/standard/JitStrrpos.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
 | `ext/standard/JitStrtok.php` | 0 | 1 |
 | `ext/standard/JitStrtotime.php` | 0 | 1 |
@@ -1114,6 +1114,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrrevJitHelper.php` | 0 | 1 |
+| `ext/standard/StrrposJitHelper.php` | 0 | 1 |
 | `ext/standard/StrspnJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtokJitHelper.php` | 0 | 1 |
 | `ext/standard/StrtotimeJitHelper.php` | 0 | 1 |
@@ -2692,6 +2693,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringDirJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDirRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringErrorLog.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringExplode.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFgetcsvJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringFileGetContents.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringFilePutContents.php` | 0 | 1 |
@@ -2779,6 +2781,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrspn.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringStrtokJit.php` | 0 | 1 |
@@ -7004,6 +7007,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/standard/ExplodeJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 28)
+- new Variable (line 30)
+- 2 class method(s)
+
 ### `ext/standard/FsDirJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7206,7 +7216,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/HtmlspecialcharsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/HttpBuildQueryJitHelper.php`
 
@@ -7783,7 +7793,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitExplode.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/JitFclose.php`
 
@@ -9445,11 +9455,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
-### `ext/standard/JitStrrpos.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
 ### `ext/standard/JitStrstr.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11073,6 +11078,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/StrrposJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/StrspnJitHelper.php`
 
@@ -12825,66 +12835,66 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 366)
 - new Variable (line 372)
 - new Variable (line 379)
-- new Variable (line 976)
-- new Variable (line 980)
-- new Variable (line 993)
-- new Variable (line 997)
-- new Variable (line 1089)
-- new Variable (line 1093)
-- new Variable (line 1103)
-- new Variable (line 1107)
-- new Variable (line 1146)
-- new Variable (line 1150)
-- new Variable (line 1195)
-- new Variable (line 1206)
-- new Variable (line 1210)
-- new Variable (line 1225)
-- new Variable (line 1232)
-- new Variable (line 1256)
-- new Variable (line 1325)
-- new Variable (line 1342)
-- new Variable (line 1351)
-- new Variable (line 1388)
-- new Variable (line 1490)
-- new Variable (line 1494)
-- new Variable (line 1614)
-- new Variable (line 1630)
-- new Variable (line 1649)
-- new Variable (line 1662)
-- new Variable (line 1681)
-- new Variable (line 1697)
-- new Variable (line 1851)
-- new Variable (line 1855)
-- new Error (line 1872)
-- new Error (line 1878)
+- new Variable (line 999)
+- new Variable (line 1003)
+- new Variable (line 1016)
+- new Variable (line 1020)
+- new Variable (line 1112)
+- new Variable (line 1116)
+- new Variable (line 1126)
+- new Variable (line 1130)
+- new Variable (line 1169)
+- new Variable (line 1173)
+- new Variable (line 1218)
+- new Variable (line 1229)
+- new Variable (line 1233)
+- new Variable (line 1248)
+- new Variable (line 1255)
+- new Variable (line 1279)
+- new Variable (line 1348)
+- new Variable (line 1365)
+- new Variable (line 1374)
+- new Variable (line 1411)
+- new Variable (line 1513)
+- new Variable (line 1517)
+- new Variable (line 1637)
+- new Variable (line 1653)
+- new Variable (line 1672)
+- new Variable (line 1685)
+- new Variable (line 1704)
+- new Variable (line 1720)
+- new Variable (line 1874)
+- new Variable (line 1878)
+- new Error (line 1895)
 - new Error (line 1901)
-- new Error (line 1904)
-- new Variable (line 1920)
-- new Variable (line 1936)
-- new Variable (line 2177)
-- new Variable (line 2181)
-- new Variable (line 2201)
-- new Variable (line 2209)
-- new Variable (line 2230)
-- new Variable (line 2242)
-- new Variable (line 2257)
-- new Variable (line 2271)
-- new Variable (line 2369)
-- new Variable (line 2377)
-- new Variable (line 2495)
-- new Variable (line 2500)
-- new Error (line 2520)
-- new Error (line 2524)
-- new Variable (line 2586)
-- new Variable (line 2592)
-- new Variable (line 2598)
-- new Variable (line 2638)
-- new Variable (line 2643)
-- new Variable (line 2672)
-- new Variable (line 2682)
-- new Variable (line 2688)
-- new Variable (line 2710)
-- 131 class method(s)
+- new Error (line 1924)
+- new Error (line 1927)
+- new Variable (line 1943)
+- new Variable (line 1959)
+- new Variable (line 2200)
+- new Variable (line 2204)
+- new Variable (line 2224)
+- new Variable (line 2232)
+- new Variable (line 2253)
+- new Variable (line 2265)
+- new Variable (line 2280)
+- new Variable (line 2294)
+- new Variable (line 2392)
+- new Variable (line 2400)
+- new Variable (line 2518)
+- new Variable (line 2523)
+- new Error (line 2543)
+- new Error (line 2547)
+- new Variable (line 2609)
+- new Variable (line 2615)
+- new Variable (line 2621)
+- new Variable (line 2661)
+- new Variable (line 2666)
+- new Variable (line 2695)
+- new Variable (line 2705)
+- new Variable (line 2711)
+- new Variable (line 2733)
+- 132 class method(s)
 
 ### `ext/standard/VmRound.php`
 
@@ -13280,11 +13290,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmString.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 1400)
-- new Error (line 1411)
-- new Error (line 3565)
-- new Error (line 3590)
-- 202 class method(s)
+- new Error (line 1418)
+- new Error (line 1429)
+- new Error (line 3595)
+- new Error (line 3620)
+- 203 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
 
@@ -14633,8 +14643,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/explode.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 47)
-- new Variable (line 49)
+- new HashTable (line 48)
+- new Variable (line 50)
 - 3 class method(s)
 
 ### `ext/standard/expm1.php`
@@ -21335,6 +21345,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringExplode.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringFgetcsvJit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21871,6 +21886,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 118)
 - 7 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringStrrpos.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringStrspn.php`
 
