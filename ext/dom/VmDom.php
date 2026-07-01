@@ -497,11 +497,19 @@ final class VmDom
         return $fragment;
     }
 
-    public static function saveXML(ObjectEntry $document): string
+    public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null): string
     {
         $state = self::ensureDocument($document);
         if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
             throw new \LogicException('DOMDocument::saveXML() called on non-document node in this compiler build');
+        }
+
+        if (null !== $node) {
+            if (!self::isDomNode($node)) {
+                throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
+            }
+
+            return self::serializeNode($node);
         }
 
         $lines = ['<?xml version="1.0"?>'];
@@ -633,22 +641,46 @@ final class VmDom
         return null;
     }
 
+    private static function serializeNode(ObjectEntry $entry): string
+    {
+        if (self::isElement($entry)) {
+            return self::serializeElement($entry);
+        }
+
+        throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
     private static function serializeElement(ObjectEntry $entry): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
+        $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.'/>';
+            return '<'.$name.$attrPart.'/>';
         }
         $parts = [];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeElement($child);
+                $parts[] = self::serializeNode($child);
             }
         }
 
-        return '<'.$name.'>'.implode('', $parts).'</'.$name.'>';
+        return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+    }
+
+    /** @return non-empty-string */
+    private static function serializeAttributes(DomNodeState $state): string
+    {
+        if ([] === $state->attributes) {
+            return '';
+        }
+        $parts = [];
+        foreach ($state->attributes as $aname => $avalue) {
+            $parts[] = self::escapeName($aname).'="'.self::escapeAttr($avalue).'"';
+        }
+
+        return ' '.implode(' ', $parts);
     }
 
     /**
