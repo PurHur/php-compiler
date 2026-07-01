@@ -19,7 +19,12 @@ class JITTest extends BaseTest {
     {
         foreach (parent::providePHPTests() as $name => $case) {
             if (!CompilerVersion::supportsStrIncrement()
-                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))) {
+                && (str_contains($name, 'str_increment') || str_contains($name, 'str_decrement'))
+                && !str_contains($name, 'str_increment_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsStrIncrement()
+                && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
             if (!CompilerVersion::supportsHex2binStrict()
