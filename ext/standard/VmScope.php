@@ -96,9 +96,7 @@ final class VmScope
         $refs = 0 !== ($flags & self::EXTR_REFS);
         $extractType = $flags & 0xFF;
         if ($extractType < self::EXTR_OVERWRITE || $extractType > self::EXTR_IF_EXISTS) {
-            self::extractWarning($frame, 'Invalid extract type');
-
-            return 0;
+            throw new \ValueError('extract(): Argument #2 ($flags) must be a valid extract type');
         }
 
         $prefix = null;
