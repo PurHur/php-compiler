@@ -24,8 +24,12 @@ final class array_pad extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (3 !== \count($frame->calledArgs)) {
-            throw new \LogicException('array_pad() requires exactly three arguments');
+        $argc = \count($frame->calledArgs);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_pad() expects exactly 3 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
@@ -41,8 +45,12 @@ final class array_pad extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (3 !== \count($args)) {
-            throw new \LogicException('array_pad() requires exactly three arguments');
+        $argc = \count($args);
+        if (3 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'array_pad() expects exactly 3 arguments, %d given',
+                $argc
+            ));
         }
         TypeErrorRaise::ensureLinked($context);
         JitArrayElem::requireArrayParam($context, $args[0], 'array_pad', 1, 'array');
