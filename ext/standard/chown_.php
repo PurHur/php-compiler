@@ -25,7 +25,7 @@ final class chown_ extends Internal
             throw new \LogicException('chown() requires exactly two arguments in this compiler build');
         }
         $path = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'chown');
-        $userVar = VmFilestatArg::requireIntOrStringArg($frame->calledArgs[1], 'chown', 1, 'user');
+        $userVar = VmFilestatArg::requireIntOrStringArgForFrame($frame, 1, 'chown', 'user');
         if (null === $frame->returnVar) {
             return;
         }
