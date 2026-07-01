@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** in_array() JIT routes through InArrayJitHelper PHP not ArrayBuiltinHelper LLVM (#12503). */
+/** in_array() JIT routes through InArrayJitHelper PHP not ArrayBuiltinHelper LLVM (#12503, #14360). */
 final class InArrayRuntimeShrinkTest extends TestCase
 {
     public function testInArrayRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/InArrayRuntime.php');
         $this->assertStringContainsString('InArrayJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::inArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/in_array.php');
         $this->assertStringContainsString('InArrayRuntime::inArray', $builtin);
