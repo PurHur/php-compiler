@@ -200,6 +200,29 @@ PHP;
         self::assertSame("1\n0\n0\n", ob_get_clean());
     }
 
+    public function test_dom_node_compare_document_position(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><parent><child/></parent><sibling/></root>');
+$parent = $doc->getElementsByTagName('parent')->item(0);
+$child = $doc->getElementsByTagName('child')->item(0);
+$sibling = $doc->getElementsByTagName('sibling')->item(0);
+$contains = DOMNode::DOCUMENT_POSITION_CONTAINS | DOMNode::DOCUMENT_POSITION_PRECEDING;
+$contained = DOMNode::DOCUMENT_POSITION_CONTAINED_BY | DOMNode::DOCUMENT_POSITION_FOLLOWING;
+echo $parent->compareDocumentPosition($child), "\n";
+echo $child->compareDocumentPosition($parent), "\n";
+echo $parent->compareDocumentPosition($sibling), "\n";
+echo (int) (($parent->compareDocumentPosition($sibling) & DOMNode::DOCUMENT_POSITION_DISCONNECTED) === 0), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_compare_document_position.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("10\n20\n2\n1\n", ob_get_clean());
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');

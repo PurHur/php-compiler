@@ -130,6 +130,16 @@ final class VmDom
         $node->methodVisibility['getlineno'] = $pub;
         $node->methods['hasattributes'] = new NodeHasAttributes();
         $node->methodVisibility['hasattributes'] = $pub;
+        $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
+        $node->methodVisibility['comparedocumentposition'] = $pub;
+        DomClassConstants::registerIntConstants($node, [
+            'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
+            'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
+            'DOCUMENT_POSITION_FOLLOWING' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
+            'DOCUMENT_POSITION_CONTAINS' => DomConstants::DOCUMENT_POSITION_CONTAINS,
+            'DOCUMENT_POSITION_CONTAINED_BY' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
+            'DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
+        ]);
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -1436,6 +1446,107 @@ final class VmDom
         }
 
         return false;
+    }
+
+    public static function compareDocumentPosition(ObjectEntry $node, ObjectEntry $other): int
+    {
+        if ($node->id === $other->id) {
+            return 0;
+        }
+        if (!DomRegistry::has($node) || !DomRegistry::has($other)) {
+            return self::disconnectedDocumentPosition($node, $other);
+        }
+
+        $root1 = self::getTreeRoot($node);
+        $root2 = self::getTreeRoot($other);
+        if ($root1->id !== $root2->id) {
+            return self::disconnectedDocumentPosition($node, $other);
+        }
+
+        if (self::contains($node, $other)) {
+            return DomConstants::DOCUMENT_POSITION_CONTAINS | DomConstants::DOCUMENT_POSITION_PRECEDING;
+        }
+        if (self::contains($other, $node)) {
+            return DomConstants::DOCUMENT_POSITION_CONTAINED_BY | DomConstants::DOCUMENT_POSITION_FOLLOWING;
+        }
+
+        $orderNode = self::documentOrderIndex($root1, $node);
+        $orderOther = self::documentOrderIndex($root1, $other);
+        if ($orderNode < 0 || $orderOther < 0) {
+            return self::disconnectedDocumentPosition($node, $other);
+        }
+        if ($orderNode < $orderOther) {
+            return DomConstants::DOCUMENT_POSITION_PRECEDING;
+        }
+
+        return DomConstants::DOCUMENT_POSITION_FOLLOWING;
+    }
+
+    private static function disconnectedDocumentPosition(ObjectEntry $node, ObjectEntry $other): int
+    {
+        $ordering = $node->id < $other->id
+            ? DomConstants::DOCUMENT_POSITION_PRECEDING
+            : DomConstants::DOCUMENT_POSITION_FOLLOWING;
+
+        return DomConstants::DOCUMENT_POSITION_DISCONNECTED
+            | DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC
+            | $ordering;
+    }
+
+    private static function getTreeRoot(ObjectEntry $node): ObjectEntry
+    {
+        $current = $node;
+        while (DomRegistry::has($current)) {
+            $state = DomRegistry::state($current);
+            if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
+                return $current;
+            }
+            if (null === $state->parentId) {
+                return $current;
+            }
+            $parent = DomRegistry::entry($state->parentId);
+            if (null === $parent) {
+                return $current;
+            }
+            $current = $parent;
+        }
+
+        return $current;
+    }
+
+    private static function documentOrderIndex(ObjectEntry $root, ObjectEntry $target): int
+    {
+        $counter = 0;
+        $found = -1;
+        self::walkDocumentOrder($root, $target, $counter, $found);
+
+        return $found;
+    }
+
+    private static function walkDocumentOrder(
+        ObjectEntry $node,
+        ObjectEntry $target,
+        int &$counter,
+        int &$found
+    ): void {
+        if ($node->id === $target->id) {
+            $found = $counter;
+
+            return;
+        }
+        ++$counter;
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::walkDocumentOrder($child, $target, $counter, $found);
+                if ($found >= 0) {
+                    return;
+                }
+            }
+        }
     }
 
     public static function contains(ObjectEntry $node, ?ObjectEntry $other): bool
