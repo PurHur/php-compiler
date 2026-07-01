@@ -6,12 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringPregQuote;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** preg_quote() — escape regex metacharacters (subset of PHP; native LLVM in JIT/AOT). */
+/**
+ * preg_quote() — escape regex metacharacters (subset of PHP).
+ *
+ * VM: {@see VmString::pregQuote()}; JIT/AOT: {@see StringPregQuote} + {@see PregQuoteJitHelper}.
+ */
 final class preg_quote extends Internal
 {
     public function execute(Frame $frame): void
@@ -47,13 +52,21 @@ final class preg_quote extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('preg_quote() requires one or two arguments in this compiler build');
         }
+
+        StringPregQuote::ensureLinked($context);
+
         $subject = JitStringBuiltinArg::lower($context, $args[0], 'preg_quote', 0, 'str');
+        $null = $context->getTypeFromString('__string__*')->constNull();
         if (1 === $argc) {
-            return JitPregQuote::quote($context, $subject, null);
+            return $context->builder->call(
+                $context->lookupFunction('__string__preg_quote'),
+                $subject,
+                $null
+            );
         }
 
-        return JitPregQuote::quote(
-            $context,
+        return $context->builder->call(
+            $context->lookupFunction('__string__preg_quote'),
             $subject,
             JitStringBuiltinArg::lower($context, $args[1], 'preg_quote', 1, 'delimiter')
         );

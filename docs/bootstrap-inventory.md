@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3634 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9924 |
+| Source constructs flagged (warnings) | 9926 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -842,7 +842,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitPregMatchAll.php` | 0 | 1 |
 | `ext/standard/JitPregMatchAllEx.php` | 0 | 1 |
 | `ext/standard/JitPregMatchEx.php` | 0 | 1 |
-| `ext/standard/JitPregQuote.php` | 0 | 1 |
 | `ext/standard/JitPregReplace.php` | 0 | 1 |
 | `ext/standard/JitPregReplaceCallback.php` | 0 | 1 |
 | `ext/standard/JitPregReplaceCallbackArray.php` | 0 | 1 |
@@ -1050,6 +1049,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/PregEmptyPatternReplaceJitHelper.php` | 0 | 1 |
 | `ext/standard/PregExpandJitHelper.php` | 0 | 1 |
 | `ext/standard/PregJitHelper.php` | 0 | 2 |
+| `ext/standard/PregQuoteJitHelper.php` | 0 | 1 |
 | `ext/standard/PregReplacementExpand.php` | 0 | 1 |
 | `ext/standard/PrintRJitHelper.php` | 0 | 1 |
 | `ext/standard/ProcessIdentityJitHelper.php` | 0 | 1 |
@@ -2753,7 +2753,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringPosixTimes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPregMatch.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPregMatchJit.php` | 0 | 1 |
-| `lib/JIT/Builtin/StringPregQuote.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringPregQuote.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPrintR.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringQuotPrint.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
@@ -8822,11 +8822,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `ext/standard/JitPregQuote.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
 ### `ext/standard/JitPregReplace.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10706,6 +10701,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 11 class method(s)
 - 1 closure(s)
+
+### `ext/standard/PregQuoteJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/PregReplacementExpand.php`
 
@@ -21707,7 +21707,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringPregQuote.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new JIT (line 130)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringPrintR.php`
 

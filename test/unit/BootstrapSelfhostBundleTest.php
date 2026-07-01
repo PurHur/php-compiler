@@ -139,7 +139,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitDate.php',
         'ext/standard/JitImplode.php',
         'ext/standard/Nl2brJitHelper.php',
-        'ext/standard/JitPregQuote.php',
+        'ext/standard/PregQuoteJitHelper.php',
         'ext/standard/JitStrRot13.php',
         'ext/standard/JitSessionId.php',
         'ext/standard/JitSessionName.php',
