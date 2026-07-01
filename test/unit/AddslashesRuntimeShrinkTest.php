@@ -1,0 +1,46 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\AddslashesJitHelper;
+use PHPCompiler\ext\standard\VmString;
+use PHPUnit\Framework\TestCase;
+
+/** addslashes() JIT routes through AddslashesJitHelper PHP not inline LLVM (#14741). */
+final class AddslashesRuntimeShrinkTest extends TestCase
+{
+    public function testStringAddslashesUsesJitHelperNotInlineLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringAddslashes.php');
+        $this->assertStringContainsString('AddslashesJitHelper', $source);
+        $this->assertStringNotContainsString('addslashes_count_head', $source);
+        $this->assertStringNotContainsString('shouldEscape', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitAddslashes.php');
+
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/addslashes.php');
+        $this->assertStringContainsString('StringAddslashes::ensureLinked', $builtin);
+        $this->assertStringContainsString('__string__addslashes', $builtin);
+        $this->assertStringNotContainsString('JitAddslashes', $builtin);
+    }
+
+    public function testAddslashesJitHelperDelegatesToVmString(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/AddslashesJitHelper.php');
+        $this->assertStringContainsString('VmString::addslashes', $source);
+
+        $input = "a'b\\0c";
+        $expected = VmString::addslashes($input);
+        $this->assertSame($expected, AddslashesJitHelper::addslashesArgv($input));
+        $this->assertSame($expected, VmString::addslashes($input));
+    }
+
+    public function testSpineBundleOmitsDeletedJitAddslashes(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('JitAddslashes.php', $spine);
+        $this->assertStringContainsString('AddslashesJitHelper.php', $spine);
+        $this->assertStringContainsString('StringAddslashes.php', $spine);
+    }
+}

@@ -602,7 +602,7 @@ require_once __DIR__.'/../../../ext/standard/IniIntrospectionJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IniJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IniParseQuantityJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitAddcslashes.php';
-require_once __DIR__.'/../../../ext/standard/JitAddslashes.php';
+require_once __DIR__.'/../../../ext/standard/AddslashesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayChunk.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayCountRecursive.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayElem.php';

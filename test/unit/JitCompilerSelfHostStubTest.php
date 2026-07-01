@@ -186,7 +186,7 @@ final class JitCompilerSelfHostStubTest extends TestCase
         'PHPCompiler\\Doctor::run',
         'PHPCompiler\\Cli\\InvokeCwd::baseDir',
         'PHPCompiler\\Web\\CgiDriver::serve',
-        'PHPCompiler\\ext\\standard\\JitAddslashes::escape',
+        'PHPCompiler\\ext\\standard\\AddslashesJitHelper::addslashesArgv',
     ];
 
     public function testCompilerSkipPatternCount(): void
