@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -13,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for shuffle() via ShuffleJitHelper PHP (#12762).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::shufflePacked()}.
+ * Standalone AOT compiles {@see ShuffleJitHelper} via JitVmHelperLink (#14299); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::shufflePacked()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::shufflePacked()}
  * php-src: ext/standard/array.c — php_shuffle
  */
@@ -32,8 +31,7 @@ final class ShuffleRuntime
 
     public static function shufflePacked(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::shufflePacked($context, $array);
 
             return;
@@ -49,12 +47,13 @@ final class ShuffleRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
