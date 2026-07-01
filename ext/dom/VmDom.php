@@ -127,6 +127,10 @@ final class VmDom
             $node->methods['contains'] = new NodeContains();
             $node->methodVisibility['contains'] = $pub;
         }
+        if (CompilerVersion::supportsDomNodeGetRootNode()) {
+            $node->methods['getrootnode'] = new NodeGetRootNode();
+            $node->methodVisibility['getrootnode'] = $pub;
+        }
         $node->methods['lookupprefix'] = new NodeLookupPrefix();
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
@@ -636,6 +640,25 @@ final class VmDom
         }
 
         return $state->nodeName;
+    }
+
+    public static function getRootNode(ObjectEntry $node): ObjectEntry
+    {
+        if (!DomRegistry::has($node)) {
+            return $node;
+        }
+        $current = $node;
+        while (true) {
+            $state = DomRegistry::state($current);
+            if (null === $state->parentId) {
+                return $current;
+            }
+            $parent = DomRegistry::entry($state->parentId);
+            if (null === $parent) {
+                return $current;
+            }
+            $current = $parent;
+        }
     }
 
     /**
