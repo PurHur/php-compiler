@@ -44,6 +44,9 @@ class ObjectEntry {
     /** User generator instance state (issue #167). */
     public ?GeneratorState $generatorState = null;
 
+    /** DatePeriod Iterator cursor (#14228). */
+    public ?DatePeriodIteratorState $datePeriodIterator = null;
+
     /** Anonymous function / closure body (issue #72). */
     public ?ClosureState $closureState = null;
 
@@ -146,6 +149,7 @@ class ObjectEntry {
             }
         }
         $this->generatorState = null;
+        $this->datePeriodIterator = null;
         $this->closureState = null;
         $this->lazyInitializer = null;
         $this->lazyPending = false;

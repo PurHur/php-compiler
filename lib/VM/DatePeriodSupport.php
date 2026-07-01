@@ -11,6 +11,13 @@ final class DatePeriodSupport
 {
     public const CLASS_DATEPERIOD = 'dateperiod';
 
+    /** php-src PHP_DATE_PERIOD_INCLUDE_END_DATE — end-date ctor overload sentinel. */
+    public const RECURRENCES_END_DATE = 2147483648;
+
+    public const OPTION_EXCLUDE_START_DATE = 1;
+
+    public const OPTION_INCLUDE_END_DATE = 2;
+
     public static function requireDatePeriod(
         Variable $var,
         string $label,
@@ -34,7 +41,8 @@ final class DatePeriodSupport
         ObjectEntry $period,
         ObjectEntry $start,
         ObjectEntry $interval,
-        int $recurrences
+        int $recurrences,
+        int $options = 0
     ): void {
         if ($recurrences < 1) {
             throw new \Exception('DatePeriod::__construct(): Recurrence count must be greater than 0');
@@ -44,9 +52,165 @@ final class DatePeriodSupport
         self::setNullProperty($period, 'end');
         self::setObjectProperty($period, 'interval', $interval);
         self::requireIntProperty($period, 'recurrences')->int($recurrences + 1);
-        self::requireBoolProperty($period, 'include_start_date')->bool(true);
+        self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
         self::requireBoolProperty($period, 'include_end_date')->bool(false);
         $period->constructed = true;
+        $period->datePeriodIterator = null;
+    }
+
+    /** php-src date_period_initialize — start/interval/end form (#14228). */
+    public static function initFromEndDate(
+        ObjectEntry $period,
+        ObjectEntry $start,
+        ObjectEntry $interval,
+        ObjectEntry $end,
+        int $options = 0
+    ): void {
+        self::setObjectProperty($period, 'start', $start);
+        self::setNullProperty($period, 'current');
+        self::setObjectProperty($period, 'end', $end);
+        self::setObjectProperty($period, 'interval', $interval);
+        self::requireIntProperty($period, 'recurrences')->int(self::RECURRENCES_END_DATE);
+        self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
+        self::requireBoolProperty($period, 'include_end_date')->bool(0 !== ($options & self::OPTION_INCLUDE_END_DATE));
+        $period->constructed = true;
+        $period->datePeriodIterator = null;
+    }
+
+    public static function iteratorRewind(ObjectEntry $period): void
+    {
+        self::requireDatePeriodFromObject($period);
+        $state = $period->datePeriodIterator ??= new DatePeriodIteratorState();
+        $state->key = 0;
+        $state->started = true;
+
+        $start = self::requireObjectProperty($period, 'start');
+        $interval = self::requireObjectProperty($period, 'interval');
+        $includeStart = self::requireBoolProperty($period, 'include_start_date')->toBool();
+
+        $current = DateTimeSupport::cloneDateTimeLike($start);
+        if (!$includeStart) {
+            DateTimeSupport::addInterval($current, $interval);
+        }
+        self::setObjectProperty($period, 'current', $current);
+    }
+
+    public static function iteratorValid(ObjectEntry $period): bool
+    {
+        self::requireDatePeriodFromObject($period);
+        $state = $period->datePeriodIterator;
+        if (null === $state || !$state->started) {
+            return false;
+        }
+        $current = self::currentObjectProperty($period);
+        if (null === $current) {
+            return false;
+        }
+
+        $recurrences = self::requireIntProperty($period, 'recurrences')->toInt();
+        if (self::RECURRENCES_END_DATE === $recurrences) {
+            $end = self::objectProperty($period, 'end');
+            if (null === $end) {
+                return false;
+            }
+            $cmp = self::compareDateTimeObjects($current, $end);
+            if (self::requireBoolProperty($period, 'include_end_date')->toBool()) {
+                return $cmp <= 0;
+            }
+
+            return $cmp < 0;
+        }
+
+        return $state->key < $recurrences;
+    }
+
+    public static function iteratorCurrent(ObjectEntry $period): ?ObjectEntry
+    {
+        self::requireDatePeriodFromObject($period);
+        $current = self::currentObjectProperty($period);
+        if (null === $current) {
+            return null;
+        }
+
+        return DateTimeSupport::cloneDateTimeLike($current);
+    }
+
+    public static function iteratorKey(ObjectEntry $period): int
+    {
+        self::requireDatePeriodFromObject($period);
+        $state = $period->datePeriodIterator;
+
+        return null !== $state ? $state->key : 0;
+    }
+
+    public static function iteratorNext(ObjectEntry $period): void
+    {
+        self::requireDatePeriodFromObject($period);
+        $state = $period->datePeriodIterator;
+        if (null === $state) {
+            return;
+        }
+        ++$state->key;
+        $current = self::currentObjectProperty($period);
+        if (null === $current) {
+            return;
+        }
+        $interval = self::requireObjectProperty($period, 'interval');
+        DateTimeSupport::addInterval($current, $interval);
+    }
+
+    private static function requireDatePeriodFromObject(ObjectEntry $period): void
+    {
+        if (self::CLASS_DATEPERIOD !== strtolower($period->class->name)) {
+            throw new \LogicException('DatePeriod iterator called on non-DatePeriod object');
+        }
+    }
+
+    private static function requireObjectProperty(ObjectEntry $period, string $name): ObjectEntry
+    {
+        $obj = self::objectProperty($period, $name);
+        if (null === $obj) {
+            throw new \LogicException("DatePeriod property {$name} is missing in this compiler build");
+        }
+
+        return $obj;
+    }
+
+    private static function objectProperty(ObjectEntry $period, string $name): ?ObjectEntry
+    {
+        $var = self::requireProperty($period, $name)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return null;
+        }
+
+        return $var->toObject();
+    }
+
+    private static function currentObjectProperty(ObjectEntry $period): ?ObjectEntry
+    {
+        return self::objectProperty($period, 'current');
+    }
+
+    private static function compareDateTimeObjects(ObjectEntry $left, ObjectEntry $right): int
+    {
+        $leftTs = DateTimeSupport::readTimestamp($left);
+        $rightTs = DateTimeSupport::readTimestamp($right);
+        if ($leftTs < $rightTs) {
+            return -1;
+        }
+        if ($leftTs > $rightTs) {
+            return 1;
+        }
+        $leftUs = DateTimeSupport::readMicrosecond($left);
+        $rightUs = DateTimeSupport::readMicrosecond($right);
+        if ($leftUs < $rightUs) {
+            return -1;
+        }
+        if ($leftUs > $rightUs) {
+            return 1;
+        }
+
+        return 0;
     }
 
     /**

@@ -7,6 +7,11 @@ namespace PHPCompiler\VM;
 use PHPCompiler\CompilerVersion;
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\VM\Builtin\DatePeriodConstruct;
+use PHPCompiler\VM\Builtin\DatePeriodCurrent;
+use PHPCompiler\VM\Builtin\DatePeriodKey;
+use PHPCompiler\VM\Builtin\DatePeriodNext;
+use PHPCompiler\VM\Builtin\DatePeriodRewind;
+use PHPCompiler\VM\Builtin\DatePeriodValid;
 use PHPCompiler\VM\Builtin\DateIntervalConstruct;
 use PHPCompiler\VM\Builtin\DateIntervalCreateFromDateString;
 use PHPCompiler\VM\Builtin\DateIntervalFormat;
@@ -1077,6 +1082,7 @@ final class BuiltinClasses
         $objProto = new Variable(Variable::TYPE_OBJECT);
         $nullProto = new Variable(Variable::TYPE_NULL);
         $dp = new ClassEntry('DatePeriod');
+        $dp->interfaces = ['iterator'];
         $dp->properties[] = new ClassProperty('start', null, $objProto);
         $dp->properties[] = new ClassProperty('current', null, $nullProto);
         $dp->properties[] = new ClassProperty('end', null, $nullProto);
@@ -1090,6 +1096,16 @@ final class BuiltinClasses
         $dp->constructor = new DatePeriodConstruct();
         $dp->methods['__construct'] = $dp->constructor;
         $dp->methodVisibility['__construct'] = $pub;
+        $dp->methods['rewind'] = new DatePeriodRewind();
+        $dp->methodVisibility['rewind'] = $pub;
+        $dp->methods['valid'] = new DatePeriodValid();
+        $dp->methodVisibility['valid'] = $pub;
+        $dp->methods['current'] = new DatePeriodCurrent();
+        $dp->methodVisibility['current'] = $pub;
+        $dp->methods['key'] = new DatePeriodKey();
+        $dp->methodVisibility['key'] = $pub;
+        $dp->methods['next'] = new DatePeriodNext();
+        $dp->methodVisibility['next'] = $pub;
         $ctx->classes[DatePeriodSupport::CLASS_DATEPERIOD] = $dp;
     }
 
