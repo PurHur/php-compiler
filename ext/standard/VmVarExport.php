@@ -109,6 +109,19 @@ final class VmVarExport
         return '\\'.ltrim($enumClassName, '\\').'::'.$caseName;
     }
 
+    /** php-src var.c — enum case elements break onto the next indented line after {@code =>}. */
+    private static function exportValueNeedsLineBreakAfterArrow(Variable $v): bool
+    {
+        if (Variable::TYPE_ENUM_CASE === $v->type) {
+            return true;
+        }
+        if (Variable::TYPE_OBJECT === $v->type && EnumCaseSupport::isEnumCase($v->toObject())) {
+            return true;
+        }
+
+        return false;
+    }
+
     /**
      * @param \SplObjectStorage<int, true> $visited
      */
@@ -165,14 +178,20 @@ final class VmVarExport
             $k = Variable::TYPE_INTEGER === $key->type
                 ? (string) $key->toInt()
                 : self::formatExportStringKey($key->toString());
-            $lines[] = $inner.$k.' => '.self::formatNested(
+            $resolved = $value->resolveIndirect();
+            $formatted = self::formatNested(
                 $vm,
-                $value->resolveIndirect(),
+                $resolved,
                 $level + 1,
                 $frame,
                 $visited,
                 $warned
-            ).",\n";
+            );
+            if (self::exportValueNeedsLineBreakAfterArrow($resolved)) {
+                $lines[] = $inner.$k.' => '."\n".$inner.$formatted.",\n";
+            } else {
+                $lines[] = $inner.$k.' => '.$formatted.",\n";
+            }
         }
         $lines[] = $indent.')';
 
