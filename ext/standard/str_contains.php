@@ -32,8 +32,6 @@ final class str_contains extends Internal
         $this->requireExactArgCount($frame, 'str_contains', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_contains', 'needle', 1, $frame);
-        InternalStrictArg::requireString($frame, 0, 'str_contains', 'haystack');
-        InternalStrictArg::requireString($frame, 1, 'str_contains', 'needle');
         $haystackStr = VmString::coerceStringBuiltinArg(
             $frame->calledArgs[0],
             'str_contains',
