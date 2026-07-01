@@ -18,6 +18,12 @@ final class CliArgvRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('CliArgvStandaloneLlvm', $source);
         $this->assertStringContainsString('CREATE_TABLE_HELPER', $source);
         $this->assertStringContainsString('NestedJitCompileScope', $source);
+        $this->assertStringContainsString('implementStoreArgv', $source);
+        $storePos = strpos($source, 'self::implementStoreArgv');
+        $helperPos = strpos($source, 'self::ensureJitHelperCompiled($context);', $storePos ?: 0);
+        $this->assertNotFalse($storePos);
+        $this->assertNotFalse($helperPos);
+        $this->assertLessThan($helperPos, $storePos, 'CLI argv ABI stubs must emit before nested CliArgvJitHelper compile (#14470)');
         $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/CliArgvStandaloneLlvm.php');
     }
 
