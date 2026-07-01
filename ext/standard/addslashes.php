@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringAddslashes;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -15,7 +16,11 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** addslashes() — escape quotes, backslash, and NUL (subset of PHP; native LLVM in JIT/AOT). */
+/**
+ * addslashes() — escape quotes, backslash, and NUL (subset of PHP).
+ *
+ * VM: {@see VmString::addslashes()}; JIT/AOT: {@see StringAddslashes} + {@see AddslashesJitHelper}.
+ */
 final class addslashes extends Internal
 {
     public function execute(Frame $frame): void
@@ -43,8 +48,10 @@ final class addslashes extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'addslashes', 'string', 1);
 
-        return JitAddslashes::escape(
-            $context,
+        StringAddslashes::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__addslashes'),
             JitStringBuiltinArg::lower($context, $args[0], 'addslashes', 0, 'string')
         );
     }

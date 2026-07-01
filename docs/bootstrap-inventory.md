@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3634 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9920 |
+| Source constructs flagged (warnings) | 9922 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -419,6 +419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
 | `ext/spl/VmSplRegistry.php` | 0 | 4 |
 | `ext/spl/spl_classes.php` | 0 | 2 |
+| `ext/standard/AddslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/ApacheNoteJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayChangeKeyCaseJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayChunkJitHelper.php` | 0 | 1 |
@@ -554,7 +555,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/IniJitHelper.php` | 0 | 1 |
 | `ext/standard/IniParseQuantityJitHelper.php` | 0 | 1 |
 | `ext/standard/JitAddcslashes.php` | 0 | 1 |
-| `ext/standard/JitAddslashes.php` | 0 | 1 |
 | `ext/standard/JitArrayChunk.php` | 0 | 1 |
 | `ext/standard/JitArrayCountRecursive.php` | 0 | 1 |
 | `ext/standard/JitArrayElem.php` | 0 | 1 |
@@ -2676,7 +2676,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StreamSocketPairRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StreamSync.php` | 0 | 1 |
 | `lib/JIT/Builtin/StreamSyncJit.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringAddslashes.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringAddslashes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
@@ -6498,6 +6498,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 30)
 - 2 class method(s)
 
+### `ext/standard/AddslashesJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/ApacheNoteJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7282,11 +7287,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/JitAddcslashes.php`
-
-**Warnings** (review for bootstrap subset):
-- 1 class method(s)
-
-### `ext/standard/JitAddslashes.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -21243,7 +21243,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringAddslashes.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- new JIT (line 129)
+- 7 class method(s)
+- 1 closure(s)
 
 ### `lib/JIT/Builtin/StringBin2hex.php`
 
