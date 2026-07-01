@@ -41,10 +41,14 @@ final class ApacheGetenvSetenvTest extends TestCase
         $this->assertFalse(VmHead::registersRequestHeaderFunctions());
         $this->assertNotContains('apache_getenv', BuiltinRegistry::sortedNames());
         $this->assertNotContains('apache_setenv', BuiltinRegistry::sortedNames());
+        $this->assertNotContains('apache_note', BuiltinRegistry::sortedNames());
+        $this->assertNotContains('apache_get_version', BuiltinRegistry::sortedNames());
 
         $runtime = new Runtime();
         $this->assertArrayNotHasKey('apache_getenv', $runtime->vmContext->functions);
         $this->assertArrayNotHasKey('apache_setenv', $runtime->vmContext->functions);
+        $this->assertArrayNotHasKey('apache_note', $runtime->vmContext->functions);
+        $this->assertArrayNotHasKey('apache_get_version', $runtime->vmContext->functions);
     }
 
     public function testCgiRequestMethodRegistersApacheEnvironmentFunctions(): void
@@ -58,6 +62,8 @@ final class ApacheGetenvSetenvTest extends TestCase
         $runtime = new Runtime();
         $this->assertArrayHasKey('apache_getenv', $runtime->vmContext->functions);
         $this->assertArrayHasKey('apache_setenv', $runtime->vmContext->functions);
+        $this->assertArrayHasKey('apache_note', $runtime->vmContext->functions);
+        $this->assertArrayHasKey('apache_get_version', $runtime->vmContext->functions);
     }
 
     public function testReproRoundTripOnCgiProfile(): void
@@ -68,6 +74,20 @@ final class ApacheGetenvSetenvTest extends TestCase
 
         $repoRoot = \dirname(__DIR__, 2);
         $script = $repoRoot.'/test/repro/maintainer_gap_apache_getenv_setenv.php';
+        $cmd = 'REQUEST_METHOD=GET '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($repoRoot.'/bin/vm.php').' '
+            .escapeshellarg($script).' 2>/dev/null';
+        $output = shell_exec($cmd);
+        $this->assertSame("ok\n", $output);
+    }
+
+    public function testApacheNoteGetVersionReproOnCgiProfile(): void
+    {
+        putenv('REQUEST_METHOD=GET');
+        $_ENV['REQUEST_METHOD'] = 'GET';
+        $_SERVER['REQUEST_METHOD'] = 'GET';
+
+        $repoRoot = \dirname(__DIR__, 2);
+        $script = $repoRoot.'/test/repro/maintainer_gap_apache_note_get_version.php';
         $cmd = 'REQUEST_METHOD=GET '.escapeshellarg(PHP_BINARY).' '.escapeshellarg($repoRoot.'/bin/vm.php').' '
             .escapeshellarg($script).' 2>/dev/null';
         $output = shell_exec($cmd);

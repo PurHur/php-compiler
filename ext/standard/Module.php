@@ -489,6 +489,8 @@ class Module extends ModuleAbstract
                 new getallheaders_('apache_request_headers'),
                 new apache_getenv_(),
                 new apache_setenv_(),
+                new apache_note(),
+                new apache_get_version(),
             ] : []),
             ...(CompilerVersion::supportsHttpLastResponseHeaders() ? [
                 new http_get_last_response_headers(),
