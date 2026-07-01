@@ -7,7 +7,6 @@ namespace PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -19,8 +18,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_map() single-array paths via ArrayMapJitHelper PHP (#10183).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildMapArray()}.
- * Closure callbacks still use LLVM until a VM bridge exists.
+ * Standalone AOT compiles {@see ArrayMapJitHelper} via nested JIT bridges (#14277); closure callbacks keep LLVM until VM bridge exists.
  * SSOT: {@see \PHPCompiler\ext\standard\array_map}
  * php-src: ext/standard/array.c — php_array_map()
  */
@@ -49,9 +47,6 @@ final class ArrayMapRuntime
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
             return ArrayBuiltinHelper::buildMapArrayWithClosure($context, $callback, $array);
         }
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::buildMapArray($context, $callback, $array);
-        }
 
         self::ensureLinked($context);
         $ht = self::argToHashtable($context, $array);
@@ -71,9 +66,6 @@ final class ArrayMapRuntime
      */
     public static function mapMultipleWithBuiltin(Context $context, array $arrays, string $builtinName): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            throw new \LogicException('array_map() multi-array string builtin standalone LLVM path not implemented');
-        }
         self::ensureLinked($context);
         $sources = [];
         foreach ($arrays as $array) {
@@ -89,12 +81,13 @@ final class ArrayMapRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_map__null');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
