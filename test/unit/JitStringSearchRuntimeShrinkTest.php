@@ -17,10 +17,10 @@ final class JitStringSearchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString("self::emitFindSubstrLoop(\$context, \$fn, 'strncasecmp')", $source);
     }
 
-    public function testJitStrposRoutesThroughJitStringSearch(): void
+    public function testStrposJitRoutesThroughStrposJitHelperNotJitStrpos(): void
     {
-        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStrpos.php');
-        $this->assertStringContainsString('JitStringSearch::find', $source);
-        $this->assertStringNotContainsString('strcasestr', $source);
+        $strpos = (string) file_get_contents(__DIR__.'/../../ext/standard/strpos.php');
+        $this->assertStringContainsString('StringStrpos::invoke', $strpos);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitStrpos.php');
     }
 }

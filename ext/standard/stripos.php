@@ -6,9 +6,11 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -50,12 +52,43 @@ final class stripos extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('stripos() requires two or three arguments');
         }
-        $hay = $this->jitString($context, $args[0], 'stripos() argument #1');
-        $needle = $this->jitString($context, $args[1], 'stripos() argument #2');
+        $hayLit = JitStringArg::compileTimeLiteral($args[0]);
+        $needleLit = JitStringArg::compileTimeLiteral($args[1]);
+        $offsetLit = 3 === $argc ? self::tryCompileTimeInt($context, $args[2]) : 0;
+        if (null !== $hayLit && null !== $needleLit && null !== $offsetLit) {
+            $pos = VmString::stripos($hayLit, $needleLit, $offsetLit);
+
+            return $context->constantFromInteger(
+                false === $pos ? StringStrpos::NOT_FOUND : $pos,
+                'int64'
+            );
+        }
+
+        StringStrpos::ensureLinked($context);
+        $hay = JitStringBuiltinArg::lower($context, $args[0], 'stripos', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lower($context, $args[1], 'stripos', 1, 'needle');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'stripos', 3, 'offset')
             : null;
 
-        return JitStrpos::find($context, $hay, $needle, $offset, true);
+        return StringStrpos::invoke($context, $hay, $needle, $offset, true);
+    }
+
+    private static function tryCompileTimeInt(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+        if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $const = $arg->value;
+            if ($const instanceof Value && $const->isConstant()) {
+                return VmMath::floatToZendLong((float) $const->constDouble());
+            }
+        }
+
+        return null;
     }
 }

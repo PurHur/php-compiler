@@ -10,6 +10,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringStrpos;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\BasicBlock;
@@ -254,7 +255,7 @@ final class JitStringSearch
             $i32->constInt(self::NOT_FOUND, true)
         );
         $pos = $context->builder->zExt($found, $i64);
-        $sentinel = $i64->constInt(JitStrpos::NOT_FOUND, false);
+        $sentinel = $i64->constInt(StringStrpos::NOT_FOUND, false);
 
         return $context->builder->select($notFound, $sentinel, $pos);
     }
