@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -15,7 +14,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_pad() via ArrayPadJitHelper PHP (#12476).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::pad()}.
+ * Standalone AOT compiles {@see ArrayPadJitHelper} via JitVmHelperLink (#14286); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::pad()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::padCopy()}
  * php-src: ext/standard/array.c — php_array_pad()
  */
@@ -38,8 +37,7 @@ final class ArrayPadRuntime
         Value $length,
         JITVariable $value
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::pad($context, $array, $length, $value);
         }
 
@@ -60,12 +58,13 @@ final class ArrayPadRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_PAD);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
