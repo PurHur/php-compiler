@@ -10,6 +10,9 @@ final class ArrayFirstLastEmptyErrorTest extends TestCase
 {
     public function testEmptyArrayThrowsError(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_first/array_last withheld on PHP 8.2 reference profile (#14505)');
+        }
         $code = <<<'PHP'
 <?php
 foreach (['array_first', 'array_last'] as $fn) {

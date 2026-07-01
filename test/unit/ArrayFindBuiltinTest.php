@@ -61,6 +61,9 @@ TXT;
 
     public function testVmMatchesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         $this->assertOutputMatches($this->runBin('bin/vm.php'));
     }
 
@@ -70,6 +73,9 @@ TXT;
      */
     public function testJitMatchesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
@@ -90,6 +96,9 @@ TXT;
      */
     public function testAotLintCompilesSubset(): void
     {
+        if (!CompilerVersion::supportsPhp84ArraySearchFunctions()) {
+            $this->markTestSkipped('array_find family withheld on PHP 8.2 reference profile (#14505)');
+        }
         if (!LlvmToolchain::isReady(dirname(__DIR__, 2))) {
             $this->markTestSkipped('LLVM 9 toolchain not available');
         }
