@@ -11613,11 +11613,26 @@ class Compiler {
                     // Plus immediately precedes the call — wire TYPE_ARG_SEND to Plus.result (#10490, #12763).
                     return null;
                 }
-                if ($child instanceof Op\Expr\Array_
-                    && $this->operandsReferToSameVariable($child->result, $arg)
-                    && $this->callArgOperandExpectsArrayProducer($arg)
-                ) {
-                    return $child;
+                if ($child instanceof Op\Expr\Array_) {
+                    $callArgProbe = $callOp->args[$argIndex] ?? $arg;
+                    // var_export([array_any([], fn), array_all([], fn)]) — stmt-before Array_ (#14516).
+                    if (
+                        $i === $callIndex - 1
+                        && (
+                            $this->operandsReferToSameVariable($child->result, $callArgProbe)
+                            || $this->operandsReferToSameVariable($child->result, $arg)
+                            || $this->callArgIsDeadInlineTemporary($callArgProbe)
+                        )
+                    ) {
+                        return $child;
+                    }
+                    if (
+                        $this->operandsReferToSameVariable($child->result, $arg)
+                        && $this->callArgOperandExpectsArrayProducer($arg)
+                    ) {
+                        return $child;
+                    }
+                    continue;
                 }
             }
         }
@@ -11670,6 +11685,17 @@ class Compiler {
                 || $directCall instanceof Op\Expr\StaticCall
                 || $directCall instanceof Op\Expr\MethodCall
             ) {
+                $embedded = $this->unwrapArrayLiteralExpr($positionalCallArg);
+                if (null === $embedded) {
+                    $embeddedProducer = $this->findCfgProducerExprForOperand($positionalCallArg);
+                    if ($embeddedProducer instanceof Op\Expr\Array_) {
+                        $embedded = $embeddedProducer;
+                    }
+                }
+                if ($embedded instanceof Op\Expr\Array_) {
+                    return $embedded;
+                }
+
                 return null;
             }
             $unassigned = $this->findUnassignedInlineArrayProducerForDeadCallArg(
@@ -11715,6 +11741,20 @@ class Compiler {
             }
 
             return $producer;
+        }
+
+        $callArg = $callOp->args[$argIndex] ?? $arg;
+        if ($callArg instanceof Operand && $this->callArgOperandExpectsArrayProducer($callArg)) {
+            $embedded = $this->unwrapArrayLiteralExpr($callArg);
+            if (null === $embedded) {
+                $embeddedProducer = $this->findCfgProducerExprForOperand($callArg);
+                if ($embeddedProducer instanceof Op\Expr\Array_) {
+                    $embedded = $embeddedProducer;
+                }
+            }
+            if ($embedded instanceof Op\Expr\Array_) {
+                return $embedded;
+            }
         }
 
         return null;
@@ -13205,6 +13245,13 @@ class Compiler {
      */
     private function slotForDeadInlineArrayOrCallResultCallArg(Block $block, Op $cfgCallOp, int $argIndex): ?string
     {
+        $embeddedArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, $argIndex, $block);
+        if ($embeddedArray instanceof Op\Expr\Array_) {
+            $embeddedSlot = $block->slotForOperand($embeddedArray->result);
+            if (null !== $embeddedSlot) {
+                return (string) $embeddedSlot;
+            }
+        }
         if (!$this->callArgIsNestedFuncCallResult($cfgCallOp, $argIndex, $block)) {
             return $this->slotForRecentInitArrayCallArg($block);
         }
@@ -13240,6 +13287,18 @@ class Compiler {
         $callArg = $cfgCallOp->args[$argIndex] ?? null;
         if (null === $callArg) {
             return false;
+        }
+        if ($callArg instanceof Operand) {
+            $embeddedArray = $this->unwrapArrayLiteralExpr($callArg);
+            if (null === $embeddedArray) {
+                $producer = $this->findCfgProducerExprForOperand($callArg);
+                if ($producer instanceof Op\Expr\Array_) {
+                    $embeddedArray = $producer;
+                }
+            }
+            if ($embeddedArray instanceof Op\Expr\Array_) {
+                return false;
+            }
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         foreach ($producers as $producer) {
@@ -15438,6 +15497,29 @@ class Compiler {
     }
 
     /**
+     * var_export([array_any([], fn), array_all([], fn)]) — prefer embedded Array_ over sibling FuncCall (#14516).
+     */
+    private function preferEmbeddedArrayLiteralOverSiblingFuncCallMatch(
+        ?Op\Expr $matched,
+        Op $cfgCallOp,
+        int $argIndex,
+        Block $block,
+        Operand $callArgProbe
+    ): ?Op\Expr {
+        if (
+            ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
+            && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+        ) {
+            $embeddedArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, $argIndex, $block);
+            if ($embeddedArray instanceof Op\Expr\Array_) {
+                return $embeddedArray;
+            }
+        }
+
+        return $matched;
+    }
+
+    /**
      * var_export(C::__set_state([]), true) — nested Array_ is not arg #0 when a sibling call feeds the dead temp (#11896).
      *
      * @param list<Op\Expr> $producers
@@ -17121,6 +17203,28 @@ class Compiler {
         $prev = $block->orig->children[$callIndex - 1] ?? null;
 
         return $prev instanceof Op\Expr\Array_ ? $prev : null;
+    }
+
+    /**
+     * Array_ feeding a dead inline call arg — stmt-before, embedded literal, or cfg producer (#14516).
+     */
+    private function inlineArrayLiteralForDeadCallArg(Op $callOp, int $argIndex, Block $block): ?Op\Expr\Array_
+    {
+        $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
+        if ($immediate instanceof Op\Expr\Array_) {
+            return $immediate;
+        }
+        $callArg = $callOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand) {
+            return null;
+        }
+        $embedded = $this->unwrapArrayLiteralExpr($callArg);
+        if ($embedded instanceof Op\Expr\Array_) {
+            return $embedded;
+        }
+        $producer = $this->findCfgProducerExprForOperand($callArg);
+
+        return $producer instanceof Op\Expr\Array_ ? $producer : null;
     }
 
     /** Hoisted FuncCall / MethodCall / StaticCall sibling inline call-arg producers (#9463, #9351, #12421). */
@@ -21954,6 +22058,19 @@ class Compiler {
             $inlineArray = null === $dimFetchSlot
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
+            if (null === $inlineArray && null !== $cfgCallOp) {
+                $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                if ($stmtBeforeArray instanceof Op\Expr\Array_) {
+                    $callArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                    if (
+                        $this->callArgIsDeadInlineTemporary($callArgProbe)
+                        || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
+                        || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                    ) {
+                        $inlineArray = $stmtBeforeArray;
+                    }
+                }
+            }
             $callArgOperand = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
             if (
                 null !== $inlineArray
@@ -22064,6 +22181,13 @@ class Compiler {
                         );
                         if ($matched instanceof Op\Expr) {
                             $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            $matched = $this->preferEmbeddedArrayLiteralOverSiblingFuncCallMatch(
+                                $matched,
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $block,
+                                $callArgProbe
+                            );
                             $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
                                 $matched,
                                 $producers,
@@ -22236,6 +22360,13 @@ class Compiler {
                         );
                         if ($matched instanceof Op\Expr) {
                             $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            $matched = $this->preferEmbeddedArrayLiteralOverSiblingFuncCallMatch(
+                                $matched,
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $block,
+                                $callArgProbe
+                            );
                             $matched = $this->preferSiblingCallOverNestedArrayInlineMatch(
                                 $matched,
                                 $producers,
@@ -22811,7 +22942,7 @@ class Compiler {
                 }
                 // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
                 if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
-                    $immediateArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
                     if ($immediateArray instanceof Op\Expr\Array_) {
                         $immediateSlot = $block->slotForOperand($immediateArray->result);
                         if (null === $immediateSlot) {

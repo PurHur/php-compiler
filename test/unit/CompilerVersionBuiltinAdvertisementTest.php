@@ -74,9 +74,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
+    public function testPhp84ArraySearchFunctionsAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
     public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
@@ -170,12 +170,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
-    public function testVmDoesNotRegisterArrayFindFamilyOnReferenceProfile(): void
+    public function testVmRegistersArrayFindFamilyOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last'] as $fn) {
-            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
         }
     }
 
