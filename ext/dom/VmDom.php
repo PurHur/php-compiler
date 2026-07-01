@@ -234,6 +234,9 @@ final class VmDom
         $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
+        $element->methods['setidattribute'] = new ElementSetIdAttribute();
+        $element->methodVisibility['setidattribute'] = $pub;
+        $element->methodNames['setidattribute'] = 'setIdAttribute';
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -486,6 +489,73 @@ final class VmDom
         if (self::isXmlnsAttributeName($qualifiedName)) {
             $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
         }
+        if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
+            self::syncElementIdRegistration($element);
+        }
+    }
+
+    /** DOMElement::setIdAttribute() — manual ID map for getElementById() (php-src ext/dom/node.c; #14493). */
+    public static function setIdAttribute(ObjectEntry $element, string $name, bool $isId): void
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($name, $state->attributes)) {
+            throw new \DOMException('Not Found Error', 8);
+        }
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            throw new \DOMException('Not Found Error', 8);
+        }
+        self::unregisterElementId($document, $element);
+        if ($isId) {
+            $state->idAttributeName = $name;
+            self::registerElementId($document, $element);
+        } else {
+            $state->idAttributeName = null;
+        }
+    }
+
+    private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
+    {
+        $nodeState = DomRegistry::state($element);
+        $idAttr = $nodeState->idAttributeName;
+        if (null === $idAttr) {
+            return;
+        }
+        $value = $nodeState->attributes[$idAttr] ?? null;
+        if (null === $value || '' === $value) {
+            return;
+        }
+        DomRegistry::state($document)->elementIds[$value] = $element->id;
+    }
+
+    private static function unregisterElementId(ObjectEntry $document, ObjectEntry $element): void
+    {
+        $nodeState = DomRegistry::state($element);
+        $idAttr = $nodeState->idAttributeName;
+        if (null === $idAttr) {
+            return;
+        }
+        $value = $nodeState->attributes[$idAttr] ?? null;
+        if (null === $value || '' === $value) {
+            return;
+        }
+        $docState = DomRegistry::state($document);
+        if (($docState->elementIds[$value] ?? null) === $element->id) {
+            unset($docState->elementIds[$value]);
+        }
+    }
+
+    private static function syncElementIdRegistration(ObjectEntry $element): void
+    {
+        $document = self::ownerDocumentEntry($element);
+        if (null === $document) {
+            return;
+        }
+        self::unregisterElementId($document, $element);
+        self::registerElementId($document, $element);
     }
 
     public static function lookupPrefix(ObjectEntry $node, ?string $namespace): ?string
@@ -820,12 +890,6 @@ final class VmDom
     {
         $docState = DomRegistry::state($document);
         $docState->elementIds = [];
-        if (!self::documentValidateOnParse($document)) {
-            return;
-        }
-        if ([] === $docState->idAttrByElement) {
-            return;
-        }
         self::indexElementIdsRecursive($document, $root);
     }
 
@@ -852,7 +916,13 @@ final class VmDom
         }
         $docState = DomRegistry::state($document);
         $nodeState = DomRegistry::state($node);
-        $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+        $idAttr = null;
+        if (self::documentValidateOnParse($document)) {
+            $idAttr = $docState->idAttrByElement[$nodeState->nodeName] ?? null;
+        }
+        if (null === $idAttr && null !== $nodeState->idAttributeName) {
+            $idAttr = $nodeState->idAttributeName;
+        }
         if (null !== $idAttr) {
             $value = $nodeState->attributes[$idAttr] ?? null;
             if (null !== $value && '' !== $value) {
