@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ErrorReporter;
+use PHPCompiler\VM\Variable;
 
 /**
  * tempnam() path creation (php-src ext/standard/file.c, main/php_open_temporary_file.c, #4401).
@@ -15,6 +16,19 @@ final class VmFsTempnam
     private const PREFIX_MAX = 64;
 
     public const NOTICE_MESSAGE = "tempnam(): file created in the system's temporary directory";
+
+    /**
+     * php-src ext/standard/file.c — null $directory selects system temp dir (#14672).
+     */
+    public static function resolveDirectoryArg(Variable $var): string
+    {
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return VmSysGetTempDirNative::resolve();
+        }
+
+        return VmString::coercePathBuiltinArg($var, 'tempnam', 0, 'directory');
+    }
 
     public static function normalizePrefix(string $prefix): string
     {
