@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_chunk() JIT routes through ArrayChunkJitHelper PHP not ArrayBuiltinHelper LLVM (#12455). */
+/** array_chunk() JIT routes through ArrayChunkJitHelper PHP not ArrayBuiltinHelper LLVM (#12455, #14289). */
 final class ArrayChunkRuntimeShrinkTest extends TestCase
 {
     public function testArrayChunkRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayChunkRuntime.php');
         $this->assertStringContainsString('ArrayChunkJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildChunkArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_chunk.php');
         $this->assertStringContainsString('ArrayChunkRuntime::chunk', $builtin);

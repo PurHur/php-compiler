@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_chunk() via ArrayChunkJitHelper PHP (#12455).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildChunkArray()}.
+ * Standalone AOT compiles {@see ArrayChunkJitHelper} via JitVmHelperLink (#14289); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildChunkArray()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::chunkCopy()}
  * php-src: ext/standard/array.c — php_array_chunk()
  */
@@ -37,8 +36,7 @@ final class ArrayChunkRuntime
         Value $size,
         ?Value $preserveKeys = null
     ): Value {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildChunkArray($context, $array, $size, $preserveKeys);
         }
 
@@ -62,12 +60,13 @@ final class ArrayChunkRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_CHUNK);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
