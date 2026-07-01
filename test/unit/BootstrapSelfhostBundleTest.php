@@ -202,6 +202,8 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitUrlencode.php',
         'ext/standard/WordwrapJitHelper.php',
         'lib/JIT/Builtin/StringWordwrap.php',
+        'lib/JIT/Builtin/StringStrrev.php',
+        'ext/standard/StrrevJitHelper.php',
         'ext/standard/JitFflush.php',
         'ext/standard/JitFilePutContents.php',
         'ext/standard/JitFilemtime.php',
