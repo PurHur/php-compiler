@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_filter() no-callback path via ArrayFilterJitHelper PHP (#12370).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildFilterArray()}.
+ * Standalone AOT compiles {@see ArrayFilterJitHelper} via JitVmHelperLink bridge (#14386); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::buildFilterArray()}.
  * SSOT: {@see \PHPCompiler\ext\standard\array_filter}
  * php-src: ext/standard/array.c — php_array_filter()
  */
@@ -33,8 +32,7 @@ final class ArrayFilterRuntime
 
     public static function filterDefault(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::buildFilterArray($context, $array);
         }
 
@@ -52,12 +50,13 @@ final class ArrayFilterRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_FILTER);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);

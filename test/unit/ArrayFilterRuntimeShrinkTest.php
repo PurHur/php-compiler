@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_filter() JIT routes through ArrayFilterJitHelper PHP not ArrayBuiltinHelper LLVM (#12370). */
+/** array_filter() JIT routes through ArrayFilterJitHelper PHP not ArrayBuiltinHelper LLVM (#12370, #14386). */
 final class ArrayFilterRuntimeShrinkTest extends TestCase
 {
     public function testArrayFilterRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFilterRuntime.php');
         $this->assertStringContainsString('ArrayFilterJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::buildFilterArray', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_filter.php');
         $this->assertStringContainsString('ArrayFilterRuntime::filterDefault', $builtin);
