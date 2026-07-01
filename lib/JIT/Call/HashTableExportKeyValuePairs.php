@@ -22,20 +22,9 @@ final class HashTableExportKeyValuePairs implements Call
         if ([] === $args) {
             throw new \LogicException('exportKeyValuePairs() requires a HashTable receiver');
         }
-        $ht = self::hashtableFromReceiver($context, $args[0]);
+        $ht = HashTableNestedReceiver::hashtableFromReceiver($context, $args[0]);
 
         return self::exportPairs($context, $ht);
-    }
-
-    private static function hashtableFromReceiver(Context $context, Variable $receiver): Value
-    {
-        $htPtrTy = $context->getTypeFromString('__hashtable__*');
-        if (Variable::TYPE_HASHTABLE === $receiver->type) {
-            return HashTableHelper::loadHashtablePointer($context, $receiver);
-        }
-        $objPtr = $context->helper->loadValue($receiver);
-
-        return $context->builder->bitcast($objPtr, $htPtrTy);
     }
 
     private static function exportPairs(Context $context, Value $ht): Value
