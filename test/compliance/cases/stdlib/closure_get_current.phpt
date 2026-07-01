@@ -25,4 +25,4 @@ try {
 }
 --EXPECT--
 true
-Current function is not a closure
+No active Closure instance to get
