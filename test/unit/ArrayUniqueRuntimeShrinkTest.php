@@ -10,15 +10,16 @@ use PHPCompiler\VM\Variable;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPUnit\Framework\TestCase;
 
-/** array_unique() JIT routes through ArrayUniqueJitHelper PHP not ArrayBuiltinHelper LLVM (#12341). */
+/** array_unique() JIT routes through ArrayUniqueJitHelper PHP not ArrayBuiltinHelper LLVM (#12341, #14385). */
 final class ArrayUniqueRuntimeShrinkTest extends TestCase
 {
     public function testArrayUniqueRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayUniqueRuntime.php');
         $this->assertStringContainsString('ArrayUniqueJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::arrayUnique', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_unique.php');
         $this->assertStringContainsString('ArrayUniqueRuntime::unique', $builtin);
