@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -18,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_push() via ArrayPushJitHelper PHP (#12719).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::push()}.
+ * Standalone AOT compiles {@see ArrayPushJitHelper} via nested JIT bridges (#14303); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::push()}.
  * SSOT: {@see \PHPCompiler\ext\standard\array_push}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_push)
  */
@@ -38,8 +37,7 @@ final class ArrayPushRuntime
 
     public static function push(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::push($context, $array, ...$values);
         }
 
@@ -62,12 +60,13 @@ final class ArrayPushRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_push__count');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
