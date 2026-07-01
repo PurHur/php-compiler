@@ -851,6 +851,29 @@ class Context {
         return !$global->isUndefined() && Variable::TYPE_NULL !== $global->type;
     }
 
+    /**
+     * empty($GLOBALS['name']) — symbol probe then value truthiness (#14798).
+     */
+    public function globalsTableOffsetIsEmpty(Variable $index): bool
+    {
+        if (Variable::TYPE_STRING !== $index->type) {
+            $table = $this->ensureGlobalsTable()->toArray();
+            if (!$table->keyExists($index)) {
+                return true;
+            }
+            $stored = $table->findVariable($index, false);
+
+            return !\PHPCompiler\ext\standard\boolval::isTruthy($stored->resolveIndirect());
+        }
+        $name = $index->toString();
+        if (!isset($this->globalVars[$name])) {
+            return true;
+        }
+        $global = $this->globalVars[$name]->resolveIndirect();
+
+        return !\PHPCompiler\ext\standard\boolval::isTruthy($global);
+    }
+
     private function syncGlobalEntryInGlobalsTable(string $name, Variable $global): void
     {
         if (null === $this->globalsSuperglobal) {

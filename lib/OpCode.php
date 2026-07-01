@@ -213,6 +213,8 @@ class OpCode {
     const TYPE_EMPTY_OBJECT_PROPERTY = 126;
     /** `(void)` cast — evaluate operand, result is null (#7346). */
     const TYPE_CAST_VOID = 127;
+    /** empty($container[$dim]): ArrayAccess checks offsetGet truthiness, not isset alone (#14798). */
+    const TYPE_EMPTY_DIMENSION = 129;
 
     /** `['k' => $v, ...$tail] = $arr` string keys already assigned; empty = numeric spread only (#4889). */
     public array $listSpreadExcludedKeys = [];
