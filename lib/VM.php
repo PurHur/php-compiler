@@ -2042,7 +2042,7 @@ class VM {
                         continue;
                     }
                     $value = $hookValue->resolveIndirect();
-                    if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                    if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
                         continue;
                     }
                     $copy = new Variable();
@@ -2055,7 +2055,7 @@ class VM {
                     continue;
                 }
                 $value = $object->getProperty($meta->name)->resolveIndirect();
-                if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+                if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
                     continue;
                 }
                 $copy = new Variable();
@@ -2068,7 +2068,7 @@ class VM {
                 continue;
             }
             $value = $prop->resolveIndirect();
-            if (VM\TypedPropertyCheck::omitFromPropertyEnumeration($value)) {
+            if (VM\TypedPropertyCheck::omitFromSerialize($value)) {
                 continue;
             }
             $copy = new Variable();

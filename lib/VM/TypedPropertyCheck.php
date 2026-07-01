@@ -22,6 +22,14 @@ final class TypedPropertyCheck
         return self::isUninitialized($target);
     }
 
+    /**
+     * Zend php_var_serialize plain object: omit only uninitialized typed slots, not null (#14619).
+     */
+    public static function omitFromSerialize(Variable $var): bool
+    {
+        return self::isUninitialized($var);
+    }
+
     public static function isUninitialized(Variable $var): bool
     {
         $target = $var->resolveIndirect();
