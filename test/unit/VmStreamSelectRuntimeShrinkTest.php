@@ -23,8 +23,14 @@ final class VmStreamSelectRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelect.php');
         $this->assertStringContainsString('VmStreamSelectPure::multiplex', $source);
         $this->assertStringNotContainsString('FFI::cdef', $source);
-        $this->assertStringNotContainsString('poll(', $source);
         $this->assertStringNotContainsString('@\\stream_select', $source);
+
+        $pure = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelectPure.php');
+        $this->assertStringContainsString('VmStreamSelectPoll::multiplexFdPairs', $pure);
+
+        $poll = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSelectPoll.php');
+        $this->assertStringContainsString('poll(', $poll);
+        $this->assertStringNotContainsString('@\\stream_select', $poll);
     }
 
     public function testVmProcessDelegatesStreamSelectToVmStreamSelect(): void
