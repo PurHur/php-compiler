@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrrpos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -65,18 +66,19 @@ final class strrpos extends Internal
             $pos = VmString::strrpos($hayLit, $needleLit, $offsetLit);
 
             return $context->constantFromInteger(
-                false === $pos ? JitStrrpos::NOT_FOUND : $pos,
+                false === $pos ? StringStrrpos::NOT_FOUND : $pos,
                 'int64'
             );
         }
 
+        StringStrrpos::ensureLinked($context);
         $hay = $this->jitString($context, $args[0], 'strrpos() argument #1');
         $needle = $this->jitString($context, $args[1], 'strrpos() argument #2');
         $offset = 3 === $argc
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'strrpos', 3, 'offset')
             : null;
 
-        return JitStrrpos::find($context, $hay, $needle, $offset);
+        return StringStrrpos::invoke($context, $hay, $needle, $offset);
     }
 
     private static function tryCompileTimeInt(Context $context, JITVariable $arg): ?int
