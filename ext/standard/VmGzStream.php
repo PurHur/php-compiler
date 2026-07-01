@@ -122,6 +122,16 @@ final class VmGzStream
         return VmGzStreamNative::gzrewind($handle);
     }
 
+    /** gzeof() — EOF probe on gzip stream (ext/zlib/zlib.c, #14596). */
+    public static function gzeof(int $handle): int
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return 1;
+        }
+
+        return VmGzStreamNative::gzeof($handle);
+    }
+
     /**
      * readgzfile() — output decompressed file bytes to stdout (ext/zlib/zlib.c, #4657).
      */

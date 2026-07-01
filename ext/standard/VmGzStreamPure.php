@@ -158,6 +158,20 @@ final class VmGzStreamPure
         return 0 === self::gzseek($handle, 0, \SEEK_SET);
     }
 
+    /** gzeof() — true when read position is at or past EOF (ext/zlib/zlib.c, #14596). */
+    public static function gzeof(int $handle): int
+    {
+        $stream = self::$streams[$handle] ?? null;
+        if (null === $stream) {
+            return 1;
+        }
+        if ($stream['writing']) {
+            return 0;
+        }
+
+        return $stream['pos'] >= \strlen($stream['buffer']) ? 1 : 0;
+    }
+
     public static function gzclose(int $handle): bool
     {
         $stream = self::$streams[$handle] ?? null;
