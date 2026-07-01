@@ -17,6 +17,12 @@ final class QuotemetaRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('QuotemetaJitHelper', $source);
         $this->assertStringNotContainsString('quotemeta_count_head', $source);
         $this->assertStringNotContainsString('shouldEscape', $source);
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitQuotemeta.php');
+
+        $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/quotemeta.php');
+        $this->assertStringContainsString('StringQuotemeta::ensureLinked', $builtin);
+        $this->assertStringContainsString('__string__quotemeta', $builtin);
+        $this->assertStringNotContainsString('JitQuotemeta', $builtin);
     }
 
     public function testQuotemetaJitHelperDelegatesToVmString(): void
@@ -29,9 +35,10 @@ final class QuotemetaRuntimeShrinkTest extends TestCase
         $this->assertSame($expected, VmString::quotemeta('$a.b'));
     }
 
-    public function testSpineBundleIncludesQuotemetaJitHelper(): void
+    public function testSpineBundleOmitsDeletedJitQuotemeta(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringNotContainsString('JitQuotemeta.php', $spine);
         $this->assertStringContainsString('QuotemetaJitHelper.php', $spine);
         $this->assertStringContainsString('StringQuotemeta.php', $spine);
     }

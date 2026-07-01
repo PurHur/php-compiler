@@ -27,11 +27,26 @@ final class StringQuotemeta
         self::QUOTEMETA_HELPER,
     ];
 
+    /** @var list<string> */
+    private const ABI_FUNCTIONS = [
+        '__string__quotemeta',
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__string__quotemeta');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__string__quotemeta', $probe);
+            self::registerLinkedRuntime($context);
 
             return;
         }
@@ -44,6 +59,7 @@ final class StringQuotemeta
 
         self::ensureJitHelperCompiled($context);
         self::implementBridge($context);
+        self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
             $context->builder->positionAtEnd($savedBlock);
@@ -55,9 +71,18 @@ final class StringQuotemeta
     private static function implementBridge(Context $context): void
     {
         $abiName = '__string__quotemeta';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
         $strPtr = $context->getTypeFromString('__string__*');
         $ft = $context->context->functionType($strPtr, false, $strPtr);
-        $fn = $context->module->addFunction($abiName, $ft);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
 
         $entry = $fn->appendBasicBlock('quotemeta_bridge_entry');
         $context->builder->positionAtEnd($entry);
@@ -108,6 +133,17 @@ final class StringQuotemeta
             if (!isset($context->functions[\strtolower($logical)])) {
                 throw new \LogicException($logical.' was not compiled for JIT (#14705)');
             }
+        }
+    }
+
+    private static function registerLinkedRuntime(Context $context): void
+    {
+        foreach (self::ABI_FUNCTIONS as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn) {
+                throw new \LogicException($name.' missing after StringQuotemeta bridge (#14705)');
+            }
+            $context->registerFunction($name, $fn);
         }
     }
 }

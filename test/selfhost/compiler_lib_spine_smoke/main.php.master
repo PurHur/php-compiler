@@ -188,7 +188,7 @@ require_once __DIR__.'/../../../ext/standard/JitImplode.php';
 require_once __DIR__.'/../../../ext/standard/JitNl2br.php';
 require_once __DIR__.'/../../../ext/standard/JitPregMatch.php';
 require_once __DIR__.'/../../../ext/standard/JitPregQuote.php';
-require_once __DIR__.'/../../../ext/standard/JitQuotemeta.php';
+require_once __DIR__.'/../../../ext/standard/QuotemetaJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitStrRot13.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionId.php';
 require_once __DIR__.'/../../../ext/standard/JitSessionName.php';
