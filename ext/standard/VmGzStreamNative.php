@@ -40,4 +40,19 @@ final class VmGzStreamNative
     {
         return VmGzStreamPure::gzclose($handle);
     }
+
+    public static function gzseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        return VmGzStreamPure::gzseek($handle, $offset, $whence);
+    }
+
+    public static function gztell(int $handle): int|false
+    {
+        return VmGzStreamPure::gztell($handle);
+    }
+
+    public static function gzrewind(int $handle): bool
+    {
+        return VmGzStreamPure::gzrewind($handle);
+    }
 }

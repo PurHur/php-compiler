@@ -31,6 +31,12 @@ final class GzStreamRuntime
 
     private const GZCLOSE = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzcloseArgv';
 
+    private const GZSEEK = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzseekArgv';
+
+    private const GZTELL = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gztellArgv';
+
+    private const GZREWIND = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzrewindArgv';
+
     private const GZ_READ_ALL = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzReadAllArgv';
 
     private const GZ_PASSTHRU = 'PHPCompiler\\ext\\standard\\GzStreamJitHelper::gzPassthruArgv';
@@ -42,6 +48,9 @@ final class GzStreamRuntime
         self::GZREAD,
         self::GZGETS,
         self::GZCLOSE,
+        self::GZSEEK,
+        self::GZTELL,
+        self::GZREWIND,
         self::GZ_READ_ALL,
         self::GZ_PASSTHRU,
     ];
@@ -53,6 +62,9 @@ final class GzStreamRuntime
         '__compiler_gzread',
         '__compiler_gzgets',
         '__compiler_gzclose',
+        '__compiler_gzseek',
+        '__compiler_gztell',
+        '__compiler_gzrewind',
         '__compiler_gz_read_all',
         '__compiler_gz_passthru',
     ];
@@ -92,6 +104,9 @@ final class GzStreamRuntime
         self::implementIfMissing($context, '__compiler_gzread', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZREAD, 2));
         self::implementIfMissing($context, '__compiler_gzgets', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZGETS, 2));
         self::implementIfMissing($context, '__compiler_gzclose', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::GZCLOSE, 1));
+        self::implementIfMissing($context, '__compiler_gzseek', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZSEEK, 3));
+        self::implementIfMissing($context, '__compiler_gztell', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZTELL, 1));
+        self::implementIfMissing($context, '__compiler_gzrewind', static fn (Context $ctx, LlvmFunction $fn) => self::emitI32Bridge($ctx, $fn, self::GZREWIND, 1));
         self::implementIfMissing($context, '__compiler_gz_read_all', static fn (Context $ctx, LlvmFunction $fn) => self::emitNullableStringBridge($ctx, $fn, self::GZ_READ_ALL, 1));
         self::implementIfMissing($context, '__compiler_gz_passthru', static fn (Context $ctx, LlvmFunction $fn) => self::emitI64Bridge($ctx, $fn, self::GZ_PASSTHRU, 1));
         self::registerLinkedRuntime($context);
@@ -124,6 +139,9 @@ final class GzStreamRuntime
             '__compiler_gzread', '__compiler_gzgets' => $context->context->functionType($strPtr, false, $i64, $i64),
             '__compiler_gz_read_all' => $context->context->functionType($strPtr, false, $i64),
             '__compiler_gzclose' => $context->context->functionType($i32, false, $i64),
+            '__compiler_gzseek' => $context->context->functionType($i64, false, $i64, $i64, $i64),
+            '__compiler_gztell' => $context->context->functionType($i64, false, $i64),
+            '__compiler_gzrewind' => $context->context->functionType($i32, false, $i64),
             '__compiler_gz_passthru' => $context->context->functionType($i64, false, $i64),
             default => throw new \LogicException('GzStreamRuntime: unknown '.$name),
         };
@@ -150,7 +168,7 @@ final class GzStreamRuntime
         $mode = $fn->getParam(1);
         $pathNull = $context->builder->icmp(Builder::INT_EQ, $path, $strPtr->constNull());
         $modeNull = $context->builder->icmp(Builder::INT_EQ, $mode, $strPtr->constNull());
-        $bad = $context->builder->or_($pathNull, $modeNull);
+        $bad = $context->builder->or($pathNull, $modeNull);
         $context->builder->branchIf($bad, $fail, $body);
 
         $context->builder->positionAtEnd($body);

@@ -92,6 +92,36 @@ final class VmGzStream
         return VmGzStreamNative::gzclose($handle);
     }
 
+    /** gzseek() — seek within decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gzseek(int $handle, int $offset, int $whence = \SEEK_SET): int
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return -1;
+        }
+
+        return VmGzStreamNative::gzseek($handle, $offset, $whence);
+    }
+
+    /** gztell() — tell position in decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gztell(int $handle): int|false
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+
+        return VmGzStreamNative::gztell($handle);
+    }
+
+    /** gzrewind() — rewind decompressed gzip stream (ext/zlib/zlib.c, #14585). */
+    public static function gzrewind(int $handle): bool
+    {
+        if (!VmGzStreamNative::isNativeHandle($handle)) {
+            return false;
+        }
+
+        return VmGzStreamNative::gzrewind($handle);
+    }
+
     /**
      * readgzfile() — output decompressed file bytes to stdout (ext/zlib/zlib.c, #4657).
      */
