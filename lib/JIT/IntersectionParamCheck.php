@@ -42,8 +42,8 @@ final class IntersectionParamCheck
 
             return;
         }
-        foreach ($interfaceLcs as $ifaceLc) {
-            $ok = self::emitImplements($context, $objectType, $arg, $ifaceLc);
+        foreach ($interfaceLcs as $memberLc) {
+            $ok = self::emitMemberSatisfies($context, $objectType, $arg, $memberLc);
             self::branchOnBoolOrRaise($context, $ok, $kind, $expected, $arg, $objectType);
         }
     }
@@ -60,6 +60,20 @@ final class IntersectionParamCheck
     {
         TypeErrorRaise::emitRaise($context, $message);
         $context->builder->call($context->lookupFunction('abort'));
+    }
+
+    private static function emitMemberSatisfies(
+        Context $context,
+        ObjectType $objectType,
+        Variable $arg,
+        string $memberLc
+    ): Variable {
+        $memberLc = strtolower(ltrim($memberLc, '\\'));
+        if ($objectType->isInterfaceClassLc($memberLc)) {
+            return self::emitImplements($context, $objectType, $arg, $memberLc);
+        }
+
+        return $objectType->emitInstanceOf($arg, $memberLc);
     }
 
     private static function emitImplements(

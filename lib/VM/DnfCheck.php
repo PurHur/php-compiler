@@ -58,8 +58,8 @@ final class DnfCheck
             return false;
         }
         $entry = $value->toObject()->class;
-        foreach ($interfaceLcs as $ifaceLc) {
-            if (!InterfaceCheck::entryImplements($entry, $ifaceLc, $context)) {
+        foreach ($interfaceLcs as $memberLc) {
+            if (!InterfaceCheck::entrySatisfiesIntersectionMember($entry, $memberLc, $context)) {
                 return false;
             }
         }
