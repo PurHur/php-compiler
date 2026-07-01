@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayReduceCallbackPolicy;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\JitVmHelperLink;
@@ -16,7 +15,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_reduce() string-builtin path via ArrayReduceJitHelper PHP (#12646).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::buildReduceArray()}.
+ * Standalone AOT compiles {@see ArrayReduceJitHelper} via JitVmHelperLink bridge (#14438) for string-builtin callbacks.
  * Closure callbacks still use LLVM until a VM bridge exists.
  * SSOT: {@see \PHPCompiler\ext\standard\array_reduce}
  * php-src: ext/standard/array.c — php_array_reduce()
@@ -49,9 +48,6 @@ final class ArrayReduceRuntime
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)) {
             return ArrayBuiltinHelper::buildReduceArrayWithClosure($context, $array, $callback, $initial);
         }
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return ArrayBuiltinHelper::buildReduceArray($context, $array, $callback, $initial);
-        }
 
         $name = $callback->compileTimeString;
         if (null === $name) {
@@ -75,12 +71,13 @@ final class ArrayReduceRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_REDUCE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
