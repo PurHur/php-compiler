@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_replace_key() via ArrayReplaceKeyJitHelper PHP (#12488).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayReplaceKey()}.
+ * Standalone AOT compiles {@see ArrayReplaceKeyJitHelper} via JitVmHelperLink bridge (#14531); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayReplaceKey()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::replaceKeyCopy()}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_replace_key) (PHP 8.4+)
  */
@@ -33,8 +32,7 @@ final class ArrayReplaceKeyRuntime
 
     public static function replaceKey(Context $context, JITVariable $base, JITVariable $replacements): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($base->type)
+        if (ArrayBuiltinHelper::isNativeArray($base->type)
             || ArrayBuiltinHelper::isNativeArray($replacements->type)) {
             return ArrayBuiltinHelper::arrayReplaceKey($context, $base, $replacements);
         }
@@ -55,19 +53,13 @@ final class ArrayReplaceKeyRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
-        $probe = $context->module->getNamedFunction(self::ABI_REPLACE_KEY);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            self::registerLinkedRuntime($context);
-
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
