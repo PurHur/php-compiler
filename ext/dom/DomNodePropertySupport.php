@@ -24,7 +24,8 @@ final class DomNodePropertySupport
 
         return strtolower(VmDom::PROP_NODE_TYPE) === $lc
             || strtolower(VmDom::PROP_OWNER_DOCUMENT) === $lc
-            || strtolower(VmDom::PROP_NODE_VALUE) === $lc;
+            || strtolower(VmDom::PROP_NODE_VALUE) === $lc
+            || strtolower(VmDom::PROP_TEXT_CONTENT) === $lc;
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -58,6 +59,11 @@ final class DomNodePropertySupport
 
             return $var;
         }
+        if (strtolower(VmDom::PROP_TEXT_CONTENT) === $lc) {
+            $var->string(VmDom::readTextContent($object));
+
+            return $var;
+        }
 
         throw new \LogicException('DomNodePropertySupport::getProperty() called with unmanaged name');
     }
@@ -71,7 +77,8 @@ final class DomNodePropertySupport
         Variable $value,
         Context $ctx
     ): bool {
-        if (strtolower(VmDom::PROP_NODE_VALUE) !== strtolower($propName)) {
+        $lc = strtolower($propName);
+        if (strtolower(VmDom::PROP_NODE_VALUE) !== $lc && strtolower(VmDom::PROP_TEXT_CONTENT) !== $lc) {
             return false;
         }
         if (!DomRegistry::has($owner)) {
@@ -79,11 +86,16 @@ final class DomNodePropertySupport
         }
         $resolved = $value->resolveIndirect();
         if (Variable::TYPE_NULL === $resolved->type) {
-            VmDom::writeNodeValue($ctx, $owner, '');
+            $text = '';
         } elseif (Variable::TYPE_STRING === $resolved->type) {
-            VmDom::writeNodeValue($ctx, $owner, $resolved->toString());
+            $text = $resolved->toString();
         } else {
-            VmDom::writeNodeValue($ctx, $owner, $resolved->toString());
+            $text = $resolved->toString();
+        }
+        if (strtolower(VmDom::PROP_TEXT_CONTENT) === $lc) {
+            VmDom::writeTextContent($ctx, $owner, $text);
+        } else {
+            VmDom::writeNodeValue($ctx, $owner, $text);
         }
 
         return true;
