@@ -47,6 +47,16 @@ final class JitFilestatArg
         if (\in_array($arg->type, [JITVariable::TYPE_STRING, JITVariable::TYPE_NATIVE_LONG], true)) {
             return;
         }
+        if (JITVariable::TYPE_NULL === $arg->type) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort(
+                    $context,
+                    self::intOrStringTypeError($function, $argIndex, $paramName, 'null')
+                );
+            }
+
+            return;
+        }
         $enumClass = JitOperandTypeLabel::compileTimeEnumClassName($context, $arg);
         if (null !== $enumClass) {
             self::emitTypeErrorAndAbort(
@@ -133,6 +143,27 @@ final class JitFilestatArg
         return JitLongArg::lower($context, $arg, $function.'() '.$paramName);
     }
 
+    public static function coerceIntOrStringJitArg(
+        Context $context,
+        JITVariable $arg,
+        string $function,
+        int $argIndex,
+        string $paramName
+    ): JITVariable {
+        self::guardIntOrString($context, $arg, $function, $argIndex, $paramName);
+        if (JITVariable::TYPE_NULL !== $arg->type) {
+            return $arg;
+        }
+        $i64 = $context->getTypeFromString('int64');
+
+        return new JITVariable(
+            $context,
+            JITVariable::TYPE_NATIVE_LONG,
+            JITVariable::KIND_VALUE,
+            $i64->constInt(0, false)
+        );
+    }
+
     public static function valuePtrAfterIntOrStringGuard(
         Context $context,
         JITVariable $arg,
@@ -140,7 +171,7 @@ final class JitFilestatArg
         int $argIndex,
         string $paramName
     ): Value {
-        self::guardIntOrString($context, $arg, $function, $argIndex, $paramName);
+        $arg = self::coerceIntOrStringJitArg($context, $arg, $function, $argIndex, $paramName);
 
         return JitValueBox::valuePtrFromVariable($context, $arg);
     }

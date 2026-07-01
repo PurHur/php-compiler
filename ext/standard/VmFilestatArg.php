@@ -125,6 +125,42 @@ final class VmFilestatArg
     }
 
     /**
+     * Z_PARAM_STR_OR_LONG user/group — null coerces to int 0 when caller is non-strict (#14673).
+     *
+     * @throws \TypeError|\LogicException
+     */
+    public static function requireIntOrStringArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        string $paramName
+    ): Variable {
+        $var = $frame->calledArgs[$argIndex]->resolveIndirect();
+        self::rejectEnumCaseIntOrStringArg($var, $function, $argIndex, $paramName);
+        if (Variable::TYPE_NULL === $var->type) {
+            if (InternalStrictArg::isCallerStrict($frame)) {
+                throw new \TypeError(self::intOrStringTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    'null'
+                ));
+            }
+            $coerced = new Variable();
+            $coerced->int(0);
+
+            return $coerced;
+        }
+        if (!\in_array($var->type, [Variable::TYPE_INTEGER, Variable::TYPE_STRING], true)) {
+            throw new \LogicException(
+                $function.'() '.$paramName.' must be int or string in this compiler build'
+            );
+        }
+
+        return $var;
+    }
+
+    /**
      * @throws \TypeError|\LogicException
      */
     public static function requireIntOrStringArg(
