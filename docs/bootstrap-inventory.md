@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3626 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9875 |
+| Source constructs flagged (warnings) | 9876 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1334,7 +1334,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPointerTarget.php` | 0 | 3 |
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
-| `ext/standard/VmPreg.php` | 0 | 7 |
+| `ext/standard/VmPreg.php` | 0 | 8 |
 | `ext/standard/VmPregEngine.php` | 0 | 56 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
@@ -11228,32 +11228,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 771)
 - new Variable (line 812)
 - new Variable (line 818)
-- new Variable (line 855)
-- new Variable (line 861)
-- new HashTable (line 883)
-- new HashTable (line 888)
-- new Variable (line 891)
-- new HashTable (line 904)
-- new Variable (line 906)
-- new Variable (line 1033)
-- new Variable (line 1084)
-- new Variable (line 1091)
-- new Random\BrokenRandomEngineError (line 1112)
-- new Variable (line 1123)
-- new HashTable (line 1124)
-- new Variable (line 1128)
-- new HashTable (line 1247)
-- new Variable (line 1258)
-- new HashTable (line 1298)
-- new Variable (line 1309)
-- new Variable (line 1322)
-- new HashTable (line 1362)
-- new Variable (line 1371)
-- new Variable (line 1452)
-- new Variable (line 1553)
-- new Variable (line 1555)
-- new HashTable (line 1568)
-- new Variable (line 1571)
+- new Variable (line 856)
+- new Variable (line 862)
+- new HashTable (line 884)
+- new HashTable (line 889)
+- new Variable (line 892)
+- new HashTable (line 905)
+- new Variable (line 907)
+- new Variable (line 1034)
+- new Variable (line 1085)
+- new Variable (line 1092)
+- new Random\BrokenRandomEngineError (line 1113)
+- new Variable (line 1124)
+- new HashTable (line 1125)
+- new Variable (line 1129)
+- new HashTable (line 1248)
+- new Variable (line 1259)
+- new HashTable (line 1299)
+- new Variable (line 1310)
+- new Variable (line 1323)
+- new HashTable (line 1363)
+- new Variable (line 1372)
+- new Variable (line 1453)
+- new Variable (line 1554)
+- new Variable (line 1556)
+- new HashTable (line 1569)
+- new Variable (line 1572)
 - 82 class method(s)
 - 3 closure(s)
 
@@ -12531,12 +12531,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPreg.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 114)
-- new HashTable (line 427)
-- new Variable (line 440)
-- new HashTable (line 447)
-- new Variable (line 448)
+- new Variable (line 115)
+- new Variable (line 153)
+- new HashTable (line 438)
 - new Variable (line 451)
+- new HashTable (line 458)
+- new Variable (line 459)
+- new Variable (line 462)
 - 21 class method(s)
 
 ### `ext/standard/VmPregEngine.php`
