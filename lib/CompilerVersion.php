@@ -110,13 +110,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378).
+     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0.
      */
     public static function supportsStrIncrement(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
@@ -397,13 +397,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0.
      */
     public static function supportsJsonValidate(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
