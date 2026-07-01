@@ -1809,32 +1809,41 @@ final class VmMbstring
     }
 
     /**
+     * Split into ascii pass-through prefix and encoded suffix (php-src mbfl mime header).
+     *
      * @return list<array{type: 'ascii'|'encoded', text: string}>
      */
     private static function mimeHeaderSplitSegments(string $str): array
     {
-        $parts = [];
         $len = \strlen($str);
-        $i = 0;
-        while ($i < $len) {
-            $start = $i;
-            while ($i < $len && self::mimeHeaderIsSafeAsciiByte($str[$i])) {
-                ++$i;
-            }
-            if ($i > $start) {
-                $parts[] = ['type' => 'ascii', 'text' => \substr($str, $start, $i - $start)];
-            }
-            if ($i >= $len) {
+        $encodeStart = null;
+        for ($i = 0; $i < $len; ++$i) {
+            if (!self::mimeHeaderIsSafeAsciiByte($str[$i])) {
+                $encodeStart = $i;
                 break;
             }
-            $start = $i;
-            while ($i < $len && !self::mimeHeaderIsSafeAsciiByte($str[$i])) {
-                $i += VmString::utf8CharByteWidth($str, $i);
+        }
+        if (null === $encodeStart) {
+            return [['type' => 'ascii', 'text' => $str]];
+        }
+        if (0 === $encodeStart) {
+            return [['type' => 'encoded', 'text' => $str]];
+        }
+        $spacePos = null;
+        for ($j = $encodeStart - 1; $j >= 0; --$j) {
+            if (' ' === $str[$j]) {
+                $spacePos = $j;
+                break;
             }
-            $parts[] = ['type' => 'encoded', 'text' => \substr($str, $start, $i - $start)];
+        }
+        if (null === $spacePos) {
+            return [['type' => 'encoded', 'text' => $str]];
         }
 
-        return $parts;
+        return [
+            ['type' => 'ascii', 'text' => \substr($str, 0, $spacePos + 1)],
+            ['type' => 'encoded', 'text' => \substr($str, $spacePos + 1)],
+        ];
     }
 
     private static function mimeHeaderIsSafeAsciiByte(string $byte): bool
