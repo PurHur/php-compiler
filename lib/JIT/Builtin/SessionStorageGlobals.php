@@ -31,6 +31,8 @@ final class SessionStorageGlobals
 
     public const GLOBAL_MODULE_LEN = '__phpc_session_module_len';
 
+    public const GLOBAL_CACHE_EXPIRE = '__phpc_session_cache_expire';
+
     /** @var Value|null */
     public static $idBufGlobal = null;
 
@@ -51,6 +53,9 @@ final class SessionStorageGlobals
 
     /** @var Value|null */
     public static $moduleLenGlobal = null;
+
+    /** @var Value|null */
+    public static $cacheExpireGlobal = null;
 
     public static function ensureGlobals(Context $context): void
     {
@@ -83,6 +88,12 @@ final class SessionStorageGlobals
             $i64,
             self::GLOBAL_MODULE_LEN,
             $i64->constInt($defaultModuleLen, false)
+        );
+        self::$cacheExpireGlobal = self::ensureGlobal(
+            $context,
+            $i64,
+            self::GLOBAL_CACHE_EXPIRE,
+            $i64->constInt(VmSession::DEFAULT_CACHE_EXPIRE, false)
         );
     }
 
