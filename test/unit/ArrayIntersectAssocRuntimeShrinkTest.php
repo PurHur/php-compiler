@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_intersect_assoc() JIT routes through ArrayIntersectAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12636). */
+/** array_intersect_assoc() JIT routes through ArrayIntersectAssocJitHelper PHP not ArrayBuiltinHelper LLVM (#12636, #14399). */
 final class ArrayIntersectAssocRuntimeShrinkTest extends TestCase
 {
     public function testArrayIntersectAssocRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayIntersectAssocRuntime.php');
         $this->assertStringContainsString('ArrayIntersectAssocJitHelper', $runtime);
-        $this->assertStringContainsString('ArrayBuiltinHelper::arrayIntersectAssoc', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayIntersectAssoc', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_intersect_assoc.php');
         $this->assertStringContainsString('ArrayIntersectAssocRuntime::intersectAssoc', $builtin);
