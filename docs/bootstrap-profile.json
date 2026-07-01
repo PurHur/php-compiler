@@ -2799,6 +2799,7 @@
         "lib/JIT/Builtin/StringJsonDecode.php",
         "lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php",
         "lib/JIT/Builtin/StringJsonEncode.php",
+        "lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php",
         "lib/JIT/Builtin/StringLevenshtein.php",
         "lib/JIT/Builtin/StringLocaltime.php",
         "lib/JIT/Builtin/StringLzf.php",
@@ -3884,9 +3885,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3654,
+        "inventory_files": 3655,
         "excluded": 0,
-        "eligible": 3654,
+        "eligible": 3655,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

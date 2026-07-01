@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3654 |
-| Phase A inventory files (M2 ratio SSOT) | 3654 |
+| PHP files on vm.php path | 3655 |
+| Phase A inventory files (M2 ratio SSOT) | 3655 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9977 |
+| Source constructs flagged (warnings) | 9978 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2743,6 +2743,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringLevenshtein.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringLocaltime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringLzf.php` | 0 | 2 |
@@ -21670,8 +21671,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new JIT (line 197)
-- 10 class method(s)
+- 9 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `lib/JIT/Builtin/StringLevenshtein.php`
 
