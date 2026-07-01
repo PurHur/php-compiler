@@ -54,6 +54,18 @@ final class VmInetNativeTest extends TestCase
         $this->assertIsString($v4);
         $this->assertSame(4, \strlen((string) $v4));
         $this->assertSame('127.0.0.1', VmInetPure::inet_ntop((string) $v4));
+
+        $mappedPacked = VmInetPure::inet_pton('::ffff:127.0.0.1');
+        $this->assertIsString($mappedPacked);
+        $this->assertSame('::ffff:127.0.0.1', VmInetPure::inet_ntop((string) $mappedPacked));
+
+        $compatPacked = \hex2bin('0000000000000000000000007f000001');
+        $this->assertIsString($compatPacked);
+        $this->assertSame('::127.0.0.1', VmInetPure::inet_ntop($compatPacked));
+
+        $loopback6 = VmInetPure::inet_pton('::1');
+        $this->assertIsString($loopback6);
+        $this->assertSame('::1', VmInetPure::inet_ntop((string) $loopback6));
     }
 
     public function testNativeInetMatchesPure(): void
