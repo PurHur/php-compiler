@@ -35,8 +35,8 @@ final class rename_ extends Internal
         if (isset($frame->calledArgs[2])) {
             VmStreamContext::validateOptionalContextArg($frame->calledArgs[2], 'rename', 3);
         }
-        $from = VmString::stringBuiltinArgForFrame($frame, 0, 'rename', 0, 'from');
-        $to = VmString::stringBuiltinArgForFrame($frame, 1, 'rename', 1, 'to');
+        $from = VmFilestatArg::coerceFilenameArg($frame->calledArgs[0], 'rename');
+        $to = VmFilestatArg::coerceFilenameArg($frame->calledArgs[1], 'rename');
         $ok = VmFs::rename($from, $to);
         if (!$ok) {
             VmFilestatFailure::warnRenameFailed($frame, $from, $to);
@@ -62,8 +62,8 @@ final class rename_ extends Internal
         if (isset($args[2])) {
             JitStreamContextOptionalArg::validate($context, $args[2], 'rename', 3);
         }
-        $from = JitStringBuiltinArg::lower($context, $args[0], 'rename', 0, 'from');
-        $to = JitStringBuiltinArg::lower($context, $args[1], 'rename', 1, 'to');
+        $from = JitStringBuiltinArg::lowerPath($context, $args[0], 'rename', 0, 'from');
+        $to = JitStringBuiltinArg::lowerPath($context, $args[1], 'rename', 1, 'to');
 
         return JitRename::invoke($context, $from, $to);
     }
