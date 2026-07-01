@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for array_unique() via ArrayUniqueJitHelper PHP (#12341).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::arrayUnique()}.
+ * Standalone AOT compiles {@see ArrayUniqueJitHelper} via JitVmHelperLink bridge (#14385); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::arrayUnique()}.
  * SSOT: {@see \PHPCompiler\ext\standard\ArrayUniqueJitHelper}
  * php-src: ext/standard/array.c — php_array_unique()
  */
@@ -33,8 +32,7 @@ final class ArrayUniqueRuntime
 
     public static function unique(Context $context, JITVariable $array, int $flags): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::arrayUnique($context, $array, $flags);
         }
 
@@ -54,12 +52,13 @@ final class ArrayUniqueRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_UNIQUE);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
