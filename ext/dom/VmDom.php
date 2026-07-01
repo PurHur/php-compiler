@@ -53,6 +53,8 @@ final class VmDom
 
     public const PROP_NODE_NAME = 'nodeName';
 
+    public const PROP_TAG_NAME = 'tagName';
+
     public const PROP_NODE_TYPE = 'nodeType';
 
     public const PROP_OWNER_DOCUMENT = 'ownerDocument';
@@ -1404,7 +1406,7 @@ final class VmDom
         array &$matches
     ): void {
         if (self::isElement($node)) {
-            $name = DomRegistry::state($node)->nodeName;
+            $name = self::readLocalName($node);
             if (null === $want || $name === $want) {
                 $matches[] = $node->id;
             }

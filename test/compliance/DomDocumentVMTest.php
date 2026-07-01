@@ -21,6 +21,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_get_elements_by_tag_name.phpt',
             'dom_get_elements_by_tag_name.phpt'
         );
+        yield 'dom_get_elements_by_tag_name_local.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_get_elements_by_tag_name_local.phpt',
+            'dom_get_elements_by_tag_name_local.phpt'
+        );
         yield 'domdocument_loadxml.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/domdocument_loadxml.phpt',
             'domdocument_loadxml.phpt'
