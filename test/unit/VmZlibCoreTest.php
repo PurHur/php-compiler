@@ -61,4 +61,18 @@ final class VmZlibCoreTest extends TestCase
         $this->assertSame($zendHex, $vmHex);
         $this->assertSame($plain, VmZlibCore::gzinflate((string) VmZlibCore::gzdeflate($plain)));
     }
+
+    /** Issue #14251 — homogeneous payload raw deflate bytes match libz (ext/zlib/zlib.c). */
+    public function testRawDeflateRepeatingPayloadMatchesLibzHex(): void
+    {
+        if (!\function_exists('zlib_encode')) {
+            $this->markTestSkipped('zlib extension required for reference hex');
+        }
+
+        $plain = str_repeat('a', 100);
+        $zendHex = bin2hex((string) zlib_encode($plain, ZLIB_ENCODING_RAW));
+        $vmHex = bin2hex((string) VmZlibCore::gzdeflate($plain));
+        $this->assertSame('4b4ca43d0000', $zendHex);
+        $this->assertSame($zendHex, $vmHex);
+    }
 }

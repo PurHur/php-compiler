@@ -378,6 +378,13 @@ final class VmZlibCore
 
     private static function rawDeflate(string $data, int $level): string|false
     {
+        if (!self::isFfiDisabled()) {
+            $ref = VmZlibLibzReference::rawDeflate($data, $level);
+            if (null !== $ref) {
+                return $ref;
+            }
+        }
+
         $inLen = \strlen($data);
         $lvl = self::sdeflLevel($level);
         $outCap = 128 + (int) (($inLen * 110) / 100);
@@ -408,7 +415,7 @@ final class VmZlibCore
             if ($maxMatch > self::MAX_MATCH) {
                 $maxMatch = self::MAX_MATCH;
             }
-            if ($maxMatch > self::MIN_MATCH) {
+            if ($maxMatch >= self::MIN_MATCH) {
                 $limit = $p - self::WIN_SIZ;
                 if ($limit < self::NIL) {
                     $limit = self::NIL;
