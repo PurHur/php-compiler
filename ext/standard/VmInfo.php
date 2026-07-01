@@ -52,6 +52,14 @@ final class VmInfo
 
     public const CREDITS_ALL = -1;
 
+    /** phpinfo(INFO_CREDITS) embeds these sections without CREDITS_FULLPAGE wrap (ext/standard/info.c, #14296). */
+    private const PHPINFO_CREDITS_FLAGS =
+        self::CREDITS_GROUP
+        | self::CREDITS_GENERAL
+        | self::CREDITS_SAPI
+        | self::CREDITS_MODULES
+        | self::CREDITS_QA;
+
     /** php-src maps the Zend engine module to extension name Core (ext/standard/info.c). */
     public static function isEngineExtensionName(string $extension): bool
     {
@@ -213,7 +221,7 @@ final class VmInfo
             $html .= self::licenseSectionHtml();
         }
         if (self::infoFlagSelected($flags, self::INFO_CREDITS)) {
-            $html .= self::creditsSectionHtml(self::CREDITS_GENERAL);
+            $html .= self::creditsSectionHtml(self::PHPINFO_CREDITS_FLAGS);
         }
         $html .= '</div></body></html>';
 
