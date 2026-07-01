@@ -25,9 +25,21 @@ final class ScopeBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactUndefinedVariableWarning', $source);
         $this->assertStringContainsString('ScopeBuiltinRuntime::emitCompactInvalidArgumentWarning', $source);
         $this->assertStringContainsString('ScopeBuiltinRuntime::resolveExtractTargetName', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::collectCompactNamesFromHashtable', $source);
+        $this->assertStringContainsString('ScopeBuiltinRuntime::storeVarSnapshotAtStringKey', $source);
         $this->assertStringNotContainsString('snprintf', $source);
         $this->assertStringNotContainsString('emitCompactInvalidArgumentWarningMessage', $source);
         $this->assertStringNotContainsString('importKeyIntoScope', $source);
+        $this->assertStringNotContainsString('storeDefinedVarAtStringKey', $source);
+        $this->assertStringNotContainsString('collectCompactFromHashtable', $source);
+    }
+
+    public function testScopeBuiltinJitHelperCompactAndDefinedVarsBridges(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/ScopeBuiltinJitHelper.php');
+        $this->assertStringContainsString('collectCompactNamesFromHashtable', $source);
+        $this->assertStringContainsString('storeVarSnapshotAtStringKey', $source);
+        $this->assertStringContainsString('emitCompactInvalidArgumentWarningFromVariable', $source);
     }
 
     public function testScopeBuiltinJitHelperExtractNameResolution(): void
