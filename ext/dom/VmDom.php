@@ -150,9 +150,12 @@ final class VmDom
 
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
+        $nodeList->interfaces[] = 'countable';
         $nodeList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
         $nodeList->methods['item'] = new NodeListItem();
         $nodeList->methodVisibility['item'] = $pub;
+        $nodeList->methods['count'] = new NodeListCount();
+        $nodeList->methodVisibility['count'] = $pub;
         $ctx->classes[self::CLASS_NODE_LIST] = $nodeList;
 
         $impl = new ClassEntry('DOMImplementation');
