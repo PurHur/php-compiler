@@ -348,10 +348,10 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
-    /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989). */
+    /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989, #14722). */
     public static function supportsClassHasFunctions(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
