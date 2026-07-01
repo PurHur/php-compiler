@@ -9,7 +9,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** natsort()/natcasesort() JIT routes through NaturalSortJitHelper PHP not ArrayBuiltinHelper LLVM (#12753). */
+/** natsort()/natcasesort() JIT routes through NaturalSortJitHelper PHP not ArrayBuiltinHelper LLVM (#12753, #14529). */
 final class NaturalSortRuntimeShrinkTest extends TestCase
 {
     public function testNaturalSortRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -17,7 +17,7 @@ final class NaturalSortRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/NaturalSortRuntime.php');
         $this->assertStringContainsString('NaturalSortJitHelper', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::natsortByValue', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $natsort = (string) file_get_contents(__DIR__.'/../../ext/standard/natsort_.php');
         $natcasesort = (string) file_get_contents(__DIR__.'/../../ext/standard/natcasesort_.php');

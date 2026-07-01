@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -13,8 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 /**
  * JIT/AOT link for natsort()/natcasesort() via NaturalSortJitHelper PHP (#12753).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::natsortByValue()} /
- * {@see ArrayBuiltinHelper::natcasesortByValue()}.
+ * Standalone AOT compiles {@see NaturalSortJitHelper} via JitVmHelperLink bridge (#14529); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::natsortByValue()} / {@see ArrayBuiltinHelper::natcasesortByValue()}.
  * SSOT: {@see \PHPCompiler\ext\standard\VmArray::natsortCopy()} /
  * {@see \PHPCompiler\ext\standard\VmArray::natcasesortCopy()}
  * php-src: ext/standard/array.c — php_natsort / php_natcasesort
@@ -39,8 +37,7 @@ final class NaturalSortRuntime
 
     public static function natsortByValue(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::natsortByValue($context, $array);
 
             return;
@@ -53,8 +50,7 @@ final class NaturalSortRuntime
 
     public static function natcasesortByValue(Context $context, JITVariable $array): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             ArrayBuiltinHelper::natcasesortByValue($context, $array);
 
             return;
@@ -70,12 +66,13 @@ final class NaturalSortRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $savedBlock = null;
         try {
             $savedBlock = $context->builder->getInsertBlock();
