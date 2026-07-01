@@ -20,6 +20,9 @@ final class VmPhpFdStream
 
     private const CHUNK = 8192;
 
+  /** Linux EAGAIN / EWOULDBLOCK — non-blocking read with no data (php-src streams.c). */
+    private const EAGAIN = 11;
+
     /** PHP LOCK_* operands (ext/standard/flock.c). */
     private const PHP_LOCK_SH = 1;
 
@@ -200,6 +203,10 @@ final class VmPhpFdStream
                 $chunk = min(self::CHUNK, $remaining);
                 $n = (int) $ffi->read($state->fd, \FFI::addr($buf[0]), $chunk);
                 if ($n < 0) {
+                    if (!VmFs::handleBlocked($handle) && self::isWouldBlockErrno(self::readErrno())) {
+                        return '';
+                    }
+
                     return false;
                 }
                 if (0 === $n) {
@@ -606,6 +613,18 @@ final class VmPhpFdStream
         }
     }
 
+    private static function readErrno(): int
+    {
+        $ffi = self::ffi();
+
+        return null !== $ffi ? (int) $ffi->errno : (int) \FFI::errno();
+    }
+
+    private static function isWouldBlockErrno(int $errno): bool
+    {
+        return self::EAGAIN === $errno;
+    }
+
     private static function ffiEnabled(): bool
     {
         $v = getenv('PHP_COMPILER_DISABLE_FFI');
@@ -646,6 +665,7 @@ int flock(int fd, int operation);
 int fsync(int fd);
 int fdatasync(int fd);
 int fcntl(int fd, int cmd, ...);
+extern int errno;
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {

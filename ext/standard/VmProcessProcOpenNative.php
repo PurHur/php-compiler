@@ -18,7 +18,12 @@ final class VmProcessProcOpenNative
 
     private const WNOHANG = 1;
 
-    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool}> */
+    /** Linux SIGCONT / SIGSTOP — pause child until parent pipe setup completes (php-src proc_open race). */
+    private const SIGCONT = 18;
+
+    private const SIGSTOP = 19;
+
+    /** @var array<int, array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles: list<int>, childPaused: bool}> */
     private static array $slots = [];
 
     private static int $nextHandleId = 0;
@@ -95,6 +100,7 @@ final class VmProcessProcOpenNative
             }
 
             if (0 === $pid) {
+                $ffi->raise(self::SIGSTOP);
                 self::closePipeWrite($ffi, $stdinPipe);
                 self::closePipeRead($ffi, $stdoutPipe);
                 self::closePipeRead($ffi, $stderrPipe);
@@ -168,6 +174,8 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
+                'childPaused' => true,
             ];
 
             return [$slot, $pipeHandles];
@@ -227,6 +235,7 @@ final class VmProcessProcOpenNative
             }
 
             if (0 === $pid) {
+                $ffi->raise(self::SIGSTOP);
                 self::closePipeWrite($ffi, $stdinPipe);
                 self::closePipeRead($ffi, $stdoutPipe);
                 self::closePipeRead($ffi, $stderrPipe);
@@ -300,6 +309,8 @@ final class VmProcessProcOpenNative
                 'statusKnown' => false,
                 'status' => 0,
                 'active' => true,
+                'pipeHandles' => array_values($pipeHandles),
+                'childPaused' => true,
             ];
 
             return [$slot, $pipeHandles];
@@ -323,6 +334,8 @@ final class VmProcessProcOpenNative
         }
 
         $slot['active'] = false;
+        self::closeRemainingPipeHandles($slot);
+        self::resumeChildIfPaused($ffi, $slot);
         self::$slots[$handle] = $slot;
 
         if ($slot['statusKnown']) {
@@ -453,6 +466,8 @@ final class VmProcessProcOpenNative
             return false;
         }
 
+        self::resumeChildIfPaused($ffi, $slot);
+
         try {
             return 0 === (int) $ffi->kill($slot['pid'], $signal);
         } catch (\Throwable) {
@@ -471,6 +486,22 @@ final class VmProcessProcOpenNative
         }
 
         return $lowByte;
+    }
+
+    /**
+     * php-src proc_open_rsrc_dtor — close pipe streams before waitpid (ext/standard/proc_open.c).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool} $slot
+     */
+    private static function closeRemainingPipeHandles(array &$slot): void
+    {
+        foreach ($slot['pipeHandles'] ?? [] as $pipeHandle) {
+            if (!\is_int($pipeHandle) || !VmPhpFdStream::isValidHandle($pipeHandle)) {
+                continue;
+            }
+            VmFs::fclose($pipeHandle);
+        }
+        $slot['pipeHandles'] = [];
     }
 
     /**
@@ -536,6 +567,19 @@ final class VmProcessProcOpenNative
         $ffi->waitpid($pid, \FFI::addr($status), 0);
     }
 
+    /** Child raises SIGSTOP at fork; resume on proc_close()/proc_terminate(). */
+    private static function resumeChildIfPaused(\FFI $ffi, array &$slot): void
+    {
+        if (!($slot['childPaused'] ?? false)) {
+            return;
+        }
+        $pid = $slot['pid'];
+        if ($pid > 0) {
+            $ffi->kill($pid, self::SIGCONT);
+        }
+        $slot['childPaused'] = false;
+    }
+
     /** @param list<string> $argv */
     private static function execArgv(\FFI $ffi, array $argv): void
     {
@@ -599,6 +643,7 @@ int execvp(const char *file, char *const argv[]);
 void _exit(int status);
 pid_t waitpid(pid_t pid, int *status, int options);
 int kill(pid_t pid, int sig);
+int raise(int sig);
 CDEF;
 
         foreach (['libc.so.6', 'libc.so'] as $lib) {
