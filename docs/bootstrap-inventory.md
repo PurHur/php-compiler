@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3614 |
-| Phase A inventory files (M2 ratio SSOT) | 3614 |
+| PHP files on vm.php path | 3617 |
+| Phase A inventory files (M2 ratio SSOT) | 3617 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9846 |
+| Source constructs flagged (warnings) | 9852 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -724,6 +724,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitGmgetdate.php` | 0 | 1 |
 | `ext/standard/JitGmmktime.php` | 0 | 1 |
 | `ext/standard/JitGzclose.php` | 0 | 1 |
+| `ext/standard/JitGzeof.php` | 0 | 1 |
 | `ext/standard/JitGzfile.php` | 0 | 1 |
 | `ext/standard/JitGzgets.php` | 0 | 1 |
 | `ext/standard/JitGzopen.php` | 0 | 1 |
@@ -1019,7 +1020,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MimeContentTypeJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
-| `ext/standard/Module.php` | 0 | 772 |
+| `ext/standard/Module.php` | 0 | 774 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
 | `ext/standard/NativeObStorage.php` | 0 | 1 |
@@ -1765,11 +1766,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/gzdecode.php` | 0 | 1 |
 | `ext/standard/gzdeflate.php` | 0 | 1 |
 | `ext/standard/gzencode.php` | 0 | 1 |
+| `ext/standard/gzeof.php` | 0 | 1 |
 | `ext/standard/gzfile.php` | 0 | 3 |
 | `ext/standard/gzgets.php` | 0 | 1 |
 | `ext/standard/gzinflate.php` | 0 | 1 |
 | `ext/standard/gzopen.php` | 0 | 1 |
 | `ext/standard/gzpassthru.php` | 0 | 1 |
+| `ext/standard/gzputs.php` | 0 | 2 |
 | `ext/standard/gzread.php` | 0 | 1 |
 | `ext/standard/gzrewind.php` | 0 | 1 |
 | `ext/standard/gzseek.php` | 0 | 1 |
@@ -4339,32 +4342,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 295)
 - new DomNodeState (line 300)
 - new Variable (line 313)
-- new DomNodeState (line 350)
-- new ObjectEntry (line 370)
-- new DomNodeState (line 375)
-- new Variable (line 385)
-- new ObjectEntry (line 404)
-- new DomNodeState (line 409)
-- new Variable (line 423)
-- new DOMException (line 432)
-- new DOMException (line 485)
-- new DOMException (line 501)
-- new DOMException (line 505)
-- new DOMException (line 509)
-- new ObjectEntry (line 792)
-- new DomNodeState (line 797)
-- new ObjectEntry (line 816)
-- new DomNodeState (line 821)
-- new Variable (line 826)
-- new DOMException (line 1045)
-- new DOMException (line 1071)
-- new Variable (line 1143)
-- new DOMException (line 1272)
-- new ObjectEntry (line 1354)
-- new DomNodeState (line 1358)
-- new Variable (line 1364)
-- new Variable (line 1897)
-- new DOMException (line 1911)
+- new DomNodeState (line 347)
+- new ObjectEntry (line 367)
+- new DomNodeState (line 372)
+- new Variable (line 382)
+- new ObjectEntry (line 401)
+- new DomNodeState (line 406)
+- new Variable (line 420)
+- new DOMException (line 429)
+- new DOMException (line 482)
+- new DOMException (line 498)
+- new DOMException (line 502)
+- new DOMException (line 506)
+- new ObjectEntry (line 789)
+- new DomNodeState (line 794)
+- new ObjectEntry (line 813)
+- new DomNodeState (line 818)
+- new Variable (line 823)
+- new DOMException (line 1042)
+- new DOMException (line 1068)
+- new Variable (line 1140)
+- new DOMException (line 1269)
+- new ObjectEntry (line 1351)
+- new DomNodeState (line 1355)
+- new Variable (line 1361)
+- new Variable (line 1894)
+- new DOMException (line 1908)
 - 98 class method(s)
 
 ### `ext/filter/BuiltinEnums.php`
@@ -7100,7 +7103,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/GzStreamJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/HashCryptoJitHelper.php`
 
@@ -8180,6 +8183,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `ext/standard/JitGzclose.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/JitGzeof.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -10404,109 +10412,111 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new gzuncompress (line 831)
 - new gzopen (line 832)
 - new gzwrite (line 833)
-- new gzread (line 834)
-- new gzgets (line 835)
-- new gzseek (line 836)
-- new gztell (line 837)
-- new gzrewind (line 838)
-- new gzclose (line 839)
-- new readgzfile (line 840)
-- new gzfile (line 841)
-- new gzpassthru (line 842)
-- new zlib_encode (line 843)
-- new zlib_decode (line 844)
-- new zlib_get_coding_type (line 845)
-- new fnmatch (line 846)
-- new time (line 847)
-- new getmypid (line 848)
-- new getmyuid (line 849)
-- new getmygid (line 850)
-- new get_current_user (line 851)
-- new get_cfg_var (line 852)
-- new php_ini_loaded_file (line 853)
-- new php_ini_scanned_files (line 854)
-- new zend_thread_id (line 855)
-- new getmygrgid (line 856)
-- new getmyinode (line 857)
-- new getlastmod (line 858)
-- new getrusage (line 859)
-- new cli_get_process_title (line 860)
-- new cli_set_process_title (line 861)
-- new proc_nice (line 862)
-- new memory_get_peak_usage (line 863)
-- new memory_get_usage (line 864)
-- new memory_reset_peak_usage (line 865)
-- new microtime (line 866)
-- new gettimeofday (line 867)
-- new hrtime (line 868)
-- new clock_gettime (line 869)
-- new phpversion (line 870)
-- new php_sapi_name (line 871)
-- new getopt (line 872)
-- new php_uname (line 873)
-- new phpinfo (line 874)
-- new phpcredits (line 875)
-- new zend_version (line 876)
-- new version_compare (line 877)
-- new extension_loaded (line 878)
-- new get_loaded_extensions (line 879)
-- new get_extension_funcs (line 880)
-- new date (line 881)
-- new timezone_version_get (line 882)
-- new timezone_identifiers_list (line 883)
-- new timezone_abbreviations_list (line 884)
-- new timezone_name_from_abbr (line 885)
-- new timezone_open (line 886)
-- new timezone_name_get (line 887)
-- new timezone_offset_get (line 888)
-- new date_offset_get (line 889)
-- new timezone_location_get (line 890)
-- new timezone_transitions_get (line 891)
-- new gmdate (line 892)
-- new strftime (line 893)
-- new gmstrftime (line 894)
-- new strptime (line 895)
-- new getdate (line 896)
-- new gmgetdate (line 897)
-- new gmmktime (line 898)
-- new mktime (line 899)
-- new strtotime (line 900)
-- new checkdate (line 901)
-- new date_default_timezone_get (line 902)
-- new date_default_timezone_set (line 903)
-- new localtime (line 904)
-- new localeconv (line 905)
-- new idate (line 906)
-- new date_sun_info (line 907)
-- new date_interval_format (line 908)
-- new date_interval_create_from_date_string (line 909)
-- new date_create (line 910)
-- new date_create_immutable (line 911)
-- new date_create_from_format (line 912)
-- new date_create_immutable_from_format (line 913)
-- new date_parse (line 914)
-- new date_parse_from_format (line 915)
-- new date_add (line 916)
-- new date_sub (line 917)
-- new date_modify (line 918)
-- new date_diff (line 919)
-- new date_sunrise (line 920)
-- new date_sunset (line 921)
-- new sleep (line 922)
-- new set_time_limit (line 923)
-- new setlocale (line 924)
-- new nl_langinfo (line 925)
-- new ignore_user_abort (line 926)
-- new connection_aborted (line 927)
-- new spl_autoload (line 928)
-- new spl_autoload_extensions (line 929)
-- new spl_autoload_functions (line 930)
-- new spl_autoload_register (line 931)
-- new spl_autoload_unregister (line 932)
-- new spl_autoload_call (line 933)
-- new time_nanosleep (line 934)
-- new time_sleep_until (line 935)
-- new usleep (line 936)
+- new gzputs (line 834)
+- new gzread (line 835)
+- new gzgets (line 836)
+- new gzseek (line 837)
+- new gztell (line 838)
+- new gzrewind (line 839)
+- new gzeof (line 840)
+- new gzclose (line 841)
+- new readgzfile (line 842)
+- new gzfile (line 843)
+- new gzpassthru (line 844)
+- new zlib_encode (line 845)
+- new zlib_decode (line 846)
+- new zlib_get_coding_type (line 847)
+- new fnmatch (line 848)
+- new time (line 849)
+- new getmypid (line 850)
+- new getmyuid (line 851)
+- new getmygid (line 852)
+- new get_current_user (line 853)
+- new get_cfg_var (line 854)
+- new php_ini_loaded_file (line 855)
+- new php_ini_scanned_files (line 856)
+- new zend_thread_id (line 857)
+- new getmygrgid (line 858)
+- new getmyinode (line 859)
+- new getlastmod (line 860)
+- new getrusage (line 861)
+- new cli_get_process_title (line 862)
+- new cli_set_process_title (line 863)
+- new proc_nice (line 864)
+- new memory_get_peak_usage (line 865)
+- new memory_get_usage (line 866)
+- new memory_reset_peak_usage (line 867)
+- new microtime (line 868)
+- new gettimeofday (line 869)
+- new hrtime (line 870)
+- new clock_gettime (line 871)
+- new phpversion (line 872)
+- new php_sapi_name (line 873)
+- new getopt (line 874)
+- new php_uname (line 875)
+- new phpinfo (line 876)
+- new phpcredits (line 877)
+- new zend_version (line 878)
+- new version_compare (line 879)
+- new extension_loaded (line 880)
+- new get_loaded_extensions (line 881)
+- new get_extension_funcs (line 882)
+- new date (line 883)
+- new timezone_version_get (line 884)
+- new timezone_identifiers_list (line 885)
+- new timezone_abbreviations_list (line 886)
+- new timezone_name_from_abbr (line 887)
+- new timezone_open (line 888)
+- new timezone_name_get (line 889)
+- new timezone_offset_get (line 890)
+- new date_offset_get (line 891)
+- new timezone_location_get (line 892)
+- new timezone_transitions_get (line 893)
+- new gmdate (line 894)
+- new strftime (line 895)
+- new gmstrftime (line 896)
+- new strptime (line 897)
+- new getdate (line 898)
+- new gmgetdate (line 899)
+- new gmmktime (line 900)
+- new mktime (line 901)
+- new strtotime (line 902)
+- new checkdate (line 903)
+- new date_default_timezone_get (line 904)
+- new date_default_timezone_set (line 905)
+- new localtime (line 906)
+- new localeconv (line 907)
+- new idate (line 908)
+- new date_sun_info (line 909)
+- new date_interval_format (line 910)
+- new date_interval_create_from_date_string (line 911)
+- new date_create (line 912)
+- new date_create_immutable (line 913)
+- new date_create_from_format (line 914)
+- new date_create_immutable_from_format (line 915)
+- new date_parse (line 916)
+- new date_parse_from_format (line 917)
+- new date_add (line 918)
+- new date_sub (line 919)
+- new date_modify (line 920)
+- new date_diff (line 921)
+- new date_sunrise (line 922)
+- new date_sunset (line 923)
+- new sleep (line 924)
+- new set_time_limit (line 925)
+- new setlocale (line 926)
+- new nl_langinfo (line 927)
+- new ignore_user_abort (line 928)
+- new connection_aborted (line 929)
+- new spl_autoload (line 930)
+- new spl_autoload_extensions (line 931)
+- new spl_autoload_functions (line 932)
+- new spl_autoload_register (line 933)
+- new spl_autoload_unregister (line 934)
+- new spl_autoload_call (line 935)
+- new time_nanosleep (line 936)
+- new time_sleep_until (line 937)
+- new usleep (line 938)
 - 5 class method(s)
 - 1 closure(s)
 
@@ -11972,17 +11982,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmGzStream.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/VmGzStreamNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/VmGzStreamPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/VmHash.php`
 
@@ -15267,6 +15277,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/gzeof.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/gzfile.php`
 
 **Warnings** (review for bootstrap subset):
@@ -15292,6 +15307,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/gzpassthru.php`
 
 **Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `ext/standard/gzputs.php`
+
+**Warnings** (review for bootstrap subset):
+- new gzwrite (line 21)
 - 2 class method(s)
 
 ### `ext/standard/gzread.php`
@@ -20154,9 +20175,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/GzStreamRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 342)
+- new JIT (line 348)
 - 12 class method(s)
-- 11 closure(s)
+- 12 closure(s)
 
 ### `lib/JIT/Builtin/HashtableValueOutJitBridge.php`
 
