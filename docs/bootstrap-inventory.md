@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3627 |
-| Phase A inventory files (M2 ratio SSOT) | 3627 |
+| PHP files on vm.php path | 3629 |
+| Phase A inventory files (M2 ratio SSOT) | 3629 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9885 |
+| Source constructs flagged (warnings) | 9889 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -479,6 +479,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ConvertUuJitHelper.php` | 0 | 1 |
 | `ext/standard/CopyJitHelper.php` | 0 | 1 |
 | `ext/standard/CoreExtensionFunctions.php` | 0 | 1 |
+| `ext/standard/CountCharsJitHelper.php` | 0 | 3 |
 | `ext/standard/CslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/CsvJitHelper.php` | 0 | 3 |
 | `ext/standard/DateConstants.php` | 0 | 1 |
@@ -2679,6 +2680,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringCountChars.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringCslashes.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringDateTime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringDeployPath.php` | 0 | 2 |
@@ -6878,6 +6880,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/CountCharsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 43)
+- new Variable (line 52)
+- 3 class method(s)
+
 ### `ext/standard/CslashesJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7516,7 +7525,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitCountChars.php`
 
 **Warnings** (review for bootstrap subset):
-- 9 class method(s)
+- 6 class method(s)
 
 ### `ext/standard/JitCrc32.php`
 
@@ -14234,8 +14243,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/count_chars.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 55)
-- new Variable (line 64)
+- new HashTable (line 56)
+- new Variable (line 65)
 - 2 class method(s)
 
 ### `ext/standard/crc32.php`
@@ -21239,6 +21248,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 8 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringCountChars.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/StringCslashes.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22766,19 +22780,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1121)
-- new Result (line 1142)
-- new Variable (line 1414)
-- new Variable (line 1734)
-- new Variable (line 1865)
-- new Variable (line 2051)
-- new VMVariable (line 2209)
-- new VMVariable (line 2225)
-- new VMVariable (line 2231)
-- new VMVariable (line 2237)
-- new VMVariable (line 2248)
-- new Variable (line 2278)
-- new Variable (line 2317)
+- new Result (line 1122)
+- new Result (line 1143)
+- new Variable (line 1415)
+- new Variable (line 1735)
+- new Variable (line 1866)
+- new Variable (line 2052)
+- new VMVariable (line 2210)
+- new VMVariable (line 2226)
+- new VMVariable (line 2232)
+- new VMVariable (line 2238)
+- new VMVariable (line 2249)
+- new Variable (line 2279)
+- new Variable (line 2318)
 - 98 class method(s)
 - 28 closure(s)
 
