@@ -212,6 +212,7 @@ final class ModuleRegistry
                 || 'readgzfile' === $functionName,
             'readline' => str_starts_with($functionName, 'readline'),
             'bcmath' => str_starts_with($functionName, 'bc'),
+            'openssl' => str_starts_with($functionName, 'openssl_'),
             default => false,
         };
     }

@@ -9,12 +9,30 @@ use PHPCompiler\Runtime;
 use PHPCompiler\VM;
 
 /**
- * openssl extension module entry (php-src ext/openssl/openssl.c; issue #7000).
+ * openssl extension module entry (php-src ext/openssl/openssl.c; issue #7000, #11859).
  *
  * Crypto algorithms land in #3324; PKCS#7 in #6804; key APIs in #6295.
+ * Logical {@code openssl} extension is withheld until {@see OpensslExtensionPolicy}.
  */
 class Module extends ModuleAbstract
 {
+    public function getExtensionName(): string
+    {
+        return 'standard';
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function getAdditionalExtensionNames(): array
+    {
+        if (!OpensslExtensionPolicy::advertisesExtension()) {
+            return [];
+        }
+
+        return ['openssl'];
+    }
+
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);
