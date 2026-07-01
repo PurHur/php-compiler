@@ -1457,6 +1457,7 @@ require_once __DIR__.'/../../../ext/standard/VmZendDoubleString.php';
 require_once __DIR__.'/../../../ext/standard/VmZlib.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibArg.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibCore.php';
+require_once __DIR__.'/../../../ext/standard/VmZlibLibzReference.php';
 require_once __DIR__.'/../../../ext/standard/VmZlibStreamFilter.php';
 require_once __DIR__.'/../../../ext/standard/WeakRefRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ZendSort.php';
