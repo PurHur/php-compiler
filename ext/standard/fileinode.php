@@ -18,13 +18,14 @@ final class fileinode extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileinode() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'fileinode');
         if (null === $frame->returnVar) {
             return;
         }
         $inode = VmFs::fileInode($path);
         if (false === $inode) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'fileinode', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'fileinode', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($inode);

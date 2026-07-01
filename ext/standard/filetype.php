@@ -18,13 +18,14 @@ final class filetype extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filetype() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filetype');
         if (null === $frame->returnVar) {
             return;
         }
         $type = VmFs::fileType($path);
         if (false === $type) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'filetype', $path, true);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'filetype', $path, true);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->string($type);

@@ -18,13 +18,14 @@ final class filemtime extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('filemtime() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'filemtime');
         if (null === $frame->returnVar) {
             return;
         }
         $mtime = VmFs::fileMtime($path);
         if (false === $mtime) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'filemtime', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'filemtime', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($mtime);

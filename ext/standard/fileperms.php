@@ -18,13 +18,14 @@ final class fileperms extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('fileperms() requires exactly one argument in this compiler build');
         }
+        $filenameArg = $frame->calledArgs[0];
         $path = VmFilestatArg::filenameArgForFrame($frame, 0, 'fileperms');
         if (null === $frame->returnVar) {
             return;
         }
         $mode = VmFs::filePerms($path);
         if (false === $mode) {
-            VmFilestatFailure::warnPathStatFailed($frame, 'fileperms', $path, false);
+            VmFilestatArg::warnPathStatFailedForFilenameArg($frame, $filenameArg, 'fileperms', $path, false);
             $frame->returnVar->bool(false);
         } else {
             $frame->returnVar->int($mode);
