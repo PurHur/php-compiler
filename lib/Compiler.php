@@ -4558,23 +4558,17 @@ class Compiler {
     }
 
     /**
-     * Zend zend_handle_never_type — PHP 8.2+ allows never in parameter/return unions (#7414).
+     * Zend zend_handle_never_type — never is only valid as a standalone signature type (#14334).
      */
     protected function assertFunctionSignatureNeverType(?Op\Type $type): void
     {
-        if ($this->cfgTypeContainsNeverInIntersection($type)) {
-            $this->throwCompileError('never can only be used as a standalone type');
+        if (!$this->cfgTypeContainsNever($type)) {
+            return;
         }
-        if ($type instanceof Op\Type\Nullable && $this->cfgTypeContainsNever($type->subtype)) {
-            $this->throwCompileError('never can only be used as a standalone type');
+        if ($this->cfgTypeIsStandaloneNever($type)) {
+            return;
         }
-        if (
-            $type instanceof Op\Type\Union_
-            && $this->cfgTypeContainsNever($type)
-            && $this->cfgTypeContainsNull($type)
-        ) {
-            $this->throwCompileError('never can only be used as a standalone type');
-        }
+        $this->throwCompileError('never can only be used as a standalone type');
     }
 
     /**

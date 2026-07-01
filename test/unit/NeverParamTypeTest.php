@@ -7,7 +7,7 @@ namespace PHPCompiler\Test\Unit;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
-/** @covers issue #6633 #7414 #11473 */
+/** @covers issue #6633 #11473 #14334 */
 final class NeverParamTypeTest extends TestCase
 {
     public function testStandaloneNeverParamRejectedAtCompileTime(): void
@@ -51,7 +51,7 @@ PHP;
         $runtime->parseAndCompile($code, 'never_param_interface.php');
     }
 
-    public function testNeverInUnionParamCompilesAndAcceptsInt(): void
+    public function testNeverInUnionParamRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
@@ -59,31 +59,22 @@ PHP;
 function f(int|never $x): int {
     return $x;
 }
-echo f(42);
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'never_union_param.php'));
-        $this->assertSame('42', ob_get_clean());
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_union_param.php');
     }
 
-    public function testNeverInUnionParamRejectsString(): void
+    public function testNeverIntersectionUnionParamRejectedAtCompileTime(): void
     {
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
-function f(int|never $x): void {}
-try {
-    f('bad');
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
+function f(never&string $x): void {}
 PHP;
-        ob_start();
-        $runtime->run($runtime->parseAndCompile($code, 'never_union_param_bad.php'));
-        $this->assertSame(
-            "TypeError: Argument must be of type int|never, string given\n",
-            ob_get_clean()
-        );
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('never can only be used as a standalone type');
+        $runtime->parseAndCompile($code, 'never_intersection_param.php');
     }
 
 }

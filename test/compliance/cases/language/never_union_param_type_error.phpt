@@ -1,12 +1,10 @@
 --TEST--
-Language: never in parameter union — rejects incompatible values (#7414)
+Language: never in parameter union — compile-time fatal (#14334)
 --FILE--
 <?php
 function f(int|never $x): void {}
-try {
-    f('bad');
-} catch (Throwable $e) {
-    echo get_class($e), ': ', $e->getMessage(), "\n";
-}
---EXPECT--
-TypeError: Argument must be of type int|never, string given
+echo "compiled\n";
+--EXPECT_EXIT--
+255
+--EXPECTF--
+Fatal error: never can only be used as a standalone type in %s on line %d
