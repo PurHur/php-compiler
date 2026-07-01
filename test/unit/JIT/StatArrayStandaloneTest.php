@@ -22,7 +22,8 @@ final class StatArrayStandaloneTest extends TestCase
 
         $runtime = (string) file_get_contents(__DIR__.'/../../../lib/JIT/Builtin/StatArrayRuntime.php');
         $this->assertStringContainsString('StatArrayJitHelper', $runtime);
-        $this->assertStringContainsString('StatArrayLlvm::implement', $runtime);
+        $this->assertStringContainsString('NestedJitCompileScope', $runtime);
+        $this->assertStringNotContainsString('StatArrayLlvm', $runtime);
         $this->assertStringContainsString('__phpc_stat', $runtime);
 
         $helper = (string) file_get_contents(__DIR__.'/../../../ext/standard/StatArrayJitHelper.php');
