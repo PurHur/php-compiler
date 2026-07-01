@@ -2371,6 +2371,7 @@ require_once __DIR__.'/../../../lib/AsymmetricVisibilityRejector.php';
 require_once __DIR__.'/../../../lib/BareThrowSyntaxRejector.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/BuiltinByRefParams.php';
+require_once __DIR__.'/../../../lib/BuiltinFunctionClassConstant.php';
 require_once __DIR__.'/../../../lib/BuiltinInternalArgInfo.php';
 require_once __DIR__.'/../../../lib/BuiltinParamNames.php';
 require_once __DIR__.'/../../../lib/BuiltinTypeClassConstant.php';
