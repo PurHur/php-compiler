@@ -34,9 +34,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
-    public function testJsonValidateWithheldOnReferenceProfileUntilStable84(): void
+    public function testJsonValidateAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
     public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
@@ -44,9 +44,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
-    public function testStrIncrementWithheldOnReferenceProfile(): void
+    public function testStrIncrementAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
@@ -152,10 +152,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void
