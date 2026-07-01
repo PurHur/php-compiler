@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3543 |
-| Phase A inventory files (M2 ratio SSOT) | 3543 |
+| PHP files on vm.php path | 3545 |
+| Phase A inventory files (M2 ratio SSOT) | 3545 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9648 |
+| Source constructs flagged (warnings) | 9657 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -372,7 +372,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplArrayStorage.php` | 0 | 13 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
 | `ext/spl/SplDllistSerializeSupport.php` | 0 | 2 |
-| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 19 |
+| `ext/spl/SplDoublyLinkedListBuiltin.php` | 0 | 20 |
 | `ext/spl/SplFileInfoBuiltin.php` | 0 | 4 |
 | `ext/spl/SplFileInfoStorage.php` | 0 | 1 |
 | `ext/spl/SplFileObjectBuiltin.php` | 0 | 9 |
@@ -382,7 +382,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplIteratorSupport.php` | 0 | 2 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 24 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
-| `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 8 |
+| `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 9 |
 | `ext/spl/SplTempFileObjectBuiltin.php` | 0 | 3 |
 | `ext/spl/VmSplIterators.php` | 0 | 10 |
 | `ext/spl/VmSplObserver.php` | 0 | 3 |
@@ -390,6 +390,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/spl_classes.php` | 0 | 2 |
 | `ext/standard/ArrayChangeKeyCaseJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayChunkJitHelper.php` | 0 | 1 |
+| `ext/standard/ArrayColumnJitHelper.php` | 0 | 12 |
 | `ext/standard/ArrayCombineJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCountJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayCountRecursiveJitHelper.php` | 0 | 1 |
@@ -1411,7 +1412,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_any.php` | 0 | 1 |
 | `ext/standard/array_change_key_case.php` | 0 | 1 |
 | `ext/standard/array_chunk.php` | 0 | 1 |
-| `ext/standard/array_column.php` | 0 | 7 |
+| `ext/standard/array_column.php` | 0 | 1 |
 | `ext/standard/array_combine.php` | 0 | 1 |
 | `ext/standard/array_count.php` | 0 | 1 |
 | `ext/standard/array_count_values.php` | 0 | 1 |
@@ -2343,6 +2344,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayChunkRuntime.php` | 0 | 1 |
+| `lib/JIT/Builtin/ArrayColumnRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCombineRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCountRecursiveRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayCountRuntime.php` | 0 | 1 |
@@ -5987,19 +5989,20 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 147)
 - new Variable (line 159)
 - new Variable (line 172)
-- new Variable (line 180)
-- new OutOfRangeException (line 203)
-- new Variable (line 205)
+- new Variable (line 185)
+- new Variable (line 193)
 - new OutOfRangeException (line 216)
 - new Variable (line 218)
-- new OutOfRangeException (line 228)
-- new ArgumentCountError (line 297)
-- new ArgumentCountError (line 357)
-- new ArgumentCountError (line 402)
-- new ArgumentCountError (line 429)
-- new ArgumentCountError (line 453)
-- new ArgumentCountError (line 482)
-- 28 class method(s)
+- new OutOfRangeException (line 229)
+- new Variable (line 231)
+- new OutOfRangeException (line 241)
+- new ArgumentCountError (line 310)
+- new ArgumentCountError (line 370)
+- new ArgumentCountError (line 415)
+- new ArgumentCountError (line 442)
+- new ArgumentCountError (line 466)
+- new ArgumentCountError (line 495)
+- 29 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
 
@@ -6127,8 +6130,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SplStackConstruct (line 101)
 - new SplStackSetIteratorMode (line 104)
 - new SplStackGetIteratorMode (line 107)
-- new ArgumentCountError (line 172)
-- 13 class method(s)
+- new SplStackTop (line 110)
+- new ArgumentCountError (line 174)
+- 14 class method(s)
 
 ### `ext/spl/SplTempFileObjectBuiltin.php`
 
@@ -6181,6 +6185,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/ArrayColumnJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new HashTable (line 20)
+- new Variable (line 27)
+- new HashTable (line 40)
+- new Variable (line 48)
+- new HashTable (line 58)
+- new Variable (line 62)
+- new Variable (line 67)
+- new HashTable (line 77)
+- new Variable (line 81)
+- new Variable (line 91)
+- new Variable (line 129)
+- 6 class method(s)
 
 ### `ext/standard/ArrayCombineJitHelper.php`
 
@@ -13091,13 +13111,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_column.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 51)
-- new Variable (line 56)
-- new Variable (line 70)
-- new Variable (line 94)
-- new Variable (line 103)
-- new Variable (line 288)
-- 6 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/array_combine.php`
 
@@ -19094,6 +19108,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `lib/JIT/Builtin/ArrayColumnRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 9 class method(s)
 
 ### `lib/JIT/Builtin/ArrayCombineRuntime.php`
 

@@ -2406,6 +2406,7 @@ require_once __DIR__.'/../../../lib/JIT/BoundMethodCallableHelper.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayChangeKeyCaseRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayChunkRuntime.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayColumnRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayCombineRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayCountRecursiveRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/ArrayCountRuntime.php';
