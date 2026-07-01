@@ -27,8 +27,8 @@ final class SplQueueBuiltin
 {
     public const CLASS_LC = 'splqueue';
 
-    /** php-src SPL_DLLIST_IT_MODE_FIFO | SPL_DLLIST_IT_MODE_KEEP */
-    public const IT_MODE_FIFO = 4;
+    /** php-src SPL_DLLIST_IT_FIFO (ext/spl/spl_dllist.h). */
+    public const IT_MODE_FIFO = 0;
 
     public static function registerClass(Context $ctx): void
     {
@@ -77,8 +77,8 @@ final class SplStackBuiltin
 {
     public const CLASS_LC = 'splstack';
 
-    /** php-src SPL_DLLIST_IT_MODE_LIFO | SPL_DLLIST_IT_MODE_KEEP */
-    public const IT_MODE_LIFO = 6;
+    /** php-src SPL_DLLIST_IT_LIFO (ext/spl/spl_dllist.h). */
+    public const IT_MODE_LIFO = 2;
 
     public static function registerClass(Context $ctx): void
     {
@@ -134,7 +134,7 @@ final class SplQueueConstruct extends VmClassMethod
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::__construct()'
         );
-        SplDoublyLinkedListBuiltin::init($object, SplQueueBuiltin::IT_MODE_FIFO);
+        SplDoublyLinkedListBuiltin::init($object, SplDoublyLinkedListBuiltin::IT_MODE_FIX);
     }
 }
 
@@ -152,7 +152,10 @@ final class SplStackConstruct extends VmClassMethod
             SplStackBuiltin::CLASS_LC,
             'SplStack::__construct()'
         );
-        SplDoublyLinkedListBuiltin::init($object, SplStackBuiltin::IT_MODE_LIFO);
+        SplDoublyLinkedListBuiltin::init(
+            $object,
+            SplDoublyLinkedListBuiltin::IT_MODE_LIFO | SplDoublyLinkedListBuiltin::IT_MODE_FIX
+        );
     }
 }
 
@@ -207,11 +210,23 @@ final class SplQueueSetIteratorMode extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiverIsA(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::setIteratorMode()'
         );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplQueue::setIteratorMode() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int($newMode);
     }
 }
 
@@ -224,7 +239,7 @@ final class SplQueueGetIteratorMode extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiverIsA(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplQueueBuiltin::CLASS_LC,
             'SplQueue::getIteratorMode()'
@@ -232,7 +247,7 @@ final class SplQueueGetIteratorMode extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(SplQueueBuiltin::IT_MODE_FIFO);
+        $frame->returnVar->int(SplDoublyLinkedListBuiltin::getIteratorMode($object));
     }
 }
 
@@ -245,11 +260,23 @@ final class SplStackSetIteratorMode extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiverIsA(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplStackBuiltin::CLASS_LC,
             'SplStack::setIteratorMode()'
         );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplStack::setIteratorMode() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $mode = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        $newMode = SplDoublyLinkedListBuiltin::setIteratorMode($object, $mode);
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int($newMode);
     }
 }
 
@@ -262,7 +289,7 @@ final class SplStackGetIteratorMode extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        SplIteratorSupport::receiverIsA(
+        $object = SplIteratorSupport::receiverIsA(
             $frame,
             SplStackBuiltin::CLASS_LC,
             'SplStack::getIteratorMode()'
@@ -270,7 +297,7 @@ final class SplStackGetIteratorMode extends VmClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(SplStackBuiltin::IT_MODE_LIFO);
+        $frame->returnVar->int(SplDoublyLinkedListBuiltin::getIteratorMode($object));
     }
 }
 
