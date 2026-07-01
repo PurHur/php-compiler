@@ -2250,6 +2250,7 @@ require_once __DIR__.'/../../../ext/standard/trait_exists_.php';
 require_once __DIR__.'/../../../ext/standard/trigger_error_.php';
 require_once __DIR__.'/../../../ext/standard/uasort_.php';
 require_once __DIR__.'/../../../ext/standard/ucfirst.php';
+require_once __DIR__.'/../../../ext/standard/UcwordsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ucwords.php';
 require_once __DIR__.'/../../../ext/standard/uksort_.php';
 require_once __DIR__.'/../../../ext/standard/umask_.php';

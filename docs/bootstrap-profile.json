@@ -2239,6 +2239,7 @@
         "ext/standard/trigger_error_.php",
         "ext/standard/uasort_.php",
         "ext/standard/ucfirst.php",
+        "ext/standard/UcwordsJitHelper.php",
         "ext/standard/ucwords.php",
         "ext/standard/uksort_.php",
         "ext/standard/umask_.php",
