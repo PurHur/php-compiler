@@ -192,7 +192,7 @@ final class BootstrapSelfhostBundleTest extends TestCase
         'ext/standard/JitStringConcat.php',
         'ext/standard/JitStringIndex.php',
         'ext/standard/JitStripTags.php',
-        'ext/standard/JitStripslashes.php',
+        'ext/standard/StripslashesJitHelper.php',
         'ext/standard/JitStrpbrk.php',
         'ext/standard/JitStrpos.php',
         'ext/standard/JitStrrchr.php',

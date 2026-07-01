@@ -6,12 +6,17 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStripslashes;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** stripslashes() — unescape addslashes bytes (subset of PHP; native LLVM in JIT/AOT). */
+/**
+ * stripslashes() — unescape addslashes bytes (subset of PHP).
+ *
+ * VM: {@see VmString::stripslashes()}; JIT/AOT: {@see StringStripslashes} + {@see StripslashesJitHelper}.
+ */
 final class stripslashes extends Internal
 {
     public function execute(Frame $frame): void
@@ -34,6 +39,11 @@ final class stripslashes extends Internal
             throw new \LogicException('stripslashes() requires exactly one argument in this compiler build');
         }
 
-        return JitStripslashes::unescape($context, $this->jitString($context, $args[0], 'stripslashes() argument #1'));
+        StringStripslashes::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__string__stripslashes'),
+            JitStringBuiltinArg::lower($context, $args[0], 'stripslashes', 0, 'string')
+        );
     }
 }
