@@ -22,6 +22,9 @@ final class JitFunctionExists
         $literal = JitStringArg::compileTimeLiteral($nameArg);
         if (null !== $literal) {
             $literal = VmReflection::normalizeGlobalIntrospectionName($literal);
+            if (!VmReflection::isVisibleToFunctionExists($literal)) {
+                return $i1->constInt(0, false);
+            }
 
             return $i1->constInt($context->functionIsRegistered($literal) ? 1 : 0, false);
         }

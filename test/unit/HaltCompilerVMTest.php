@@ -32,7 +32,7 @@ PHP;
         ob_start();
         $runtime->run($block);
         $out = (string) ob_get_clean();
-        $this->assertSame("exists\nbefore halt\n", $out);
+        $this->assertSame("missing\nbefore halt\n", $out);
     }
 
     public function testCompilerHaltOffsetMatchesTrailingBoundary(): void

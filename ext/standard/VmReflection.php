@@ -396,9 +396,32 @@ final class VmReflection
         return null !== $entry && $entry->isTrait;
     }
 
+    /**
+     * Language constructs and compile-time-only symbols excluded from function_exists() (php-src basic_functions.c).
+     *
+     * @var list<string> lowercase names
+     */
+    private const FUNCTION_EXISTS_EXCLUDED = [
+        '__halt_compiler',
+        'die',
+        'eval',
+        'exit',
+    ];
+
+    /** Whether function_exists() may report true — excludes constructs Zend omits from the function table. */
+    public static function isVisibleToFunctionExists(string $functionName): bool
+    {
+        return !\in_array(\strtolower($functionName), self::FUNCTION_EXISTS_EXCLUDED, true);
+    }
+
     public static function functionExists(Context $ctx, string $functionName): bool
     {
-        return isset($ctx->functions[strtolower(self::normalizeGlobalIntrospectionName($functionName))]);
+        $normalized = \strtolower(self::normalizeGlobalIntrospectionName($functionName));
+        if (!self::isVisibleToFunctionExists($normalized)) {
+            return false;
+        }
+
+        return isset($ctx->functions[$normalized]);
     }
 
     /**
