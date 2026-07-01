@@ -135,6 +135,10 @@ final class VmDom
         $node->methodVisibility['getlineno'] = $pub;
         $node->methods['hasattributes'] = new NodeHasAttributes();
         $node->methodVisibility['hasattributes'] = $pub;
+        $node->methods['isdefaultnamespace'] = new NodeIsDefaultNamespace();
+        $node->methodVisibility['isdefaultnamespace'] = $pub;
+        $node->methods['issupported'] = new NodeIsSupported();
+        $node->methodVisibility['issupported'] = $pub;
         $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
         $node->methodVisibility['comparedocumentposition'] = $pub;
         DomClassConstants::registerIntConstants($node, [
@@ -306,11 +310,27 @@ final class VmDom
         $feature = strtoupper($feature);
         $version = trim($version);
 
-        if ('XML' !== $feature && 'Core' !== $feature) {
+        if ('CORE' === $feature) {
+            return '1.0' === $version;
+        }
+        if ('XML' === $feature) {
+            return '1.0' === $version || '2.0' === $version;
+        }
+
+        return false;
+    }
+
+    public static function isDefaultNamespace(ObjectEntry $node, ?string $namespaceUri): bool
+    {
+        if (null === $namespaceUri) {
+            return false;
+        }
+        $defaultNs = self::lookupNamespaceURI($node, null);
+        if (null === $defaultNs) {
             return false;
         }
 
-        return '1.0' === $version || '2.0' === $version;
+        return $defaultNs === $namespaceUri;
     }
 
     public static function ensureDocument(ObjectEntry $document): DomNodeState
