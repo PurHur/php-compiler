@@ -27,7 +27,10 @@ final class vprintf_ extends Internal
     {
         $argc = \count($frame->calledArgs);
         if (2 !== $argc) {
-            throw new \LogicException('vprintf() requires exactly two arguments in this compiler build');
+            throw new \ArgumentCountError(\sprintf(
+                'vprintf() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $fmtVar = $frame->calledArgs[0]->resolveIndirect();
         $argsVar = $frame->calledArgs[1]->resolveIndirect();
@@ -42,8 +45,12 @@ final class vprintf_ extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('vprintf() requires exactly two arguments in this compiler build');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'vprintf() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         $i64 = $context->getTypeFromString('int64');
         $stdout = $i64->constInt(1, false);

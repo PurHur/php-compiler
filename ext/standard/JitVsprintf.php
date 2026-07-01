@@ -24,8 +24,12 @@ final class JitVsprintf
 
     public static function format(Context $context, JITVariable ...$args): Value
     {
-        if (2 !== \count($args)) {
-            throw new \LogicException('vsprintf() requires exactly two arguments');
+        $argc = \count($args);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'vsprintf() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         self::requireValuesArrayArg($context, $args[1], 'vsprintf', 2);
         $fmt = JitStringArg::lower($context, $args[0], 'vsprintf() format');
