@@ -102,6 +102,9 @@ PHP;
 
     public function test_dom_node_contains_descendant_check(): void
     {
+        if (!CompilerVersion::supportsDomNodeContains()) {
+            self::markTestSkipped('DOMNode::contains() withheld on 8.2 reference profile (#14535)');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

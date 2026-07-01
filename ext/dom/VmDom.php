@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -120,8 +121,10 @@ final class VmDom
         $node->methodVisibility['issamenode'] = $pub;
         $node->methods['haschildnodes'] = new NodeHasChildNodes();
         $node->methodVisibility['haschildnodes'] = $pub;
-        $node->methods['contains'] = new NodeContains();
-        $node->methodVisibility['contains'] = $pub;
+        if (CompilerVersion::supportsDomNodeContains()) {
+            $node->methods['contains'] = new NodeContains();
+            $node->methodVisibility['contains'] = $pub;
+        }
         $node->methods['lookupprefix'] = new NodeLookupPrefix();
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();

@@ -41,6 +41,12 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_node_get_line_no.phpt',
             'dom_node_get_line_no.phpt'
         );
+        if (!CompilerVersion::supportsDomNodeContains()) {
+            yield 'php84_dom_node_contains_phantom.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/php84_dom_node_contains_phantom.phpt',
+                'php84_dom_node_contains_phantom.phpt'
+            );
+        }
     }
 
     public function setUp(): void
