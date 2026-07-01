@@ -15,6 +15,6 @@ final class CallArgvGlobalsTest extends TestCase
         $this->assertStringContainsString('$htModule', $source);
         $this->assertStringContainsString('getNamedGlobal', $source);
         $this->assertStringContainsString('self::$htModule === $module', $source);
-        $this->assertStringNotContainsString('public static $htGlobal', $source);
+        $this->assertStringContainsString('ensureGlobal', $source);
     }
 }

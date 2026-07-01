@@ -347,6 +347,13 @@ function run(string $filename, string $code, array $options): void
             $_ENV['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
             $_SERVER['PHP_COMPILER_AOT_USER_SCRIPT'] = '1';
         }
+        $prevBootstrapAotLink = getenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK');
+        $setBootstrapAotLink = $bootstrapAotFixture && !$isBootstrapAotLink && \function_exists('putenv');
+        if ($setBootstrapAotLink) {
+            putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=1');
+            $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
+            $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = '1';
+        }
         try {
             $runtime->standalone($block, $options['-o'], $code, $filename);
             \PHPCompiler\AOT\Linker::assertNonEmptyRequestedOutput((string) $options['-o']);
@@ -372,6 +379,16 @@ function run(string $filename, string $code, array $options): void
                     putenv('PHP_COMPILER_SELFHOST_AOT='.$prevSelfHostAot);
                     $_ENV['PHP_COMPILER_SELFHOST_AOT'] = $prevSelfHostAot;
                     $_SERVER['PHP_COMPILER_SELFHOST_AOT'] = $prevSelfHostAot;
+                }
+            }
+            if ($setBootstrapAotLink) {
+                if (false === $prevBootstrapAotLink || null === $prevBootstrapAotLink) {
+                    putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK=');
+                    unset($_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'], $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK']);
+                } else {
+                    putenv('PHP_COMPILER_BOOTSTRAP_AOT_LINK='.$prevBootstrapAotLink);
+                    $_ENV['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
+                    $_SERVER['PHP_COMPILER_BOOTSTRAP_AOT_LINK'] = $prevBootstrapAotLink;
                 }
             }
         }
