@@ -45,7 +45,12 @@ final class array_slice extends Internal
         }
         $preserveKeys = false;
         if (isset($frame->calledArgs[3])) {
-            $preserveKeys = $frame->calledArgs[3]->resolveIndirect()->toBool();
+            $preserveKeys = VmMath::requireBuiltinBoolArg(
+                $frame->calledArgs[3],
+                'array_slice',
+                4,
+                'preserve_keys'
+            );
         }
         $frame->returnVar->array($ht->sliceCopy($offsetInt, $length, $preserveKeys));
     }
@@ -72,7 +77,7 @@ final class array_slice extends Internal
             ? JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'array_slice', 3, 'length')
             : $context->getTypeFromString('int64')->constInt(0, false);
         $preserveKeys = ($argc >= 4 && !NamedOptionalCallArgs::isOmittedOptional($args[3]))
-            ? JitBoolArg::lower($context, $args[3], 'array_slice() preserve_keys')
+            ? JitBoolArg::lowerBuiltinTyped($context, $args[3], 'array_slice', 'preserve_keys', 4)
             : null;
 
         return ArraySliceRuntime::slice($context, $args[0], $offset, $hasLength, $length, $preserveKeys);
