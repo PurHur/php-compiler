@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3620 |
-| Phase A inventory files (M2 ratio SSOT) | 3620 |
+| PHP files on vm.php path | 3622 |
+| Phase A inventory files (M2 ratio SSOT) | 3622 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9857 |
+| Source constructs flagged (warnings) | 9861 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -471,6 +471,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/CheckdateJitHelper.php` | 0 | 1 |
 | `ext/standard/CheckdnsrrJitHelper.php` | 0 | 1 |
 | `ext/standard/ChownJitHelper.php` | 0 | 1 |
+| `ext/standard/ChunkSplitJitHelper.php` | 0 | 1 |
 | `ext/standard/CliArgvJitHelper.php` | 0 | 2 |
 | `ext/standard/ClockGettimeJitHelper.php` | 0 | 1 |
 | `ext/standard/CloneWithJitHelper.php` | 0 | 1 |
@@ -2673,6 +2674,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 3 |
@@ -6829,6 +6831,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/ChunkSplitJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/CliArgvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7393,7 +7400,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitChunkSplit.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/JitClassAlias.php`
 
@@ -21187,6 +21194,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/StringChunkSplit.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 121)
+- 7 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringClockGettime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22703,19 +22717,19 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Call\ReflectionEnumUnitCaseGetName (line 847)
 - new Call\ReflectionEnumUnitCaseGetName (line 848)
 - new Call\ExceptionGetMessage (line 849)
-- new Result (line 1116)
-- new Result (line 1137)
-- new Variable (line 1409)
-- new Variable (line 1729)
-- new Variable (line 1860)
-- new Variable (line 2046)
-- new VMVariable (line 2204)
-- new VMVariable (line 2220)
-- new VMVariable (line 2226)
-- new VMVariable (line 2232)
-- new VMVariable (line 2243)
-- new Variable (line 2273)
-- new Variable (line 2312)
+- new Result (line 1117)
+- new Result (line 1138)
+- new Variable (line 1410)
+- new Variable (line 1730)
+- new Variable (line 1861)
+- new Variable (line 2047)
+- new VMVariable (line 2205)
+- new VMVariable (line 2221)
+- new VMVariable (line 2227)
+- new VMVariable (line 2233)
+- new VMVariable (line 2244)
+- new Variable (line 2274)
+- new Variable (line 2313)
 - 98 class method(s)
 - 28 closure(s)
 
