@@ -104,8 +104,40 @@ final class VmReflection
         return $ctx->classes[$lc] ?? null;
     }
 
-    public static function classExists(Context $ctx, string $className): bool
+    /**
+     * Second parameter for class_exists/interface_exists/trait_exists/enum_exists (php-src zif_* autoload flag).
+     */
+    public static function autoloadFlagFromFrame(Frame $frame, int $argIndex = 1, bool $default = true): bool
     {
+        if (\count($frame->calledArgs) <= $argIndex) {
+            return $default;
+        }
+        $arg = $frame->calledArgs[$argIndex]->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $arg->type) {
+            throw new \TypeError(
+                \sprintf(
+                    '%s(): Argument #%d ($autoload) must be of type bool, %s given',
+                    $frame->func->getName(),
+                    $argIndex + 1,
+                    EnumCaseSupport::typeNameForVariable($arg)
+                )
+            );
+        }
+
+        return $arg->toBool();
+    }
+
+    private static function maybeAutoloadClass(Context $ctx, string $className, bool $autoload): void
+    {
+        if (!$autoload || null !== self::resolveClassEntry($ctx, $className)) {
+            return;
+        }
+        $ctx->autoloadClass($className);
+    }
+
+    public static function classExists(Context $ctx, string $className, bool $autoload = true): bool
+    {
+        self::maybeAutoloadClass($ctx, $className, $autoload);
         $entry = self::resolveClassEntry($ctx, $className);
 
         return null !== $entry
@@ -114,9 +146,14 @@ final class VmReflection
             && !\PHPCompiler\VM\ResourceSupport::isHiddenPseudoClassEntry($entry);
     }
 
-    public static function enumExists(Context $ctx, string $enumName): bool
+    public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
     {
-        return isset($ctx->enums[strtolower(self::normalizeGlobalIntrospectionName($enumName))]);
+        $lc = strtolower(self::normalizeGlobalIntrospectionName($enumName));
+        if ($autoload && !isset($ctx->enums[$lc]) && null === self::resolveClassEntry($ctx, $enumName)) {
+            $ctx->autoloadClass($enumName);
+        }
+
+        return isset($ctx->enums[$lc]);
     }
 
     /**
@@ -149,8 +186,9 @@ final class VmReflection
         return $result;
     }
 
-    public static function interfaceExists(Context $ctx, string $interfaceName): bool
+    public static function interfaceExists(Context $ctx, string $interfaceName, bool $autoload = true): bool
     {
+        self::maybeAutoloadClass($ctx, $interfaceName, $autoload);
         $entry = self::resolveClassEntry($ctx, $interfaceName);
 
         return null !== $entry && $entry->isInterface;
@@ -347,11 +385,12 @@ final class VmReflection
         return $result;
     }
 
-    public static function traitExists(Context $ctx, string $traitName): bool
+    public static function traitExists(Context $ctx, string $traitName, bool $autoload = true): bool
     {
         if (LazyGhostTraitSupport::isLazyGhostTrait($traitName)) {
             return false;
         }
+        self::maybeAutoloadClass($ctx, $traitName, $autoload);
         $entry = self::resolveClassEntry($ctx, $traitName);
 
         return null !== $entry && $entry->isTrait;

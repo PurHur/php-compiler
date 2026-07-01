@@ -28,7 +28,8 @@ final class enum_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $name = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'enum_exists', 0, 'enum');
-        $exists = VmReflection::enumExists($ctx, $name);
+        $autoload = VmReflection::autoloadFlagFromFrame($frame);
+        $exists = VmReflection::enumExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
         }

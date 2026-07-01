@@ -25,7 +25,8 @@ final class interface_exists_ extends Internal
         }
         $ctx = VmReflection::requireContext($frame);
         $name = VmReflection::stringArg($frame->calledArgs[0], 'interface_exists() interface name', 0);
-        $exists = VmReflection::interfaceExists($ctx, $name);
+        $autoload = VmReflection::autoloadFlagFromFrame($frame);
+        $exists = VmReflection::interfaceExists($ctx, $name, $autoload);
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool($exists);
         }
