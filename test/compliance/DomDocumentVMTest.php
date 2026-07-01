@@ -29,6 +29,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/domdocument_loadxml.phpt',
             'domdocument_loadxml.phpt'
         );
+        yield 'domdocument_loadxml_concat.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/domdocument_loadxml_concat.phpt',
+            'domdocument_loadxml_concat.phpt'
+        );
         yield 'dom_node_base_uri.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_node_base_uri.phpt',
             'dom_node_base_uri.phpt'
