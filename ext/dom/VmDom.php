@@ -83,6 +83,8 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
+        $node->methods['issamenode'] = new NodeIsSameNode();
+        $node->methodVisibility['issamenode'] = $pub;
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $nodeList = new ClassEntry('DOMNodeList');
@@ -898,6 +900,16 @@ final class VmDom
                 self::collectElementsByTagNameRecursive($child, $want, $matches);
             }
         }
+    }
+
+    public static function isDomNode(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry);
+    }
+
+    public static function isSameNode(ObjectEntry $node, ObjectEntry $other): bool
+    {
+        return $node->id === $other->id;
     }
 
     public static function isElement(ObjectEntry $entry): bool
