@@ -217,7 +217,7 @@ final class VmXml
     private static function errorRecord(int $line, int $column, string $message, int $code): array
     {
         return [
-            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'level' => LibxmlConstants::LIBXML_ERR_FATAL,
             'code' => $code,
             'column' => $column,
             'message' => $message,

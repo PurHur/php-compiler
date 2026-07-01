@@ -82,7 +82,7 @@ xml_parse($parser, '<unclosed', true);
 $errors = libxml_get_errors();
 echo count($errors), "\n";
 echo $errors[0]->code > 0 ? "code\n" : "nocode\n";
-echo $errors[0]->level === LIBXML_ERR_ERROR ? "level\n" : "nolevel\n";
+echo $errors[0]->level === LIBXML_ERR_FATAL ? "level\n" : "nolevel\n";
 libxml_clear_errors();
 echo count(libxml_get_errors()), "\n";
 PHP;
@@ -109,13 +109,14 @@ $errors = libxml_get_errors();
 echo count($errors), "\n";
 $msg = $errors[0]->message;
 echo str_contains($msg, 'Premature end of data') ? "message\n" : "nomessage\n";
+echo $errors[0]->level === LIBXML_ERR_FATAL ? "level\n" : "nolevel\n";
 libxml_clear_errors();
 echo count(libxml_get_errors()), "\n";
 PHP;
         $block = $runtime->parseAndCompile($code, 'libxml_dom_loadxml.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("failed\n1\nmessage\n0\n", ob_get_clean());
+        self::assertSame("failed\n1\nmessage\nlevel\n0\n", ob_get_clean());
     }
 
     public function test_no_runtime_c_growth_for_libxml(): void
