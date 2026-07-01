@@ -27,7 +27,7 @@ final class tempnam extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $dir = VmString::coercePathBuiltinArg($frame->calledArgs[0], 'tempnam', 0, 'directory');
+        $dir = VmFsTempnam::resolveDirectoryArg($frame->calledArgs[0]);
         $prefix = VmString::coercePathBuiltinArg($frame->calledArgs[1], 'tempnam', 1, 'prefix');
         $path = VmFsTempnam::invoke($dir, $prefix, $frame);
         if (false === $path) {
@@ -45,7 +45,7 @@ final class tempnam extends Internal
 
         return JitTempnam::invoke(
             $context,
-            JitStringArg::lower($context, $args[0], 'tempnam() directory'),
+            JitTempnam::lowerDirectory($context, $args[0]),
             JitStringArg::lower($context, $args[1], 'tempnam() prefix')
         );
     }
