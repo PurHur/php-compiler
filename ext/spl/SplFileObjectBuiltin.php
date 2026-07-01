@@ -25,6 +25,15 @@ final class SplFileObjectBuiltin
 {
     public const CLASS_LC = 'splfileobject';
 
+    /** php-src ext/spl/spl_directory.c — SPL_FILE_OBJECT_* (#14576). */
+    public const READ_AHEAD = 2;
+
+    public const SKIP_EMPTY = 4;
+
+    public const DROP_NEW_LINE = 1;
+
+    public const READ_CSV = 8;
+
     public static function registerClass(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
@@ -49,6 +58,13 @@ final class SplFileObjectBuiltin
             }
         }
 
+        SplClassConstants::registerIntConstants($entry, [
+            'READ_AHEAD' => self::READ_AHEAD,
+            'SKIP_EMPTY' => self::SKIP_EMPTY,
+            'DROP_NEW_LINE' => self::DROP_NEW_LINE,
+            'READ_CSV' => self::READ_CSV,
+        ]);
+
         $entry->constructor = new SplFileObjectConstruct();
         $entry->methods['__construct'] = $entry->constructor;
         $entry->methodVisibility['__construct'] = $pub;
@@ -68,6 +84,8 @@ final class SplFileObjectBuiltin
             'fputcsv' => SplFileObjectFputcsv::class,
             'setcsvcontrol' => SplFileObjectSetCsvControl::class,
             'getcsvcontrol' => SplFileObjectGetCsvControl::class,
+            'setflags' => SplFileObjectSetFlags::class,
+            'getflags' => SplFileObjectGetFlags::class,
             '__tostring' => SplFileObjectToString::class,
         ] as $lc => $class) {
             $entry->methods[$lc] = new $class();
@@ -75,6 +93,8 @@ final class SplFileObjectBuiltin
         }
         $entry->methodNames['setcsvcontrol'] = 'setCsvControl';
         $entry->methodNames['getcsvcontrol'] = 'getCsvControl';
+        $entry->methodNames['setflags'] = 'setFlags';
+        $entry->methodNames['getflags'] = 'getFlags';
         $entry->methodNames['getcurrentline'] = 'getCurrentLine';
         $entry->methodNames['__tostring'] = '__toString';
 
@@ -96,6 +116,8 @@ final class SplFileObjectBuiltin
             $entry->methods['getcurrentline'],
             $entry->methods['fgetcsv'],
             $entry->methods['fputcsv'],
+            $entry->methods['setflags'],
+            $entry->methods['getflags'],
         );
     }
 }
@@ -686,6 +708,52 @@ final class SplFileObjectGetCsvControl extends VmClassMethod
             $cell->string($value);
             $ht->append($cell);
         }
+    }
+}
+
+final class SplFileObjectGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(SplFileObjectStorage::getFlags($object));
+    }
+}
+
+final class SplFileObjectSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            SplFileObjectBuiltin::CLASS_LC,
+            'SplFileObject::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'SplFileObject::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flags = $frame->calledArgs[1]->resolveIndirect()->toInt();
+        SplFileObjectStorage::setFlags($object, $flags);
     }
 }
 
