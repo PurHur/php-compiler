@@ -76,6 +76,7 @@ final class StdlibConstants
     public const FILE_IGNORE_NEW_LINES = 2;
     public const FILE_SKIP_EMPTY_LINES = 4;
     public const FILE_APPEND = 8;
+    public const FILE_NO_DEFAULT_CONTEXT = 16;
 
     /** scandir() sort order (ext/standard/dir.c). */
     public const SCANDIR_SORT_ASCENDING = 0;
@@ -302,6 +303,7 @@ final class StdlibConstants
         'file_skip_empty_lines' => self::FILE_SKIP_EMPTY_LINES,
         'file_use_include_path' => self::FILE_USE_INCLUDE_PATH,
         'file_append' => self::FILE_APPEND,
+        'file_no_default_context' => self::FILE_NO_DEFAULT_CONTEXT,
         'scandir_sort_ascending' => self::SCANDIR_SORT_ASCENDING,
         'scandir_sort_descending' => self::SCANDIR_SORT_DESCENDING,
         'scandir_sort_none' => self::SCANDIR_SORT_NONE,
@@ -492,6 +494,7 @@ final class StdlibConstants
         'file_skip_empty_lines',
         'file_use_include_path',
         'file_append',
+        'file_no_default_context',
         'scandir_sort_ascending',
         'scandir_sort_descending',
         'scandir_sort_none',
