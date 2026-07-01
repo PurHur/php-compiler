@@ -160,7 +160,7 @@ final class SplDualIteratorStorage
 
     private const RS_NEXT = 4;
 
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool}> */
     private static array $store = [];
 
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
@@ -171,6 +171,7 @@ final class SplDualIteratorStorage
             'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
             'stack' => [],
             'maxDepth' => -1,
+            'rewound' => false,
         ];
     }
 
@@ -182,6 +183,7 @@ final class SplDualIteratorStorage
             'mode' => $mode,
             'stack' => [],
             'maxDepth' => -1,
+            'rewound' => false,
         ];
     }
 
@@ -262,11 +264,15 @@ final class SplDualIteratorStorage
 
     public static function rewindSimple(Frame $frame, ObjectEntry $object): void
     {
+        self::$store[$object->id]['rewound'] = true;
         self::invokeInner($frame, self::inner($object), 'rewind');
     }
 
     public static function validSimple(Frame $frame, ObjectEntry $object): bool
     {
+        if (!self::isPositionValid($object)) {
+            return false;
+        }
         $result = self::invokeInner($frame, self::inner($object), 'valid')->resolveIndirect();
 
         return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
@@ -274,11 +280,19 @@ final class SplDualIteratorStorage
 
     public static function currentSimple(Frame $frame, ObjectEntry $object): Variable
     {
+        if (!self::isPositionValid($object)) {
+            return self::nullVariable();
+        }
+
         return self::invokeInner($frame, self::inner($object), 'current');
     }
 
     public static function keySimple(Frame $frame, ObjectEntry $object): Variable
     {
+        if (!self::isPositionValid($object)) {
+            return self::nullVariable();
+        }
+
         return self::invokeInner($frame, self::inner($object), 'key');
     }
 
@@ -290,6 +304,7 @@ final class SplDualIteratorStorage
     public static function rewindRecursive(Frame $frame, ObjectEntry $object): void
     {
         $state = &self::$store[$object->id];
+        $state['rewound'] = true;
         $state['stack'] = [
             ['iterator' => $state['inner'], 'state' => self::RS_START],
         ];
@@ -372,7 +387,7 @@ final class SplDualIteratorStorage
         return $object;
     }
 
-    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<ObjectEntry>, maxDepth: int} */
+    /** @return array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool} */
     private static function state(ObjectEntry $object): array
     {
         if (!isset(self::$store[$object->id])) {
@@ -380,6 +395,25 @@ final class SplDualIteratorStorage
         }
 
         return self::$store[$object->id];
+    }
+
+    /** php-src spl_iterators_iterator_current — outer position invalid until rewind() (#14687). */
+    private static function isPositionValid(ObjectEntry $object): bool
+    {
+        $state = self::state($object);
+        if ($state['recursive']) {
+            return [] !== $state['stack'];
+        }
+
+        return $state['rewound'];
+    }
+
+    private static function nullVariable(): Variable
+    {
+        $null = new Variable();
+        $null->null();
+
+        return $null;
     }
 
     private static function advanceFromYield(Frame $frame, ObjectEntry $object): void
