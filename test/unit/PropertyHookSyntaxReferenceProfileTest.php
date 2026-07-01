@@ -10,13 +10,22 @@ use PHPUnit\Framework\TestCase;
 /** Property-hook syntax rejected on Zend 8.2 reference profile (#14062). */
 final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 {
+    private function skipWhenForwardProfile(): void
+    {
+        if (CompilerVersion::supportsPropertyHooks()) {
+            $this->markTestSkipped('property hooks enabled on PHP 8.4 forward profile');
+        }
+    }
+
     public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
     {
+        $this->skipWhenForwardProfile();
         $this->assertFalse(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
     {
+        $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_ARROW);
         PropertyHookSyntaxRejector::reject(
@@ -27,6 +36,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRejectorThrowsOnHookBlock(): void
     {
+        $this->skipWhenForwardProfile();
         $this->expectException(\PHPCompiler\Compiler\CompileFatal::class);
         $this->expectExceptionMessage(PropertyHooks::REFERENCE_PROFILE_UNEXPECTED_BRACE);
         PropertyHookSyntaxRejector::reject(
@@ -37,6 +47,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRuntimeRejectsDefaultInitializerHook(): void
     {
+        $this->skipWhenForwardProfile();
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
@@ -51,6 +62,7 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
 
     public function testRuntimeRejectsHookBlockSyntax(): void
     {
+        $this->skipWhenForwardProfile();
         $runtime = new Runtime();
         try {
             $runtime->parseAndCompile(
