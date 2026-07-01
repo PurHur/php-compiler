@@ -110,13 +110,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518).
+     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0.
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsStrIncrement(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

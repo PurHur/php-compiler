@@ -44,9 +44,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
-    public function testStrIncrementAdvertisedOnForwardProfile(): void
+    public function testStrIncrementWithheldOnReferenceProfileUntilStable84(): void
     {
-        $this->assertTrue(CompilerVersion::supportsStrIncrement());
+        $this->assertFalse(CompilerVersion::supportsStrIncrement());
     }
 
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
