@@ -192,7 +192,11 @@ final class VmDom
         $feature = strtoupper($feature);
         $version = trim($version);
 
-        return ('XML' === $feature || 'Core' === $feature) && '2.0' === $version;
+        if ('XML' !== $feature && 'Core' !== $feature) {
+            return false;
+        }
+
+        return '1.0' === $version || '2.0' === $version;
     }
 
     public static function ensureDocument(ObjectEntry $document): DomNodeState
