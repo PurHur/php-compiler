@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -14,7 +13,7 @@ use PHPLLVM\Value;
 /**
  * JIT/AOT link for count(COUNT_NORMAL) via ArrayCountJitHelper PHP (#13276).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::getNumElements()}.
+ * Standalone AOT compiles {@see ArrayCountJitHelper} via JitVmHelperLink bridge (#14486); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::getNumElements()}.
  * SSOT: {@see \PHPCompiler\VM\HashTable::getNumElements()}
  * php-src: ext/standard/array.c — php_count
  */
@@ -33,8 +32,7 @@ final class ArrayCountRuntime
 
     public static function numElements(Context $context, JITVariable $array): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::getNumElements(
                 $context,
                 ArrayBuiltinHelper::loadHashTable($context, $array)
@@ -56,12 +54,13 @@ final class ArrayCountRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction(self::ABI_NUM);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
