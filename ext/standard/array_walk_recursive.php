@@ -37,6 +37,7 @@ final class array_walk_recursive extends Internal
             );
         }
         $subject = $frame->calledArgs[0]->resolveIndirect();
+        VmArraySortCallback::requireCallback($frame->calledArgs[1], 'array_walk_recursive', 2);
         $callback = $frame->calledArgs[1]->resolveIndirect();
         $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
         if (Variable::TYPE_ARRAY !== $subject->type && Variable::TYPE_OBJECT !== $subject->type) {
@@ -63,6 +64,11 @@ final class array_walk_recursive extends Internal
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException(
                 'array_walk_recursive() requires two or three arguments in this compiler build'
+            );
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            throw new \TypeError(
+                'array_walk_recursive(): Argument #2 ($callback) must be a valid callback, no array or string given'
             );
         }
         if (3 === $argc) {

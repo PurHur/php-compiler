@@ -43,6 +43,7 @@ final class array_walk extends Internal
             );
         }
         $callback = $frame->calledArgs[1]->resolveIndirect();
+        VmArraySortCallback::requireCallback($frame->calledArgs[1], 'array_walk', 2);
         $userdata = 3 === $argc ? $frame->calledArgs[2]->resolveIndirect() : null;
         if (Variable::TYPE_ARRAY === $subject->type) {
             $array = $subject;
@@ -65,6 +66,11 @@ final class array_walk extends Internal
         $argc = \count($args);
         if ($argc < 2 || $argc > 3) {
             throw new \LogicException('array_walk() requires two or three arguments in this compiler build');
+        }
+        if (JITVariable::TYPE_NULL === $args[1]->type || $args[1]->isNullConstant) {
+            throw new \TypeError(
+                'array_walk(): Argument #2 ($callback) must be a valid callback, no array or string given'
+            );
         }
         if (!ArrayMapCallbackPolicy::isJitLowerable($args[1])) {
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
