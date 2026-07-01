@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3640 |
-| Phase A inventory files (M2 ratio SSOT) | 3640 |
+| PHP files on vm.php path | 3641 |
+| Phase A inventory files (M2 ratio SSOT) | 3641 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9931 |
+| Source constructs flagged (warnings) | 9939 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -411,6 +411,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/SplFixedArrayBuiltin.php` | 0 | 34 |
 | `ext/spl/SplFixedArraySerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplIteratorSupport.php` | 0 | 2 |
+| `ext/spl/SplLegacySerializableMethods.php` | 0 | 5 |
 | `ext/spl/SplObjectStorageBuiltin.php` | 0 | 24 |
 | `ext/spl/SplObjectStorageSerializeSupport.php` | 0 | 3 |
 | `ext/spl/SplQueueSplStackBuiltin.php` | 0 | 11 |
@@ -961,8 +962,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitStripWhitespace.php` | 0 | 1 |
 | `ext/standard/JitStripcslashes.php` | 0 | 1 |
 | `ext/standard/JitStrpbrk.php` | 0 | 1 |
-| `ext/standard/StrContainsJitHelper.php` | 0 | 3 |
-| `ext/standard/StrposJitHelper.php` | 0 | 2 |
 | `ext/standard/JitStrptime.php` | 0 | 2 |
 | `ext/standard/JitStrrchr.php` | 0 | 1 |
 | `ext/standard/JitStrstr.php` | 0 | 1 |
@@ -1090,6 +1089,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StatCacheJitHelper.php` | 0 | 1 |
 | `ext/standard/StatFieldsJitHelper.php` | 0 | 1 |
 | `ext/standard/StatPathJitHelper.php` | 0 | 1 |
+| `ext/standard/StrContainsJitHelper.php` | 0 | 1 |
 | `ext/standard/StrRepeatJitHelper.php` | 0 | 1 |
 | `ext/standard/StrWordCountJitHelper.php` | 0 | 4 |
 | `ext/standard/StreamBucketJitHelper.php` | 0 | 1 |
@@ -1113,6 +1113,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/StripTagsJitHelper.php` | 0 | 1 |
 | `ext/standard/StripWhitespaceJitHelper.php` | 0 | 1 |
 | `ext/standard/StripslashesJitHelper.php` | 0 | 1 |
+| `ext/standard/StrposJitHelper.php` | 0 | 1 |
 | `ext/standard/StrptimeJitHelper.php` | 0 | 1 |
 | `ext/standard/StrrevJitHelper.php` | 0 | 1 |
 | `ext/standard/StrrposJitHelper.php` | 0 | 1 |
@@ -2770,6 +2771,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSoundex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSscanfArray.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSscanfByRef.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringStrContains.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrGetcsv.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrRepeat.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrWordCount.php` | 0 | 4 |
@@ -2780,10 +2782,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStripslashes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrrev.php` | 0 | 3 |
-| `lib/JIT/Builtin/StringStrContains.php` | 0 | 7 |
-| `lib/JIT/Builtin/StringStrpos.php` | 0 | 5 |
 | `lib/JIT/Builtin/StringStrrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrspn.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrtok.php` | 0 | 2 |
@@ -6014,15 +6015,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArrayIteratorOffsetExists (line 74)
 - new ArrayIteratorOffsetUnset (line 76)
 - new ArrayIteratorSortMethod (line 86)
-- new HashTable (line 148)
-- new ArgumentCountError (line 193)
-- new ArgumentCountError (line 340)
-- new ArgumentCountError (line 364)
-- new ArgumentCountError (line 394)
-- new ArgumentCountError (line 418)
-- new ArgumentCountError (line 445)
-- new ArgumentCountError (line 475)
-- new ArgumentCountError (line 488)
+- new HashTable (line 150)
+- new ArgumentCountError (line 195)
+- new ArgumentCountError (line 342)
+- new ArgumentCountError (line 366)
+- new ArgumentCountError (line 396)
+- new ArgumentCountError (line 420)
+- new ArgumentCountError (line 447)
+- new ArgumentCountError (line 477)
+- new ArgumentCountError (line 490)
 - 24 class method(s)
 
 ### `ext/spl/ArrayObjectBuiltin.php`
@@ -6043,15 +6044,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArrayObjectOffsetUnset (line 78)
 - new ArrayObjectAppend (line 80)
 - new ArrayObjectExchangeArray (line 82)
-- new HashTable (line 103)
-- new ArgumentCountError (line 205)
-- new ArgumentCountError (line 264)
-- new ArgumentCountError (line 313)
-- new ArgumentCountError (line 343)
-- new ArgumentCountError (line 367)
-- new ArgumentCountError (line 394)
-- new ArgumentCountError (line 418)
-- new ArgumentCountError (line 453)
+- new HashTable (line 105)
+- new ArgumentCountError (line 207)
+- new ArgumentCountError (line 266)
+- new ArgumentCountError (line 315)
+- new ArgumentCountError (line 345)
+- new ArgumentCountError (line 369)
+- new ArgumentCountError (line 396)
+- new ArgumentCountError (line 420)
+- new ArgumentCountError (line 455)
 - 15 class method(s)
 
 ### `ext/spl/BuiltinClasses.php`
@@ -6308,25 +6309,25 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 55)
 - new SplDoublyLinkedListConstruct (line 63)
-- new Variable (line 164)
-- new Variable (line 238)
-- new Variable (line 256)
-- new Variable (line 268)
-- new Variable (line 281)
-- new Variable (line 294)
-- new Variable (line 302)
-- new OutOfRangeException (line 325)
-- new Variable (line 327)
-- new OutOfRangeException (line 338)
-- new Variable (line 340)
-- new OutOfRangeException (line 350)
-- new ArgumentCountError (line 419)
-- new ArgumentCountError (line 479)
-- new ArgumentCountError (line 524)
-- new ArgumentCountError (line 551)
-- new ArgumentCountError (line 575)
-- new ArgumentCountError (line 604)
-- new ArgumentCountError (line 724)
+- new Variable (line 165)
+- new Variable (line 239)
+- new Variable (line 257)
+- new Variable (line 269)
+- new Variable (line 282)
+- new Variable (line 295)
+- new Variable (line 303)
+- new OutOfRangeException (line 326)
+- new Variable (line 328)
+- new OutOfRangeException (line 339)
+- new Variable (line 341)
+- new OutOfRangeException (line 351)
+- new ArgumentCountError (line 420)
+- new ArgumentCountError (line 480)
+- new ArgumentCountError (line 525)
+- new ArgumentCountError (line 552)
+- new ArgumentCountError (line 576)
+- new ArgumentCountError (line 605)
+- new ArgumentCountError (line 725)
 - 42 class method(s)
 
 ### `ext/spl/SplFileInfoBuiltin.php`
@@ -6412,31 +6413,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 100)
 - 9 class method(s)
 
+### `ext/spl/SplLegacySerializableMethods.php`
+
+**Warnings** (review for bootstrap subset):
+- new SplLegacySerializableSerialize (line 27)
+- new SplLegacySerializableUnserialize (line 29)
+- new VmSerializeRefState (line 69)
+- new ArgumentCountError (line 95)
+- 4 class method(s)
+
 ### `ext/spl/SplObjectStorageBuiltin.php`
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 45)
 - new SplObjectStorageConstruct (line 48)
-- new Variable (line 151)
-- new Variable (line 155)
-- new Variable (line 158)
-- new UnexpectedValueException (line 202)
-- new Variable (line 204)
-- new Variable (line 292)
-- new Variable (line 304)
-- new Variable (line 316)
-- new Variable (line 370)
-- new ArgumentCountError (line 410)
-- new ArgumentCountError (line 435)
-- new ArgumentCountError (line 487)
-- new ArgumentCountError (line 537)
-- new ArgumentCountError (line 564)
-- new ArgumentCountError (line 588)
-- new ArgumentCountError (line 617)
-- new ArgumentCountError (line 740)
-- new ArgumentCountError (line 764)
-- new ArgumentCountError (line 788)
-- new ArgumentCountError (line 817)
+- new Variable (line 152)
+- new Variable (line 156)
+- new Variable (line 159)
+- new UnexpectedValueException (line 203)
+- new Variable (line 205)
+- new Variable (line 293)
+- new Variable (line 305)
+- new Variable (line 317)
+- new Variable (line 371)
+- new ArgumentCountError (line 411)
+- new ArgumentCountError (line 436)
+- new ArgumentCountError (line 488)
+- new ArgumentCountError (line 538)
+- new ArgumentCountError (line 565)
+- new ArgumentCountError (line 589)
+- new ArgumentCountError (line 618)
+- new ArgumentCountError (line 741)
+- new ArgumentCountError (line 765)
+- new ArgumentCountError (line 789)
+- new ArgumentCountError (line 818)
 - 47 class method(s)
 - 1 closure(s)
 
@@ -6494,8 +6504,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ClassEntry (line 162)
-- new Variable (line 192)
-- new Variable (line 196)
+- new Variable (line 197)
+- new Variable (line 201)
 - 4 class method(s)
 
 ### `ext/spl/spl_classes.php`
@@ -9420,7 +9430,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitStringSearch.php`
 
 **Warnings** (review for bootstrap subset):
-- 17 class method(s)
+- 14 class method(s)
 
 ### `ext/standard/JitStripTags.php`
 
@@ -9441,16 +9451,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
-
-### `ext/standard/StrContainsJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- 3 class method(s)
-
-### `ext/standard/StrposJitHelper.php`
-
-**Warnings** (review for bootstrap subset):
-- 2 class method(s)
 
 ### `ext/standard/JitStrptime.php`
 
@@ -10944,6 +10944,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 7 class method(s)
 
+### `ext/standard/StrContainsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/StrRepeatJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11076,6 +11081,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
+
+### `ext/standard/StrposJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/StrptimeJitHelper.php`
 
@@ -12541,8 +12551,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPhpFdStream.php`
 
 **Warnings** (review for bootstrap subset):
-- new PhpFdStreamState (line 117)
-- 30 class method(s)
+- new PhpFdStreamState (line 120)
+- 32 class method(s)
 
 ### `ext/standard/VmPhpFilterStream.php`
 
@@ -12768,7 +12778,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmProcessProcOpenNative.php`
 
 **Warnings** (review for bootstrap subset):
-- 22 class method(s)
+- 24 class method(s)
 
 ### `ext/standard/VmRandom.php`
 
@@ -17439,7 +17449,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/stripos.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/stripslashes.php`
 
@@ -17479,7 +17489,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/strpos.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 3 class method(s)
 
 ### `ext/standard/strptime.php`
 
@@ -21818,6 +21828,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringStrContains.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `lib/JIT/Builtin/StringStrGetcsv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21881,6 +21896,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/StringStrpos.php`
+
+**Warnings** (review for bootstrap subset):
+- 5 class method(s)
+
 ### `lib/JIT/Builtin/StringStrptime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21894,16 +21914,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 118)
 - 7 class method(s)
 - 1 closure(s)
-
-### `lib/JIT/Builtin/StringStrContains.php`
-
-**Warnings** (review for bootstrap subset):
-- 7 class method(s)
-
-### `lib/JIT/Builtin/StringStrpos.php`
-
-**Warnings** (review for bootstrap subset):
-- 5 class method(s)
 
 ### `lib/JIT/Builtin/StringStrrpos.php`
 
@@ -26299,7 +26309,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Error (line 29)
 - new Error (line 32)
 - new Error (line 35)
-- 7 class method(s)
+- 8 class method(s)
 - 1 closure(s)
 
 ### `lib/VM/CloneWithSupport.php`
