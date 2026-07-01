@@ -483,6 +483,7 @@ class Module extends ModuleAbstract
             new header_remove(),
             ...(CompilerVersion::supportsHeaderList() ? [new header_list()] : []),
             new headers_list(),
+            new apache_response_headers(),
             ...(VmHead::registersRequestHeaderFunctions() ? [
                 new getallheaders_(),
                 new getallheaders_('apache_request_headers'),
