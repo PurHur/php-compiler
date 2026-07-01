@@ -50,6 +50,10 @@ final class VmDom
 
     public const PROP_NODE_VALUE = 'nodeValue';
 
+    public const PROP_TEXT_CONTENT = 'textContent';
+
+    public const PROP_PREVIOUS_SIBLING = 'previousSibling';
+
     public const PROP_FIRST_CHILD = 'firstChild';
 
     public const PROP_LAST_CHILD = 'lastChild';
@@ -87,9 +91,11 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_NODE_TYPE, null, $intProto);
         $node->properties[] = new ClassProperty(self::PROP_OWNER_DOCUMENT, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_NODE_VALUE, $nullProto, $strProto);
+        $node->properties[] = new ClassProperty(self::PROP_TEXT_CONTENT, $nullProto, $strProto);
         $node->properties[] = new ClassProperty(self::PROP_FIRST_CHILD, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_LAST_CHILD, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_CHILD_NODES, null, $objProto);
+        $node->properties[] = new ClassProperty(self::PROP_PREVIOUS_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_NEXT_SIBLING, $nullProto, $objProto);
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
         $node->methods['clonenode'] = new NodeCloneNode();
@@ -826,6 +832,9 @@ final class VmDom
         if (!$entry->hasProperty(self::PROP_NEXT_SIBLING)) {
             $entry->allocateProperty(self::PROP_NEXT_SIBLING)->null();
         }
+        if (!$entry->hasProperty(self::PROP_PREVIOUS_SIBLING)) {
+            $entry->allocateProperty(self::PROP_PREVIOUS_SIBLING)->null();
+        }
         if (!$entry->hasProperty(self::PROP_PARENT_NODE)) {
             $entry->allocateProperty(self::PROP_PARENT_NODE)->null();
         }
@@ -959,6 +968,18 @@ final class VmDom
             }
             self::initNodePropertySlots($child);
             $siblingVar = $child->getProperty(self::PROP_NEXT_SIBLING);
+            $prevVar = $child->getProperty(self::PROP_PREVIOUS_SIBLING);
+            $prevId = $state->childIds[$index - 1] ?? null;
+            if (null !== $prevId) {
+                $prev = DomRegistry::entry($prevId);
+                if (null !== $prev) {
+                    $prevVar->object($prev);
+                } else {
+                    $prevVar->null();
+                }
+            } else {
+                $prevVar->null();
+            }
             $nextId = $state->childIds[$index + 1] ?? null;
             if (null !== $nextId) {
                 $next = DomRegistry::entry($nextId);
@@ -1092,6 +1113,31 @@ final class VmDom
             self::linkChildToParent($text, $node);
         }
         self::syncSubtree($ctx, $node);
+    }
+
+    public static function readTextContent(ObjectEntry $node): string
+    {
+        if (!DomRegistry::has($node)) {
+            return '';
+        }
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+            return $state->textContent ?? '';
+        }
+        $parts = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                $parts[] = self::readTextContent($child);
+            }
+        }
+
+        return implode('', $parts);
+    }
+
+    public static function writeTextContent(Context $ctx, ObjectEntry $node, string $value): void
+    {
+        self::writeNodeValue($ctx, $node, $value);
     }
 
     public static function isElement(ObjectEntry $entry): bool

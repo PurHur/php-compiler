@@ -99,6 +99,28 @@ PHP;
         self::assertSame("1\ndoc\n''\n'hello'\n1\n", ob_get_clean());
     }
 
+    public function test_dom_node_text_content_and_previous_sibling(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a/><b/></root>');
+$a = $doc->getElementsByTagName('a')->item(0);
+$b = $doc->getElementsByTagName('b')->item(0);
+$root = $doc->documentElement;
+echo ($b->previousSibling === $a) ? "prev\n" : "noprev\n";
+echo null === $a->previousSibling ? "nullprev\n" : "badprev\n";
+$root->textContent = 'hi';
+echo var_export($root->textContent, true), "\n";
+echo $root->childNodes->length, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_text_content.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("prev\nnullprev\n'hi'\n1\n", ob_get_clean());
+    }
+
     public function test_dom_document_savexml_node_subtree(): void
     {
         $runtime = new Runtime();
