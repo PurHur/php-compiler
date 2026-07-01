@@ -50,6 +50,12 @@ final class VmDom
 
     public const PROP_LENGTH = 'length';
 
+    public const PROP_NAME = 'name';
+
+    public const PROP_PUBLIC_ID = 'publicId';
+
+    public const PROP_SYSTEM_ID = 'systemId';
+
     public static function registerClasses(Context $ctx): void
     {
         if (isset($ctx->classes[self::CLASS_IMPLEMENTATION])) {
@@ -92,6 +98,11 @@ final class VmDom
 
         $doctype = new ClassEntry('DOMDocumentType');
         $doctype->isInternal = true;
+        $doctype->parentLc = self::CLASS_NODE;
+        $doctype->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, null, $strProto);
+        $doctype->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, null, $strProto);
         $ctx->classes[self::CLASS_DOCUMENT_TYPE] = $doctype;
 
         $document = new ClassEntry('DOMDocument');
@@ -139,6 +150,7 @@ final class VmDom
         $state->publicId = $publicId;
         $state->systemId = $systemId;
         DomRegistry::attach($entry, $state);
+        self::initDocumentTypePropertySlots($entry, $qualifiedName, $publicId, $systemId);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -511,6 +523,19 @@ final class VmDom
         return self::CLASS_NODE_LIST === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_NODELIST === DomRegistry::state($entry)->nodeType;
+    }
+
+    private static function initDocumentTypePropertySlots(
+        ObjectEntry $entry,
+        string $qualifiedName,
+        string $publicId,
+        string $systemId
+    ): void {
+        $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
+        $entry->getProperty(self::PROP_NAME)->string($qualifiedName);
+        $entry->getProperty(self::PROP_PUBLIC_ID)->string($publicId);
+        $entry->getProperty(self::PROP_SYSTEM_ID)->string($systemId);
+        self::initNodePropertySlots($entry);
     }
 
     private static function initNodePropertySlots(ObjectEntry $entry): void
