@@ -10,7 +10,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** count(COUNT_RECURSIVE) JIT routes through ArrayCountRecursiveJitHelper PHP not JitArrayCountRecursive LLVM (#13274). */
+/** count(COUNT_RECURSIVE) JIT routes through ArrayCountRecursiveJitHelper PHP not JitArrayCountRecursive LLVM (#13274, #14487). */
 final class ArrayCountRecursiveRuntimeShrinkTest extends TestCase
 {
     public function testArrayCountRecursiveRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
@@ -18,7 +18,7 @@ final class ArrayCountRecursiveRuntimeShrinkTest extends TestCase
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCountRecursiveRuntime.php');
         $this->assertStringContainsString('ArrayCountRecursiveJitHelper', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::countRecursive', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_count.php');
         $this->assertStringContainsString('ArrayCountRecursiveRuntime::countRecursive', $builtin);
