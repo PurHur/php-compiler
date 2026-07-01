@@ -9,15 +9,16 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** array_product() JIT routes through ArrayProductJitHelper PHP not ArrayBuiltinHelper LLVM (#12591). */
+/** array_product() JIT routes through ArrayProductJitHelper PHP not ArrayBuiltinHelper LLVM (#12591, #14359). */
 final class ArrayProductRuntimeShrinkTest extends TestCase
 {
     public function testArrayProductRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayProductRuntime.php');
         $this->assertStringContainsString('ArrayProductJitHelper', $runtime);
+        $this->assertStringContainsString('isNativeArray', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::arrayProduct', $runtime);
-        $this->assertStringContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_product.php');
         $this->assertStringContainsString('ArrayProductRuntime::product', $builtin);
