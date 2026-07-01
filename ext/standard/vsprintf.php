@@ -23,8 +23,12 @@ final class vsprintf extends Internal
 
     public function execute(Frame $frame): void
     {
-        if (2 !== \count($frame->calledArgs)) {
-            throw new \LogicException('vsprintf() requires exactly two arguments');
+        $argc = \count($frame->calledArgs);
+        if (2 !== $argc) {
+            throw new \ArgumentCountError(\sprintf(
+                'vsprintf() expects exactly 2 arguments, %d given',
+                $argc
+            ));
         }
         if (null === $frame->returnVar) {
             return;
