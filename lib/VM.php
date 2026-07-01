@@ -5670,12 +5670,22 @@ restart:
                             }
                             $arg1->newArray();
                             $packed = $arg1->toArray();
+                            $variadicByRef = isset($frame->block->paramByRef[$variadicParamIdx]);
                             for ($i = $recvIdx; $i <= $variadicEndIdx; ++$i) {
                                 if (!array_key_exists($i, $frame->calledArgs)) {
                                     continue;
                                 }
                                 $copy = new Variable();
-                                $copy->copyFrom($frame->calledArgs[$i]);
+                                if ($variadicByRef) {
+                                    $src = $frame->calledArgs[$i];
+                                    if ($copy !== $src) {
+                                        $copy->indirect($src);
+                                    } else {
+                                        $copy->copyFrom($src);
+                                    }
+                                } else {
+                                    $copy->copyFrom($frame->calledArgs[$i]);
+                                }
                                 $packed->append($copy);
                             }
                         } catch (\TypeError $e) {
@@ -11896,8 +11906,28 @@ restart:
                 $thisArgOffset = 1;
             }
             $paramIdx = $argIndex - $thisArgOffset;
+            if (isset($block->paramByRef[$paramIdx])) {
+                if (
+                    null !== $block->variadicParamIndex
+                    && $paramIdx === $block->variadicParamIndex
+                ) {
+                    return VM\ReferencableCheck::outgoingUserArgNeedsVariadicByRef(
+                        $block,
+                        $argIndex,
+                        $thisArgOffset,
+                        $argIndex + 1
+                    );
+                }
 
-            return isset($block->paramByRef[$paramIdx]);
+                return true;
+            }
+
+            return VM\ReferencableCheck::outgoingUserArgNeedsVariadicByRef(
+                $block,
+                $argIndex,
+                $thisArgOffset,
+                $argIndex + 1
+            );
         }
 
         return false;

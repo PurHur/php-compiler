@@ -61,8 +61,29 @@ final class ReferencableCheck
         ) {
             $thisArgOffset = 1;
         }
+        $variadicByRefIdx = self::variadicByRefParamIndex($calleeBlock);
+        $variadicEndIdx = null;
+        if (null !== $variadicByRefIdx) {
+            $variadicEndIdx = self::variadicByRefEndArgIndex(
+                $calleeBlock,
+                $variadicByRefIdx,
+                $thisArgOffset,
+                $calledArgs
+            );
+        }
         foreach ($calleeBlock->paramByRef as $paramIdx => $_) {
             $idx = (int) $paramIdx;
+            if (null !== $variadicByRefIdx && $idx === $variadicByRefIdx) {
+                $start = $variadicByRefIdx + $thisArgOffset;
+                $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
+                for ($argIndex = $start; $argIndex <= $variadicEndIdx; ++$argIndex) {
+                    if (!array_key_exists($argIndex, $calledArgs)) {
+                        continue;
+                    }
+                    self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
+                }
+                continue;
+            }
             $argIndex = $idx + $thisArgOffset;
             if (!array_key_exists($argIndex, $calledArgs)) {
                 continue;
@@ -70,6 +91,79 @@ final class ReferencableCheck
             $paramName = $calleeBlock->paramNames[$idx] ?? 'param'.$idx;
             self::assertArgument($fn, $idx, $paramName, $calledArgs[$argIndex], $caller);
         }
+    }
+
+    public static function variadicByRefParamIndex(Block $calleeBlock): ?int
+    {
+        $variadicIdx = $calleeBlock->variadicParamIndex;
+        if (null === $variadicIdx || !isset($calleeBlock->paramByRef[$variadicIdx])) {
+            return null;
+        }
+
+        return $variadicIdx;
+    }
+
+    /**
+     * @param array<int, Variable> $calledArgs
+     */
+    public static function variadicByRefEndArgIndex(
+        Block $calleeBlock,
+        int $variadicParamIdx,
+        int $thisArgOffset,
+        array $calledArgs
+    ): int {
+        $paramCount = \count($calleeBlock->paramNames);
+        $maxArgIdx = -1;
+        foreach (array_keys($calledArgs) as $argKey) {
+            if ($argKey > $maxArgIdx) {
+                $maxArgIdx = (int) $argKey;
+            }
+        }
+        $hasTrailingFixedAfterVariadic = $variadicParamIdx < $paramCount - 1;
+        if ($hasTrailingFixedAfterVariadic) {
+            $trailingCount = $paramCount - $variadicParamIdx - 1;
+            $numProvided = $maxArgIdx + 1;
+            $numToTrailing = min(
+                $trailingCount,
+                max(0, $numProvided - $variadicParamIdx - 1)
+            );
+
+            return $numProvided - $numToTrailing - 1;
+        }
+
+        return $maxArgIdx;
+    }
+
+    /**
+     * Whether $argIndex is in the variadic by-reference tail for a user call.
+     */
+    public static function outgoingUserArgNeedsVariadicByRef(
+        Block $calleeBlock,
+        int $argIndex,
+        int $thisArgOffset,
+        int $numProvidedAfterSend
+    ): bool {
+        $variadicByRefIdx = self::variadicByRefParamIndex($calleeBlock);
+        if (null === $variadicByRefIdx) {
+            return false;
+        }
+        $start = $variadicByRefIdx + $thisArgOffset;
+        if ($argIndex < $start) {
+            return false;
+        }
+        $paramCount = \count($calleeBlock->paramNames);
+        $hasTrailingFixedAfterVariadic = $variadicByRefIdx < $paramCount - 1;
+        if (!$hasTrailingFixedAfterVariadic) {
+            return true;
+        }
+        $trailingCount = $paramCount - $variadicByRefIdx - 1;
+        $numToTrailing = min(
+            $trailingCount,
+            max(0, $numProvidedAfterSend - $variadicByRefIdx - 1)
+        );
+        $variadicEndIdx = $numProvidedAfterSend - $numToTrailing - 1;
+
+        return $argIndex <= $variadicEndIdx;
     }
 
     /**
