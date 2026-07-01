@@ -6,7 +6,6 @@ namespace PHPCompiler\JIT\Builtin;
 
 use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
-use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
@@ -18,7 +17,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for array_unshift() via ArrayUnshiftJitHelper PHP (#12717).
  *
- * Standalone AOT keeps LLVM in {@see ArrayBuiltinHelper::unshift()}.
+ * Standalone AOT compiles {@see ArrayUnshiftJitHelper} via nested JIT bridges (#14316); native literal arrays keep LLVM in {@see ArrayBuiltinHelper::unshift()}.
  * SSOT: {@see \PHPCompiler\ext\standard\array_unshift}
  * php-src: ext/standard/array.c — PHP_FUNCTION(array_unshift)
  */
@@ -38,8 +37,7 @@ final class ArrayUnshiftRuntime
 
     public static function unshift(Context $context, JITVariable $array, JITVariable ...$values): Value
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType
-            || ArrayBuiltinHelper::isNativeArray($array->type)) {
+        if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return ArrayBuiltinHelper::unshift($context, $array, ...$values);
         }
 
@@ -62,12 +60,13 @@ final class ArrayUnshiftRuntime
         self::implement($context);
     }
 
+    public static function ensureStandaloneBodies(Context $context): void
+    {
+        self::implement($context);
+    }
+
     public static function implement(Context $context): void
     {
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            return;
-        }
-
         $probe = $context->module->getNamedFunction('__array_unshift__count');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
