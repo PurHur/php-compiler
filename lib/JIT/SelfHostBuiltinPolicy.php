@@ -109,6 +109,7 @@ final class SelfHostBuiltinPolicy
         'session_reset' => 'session',
         'session_create_id' => 'session',
         'session_gc' => 'session',
+        'session_cache_expire' => 'session',
     ];
 
     /** @var array<string, string> */

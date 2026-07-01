@@ -37,6 +37,9 @@ final class VmSession
 
     public const MAX_MODULE_LEN = 32;
 
+    /** php-src ext/session/session.c — PS(cache_expire) / session.cache_expire default (minutes). */
+    public const DEFAULT_CACHE_EXPIRE = 180;
+
     private static bool $active = false;
 
     private static string $name = self::DEFAULT_NAME;
@@ -45,12 +48,30 @@ final class VmSession
 
     private static string $moduleName = self::DEFAULT_MODULE;
 
+    private static int $cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+
     public static function reset(): void
     {
         self::$active = false;
         self::$name = self::DEFAULT_NAME;
         self::$id = '';
         self::$moduleName = self::DEFAULT_MODULE;
+        self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+    }
+
+    public static function getCacheExpire(): int
+    {
+        return self::$cacheExpire;
+    }
+
+    public static function setCacheExpire(int $minutes): void
+    {
+        if ($minutes <= 0) {
+            throw new \ValueError(
+                'session_cache_expire(): Argument #1 ($new_cache_expire) must be greater than 0'
+            );
+        }
+        self::$cacheExpire = $minutes;
     }
 
     public static function isActive(): bool
