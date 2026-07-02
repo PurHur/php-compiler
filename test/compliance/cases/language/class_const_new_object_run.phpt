@@ -31,10 +31,10 @@ var_export(D::Y);
 echo "\n";
 echo D::Y->x === 7 ? "1\n" : "0\n";
 --EXPECT--
-(object) array (
+(object) array(
 )
 1
-\Foo::__set_state(array (
+\Foo::__set_state(array(
   'x' => 7,
 ))
 1
