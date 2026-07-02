@@ -151,11 +151,8 @@ final class array_walk extends Internal
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
-            if (Variable::TYPE_NULL !== $result->type) {
-                array_map::appendKeyedCopy($out, $key, $result);
-            } else {
-                array_map::appendKeyedCopy($out, $key, $value);
-            }
+            // Internal callbacks mutate only by-ref slots; ignore return value (php-src array.c, #14830).
+            array_map::appendKeyedCopy($out, $key, $value);
         }
         $array->array($out);
 
@@ -212,9 +209,6 @@ final class array_walk extends Internal
             }
             if (VmArrayWalkCallback::callbackFailed($result)) {
                 return false;
-            }
-            if (null === $userFn && Variable::TYPE_NULL !== $result->type) {
-                $object->getProperty($propName)->copyFrom($result);
             }
         }
 
