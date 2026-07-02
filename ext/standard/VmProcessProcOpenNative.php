@@ -177,6 +177,7 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
+            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {
@@ -312,6 +313,7 @@ final class VmProcessProcOpenNative
                 'pipeHandles' => array_values($pipeHandles),
                 'childPaused' => true,
             ];
+            self::resumeChildIfPaused($ffi, self::$slots[$slot]);
 
             return [$slot, $pipeHandles];
         } catch (\Throwable) {
@@ -567,7 +569,7 @@ final class VmProcessProcOpenNative
         $ffi->waitpid($pid, \FFI::addr($status), 0);
     }
 
-    /** Child raises SIGSTOP at fork; resume on proc_close()/proc_terminate(). */
+    /** Child raises SIGSTOP at fork; parent resumes after pipe setup (php-src proc_open.c). */
     private static function resumeChildIfPaused(\FFI $ffi, array &$slot): void
     {
         if (!($slot['childPaused'] ?? false)) {
