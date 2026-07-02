@@ -241,11 +241,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412, #15028).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#15083).
      */
     public static function supportsFpow(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /** PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241). */
@@ -257,11 +257,11 @@ final class CompilerVersion
     /**
      * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15028).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#15083).
      */
     public static function supportsRoundingModeEnum(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
