@@ -749,6 +749,18 @@ final class VmMath
         return \pow($num, $exponent);
     }
 
+    /** fmod() — floating-point remainder (php-src ext/standard/math.c). */
+    public static function fmod(float $num1, float $num2): float
+    {
+        return \fmod($num1, $num2);
+    }
+
+    /** hypot() — sqrt(x² + y²) without overflow (php-src ext/standard/math.c). */
+    public static function hypot(float $x, float $y): float
+    {
+        return \hypot($x, $y);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */
