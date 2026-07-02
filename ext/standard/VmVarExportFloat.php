@@ -22,16 +22,8 @@ final class VmVarExportFloat
         if (\is_infinite($f)) {
             return $f < 0 ? '-INF' : 'INF';
         }
-        $precision = VmIni::parseSerializePrecision(VmIni::getSerializePrecision());
-        $abs = \abs($f);
-        if ($abs >= 1e14) {
-            // Large overflow doubles: zend_gcvt dtoa path (#14927, ext/standard/var.c).
-            $s = VmFloatDtoa::formatH($f);
-        } else {
-            // serialize_precision -1 historically used 17 sig digits for var_export (#14707).
-            $ndigit = $precision > 0 ? $precision : 17;
-            $s = VmSerializeFormat::formatDoubleWithPrecision($f, $ndigit);
-        }
+        // Shortest round-tripping decimal (php-src zend_print_flat_zval / %.*H dtoa, #15044).
+        $s = VmFloatDtoa::formatH($f);
         if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
         }
