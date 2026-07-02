@@ -1980,6 +1980,7 @@ require_once __DIR__.'/../../../ext/standard/natcasesort_.php';
 require_once __DIR__.'/../../../ext/standard/natsort_.php';
 require_once __DIR__.'/../../../ext/standard/net_get_interfaces.php';
 require_once __DIR__.'/../../../ext/standard/next.php';
+require_once __DIR__.'/../../../ext/standard/nextafter.php';
 require_once __DIR__.'/../../../ext/standard/nl2br.php';
 require_once __DIR__.'/../../../ext/standard/nl_langinfo.php';
 require_once __DIR__.'/../../../ext/standard/number_format.php';
