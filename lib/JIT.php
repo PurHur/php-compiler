@@ -8502,7 +8502,11 @@ class JIT {
 
                     return $origBasicBlock;
                 case OpCode::TYPE_NULLSAFE:
-                    $branchBlock = $builder->getInsertBlock();
+                    $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
+                    if (null === $branchBlock) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'nullsafe_branch');
+                        $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context) ?? $origBasicBlock;
+                    }
                     $builder->positionAtEnd($branchBlock);
                     $nullsafeResult = $block->getOperand($op->arg1);
                     $this->context->coalesceAssignTargets[$nullsafeResult] = true;
@@ -8536,14 +8540,25 @@ class JIT {
                         $mergeLimit = JIT\CoalesceHelper::mergeBlockOpcodeLimit($op->block3);
                         $merged = $this->compileBlockInternal($func, $op->block3, $mergeLimit, $mergeBb, 0, false, ...$args);
                         unset($this->context->coalesceAssignTargets[$nullsafeResult]);
+                        if ($this->context->inlineIncludeDepth > 0) {
+                            // Mirror ?? lowering: stay in the including TU (#866, #784, #15149).
+                            break;
+                        }
 
                         return $merged;
                     }
                     unset($this->context->coalesceAssignTargets[$nullsafeResult]);
+                    if ($this->context->inlineIncludeDepth > 0) {
+                        break;
+                    }
 
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
-                    $branchBlock = $builder->getInsertBlock();
+                    $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context);
+                    if (null === $branchBlock) {
+                        JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jumpif_branch');
+                        $branchBlock = JIT\BasicBlockHelper::tryGetInsertBlock($this->context) ?? $origBasicBlock;
+                    }
                     $builder->positionAtEnd($branchBlock);
                     $this->maybeRefreshIncludeBindingsBeforeUse();
                     $ternaryMergeReturn = null;
