@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3752 |
-| Phase A inventory files (M2 ratio SSOT) | 3752 |
+| PHP files on vm.php path | 3756 |
+| Phase A inventory files (M2 ratio SSOT) | 3756 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10157 |
+| Source constructs flagged (warnings) | 10167 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -129,6 +129,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/ImplementationGetFeature.php` | 0 | 2 |
 | `ext/dom/ImplementationHasFeature.php` | 0 | 1 |
 | `ext/dom/Module.php` | 0 | 1 |
+| `ext/dom/NodeAppend.php` | 0 | 1 |
 | `ext/dom/NodeCloneNode.php` | 0 | 1 |
 | `ext/dom/NodeCompareDocumentPosition.php` | 0 | 1 |
 | `ext/dom/NodeContains.php` | 0 | 1 |
@@ -145,9 +146,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/dom/NodeListItem.php` | 0 | 1 |
 | `ext/dom/NodeLookupNamespaceURI.php` | 0 | 1 |
 | `ext/dom/NodeLookupPrefix.php` | 0 | 1 |
+| `ext/dom/NodePrepend.php` | 0 | 1 |
 | `ext/dom/NodeRemoveChild.php` | 0 | 1 |
 | `ext/dom/NodeReplaceChild.php` | 0 | 1 |
-| `ext/dom/VmDom.php` | 0 | 121 |
+| `ext/dom/VmDom.php` | 0 | 127 |
 | `ext/filter/BuiltinEnums.php` | 0 | 3 |
 | `ext/filter/FilterBooleanJitHelper.php` | 0 | 1 |
 | `ext/filter/FilterConstants.php` | 0 | 2 |
@@ -540,6 +542,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/Expm1JitHelper.php` | 0 | 1 |
 | `ext/standard/FloorJitHelper.php` | 0 | 1 |
 | `ext/standard/FmodJitHelper.php` | 0 | 1 |
+| `ext/standard/FpowJitHelper.php` | 0 | 1 |
 | `ext/standard/FsDirJitHelper.php` | 0 | 1 |
 | `ext/standard/FsGlobJitHelper.php` | 0 | 1 |
 | `ext/standard/FstatJitHelper.php` | 0 | 1 |
@@ -2623,6 +2626,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathExpm1.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFmod.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathFpow.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathHypot.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsFinite.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsInfinite.php` | 0 | 1 |
@@ -4332,6 +4336,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/NodeAppend.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/NodeCloneNode.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4412,6 +4421,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/dom/NodePrepend.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/dom/NodeRemoveChild.php`
 
 **Warnings** (review for bootstrap subset):
@@ -4450,101 +4464,107 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new NodeHasChildNodes (line 132)
 - new NodeContains (line 135)
 - new NodeGetRootNode (line 139)
-- new NodeLookupPrefix (line 142)
-- new NodeLookupNamespaceURI (line 144)
-- new NodeGetLineNo (line 146)
-- new NodeGetNodePath (line 148)
-- new NodeHasAttributes (line 150)
-- new NodeIsDefaultNamespace (line 152)
-- new NodeIsSupported (line 154)
-- new NodeCompareDocumentPosition (line 156)
-- new ClassEntry (line 168)
-- new ClassProperty (line 171)
-- new ClassEntry (line 174)
-- new ClassProperty (line 177)
-- new NodeListItem (line 178)
-- new NodeListCount (line 180)
-- new ClassEntry (line 184)
-- new ImplementationCreateDocument (line 186)
-- new ImplementationCreateDocumentType (line 188)
-- new ImplementationGetFeature (line 190)
-- new ImplementationHasFeature (line 192)
-- new ClassEntry (line 196)
-- new ClassProperty (line 199)
-- new ClassProperty (line 200)
-- new ClassProperty (line 201)
-- new ClassProperty (line 202)
-- new ClassEntry (line 205)
-- new ClassProperty (line 208)
-- new ClassProperty (line 209)
-- new ClassProperty (line 210)
-- new DocumentLoadXML (line 211)
-- new DocumentLoadHTML (line 213)
-- new DocumentCreateElement (line 216)
-- new DocumentCreateElementNS (line 218)
-- new DocumentCreateDocumentFragment (line 220)
-- new DocumentAppendChild (line 222)
-- new DocumentSaveXML (line 224)
-- new DocumentSaveHTML (line 226)
-- new DocumentGetElementsByTagName (line 229)
-- new DocumentGetElementById (line 231)
-- new ClassEntry (line 235)
-- new ClassProperty (line 238)
-- new ElementAppendChild (line 239)
-- new ElementGetAttribute (line 241)
-- new ElementGetAttributeNS (line 243)
-- new ElementHasAttributeNS (line 245)
-- new ElementSetAttribute (line 247)
-- new ElementSetAttributeNS (line 249)
-- new ElementSetIdAttribute (line 251)
-- new ClassEntry (line 256)
-- new ClassProperty (line 259)
-- new FragmentAppendChild (line 260)
-- new ObjectEntry (line 276)
-- new DomNodeState (line 278)
-- new Variable (line 286)
-- new ObjectEntry (line 309)
-- new DomNodeState (line 314)
-- new Variable (line 339)
-- new DomNodeState (line 373)
-- new ObjectEntry (line 393)
-- new DomNodeState (line 398)
-- new Variable (line 408)
-- new ObjectEntry (line 427)
-- new DomNodeState (line 432)
-- new Variable (line 446)
-- new DOMException (line 455)
-- new DOMException (line 508)
-- new DOMException (line 524)
+- new NodeAppend (line 142)
+- new NodePrepend (line 144)
+- new NodeLookupPrefix (line 146)
+- new NodeLookupNamespaceURI (line 148)
+- new NodeGetLineNo (line 150)
+- new NodeGetNodePath (line 152)
+- new NodeHasAttributes (line 154)
+- new NodeIsDefaultNamespace (line 156)
+- new NodeIsSupported (line 158)
+- new NodeCompareDocumentPosition (line 160)
+- new ClassEntry (line 172)
+- new ClassProperty (line 175)
+- new ClassEntry (line 178)
+- new ClassProperty (line 181)
+- new NodeListItem (line 182)
+- new NodeListCount (line 184)
+- new ClassEntry (line 188)
+- new ImplementationCreateDocument (line 190)
+- new ImplementationCreateDocumentType (line 192)
+- new ImplementationGetFeature (line 194)
+- new ImplementationHasFeature (line 196)
+- new ClassEntry (line 200)
+- new ClassProperty (line 203)
+- new ClassProperty (line 204)
+- new ClassProperty (line 205)
+- new ClassProperty (line 206)
+- new ClassEntry (line 209)
+- new ClassProperty (line 212)
+- new ClassProperty (line 213)
+- new ClassProperty (line 214)
+- new DocumentLoadXML (line 215)
+- new DocumentLoadHTML (line 217)
+- new DocumentCreateElement (line 220)
+- new DocumentCreateElementNS (line 222)
+- new DocumentCreateDocumentFragment (line 224)
+- new DocumentAppendChild (line 226)
+- new DocumentSaveXML (line 228)
+- new DocumentSaveHTML (line 230)
+- new DocumentGetElementsByTagName (line 233)
+- new DocumentGetElementById (line 235)
+- new ClassEntry (line 239)
+- new ClassProperty (line 242)
+- new ElementAppendChild (line 243)
+- new ElementGetAttribute (line 245)
+- new ElementGetAttributeNS (line 247)
+- new ElementHasAttributeNS (line 249)
+- new ElementSetAttribute (line 251)
+- new ElementSetAttributeNS (line 253)
+- new ElementSetIdAttribute (line 255)
+- new ClassEntry (line 260)
+- new ClassProperty (line 263)
+- new FragmentAppendChild (line 264)
+- new ObjectEntry (line 280)
+- new DomNodeState (line 282)
+- new Variable (line 290)
+- new ObjectEntry (line 313)
+- new DomNodeState (line 318)
+- new Variable (line 343)
+- new DomNodeState (line 377)
+- new ObjectEntry (line 397)
+- new DomNodeState (line 402)
+- new Variable (line 412)
+- new ObjectEntry (line 431)
+- new DomNodeState (line 436)
+- new Variable (line 450)
+- new DOMException (line 459)
+- new DOMException (line 512)
 - new DOMException (line 528)
 - new DOMException (line 532)
-- new ObjectEntry (line 860)
-- new DomNodeState (line 865)
-- new ObjectEntry (line 884)
-- new DomNodeState (line 889)
-- new Variable (line 894)
-- new DOMException (line 1243)
-- new DOMException (line 1269)
-- new DOMException (line 1287)
-- new DOMException (line 1290)
-- new DOMException (line 1298)
-- new DOMException (line 1324)
-- new DOMException (line 1337)
-- new DOMException (line 1652)
-- new Variable (line 1676)
-- new DOMException (line 1805)
-- new ObjectEntry (line 1887)
-- new DomNodeState (line 1891)
-- new Variable (line 1897)
-- new DOMException (line 1962)
-- new DOMException (line 1969)
-- new DOMException (line 1976)
-- new DOMException (line 1980)
-- new DOMException (line 1983)
-- new DOMException (line 1992)
-- new Variable (line 2502)
-- new DOMException (line 2516)
-- 125 class method(s)
+- new DOMException (line 536)
+- new ObjectEntry (line 864)
+- new DomNodeState (line 869)
+- new ObjectEntry (line 888)
+- new DomNodeState (line 893)
+- new Variable (line 898)
+- new DOMException (line 1247)
+- new DOMException (line 1273)
+- new DOMException (line 1291)
+- new DOMException (line 1294)
+- new DOMException (line 1302)
+- new DOMException (line 1328)
+- new DOMException (line 1341)
+- new DOMException (line 1440)
+- new DOMException (line 1469)
+- new DOMException (line 1510)
+- new DOMException (line 1535)
+- new DOMException (line 1834)
+- new Variable (line 1858)
+- new DOMException (line 1987)
+- new ObjectEntry (line 2069)
+- new DomNodeState (line 2073)
+- new Variable (line 2079)
+- new DOMException (line 2144)
+- new DOMException (line 2151)
+- new DOMException (line 2158)
+- new DOMException (line 2162)
+- new DOMException (line 2165)
+- new DOMException (line 2174)
+- new Variable (line 2684)
+- new DOMException (line 2698)
+- 131 class method(s)
 - 1 closure(s)
 
 ### `ext/filter/BuiltinEnums.php`
@@ -7394,6 +7414,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/FmodJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/FpowJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -21066,6 +21091,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathFmod.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathFpow.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
