@@ -8,7 +8,7 @@ use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
-use PHPCompiler\JIT\JitIsFinite;
+use PHPCompiler\JIT\Builtin\MathIsFinite;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitOperandTypeLabel;
 use PHPCompiler\JIT\JitStringArg;
@@ -342,7 +342,7 @@ final class JitIntdiv
         bool $nullable = false,
         bool $warnFloatPrecision = false
     ): Value {
-        $isFinite = JitIsFinite::lower($context, $doubleVal);
+        $isFinite = MathIsFinite::invoke($context, $doubleVal);
         $okBlock = BasicBlockHelper::append($context, 'intdiv_dbl_ok');
         $errBlock = BasicBlockHelper::append($context, 'intdiv_dbl_err');
         $context->builder->branchIf($isFinite, $okBlock, $errBlock);

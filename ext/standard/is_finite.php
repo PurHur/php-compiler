@@ -13,8 +13,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathIsFinite;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitIsFinite;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -53,6 +53,6 @@ final class is_finite extends Internal
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'is_finite', 'float');
 
-        return JitIsFinite::lower($context, $asFloat);
+        return MathIsFinite::invoke($context, $asFloat);
     }
 }
