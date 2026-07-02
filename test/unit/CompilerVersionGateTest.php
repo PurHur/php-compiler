@@ -44,9 +44,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testSupportsJsonValidateFalseOnReferenceProfile(): void
+    public function testSupportsJsonValidateTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
     public function testAdvertisesReflectionConstantClassFalseOnReferenceProfile(): void
@@ -207,10 +207,10 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testSupportsMbTrimFunctionsFalseOnReferenceProfile(): void
