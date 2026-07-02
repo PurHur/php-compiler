@@ -25,6 +25,7 @@ class Module extends ModuleAbstract
         return [
             new hash_init(),
             new hash_update(),
+            new hash_update_file(),
             new hash_update_stream(),
             new hash_final(),
             new hash_copy(),
