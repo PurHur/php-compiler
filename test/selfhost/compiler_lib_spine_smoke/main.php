@@ -967,7 +967,7 @@ require_once __DIR__.'/../../../ext/standard/JitSscanf.php';
 require_once __DIR__.'/../../../ext/standard/JitStat.php';
 require_once __DIR__.'/../../../ext/standard/JitStatArray.php';
 require_once __DIR__.'/../../../ext/standard/JitStrGetcsv.php';
-require_once __DIR__.'/../../../ext/standard/JitStrIncdec.php';
+require_once __DIR__.'/../../../ext/standard/StrIncdecJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIreplace.php';
 require_once __DIR__.'/../../../ext/standard/JitStrIreplaceMulti.php';
 require_once __DIR__.'/../../../ext/standard/JitStrPad.php';
@@ -2813,6 +2813,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonDecodeInventoryStubs.p
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncode.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringJsonEncodeInventoryStubs.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringLevenshtein.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrIncdec.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrspn.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringStrWordCount.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringLocaltime.php';
