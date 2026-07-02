@@ -341,7 +341,11 @@ final class VmReflection
         $names = [];
         foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
             foreach ($module->getFunctions() as $func) {
-                $names[] = $func->getName();
+                $name = $func->getName();
+                if (self::isCompilerAbiHelperName($name)) {
+                    continue;
+                }
+                $names[] = $name;
             }
         }
         $names = array_values(array_unique($names));
@@ -412,7 +416,18 @@ final class VmReflection
     /** Whether function_exists() may report true — excludes constructs Zend omits from the function table. */
     public static function isVisibleToFunctionExists(string $functionName): bool
     {
-        return !\in_array(\strtolower($functionName), self::FUNCTION_EXISTS_EXCLUDED, true);
+        $lc = \strtolower($functionName);
+        if (self::isCompilerAbiHelperName($lc)) {
+            return false;
+        }
+
+        return !\in_array($lc, self::FUNCTION_EXISTS_EXCLUDED, true);
+    }
+
+    /** JIT/AOT self-host ABI helpers — linkable but hidden from user introspection (#15046). */
+    public static function isCompilerAbiHelperName(string $functionName): bool
+    {
+        return str_starts_with(\strtolower($functionName), '__compiler_');
     }
 
     public static function functionExists(Context $ctx, string $functionName): bool
