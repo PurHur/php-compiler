@@ -9,7 +9,7 @@ use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #4646: AOT standalone must define __phpc_char_in_mask (PHP LLVM, not C bitcode).
+ * Issue #4646 / #14908: AOT standalone must define __phpc_char_in_mask via CharInMaskJitHelper PHP.
  *
  * @group aot-lint
  */
