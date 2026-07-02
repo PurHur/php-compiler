@@ -160,7 +160,7 @@ final class SplDualIteratorStorage
 
     private const RS_NEXT = 4;
 
-    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool}> */
+    /** @var array<int, array{inner: ObjectEntry, recursive: bool, mode: int, stack: list<array{iterator: ObjectEntry, state: int}>, maxDepth: int, rewound: bool, noRewind: bool}> */
     private static array $store = [];
 
     public static function initSimple(ObjectEntry $object, ObjectEntry $inner): void
@@ -172,6 +172,21 @@ final class SplDualIteratorStorage
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => false,
+            'noRewind' => false,
+        ];
+    }
+
+    /** NoRewindIterator — valid/current without outer rewind(); inner position preserved (#15150). */
+    public static function initNoRewind(ObjectEntry $object, ObjectEntry $inner): void
+    {
+        self::$store[$object->id] = [
+            'inner' => $inner,
+            'recursive' => false,
+            'mode' => IteratorIteratorBuiltin::LEAVES_ONLY,
+            'stack' => [],
+            'maxDepth' => -1,
+            'rewound' => true,
+            'noRewind' => true,
         ];
     }
 
@@ -184,6 +199,7 @@ final class SplDualIteratorStorage
             'stack' => [],
             'maxDepth' => -1,
             'rewound' => false,
+            'noRewind' => false,
         ];
     }
 
@@ -403,6 +419,9 @@ final class SplDualIteratorStorage
         $state = self::state($object);
         if ($state['recursive']) {
             return [] !== $state['stack'];
+        }
+        if ($state['noRewind']) {
+            return true;
         }
 
         return $state['rewound'];

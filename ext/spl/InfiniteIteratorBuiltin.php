@@ -175,7 +175,7 @@ final class NoRewindIteratorConstruct extends VmClassMethod
             $frame,
             $frame->calledArgs[1]
         );
-        SplDualIteratorStorage::initSimple($object, $inner);
+        SplDualIteratorStorage::initNoRewind($object, $inner);
     }
 }
 
