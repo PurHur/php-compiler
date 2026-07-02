@@ -322,6 +322,9 @@ final class VmDate
         if (Variable::TYPE_INTEGER === $var->type) {
             return $var->toInt();
         }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toInt();
+        }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(self::nullableTimestampTypeError(
                 $function,
