@@ -151,11 +151,11 @@ final class VmLocale
     }
 
     /**
-     * php-src ext/standard/locale.c — single-char "0" is the query-current-locale idiom.
+     * php-src ext/standard/locale.c — keep literal "0" distinct from null (query idiom vs normalized LC_ALL query).
      */
-    private static function normalizeLocaleArg(string $locale): ?string
+    private static function normalizeLocaleArg(string $locale): string
     {
-        return '0' === $locale ? null : $locale;
+        return $locale;
     }
 
     private static function writeEmptyLocaleconv(HashTable $ht): void

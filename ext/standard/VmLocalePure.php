@@ -12,6 +12,10 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmLocalePure
 {
+    private static ?string $preservedLcCtype = null;
+
+    private static bool $trackingInitialized = false;
+
     public static function available(): bool
     {
         return \function_exists('setlocale') && \function_exists('localeconv');
@@ -119,15 +123,27 @@ final class VmLocalePure
         }
 
         if ([] === $locales) {
-            return self::normalizeSetlocaleResult(@\setlocale($category, '0'));
+            return self::querySetlocale($category, null);
         }
 
         foreach ($locales as $locale) {
             if (null === $locale) {
-                return self::normalizeSetlocaleResult(@\setlocale($category, '0'));
+                return self::querySetlocale($category, null);
             }
+            if ('0' === $locale) {
+                return self::querySetlocale($category, '0');
+            }
+
+            self::bootstrapTrackingIfNeeded();
+
             $result = @\setlocale($category, $locale);
             if (false !== $result && '' !== $result) {
+                if (self::isLcAll($category)) {
+                    self::restorePreservedLcCtype();
+                } elseif (self::lcCtypeCategory() === $category) {
+                    self::$preservedLcCtype = $result;
+                }
+
                 return $result;
             }
         }
@@ -164,8 +180,54 @@ final class VmLocalePure
         return $text;
     }
 
-    private static function normalizeSetlocaleResult(string|false $result): string|false
+    private static function bootstrapTrackingIfNeeded(): void
     {
+        if (self::$trackingInitialized) {
+            return;
+        }
+
+        self::$trackingInitialized = true;
+        $lcAll = self::lcConstants()['LC_ALL'];
+
+        // Host Zend setlocale(LC_ALL, null) from ext/ PHP — not the VM builtin (#8684).
+        $normalized = @\setlocale($lcAll, null);
+        if (\is_string($normalized) && '' !== $normalized) {
+            self::$preservedLcCtype = $normalized;
+
+            return;
+        }
+
+        self::$preservedLcCtype = 'C';
+    }
+
+    private static function lcCtypeCategory(): int
+    {
+        return self::lcConstants()['LC_CTYPE'];
+    }
+
+    private static function isLcAll(int $category): bool
+    {
+        return self::lcConstants()['LC_ALL'] === $category;
+    }
+
+    private static function restorePreservedLcCtype(): void
+    {
+        if (null === self::$preservedLcCtype) {
+            return;
+        }
+
+        @\setlocale(self::lcCtypeCategory(), self::$preservedLcCtype);
+    }
+
+    private static function querySetlocale(int $category, ?string $mode): string|false
+    {
+        if (self::isLcAll($category) && null === $mode) {
+            self::bootstrapTrackingIfNeeded();
+
+            return self::$preservedLcCtype ?? 'C';
+        }
+
+        $result = @\setlocale($category, '0');
         if (false === $result || '' === $result) {
             return false;
         }
