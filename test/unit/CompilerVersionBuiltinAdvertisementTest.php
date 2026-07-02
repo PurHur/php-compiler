@@ -34,9 +34,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsBuiltinStubEnums());
     }
 
-    public function testJsonValidateWithheldOnReferenceProfileUntilStable84(): void
+    public function testJsonValidateAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
     public function testMbStrPadWithheldOnReferenceProfileUntilStable84(): void
@@ -44,14 +44,14 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
-    public function testStrIncrementWithheldOnReferenceProfileUntilStable84(): void
+    public function testStrIncrementAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
-    public function testClassHasFunctionsWithheldOnReferenceProfileUntilStable84(): void
+    public function testClassHasFunctionsAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+        $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
     }
 
     public function testPhp84ReflectionProbeBuiltinsWithheldOnReferenceProfile(): void
@@ -64,9 +64,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
     }
 
-    public function testFpowWithheldOnReferenceProfileUntilStable84(): void
+    public function testFpowAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsFpow());
+        $this->assertTrue(CompilerVersion::supportsFpow());
     }
 
     public function testNextafterWithheldOnReferenceProfileUntilStable84(): void
@@ -74,15 +74,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsNextafter());
     }
 
-    public function testRoundingModeEnumWithheldOnReferenceProfile(): void
+    public function testRoundingModeEnumAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
+        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
+    public function testVmRegistersRoundingModeOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
+        $this->assertTrue(isset($runtime->vmContext->classes['roundingmode']));
     }
 
     public function testRandomIntervalBoundaryWithheldOnReferenceProfile(): void
@@ -106,9 +106,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
+    public function testPhp84ArraySearchFunctionsAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
     }
 
     public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
@@ -193,10 +193,10 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         }
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testVmDoesNotRegisterStreamSupportsOnReferenceProfile(): void
@@ -211,12 +211,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
-    public function testVmDoesNotRegisterArrayFindFamilyOnReferenceProfile(): void
+    public function testVmRegistersArrayFindFamilyOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last'] as $fn) {
-            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
         }
     }
 

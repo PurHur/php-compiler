@@ -110,13 +110,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709).
+     * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709, #15026).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsStrIncrement(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
@@ -238,11 +238,14 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4', '>=');
     }
 
-    /** PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412). */
+    /**
+     * PHP 8.4+ fpow() IEEE float power (ext/standard/math.c; issue #7045, #12412, #15028).
+     *
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
+     */
     public static function supportsFpow(): bool
     {
-        // Stable 8.4.0+ only — 8.4.0-dev reference profile matches Zend 8.2 phantom gate (#11846).
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /** PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241). */
@@ -252,13 +255,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846).
+     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15028).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsRoundingModeEnum(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
@@ -358,10 +361,14 @@ final class CompilerVersion
         return self::advertisesBuiltinSince('8.4.0');
     }
 
-    /** PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989, #14722). */
+    /**
+     * PHP 8.4+ class_has_method/property/constant() (ext/standard/basic_functions.c; issue #9989, #14722, #15025).
+     *
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
+     */
     public static function supportsClassHasFunctions(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
@@ -417,13 +424,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15001).
+     * PHP 8.3+ json_validate() (ext/json/php_json.c, issue #3101, #11826, #12363, #13365, #14518, #14708, #14972, #15026).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsJsonValidate(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.3.0');
     }
 
     /**
@@ -538,13 +545,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622).
+     * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsPhp84ArraySearchFunctions(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
