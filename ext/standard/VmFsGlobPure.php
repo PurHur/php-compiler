@@ -84,6 +84,11 @@ final class VmFsGlobPure
             return false;
         }
 
+        // php-src ext/standard/dir.c — directory-only pattern with trailing slash matches itself.
+        if ('' === $filePattern && str_ends_with($pattern, '/')) {
+            return [$pattern];
+        }
+
         $entries = VmDirNative::listSorted($dir);
         if (false === $entries) {
             return false;
