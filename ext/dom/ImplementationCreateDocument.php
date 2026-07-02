@@ -17,16 +17,19 @@ final class ImplementationCreateDocument extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        if (\count($frame->calledArgs) < 4) {
-            throw new \LogicException('DOMImplementation::createDocument() expects exactly 3 arguments');
-        }
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMImplementation::createDocument() requires VM context');
         }
         self::receiver($frame, VmDom::CLASS_IMPLEMENTATION, 'DOMImplementation::createDocument()');
-        $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMImplementation::createDocument()', 0);
-        $qualifiedName = $this->stringArg($frame->calledArgs[2], 'DOMImplementation::createDocument()', 1);
-        $doctype = self::optionalDocumentType($frame->calledArgs[3]);
+        $namespace = isset($frame->calledArgs[1])
+            ? $this->nullableStringArg($frame->calledArgs[1], 'DOMImplementation::createDocument()', 0)
+            : null;
+        $qualifiedName = isset($frame->calledArgs[2])
+            ? $this->stringArg($frame->calledArgs[2], 'DOMImplementation::createDocument()', 1)
+            : '';
+        $doctype = isset($frame->calledArgs[3])
+            ? self::optionalDocumentType($frame->calledArgs[3])
+            : null;
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom(VmDom::createDocument(
                 $frame->vmContext,
