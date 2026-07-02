@@ -30,16 +30,12 @@ final class CastSupport
             return $result;
         }
 
+        if (ResourceSupport::isVmResource($src)) {
+            return self::vmResourceArrayCast();
+        }
+
         if (Variable::TYPE_OBJECT === $src->type) {
             $obj = $src->toObject();
-            if (ResourceSupport::isResourceObject($obj)) {
-                $result->newArray();
-                $copy = new Variable();
-                $copy->copyFrom($src);
-                $result->toArray()->append($copy);
-
-                return $result;
-            }
             if (EnumCaseSupport::isEnumCase($obj)) {
                 $result->newArray();
                 self::enumCaseObjectToArray($obj, $result->toArray());
@@ -68,6 +64,17 @@ final class CastSupport
         $copy = new Variable();
         $copy->copyFrom($src);
         $result->toArray()->append($copy);
+
+        return $result;
+    }
+
+    /** Zend convert_to_array(IS_RESOURCE) — one-element array with NULL at index 0 (#15002). */
+    public static function vmResourceArrayCast(): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $null = new Variable(Variable::TYPE_NULL);
+        $result->toArray()->append($null);
 
         return $result;
     }
