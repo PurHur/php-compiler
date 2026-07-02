@@ -101,7 +101,7 @@ final class BuiltinParamNames
             case 'array_reduce':
                 return ['array', 'callback', 'initial'];
             case 'array_pad':
-                return ['array', 'length', 'value'];
+                return ['array', 'length', 'value', 'pad_type'];
             case 'array_combine':
                 return ['keys', 'values'];
             case 'array_chunk':

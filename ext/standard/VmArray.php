@@ -797,9 +797,43 @@ final class VmArray
     /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
      */
-    public static function pad(HashTable $array, int $length, Variable $value): HashTable
+    public static function pad(HashTable $array, int $length, Variable $value, int $padType = 0): HashTable
     {
-        return $array->padCopy($length, $value);
+        $target = abs($length);
+        $count = $array->getNumElements();
+        if ($target <= $count) {
+            return $array->padCopy($length, $value);
+        }
+
+        // Default direction uses legacy sign-of-length behavior; explicit pad_type overrides.
+        $direction = $padType;
+        if (0 === $direction) {
+            $direction = $length >= 0 ? 0 : 1;
+        }
+
+        // 0=right, 1=left, 2=both (php-src ext/standard/array.c; #14561)
+        return match ($direction) {
+            0 => $array->padCopy($target, $value),
+            1 => $array->padCopy(-$target, $value),
+            2 => self::padBoth($array, $target, $value),
+            default => throw new \ValueError('array_pad(): Argument #4 ($pad_type) must be a valid pad type'),
+        };
+    }
+
+    private static function padBoth(HashTable $array, int $target, Variable $value): HashTable
+    {
+        $count = $array->getNumElements();
+        if ($target <= $count) {
+            return $array->padCopy($target, $value);
+        }
+        $padCount = $target - $count;
+        // When odd, the extra element pads on the left (php-src php_array_pad).
+        $leftPad = intdiv($padCount + 1, 2);
+        $rightPad = $padCount - $leftPad;
+
+        $out = $array->padCopy(-($count + $leftPad), $value);
+
+        return $out->padCopy($count + $leftPad + $rightPad, $value);
     }
 
     /**
