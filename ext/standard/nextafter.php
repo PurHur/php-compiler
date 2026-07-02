@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathNextafter;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -61,6 +62,6 @@ final class nextafter extends Internal
             'next'
         );
 
-        return $context->builder->call($context->lookupFunction('nextafter'), $num, $next);
+        return MathNextafter::invoke($context, $num, $next);
     }
 }
