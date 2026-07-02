@@ -821,6 +821,18 @@ final class VmMath
         return \log10($num);
     }
 
+    /** log1p() — log(1+x) (php-src ext/standard/math.c). */
+    public static function log1p(float $num): float
+    {
+        return \log1p($num);
+    }
+
+    /** expm1() — exp(x)-1 (php-src ext/standard/math.c). */
+    public static function expm1(float $num): float
+    {
+        return \expm1($num);
+    }
+
     /** floor() — round toward negative infinity (php-src ext/standard/math.c). */
     public static function floor(float $num): float
     {

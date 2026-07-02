@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathLog1p;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -22,7 +23,7 @@ final class log1p extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\log1p(VmMath::parseDoubleBuiltinArg($v, 'log1p', 1, 'num')));
+        $frame->returnVar->float(VmMath::log1p(VmMath::parseDoubleBuiltinArg($v, 'log1p', 1, 'num')));
     }
 
     public Context $context;
@@ -35,6 +36,6 @@ final class log1p extends Internal
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'log1p', 'float');
 
-        return $context->builder->call($context->lookupFunction('log1p'), $asFloat);
+        return MathLog1p::invoke($context, $asFloat);
     }
 }
