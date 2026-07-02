@@ -63,6 +63,17 @@ class AotTest extends BaseTest
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
+                && (str_contains($name, 'attribute_exists')
+                    || str_contains($name, 'class_meth_exists')
+                    || str_contains($name, 'unitenum_exists'))
+                && !str_contains($name, 'reflection_probe_builtins_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
+                && str_contains($name, 'reflection_probe_builtins_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsHex2binStrict()
                 && str_contains($name, 'hex2bin_strict')
                 && !str_contains($name, 'hex2bin_strict_arity_reference_profile')) {

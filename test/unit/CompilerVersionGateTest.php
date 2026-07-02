@@ -24,6 +24,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
     }
 
+    public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+    }
+
     public function testSupportsClassUsesRecursiveFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
