@@ -151,7 +151,7 @@ final class array_walk extends Internal
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
-            // php-src ext/standard/array.c — internal callbacks discard retval (#14830).
+            // Internal callbacks mutate only by-ref slots; ignore return value (php-src array.c, #14830).
             array_map::appendKeyedCopy($out, $key, $value);
         }
         $array->array($out);

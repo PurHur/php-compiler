@@ -405,8 +405,16 @@ final class CycleCollector
     /** @param callable(Variable): void $visitVar */
     public static function markFrameRoots(Frame $frame, callable $visitVar, bool $includeParents = true): void
     {
-        foreach ($frame->scope as $slot) {
-            $visitVar($slot);
+        // Named locals + dynamic locals only — compiler temps in scope[] are not Zend roots (#14827).
+        if (null !== $frame->block) {
+            foreach ($frame->block->eachNamedScopeSlot() as [, $slot]) {
+                if (isset($frame->scope[$slot])) {
+                    $visitVar($frame->scope[$slot]);
+                }
+            }
+        }
+        foreach ($frame->dynamicLocals as $var) {
+            $visitVar($var);
         }
         foreach ($frame->calledArgs as $arg) {
             $visitVar($arg);

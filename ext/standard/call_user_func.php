@@ -51,7 +51,7 @@ final class call_user_func extends Internal
         }
         if (2 === $argc) {
             $sole = $frame->calledArgs[1]->resolveIndirect();
-            if (Variable::TYPE_ARRAY === $sole->type) {
+            if (Variable::TYPE_ARRAY === $sole->type && self::arrayArgShouldUnpack($sole)) {
                 return VmCallable::arrayVariableToArgEntries($sole);
             }
         }
@@ -72,5 +72,23 @@ final class call_user_func extends Internal
         }
 
         return JitCallUserFunc::invoke($context, $args[0], \array_slice($args, 1));
+    }
+
+    /** Named-arg lowering packs string keys; list arrays are single value args (#14829). */
+    private static function arrayArgShouldUnpack(Variable $arrayVar): bool
+    {
+        foreach ($arrayVar->toArray()->iterateKeyed(false) as $pair) {
+            [$keyVar, ] = $pair;
+            $key = $keyVar->resolveIndirect();
+            if (Variable::TYPE_STRING !== $key->type) {
+                continue;
+            }
+            $keyStr = $key->toString();
+            if ('' !== $keyStr && !ctype_digit($keyStr)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
