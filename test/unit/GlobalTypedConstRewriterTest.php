@@ -42,45 +42,14 @@ PHP;
         self::assertStringContainsString('/*phpc-global-typed-const:string*/ const NS_NAME', preg_replace('/\s+/', ' ', $out));
     }
 
-    public function testRewritesFinalFileScopeTypedConst(): void
-    {
-        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
-        }
-        $src = <<<'PHP'
-<?php
-final const string APP_NAME = 'alpha';
-PHP;
-        $out = GlobalTypedConstRewriter::rewrite($src);
-        self::assertStringContainsString('/*phpc-global-typed-const:final:string*/ const APP_NAME', preg_replace('/\s+/', ' ', $out));
-    }
-
-    public function testRewritesFinalNamespaceBlockTypedConst(): void
-    {
-        if (!\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants require PHP 8.4.0+ target');
-        }
-        $src = <<<'PHP'
-<?php
-namespace FinalTyped {
-    final const string NS_NAME = 'beta';
-}
-PHP;
-        $out = GlobalTypedConstRewriter::rewrite($src);
-        self::assertStringContainsString('/*phpc-global-typed-const:final:string*/ const NS_NAME', preg_replace('/\s+/', ' ', $out));
-    }
-
     public function testParseMarkerPayloadFinalPrefix(): void
     {
         self::assertSame(['string', true], GlobalTypedConstRewriter::parseMarkerPayload('final:string'));
         self::assertSame(['int', false], GlobalTypedConstRewriter::parseMarkerPayload('int'));
     }
 
-    public function testRejectsFinalGlobalTypedConstWhenGateOff(): void
+    public function testRejectsFinalGlobalTypedConst(): void
     {
-        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
-        }
         $src = <<<'PHP'
 <?php
 final const string APP_NAME = 'alpha';
@@ -90,11 +59,8 @@ PHP;
         GlobalTypedConstRewriter::rewrite($src);
     }
 
-    public function testRejectsFinalNamespaceTypedConstWhenGateOff(): void
+    public function testRejectsFinalNamespaceTypedConst(): void
     {
-        if (\PHPCompiler\CompilerVersion::supportsFinalGlobalTypedConstants()) {
-            self::markTestSkipped('final global typed constants enabled on PHP 8.4+ target');
-        }
         $src = <<<'PHP'
 <?php
 namespace N {
