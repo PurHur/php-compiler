@@ -779,6 +779,12 @@ final class VmMath
         return \tan($num);
     }
 
+    /** exp() — natural exponential (php-src ext/standard/math.c). */
+    public static function exp(float $num): float
+    {
+        return \exp($num);
+    }
+
     /** sqrt() — square root (php-src ext/standard/math.c). */
     public static function sqrt(float $num): float
     {

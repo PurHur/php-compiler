@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathExp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -37,7 +38,7 @@ final class exp extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\exp($num));
+        $frame->returnVar->float(VmMath::exp($num));
     }
 
     public Context $context;
@@ -50,8 +51,6 @@ final class exp extends Internal
         }
         $double = $context->getTypeFromString('double');
         $asFloat = pow::toJitDouble($context, $args[0], $double);
-        $fn = $context->lookupFunction('exp');
-
         if (JITVariable::TYPE_NATIVE_LONG === $args[0]->type) {
             JitLongArg::lower($context, $args[0], 'exp() argument #1');
         }
@@ -59,7 +58,7 @@ final class exp extends Internal
             JitLongArg::lower($context, $args[1], 'exp() argument #2');
         }
 
-        return $context->builder->call($fn, $asFloat);
+        return MathExp::invoke($context, $asFloat);
     }
 
 }
