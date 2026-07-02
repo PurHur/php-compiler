@@ -779,6 +779,12 @@ final class VmMath
         return \tan($num);
     }
 
+    /** log10() — base-10 logarithm (php-src ext/standard/math.c). */
+    public static function log10(float $num): float
+    {
+        return \log10($num);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */
