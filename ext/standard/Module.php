@@ -585,6 +585,7 @@ class Module extends ModuleAbstract
             new is_dir(),
             new is_readable(),
             new is_writable(),
+            new is_writable('is_writeable'),
             new is_executable(),
             new is_link(),
             new readlink(),

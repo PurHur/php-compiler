@@ -130,7 +130,7 @@ final class SelfHostBuiltinPolicy
         'lstat' => 'filesystem',
         'fstat' => 'filesystem',
         'is_file' => 'filesystem', 'is_dir' => 'filesystem', 'is_readable' => 'filesystem',
-        'is_writable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
+        'is_writable' => 'filesystem', 'is_writeable' => 'filesystem', 'file_get_contents' => 'filesystem', 'file_put_contents' => 'filesystem',
         'filemtime' => 'filesystem',
         'fileatime' => 'filesystem',
         'filectime' => 'filesystem',
