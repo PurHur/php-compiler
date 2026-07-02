@@ -28,6 +28,7 @@ final class BuiltinClasses
         IteratorIteratorBuiltin::registerClass($ctx);
         FilterIteratorBuiltin::registerClass($ctx);
         CallbackFilterIteratorBuiltin::registerClass($ctx);
+        RegexIteratorBuiltin::registerClass($ctx);
         ParentIteratorBuiltin::registerClass($ctx);
         AppendIteratorBuiltin::registerClass($ctx);
         MultipleIteratorBuiltin::registerClass($ctx);
