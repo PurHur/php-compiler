@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmDebugBacktrace;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\VM\Builtin\VmClassMethod;
-use PHPCompiler\VM\FatalSite;
 
 /**
  * Populate user exception `trace` property on throw (issue #3351; Zend zend_exceptions.c).
@@ -94,7 +93,17 @@ final class ExceptionTrace
         $traceProp->duplicateFrom($trace);
     }
 
-    /** Generator throw-site snapshot when debug_backtrace cannot see isolated stack (#13418). */
+    public static function throwableHadNonEmptyTrace(Variable $thrown): bool
+    {
+        $thrown = $thrown->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $thrown->type) {
+            return false;
+        }
+
+        return self::traceVariableHasFrames(ExceptionTrace::resolveTraceVariable($thrown->toObject()));
+    }
+
+    /** Generator throw-site snapshot — Zend labels resume frame `[internal function]` (#13418, #14992). */
     public static function captureGeneratorThrowSite(Context $ctx, Frame $frame, Variable $thrown): void
     {
         $thrown = $thrown->resolveIndirect();
@@ -107,11 +116,7 @@ final class ExceptionTrace
             return;
         }
         $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
-        $built = self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame));
-        if (0 === $built->toArray()->getNumElements()) {
-            $built = self::generatorThrowFrameTrace($frame);
-        }
-        $traceProp->duplicateFrom($built);
+        $traceProp->duplicateFrom(self::generatorThrowSiteTrace($frame));
     }
 
     /** Append Generator::{next,send,...} after throw-site frames (Zend zend_generators.c, #13418). */
@@ -217,31 +222,34 @@ final class ExceptionTrace
         return VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $methodName, $className, '->');
     }
 
-    private static function generatorThrowFrameTrace(Frame $frame): Variable
+    private static function generatorThrowSiteTrace(Frame $frame): Variable
     {
         $trace = new Variable();
         $trace->newArray();
         if (null === $frame->block || null === $frame->block->func) {
             return $trace;
         }
-        $entry = new Variable();
-        $entry->newArray();
-        $ht = $entry->toArray();
-        $file = $frame->block->scriptPath();
-        if ('' !== $file) {
-            $fileVar = new Variable(Variable::TYPE_STRING);
-            $fileVar->string($file);
-            $ht->add('file', $fileVar);
-            $lineVar = new Variable(Variable::TYPE_INTEGER);
-            $lineVar->int(FatalSite::lineFromOpcodes($frame));
-            $ht->add('line', $lineVar);
-        }
-        $fnVar = new Variable(Variable::TYPE_STRING);
-        $fnVar->string($frame->block->func->name);
-        $ht->add('function', $fnVar);
-        $trace->toArray()->append($entry);
+        $trace->toArray()->append(self::generatorInternalFunctionFrameEntry($frame->block->func->name));
 
         return $trace;
+    }
+
+    private static function generatorInternalFunctionFrameEntry(string $functionName): Variable
+    {
+        $entry = new Variable();
+        $entry->newArray();
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($functionName);
+        $entry->toArray()->add('function', $fnVar);
+
+        return $entry;
+    }
+
+    private static function traceVariableHasFrames(Variable $trace): bool
+    {
+        $trace = $trace->resolveIndirect();
+
+        return Variable::TYPE_ARRAY === $trace->type && $trace->toArray()->getNumElements() > 0;
     }
 
     private static function classHasInstanceProperty(ClassEntry $class, string $name, Context $ctx): bool
