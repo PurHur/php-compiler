@@ -244,15 +244,4 @@ final class VmArrayWalk
 
         return true;
     }
-
-    private static function replaceAtKey(HashTable $table, Variable $key, Variable $value): void
-    {
-        $copy = new Variable();
-        $copy->copyFrom($value);
-        if (Variable::TYPE_INTEGER === $key->type) {
-            $table->updateIndex($key->toInt(), $copy);
-        } else {
-            $table->update($key->toString(), $copy);
-        }
-    }
 }
