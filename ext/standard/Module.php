@@ -146,6 +146,10 @@ class Module extends ModuleAbstract
             'PSFS_FLAG_NORMAL' => StdlibConstants::PSFS_FLAG_NORMAL,
             'PSFS_FLAG_FLUSH_INC' => StdlibConstants::PSFS_FLAG_FLUSH_INC,
             'PSFS_FLAG_FLUSH_CLOSE' => StdlibConstants::PSFS_FLAG_FLUSH_CLOSE,
+            // array_pad() pad_type (php-src ext/standard/array.c; #14561)
+            'ARRAY_PAD_RIGHT' => 0,
+            'ARRAY_PAD_LEFT' => 1,
+            'ARRAY_PAD_BOTH' => 2,
         ] + VmStreamSupports::constants() + VmStreamNotification::constants() + VmImage::constants() + VmJsonFlags::constants() as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
