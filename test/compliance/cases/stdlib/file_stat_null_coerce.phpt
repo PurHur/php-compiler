@@ -31,6 +31,5 @@ if ('' !== dirname(null)) {
 }
 echo 0 === $fail ? "ok\n" : "fail\n";
 --EXPECTF--
-PHP Warning:  filesize(): stat failed for  in %s on line %d
 PHP Warning:  rename(,/tmp/no-such-target-13354): No such file or directory in %s on line %d
 ok

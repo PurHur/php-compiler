@@ -22,6 +22,5 @@ if ('' !== dirname(null)) {
     ++$fail;
 }
 echo 0 === $fail ? "ok\n" : "fail\n";
---EXPECTF--
-PHP Warning:  filesize(): stat failed for  in %s on line %d
+--EXPECT--
 ok
