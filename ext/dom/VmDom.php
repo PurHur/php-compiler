@@ -729,10 +729,55 @@ final class VmDom
             return 'text()';
         }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
-            return $state->nodeName;
+            $name = $state->nodeName;
+            $index = self::elementPathIndexAmongSiblings($node);
+            if (null !== $index) {
+                return $name.'['.$index.']';
+            }
+
+            return $name;
         }
 
         return $state->nodeName;
+    }
+
+    /** 1-based index when multiple element siblings share nodeName (php-src dom_node_get_node_path; #15125). */
+    private static function elementPathIndexAmongSiblings(ObjectEntry $node): ?int
+    {
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            return null;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent) {
+            return null;
+        }
+        $parentState = DomRegistry::state($parent);
+        $nodeName = $state->nodeName;
+        $sameNameCount = 0;
+        $index = 0;
+        foreach ($parentState->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            $childState = DomRegistry::state($child);
+            if (DomConstants::XML_ELEMENT_NODE !== $childState->nodeType) {
+                continue;
+            }
+            if ($childState->nodeName !== $nodeName) {
+                continue;
+            }
+            ++$sameNameCount;
+            if ($child->id === $node->id) {
+                $index = $sameNameCount;
+            }
+        }
+        if ($sameNameCount <= 1) {
+            return null;
+        }
+
+        return $index;
     }
 
     public static function getRootNode(ObjectEntry $node): ObjectEntry
