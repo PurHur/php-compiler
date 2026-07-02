@@ -149,7 +149,7 @@ final class ClassConstFetchHelper
 
         $context->builder->positionAtEnd($fail);
         $displayClass = self::displayClassName($objectType, -1, $classOp);
-        $message = "Undefined class constant {$displayClass}::{$constName}";
+        $message = "Undefined constant {$displayClass}::{$constName}";
         $context->builder->call(
             $context->lookupFunction('__compiler_jit_raise_logic_exception'),
             self::messageDataPtrForRuntime($context, $message),

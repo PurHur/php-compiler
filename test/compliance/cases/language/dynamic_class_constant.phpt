@@ -31,4 +31,4 @@ int(1)
 
 enum(E::A)
 
-Error: Undefined class constant C::MISSING
+Error: Undefined constant C::MISSING

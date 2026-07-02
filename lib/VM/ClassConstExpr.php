@@ -186,7 +186,7 @@ final class ClassConstExpr
                     return;
                 }
             }
-            throw new \LogicException("Undefined class constant {$className}::{$constName}");
+            throw new \LogicException("Undefined constant {$className}::{$constName}");
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($classEntry, $constName, $frame->scope[$op->arg1])) {
             return;
@@ -221,7 +221,7 @@ final class ClassConstExpr
             }
             $display = $entry->constNames[$constName] ?? $constName;
             throw new \LogicException(
-                "Undefined class constant {$entry->name}::{$display}"
+                "Undefined constant {$entry->name}::{$display}"
             );
         }
         if (EnumCaseSupport::tryMaterializeEnumCaseConstantFetch($entry, $constName, $frame->scope[$op->arg1])) {
