@@ -17,7 +17,7 @@ try {
     exit(1);
 } catch (\TypeError $e) {
     $msg = $e->getMessage();
-    if (!str_contains($msg, 'not a valid directory resource')) {
+    if (!str_contains($msg, 'not a valid Directory resource')) {
         echo "fail: wrong message: {$msg}\n";
         exit(1);
     }

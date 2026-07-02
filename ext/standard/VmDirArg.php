@@ -15,7 +15,7 @@ final class VmDirArg
     public static function invalidDirTypeError(string $functionName): \TypeError
     {
         return new \TypeError(\sprintf(
-            '%s(): supplied resource is not a valid directory resource',
+            '%s(): supplied resource is not a valid Directory resource',
             $functionName
         ));
     }
