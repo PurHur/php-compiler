@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAsin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class asin extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\asin($num));
+        $frame->returnVar->float(VmMath::asin($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class asin extends Internal
             throw new \LogicException('asin() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'asin', 'float');
-        $fn = $context->lookupFunction('asin');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathAsin::invoke($context, $asFloat);
     }
 
 }
