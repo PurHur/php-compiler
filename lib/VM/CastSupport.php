@@ -32,6 +32,14 @@ final class CastSupport
 
         if (Variable::TYPE_OBJECT === $src->type) {
             $obj = $src->toObject();
+            if (ResourceSupport::isResourceObject($obj)) {
+                $result->newArray();
+                $copy = new Variable();
+                $copy->copyFrom($src);
+                $result->toArray()->append($copy);
+
+                return $result;
+            }
             if (EnumCaseSupport::isEnumCase($obj)) {
                 $result->newArray();
                 self::enumCaseObjectToArray($obj, $result->toArray());
