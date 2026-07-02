@@ -44,8 +44,9 @@ final class VmFsTempnamPure
 
     private static function randomSuffix(): string
     {
+        // php-src main/php_open_temporary_file.c — mkstemp uses six random suffix chars (#15138).
         try {
-            return \bin2hex(VmString::randomBytes(6));
+            return \bin2hex(VmString::randomBytes(3));
         } catch (\Throwable) {
             return \dechex(\random_int(0, 0xFFFFFF));
         }
