@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3744 |
-| Phase A inventory files (M2 ratio SSOT) | 3744 |
+| PHP files on vm.php path | 3745 |
+| Phase A inventory files (M2 ratio SSOT) | 3745 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10140 |
+| Source constructs flagged (warnings) | 10152 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -419,6 +419,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/RecursiveArrayIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/RecursiveCallbackFilterIteratorBuiltin.php` | 0 | 16 |
 | `ext/spl/RecursiveTreeIteratorBuiltin.php` | 0 | 6 |
+| `ext/spl/RegexIteratorBuiltin.php` | 0 | 12 |
 | `ext/spl/SplArraySerializeSupport.php` | 0 | 2 |
 | `ext/spl/SplArrayStorage.php` | 0 | 13 |
 | `ext/spl/SplClassConstants.php` | 0 | 2 |
@@ -6519,6 +6520,22 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ArgumentCountError (line 413)
 - new ArgumentCountError (line 478)
 - 24 class method(s)
+
+### `ext/spl/RegexIteratorBuiltin.php`
+
+**Warnings** (review for bootstrap subset):
+- new ClassEntry (line 55)
+- new RegexIteratorConstruct (line 74)
+- new RegexIteratorAccept (line 77)
+- new Variable (line 225)
+- new Variable (line 250)
+- new Variable (line 269)
+- new Variable (line 290)
+- new ArgumentCountError (line 403)
+- new ArgumentCountError (line 646)
+- new ArgumentCountError (line 701)
+- new ArgumentCountError (line 756)
+- 37 class method(s)
 
 ### `ext/spl/SplArraySerializeSupport.php`
 
