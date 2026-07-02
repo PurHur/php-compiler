@@ -226,6 +226,24 @@ final class ErrorReporter
     }
 
     /**
+     * Zend E_WARNING for undefined instance property read (zend_object_handlers.c, #14938).
+     */
+    public function undefinedPropertyRead(
+        string $className,
+        string $propertyName,
+        ?Context $context = null,
+        ?Frame $frame = null,
+        ?string $file = null
+    ): void {
+        $this->emitWarning(
+            sprintf('Undefined property: %s::$%s', $className, $propertyName),
+            $context,
+            $frame,
+            $file
+        );
+    }
+
+    /**
      * Zend E_WARNING for property read on non-object including null (zend_fetch.c, #5276, #10381).
      */
     public function propertyReadOnNonObject(

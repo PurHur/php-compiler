@@ -6348,7 +6348,15 @@ restart:
                         $result->indirect($propertyObject->allocateProperty($name));
                         break;
                     }
-                    throw new \LogicException('Undefined property access');
+                    $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                    $this->context->errors->undefinedPropertyRead(
+                        $propertyObject->class->name,
+                        $name,
+                        $this->context,
+                        $frame,
+                        $scriptFile
+                    );
+                    $result->null();
                     break;
                 case OpCode::TYPE_INIT_ARRAY:
                     $result = $frame->scope[$op->arg1];
