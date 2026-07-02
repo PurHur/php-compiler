@@ -1,0 +1,39 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\HtmlspecialcharsDecodeJitHelper;
+use PHPUnit\Framework\TestCase;
+
+/** htmlspecialchars_decode() JIT routes through HtmlspecialcharsDecodeJitHelper PHP not inline LLVM (#14820). */
+final class HtmlspecialcharsDecodeRuntimeShrinkTest extends TestCase
+{
+    public function testStringHtmlspecialcharsDecodeUsesJitHelperNotInlineLlvm(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsDecode.php');
+        $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper', $source);
+        $this->assertStringNotContainsString('countLoop', $source);
+        $this->assertStringNotContainsString('writeLoop', $source);
+        $this->assertStringNotContainsString('quoteBothFlag', $source);
+    }
+
+    public function testHtmlspecialcharsDecodeJitHelperDelegatesToVmString(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/HtmlspecialcharsDecodeJitHelper.php');
+        $this->assertStringContainsString('VmString::htmlspecialchars_decode', $source);
+
+        $input = '&lt;a&gt;&quot;b&#039;c';
+        $flags = ENT_QUOTES | ENT_HTML5;
+        $expected = \PHPCompiler\ext\standard\VmString::htmlspecialchars_decode($input, $flags);
+        $this->assertSame($expected, HtmlspecialcharsDecodeJitHelper::htmlspecialcharsDecodeArgv($input, $flags));
+    }
+
+    public function testSpineBundleIncludesHtmlspecialcharsDecodeJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('HtmlspecialcharsDecodeJitHelper.php', $spine);
+        $this->assertStringContainsString('StringHtmlspecialcharsDecode.php', $spine);
+    }
+}
