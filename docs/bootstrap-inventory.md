@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3689 |
-| Phase A inventory files (M2 ratio SSOT) | 3689 |
+| PHP files on vm.php path | 3692 |
+| Phase A inventory files (M2 ratio SSOT) | 3692 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10069 |
+| Source constructs flagged (warnings) | 10079 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -239,11 +239,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/libxml/BuiltinClasses.php` | 0 | 1 |
 | `ext/libxml/LibxmlConstants.php` | 0 | 1 |
 | `ext/libxml/LibxmlFunction.php` | 0 | 1 |
-| `ext/libxml/Module.php` | 0 | 7 |
-| `ext/libxml/VmLibxml.php` | 0 | 14 |
+| `ext/libxml/Module.php` | 0 | 10 |
+| `ext/libxml/VmLibxml.php` | 0 | 15 |
 | `ext/libxml/libxml_clear_errors.php` | 0 | 1 |
+| `ext/libxml/libxml_disable_entity_loader.php` | 0 | 2 |
 | `ext/libxml/libxml_get_errors.php` | 0 | 1 |
+| `ext/libxml/libxml_get_external_entity_loader.php` | 0 | 2 |
 | `ext/libxml/libxml_get_last_error.php` | 0 | 1 |
+| `ext/libxml/libxml_set_external_entity_loader.php` | 0 | 2 |
 | `ext/libxml/libxml_set_streams_context.php` | 0 | 2 |
 | `ext/libxml/libxml_use_internal_errors.php` | 0 | 2 |
 | `ext/lzf/JitLzf.php` | 0 | 1 |
@@ -5109,29 +5112,39 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new libxml_get_last_error (line 39)
 - new libxml_clear_errors (line 40)
 - new libxml_set_streams_context (line 41)
+- new libxml_disable_entity_loader (line 42)
+- new libxml_set_external_entity_loader (line 43)
+- new libxml_get_external_entity_loader (line 44)
 - 2 class method(s)
 
 ### `ext/libxml/VmLibxml.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 37)
-- new Variable (line 38)
-- new ClassEntry (line 39)
-- new ClassProperty (line 41)
-- new ClassProperty (line 42)
-- new ClassProperty (line 43)
-- new ClassProperty (line 44)
-- new ClassProperty (line 45)
+- new Variable (line 42)
+- new Variable (line 43)
+- new ClassEntry (line 44)
 - new ClassProperty (line 46)
-- new HashTable (line 73)
-- new Variable (line 86)
-- new ObjectEntry (line 137)
-- new Variable (line 146)
-- 9 class method(s)
+- new ClassProperty (line 47)
+- new ClassProperty (line 48)
+- new ClassProperty (line 49)
+- new ClassProperty (line 50)
+- new ClassProperty (line 51)
+- new Variable (line 104)
+- new HashTable (line 122)
+- new Variable (line 135)
+- new ObjectEntry (line 186)
+- new Variable (line 195)
+- 14 class method(s)
 
 ### `ext/libxml/libxml_clear_errors.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/libxml/libxml_disable_entity_loader.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/libxml/libxml_get_errors.php`
@@ -5139,9 +5152,21 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/libxml/libxml_get_external_entity_loader.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 20)
+- 1 class method(s)
+
 ### `ext/libxml/libxml_get_last_error.php`
 
 **Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/libxml/libxml_set_external_entity_loader.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 22)
 - 1 class method(s)
 
 ### `ext/libxml/libxml_set_streams_context.php`
