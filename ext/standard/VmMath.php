@@ -779,6 +779,12 @@ final class VmMath
         return \tan($num);
     }
 
+    /** sqrt() — square root (php-src ext/standard/math.c). */
+    public static function sqrt(float $num): float
+    {
+        return \sqrt($num);
+    }
+
     /** log10() — base-10 logarithm (php-src ext/standard/math.c). */
     public static function log10(float $num): float
     {

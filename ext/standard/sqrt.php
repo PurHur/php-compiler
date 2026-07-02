@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathSqrt;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class sqrt extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\sqrt($num));
+        $frame->returnVar->float(VmMath::sqrt($num));
     }
 
     public Context $context;
@@ -48,8 +49,7 @@ final class sqrt extends Internal
             throw new \LogicException('sqrt() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'sqrt', 'float');
-        $fn = $context->lookupFunction('sqrt');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathSqrt::invoke($context, $asFloat);
     }
 }
