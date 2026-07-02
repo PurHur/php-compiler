@@ -4048,4 +4048,40 @@ PHP;
         self::assertStringNotContainsString('bt_bad', $out);
         self::assertStringNotContainsString('ao_bad', $out);
     }
+
+    /** Issue #14828 — DateTimeZone::getTransitions(strtotime(), strtotime()) distinct arg slots. */
+    public function testDateTimeZoneGetTransitionsDualInlineStrtotimeUsesDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$tz = new DateTimeZone('Europe/Berlin');
+$trans = $tz->getTransitions(strtotime('2024-01-01'), strtotime('2024-06-01'));
+echo count($trans), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'datetimezone_get_transitions_inline.php');
+
+        $methodArgSendSlots = [];
+        $seenMethodInit = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $seenMethodInit = true;
+                continue;
+            }
+            if ($seenMethodInit && OpCode::TYPE_ARG_SEND === $op->type) {
+                $methodArgSendSlots[] = $op->arg1;
+            }
+            if ($seenMethodInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $methodArgSendSlots, 'method arg sends='.json_encode($methodArgSendSlots));
+        self::assertNotSame($methodArgSendSlots[0], $methodArgSendSlots[1]);
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("2\n", ob_get_clean());
+    }
 }
