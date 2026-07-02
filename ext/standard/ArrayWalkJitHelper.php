@@ -6,12 +6,13 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 /**
- * array_walk() / array_walk_recursive() string-builtin walks for compiled JIT/AOT modules (#14875, #14877, php-in-PHP).
+ * array_walk() / array_walk_recursive() walks for compiled JIT/AOT modules (#14875, #14877, #14933, php-in-PHP).
  *
- * SSOT shared with {@see array_walk} VM execute() internal-callback path
- * php-src: ext/standard/array.c — php_array_walk()
+ * SSOT shared with {@see array_walk} VM execute() paths via {@see VmArrayWalk}
+ * php-src: ext/standard/array.c — php_array_walk() / php_array_walk_recursive()
  */
 final class ArrayWalkJitHelper
 {
@@ -30,6 +31,42 @@ final class ArrayWalkJitHelper
     {
         $fn = VmInternalCall::resolveStringCallback($builtinName);
         if (!VmArrayWalk::walkArrayRecursiveString($table, $fn)) {
+            return;
+        }
+    }
+
+    public static function walkWithClosure(HashTable $table, Variable $closure, ?Variable $userdata): void
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'ArrayWalkJitHelper::walkWithClosure() requires an active VM context in this compiler build'
+            );
+        }
+        if (!VmArrayWalk::walkArrayFlatClosure(
+            $ctx,
+            $table,
+            VmClosureCall::resolve($closure),
+            $userdata
+        )) {
+            return;
+        }
+    }
+
+    public static function walkRecursiveWithClosure(HashTable $table, Variable $closure, ?Variable $userdata): void
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'ArrayWalkJitHelper::walkRecursiveWithClosure() requires an active VM context in this compiler build'
+            );
+        }
+        if (!VmArrayWalk::walkArrayRecursiveClosure(
+            $ctx,
+            $table,
+            VmClosureCall::resolve($closure),
+            $userdata
+        )) {
             return;
         }
     }

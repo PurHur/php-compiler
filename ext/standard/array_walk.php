@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
@@ -78,7 +77,7 @@ final class array_walk extends Internal
         }
         $userdata = 3 === $argc ? $args[2] : null;
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
-            return ArrayBuiltinHelper::walkInPlaceWithClosure($context, $args[0], $args[1], $userdata);
+            return ArrayWalkRuntime::walkInPlaceWithClosure($context, $args[0], $args[1], $userdata);
         }
         if (null !== $userdata) {
             throw new \LogicException(
