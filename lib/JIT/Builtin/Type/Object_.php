@@ -4173,7 +4173,7 @@ class Object_ extends Type {
         $this->emitDirectTraitConstAccessErrorIfNeeded($classId, $constName, $block);
         $key = strtolower($constName);
         if (!isset($this->classConstants[$classId][$key])) {
-            throw new \LogicException("Undefined class constant: {$constName}");
+            throw new \LogicException("Undefined constant: {$constName}");
         }
 
         if ($this->isEnumClassId($classId)) {

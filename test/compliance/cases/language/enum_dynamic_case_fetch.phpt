@@ -33,4 +33,4 @@ true
 backed name=A
 unit debug_type=Pure
 true
-invalid: Undefined class constant E::Z
+invalid: Undefined constant E::Z

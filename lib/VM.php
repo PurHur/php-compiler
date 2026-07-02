@@ -4576,7 +4576,7 @@ restart:
                                 $frame
                             )) {
                                 $catchFrame = $this->dispatchVmError(
-                                    "Undefined class constant {$classEntry->name}::{$memberNameRaw}",
+                                    "Undefined constant {$classEntry->name}::{$memberNameRaw}",
                                     $frame
                                 );
                                 if (null !== $catchFrame) {
@@ -4670,7 +4670,7 @@ restart:
                             $frame
                         )) {
                             $catchFrame = $this->dispatchVmError(
-                                "Undefined class constant {$className}::{$memberNameRaw}",
+                                "Undefined constant {$className}::{$memberNameRaw}",
                                 $frame
                             );
                             if (null !== $catchFrame) {
