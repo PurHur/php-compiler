@@ -247,6 +247,7 @@ if [[ "${run_code}" -eq 139 ]]; then
   bootstrap_spine_emit_crash_diag "${OUT}" "${OUT}"
 fi
 out="${run_out}"
+vm_driver_probe_ok=0
 if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   set +e
   probe_out="$(env PHP_COMPILER_VM_DRIVER_EXECUTE=1 "${OUT}" 2>&1)"
@@ -255,6 +256,7 @@ if ! grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
   if [[ "${probe_code}" -eq 0 ]] && grep -q 'vm driver ok' <<< "${probe_out}"; then
     echo "bootstrap-selfhost-lib-spine-smoke-link: bundle run failed but VM driver env probe OK (#8559)" >&2
     out="${probe_out}"
+    vm_driver_probe_ok=1
   else
     echo "bootstrap-selfhost-lib-spine-smoke-link: unexpected stdout (want compiler_lib_spine_smoke bundle OK)" >&2
     printf '%s\n' "${out}" >&2
@@ -264,7 +266,9 @@ fi
 want_sha="$(bootstrap_compiler_lib_spine_entry_sha)" || true
 if [[ -n "${want_sha:-}" ]]; then
   refresh_sidecar=0
-  if strings "${OUT}" 2>/dev/null | grep -q 'vm driver ok'; then
+  if [[ "${vm_driver_probe_ok}" == "1" ]]; then
+    refresh_sidecar=1
+  elif strings "${OUT}" 2>/dev/null | grep -q 'vm driver ok'; then
     refresh_sidecar=1
   elif [[ -x "${OUT}" ]] && grep -q 'compiler_lib_spine_smoke bundle OK' <<< "${out}"; then
     # Native full-spine emit succeeded; refresh sidecar even when env-probe strings
