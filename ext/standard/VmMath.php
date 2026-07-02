@@ -773,6 +773,12 @@ final class VmMath
         return \cos($num);
     }
 
+    /** tan() — tangent (php-src ext/standard/math.c). */
+    public static function tan(float $num): float
+    {
+        return \tan($num);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */
