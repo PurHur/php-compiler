@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3671 |
-| Phase A inventory files (M2 ratio SSOT) | 3671 |
+| PHP files on vm.php path | 3672 |
+| Phase A inventory files (M2 ratio SSOT) | 3672 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10004 |
+| Source constructs flagged (warnings) | 10005 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -180,6 +180,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/gettext/gettext.php` | 0 | 1 |
 | `ext/gettext/textdomain.php` | 0 | 2 |
 | `ext/hash/BuiltinClasses.php` | 0 | 1 |
+| `ext/hash/HashAlgosJitHelper.php` | 0 | 1 |
 | `ext/hash/HashContextDebugInfo.php` | 0 | 3 |
 | `ext/hash/HashFunction.php` | 0 | 2 |
 | `ext/hash/JitHashAlgos.php` | 0 | 1 |
@@ -4674,6 +4675,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/hash/BuiltinClasses.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/hash/HashAlgosJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -12785,7 +12791,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 - 1 closure(s)
 
 ### `ext/standard/VmPregReplaceCallback.php`
@@ -21640,7 +21646,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringHashAlgos.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 3 class method(s)
 
 ### `lib/JIT/Builtin/StringHashCrypto.php`
 
