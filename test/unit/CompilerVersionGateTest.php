@@ -164,9 +164,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsOverrideAttribute());
     }
 
-    public function testSupportsFinalGlobalTypedConstantsFalseOn84DevTarget(): void
+    public function testSupportsFinalGlobalTypedConstantsTrueOn84DevTarget(): void
     {
-        $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
+        $this->assertTrue(CompilerVersion::supportsFinalGlobalTypedConstants());
     }
 
     public function testVmRegistersStrIncrementOnForwardProfile(): void

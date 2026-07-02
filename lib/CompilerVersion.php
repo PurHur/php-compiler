@@ -80,7 +80,11 @@ final class CompilerVersion
     /** PHP 8.4+ `final const` at compile-unit scope (Zend/zend_compile.c, issue #9909, #10324). */
     public static function supportsFinalGlobalTypedConstants(): bool
     {
-        // 8.4.0-dev is below stable 8.4.0 for version_compare — matches Zend ≤8.3 until release (#10324).
+        // Forward profile on 8.4.0-dev — version_compare treats -dev below stable (#15165).
+        if (self::MAJOR_VERSION > 8 || (self::MAJOR_VERSION === 8 && self::MINOR_VERSION >= 4)) {
+            return true;
+        }
+
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
