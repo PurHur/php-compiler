@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Ast\DnfParenTypeRewriter;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +14,9 @@ final class DnfParenIntersectionTypeTest extends TestCase
 {
     public function testRewriterUnwrapsParenthesizedIntersectionParamType(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $source = '<?php function f((I1&I2) $o): void {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
         $this->assertSame('<?php function f(I1&I2 $o): void {}', $rewritten);
@@ -20,6 +24,9 @@ final class DnfParenIntersectionTypeTest extends TestCase
 
     public function testRewriterUnwrapsParenthesizedIntersectionReturnType(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $source = '<?php function f(): (I1&I2) {}';
         $rewritten = DnfParenTypeRewriter::rewrite($source);
         $this->assertSame('<?php function f(): I1&I2 {}', $rewritten);
@@ -107,6 +114,9 @@ PHP;
 
     public function testParenthesizedIntersectionParamAndReturnCompileAndRun(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php
@@ -138,6 +148,9 @@ PHP;
 
     public function testParenthesizedIntersectionParamRejectsIncompatibleValue(): void
     {
+        if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()) {
+            $this->markTestSkipped('parenthesized DNF intersection types disabled on Zend 8.2 reference profile');
+        }
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

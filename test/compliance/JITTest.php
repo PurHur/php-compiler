@@ -523,6 +523,17 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'clone_with_reference_profile')) {
                 continue;
             }
+            // 8.4-target reject gate; skipped when parenthesized DNF intersection types enabled (#14904).
+            if (CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
+                && str_contains($name, 'dnf_paren_intersection_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsParenthesizedDnfIntersectionTypes()
+                && str_contains($name, 'dnf_paren_intersection')
+                && !str_contains($name, 'dnf_paren_intersection_reference_profile')
+                && !str_contains($name, 'dnf_paren_union_only')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;
