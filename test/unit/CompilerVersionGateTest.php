@@ -44,6 +44,11 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNextafter());
+    }
+
     public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
