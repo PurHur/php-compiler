@@ -127,6 +127,18 @@ final class VmFsGlobTest extends TestCase
         $this->assertSame(['.'], $matches);
     }
 
+    /** Issue #14914 — directory path with trailing slash matches itself. */
+    public function testVmFsGlobTrailingSlashDirectoryMatchesSelf(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $dir = rtrim($tmp, '/').'/';
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($dir);
+        $this->assertSame([$dir], $matches);
+    }
+
     /** Issue #14881 — absolute directory path without double leading slash. */
     public function testVmFsGlobAbsoluteDirNormalizesLeadingSlash(): void
     {
