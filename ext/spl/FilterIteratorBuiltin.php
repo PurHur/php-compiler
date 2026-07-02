@@ -45,6 +45,8 @@ final class FilterIteratorBuiltin
         $entry->methodVisibility['__construct'] = $pub;
         $entry->methods['accept'] = new FilterIteratorAccept();
         $entry->methodVisibility['accept'] = $prot;
+        $entry->abstractMethods['accept'] = true;
+        $entry->isAbstract = true;
         foreach ([
             'rewind' => FilterIteratorRewind::class,
             'valid' => FilterIteratorValid::class,
