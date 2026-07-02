@@ -93,7 +93,8 @@ final class VmLibxml
         Context $ctx,
         array $record,
         ?Frame $frame = null,
-        ?string $file = null
+        ?string $file = null,
+        ?string $warningMessage = null
     ): void {
         if (self::$useInternalErrors) {
             self::$errors[] = $record;
@@ -102,7 +103,7 @@ final class VmLibxml
         }
 
         $ctx->errors->languageWarning(
-            $record['message'],
+            $warningMessage ?? $record['message'],
             '' !== $record['file'] ? $record['file'] : $file,
             $record['line'],
             $ctx,
