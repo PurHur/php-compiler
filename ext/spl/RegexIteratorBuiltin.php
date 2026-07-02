@@ -1,0 +1,773 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\spl;
+
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmPreg;
+use PHPCompiler\ext\standard\VmPregMatches;
+use PHPCompiler\ext\standard\VmReflection;
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Builtin\VmClassMethod;
+use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\Context;
+use PHPCompiler\VM\ObjectEntry;
+use PHPCompiler\VM\Variable;
+use PHPCfg\Func as CfgFunc;
+
+/**
+ * RegexIterator — regex filter over inner iterator (php-src ext/spl/spl_iterators.c; #15152).
+ */
+final class RegexIteratorBuiltin
+{
+    public const CLASS_LC = 'regexiterator';
+
+    public const USE_KEY = 1;
+
+    public const INVERT_MATCH = 2;
+
+    public const MATCH = 0;
+
+    public const GET_MATCH = 1;
+
+    public const ALL_MATCHES = 2;
+
+    public const SPLIT = 3;
+
+    public const REPLACE = 4;
+
+    /** @var array<int, array{regex: string, mode: int, flags: int, pregFlags: int, replacement: string, cached: ?Variable}> */
+    private static array $state = [];
+
+    public static function registerClass(Context $ctx): void
+    {
+        FilterIteratorBuiltin::registerClass($ctx);
+
+        if (isset($ctx->classes[self::CLASS_LC]) && self::classIsComplete($ctx->classes[self::CLASS_LC])) {
+            return;
+        }
+
+        $pub = CfgFunc::FLAG_PUBLIC;
+        $prot = CfgFunc::FLAG_PROTECTED;
+        $entry = isset($ctx->classes[self::CLASS_LC])
+            ? $ctx->classes[self::CLASS_LC]
+            : new ClassEntry('RegexIterator');
+        $entry->parentLc = FilterIteratorBuiltin::CLASS_LC;
+        foreach (['OuterIterator', 'Traversable', 'Iterator'] as $iface) {
+            if (isset($ctx->classes[strtolower($iface)])
+                && !\in_array($iface, $entry->interfaces, true)) {
+                $entry->interfaces[] = $iface;
+            }
+        }
+
+        SplClassConstants::registerIntConstants($entry, [
+            'USE_KEY' => self::USE_KEY,
+            'INVERT_MATCH' => self::INVERT_MATCH,
+            'MATCH' => self::MATCH,
+            'GET_MATCH' => self::GET_MATCH,
+            'ALL_MATCHES' => self::ALL_MATCHES,
+            'SPLIT' => self::SPLIT,
+            'REPLACE' => self::REPLACE,
+        ]);
+
+        $entry->constructor = new RegexIteratorConstruct();
+        $entry->methods['__construct'] = $entry->constructor;
+        $entry->methodVisibility['__construct'] = $pub;
+        $entry->methods['accept'] = new RegexIteratorAccept();
+        $entry->methodVisibility['accept'] = $prot;
+        foreach ([
+            'rewind' => RegexIteratorRewind::class,
+            'valid' => RegexIteratorValid::class,
+            'current' => RegexIteratorCurrent::class,
+            'key' => RegexIteratorKey::class,
+            'next' => RegexIteratorNext::class,
+            'getinneriterator' => RegexIteratorGetInnerIterator::class,
+            'getregex' => RegexIteratorGetRegex::class,
+            'getmode' => RegexIteratorGetMode::class,
+            'setmode' => RegexIteratorSetMode::class,
+            'getflags' => RegexIteratorGetFlags::class,
+            'setflags' => RegexIteratorSetFlags::class,
+            'getpregflags' => RegexIteratorGetPregFlags::class,
+            'setpregflags' => RegexIteratorSetPregFlags::class,
+        ] as $lc => $class) {
+            $entry->methods[$lc] = new $class();
+            $entry->methodVisibility[$lc] = $pub;
+        }
+        $entry->methodNames['getinneriterator'] = 'getInnerIterator';
+        $entry->methodNames['getregex'] = 'getRegex';
+        $entry->methodNames['getmode'] = 'getMode';
+        $entry->methodNames['setmode'] = 'setMode';
+        $entry->methodNames['getflags'] = 'getFlags';
+        $entry->methodNames['setflags'] = 'setFlags';
+        $entry->methodNames['getpregflags'] = 'getPregFlags';
+        $entry->methodNames['setpregflags'] = 'setPregFlags';
+
+        $entry->isInternal = true;
+        $ctx->classes[self::CLASS_LC] = $entry;
+    }
+
+    private static function classIsComplete(ClassEntry $entry): bool
+    {
+        return isset($entry->methods['rewind'], $entry->methods['accept'], $entry->methods['__construct']);
+    }
+
+    public static function initState(
+        ObjectEntry $object,
+        string $regex,
+        int $mode,
+        int $flags,
+        int $pregFlags
+    ): void {
+        self::validateMode($mode);
+        self::$state[$object->id] = [
+            'regex' => $regex,
+            'mode' => $mode,
+            'flags' => $flags,
+            'pregFlags' => $pregFlags,
+            'replacement' => '',
+            'cached' => null,
+        ];
+    }
+
+    public static function fetch(Frame $frame, ObjectEntry $object): void
+    {
+        $inner = SplDualIteratorStorage::inner($object);
+        while (true) {
+            $valid = SplDualIteratorStorage::callInner($frame, $inner, 'valid')->resolveIndirect();
+            if (Variable::TYPE_BOOLEAN !== $valid->type || !$valid->toBool()) {
+                self::clearCached($object);
+
+                return;
+            }
+            if (self::callAccept($frame, $object)) {
+                return;
+            }
+            self::clearCached($object);
+            SplDualIteratorStorage::callInner($frame, $inner, 'next');
+        }
+    }
+
+    public static function callAccept(Frame $frame, ObjectEntry $object): bool
+    {
+        $state = self::requireState($object);
+        $inner = SplDualIteratorStorage::inner($object);
+        $current = SplDualIteratorStorage::callInner($frame, $inner, 'current')->resolveIndirect();
+        if (Variable::TYPE_NULL === $current->type) {
+            return false;
+        }
+
+        $useKey = 0 !== ($state['flags'] & self::USE_KEY);
+        if ($useKey) {
+            $subjectVar = SplDualIteratorStorage::callInner($frame, $inner, 'key')->resolveIndirect();
+        } else {
+            if (Variable::TYPE_ARRAY === $current->type) {
+                return false;
+            }
+            $subjectVar = $current;
+        }
+
+        try {
+            $subject = VmReflection::stringArg($subjectVar, 'RegexIterator::accept()', 0);
+        } catch (\TypeError) {
+            return false;
+        }
+
+        $accepted = self::acceptSubject($frame, $object, $state, $subject, $useKey);
+        if (0 !== ($state['flags'] & self::INVERT_MATCH)) {
+            $accepted = !$accepted;
+        }
+
+        return $accepted;
+    }
+
+    /** @param array{regex: string, mode: int, flags: int, pregFlags: int, replacement: string, cached: ?Variable} $state */
+    private static function acceptSubject(
+        Frame $frame,
+        ObjectEntry $object,
+        array $state,
+        string $subject,
+        bool $useKey
+    ): bool {
+        $regex = $state['regex'];
+        $pregFlags = $state['pregFlags'];
+
+        return match ($state['mode']) {
+            self::MATCH => self::acceptMatch($regex, $subject, $pregFlags),
+            self::GET_MATCH => self::acceptGetMatch($object, $regex, $subject, $pregFlags),
+            self::ALL_MATCHES => self::acceptAllMatches($object, $regex, $subject, $pregFlags),
+            self::SPLIT => self::acceptSplit($object, $regex, $subject, $pregFlags),
+            self::REPLACE => self::acceptReplace($object, $regex, $subject, $pregFlags),
+            default => false,
+        };
+    }
+
+    private static function acceptMatch(string $regex, string $subject, int $pregFlags): bool
+    {
+        $result = VmPreg::pregMatch($regex, $subject, $matches, $pregFlags);
+
+        return false !== $result && $result > 0;
+    }
+
+    private static function acceptGetMatch(
+        ObjectEntry $object,
+        string $regex,
+        string $subject,
+        int $pregFlags
+    ): bool {
+        $matches = [];
+        $count = VmPreg::pregMatch($regex, $subject, $matches, $pregFlags);
+        if (false === $count || $count <= 0) {
+            self::clearCached($object);
+
+            return false;
+        }
+        $var = new Variable();
+        $var->array(VmPregMatches::hostMatchesToHashTable($matches, $pregFlags));
+        self::setCached($object, $var);
+
+        return true;
+    }
+
+    private static function acceptAllMatches(
+        ObjectEntry $object,
+        string $regex,
+        string $subject,
+        int $pregFlags
+    ): bool {
+        $matches = [];
+        $count = VmPreg::pregMatchAll(
+            $regex,
+            $subject,
+            $matches,
+            $pregFlags | StdlibConstants::PREG_PATTERN_ORDER
+        );
+        if (false === $count || $count <= 0) {
+            self::clearCached($object);
+
+            return false;
+        }
+        $var = new Variable();
+        $var->array(VmPregMatches::hostMatchAllToHashTable($matches, $pregFlags | StdlibConstants::PREG_PATTERN_ORDER));
+        self::setCached($object, $var);
+
+        return true;
+    }
+
+    private static function acceptSplit(
+        ObjectEntry $object,
+        string $regex,
+        string $subject,
+        int $pregFlags
+    ): bool {
+        $parts = VmPreg::pregSplit($regex, $subject, -1, $pregFlags);
+        if (false === $parts || \count($parts) <= 1) {
+            self::clearCached($object);
+
+            return false;
+        }
+        $var = new Variable();
+        $var->array(VmPreg::splitPartsToHashTable($parts, $pregFlags));
+        self::setCached($object, $var);
+
+        return true;
+    }
+
+    private static function acceptReplace(
+        ObjectEntry $object,
+        string $regex,
+        string $subject,
+        int $pregFlags
+    ): bool {
+        $replacement = self::replacementString($object);
+        $count = 0;
+        $result = VmPreg::pregReplace($regex, $replacement, $subject, -1, $count);
+        if (false === $result || !\is_string($result) || $count <= 0) {
+            self::clearCached($object);
+
+            return false;
+        }
+        $var = new Variable();
+        $var->string($result);
+        self::setCached($object, $var);
+
+        return true;
+    }
+
+    private static function replacementString(ObjectEntry $object): string
+    {
+        $prop = $object->getProperty('replacement');
+        $resolved = $prop->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return self::requireState($object)['replacement'];
+        }
+
+        return VmReflection::stringArg($resolved, 'RegexIterator::accept()', 0);
+    }
+
+    public static function currentValue(Frame $frame, ObjectEntry $object): Variable
+    {
+        $cached = self::cached($object);
+        if (null !== $cached) {
+            return $cached;
+        }
+
+        return SplDualIteratorStorage::currentSimple($frame, $object);
+    }
+
+    /** @return array{regex: string, mode: int, flags: int, pregFlags: int, replacement: string, cached: ?Variable} */
+    public static function requireState(ObjectEntry $object): array
+    {
+        if (!isset(self::$state[$object->id])) {
+            throw new \LogicException('RegexIterator state missing');
+        }
+
+        return self::$state[$object->id];
+    }
+
+    private static function cached(ObjectEntry $object): ?Variable
+    {
+        return self::$state[$object->id]['cached'] ?? null;
+    }
+
+    private static function setCached(ObjectEntry $object, Variable $value): void
+    {
+        self::$state[$object->id]['cached'] = $value;
+    }
+
+    private static function clearCached(ObjectEntry $object): void
+    {
+        if (isset(self::$state[$object->id])) {
+            self::$state[$object->id]['cached'] = null;
+        }
+    }
+
+    public static function validateMode(int $mode): void
+    {
+        if ($mode < self::MATCH || $mode > self::REPLACE) {
+            throw new \ValueError(
+                'RegexIterator::__construct(): Argument #3 ($mode) must be RegexIterator::MATCH, '
+                .'RegexIterator::GET_MATCH, RegexIterator::ALL_MATCHES, RegexIterator::SPLIT, '
+                .'or RegexIterator::REPLACE'
+            );
+        }
+    }
+
+    public static function setModeValue(ObjectEntry $object, int $mode): void
+    {
+        self::validateMode($mode);
+        self::$state[$object->id]['mode'] = $mode;
+    }
+
+    public static function setFlagsValue(ObjectEntry $object, int $flags): void
+    {
+        self::$state[$object->id]['flags'] = $flags;
+    }
+
+    public static function setPregFlagsValue(ObjectEntry $object, int $pregFlags): void
+    {
+        self::$state[$object->id]['pregFlags'] = $pregFlags;
+    }
+
+    public static function typeLabelFor(Variable $var): string
+    {
+        return match ($var->type) {
+            Variable::TYPE_NULL => 'null',
+            Variable::TYPE_BOOL => 'bool',
+            Variable::TYPE_INTEGER => 'int',
+            Variable::TYPE_DOUBLE => 'float',
+            Variable::TYPE_STRING => 'string',
+            Variable::TYPE_ARRAY => 'array',
+            Variable::TYPE_OBJECT => 'object',
+            default => 'mixed',
+        };
+    }
+}
+
+final class RegexIteratorConstruct extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('__construct');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::__construct()'
+        );
+        $argc = \count($frame->calledArgs);
+        if ($argc < 3) {
+            throw new \ArgumentCountError(
+                'RegexIterator::__construct() expects at least 2 arguments, '
+                .($argc - 1).' given'
+            );
+        }
+        if (null === $frame->vmContext) {
+            throw new \LogicException('RegexIterator::__construct() requires VM context');
+        }
+        $inner = SplDualIteratorStorage::resolveIterator(
+            $frame->vmContext,
+            $frame,
+            $frame->calledArgs[1]
+        );
+        SplDualIteratorStorage::initSimple($object, $inner);
+
+        $regex = VmReflection::stringArg($frame->calledArgs[2], 'RegexIterator::__construct() regex', 1);
+        $mode = RegexIteratorBuiltin::MATCH;
+        $flags = 0;
+        $pregFlags = 0;
+        if ($argc >= 4) {
+            $modeVar = $frame->calledArgs[3]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $modeVar->type) {
+                throw new \TypeError(
+                    'RegexIterator::__construct(): Argument #3 ($mode) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
+                );
+            }
+            $mode = $modeVar->toInt();
+        }
+        if ($argc >= 5) {
+            $flagsVar = $frame->calledArgs[4]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+                throw new \TypeError(
+                    'RegexIterator::__construct(): Argument #4 ($flags) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
+                );
+            }
+            $flags = $flagsVar->toInt();
+        }
+        if ($argc >= 6) {
+            $pregVar = $frame->calledArgs[5]->resolveIndirect();
+            if (Variable::TYPE_INTEGER !== $pregVar->type) {
+                throw new \TypeError(
+                    'RegexIterator::__construct(): Argument #5 ($preg_flags) must be of type int, '
+                    .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
+                );
+            }
+            $pregFlags = $pregVar->toInt();
+        }
+
+        RegexIteratorBuiltin::initState($object, $regex, $mode, $flags, $pregFlags);
+    }
+}
+
+final class RegexIteratorAccept extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('accept');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::accept()'
+        );
+        SplIteratorSupport::setReturnBool($frame, RegexIteratorBuiltin::callAccept($frame, $object));
+    }
+}
+
+final class RegexIteratorRewind extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('rewind');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::rewind()'
+        );
+        SplDualIteratorStorage::rewindSimple($frame, $object);
+        RegexIteratorBuiltin::fetch($frame, $object);
+    }
+}
+
+final class RegexIteratorNext extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('next');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::next()'
+        );
+        $inner = SplDualIteratorStorage::inner($object);
+        SplDualIteratorStorage::callInner($frame, $inner, 'next');
+        RegexIteratorBuiltin::fetch($frame, $object);
+    }
+}
+
+final class RegexIteratorValid extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('valid');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::valid()'
+        );
+        SplIteratorSupport::setReturnBool($frame, SplDualIteratorStorage::validSimple($frame, $object));
+    }
+}
+
+final class RegexIteratorCurrent extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('current');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::current()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, RegexIteratorBuiltin::currentValue($frame, $object));
+    }
+}
+
+final class RegexIteratorKey extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('key');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::key()'
+        );
+        SplIteratorSupport::copyReturnFrom($frame, SplDualIteratorStorage::keySimple($frame, $object));
+    }
+}
+
+final class RegexIteratorGetInnerIterator extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getInnerIterator');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::getInnerIterator()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->object(SplDualIteratorStorage::inner($object));
+    }
+}
+
+final class RegexIteratorGetRegex extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getRegex');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::getRegex()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->string(RegexIteratorBuiltin::requireState($object)['regex']);
+    }
+}
+
+final class RegexIteratorGetMode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getMode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::getMode()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(RegexIteratorBuiltin::requireState($object)['mode']);
+    }
+}
+
+final class RegexIteratorSetMode extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setMode');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::setMode()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'RegexIterator::setMode() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $modeVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $modeVar->type) {
+            throw new \TypeError(
+                'RegexIterator::setMode(): Argument #1 ($mode) must be of type int, '
+                .RegexIteratorBuiltin::typeLabelFor($modeVar).' given'
+            );
+        }
+        RegexIteratorBuiltin::setModeValue($object, $modeVar->toInt());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+final class RegexIteratorGetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::getFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(RegexIteratorBuiltin::requireState($object)['flags']);
+    }
+}
+
+final class RegexIteratorSetFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::setFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'RegexIterator::setFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $flagsVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $flagsVar->type) {
+            throw new \TypeError(
+                'RegexIterator::setFlags(): Argument #1 ($flags) must be of type int, '
+                .RegexIteratorBuiltin::typeLabelFor($flagsVar).' given'
+            );
+        }
+        RegexIteratorBuiltin::setFlagsValue($object, $flagsVar->toInt());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
+
+final class RegexIteratorGetPregFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('getPregFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::getPregFlags()'
+        );
+        if (null === $frame->returnVar) {
+            return;
+        }
+        $frame->returnVar->int(RegexIteratorBuiltin::requireState($object)['pregFlags']);
+    }
+}
+
+final class RegexIteratorSetPregFlags extends VmClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setPregFlags');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $object = SplIteratorSupport::receiverIsA(
+            $frame,
+            RegexIteratorBuiltin::CLASS_LC,
+            'RegexIterator::setPregFlags()'
+        );
+        if (\count($frame->calledArgs) < 2) {
+            throw new \ArgumentCountError(
+                'RegexIterator::setPregFlags() expects exactly 1 argument, '
+                .(\count($frame->calledArgs) - 1).' given'
+            );
+        }
+        $pregVar = $frame->calledArgs[1]->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $pregVar->type) {
+            throw new \TypeError(
+                'RegexIterator::setPregFlags(): Argument #1 ($preg_flags) must be of type int, '
+                .RegexIteratorBuiltin::typeLabelFor($pregVar).' given'
+            );
+        }
+        RegexIteratorBuiltin::setPregFlagsValue($object, $pregVar->toInt());
+        if (null !== $frame->returnVar) {
+            $frame->returnVar->null();
+        }
+    }
+}
