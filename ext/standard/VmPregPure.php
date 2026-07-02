@@ -221,39 +221,43 @@ final class VmPregPure
         }
 
         $parts = [];
-        $offset = 0;
         $count = 0;
         $maxParts = $limit <= 0 ? \PHP_INT_MAX : $limit;
         $noEmpty = 0 !== ($flags & StdlibConstants::PREG_SPLIT_NO_EMPTY);
         $delimCapture = 0 !== ($flags & StdlibConstants::PREG_SPLIT_DELIM_CAPTURE);
         $subjectLen = \strlen($subject);
         $fixedStart = self::fixedStartMatch($regex, $compiled['opts']);
+        $searchOffset = 0;
+        $lastMatchOffset = 0;
 
-        while ($offset <= $subjectLen && $count < $maxParts) {
+        while (true) {
             $ovector = self::engineMatch(
                 $compiled['ast'],
                 $compiled['groupNameToIndex'],
                 $subject,
-                $offset,
+                $searchOffset,
                 $compiled['opts'],
-                $fixedStart && 0 === $offset
+                $fixedStart && 0 === $searchOffset
             );
             if (false === $ovector) {
                 return false;
             }
             if (null === $ovector) {
-                $tail = \substr($subject, $offset);
-                if (!$noEmpty || '' !== $tail) {
-                    $parts[] = $offsetCapture ? [$tail, $offset] : $tail;
-                }
                 break;
             }
-            $matchStart = $ovector[0] ?? $offset;
-            $matchEnd = $ovector[1] ?? $offset;
-            $chunk = \substr($subject, $offset, $matchStart - $offset);
-            if (!$noEmpty || '' !== $chunk) {
-                $parts[] = $offsetCapture ? [$chunk, $offset] : $chunk;
-                ++$count;
+            $matchStart = $ovector[0] ?? $searchOffset;
+            $matchEnd = $ovector[1] ?? $searchOffset;
+            if (!$noEmpty || $matchStart !== $lastMatchOffset) {
+                $chunk = \substr($subject, $lastMatchOffset, $matchStart - $lastMatchOffset);
+                if (!$noEmpty || '' !== $chunk) {
+                    $parts[] = $offsetCapture ? [$chunk, $lastMatchOffset] : $chunk;
+                    ++$count;
+                    if ($count >= $maxParts) {
+                        self::$lastError = 0;
+
+                        return $parts;
+                    }
+                }
             }
             if ($delimCapture) {
                 $groupCount = (int) (\count($ovector) / 2);
@@ -268,23 +272,61 @@ final class VmPregPure
                     if (!$noEmpty || '' !== $delim) {
                         $parts[] = $offsetCapture ? [$delim, $gStart] : $delim;
                         ++$count;
+                        if ($count >= $maxParts) {
+                            self::$lastError = 0;
+
+                            return $parts;
+                        }
                     }
                 }
             }
-            $offset = $matchEnd;
-            if ($count >= $maxParts - 1) {
-                $tail = \substr($subject, $offset);
-                if (!$noEmpty || '' !== $tail) {
-                    $parts[] = $offsetCapture ? [$tail, $offset] : $tail;
+            $searchOffset = $lastMatchOffset = $matchEnd;
+            if ($searchOffset === $matchStart) {
+                if ($count >= $maxParts - 1) {
+                    break;
                 }
-                break;
+                if ($searchOffset < $subjectLen) {
+                    $searchOffset += self::splitAdvanceUnit($subject, $searchOffset, $compiled['opts']);
+                } else {
+                    break;
+                }
             }
             $fixedStart = false;
+        }
+
+        $tailStart = $lastMatchOffset;
+        if (!$noEmpty || $tailStart < $subjectLen) {
+            $tail = \substr($subject, $tailStart);
+            if ($count < $maxParts && (!$noEmpty || '' !== $tail)) {
+                $parts[] = $offsetCapture ? [$tail, $tailStart] : $tail;
+            }
         }
 
         self::$lastError = 0;
 
         return $parts;
+    }
+
+    /** php-src ext/pcre/php_pcre.c — calculate_unit_length() for zero-width split advance. */
+    private static function splitAdvanceUnit(string $subject, int $byteOffset, int $opts): int
+    {
+        if ($byteOffset >= \strlen($subject)) {
+            return 0;
+        }
+        if (0 !== ($opts & 0x00080000)) {
+            $charIndex = 0;
+            $pos = 0;
+            $charLen = VmString::utf8CharLength($subject);
+            while ($pos < $byteOffset && $charIndex < $charLen) {
+                $pos += \strlen(VmString::utf8CharSubstr($subject, $charIndex, 1));
+                ++$charIndex;
+            }
+            $ch = VmString::utf8CharSubstr($subject, $charIndex, 1);
+
+            return max(1, \strlen($ch));
+        }
+
+        return 1;
     }
 
     /**
