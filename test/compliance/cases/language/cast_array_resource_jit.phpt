@@ -1,5 +1,5 @@
 --TEST--
-Language: (array) cast on stream resource JIT (#15002, Zend/zend_operators.c)
+Language: (array) cast on stream resource JIT (#15012, Zend/zend_operators.c)
 --FILE--
 <?php
 $h = fopen('php://memory', 'r+');

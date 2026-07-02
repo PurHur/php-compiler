@@ -31,7 +31,7 @@ final class CastSupport
         }
 
         if (ResourceSupport::isVmResource($src)) {
-            return self::vmResourceArrayCast();
+            return self::vmResourceArrayCast($src);
         }
 
         if (Variable::TYPE_OBJECT === $src->type) {
@@ -68,13 +68,14 @@ final class CastSupport
         return $result;
     }
 
-    /** Zend convert_to_array(IS_RESOURCE) — one-element array with NULL at index 0 (#15002). */
-    public static function vmResourceArrayCast(): Variable
+    /** Zend convert_to_array(IS_RESOURCE) — one-element array with live/closed resource at index 0 (#15012, #15013). */
+    public static function vmResourceArrayCast(Variable $src): Variable
     {
         $result = new Variable();
         $result->newArray();
-        $null = new Variable(Variable::TYPE_NULL);
-        $result->toArray()->append($null);
+        $copy = new Variable();
+        $copy->copyFrom($src->resolveIndirect());
+        $result->toArray()->append($copy);
 
         return $result;
     }
