@@ -1,5 +1,5 @@
 --TEST--
-stdlib chmod()/mkdir() numeric-string mode coercion without strict_types (#14060, ext/standard/filestat.c)
+stdlib chmod()/mkdir() numeric-string mode coercion without strict_types (#15060, ext/standard/filestat.c)
 --FILE--
 <?php
 
@@ -20,6 +20,6 @@ echo $mk ? 'mkdir_ok' : 'mkdir_fail', "\n";
 echo $dmode, "\n";
 --EXPECT--
 chmod_ok
-644
+204
 mkdir_ok
-755
+341

@@ -218,7 +218,7 @@ final class VmFilestatArg
     }
 
     /**
-     * Weak-mode file mode coercion — numeric strings use zend_strtol base-0 (octal when leading 0).
+     * Weak-mode file mode coercion — Z_PARAM_LONG decimal cast for numeric strings (#15060, ext/standard/filestat.c).
      *
      * @throws \TypeError
      */
@@ -228,41 +228,7 @@ final class VmFilestatArg
         int $argIndex,
         string $paramName
     ): int {
-        $var = $var->resolveIndirect();
-        self::rejectEnumCaseIntArg($var, $function, $argIndex, $paramName);
-        if (Variable::TYPE_ARRAY === $var->type || Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::intTypeError(
-                $function,
-                $argIndex,
-                $paramName,
-                EnumCaseSupport::typeNameForVariable($var)
-            ));
-        }
-        switch ($var->type) {
-            case Variable::TYPE_INTEGER:
-                return $var->toInt();
-            case Variable::TYPE_BOOLEAN:
-                return $var->toBool() ? 1 : 0;
-            case Variable::TYPE_NULL:
-                return 0;
-            case Variable::TYPE_FLOAT:
-                return (int) $var->toFloat();
-            case Variable::TYPE_STRING:
-                $s = $var->toString();
-                if ('' === $s || !is_numeric($s)) {
-                    throw new \TypeError(self::intTypeError($function, $argIndex, $paramName, 'string'));
-                }
-                $base = VmMath::autodetectBase($s);
-
-                return (int) VmMath::baseToZval($s, $base);
-            default:
-                throw new \TypeError(self::intTypeError(
-                    $function,
-                    $argIndex,
-                    $paramName,
-                    self::vmTypeName($var->type)
-                ));
-        }
+        return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, $paramName);
     }
 
     private static function vmTypeName(int $type): string
