@@ -16248,6 +16248,15 @@ class Compiler {
             || $op instanceof Op\Expr\New_;
     }
 
+    /** php-cfg f(g(), h()) sibling producers feeding a multi-arg call (#9463, #14828). */
+    private function isSiblingMultiArgInlineCallConsumer(Op $consumer): bool
+    {
+        return $consumer instanceof Op\Expr\FuncCall
+            || $consumer instanceof Op\Expr\NsFuncCall
+            || $consumer instanceof Op\Expr\MethodCall
+            || $consumer instanceof Op\Expr\StaticCall;
+    }
+
     /**
      * @param list<Op> $children
      */
@@ -16881,8 +16890,7 @@ class Compiler {
             return false;
         }
         if (
-            !$consumer instanceof Op\Expr\FuncCall
-            && !$consumer instanceof Op\Expr\NsFuncCall
+            !$this->isSiblingMultiArgInlineCallConsumer($consumer)
         ) {
             return false;
         }
@@ -17092,6 +17100,13 @@ class Compiler {
 
                 continue;
             }
+            if ($next instanceof Op\Expr\MethodCall || $next instanceof Op\Expr\StaticCall) {
+                if ($this->isSiblingMultiArgFuncCallProducer($op, $next, $producerIndex, $j, $ops)) {
+                    return $j;
+                }
+
+                continue;
+            }
             if ($this->isSiblingInlineCallProducerExpr($next)) {
                 continue;
             }
@@ -17262,8 +17277,7 @@ class Compiler {
             return false;
         }
         if (
-            !$consumer instanceof Op\Expr\FuncCall
-            && !$consumer instanceof Op\Expr\NsFuncCall
+            !$this->isSiblingMultiArgInlineCallConsumer($consumer)
         ) {
             return false;
         }
@@ -17397,8 +17411,7 @@ class Compiler {
     ): bool {
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         if (
-            !$consumer instanceof Op\Expr\FuncCall
-            && !$consumer instanceof Op\Expr\NsFuncCall
+            !$this->isSiblingMultiArgInlineCallConsumer($consumer)
         ) {
             return false;
         }
@@ -17555,7 +17568,7 @@ class Compiler {
     ): bool {
         $consumer = $cfgChildren[$consumerIndex] ?? null;
         if (
-            (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall)
+            (null === $consumer || !$this->isSiblingMultiArgInlineCallConsumer($consumer))
             || !property_exists($consumer, 'args')
             || !is_array($consumer->args)
             || \count($consumer->args) < 2
@@ -19415,6 +19428,9 @@ class Compiler {
             return strtolower((string) $call->name->value);
         }
         if ($call instanceof Op\Expr\NsFuncCall && $call->name instanceof Operand\Literal) {
+            return strtolower((string) $call->name->value);
+        }
+        if ($call instanceof Op\Expr\MethodCall && $call->name instanceof Operand\Literal) {
             return strtolower((string) $call->name->value);
         }
 
