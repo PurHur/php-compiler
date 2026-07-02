@@ -293,6 +293,10 @@ patch_already_applied() {
       grep -q 'isEmptyListExpr' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q "Cannot use empty list" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
       ;;
+    php-cfg-list-mix-keyed-unkeyed.patch)
+      grep -q 'rejectMixedKeyedUnkeyedListAssignment' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q "Cannot mix keyed and unkeyed array entries in assignments" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-list-skip-slot.patch)
       grep -A3 'null === $item' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         | grep -q '++$logicalIndex'
@@ -4186,6 +4190,74 @@ PY
   echo "Applied php-cfg-empty-list-assignment.patch (overlay)"
 }
 
+apply_php_cfg_list_mix_keyed_unkeyed_overlay() {
+  local parser="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-list-mix-keyed-unkeyed.patch"; then
+    echo "Skip php-cfg-list-mix-keyed-unkeyed.patch (already applied)"
+    return 0
+  fi
+  python3 - "$parser" <<'PY'
+import sys
+from pathlib import Path
+
+parser_path = Path(sys.argv[1])
+text = parser_path.read_text()
+if 'rejectMixedKeyedUnkeyedListAssignment' in text:
+    raise SystemExit(0)
+old = """    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function parseListAssignment($expr, Operand $rhs)
+    {
+        if ($this->isEmptyListExpr($expr)) {
+            throw new \\CompileError('Cannot use empty list');
+        }
+
+        $attributes = $this->mapAttributes($expr);"""
+new = """    /**
+     * Zend zend_compile_list_assign — keyed vs unkeyed slots cannot mix (#14879).
+     *
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function rejectMixedKeyedUnkeyedListAssignment($expr): void
+    {
+        $isKeyed = false;
+        if (isset($expr->items[0]) && null !== $expr->items[0]) {
+            $isKeyed = null !== $expr->items[0]->key;
+        }
+        foreach ($expr->items as $item) {
+            if (null === $item || $item->unpack) {
+                continue;
+            }
+            if ($isKeyed) {
+                if (null === $item->key) {
+                    throw new \\CompileError('Cannot mix keyed and unkeyed array entries in assignments');
+                }
+            } elseif (null !== $item->key) {
+                throw new \\CompileError('Cannot mix keyed and unkeyed array entries in assignments');
+            }
+        }
+    }
+
+    /**
+     * @param Expr\\List_|Expr\\Array_ $expr
+     */
+    protected function parseListAssignment($expr, Operand $rhs)
+    {
+        if ($this->isEmptyListExpr($expr)) {
+            throw new \\CompileError('Cannot use empty list');
+        }
+        $this->rejectMixedKeyedUnkeyedListAssignment($expr);
+
+        $attributes = $this->mapAttributes($expr);"""
+if old not in text:
+    sys.stderr.write("php-cfg-list-mix-keyed-unkeyed: Parser.php anchor not found\n")
+    raise SystemExit(1)
+parser_path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-list-mix-keyed-unkeyed.patch (overlay)"
+}
+
 apply_php_cfg_spread_overlay() {
   local operand="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Operand.php"
   local array_op="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Expr/Array_.php"
@@ -5650,6 +5722,10 @@ PY
     apply_php_cfg_empty_list_assignment_overlay
     return $?
   fi
+  if [[ "$(basename "$patch")" == "php-cfg-list-mix-keyed-unkeyed.patch" ]]; then
+    apply_php_cfg_list_mix_keyed_unkeyed_overlay
+    return $?
+  fi
   if [[ "$(basename "$patch")" == "php-cfg-spread.patch" ]]; then
     apply_php_cfg_spread_overlay
     return $?
@@ -5849,6 +5925,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-assignop-coalesce.patch"
   apply_patch "$PATCH_DIR/php-cfg-list-destruct-byref.patch"
   apply_patch "$PATCH_DIR/php-cfg-empty-list-assignment.patch" || true
+  apply_patch "$PATCH_DIR/php-cfg-list-mix-keyed-unkeyed.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-skip-slot.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-list-spread.patch"
   apply_patch "$PATCH_DIR/php-cfg-first-class-callable.patch"
