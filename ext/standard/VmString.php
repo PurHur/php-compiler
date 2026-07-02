@@ -3405,6 +3405,12 @@ final class VmString
         return self::trimInt($string, $characterMask, self::TRIM_SIDE_RIGHT);
     }
 
+    /** php-src php_charmask() membership test — public for JIT helper (#14908). */
+    public static function charInTrimMask(string $ch, string $mask): bool
+    {
+        return self::charInMask($ch, $mask);
+    }
+
     public static function tryStringTrimModeBitmask(Variable $var): ?int
     {
         $var = $var->resolveIndirect();
