@@ -319,14 +319,12 @@ final class CompilerVersion
     /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse error (#14710, #12508).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 parse error (#14710, #12508, #15098).
      * php-src: Zend/zend_language_parser.y T_PRIVATE_SET; Zend/zend_compile.c ZEND_ACC_*_SET.
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        // Enable on the 8.4 development line; php-src treats this as core syntax in 8.4+.
-        // (Unlike some other gates that intentionally keep 8.4.0-dev matching Zend 8.2.)
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
