@@ -312,6 +312,18 @@ final class VmDom
         }
         DomRegistry::attach($entry, $state);
 
+        if ('' !== $qualifiedName) {
+            $rootVar = null !== $namespaceUri && '' !== $namespaceUri
+                ? self::createElementNS($ctx, $namespaceUri, $qualifiedName, $entry)
+                : self::createElement($ctx, $qualifiedName, $entry);
+            $root = $rootVar->toObject();
+            $state->childIds = [$root->id];
+            $entry->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($root);
+            self::linkChildToParent($root, $entry);
+            self::propagateDocumentId($root, $entry->id);
+            self::syncSubtree($ctx, $entry);
+        }
+
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
 
