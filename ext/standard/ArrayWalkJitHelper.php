@@ -8,7 +8,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
 /**
- * array_walk() string-builtin in-place walk for compiled JIT/AOT modules (#14875, php-in-PHP).
+ * array_walk() / array_walk_recursive() string-builtin walks for compiled JIT/AOT modules (#14875, #14877, php-in-PHP).
  *
  * SSOT shared with {@see array_walk} VM execute() internal-callback path
  * php-src: ext/standard/array.c — php_array_walk()
@@ -23,6 +23,14 @@ final class ArrayWalkJitHelper
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return;
             }
+        }
+    }
+
+    public static function walkRecursiveWithBuiltin(HashTable $table, string $builtinName): void
+    {
+        $fn = VmInternalCall::resolveStringCallback($builtinName);
+        if (!VmArrayWalk::walkArrayRecursiveString($table, $fn)) {
+            return;
         }
     }
 }
