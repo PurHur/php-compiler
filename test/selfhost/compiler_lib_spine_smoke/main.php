@@ -21,6 +21,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -531,6 +532,7 @@ require_once __DIR__.'/../../../ext/standard/ArraySumJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayUniqueJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayUnshiftJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ArrayValuesJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/AcosJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AsinJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AssertOptionsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/AttributeRegistryArgsJitHelper.php';
@@ -2658,6 +2660,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ListUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathBaseConvert.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathBaseConvertRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathAtan2.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MathAcos.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathAsin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathCeil.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathCos.php';
