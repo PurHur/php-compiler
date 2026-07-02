@@ -88,11 +88,7 @@ final class VmFilestatFailure
 
     public static function warnScandirFailed(Frame $frame, string $path): void
     {
-        self::triggerWarningWithHandlerFirst(
-            $frame,
-            \sprintf('scandir(%s): Failed to open directory: No such file or directory', $path)
-        );
-        self::triggerWarningWithHandlerFirst($frame, 'scandir(): (errno 2): No such file or directory');
+        self::warnPathOpenDirFailed($frame, 'scandir', $path);
     }
 
     public static function warnRmdirMissing(Frame $frame, string $path): void
