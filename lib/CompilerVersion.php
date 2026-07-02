@@ -206,12 +206,12 @@ final class CompilerVersion
     /**
      * PHP 8.4+ object class constants (`public const X = new Class(...)`).
      *
-     * Zend 8.4+ allows ZEND_CONST_EXPR_NEW (#12940, #14947). Gate uses `8.4` so `8.4.0-dev`
-     * forward profile matches stable 8.4+ (same as other 8.4 feature gates).
+     * Zend 8.4+ allows ZEND_CONST_EXPR_NEW (#12940, #14947). Gated on stable 8.4.0 so
+     * 8.4.0-dev reference profile matches Zend 8.2 compile-time rejection (#14985).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        return version_compare(self::VERSION, '8.4', '>=');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
