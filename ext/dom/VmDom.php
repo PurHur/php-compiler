@@ -139,6 +139,10 @@ final class VmDom
             $node->methods['getrootnode'] = new NodeGetRootNode();
             $node->methodVisibility['getrootnode'] = $pub;
         }
+        $node->methods['append'] = new NodeAppend();
+        $node->methodVisibility['append'] = $pub;
+        $node->methods['prepend'] = new NodePrepend();
+        $node->methodVisibility['prepend'] = $pub;
         $node->methods['lookupprefix'] = new NodeLookupPrefix();
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
@@ -1397,6 +1401,184 @@ final class VmDom
         self::syncSubtree($ctx, $fragment);
 
         return $fragment;
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function appendLiveStandardNodes(Context $ctx, ObjectEntry $parent, array $args): void
+    {
+        self::assertMutationParent($parent);
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::append()');
+            self::appendLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function prependLiveStandardNodes(Context $ctx, ObjectEntry $parent, array $args): void
+    {
+        self::assertMutationParent($parent);
+        for ($i = \count($args) - 1; $i >= 0; --$i) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $args[$i], 'DOMNode::prepend()');
+            self::prependLiveStandardChild($ctx, $parent, $child);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    public static function appendLiveStandardChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): void
+    {
+        if (self::isDocumentFragment($child)) {
+            self::appendFragmentChildren($ctx, $parent, $child);
+
+            return;
+        }
+        if (!self::isElement($child) && !self::isTextNode($child)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        self::assertSameDocument($parent, $child);
+        self::detachNodeIfAttached($ctx, $child);
+
+        $parentState = DomRegistry::state($parent);
+        if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
+            $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_NULL === $existing->type && self::isElement($child)) {
+                $parentState->childIds = [$child->id];
+                $parentState->documentElementName = DomRegistry::state($child)->nodeName;
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($child);
+                self::linkChildToParent($child, $parent);
+                self::propagateDocumentId($child, $parent->id);
+
+                return;
+            }
+            $parentState->childIds[] = $child->id;
+            self::linkChildToParent($child, $parent);
+            if (self::isElement($child)) {
+                self::propagateDocumentId($child, $parent->id);
+            }
+
+            return;
+        }
+
+        if (DomConstants::XML_ELEMENT_NODE !== $parentState->nodeType
+            && DomConstants::XML_DOCUMENT_FRAG_NODE !== $parentState->nodeType
+        ) {
+            throw new \DOMException('Hierarchy request error');
+        }
+
+        $parentState->childIds[] = $child->id;
+        self::linkChildToParent($child, $parent);
+    }
+
+    public static function prependLiveStandardChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): void
+    {
+        if (self::isDocumentFragment($child)) {
+            $fragState = DomRegistry::state($child);
+            $childIds = $fragState->childIds;
+            $fragState->childIds = [];
+            for ($i = \count($childIds) - 1; $i >= 0; --$i) {
+                $fragChild = DomRegistry::entry($childIds[$i]);
+                if (null === $fragChild) {
+                    continue;
+                }
+                self::linkChildToParent($fragChild, null);
+                self::prependLiveStandardChild($ctx, $parent, $fragChild);
+            }
+            self::syncSubtree($ctx, $child);
+
+            return;
+        }
+
+        $firstChild = null;
+        if (DomRegistry::has($parent) && [] !== DomRegistry::state($parent)->childIds) {
+            $firstChild = DomRegistry::entry(DomRegistry::state($parent)->childIds[0]);
+        }
+        self::insertBeforeLiveStandard($ctx, $parent, $child, $firstChild);
+    }
+
+    private static function insertBeforeLiveStandard(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ?ObjectEntry $refChild
+    ): void {
+        self::assertMutationParent($parent);
+        if (!self::isElement($newChild) && !self::isTextNode($newChild)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        self::assertSameDocument($parent, $newChild);
+        if (null !== $refChild) {
+            self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
+        }
+        self::detachNodeIfAttached($ctx, $newChild);
+        $parentState = DomRegistry::state($parent);
+        if (null === $refChild) {
+            if (DomConstants::XML_DOCUMENT_NODE === $parentState->nodeType) {
+                $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+                if (Variable::TYPE_NULL === $existing->type && self::isElement($newChild)) {
+                    $parentState->childIds = [$newChild->id];
+                    $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+                    $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+                    self::linkChildToParent($newChild, $parent);
+                    self::propagateDocumentId($newChild, $parent->id);
+
+                    return;
+                }
+            }
+            $parentState->childIds[] = $newChild->id;
+        } else {
+            $index = self::childIndex($parentState->childIds, $refChild->id);
+            if (null === $index) {
+                throw new \DOMException('Not found error');
+            }
+            \array_splice($parentState->childIds, $index, 0, [$newChild->id]);
+        }
+        self::linkChildToParent($newChild, $parent);
+        if (self::isDocument($parent) && self::isElement($newChild)) {
+            $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_NULL === $existing->type) {
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+                $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            }
+            self::propagateDocumentId($newChild, $parent->id);
+        }
+    }
+
+    private static function resolveLiveStandardAppendArg(
+        Context $ctx,
+        ObjectEntry $parent,
+        Variable $arg,
+        string $label
+    ): ObjectEntry {
+        $arg = $arg->resolveIndirect();
+        if (Variable::TYPE_STRING === $arg->type) {
+            $owner = self::ownerDocumentEntry($parent);
+            if (null === $owner && self::isDocument($parent)) {
+                $owner = $parent;
+            }
+
+            return self::createTextNode($ctx, $arg->toString(), $owner);
+        }
+        if (Variable::TYPE_OBJECT !== $arg->type) {
+            throw new \TypeError(\sprintf(
+                '%s expects argument to be of type DOMNode|string, %s given',
+                $label,
+                self::typeLabel($arg)
+            ));
+        }
+        $object = $arg->toObject();
+        if (!self::isDomNode($object)) {
+            throw new \TypeError(\sprintf(
+                '%s expects argument to be of type DOMNode|string, %s given',
+                $label,
+                $object->class->name
+            ));
+        }
+
+        return $object;
     }
 
     public static function saveXML(ObjectEntry $document, ?ObjectEntry $node = null): string
