@@ -385,6 +385,7 @@ final class VmDateTimeNative
                 ),
                 'microsecond' => $microsecond,
                 'timezone' => $useTz !== $tzName ? $useTz : null,
+                'utc_z' => str_ends_with($time, 'Z'),
             ];
         }
         if (1 === preg_match(
@@ -616,8 +617,9 @@ final class VmDateTimeNative
 
         try {
             $parsed = self::parseDateTime($date, $tzName);
+            $result = self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
 
-            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+            return self::applyParseTimezoneMetadata($result, $parsed, $date);
         } catch (NativeDateMalformedStringException) {
             return self::parseUnrecognizedDateString($date);
         }
@@ -762,7 +764,8 @@ final class VmDateTimeNative
         $hour = false === $matched['hour'] ? 0 : $matched['hour'];
         $minute = false === $matched['minute'] ? 0 : $matched['minute'];
         $second = false === $matched['second'] ? 0 : $matched['second'];
-        $microsecond = (int) \round(($matched['fraction'] ?? 0.0) * 1_000_000);
+        $fraction = $matched['fraction'] ?? false;
+        $microsecond = false === $fraction ? 0 : (int) \round($fraction * 1_000_000);
         $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
             ? $matched['timezone']
             : $tzName;
@@ -1081,7 +1084,7 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float,
+     *   fraction: float|false,
      *   timezone?: string
      * }|false
      */
@@ -1094,6 +1097,7 @@ final class VmDateTimeNative
         }
         $pos = 0;
         $timeLen = \strlen($time);
+        $formatHasFractionToken = false;
         $components = [
             'year' => false,
             'month' => false,
@@ -1101,7 +1105,7 @@ final class VmDateTimeNative
             'hour' => false,
             'minute' => false,
             'second' => false,
-            'fraction' => 0.0,
+            'fraction' => false,
         ];
         $formatLen = \strlen($format);
         for ($i = 0; $i < $formatLen; ++$i) {
@@ -1201,6 +1205,7 @@ final class VmDateTimeNative
 
                     break;
                 case 'u':
+                    $formatHasFractionToken = true;
                     $digits = self::readDigits($time, $pos, 1, 6);
                     if (false === $digits) {
                         return false;
@@ -1281,6 +1286,9 @@ final class VmDateTimeNative
                 }
             }
         }
+        if (!$formatHasFractionToken) {
+            $components['fraction'] = false;
+        }
 
         return $components;
     }
@@ -1293,10 +1301,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function warnInvalidCalendarComponents(array $components): array
     {
@@ -1320,10 +1328,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function normalizeMatchedComponents(array $components): array
     {
@@ -1501,6 +1509,72 @@ final class VmDateTimeNative
             $result['warnings'] = $warnings;
         }
         $result['is_localtime'] = true;
+
+        return self::withZoneTypeZeroMetadata($result);
+    }
+
+    /**
+     * php-src timelib — numeric offset suffix metadata for date_parse() (#14806).
+     *
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withOffsetTimezoneMetadata(array $result, int $offsetSeconds): array
+    {
+        $result['zone_type'] = 1;
+        $result['zone'] = $offsetSeconds;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withUtcTimezoneMetadata(array $result): array
+    {
+        $result['zone_type'] = 2;
+        $result['zone'] = 0;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withZoneTypeZeroMetadata(array $result): array
+    {
+        $result['zone_type'] = 0;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @param array{timestamp: int, microsecond: int, timezone?: string|null, utc_z?: bool} $parsed
+     *
+     * @return array<string, mixed>
+     */
+    private static function applyParseTimezoneMetadata(array $result, array $parsed, string $date): array
+    {
+        if (!empty($parsed['utc_z'])) {
+            return self::withUtcTimezoneMetadata($result);
+        }
+        $embedded = $parsed['timezone'] ?? null;
+        if (\is_string($embedded) && '' !== $embedded) {
+            $offset = self::parseNumericTimezoneOffset($embedded);
+            if (null !== $offset) {
+                return self::withOffsetTimezoneMetadata($result, $offset);
+            }
+
+            return self::withNamedTimezoneMetadata($result, $embedded);
+        }
 
         return $result;
     }

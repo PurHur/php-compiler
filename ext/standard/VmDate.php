@@ -322,6 +322,9 @@ final class VmDate
         if (Variable::TYPE_INTEGER === $var->type) {
             return $var->toInt();
         }
+        if (Variable::TYPE_FLOAT === $var->type) {
+            return $var->toInt();
+        }
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(self::nullableTimestampTypeError(
                 $function,
@@ -542,6 +545,12 @@ final class VmDate
         self::hashSetBool($ht, 'is_localtime', $result['is_localtime']);
         if (isset($result['zone_type'])) {
             self::hashSetLong($ht, 'zone_type', $result['zone_type']);
+        }
+        if (isset($result['zone'])) {
+            self::hashSetLong($ht, 'zone', $result['zone']);
+        }
+        if (isset($result['is_dst'])) {
+            self::hashSetBool($ht, 'is_dst', $result['is_dst']);
         }
         if (isset($result['tz_id'])) {
             self::hashSetString($ht, 'tz_id', $result['tz_id']);
