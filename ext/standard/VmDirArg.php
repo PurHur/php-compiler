@@ -23,6 +23,10 @@ final class VmDirArg
     public static function requireDirHandle(Variable $v, string $functionName, int $argNum = 1): int
     {
         $v = $v->resolveIndirect();
+        if (Variable::TYPE_NULL === $v->type) {
+            // php-src ext/standard/dir.c — _php_stream_free() on null handle
+            throw new \TypeError('No resource supplied');
+        }
         if (EnumCaseSupport::isEnumCaseVariable($v)) {
             throw new \TypeError(\sprintf(
                 '%s(): Argument #%d ($dir_handle) must be of type resource, %s given',
