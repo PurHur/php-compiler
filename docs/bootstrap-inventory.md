@@ -6801,7 +6801,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayWalkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/AssertOptionsJitHelper.php`
 
@@ -11893,7 +11893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatFailure.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/VmFloatDtoa.php`
 
@@ -19972,7 +19972,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayWalkRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/AssertFail.php`
 
