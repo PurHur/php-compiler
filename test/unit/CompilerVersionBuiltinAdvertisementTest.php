@@ -64,9 +64,9 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
     }
 
-    public function testFpowAdvertisedOnForwardProfile(): void
+    public function testFpowWithheldOnReferenceProfileUntilStable84(): void
     {
-        $this->assertTrue(CompilerVersion::supportsFpow());
+        $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
     public function testNextafterWithheldOnReferenceProfileUntilStable84(): void
@@ -74,15 +74,24 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsNextafter());
     }
 
-    public function testRoundingModeEnumAdvertisedOnForwardProfile(): void
+    public function testRoundingModeEnumWithheldOnReferenceProfileUntilStable84(): void
     {
-        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
+        $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testVmRegistersRoundingModeOnForwardProfile(): void
+    public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->classes['roundingmode']));
+        $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
+    }
+
+    public function testVmDoesNotRegisterFpowOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['fpow', 'fmin', 'fmax'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
     }
 
     public function testRandomIntervalBoundaryWithheldOnReferenceProfile(): void
