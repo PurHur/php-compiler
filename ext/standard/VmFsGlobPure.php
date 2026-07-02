@@ -21,6 +21,10 @@ final class VmFsGlobPure
      */
     public static function glob(string $pattern, int $flags = 0)
     {
+        if ('.' === $pattern) {
+            return ['.'];
+        }
+
         $onlyDir = 0 !== ($flags & StdlibConstants::GLOB_ONLYDIR);
         $libcFlags = $flags & StdlibConstants::GLOB_AVAILABLE_FLAGS & ~StdlibConstants::GLOB_ONLYDIR;
         $globMark = 0 !== ($libcFlags & StdlibConstants::GLOB_MARK);
@@ -56,7 +60,7 @@ final class VmFsGlobPure
             $matches = self::applyGlobMark($matches);
         }
 
-        return $matches;
+        return array_map(self::normalizePath(...), $matches);
     }
 
     /**
@@ -93,7 +97,7 @@ final class VmFsGlobPure
             if (!VmFnmatch::match($filePattern, $entry, self::fnmatchFlagsFromGlob($libcFlags))) {
                 continue;
             }
-            $full = ('.' === $dir) ? $entry : ($dir.'/'.$entry);
+            $full = self::joinPath($dir, $entry);
             if ($onlyDir && !self::pathIsDir($full)) {
                 continue;
             }
@@ -238,5 +242,30 @@ final class VmFsGlobPure
         }
 
         return ($stat['mode'] & 0xF000) === 0x4000;
+    }
+
+    private static function joinPath(string $dir, string $entry): string
+    {
+        if ('.' === $dir) {
+            return $entry;
+        }
+        if ('/' === $dir) {
+            return '/'.$entry;
+        }
+        if (str_ends_with($dir, '/')) {
+            return $dir.$entry;
+        }
+
+        return $dir.'/'.$entry;
+    }
+
+    /** Collapse duplicate leading slashes (Zend ext/standard/dir.c path normalization). */
+    private static function normalizePath(string $path): string
+    {
+        if (str_starts_with($path, '//') && !str_starts_with($path, '///')) {
+            return '/'.ltrim($path, '/');
+        }
+
+        return $path;
     }
 }
