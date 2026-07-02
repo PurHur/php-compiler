@@ -38,6 +38,7 @@ final class preg_filter extends Internal
         }
         $pattern = VmReflection::stringArg($frame->calledArgs[0], 'preg_filter() pattern', 0);
         $replacement = VmReflection::stringArg($frame->calledArgs[1], 'preg_filter() replacement', 1);
+        VmPregFailure::warnPatternCompileFailure($frame, 'preg_filter', $pattern);
         $subjectVar = VmPreg::requireStringOrArraySubject(
             $frame->calledArgs[2],
             'preg_filter',
