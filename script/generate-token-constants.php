@@ -43,6 +43,10 @@ foreach ($tokenizer as $name => $value) {
 
 $idToName = [];
 foreach ($nameToId as $name => $id) {
+    // TOKEN_PARSE (id 1) is not a named lexer token in tokenizer_data.c (#14925).
+    if ('TOKEN_PARSE' === $name) {
+        continue;
+    }
     if (isset($canonicalIdToName[$id])) {
         $idToName[$id] = $canonicalIdToName[$id];
     } elseif (!isset($idToName[$id])) {
