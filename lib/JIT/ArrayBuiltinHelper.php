@@ -3992,14 +3992,8 @@ final class ArrayBuiltinHelper
 
         $context->builder->positionAtEnd($walkBlock);
         $elem = HashTableHelper::readIndexedToValueBox($context, $src, $idx);
-        $mapped = $handler->call($context, $elem);
-        self::storeMappedAtIndex(
-            $context,
-            $src,
-            $idx,
-            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
-            $resultType
-        );
+        // php-src ext/standard/array.c — array_walk discards internal callback retval (#14830).
+        $handler->call($context, $elem);
         $context->builder->branch($advance);
 
         $context->builder->positionAtEnd($skip);
@@ -4328,13 +4322,8 @@ final class ArrayBuiltinHelper
         $elemSlot = JitValueBox::alloc($context);
         JitValueBox::copyFromPointer($context, $elemSlot, $valEntry);
         $elem = new Variable($context, Variable::TYPE_VALUE, Variable::KIND_VARIABLE, $elemSlot);
-        $mapped = $handler->call($context, $elem);
-        self::storeMappedVariableToValuePtr(
-            $context,
-            $valEntry,
-            new Variable($context, $resultType, Variable::KIND_VALUE, $mapped),
-            $resultType
-        );
+        // php-src ext/standard/array.c — array_walk_recursive discards internal callback retval (#14830).
+        $handler->call($context, $elem);
         $context->builder->branch($doneBlock);
 
         $context->builder->positionAtEnd($doneBlock);

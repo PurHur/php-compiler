@@ -12,15 +12,15 @@ use PHPUnit\Framework\TestCase;
 final class ArrayWalkBuiltinTest extends TestCase
 {
     private const CODE = <<<'PHP'
-$items = ['a', 'b'];
-$ok = array_walk($items, 'strtoupper');
+$items = [' a ', ' b '];
+$ok = array_walk($items, 'trim');
 echo $ok ? 'ok' : 'fail', "\n";
 echo $items[0], '|', $items[1], "\n";
 PHP;
 
     private const EXPECT = <<<'TXT'
 ok
-A|B
+ a | b 
 TXT;
 
     public function testVmMatchesPhpSubset(): void

@@ -3,7 +3,9 @@ stdlib array_walk() string callback
 --FILE--
 <?php
 $items = ['a', 'b', 'c'];
-$ok = array_walk($items, 'strtoupper');
+$ok = array_walk($items, function (&$v) {
+    $v = strtoupper($v);
+});
 echo $ok ? 'ok' : 'fail', "\n";
 echo $items[0], '|', $items[1], '|', $items[2], "\n";
 --EXPECT--
