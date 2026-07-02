@@ -16,7 +16,7 @@ echo "\n";
 var_export(is_iterable($o));
 echo "\n";
 echo iterator_count($o), "\n";
-echo iterator_apply($o, fn ($v) => $v * 2, []), "\n";
+echo iterator_apply($o, fn () => true, []), "\n";
 var_export(is_iterable('x'));
 echo "\n";
 --EXPECT--

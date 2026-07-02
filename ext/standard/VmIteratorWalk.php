@@ -64,8 +64,8 @@ final class VmIteratorWalk
         $count = 0;
         $iterable = $iterable->resolveIndirect();
         if (Variable::TYPE_ARRAY === $iterable->type) {
-            foreach ($iterable->toArray()->iterateKeyed(true) as [$key, $value]) {
-                if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+            foreach ($iterable->toArray()->iterateKeyed(true) as $pair) {
+                if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
                 ++$count;
@@ -77,11 +77,7 @@ final class VmIteratorWalk
             $gen = $iterable->toObject()->generatorState;
             $gen->rewind();
             while ($vm->resumeGenerator($gen)) {
-                $value = new Variable();
-                $value->copyFrom($gen->currentValue);
-                $key = new Variable();
-                $key->copyFrom($gen->currentKey);
-                if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+                if (!self::invokeApplyCallback($frame, $callback, $params)) {
                     break;
                 }
                 ++$count;
@@ -93,14 +89,15 @@ final class VmIteratorWalk
         $object = ForeachIterator::resolveTraversableObject($vm, $frame, $iterable);
         $vm->invokeForeachInstanceMethod($frame, $object, 'rewind');
         while ($vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
-            $value = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
-            $key = $vm->invokeForeachInstanceMethod($frame, $object, 'key')->resolveIndirect();
-            if (!self::invokeApplyCallback($frame, $callback, $value, $key, $params)) {
+            if (!self::invokeApplyCallback($frame, $callback, $params)) {
                 break;
             }
             ++$count;
-            $before = $value;
+            $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
+            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+                break;
+            }
             $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             if (self::vmValuesEqual($before, $after) && $count > 0) {
                 break;
@@ -141,8 +138,6 @@ final class VmIteratorWalk
     private static function invokeApplyCallback(
         Frame $frame,
         Variable $callback,
-        Variable $value,
-        Variable $key,
         array $params
     ): bool {
         $callback = $callback->resolveIndirect();
@@ -151,7 +146,7 @@ final class VmIteratorWalk
                 throw new \LogicException('iterator_apply() requires VM context in this compiler build');
             }
             $closure = VmClosureCall::resolve($callback);
-            $result = VmClosureCall::invoke($frame->vmContext, $closure, $value, $key, ...$params);
+            $result = VmClosureCall::invoke($frame->vmContext, $closure, ...$params);
 
             return self::applyCallbackTruthy($result);
         }
@@ -163,13 +158,13 @@ final class VmIteratorWalk
         $name = $callback->toString();
         try {
             $fn = VmInternalCall::resolveStringCallback($name);
-            $result = VmInternalCall::invoke($fn, $value, $key, ...$params);
+            $result = VmInternalCall::invoke($fn, ...$params);
         } catch (\LogicException) {
             if (null === $frame->vmContext) {
                 throw new \LogicException('iterator_apply() requires VM context in this compiler build');
             }
             $fn = VmUserCall::resolveStringCallback($frame->vmContext, $name);
-            $result = VmUserCall::invokeArgs($frame->vmContext, $fn, $value, $key, ...$params);
+            $result = VmUserCall::invokeArgs($frame->vmContext, $fn, ...$params);
         }
 
         return self::applyCallbackTruthy($result);
@@ -211,6 +206,9 @@ final class VmIteratorWalk
             $before = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             ++$count;
             $vm->invokeForeachInstanceMethod($frame, $object, 'next');
+            if (!$vm->invokeForeachInstanceMethod($frame, $object, 'valid')->toBool()) {
+                break;
+            }
             $after = $vm->invokeForeachInstanceMethod($frame, $object, 'current')->resolveIndirect();
             if (self::vmValuesEqual($before, $after) && $count > 0) {
                 break;

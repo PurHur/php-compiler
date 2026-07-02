@@ -11,6 +11,6 @@ class C implements Iterator {
     public function next(): void { ++$this->i; }
 }
 $o = new C();
-echo iterator_apply($o, fn ($v) => $v + 1, [$o]), "\n";
+echo iterator_apply($o, fn ($c) => $c->current() + 1, [$o]), "\n";
 --EXPECT--
 2
