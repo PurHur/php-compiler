@@ -548,6 +548,12 @@ final class Variable {
             case self::TYPE_ARRAY:
                 return $this->toArray()->getNumElements() > 0 ? 1.0 : 0.0;
             case self::TYPE_OBJECT:
+                if (ResourceSupport::isResourceObject($this->toObject())) {
+                    $handle = ResourceSupport::resolveHandle($this);
+                    if (null !== $handle) {
+                        return (float) $handle;
+                    }
+                }
                 if (EnumCaseSupport::isEnumCase($this->toObject())) {
                     $enumFloat = EnumCaseSupport::tryCastToFloat($this, $vm?->context);
                     if (null !== $enumFloat) {

@@ -10,18 +10,24 @@ use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** (array) cast on VM resources matches Zend one-element NULL array (#15002). */
+/** (array) cast on VM resources embeds the resource zval at index 0 (#15012, #15013). */
 final class ResourceArrayCastTest extends TestCase
 {
-    public function testCastSupportVmResourceArrayCastShape(): void
+    public function testCastSupportVmResourceArrayCastEmbedsSource(): void
     {
-        $cast = CastSupport::vmResourceArrayCast();
+        $runtime = new \PHPCompiler\Runtime();
+        $ctx = $runtime->vmContext;
+        $src = new Variable();
+        ResourceSupport::wrap($src, 42, ResourceState::KIND_STREAM, $ctx);
+
+        $cast = CastSupport::vmResourceArrayCast($src);
         $this->assertSame(Variable::TYPE_ARRAY, $cast->type);
         $ht = $cast->toArray();
         $this->assertSame(1, $ht->getNumElements());
         $elem = $ht->findIndex(0);
         $this->assertNotNull($elem);
-        $this->assertSame(Variable::TYPE_NULL, $elem->resolveIndirect()->type);
+        $this->assertTrue(ResourceSupport::isVmResource($elem->resolveIndirect()));
+        $this->assertSame(42, ResourceSupport::resolveHandle($elem->resolveIndirect()));
     }
 
     public function testCastSupportRoutesStreamResourceThroughVmResourceBranch(): void
@@ -35,6 +41,6 @@ final class ResourceArrayCastTest extends TestCase
         $this->assertSame(1, $cast->toArray()->getNumElements());
         $elem = $cast->toArray()->findIndex(0);
         $this->assertNotNull($elem);
-        $this->assertSame(Variable::TYPE_NULL, $elem->resolveIndirect()->type);
+        $this->assertTrue(ResourceSupport::isVmResource($elem->resolveIndirect()));
     }
 }
