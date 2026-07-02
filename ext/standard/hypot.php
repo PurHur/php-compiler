@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathHypot;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -40,7 +41,7 @@ final class hypot extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\hypot($x, $y));
+        $frame->returnVar->float(VmMath::hypot($x, $y));
     }
 
     public Context $context;
@@ -52,9 +53,8 @@ final class hypot extends Internal
             return $context->getTypeFromString('double')->constReal(0.0);
         }
         [$x, $y] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'hypot', 'x', 'y', 'float');
-        $fn = $context->lookupFunction('hypot');
 
-        return $context->builder->call($fn, $x, $y);
+        return MathHypot::invoke($context, $x, $y);
     }
 
 
