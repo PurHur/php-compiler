@@ -4,19 +4,31 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\HashAlgosRegistry;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPCompiler\JIT\JitNestedHelperCoerce;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * LLVM implementation of __compiler_hash_algos (issue #11463).
+ * JIT/AOT link for __compiler_hash_algos via HashAlgosJitHelper PHP (#14909).
  *
- * php-src: ext/hash/hash.c — php_hash_algos().
- * VM semantics: ext/standard/VmHash::algos().
+ * Replaces ~88 LOC inline LLVM registry walk.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmHash::algos()}
+ * php-src: ext/hash/hash.c — php_hash_algos()
  */
 final class StringHashAlgos
 {
+    private const ABI_HASH_ALGOS = '__compiler_hash_algos';
+
+    private const HELPER_PATH = '/ext/hash/HashAlgosJitHelper.php';
+
+    private const ALGOS_HELPER = 'PHPCompiler\\ext\\hash\\HashAlgosJitHelper::algosArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::ALGOS_HELPER,
+    ];
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -24,65 +36,34 @@ final class StringHashAlgos
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__compiler_hash_algos');
+        $probe = $context->module->getNamedFunction(self::ABI_HASH_ALGOS);
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
-            $context->registerFunction('__compiler_hash_algos', $probe);
+            $context->registerFunction(self::ABI_HASH_ALGOS, $probe);
 
             return;
         }
 
+        JitVmHelperLink::ensureCompiled($context, self::HELPER_PATH, self::COMPILED_HELPERS, '#14909');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, self::ALGOS_HELPER, '#14909');
+
         $htPtr = $context->getTypeFromString('__hashtable__*');
-        $ft = $context->context->functionType($htPtr, false);
         $fn = null !== $probe
             ? $probe
-            : $context->module->addFunction('__compiler_hash_algos', $ft);
-        self::implementHashAlgos($context, $fn);
-        $context->registerFunction('__compiler_hash_algos', $fn);
-    }
-
-    private static function implementHashAlgos(Context $context, LlvmFunction $fn): void
-    {
-        $entry = $fn->appendBasicBlock('hash_algos_entry');
-        $context->builder->positionAtEnd($entry);
-
-        $htPtr = $context->getTypeFromString('__hashtable__*');
-        $i64 = $context->getTypeFromString('int64');
-        $ht = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
-        $nullHt = $htPtr->constNull();
-        $isNull = $context->builder->icmp(Builder::INT_EQ, $ht, $nullHt);
-
-        $failBb = $fn->appendBasicBlock('hash_algos_fail');
-        $buildBb = $fn->appendBasicBlock('hash_algos_build');
-        $context->builder->branchIf($isNull, $failBb, $buildBb);
-
-        $context->builder->positionAtEnd($failBb);
-        $context->builder->returnValue($nullHt);
-        $context->builder->clearInsertionPosition();
-
-        $context->builder->positionAtEnd($buildBb);
-        $setAt = $context->lookupFunction('__hashtable__setStringAt');
-        foreach (HashAlgosRegistry::ALL_ALGOS as $index => $algo) {
-            $context->builder->call(
-                $setAt,
-                $ht,
-                $i64->constInt($index, false),
-                self::literalString($context, $algo)
+            : $context->module->addFunction(
+                self::ABI_HASH_ALGOS,
+                $context->context->functionType($htPtr, false)
             );
-        }
-        $context->builder->returnValue($ht);
+        self::implementBridge($context, $fn, $helperFn);
+        $context->registerFunction(self::ABI_HASH_ALGOS, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function literalString(Context $context, string $text): \PHPLLVM\Value
+    private static function implementBridge(Context $context, LlvmFunction $fn, LlvmFunction $helperFn): void
     {
-        $i64 = $context->getTypeFromString('int64');
-        $charPtr = $context->getTypeFromString('char*');
-        $cstr = $context->builder->pointerCast($context->constantFromString($text), $charPtr);
-
-        return $context->builder->call(
-            $context->lookupFunction('__string__init'),
-            $i64->constInt(\strlen($text), false),
-            $cstr
-        );
+        $entry = $fn->appendBasicBlock('hash_algos_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $htRaw = $context->builder->call($helperFn);
+        $ht = JitNestedHelperCoerce::coerceToHashtablePtr($context, $htRaw);
+        $context->builder->returnValue($ht);
     }
 }
