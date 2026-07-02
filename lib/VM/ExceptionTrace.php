@@ -8,7 +8,6 @@ use PHPCompiler\Frame;
 use PHPCompiler\ext\standard\VmDebugBacktrace;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\VM\Builtin\VmClassMethod;
-use PHPCompiler\VM\FatalSite;
 
 /**
  * Populate user exception `trace` property on throw (issue #3351; Zend zend_exceptions.c).
@@ -107,11 +106,7 @@ final class ExceptionTrace
             return;
         }
         $traceProp = $object->getProperty(ExceptionSupport::PROP_TRACE);
-        $built = self::sanitizeCapturedTrace(VmDebugBacktrace::build($frame));
-        if (0 === $built->toArray()->getNumElements()) {
-            $built = self::generatorThrowFrameTrace($frame);
-        }
-        $traceProp->duplicateFrom($built);
+        $traceProp->duplicateFrom(self::sanitizeCapturedTrace(self::generatorThrowFrameTrace($frame)));
     }
 
     /** Append Generator::{next,send,...} after throw-site frames (Zend zend_generators.c, #13418). */
@@ -224,22 +219,9 @@ final class ExceptionTrace
         if (null === $frame->block || null === $frame->block->func) {
             return $trace;
         }
-        $entry = new Variable();
-        $entry->newArray();
-        $ht = $entry->toArray();
-        $file = $frame->block->scriptPath();
-        if ('' !== $file) {
-            $fileVar = new Variable(Variable::TYPE_STRING);
-            $fileVar->string($file);
-            $ht->add('file', $fileVar);
-            $lineVar = new Variable(Variable::TYPE_INTEGER);
-            $lineVar->int(FatalSite::lineFromOpcodes($frame));
-            $ht->add('line', $lineVar);
-        }
-        $fnVar = new Variable(Variable::TYPE_STRING);
-        $fnVar->string($frame->block->func->name);
-        $ht->add('function', $fnVar);
-        $trace->toArray()->append($entry);
+        $trace->toArray()->append(
+            VmDebugBacktrace::internalFunctionFrameEntry($frame->block->func->name)
+        );
 
         return $trace;
     }
