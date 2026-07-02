@@ -131,8 +131,15 @@ class LoopResolver extends NodeVisitorAbstract
     {
         $attrs = $node->getAttributes();
         $line = isset($attrs['startLine']) ? (int) $attrs['startLine'] : 0;
+        $level = 1;
+        if ($node->num instanceof LNumber) {
+            $level = $node->num->value;
+        }
+        $message = $level > 1
+            ? \sprintf('"continue %d" targeting switch is equivalent to "break %d"', $level, $level)
+            : '"continue" targeting switch is equivalent to "break"';
         $args = [
-            new Arg(new String_('"continue" targeting switch is equivalent to "break"', $attrs)),
+            new Arg(new String_($message, $attrs)),
         ];
         if ($line > 0) {
             $args[] = new Arg(new LNumber($line, $attrs), false, false, $attrs);
