@@ -54,6 +54,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
     }
 
+    public function testPhp84ReflectionProbeBuiltinsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+    }
+
     public function testClassUsesRecursiveWithheldOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsClassUsesRecursive());
@@ -141,6 +146,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['class_uses_recursive']));
+    }
+
+    public function testVmDoesNotRegisterPhp84ReflectionProbeBuiltinsOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $ctx = $runtime->vmContext;
+        foreach (['attribute_exists', 'class_meth_exists', 'unitenum_exists'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+        }
     }
 
     public function testVmDoesNotRegisterSortingEnumOnReferenceProfile(): void

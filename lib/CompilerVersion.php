@@ -359,6 +359,17 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ attribute_exists(), class_meth_exists(), unitenum_exists()
+     * (ext/reflection/php_reflection.c, ext/standard/basic_functions.c; #14995).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     */
+    public static function supportsPhp84ReflectionProbeBuiltins(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
+    /**
      * PHP 8.4+ zend_thread_id() (ext/standard/basic_functions.c, issue #6870, #11842, #12386).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.

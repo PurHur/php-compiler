@@ -85,6 +85,18 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'class_uses_recursive_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
+                && (str_contains($name, 'attribute_exists')
+                    || str_contains($name, 'class_meth_exists')
+                    || str_contains($name, 'unitenum_exists')
+                    || str_contains($name, 'nodiscard_class_exists'))
+                && !str_contains($name, 'reflection_probe_builtins_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
+                && str_contains($name, 'reflection_probe_builtins_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGetmygrgid()
                 && str_contains($name, 'getmygrgid')
                 && !str_contains($name, 'getmygrgid_phantom')) {
