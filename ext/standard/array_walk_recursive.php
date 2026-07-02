@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
@@ -86,7 +87,7 @@ final class array_walk_recursive extends Internal
             $this->jitString($context, $args[1], 'array_walk_recursive() callback');
         }
 
-        return ArrayBuiltinHelper::walkRecursiveInPlace($context, $args[0], $args[1]);
+        return ArrayWalkRuntime::walkRecursiveInPlaceWithStringBuiltin($context, $args[0], $args[1]);
     }
 
     private function walkSubjectArray(
