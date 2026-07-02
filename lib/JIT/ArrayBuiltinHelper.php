@@ -945,23 +945,11 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * array_map() with closure / arrow callback (issue #142, #1154).
+     * array_map() with closure / arrow callback — delegates to ArrayMapRuntime PHP (#14977).
      */
     public static function buildMapArrayWithClosure(Context $context, Variable $callback, Variable $array): Value
     {
-        $closureCall = $callback->closureCall;
-        if (null === $closureCall) {
-            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
-        }
-        if (self::isNativeArray($array->type)) {
-            return self::buildMapFromNativeArrayWithClosure($context, $closureCall, $array);
-        }
-
-        return self::buildMapFromHashTableWithClosure(
-            $context,
-            $closureCall,
-            self::loadHashTable($context, $array)
-        );
+        return ArrayMapRuntime::mapSingle($context, $callback, $array);
     }
 
     /**
@@ -975,7 +963,7 @@ final class ArrayBuiltinHelper
             return self::buildMapNullZipFromMultiple($context, $arrays);
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            return self::buildMapClosureZipFromMultiple($context, $callback, $arrays);
+            return ArrayMapRuntime::mapMultipleWithClosure($context, $callback, $arrays);
         }
         if (ArrayMapCallbackPolicy::isJitLowerableScalar(
             $callback->type,
