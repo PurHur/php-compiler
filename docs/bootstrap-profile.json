@@ -1031,7 +1031,6 @@
         "ext/standard/JitTouch.php",
         "ext/standard/JitTraitExists.php",
         "ext/standard/JitUmask.php",
-        "ext/standard/JitUniqid.php",
         "ext/standard/JitUnitEnumExists.php",
         "ext/standard/JitUnlink.php",
         "ext/standard/JitUnpack.php",
@@ -1187,6 +1186,7 @@
         "ext/standard/TimezoneOffsetJitHelper.php",
         "ext/standard/TriggerErrorJitHelper.php",
         "ext/standard/UcwordsJitHelper.php",
+        "ext/standard/UniqidJitHelper.php",
         "ext/standard/UnpackEngine.php",
         "ext/standard/UnpackJitHelper.php",
         "ext/standard/UnserializeJitHelper.php",
@@ -2422,6 +2422,7 @@
         "lib/Compiler/InheritanceVariance.php",
         "lib/Compiler/InterfaceConstVisibilityCheck.php",
         "lib/Compiler/InterfaceImplementationCheck.php",
+        "lib/Compiler/InterfaceMethodBodyCheck.php",
         "lib/Compiler/InterfaceMethodVisibilityCheck.php",
         "lib/Compiler/MagicMethodReturnTypeCheck.php",
         "lib/Compiler/NewCtorParens.php",
@@ -2878,6 +2879,7 @@
         "lib/JIT/Builtin/StringTrimMask.php",
         "lib/JIT/Builtin/StringTrimModeJit.php",
         "lib/JIT/Builtin/StringUcwords.php",
+        "lib/JIT/Builtin/StringUniqid.php",
         "lib/JIT/Builtin/StringUnpack.php",
         "lib/JIT/Builtin/StringUnserialize.php",
         "lib/JIT/Builtin/StringUrldecode.php",
@@ -3898,9 +3900,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3668,
+        "inventory_files": 3670,
         "excluded": 0,
-        "eligible": 3668,
+        "eligible": 3670,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
