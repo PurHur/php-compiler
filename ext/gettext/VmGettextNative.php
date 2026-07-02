@@ -47,6 +47,11 @@ final class VmGettextNative
         return VmGettextPure::translate($domain, $msgid, $category);
     }
 
+    public static function ngettext(string $msgid1, string $msgid2, int $n): string
+    {
+        return self::dngettext(self::$currentDomain, $msgid1, $msgid2, $n);
+    }
+
     public static function dngettext(string $domain, string $msgid1, string $msgid2, int $n): string
     {
         return VmGettextPure::translatePlural($domain, $msgid1, $msgid2, $n, self::LC_MESSAGES);
