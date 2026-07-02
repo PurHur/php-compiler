@@ -65,6 +65,8 @@ final class BootstrapLibSpineVmSmokeTest extends TestCase
         $this->assertStringContainsString('inventory argv driver unavailable (no Zend — #8716)', $script);
         $this->assertStringContainsString('BOOTSTRAP_LIB_SPINE_SMOKE_GEN0_FALLBACK', $script);
         $this->assertStringContainsString('BOOTSTRAP_NO_ZEND_FALLBACK:-0}" != "1"', $script);
+        $this->assertStringContainsString('vm_driver_probe_ok=1', $script);
+        $this->assertStringContainsString('vm_driver_probe_ok}" == "1"', $script);
     }
 
     public function testSpineEntryBundlesBinVmPhp(): void
