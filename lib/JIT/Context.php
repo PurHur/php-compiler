@@ -936,6 +936,7 @@ class Context {
                 Builtin\StringStrrev::ensureStandaloneBodies($this);
                 Builtin\StringStrRepeat::ensureStandaloneBodies($this);
                 Builtin\StringStrPad::ensureStandaloneBodies($this);
+                Builtin\StringStrRot13::ensureStandaloneBodies($this);
                 Builtin\StringChunkSplit::ensureStandaloneBodies($this);
                 Builtin\StringHex2bin::ensureStandaloneBodies($this);
                 Builtin\StringLevenshtein::ensureStandaloneBodies($this);
