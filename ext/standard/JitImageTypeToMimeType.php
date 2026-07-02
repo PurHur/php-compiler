@@ -39,7 +39,7 @@ final class JitImageTypeToMimeType
 
     public static function invoke(Context $context, JITVariable $imageTypeArg): Value
     {
-        $imageType = JitImageTypeToExtension::lowerImageType(
+        $imageType = JitImageTypeArg::lowerImageType(
             $context,
             $imageTypeArg,
             'image_type_to_mime_type'
