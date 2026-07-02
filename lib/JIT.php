@@ -8543,6 +8543,7 @@ class JIT {
 
                     return $origBasicBlock;
                 case OpCode::TYPE_JUMPIF:
+                    JIT\BasicBlockHelper::ensureOpenInsertBlock($this->context, 'jumpif_cont');
                     $branchBlock = $builder->getInsertBlock();
                     $builder->positionAtEnd($branchBlock);
                     $this->maybeRefreshIncludeBindingsBeforeUse();

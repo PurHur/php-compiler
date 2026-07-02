@@ -568,7 +568,9 @@ class Context {
     }
 
     public function popScope(): void {
-        assert(!empty($this->scopeStack));
+        if ([] === $this->scopeStack) {
+            return;
+        }
         $this->scope = array_pop($this->scopeStack);
     }
 
