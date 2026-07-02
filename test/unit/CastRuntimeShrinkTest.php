@@ -31,5 +31,14 @@ final class CastRuntimeShrinkTest extends TestCase
     {
         $this->assertTrue(\PHPCompiler\VM\CastJitHelper::boolYieldsEmptyArray(false));
         $this->assertFalse(\PHPCompiler\VM\CastJitHelper::boolYieldsEmptyArray(true));
+        $cast = \PHPCompiler\VM\CastSupport::vmResourceArrayCast();
+        $this->assertSame(1, $cast->toArray()->getNumElements());
+    }
+
+    public function testCastArraySharedUsesWrapNullForResourceObjectCast(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/CastArrayShared.php');
+        $this->assertStringContainsString('wrapNullInArray', $source);
+        $this->assertStringContainsString('emitObjectOperandToArray', $source);
     }
 }
