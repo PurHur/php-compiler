@@ -61,9 +61,6 @@ final class VmArrayWalk
             if (Variable::TYPE_BOOLEAN === $result->type && !$result->toBool()) {
                 return false;
             }
-            if (Variable::TYPE_NULL !== $result->type) {
-                self::replaceAtKey($table, $key, $result);
-            }
         }
 
         return true;
