@@ -6,6 +6,8 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\libxml\LibxmlConstants;
+use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -842,6 +844,10 @@ final class VmDom
             return false;
         }
 
+        if (self::documentValidateOnParse($document)) {
+            self::validateOnParseDtd($ctx, $trimmed, $root, $frame);
+        }
+
         $state = DomRegistry::state($document);
         $state->childIds = [$root->id];
         $state->idAttrByElement = $idAttrByElement;
@@ -984,6 +990,132 @@ final class VmDom
     private static function escapeAttribute(string $value): string
     {
         return str_replace(['&', '"', '<'], ['&amp;', '&quot;', '&lt;'], $value);
+    }
+
+    /**
+     * DTD validation warnings when validateOnParse is true (php-src ext/dom/document.c; #14536).
+     */
+    private static function validateOnParseDtd(
+        Context $ctx,
+        string $xml,
+        ObjectEntry $root,
+        ?\PHPCompiler\Frame $frame
+    ): void {
+        $doctypeName = self::parseDoctypeName($xml);
+        if (null === $doctypeName) {
+            self::reportDomLibxmlError($ctx, 'Validation failed: no DTD found !', 522, 1, $frame);
+
+            return;
+        }
+
+        $rootName = DomRegistry::state($root)->nodeName;
+        if ($doctypeName !== $rootName) {
+            self::reportDomLibxmlError(
+                $ctx,
+                "root and DTD name do not match '{$rootName}' and '{$doctypeName}'",
+                531,
+                self::approximateXmlColumn($xml, $rootName),
+                $frame
+            );
+        }
+
+        $declaredElements = self::parseDoctypeElementDeclarations($xml);
+        foreach (self::collectElementNames($root) as $elementName) {
+            if (!isset($declaredElements[$elementName])) {
+                self::reportDomLibxmlError(
+                    $ctx,
+                    "No declaration for element {$elementName}",
+                    534,
+                    self::approximateXmlColumn($xml, $elementName),
+                    $frame
+                );
+            }
+        }
+    }
+
+    private static function reportDomLibxmlError(
+        Context $ctx,
+        string $message,
+        int $code,
+        int $column,
+        ?\PHPCompiler\Frame $frame
+    ): void {
+        VmLibxml::handleError($ctx, [
+            'level' => LibxmlConstants::LIBXML_ERR_ERROR,
+            'code' => $code,
+            'column' => $column,
+            'message' => $message,
+            'file' => '',
+            'line' => 1,
+        ], $frame, null, 'DOMDocument::loadXML(): '.$message.' in Entity, line: 1');
+    }
+
+    private static function approximateXmlColumn(string $xml, string $needle): int
+    {
+        $pos = strpos($xml, $needle);
+        if (false === $pos) {
+            return 1;
+        }
+
+        return $pos + 1;
+    }
+
+    private static function parseDoctypeName(string $xml): ?string
+    {
+        if (!preg_match('/<!DOCTYPE\s+([A-Za-z_][\w:.-]*)/', $xml, $match)) {
+            return null;
+        }
+
+        return $match[1];
+    }
+
+    /**
+     * @return array<string, true>
+     */
+    private static function parseDoctypeElementDeclarations(string $xml): array
+    {
+        $declared = [];
+        if (!preg_match('/<!DOCTYPE\s+\S+\s*\[(.*)\]\s*>/s', $xml, $doctype)) {
+            return $declared;
+        }
+        if (!preg_match_all('/<!ELEMENT\s+(\S+)\s+/', $doctype[1], $matches)) {
+            return $declared;
+        }
+        foreach ($matches[1] as $name) {
+            $declared[$name] = true;
+        }
+
+        return $declared;
+    }
+
+    /**
+     * @return list<string>
+     */
+    private static function collectElementNames(ObjectEntry $root): array
+    {
+        /** @var array<string, true> $names */
+        $names = [];
+        self::collectElementNamesRecursive($root, $names);
+
+        return array_keys($names);
+    }
+
+    /**
+     * @param array<string, true> $names
+     */
+    private static function collectElementNamesRecursive(ObjectEntry $node, array &$names): void
+    {
+        if (!self::isElement($node)) {
+            return;
+        }
+        $state = DomRegistry::state($node);
+        $names[$state->nodeName] = true;
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementNamesRecursive($child, $names);
+            }
+        }
     }
 
     /**

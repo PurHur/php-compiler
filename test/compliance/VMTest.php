@@ -45,6 +45,15 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'rounding_mode_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsRandomIntervalBoundary()
+                && str_contains($name, 'random_interval_boundary')
+                && !str_contains($name, 'random_interval_boundary_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsRandomIntervalBoundary()
+                && str_contains($name, 'random_interval_boundary_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsGetDeclaredExcludeDeprecated()
                 && str_contains($name, 'get_declared_exclude_deprecated')
                 && !str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {

@@ -15,7 +15,7 @@ final class VmIni
     /** php-src INI_ALL — user/perdir/system readable. */
     private const INI_ACCESS_ALL = 7;
 
-    /** Read-only boolean directives with Zend CLI defaults (ext/standard/ini.c, #11356). */
+    /** Read-only boolean directives with Zend CLI defaults (ext/standard/ini.c, #11356, #14844). */
     private const READONLY_BOOL_DEFAULTS = [
         'enable_dl' => false,
         'short_open_tag' => false,
@@ -23,9 +23,11 @@ final class VmIni
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
+        'allow_url_fopen' => true,
+        'allow_url_include' => false,
     ];
 
-    /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357). */
+    /** Read-only string directives with Zend CLI defaults (ext/standard/ini.c, #11357, #14844). */
     private const READONLY_STRING_DEFAULTS = [
         'session.save_handler' => 'files',
         'user_ini.filename' => '.user.ini',
@@ -33,6 +35,12 @@ final class VmIni
         'realpath_cache_ttl' => '120',
         'post_max_size' => '8M',
         'upload_max_filesize' => '2M',
+        'default_socket_timeout' => '60',
+        'auto_detect_line_endings' => '0',
+        'default_mimetype' => 'text/html',
+        'variables_order' => 'GPCS',
+        'request_order' => 'GP',
+        'arg_separator.output' => '&',
     ];
 
     /** php-src php.ini compile-time default for max_execution_time (ext/standard/ini.c, #12481). */
