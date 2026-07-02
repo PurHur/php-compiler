@@ -35,8 +35,7 @@ final class ArrayPadRuntime
         Context $context,
         JITVariable $array,
         Value $length,
-        JITVariable $value,
-        Value $padType
+        JITVariable $value
     ): Value {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
@@ -46,8 +45,7 @@ final class ArrayPadRuntime
             $context->lookupFunction(self::ABI_PAD),
             $ht,
             $length,
-            $valuePtr,
-            $padType
+            $valuePtr
         );
     }
 
@@ -83,7 +81,7 @@ final class ArrayPadRuntime
             $context,
             self::ABI_PAD,
             'array_pad_bridge_entry',
-            [$htPtr, $i64, $valuePtr, $i64],
+            [$htPtr, $i64, $valuePtr],
             $htPtr,
             self::PAD_HELPER,
             self::HELPER_PATH,

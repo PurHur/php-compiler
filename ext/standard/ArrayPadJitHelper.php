@@ -15,8 +15,8 @@ use PHPCompiler\VM\Variable;
  */
 final class ArrayPadJitHelper
 {
-    public static function padCopy(HashTable $ht, int $length, Variable $value, int $padType = 0): HashTable
+    public static function padCopy(HashTable $ht, int $length, Variable $value): HashTable
     {
-        return VmArray::pad($ht, $length, $value, $padType);
+        return VmArray::pad($ht, $length, $value);
     }
 }
