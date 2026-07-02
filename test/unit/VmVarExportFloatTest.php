@@ -25,4 +25,15 @@ final class VmVarExportFloatTest extends TestCase
         $this->assertSame('100.0', VmVarExportFloat::format(100.0));
         $this->assertSame('1.0E-10', VmVarExportFloat::format(1.0E-10));
     }
+
+    /** hexdec/bindec overflow float — var_export ULP matches Zend (#14927). */
+    public function testLargeOverflowFloatMatchesZendVarExport(): void
+    {
+        $hex = hexdec('FFFFFFFFFFFFFFFF');
+        $this->assertSame('1.8446744073709552E+19', VmVarExportFloat::format($hex));
+        $this->assertSame(
+            '3.6893488147419103E+19',
+            VmVarExportFloat::format(bindec(str_repeat('1', 65)))
+        );
+    }
 }

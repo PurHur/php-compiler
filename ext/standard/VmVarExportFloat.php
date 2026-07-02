@@ -23,9 +23,15 @@ final class VmVarExportFloat
             return $f < 0 ? '-INF' : 'INF';
         }
         $precision = VmIni::parseSerializePrecision(VmIni::getSerializePrecision());
-        // php-src smart_str_append_double: zend_gcvt with serialize_precision; -1 → NDIGIT sig digits (#14707).
-        $ndigit = $precision > 0 ? $precision : 17;
-        $s = VmSerializeFormat::formatDoubleWithPrecision($f, $ndigit);
+        $abs = \abs($f);
+        if ($abs >= 1e14) {
+            // Large overflow doubles: zend_gcvt dtoa path (#14927, ext/standard/var.c).
+            $s = VmFloatDtoa::formatH($f);
+        } else {
+            // serialize_precision -1 historically used 17 sig digits for var_export (#14707).
+            $ndigit = $precision > 0 ? $precision : 17;
+            $s = VmSerializeFormat::formatDoubleWithPrecision($f, $ndigit);
+        }
         if (false === \strpos($s, '.') && false === \stripos($s, 'e')) {
             return $s.'.0';
         }
