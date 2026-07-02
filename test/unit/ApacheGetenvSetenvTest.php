@@ -43,12 +43,14 @@ final class ApacheGetenvSetenvTest extends TestCase
         $this->assertNotContains('apache_setenv', BuiltinRegistry::sortedNames());
         $this->assertNotContains('apache_note', BuiltinRegistry::sortedNames());
         $this->assertNotContains('apache_get_version', BuiltinRegistry::sortedNames());
+        $this->assertNotContains('apache_response_headers', BuiltinRegistry::sortedNames());
 
         $runtime = new Runtime();
         $this->assertArrayNotHasKey('apache_getenv', $runtime->vmContext->functions);
         $this->assertArrayNotHasKey('apache_setenv', $runtime->vmContext->functions);
         $this->assertArrayNotHasKey('apache_note', $runtime->vmContext->functions);
         $this->assertArrayNotHasKey('apache_get_version', $runtime->vmContext->functions);
+        $this->assertArrayNotHasKey('apache_response_headers', $runtime->vmContext->functions);
     }
 
     public function testCgiRequestMethodRegistersApacheEnvironmentFunctions(): void
@@ -64,6 +66,7 @@ final class ApacheGetenvSetenvTest extends TestCase
         $this->assertArrayHasKey('apache_setenv', $runtime->vmContext->functions);
         $this->assertArrayHasKey('apache_note', $runtime->vmContext->functions);
         $this->assertArrayHasKey('apache_get_version', $runtime->vmContext->functions);
+        $this->assertArrayHasKey('apache_response_headers', $runtime->vmContext->functions);
     }
 
     public function testReproRoundTripOnCgiProfile(): void

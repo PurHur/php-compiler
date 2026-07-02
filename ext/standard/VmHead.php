@@ -9,8 +9,8 @@ use PHPCompiler\CompilerVersion;
 /**
  * SAPI gating for Apache-style request header builtins (issue #11780).
  *
- * php-src: ext/standard/head.c — getallheaders/apache_request_headers registered
- * only for apache/apache2handler/cli-server, not generic cli.
+ * php-src: ext/standard/head.c — getallheaders/apache_request_headers/apache_response_headers
+ * registered only for apache/apache2handler/cli-server, not generic cli.
  */
 final class VmHead
 {

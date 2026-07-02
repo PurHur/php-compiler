@@ -41,10 +41,12 @@ final class GetallheadersCliPhantomTest extends TestCase
         $this->assertFalse(VmHead::registersRequestHeaderFunctions());
         $this->assertNotContains('getallheaders', BuiltinRegistry::sortedNames());
         $this->assertNotContains('apache_request_headers', BuiltinRegistry::sortedNames());
+        $this->assertNotContains('apache_response_headers', BuiltinRegistry::sortedNames());
 
         $runtime = new Runtime();
         $this->assertArrayNotHasKey('getallheaders', $runtime->vmContext->functions);
         $this->assertArrayNotHasKey('apache_request_headers', $runtime->vmContext->functions);
+        $this->assertArrayNotHasKey('apache_response_headers', $runtime->vmContext->functions);
     }
 
     public function testCgiRequestMethodRegistersRequestHeaderFunctions(): void
@@ -58,5 +60,6 @@ final class GetallheadersCliPhantomTest extends TestCase
         $runtime = new Runtime();
         $this->assertArrayHasKey('getallheaders', $runtime->vmContext->functions);
         $this->assertArrayHasKey('apache_request_headers', $runtime->vmContext->functions);
+        $this->assertArrayHasKey('apache_response_headers', $runtime->vmContext->functions);
     }
 }
