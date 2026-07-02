@@ -1,5 +1,4 @@
 <?php
-declare(strict_types=1);
 
 $warnings = [];
 set_error_handler(static function (int $severity, string $message) use (&$warnings): bool {
