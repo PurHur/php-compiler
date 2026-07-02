@@ -252,10 +252,9 @@ final class VmPregPure
                 if (!$noEmpty || '' !== $chunk) {
                     $parts[] = $offsetCapture ? [$chunk, $lastMatchOffset] : $chunk;
                     ++$count;
-                    if ($count >= $maxParts) {
-                        self::$lastError = 0;
-
-                        return $parts;
+                    if ($count >= $maxParts - 1) {
+                        $lastMatchOffset = $matchEnd;
+                        break;
                     }
                 }
             }
@@ -272,10 +271,9 @@ final class VmPregPure
                     if (!$noEmpty || '' !== $delim) {
                         $parts[] = $offsetCapture ? [$delim, $gStart] : $delim;
                         ++$count;
-                        if ($count >= $maxParts) {
-                            self::$lastError = 0;
-
-                            return $parts;
+                        if ($count >= $maxParts - 1) {
+                            $lastMatchOffset = $matchEnd;
+                            break 2;
                         }
                     }
                 }
