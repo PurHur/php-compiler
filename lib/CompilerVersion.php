@@ -255,11 +255,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ Random\IntervalBoundary unit enum (ext/random/random.stub.php; #11551).
+     * PHP 8.3+ Random\IntervalBoundary unit enum (ext/random/random.stub.php; #11551, #14847).
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsRandomIntervalBoundary(): bool
     {
-        return self::advertisesBuiltinSince('8.3.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

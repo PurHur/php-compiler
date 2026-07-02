@@ -196,6 +196,17 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
     }
 
+    public function testSupportsRandomIntervalBoundaryFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRandomIntervalBoundary());
+    }
+
+    public function testVmDoesNotRegisterRandomIntervalBoundaryOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
+    }
+
     public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
     {
         $runtime = new Runtime();
