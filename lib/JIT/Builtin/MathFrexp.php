@@ -1,0 +1,160 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\JIT\Builtin;
+
+use PHPCompiler\JIT;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPLLVM\Builder;
+use PHPLLVM\Value;
+use PHPLLVM\Value\Function_ as LlvmFunction;
+
+/**
+ * JIT/AOT link for frexp() via FrexpJitHelper PHP (#15201).
+ *
+ * Replaces libc `frexp` LLVM lookup in ext/standard/frexp.php.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmMath}.
+ * php-src: ext/standard/math.c — PHP_FUNCTION(frexp)
+ */
+final class MathFrexp
+{
+    private const ABI_FREXP = 'phpc_frexp';
+
+    private const HELPER_PATH = '/ext/standard/FrexpJitHelper.php';
+
+    private const COMPUTE_HELPER = 'PHPCompiler\\ext\\standard\\FrexpJitHelper::compute';
+
+    private const EXPONENT_HELPER = 'PHPCompiler\\ext\\standard\\FrexpJitHelper::exponent';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::COMPUTE_HELPER,
+        self::EXPONENT_HELPER,
+    ];
+
+    public static function ensureLinked(Context $context): void
+    {
+        self::implement($context);
+    }
+
+    public static function invoke(Context $context, Value $num, Value $outPtr): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_FREXP),
+            $num,
+            $outPtr
+        );
+    }
+
+    private static function implement(Context $context): void
+    {
+        $probe = $context->module->getNamedFunction(self::ABI_FREXP);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI_FREXP, $probe);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+        self::implementFrexpBridge($context);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementFrexpBridge(Context $context): void
+    {
+        $abiName = self::ABI_FREXP;
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        $valuePtr = $context->getTypeFromString('__value__*');
+        $doubleTy = $context->getTypeFromString('double');
+        $i64 = $context->getTypeFromString('int64');
+        $ft = $context->context->functionType($doubleTy, false, $doubleTy, $valuePtr);
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction($abiName, $ft);
+
+        $entry = $fn->appendBasicBlock('frexp_bridge_entry');
+        $nullOut = $fn->appendBasicBlock('frexp_bridge_null_out');
+        $work = $fn->appendBasicBlock('frexp_bridge_work');
+        $done = $fn->appendBasicBlock('frexp_bridge_done');
+
+        $context->builder->positionAtEnd($entry);
+        $num = $fn->getParam(0);
+        $out = $fn->getParam(1);
+        $isNull = $context->builder->icmp(Builder::INT_EQ, $out, $out->typeOf()->constNull());
+        $context->builder->branchIf($isNull, $nullOut, $work);
+
+        $context->builder->positionAtEnd($nullOut);
+        $fracOnly = $context->builder->call(self::helperFunction($context, self::COMPUTE_HELPER), $num);
+        $context->builder->returnValue($fracOnly);
+
+        $context->builder->positionAtEnd($work);
+        $frac = $context->builder->call(self::helperFunction($context, self::COMPUTE_HELPER), $num);
+        $expVal = $context->builder->call(self::helperFunction($context, self::EXPONENT_HELPER));
+        $expI64 = $expVal->typeOf() === $i64
+            ? $expVal
+            : $context->builder->sext($expVal, $i64);
+        $context->builder->call(
+            $context->lookupFunction('__value__writeLong'),
+            $out,
+            $expI64
+        );
+        $context->builder->branch($done);
+
+        $context->builder->positionAtEnd($done);
+        $context->builder->returnValue($frac);
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function helperFunction(Context $context, string $logical): LlvmFunction
+    {
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower($logical);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException($logical.' missing after FrexpJitHelper compile (#15201)');
+        }
+
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
+            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FrexpJitHelper.php');
+            if (null === $block) {
+                throw new \LogicException('FrexpJitHelper.php parseAndCompile failed (#15201)');
+            }
+            $jit = new JIT($context);
+            $jit->compile($block);
+        });
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#15201)');
+            }
+        }
+    }
+}

@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MathFrexp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -39,19 +39,9 @@ final class frexp extends Internal
             throw new \LogicException('frexp() requires exactly two arguments');
         }
         $double = $context->getTypeFromString('double');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
         $num = pow::toJitDouble($context, $args[0], $double);
         $outPtr = JitValueBox::valuePtrFromVariable($context, $args[1]);
-        $expSlot = BasicBlockHelper::entryAlloca($context, $i32);
-        $frac = $context->builder->call($context->lookupFunction('frexp'), $num, $expSlot);
-        $expVal = $context->builder->load($expSlot);
-        $context->builder->call(
-            $context->lookupFunction('__value__writeLong'),
-            $outPtr,
-            $context->builder->sext($expVal, $i64)
-        );
 
-        return $frac;
+        return MathFrexp::invoke($context, $num, $outPtr);
     }
 }
