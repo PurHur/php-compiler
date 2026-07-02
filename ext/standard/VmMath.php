@@ -779,6 +779,24 @@ final class VmMath
         return \tan($num);
     }
 
+    /** cosh() — hyperbolic cosine (php-src ext/standard/math.c). */
+    public static function cosh(float $num): float
+    {
+        return \cosh($num);
+    }
+
+    /** sinh() — hyperbolic sine (php-src ext/standard/math.c). */
+    public static function sinh(float $num): float
+    {
+        return \sinh($num);
+    }
+
+    /** tanh() — hyperbolic tangent (php-src ext/standard/math.c). */
+    public static function tanh(float $num): float
+    {
+        return \tanh($num);
+    }
+
     /** exp() — natural exponential (php-src ext/standard/math.c). */
     public static function exp(float $num): float
     {
