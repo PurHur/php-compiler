@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3667 |
-| Phase A inventory files (M2 ratio SSOT) | 3667 |
+| PHP files on vm.php path | 3668 |
+| Phase A inventory files (M2 ratio SSOT) | 3668 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9998 |
+| Source constructs flagged (warnings) | 10001 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -2315,6 +2315,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Ast/GroupUseStripper.php` | 0 | 1 |
 | `lib/Ast/HexFloatLiteralDesugar.php` | 0 | 3 |
 | `lib/Ast/InOperatorDesugar.php` | 0 | 1 |
+| `lib/Ast/ListDestructMixKeyedCompileCheck.php` | 0 | 2 |
 | `lib/Ast/MultiBlockNameContext.php` | 0 | 2 |
 | `lib/Ast/MultiBlockNameResolver.php` | 0 | 3 |
 | `lib/Ast/NewDereferenceableDesugar.php` | 0 | 2 |
@@ -3110,7 +3111,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/PseudoClassScope.php` | 0 | 1 |
 | `lib/ReadonlyFunctionRejector.php` | 0 | 2 |
 | `lib/ReadonlyMethodModifierRejector.php` | 0 | 2 |
-| `lib/Runtime.php` | 0 | 68 |
+| `lib/Runtime.php` | 0 | 69 |
 | `lib/RuntimeStrictness.php` | 0 | 1 |
 | `lib/SourceBareThrowRewriter.php` | 0 | 1 |
 | `lib/SourcePreprocessor/PropertyHooks.php` | 0 | 4 |
@@ -6801,7 +6802,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/ArrayWalkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/AssertOptionsJitHelper.php`
 
@@ -11893,7 +11894,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFilestatFailure.php`
 
 **Warnings** (review for bootstrap subset):
-- 15 class method(s)
+- 16 class method(s)
 
 ### `ext/standard/VmFloatDtoa.php`
 
@@ -18513,6 +18514,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 18 class method(s)
 
+### `lib/Ast/ListDestructMixKeyedCompileCheck.php`
+
+**Warnings** (review for bootstrap subset):
+- new CompileFatal (line 91)
+- 4 class method(s)
+
 ### `lib/Ast/MultiBlockNameContext.php`
 
 **Warnings** (review for bootstrap subset):
@@ -19972,7 +19979,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/ArrayWalkRuntime.php`
 
 **Warnings** (review for bootstrap subset):
-- 5 class method(s)
+- 7 class method(s)
 
 ### `lib/JIT/Builtin/AssertFail.php`
 
@@ -24055,64 +24062,65 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new SealedClassAnnotator (line 133)
 - new StaticClassAnnotator (line 135)
 - new Ast\EnumPropertyCompileCheck (line 137)
-- new Ast\GeneratorYieldSourceMarker (line 138)
-- new Parser (line 139)
-- new ParserFactory (line 140)
-- new Traverser (line 144)
-- new InOperatorResolver (line 145)
-- new ExitFunctionResolver (line 146)
-- new VoidCastResolver (line 147)
-- new Visitor\Simplifier (line 148)
-- new Visitor\DeadBlockEliminator (line 149)
-- new Traverser (line 150)
-- new Visitor\PhiResolver (line 151)
-- new NullSafeLivenessDetector (line 152)
-- new Optimizer\AssignOp (line 153)
-- new TypeReconstructor (line 155)
-- new Compiler (line 173)
-- new VMContext (line 178)
-- new VM (line 184)
-- new ext\types\Module (line 212)
-- new ext\spl\Module (line 213)
-- new ext\intl\Module (line 214)
-- new ext\zip\Module (line 215)
-- new ext\libxml\Module (line 216)
-- new ext\dom\Module (line 217)
-- new ext\xml\Module (line 218)
-- new ext\gd\Module (line 219)
-- new ext\iconv\Module (line 220)
-- new ext\gettext\Module (line 221)
-- new ext\mbstring\Module (line 222)
-- new ext\filter\Module (line 223)
-- new ext\calendar\Module (line 224)
-- new ext\session\Module (line 225)
-- new ext\bcmath\Module (line 226)
-- new ext\stats\Module (line 227)
-- new ext\openssl\Module (line 228)
-- new ext\curl\Module (line 229)
-- new ext\hash\Module (line 230)
-- new ext\posix\Module (line 231)
-- new ext\sockets\Module (line 232)
-- new ext\ctype\Module (line 233)
-- new ext\tokenizer\Module (line 234)
-- new ext\random\Module (line 235)
-- new ext\igbinary\Module (line 236)
-- new ext\msgpack\Module (line 237)
-- new ext\zstd\Module (line 238)
-- new ext\lzf\Module (line 239)
-- new ext\bz2\Module (line 240)
-- new ext\sodium\Module (line 241)
-- new ext\standard\Module (line 242)
-- new JIT (line 318)
-- new JITContext (line 332)
-- new SealedClassPreprocessor (line 375)
-- new StaticClassPreprocessor (line 378)
-- new SourcePreprocessor\PropertyHooks (line 381)
-- new State (line 504)
-- new ReflectionProperty (line 531)
-- new ReflectionProperty (line 534)
-- new LintCompiler (line 925)
-- new Variable (line 1052)
+- new Ast\ListDestructMixKeyedCompileCheck (line 138)
+- new Ast\GeneratorYieldSourceMarker (line 139)
+- new Parser (line 140)
+- new ParserFactory (line 141)
+- new Traverser (line 145)
+- new InOperatorResolver (line 146)
+- new ExitFunctionResolver (line 147)
+- new VoidCastResolver (line 148)
+- new Visitor\Simplifier (line 149)
+- new Visitor\DeadBlockEliminator (line 150)
+- new Traverser (line 151)
+- new Visitor\PhiResolver (line 152)
+- new NullSafeLivenessDetector (line 153)
+- new Optimizer\AssignOp (line 154)
+- new TypeReconstructor (line 156)
+- new Compiler (line 174)
+- new VMContext (line 179)
+- new VM (line 185)
+- new ext\types\Module (line 213)
+- new ext\spl\Module (line 214)
+- new ext\intl\Module (line 215)
+- new ext\zip\Module (line 216)
+- new ext\libxml\Module (line 217)
+- new ext\dom\Module (line 218)
+- new ext\xml\Module (line 219)
+- new ext\gd\Module (line 220)
+- new ext\iconv\Module (line 221)
+- new ext\gettext\Module (line 222)
+- new ext\mbstring\Module (line 223)
+- new ext\filter\Module (line 224)
+- new ext\calendar\Module (line 225)
+- new ext\session\Module (line 226)
+- new ext\bcmath\Module (line 227)
+- new ext\stats\Module (line 228)
+- new ext\openssl\Module (line 229)
+- new ext\curl\Module (line 230)
+- new ext\hash\Module (line 231)
+- new ext\posix\Module (line 232)
+- new ext\sockets\Module (line 233)
+- new ext\ctype\Module (line 234)
+- new ext\tokenizer\Module (line 235)
+- new ext\random\Module (line 236)
+- new ext\igbinary\Module (line 237)
+- new ext\msgpack\Module (line 238)
+- new ext\zstd\Module (line 239)
+- new ext\lzf\Module (line 240)
+- new ext\bz2\Module (line 241)
+- new ext\sodium\Module (line 242)
+- new ext\standard\Module (line 243)
+- new JIT (line 319)
+- new JITContext (line 333)
+- new SealedClassPreprocessor (line 376)
+- new StaticClassPreprocessor (line 379)
+- new SourcePreprocessor\PropertyHooks (line 382)
+- new State (line 505)
+- new ReflectionProperty (line 532)
+- new ReflectionProperty (line 535)
+- new LintCompiler (line 926)
+- new Variable (line 1053)
 - 53 class method(s)
 
 ### `lib/RuntimeStrictness.php`

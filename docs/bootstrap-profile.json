@@ -2367,6 +2367,7 @@
         "lib/Ast/GroupUseStripper.php",
         "lib/Ast/HexFloatLiteralDesugar.php",
         "lib/Ast/InOperatorDesugar.php",
+        "lib/Ast/ListDestructMixKeyedCompileCheck.php",
         "lib/Ast/MultiBlockNameContext.php",
         "lib/Ast/MultiBlockNameResolver.php",
         "lib/Ast/NewDereferenceableDesugar.php",
@@ -3897,9 +3898,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3667,
+        "inventory_files": 3668,
         "excluded": 0,
-        "eligible": 3667,
+        "eligible": 3668,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1
