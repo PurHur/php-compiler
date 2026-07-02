@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrIncdec;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -45,6 +46,6 @@ final class str_increment extends Internal
 
         $input = JitStringBuiltinArg::lower($context, $args[0], 'str_increment', 0, 'string');
 
-        return JitStrIncdec::increment($context, $input, $args[0]);
+        return StringStrIncdec::invokeIncrement($context, $input);
     }
 }
