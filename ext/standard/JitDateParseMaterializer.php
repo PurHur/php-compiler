@@ -93,6 +93,24 @@ final class JitDateParseMaterializer
                 $i64->constInt($result['zone_type'], false)
             );
         }
+        if (isset($result['zone'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('zone'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyLong'),
+                $ht,
+                $keyStr,
+                $i64->constInt($result['zone'], false)
+            );
+        }
+        if (isset($result['is_dst'])) {
+            $keyStr = $context->builder->load($context->constantStringFromString('is_dst'));
+            $context->builder->call(
+                $context->lookupFunction('__hashtable__setStringKeyBool'),
+                $ht,
+                $keyStr,
+                $i1->constInt($result['is_dst'] ? 1 : 0, false)
+            );
+        }
         if (isset($result['tz_id'])) {
             $keyStr = $context->builder->load($context->constantStringFromString('tz_id'));
             $tzStr = $context->builder->load($context->constantStringFromString($result['tz_id']));
