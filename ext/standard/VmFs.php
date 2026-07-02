@@ -1401,6 +1401,9 @@ final class VmFs
             $ok = VmStreamBlockingNative::setBlocking($fd, $mode);
             if ($ok) {
                 self::setHandleBlocked($handle, $mode);
+                if ($mode) {
+                    VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
+                }
             }
 
             return $ok;
@@ -1412,6 +1415,9 @@ final class VmFs
         $ok = VmStreamBlockingNative::setBlockingForHostResource($fp, $mode);
         if ($ok) {
             self::setHandleBlocked($handle, $mode);
+            if ($mode) {
+                VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
+            }
         }
 
         return $ok;

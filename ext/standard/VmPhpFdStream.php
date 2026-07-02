@@ -183,6 +183,9 @@ final class VmPhpFdStream
         if (null === $state || !$state->canRead || $length < 0) {
             return false;
         }
+        if (VmFs::handleBlocked($handle)) {
+            VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
+        }
         if (0 === $length) {
             return '';
         }
@@ -228,6 +231,9 @@ final class VmPhpFdStream
         $state = self::$streams[$handle] ?? null;
         if (null === $state || !$state->canWrite) {
             return false;
+        }
+        if (VmFs::handleBlocked($handle)) {
+            VmProcessProcOpenNative::resumeChildForPipeHandle($handle);
         }
         if (null !== $length && $length < 0) {
             return 0;
