@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\libxml;
 
+use PHPCompiler\ext\standard\VmCallable;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
@@ -24,6 +25,10 @@ final class VmLibxml
     private static bool $useInternalErrors = false;
 
     private static ?Variable $streamsContext = null;
+
+    private static bool $entityLoaderDisabled = false;
+
+    private static ?Variable $externalEntityLoader = null;
 
     /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $errors = [];
@@ -66,6 +71,50 @@ final class VmLibxml
     public static function streamsContext(): ?Variable
     {
         return self::$streamsContext;
+    }
+
+    /** php-src ext/libxml/libxml.c — php_libxml_disable_entity_loader() (#6379). */
+    public static function disableEntityLoader(bool $disable = true): bool
+    {
+        $previous = self::$entityLoaderDisabled;
+        self::$entityLoaderDisabled = $disable;
+
+        return $previous;
+    }
+
+    public static function entityLoaderDisabled(): bool
+    {
+        return self::$entityLoaderDisabled;
+    }
+
+    /** php-src ext/libxml/libxml.c — libxml_set_external_entity_loader() (#6379, #14953). */
+    public static function setExternalEntityLoader(Context $ctx, Variable $resolver): void
+    {
+        $resolved = $resolver->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            self::$externalEntityLoader = null;
+
+            return;
+        }
+        if (!VmCallable::isCallable($ctx, $resolver)) {
+            throw new \TypeError(
+                'libxml_set_external_entity_loader(): Argument #1 ($resolver_function) must be a valid callback'
+            );
+        }
+        $stored = new Variable();
+        $stored->copyFrom($resolved);
+        self::$externalEntityLoader = $stored;
+    }
+
+    public static function getExternalEntityLoader(): ?Variable
+    {
+        return self::$externalEntityLoader;
+    }
+
+    public static function resetEntityLoaderStateForTest(): void
+    {
+        self::$entityLoaderDisabled = false;
+        self::$externalEntityLoader = null;
     }
 
     public static function getErrors(Context $ctx): HashTable

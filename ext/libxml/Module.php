@@ -39,6 +39,9 @@ class Module extends ModuleAbstract
             new libxml_get_last_error(),
             new libxml_clear_errors(),
             new libxml_set_streams_context(),
+            new libxml_disable_entity_loader(),
+            new libxml_set_external_entity_loader(),
+            new libxml_get_external_entity_loader(),
         ];
     }
 }
