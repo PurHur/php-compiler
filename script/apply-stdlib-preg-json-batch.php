@@ -123,13 +123,13 @@ foreach (['decbin', 'dechex', 'decoct'] as $fn) {
 }
 
 patch('ext/standard/str_rot13.php', static function (string $t): string {
-    if (preg_match('/->jitString\s*\(/', $t)) {
+    if (preg_match('/StringStrRot13::ensureLinked/', $t)) {
         return $t;
     }
 
     return str_replace(
         'return JitStrRot13::rot13($context, $args[0]);',
-        "\$str = \$this->jitString(\$context, \$args[0], 'str_rot13() string');\n        \$copy = \$context->builder->call(\$context->lookupFunction('__string__separate'), \$str);\n        JitStrRot13::transformInPlace(\$context, \$copy);\n\n        return \$copy;",
+        "\$str = JitStringBuiltinArg::lower(\$context, \$args[0], 'str_rot13', 0, 'string');\n        StringStrRot13::ensureLinked(\$context);\n\n        return \$context->builder->call(\n            \$context->lookupFunction('__compiler_str_rot13'),\n            \$str\n        );",
         $t
     );
 });
