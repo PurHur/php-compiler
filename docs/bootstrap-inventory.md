@@ -11995,7 +11995,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmFsGlobPure.php`
 
 **Warnings** (review for bootstrap subset):
-- 10 class method(s)
+- 12 class method(s)
 
 ### `ext/standard/VmFsOpenNative.php`
 
@@ -12680,62 +12680,62 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 81)
-- new self (line 108)
-- new VmPregAstEmptyNode (line 191)
-- new VmPregCompileException (line 195)
-- new VmPregAstAltNode (line 212)
-- new VmPregAstEmptyNode (line 220)
-- new VmPregAstEmptyNode (line 226)
-- new VmPregAstConcatNode (line 232)
-- new VmPregCompileException (line 242)
-- new VmPregCompileException (line 246)
-- new VmPregCompileException (line 272)
-- new VmPregAstQuantNode (line 314)
-- new VmPregCompileException (line 369)
-- new VmPregCompileException (line 380)
-- new VmPregCompileException (line 386)
-- new VmPregCompileException (line 401)
-- new VmPregAstAnyNode (line 413)
-- new VmPregAstBolNode (line 418)
-- new VmPregAstEolNode (line 423)
-- new VmPregCompileException (line 429)
-- new VmPregAstCharNode (line 433)
-- new VmPregCompileException (line 453)
-- new VmPregAstEmptyNode (line 457)
-- new VmPregCompileException (line 466)
-- new VmPregCompileException (line 472)
-- new VmPregCompileException (line 478)
-- new VmPregAstEmptyNode (line 482)
-- new VmPregCompileException (line 484)
-- new VmPregCompileException (line 489)
-- new VmPregAstGroupNode (line 500)
-- new VmPregCompileException (line 518)
-- new VmPregAstBranchResetAltNode (line 522)
-- new VmPregCompileException (line 547)
-- new VmPregCompileException (line 556)
-- new VmPregCompileException (line 575)
-- new VmPregCompileException (line 583)
-- new VmPregCompileException (line 635)
-- new VmPregAstClassNode (line 639)
+- new self (line 92)
+- new self (line 121)
+- new VmPregAstEmptyNode (line 204)
+- new VmPregCompileException (line 208)
+- new VmPregAstAltNode (line 225)
+- new VmPregAstEmptyNode (line 233)
+- new VmPregAstEmptyNode (line 239)
+- new VmPregAstConcatNode (line 245)
+- new VmPregCompileException (line 255)
+- new VmPregCompileException (line 259)
+- new VmPregCompileException (line 285)
+- new VmPregAstQuantNode (line 327)
+- new VmPregCompileException (line 382)
+- new VmPregCompileException (line 393)
+- new VmPregCompileException (line 399)
+- new VmPregCompileException (line 414)
+- new VmPregAstAnyNode (line 426)
+- new VmPregAstBolNode (line 431)
+- new VmPregAstEolNode (line 436)
+- new VmPregCompileException (line 442)
+- new VmPregAstCharNode (line 446)
+- new VmPregCompileException (line 467)
+- new VmPregAstEmptyNode (line 471)
+- new VmPregCompileException (line 480)
+- new VmPregCompileException (line 486)
+- new VmPregCompileException (line 492)
+- new VmPregAstEmptyNode (line 496)
+- new VmPregCompileException (line 498)
+- new VmPregCompileException (line 503)
+- new VmPregAstGroupNode (line 514)
+- new VmPregCompileException (line 532)
+- new VmPregAstBranchResetAltNode (line 536)
+- new VmPregCompileException (line 561)
+- new VmPregCompileException (line 570)
+- new VmPregCompileException (line 589)
+- new VmPregCompileException (line 597)
 - new VmPregCompileException (line 649)
-- new VmPregCompileException (line 669)
-- new VmPregAstCharNode (line 683)
-- new VmPregCompileException (line 693)
-- new VmPregAstCharNode (line 696)
-- new VmPregAstClassNode (line 701)
-- new VmPregAstClassNode (line 702)
-- new VmPregAstClassNode (line 703)
-- new VmPregAstClassNode (line 704)
-- new VmPregAstClassNode (line 705)
-- new VmPregAstClassNode (line 706)
-- new VmPregAstBolNode (line 707)
-- new VmPregAstKeepOutNode (line 708)
-- new VmPregAstEolNode (line 709)
-- new VmPregAstEolNode (line 710)
-- new VmPregAstCharNode (line 711)
-- new VmPregBacktrackLimitException (line 770)
-- 64 class method(s)
+- new VmPregAstClassNode (line 653)
+- new VmPregCompileException (line 663)
+- new VmPregCompileException (line 683)
+- new VmPregAstCharNode (line 697)
+- new VmPregCompileException (line 707)
+- new VmPregAstCharNode (line 710)
+- new VmPregAstClassNode (line 715)
+- new VmPregAstClassNode (line 716)
+- new VmPregAstClassNode (line 717)
+- new VmPregAstClassNode (line 718)
+- new VmPregAstClassNode (line 719)
+- new VmPregAstClassNode (line 720)
+- new VmPregAstBolNode (line 721)
+- new VmPregAstKeepOutNode (line 722)
+- new VmPregAstEolNode (line 723)
+- new VmPregAstEolNode (line 724)
+- new VmPregAstCharNode (line 725)
+- new VmPregBacktrackLimitException (line 784)
+- 65 class method(s)
 
 ### `ext/standard/VmPregFailure.php`
 
@@ -12771,7 +12771,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregPattern.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/standard/VmPregPure.php`
 
@@ -13078,15 +13078,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSession.php`
 
 **Warnings** (review for bootstrap subset):
-- new Variable (line 101)
-- new HashTable (line 274)
-- new HashTable (line 340)
-- new HashTable (line 362)
-- new HashTable (line 467)
-- new HashTable (line 473)
-- new HashTable (line 479)
-- new HashTable (line 485)
-- new HashTable (line 512)
+- new Variable (line 103)
+- new HashTable (line 276)
+- new HashTable (line 342)
+- new HashTable (line 364)
+- new HashTable (line 469)
+- new HashTable (line 475)
+- new HashTable (line 481)
+- new HashTable (line 487)
+- new HashTable (line 514)
 - 37 class method(s)
 
 ### `ext/standard/VmSessionSerializer.php`
@@ -16513,9 +16513,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_filter.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 91)
-- new Variable (line 93)
-- new Variable (line 99)
+- new HashTable (line 92)
+- new Variable (line 94)
+- new Variable (line 100)
 - 4 class method(s)
 
 ### `ext/standard/preg_grep.php`
@@ -16561,9 +16561,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace_callback.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 96)
-- new Variable (line 119)
-- new Variable (line 125)
+- new HashTable (line 97)
+- new Variable (line 120)
+- new Variable (line 126)
 - 4 class method(s)
 
 ### `ext/standard/preg_replace_callback_array.php`
