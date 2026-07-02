@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
-use PHPCompiler\ext\standard\JitGetObjectVars;
 use PHPCompiler\JIT\Builtin\CastArrayRuntime;
+use PHPCompiler\JIT\CastArrayShared;
 
 /**
  * Native-type (array) cast lowering — extracted from CastHelper (#10244).
@@ -25,11 +25,7 @@ final class CastArrayNativeJit
             return new Variable($context, Variable::TYPE_HASHTABLE, Variable::KIND_VALUE, $copy);
         }
         if (Variable::TYPE_OBJECT === $src->type) {
-            $valuePtr = JitGetObjectVars::invoke($context, $src, true);
-            $array = HashTableHelper::emptyVariable($context);
-            $array->value = $valuePtr;
-
-            return $array;
+            return CastArrayShared::emitObjectOperandToArray($context, $src, true);
         }
         if (Variable::TYPE_NULL === $src->type) {
             return HashTableHelper::emptyVariable($context);

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\ext\standard\JitGetObjectVars;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\CastArrayShared;
@@ -67,9 +66,7 @@ final class CastArrayValueBoxJit
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($objectBlock);
-        $objCast = JitGetObjectVars::invoke($context, $src, true);
-        $arrayFromObj = HashTableHelper::emptyVariable($context);
-        $arrayFromObj->value = $objCast;
+        $arrayFromObj = CastArrayShared::emitObjectOperandToArray($context, $src, true);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($nullBlock);
