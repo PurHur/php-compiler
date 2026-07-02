@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StatPathRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\VM\ErrorReporter;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** Shared E_WARNING emission for stdlib JIT/AOT builtins (php-src trigger_error parity). */
@@ -41,6 +44,37 @@ final class JitBuiltinWarning
 
     public static function emitPathOpenFailed(Context $context, Value $pathStr, string $function): void
     {
+        StatPathRuntime::ensureLinked($context);
+        $isFile = JitStat::pathIsFile($context, $pathStr);
+        $i1 = $context->getTypeFromString('int1');
+        $isFileBool = $context->builder->icmp(
+            Builder::INT_NE,
+            $isFile,
+            $i1->constInt(0, false)
+        );
+
+        $fileBlock = BasicBlockHelper::append($context, 'path_open_file');
+        $missingBlock = BasicBlockHelper::append($context, 'path_open_missing');
+        $doneBlock = BasicBlockHelper::append($context, 'path_open_done');
+        $context->builder->branchIf($isFileBool, $fileBlock, $missingBlock);
+
+        $context->builder->positionAtEnd($fileBlock);
+        self::emitPathOpenDirFailedMessage($context, $pathStr, $function, 'Not a directory');
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($missingBlock);
+        self::emitPathOpenDirFailedMessage($context, $pathStr, $function, 'No such file or directory');
+        $context->builder->branch($doneBlock);
+
+        $context->builder->positionAtEnd($doneBlock);
+    }
+
+    private static function emitPathOpenDirFailedMessage(
+        Context $context,
+        Value $pathStr,
+        string $function,
+        string $reason
+    ): void {
         $map = $context->structFieldMap['__string__'];
         $pathPtr = $context->builder->structGep($pathStr, $map['value']);
         $sizeT = $context->getTypeFromString('size_t');
@@ -51,7 +85,7 @@ final class JitBuiltinWarning
         $buf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufSize);
         $bufChar = $context->builder->pointerCast($buf, $charPtr);
         $fmt = $context->builder->pointerCast(
-            $context->constantFromString('%s(%s): Failed to open directory: No such file or directory'),
+            $context->constantFromString('%s(%s): Failed to open directory: '.$reason),
             $charPtr
         );
         $fnPtr = $context->builder->pointerCast($context->constantFromString($function), $charPtr);
