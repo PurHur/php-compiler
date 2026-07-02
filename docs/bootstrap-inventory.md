@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3722 |
-| Phase A inventory files (M2 ratio SSOT) | 3722 |
+| PHP files on vm.php path | 3724 |
+| Phase A inventory files (M2 ratio SSOT) | 3724 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10118 |
+| Source constructs flagged (warnings) | 10120 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -494,6 +494,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
 | `ext/standard/BuiltinEnums.php` | 0 | 19 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
+| `ext/standard/CeilJitHelper.php` | 0 | 1 |
 | `ext/standard/CharInMaskJitHelper.php` | 0 | 1 |
 | `ext/standard/CheckdateJitHelper.php` | 0 | 1 |
 | `ext/standard/CheckdnsrrJitHelper.php` | 0 | 1 |
@@ -2595,6 +2596,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathAtan2.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvert.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvertRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/MathCeil.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathCos.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathExp.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
@@ -7109,6 +7111,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Module (line 35)
 - new Module (line 57)
 - 3 class method(s)
+
+### `ext/standard/CeilJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/CharInMaskJitHelper.php`
 
@@ -12749,7 +12756,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 61 class method(s)
+- 62 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -20890,6 +20897,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 295)
 - 10 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/MathCeil.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/MathCos.php`
 

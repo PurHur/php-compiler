@@ -809,6 +809,12 @@ final class VmMath
         return \floor($num);
     }
 
+    /** ceil() — round toward positive infinity (php-src ext/standard/math.c). */
+    public static function ceil(float $num): float
+    {
+        return \ceil($num);
+    }
+
     /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
     public static function atan2(float $y, float $x): float
     {
