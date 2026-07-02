@@ -385,6 +385,7 @@ final class VmDateTimeNative
                 ),
                 'microsecond' => $microsecond,
                 'timezone' => $useTz !== $tzName ? $useTz : null,
+                'utc_z' => str_ends_with($time, 'Z'),
             ];
         }
         if (1 === preg_match(
@@ -616,8 +617,9 @@ final class VmDateTimeNative
 
         try {
             $parsed = self::parseDateTime($date, $tzName);
+            $result = self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
 
-            return self::parseResultFromTimestamp($parsed['timestamp'], $parsed['microsecond']);
+            return self::applyParseTimezoneMetadata($result, $parsed, $date);
         } catch (NativeDateMalformedStringException) {
             return self::parseUnrecognizedDateString($date);
         }
@@ -1507,6 +1509,72 @@ final class VmDateTimeNative
             $result['warnings'] = $warnings;
         }
         $result['is_localtime'] = true;
+
+        return self::withZoneTypeZeroMetadata($result);
+    }
+
+    /**
+     * php-src timelib — numeric offset suffix metadata for date_parse() (#14806).
+     *
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withOffsetTimezoneMetadata(array $result, int $offsetSeconds): array
+    {
+        $result['zone_type'] = 1;
+        $result['zone'] = $offsetSeconds;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withUtcTimezoneMetadata(array $result): array
+    {
+        $result['zone_type'] = 2;
+        $result['zone'] = 0;
+        $result['is_dst'] = false;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     *
+     * @return array<string, mixed>
+     */
+    private static function withZoneTypeZeroMetadata(array $result): array
+    {
+        $result['zone_type'] = 0;
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $result
+     * @param array{timestamp: int, microsecond: int, timezone?: string|null, utc_z?: bool} $parsed
+     *
+     * @return array<string, mixed>
+     */
+    private static function applyParseTimezoneMetadata(array $result, array $parsed, string $date): array
+    {
+        if (!empty($parsed['utc_z'])) {
+            return self::withUtcTimezoneMetadata($result);
+        }
+        $embedded = $parsed['timezone'] ?? null;
+        if (\is_string($embedded) && '' !== $embedded) {
+            $offset = self::parseNumericTimezoneOffset($embedded);
+            if (null !== $offset) {
+                return self::withOffsetTimezoneMetadata($result, $offset);
+            }
+
+            return self::withNamedTimezoneMetadata($result, $embedded);
+        }
 
         return $result;
     }
