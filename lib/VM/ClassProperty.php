@@ -66,7 +66,11 @@ class ClassProperty {
 
     public function getVariable(): Variable {
         $var = clone $this->prototype;
-        if (!is_null($this->default) && !$this->hasRuntimeDefaultInit()) {
+        if (
+            !is_null($this->default)
+            && !$this->hasRuntimeDefaultInit()
+            && !($this->readonly && $this->fromConstructorPromotion)
+        ) {
             $var->copyFrom($this->default);
         }
 

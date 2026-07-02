@@ -10952,7 +10952,11 @@ class JIT {
                     if ($op->propertyReadonly || $this->context->scope->classIsReadonly) {
                         $this->context->type->object->markPropertyReadonly($classId, $name->value);
                     }
-                    if (null !== $op->arg2 && isset($block->constants[$op->arg2])) {
+                    if (
+                        null !== $op->arg2
+                        && isset($block->constants[$op->arg2])
+                        && !($op->propertyReadonly && $op->propertyFromConstructorPromotion)
+                    ) {
                         $this->context->type->object->definePropertyDefault(
                             $classId,
                             $name->value,
