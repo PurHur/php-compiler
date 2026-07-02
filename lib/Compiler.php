@@ -1082,6 +1082,25 @@ class Compiler {
         return $expr instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($expr);
     }
 
+    /** Explicit null literal in a call arg list — not a hoisted inline closure temp (#14893). */
+    private function callArgIsNullLiteral(?Operand $arg): bool
+    {
+        if (null === $arg) {
+            return false;
+        }
+        if ($arg instanceof Operand\NullOperand) {
+            return true;
+        }
+        if ($this->exprIsNullConst($arg)) {
+            return true;
+        }
+        if ($arg instanceof Op\Expr\ConstFetch && $this->constFetchIsNull($arg)) {
+            return true;
+        }
+
+        return false;
+    }
+
     private function constFetchIsNull(Op\Expr\ConstFetch $fetch): bool
     {
         $name = $fetch->name;
@@ -20942,6 +20961,9 @@ class Compiler {
     /** Inline or assigned closure comparators must not consume hoisted enum prelude slots (#8947). */
     private function callArgOperandIsClosureValue(Operand $operand, Block $block, ?string $calleeName = null): bool
     {
+        if ($this->callArgIsNullLiteral($operand)) {
+            return false;
+        }
         if ($this->isEmbeddedCallLiteralArg($operand)) {
             return false;
         }
@@ -22577,6 +22599,7 @@ class Compiler {
                     null !== $closureSlot
                     && null === $assignedNamedLocal
                     && !$this->isNamedVariableOperand($arg)
+                    && !$this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
                 ) {
@@ -23119,13 +23142,25 @@ class Compiler {
                 }
             } elseif (
                 null !== $cfgCallOp
+                && null === $valueSlot
                 && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                && !$this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
                 && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
                 && !$this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
             ) {
                 $closureSlot = $this->slotForRecentClosureCallArg($block);
                 if (null !== $closureSlot) {
                     $valueSlot = $closureSlot;
+                }
+            }
+            if (
+                null === $valueSlot
+                && null !== $cfgCallOp
+                && $this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
+            ) {
+                $nullArg = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                if ($nullArg instanceof Operand) {
+                    $valueSlot = $this->registerNullConstantSlot($block, $nullArg);
                 }
             }
             if (null !== $cfgCallOp) {
