@@ -3395,6 +3395,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetAttributes.php
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosure.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureScopeClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetClosureThis.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetDeclaringClass.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetDeprecatedMessage.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetDeprecatedVersion.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/ReflectionMethodGetDocComment.php';
