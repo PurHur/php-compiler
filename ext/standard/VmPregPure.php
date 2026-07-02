@@ -171,8 +171,8 @@ final class VmPregPure
                 }
                 $elemCount = 0;
                 $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $elemCount);
-                if (false === $replaced) {
-                    return false;
+                if (false === $replaced || null === $replaced) {
+                    return $replaced;
                 }
                 $out[$key] = $replaced;
                 $totalCount += $elemCount;
@@ -351,8 +351,8 @@ final class VmPregPure
                 if (1 === self::pregMatch($pattern, $item)) {
                     $itemCount = 0;
                     $replaced = self::pregReplaceString($pattern, $replacement, $item, $limit, $itemCount);
-                    if (false === $replaced) {
-                        return false;
+                    if (false === $replaced || null === $replaced) {
+                        return $replaced;
                     }
                     $totalCount += $itemCount;
                     $out[$key] = $replaced;
@@ -389,7 +389,7 @@ final class VmPregPure
         string $subject,
         int $limit,
         ?int &$count = null
-    ): string|false {
+    ): string|null|false {
         $emptyParsed = PregEmptyPatternReplace::parseEmptyPattern($pattern);
         if (null !== $emptyParsed) {
             [, $opts] = $emptyParsed;
@@ -413,12 +413,14 @@ final class VmPregPure
         if (null === $parsed) {
             self::$lastError = 1;
 
-            return false;
+            return null;
         }
         [$regex, $opts] = $parsed;
         $compiled = self::compile($pattern);
         if (null === $compiled) {
-            return false;
+            self::$lastError = 1;
+
+            return null;
         }
 
         $out = '';
