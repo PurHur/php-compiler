@@ -299,6 +299,7 @@ final class BuiltinParamNames
             case 'is_dir':
             case 'is_readable':
             case 'is_writable':
+            case 'is_writeable':
             case 'is_executable':
             case 'is_link':
             case 'stat':
