@@ -302,29 +302,29 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($closure->methods['getcurrent']));
     }
 
-    public function testSupportsDomNodeContainsFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeContainsOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeContains());
+        $this->assertTrue(CompilerVersion::supportsDomNodeContains());
     }
 
-    public function testVmDoesNotRegisterDomNodeContainsOnReferenceProfile(): void
+    public function testVmRegistersDomNodeContainsOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $node = $runtime->vmContext->classes['domnode'] ?? null;
         $this->assertNotNull($node);
-        $this->assertFalse(isset($node->methods['contains']));
+        $this->assertTrue(isset($node->methods['contains']));
     }
 
-    public function testSupportsDomNodeGetRootNodeFalseOnReferenceProfile(): void
+    public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
+        $this->assertTrue(CompilerVersion::supportsDomNodeGetRootNode());
     }
 
-    public function testVmDoesNotRegisterDomNodeGetRootNodeOnReferenceProfile(): void
+    public function testVmRegistersDomNodeGetRootNodeOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $node = $runtime->vmContext->classes['domnode'] ?? null;
         $this->assertNotNull($node);
-        $this->assertFalse(isset($node->methods['getrootnode']));
+        $this->assertTrue(isset($node->methods['getrootnode']));
     }
 }
