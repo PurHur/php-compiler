@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathCosh;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class cosh extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\cosh($num));
+        $frame->returnVar->float(VmMath::cosh($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class cosh extends Internal
             throw new \LogicException('cosh() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'cosh', 'float');
-        $fn = $context->lookupFunction('cosh');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathCosh::invoke($context, $asFloat);
     }
 
 }
