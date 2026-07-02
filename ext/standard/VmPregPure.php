@@ -340,7 +340,7 @@ final class VmPregPure
 
     public static function patternWarningMessage(string $pattern): ?string
     {
-        return VmPregPattern::patternWarningMessage($pattern);
+        return VmPregPattern::compileWarningMessage($pattern);
     }
 
     private static function pregReplaceString(

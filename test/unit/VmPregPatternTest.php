@@ -24,6 +24,15 @@ final class VmPregPatternTest extends TestCase
         $this->assertSame('Empty regular expression', VmPregPattern::patternWarningMessage(''));
     }
 
+    /** Issue #14880 — PCRE compile failures surface Zend-style warning text. */
+    public function testCompileWarningMessageForUnclosedGroup(): void
+    {
+        $this->assertSame(
+            'Compilation failed: missing closing parenthesis at offset 1',
+            VmPregPattern::compileWarningMessage('/(/')
+        );
+    }
+
     public function testVmPregPureDelegatesPatternParseToVmPregPattern(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmPregPure.php');

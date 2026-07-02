@@ -11,6 +11,8 @@ namespace PHPCompiler\ext\standard;
  */
 final class VmPregEngine
 {
+    private static ?VmPregCompileException $lastCompileException = null;
+
     private const OPT_CASELESS = 0x00000008;
 
     private const OPT_DOTALL = 0x00000020;
@@ -73,11 +75,20 @@ final class VmPregEngine
         return $this->matchStart;
     }
 
+    public static function consumeLastCompileException(): ?VmPregCompileException
+    {
+        $exception = self::$lastCompileException;
+        self::$lastCompileException = null;
+
+        return $exception;
+    }
+
     /**
      * @return array{0: VmPregAstNode, 1: array<string, int>, 2: int}|null
      */
     public static function compile(string $regex, int $opts): ?array
     {
+        self::$lastCompileException = null;
         $engine = new self();
         $engine->applyOptions($opts);
         try {
@@ -87,7 +98,9 @@ final class VmPregEngine
             }
 
             return [$ast, $engine->groupNameToIndex, $engine->nextGroup - 1];
-        } catch (VmPregCompileException) {
+        } catch (VmPregCompileException $e) {
+            self::$lastCompileException = $e;
+
             return null;
         }
     }
@@ -192,7 +205,7 @@ final class VmPregEngine
         }
         $node = $this->parseAlternation();
         if (!$this->atEnd()) {
-            throw new VmPregCompileException();
+            throw new VmPregCompileException('unexpected end of pattern', $this->pos);
         }
 
         return $node;
@@ -435,6 +448,7 @@ final class VmPregEngine
 
     private function parseGroup(): VmPregAstNode
     {
+        $openPos = $this->pos;
         $this->advance(1);
         $capture = true;
         $name = null;
@@ -486,7 +500,7 @@ final class VmPregEngine
         }
         $inner = $this->parseAlternation();
         if ($this->peek() !== ')') {
-            throw new VmPregCompileException();
+            throw new VmPregCompileException('missing closing parenthesis', $openPos);
         }
         $this->advance(1);
         if (!$capture) {
@@ -1057,6 +1071,12 @@ interface VmPregAstNode
 
 final class VmPregCompileException extends \Exception
 {
+    public function __construct(
+        public readonly string $compileMessage = 'Internal error',
+        public readonly int $compileOffset = 0,
+    ) {
+        parent::__construct($compileMessage);
+    }
 }
 
 final class VmPregAstEmptyNode implements VmPregAstNode
