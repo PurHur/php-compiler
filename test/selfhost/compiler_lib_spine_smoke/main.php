@@ -616,6 +616,7 @@ require_once __DIR__.'/../../../ext/standard/HtmlspecialcharsDecodeJitHelper.php
 require_once __DIR__.'/../../../ext/standard/HttpBuildQueryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpResponseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpStatusEnumData.php';
+require_once __DIR__.'/../../../ext/standard/HypotJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/IdateJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Ieee754.php';
 require_once __DIR__.'/../../../ext/standard/InArrayJitHelper.php';
@@ -2646,6 +2647,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/ListUnpackRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathBaseConvert.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathBaseConvertRuntime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathFmod.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MathHypot.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathLdexp.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathNextafter.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MbStrcut.php';
