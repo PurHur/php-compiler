@@ -48,11 +48,12 @@ final class CastArrayShared
         return self::wrapScalarInArray($context, $src);
     }
 
-    /** Zend convert_to_array: Resource pseudo-class embeds resource at index 0 (#15012, #15013). */
+    /** Zend convert_to_array: Resource/Closure pseudo-classes embed zval at index 0 (#15012, #15015). */
     public static function emitObjectOperandToArray(Context $context, Variable $src, bool $mangledKeys = true): Variable
     {
         $resourceClassId = self::resourceClassIdIfRegistered($context);
-        if (null === $resourceClassId) {
+        $closureClassId = self::closureClassIdIfRegistered($context);
+        if (null === $resourceClassId && null === $closureClassId) {
             return self::emitGetObjectVarsArray($context, $src, $mangledKeys);
         }
 
@@ -61,20 +62,34 @@ final class CastArrayShared
         $classId = $context->builder->load(
             $context->builder->structGep($objPtr, $objMap['class_id'])
         );
-        $isResource = $context->builder->icmp(
-            Builder::INT_EQ,
-            $classId,
-            $context->constantFromInteger($resourceClassId, 'int64')
-        );
+        $isSingleton = null;
+        if (null !== $resourceClassId) {
+            $isResource = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($resourceClassId, 'int64')
+            );
+            $isSingleton = $isResource;
+        }
+        if (null !== $closureClassId) {
+            $isClosure = $context->builder->icmp(
+                Builder::INT_EQ,
+                $classId,
+                $context->constantFromInteger($closureClassId, 'int64')
+            );
+            $isSingleton = null !== $isSingleton
+                ? $context->builder->or($isSingleton, $isClosure)
+                : $isClosure;
+        }
 
-        $resourceBlock = BasicBlockHelper::append($context, 'cast_array_obj_res');
+        $singletonBlock = BasicBlockHelper::append($context, 'cast_array_obj_singleton');
         $plainBlock = BasicBlockHelper::append($context, 'cast_array_obj_plain');
         $mergeBlock = BasicBlockHelper::append($context, 'cast_array_obj_merge');
         $doneBlock = BasicBlockHelper::append($context, 'cast_array_obj_done');
 
-        $context->builder->branchIf($isResource, $resourceBlock, $plainBlock);
+        $context->builder->branchIf($isSingleton, $singletonBlock, $plainBlock);
 
-        $context->builder->positionAtEnd($resourceBlock);
+        $context->builder->positionAtEnd($singletonBlock);
         $wrapped = self::wrapResourceInArray($context, $src);
         $context->builder->branch($mergeBlock);
 
@@ -84,7 +99,7 @@ final class CastArrayShared
 
         $context->builder->positionAtEnd($mergeBlock);
         $phi = $context->builder->phi($wrapped->value->typeOf());
-        $phi->addIncoming($wrapped->value, $resourceBlock);
+        $phi->addIncoming($wrapped->value, $singletonBlock);
         $phi->addIncoming($fromObj->value, $plainBlock);
         $context->builder->branch($doneBlock);
         $context->builder->positionAtEnd($doneBlock);
@@ -92,6 +107,16 @@ final class CastArrayShared
         $result->value = $phi;
 
         return $result;
+    }
+
+    private static function closureClassIdIfRegistered(Context $context): ?int
+    {
+        $object = $context->type->object;
+        if (!$object instanceof ObjectBuiltin) {
+            return null;
+        }
+
+        return $object->lookup('closure');
     }
 
     private static function resourceClassIdIfRegistered(Context $context): ?int
