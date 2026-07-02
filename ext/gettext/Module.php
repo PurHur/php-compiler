@@ -21,6 +21,7 @@ class Module extends ModuleAbstract
             new dgettext(),
             new dcgettext(),
             new dngettext(),
+            new ngettext(),
             new dcngettext(),
             new bind_textdomain_codeset(),
         ];

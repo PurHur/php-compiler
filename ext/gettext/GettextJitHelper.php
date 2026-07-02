@@ -27,6 +27,11 @@ final class GettextJitHelper
         return VmGettextNative::dcgettext($domain, $msgid, $category);
     }
 
+    public static function ngettextArgv(string $msgid1, string $msgid2, int $count): string
+    {
+        return VmGettextNative::ngettext($msgid1, $msgid2, $count);
+    }
+
     public static function dngettextArgv(string $domain, string $msgid1, string $msgid2, int $count): string
     {
         return VmGettextNative::dngettext($domain, $msgid1, $msgid2, $count);
