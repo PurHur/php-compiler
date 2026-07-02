@@ -9,8 +9,10 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Metric | Count |
 |--------|------:|
 | PHP files on vm.php path | 3664 |
-| PWrote /app/var/workspaces/256982f1-55cc-4550-8ad9-9247265a4aa1/repo/docs/bootstrap-inventory.md (3664 files on vm.php path, 3664 Phase A inventory files, 0 blockers)
-s) | 9995 |
+| Phase A inventory files (M2 ratio SSOT) | 3664 |
+| Phase A ratio-deferred paths | 0 |
+| Source constructs flagged (blockers) | 0 |
+| Source constructs flagged (warnings) | 9995 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
