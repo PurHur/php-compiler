@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
+use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 
 final class VmDate
@@ -302,6 +303,35 @@ final class VmDate
         }
 
         return $ht;
+    }
+
+    /**
+     * Coerce optional ?int timestamp with caller strict_types (ext/date/php_date.c, #14892).
+     *
+     * @throws \TypeError when strict_types rejects float or operand is not int|null
+     */
+    public static function coerceNullableTimestampArgForFrame(
+        Frame $frame,
+        int $argIndex,
+        string $function,
+        int $userArgIndex,
+        string $paramName = 'timestamp'
+    ): ?int {
+        $var = $frame->calledArgs[$argIndex];
+        $resolved = $var->resolveIndirect();
+        if (Variable::TYPE_NULL === $resolved->type) {
+            return null;
+        }
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            InternalStrictArg::requireNullableInt($frame, $argIndex, $function, $paramName);
+
+            return $resolved->toInt();
+        }
+        if (Variable::TYPE_FLOAT === $resolved->type && null !== $frame->vmContext) {
+            VmMath::warnFloatToIntPrecisionLoss($resolved->toFloat(), $frame->vmContext, $frame);
+        }
+
+        return self::coerceNullableTimestampArg($var, $function, $userArgIndex, $paramName);
     }
 
     /**

@@ -42,7 +42,7 @@ final class strtotime extends Internal
         if (2 === $argc) {
             $baseVar = $frame->calledArgs[1]->resolveIndirect();
             if (Variable::TYPE_NULL !== $baseVar->type) {
-                $now = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'strtotime', 2, 'baseTimestamp');
+                $now = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'strtotime', 2, 'baseTimestamp');
             }
         }
         $result = VmDateTimeNative::strtotime($time, $now);

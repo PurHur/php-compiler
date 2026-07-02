@@ -46,7 +46,7 @@ final class idate extends Internal
         }
         $timestamp = VmDate::time();
         if (2 === $argc) {
-            $coerced = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'idate', 2, 'timestamp');
+            $coerced = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'idate', 2, 'timestamp');
             if (null !== $coerced) {
                 $timestamp = $coerced;
             }

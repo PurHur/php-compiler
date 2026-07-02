@@ -32,6 +32,12 @@ final class JitDateTimestampArg
             return $context->helper->loadValue($arg);
         }
         if (JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+            if ($context->callerStrictTypes) {
+                self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+
+                return $whenNull;
+            }
+
             return $context->builder->fpToSi(
                 $context->helper->loadValue($arg),
                 $context->getTypeFromString('int64')
@@ -157,11 +163,16 @@ final class JitDateTimestampArg
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($floatBlock);
-        $doubleVal = $context->builder->call(
-            $context->lookupFunction('__value__readDouble'),
-            $valuePtr
-        );
-        $floatLong = $context->builder->fpToSi($doubleVal, $context->getTypeFromString('int64'));
+        if ($context->callerStrictTypes) {
+            self::emitTypeErrorAndAbort($context, $function, $argIndex, $paramName, 'float');
+            $floatLong = $whenNull;
+        } else {
+            $doubleVal = $context->builder->call(
+                $context->lookupFunction('__value__readDouble'),
+                $valuePtr
+            );
+            $floatLong = $context->builder->fpToSi($doubleVal, $context->getTypeFromString('int64'));
+        }
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($mergeBlock);
