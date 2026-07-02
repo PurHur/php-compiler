@@ -59,6 +59,8 @@ final class IniJitHelper
         'zend.enable_gc' => true,
         'session.use_cookies' => true,
         'session.use_only_cookies' => true,
+        'allow_url_fopen' => true,
+        'allow_url_include' => false,
     ];
 
     private const READONLY_STRING_DEFAULTS = [
@@ -68,6 +70,12 @@ final class IniJitHelper
         'realpath_cache_ttl' => '120',
         'post_max_size' => '8M',
         'upload_max_filesize' => '2M',
+        'default_socket_timeout' => '60',
+        'auto_detect_line_endings' => '0',
+        'default_mimetype' => 'text/html',
+        'variables_order' => 'GPCS',
+        'request_order' => 'GP',
+        'arg_separator.output' => '&',
     ];
 
     private const CFG_MAX_EXECUTION_TIME = '0';
