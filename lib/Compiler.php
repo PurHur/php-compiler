@@ -17140,6 +17140,9 @@ class Compiler {
             if ($next instanceof Op\Expr\ConstFetch || $next instanceof Op\Expr\ClassConstFetch) {
                 continue;
             }
+            if ($next instanceof Op\Expr\New_ || $next instanceof Op\Expr\Clone_) {
+                continue;
+            }
             break;
         }
 
@@ -17399,6 +17402,10 @@ class Compiler {
                 // array_udiff(array_keys(...), array_keys(...), strcmp(...)) — trailing FCC (#13990).
                 continue;
             }
+            // is_countable(new ArrayObject()) — New_ prelude between hoisted sibling producers (#14958).
+            if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
             if (!$this->isSiblingInlineCallProducerExpr($mid)) {
                 return false;
             }
@@ -17469,6 +17476,9 @@ class Compiler {
             if ($sib instanceof Op\Expr\ArrowFunction
                 || $sib instanceof Op\Expr\Closure
                 || $sib instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
+            if ($sib instanceof Op\Expr\New_ || $sib instanceof Op\Expr\Clone_) {
                 continue;
             }
             if (!$this->isSiblingInlineCallProducerExpr($sib)) {
@@ -17570,6 +17580,9 @@ class Compiler {
                 || $mid instanceof Op\Expr\FirstClassCallable) {
                 continue;
             }
+            if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
 
             return $this->isSiblingInlineCallProducerExpr($mid);
         }
@@ -17625,6 +17638,10 @@ class Compiler {
             if ($stmt instanceof Op\Expr\ArrowFunction
                 || $stmt instanceof Op\Expr\Closure
                 || $stmt instanceof Op\Expr\FirstClassCallable) {
+                continue;
+            }
+            // var_dump(is_countable(null), is_countable(new ArrayObject())) — New_ between producers (#14958).
+            if ($stmt instanceof Op\Expr\New_ || $stmt instanceof Op\Expr\Clone_) {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($stmt)) {
@@ -17792,6 +17809,10 @@ class Compiler {
                 --$i;
                 continue;
             }
+            if ($child instanceof Op\Expr\New_ || $child instanceof Op\Expr\Clone_) {
+                --$i;
+                continue;
+            }
             break;
         }
         $first = $i + 1;
@@ -17813,6 +17834,10 @@ class Compiler {
                 continue;
             }
             if ($this->isUnaryInlineSiblingCallArgExpr($skip)) {
+                ++$first;
+                continue;
+            }
+            if ($skip instanceof Op\Expr\New_ || $skip instanceof Op\Expr\Clone_) {
                 ++$first;
                 continue;
             }
