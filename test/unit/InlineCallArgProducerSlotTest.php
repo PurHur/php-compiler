@@ -283,6 +283,40 @@ PHP;
         self::assertSame("int(1)\nint(2)\n", ob_get_clean());
     }
 
+    /** Issue #14958 — var_dump(is_countable(null), …, is_countable(new ArrayObject())) wires all sibling slots. */
+    public function testIsCountableVarDumpMultiArgWithNewPrelude(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_dump(is_countable(null), is_countable([]), is_countable(new ArrayObject()));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'is_countable_var_dump_multi_arg.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        $varDumpSends = \array_slice($sendSlots, -3);
+        self::assertCount(3, $varDumpSends);
+        self::assertNotSame($varDumpSends[0], $varDumpSends[1], 'distinct slots 0/1');
+        self::assertNotSame($varDumpSends[0], $varDumpSends[2], 'distinct slots 0/2');
+        self::assertNotSame($varDumpSends[1], $varDumpSends[2], 'distinct slots 1/2');
+        foreach ($varDumpSends as $slot) {
+            self::assertContains($slot, $returnSlots, 'fcall returns='.json_encode($returnSlots));
+        }
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("bool(false)\nbool(true)\nbool(true)\n", ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
