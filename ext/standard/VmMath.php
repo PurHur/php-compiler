@@ -833,6 +833,18 @@ final class VmMath
         return \atan($num);
     }
 
+    /** deg2rad() — degrees to radians (php-src ext/standard/math.c). */
+    public static function deg2rad(float $num): float
+    {
+        return (\M_PI / 180.0) * $num;
+    }
+
+    /** rad2deg() — radians to degrees (php-src ext/standard/math.c). */
+    public static function rad2deg(float $num): float
+    {
+        return (180.0 / \M_PI) * $num;
+    }
+
     /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
     public static function atan2(float $y, float $x): float
     {
