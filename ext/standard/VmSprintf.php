@@ -331,6 +331,10 @@ final class VmSprintf
                 return self::formatGeneral(self::argToFloat($var, $frame), false, $floatPrec, $showSign);
             case 'G':
                 return self::formatGeneral(self::argToFloat($var, $frame), true, $floatPrec, $showSign);
+            case 'h':
+                return self::formatGeneralFixed(self::argToFloat($var, $frame), false, $floatPrec, $showSign);
+            case 'H':
+                return self::formatGeneralFixed(self::argToFloat($var, $frame), true, $floatPrec, $showSign);
             case 'a':
                 return self::formatHexFloat(self::argToFloat($var, $frame), false, $precision, $showSign);
             case 'A':
@@ -601,7 +605,14 @@ final class VmSprintf
             return self::positiveFloatSignPrefix($value, $showSign).'0';
         }
         if ($abs < 1e-4 || $abs >= 1e6) {
-            return self::trimGeneralScientific(self::formatScientific($value, $upper, $precision, $showSign));
+            return self::trimGeneralScientific(
+                self::formatScientific(
+                    $value,
+                    $upper,
+                    self::generalFormatScientificPrecision($precision),
+                    $showSign
+                )
+            );
         }
         $formatted = VmNumberFormat::format($value, $precision, '.', '');
         if (str_contains($formatted, '.')) {
@@ -609,6 +620,53 @@ final class VmSprintf
         }
 
         return self::applyFloatSignPrefix($value, $formatted, $showSign);
+    }
+
+    /** php-src sprintf.c — %h / %H (general format using non-locale %F; PHP 8.0+). */
+    private static function formatGeneralFixed(
+        float $value,
+        bool $upper,
+        int $precision = 6,
+        ?string $showSign = null
+    ): string {
+        if (\is_nan($value)) {
+            return 'NaN';
+        }
+        if (\is_infinite($value)) {
+            return ($value < 0 ? '-' : self::positiveFloatSignPrefix($value, $showSign)).'INF';
+        }
+        $abs = \abs($value);
+        if (0.0 === $abs) {
+            if (Ieee754::isNegativeZero($value)) {
+                return '-0';
+            }
+
+            return self::positiveFloatSignPrefix($value, $showSign).'0';
+        }
+        if ($abs < 1e-4 || $abs >= 1e6) {
+            return self::trimGeneralScientific(
+                self::formatScientific(
+                    $value,
+                    $upper,
+                    self::generalFormatScientificPrecision($precision),
+                    $showSign
+                )
+            );
+        }
+        $formatted = self::formatFixed($value, $precision, $showSign);
+        if (str_contains($formatted, '.')) {
+            $formatted = \rtrim(\rtrim($formatted, '0'), '.');
+        }
+
+        return $formatted;
+    }
+
+    /** php-src sprintf.c — %g/%G/%h/%H scientific branch uses precision P−1. */
+    private static function generalFormatScientificPrecision(int $precision): int
+    {
+        $p = 0 === $precision ? 1 : $precision;
+
+        return max(0, $p - 1);
     }
 
     /** php-src ext/standard/sprintf.c — SIGN flag on float conversions (#11779). */
@@ -643,6 +701,9 @@ final class VmSprintf
             return $scientific;
         }
         $mantissa = \rtrim(\rtrim($m[2], '0'), '.');
+        if (!str_contains($mantissa, '.') && str_contains($m[2], '.')) {
+            $mantissa .= '.0';
+        }
         if ('' === $mantissa || '.' === $mantissa) {
             $mantissa = '0';
         }
