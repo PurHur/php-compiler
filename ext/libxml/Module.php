@@ -38,6 +38,7 @@ class Module extends ModuleAbstract
             new libxml_get_errors(),
             new libxml_get_last_error(),
             new libxml_clear_errors(),
+            new libxml_set_streams_context(),
         ];
     }
 }

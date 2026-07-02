@@ -21,7 +21,7 @@ final class LibxmlInternalErrorsTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['libxml_use_internal_errors', 'libxml_get_errors', 'libxml_get_last_error', 'libxml_clear_errors'] as $fn) {
+        foreach (['libxml_use_internal_errors', 'libxml_get_errors', 'libxml_get_last_error', 'libxml_clear_errors', 'libxml_set_streams_context'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
         self::assertTrue(VmReflection::classExists($ctx, 'LibXMLError'));
@@ -32,13 +32,14 @@ echo (int) function_exists('libxml_use_internal_errors');
 echo (int) function_exists('libxml_get_errors');
 echo (int) function_exists('libxml_get_last_error');
 echo (int) function_exists('libxml_clear_errors');
+echo (int) function_exists('libxml_set_streams_context');
 echo (int) class_exists('LibXMLError');
 echo (int) extension_loaded('libxml');
 PHP;
         $block = $runtime->parseAndCompile($code, 'libxml_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111', ob_get_clean());
+        self::assertSame('1111111', ob_get_clean());
     }
 
     public function test_libxml_get_last_error_returns_tail_or_false(): void
@@ -118,6 +119,22 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("failed\n1\nfatal\ncode73\nmessage\n0\n", ob_get_clean());
+    }
+
+    public function test_libxml_set_streams_context_accepts_stream_context(): void
+    {
+        VmLibxml::clearErrors();
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$ctx = stream_context_create(['http' => ['timeout' => 2]]);
+libxml_set_streams_context($ctx);
+echo "ok\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'libxml_streams_context.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
     }
 
     public function test_no_runtime_c_growth_for_libxml(): void

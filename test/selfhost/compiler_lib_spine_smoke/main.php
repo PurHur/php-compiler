@@ -251,6 +251,7 @@ require_once __DIR__.'/../../../ext/libxml/VmLibxml.php';
 require_once __DIR__.'/../../../ext/libxml/libxml_clear_errors.php';
 require_once __DIR__.'/../../../ext/libxml/libxml_get_errors.php';
 require_once __DIR__.'/../../../ext/libxml/libxml_get_last_error.php';
+require_once __DIR__.'/../../../ext/libxml/libxml_set_streams_context.php';
 require_once __DIR__.'/../../../ext/libxml/libxml_use_internal_errors.php';
 require_once __DIR__.'/../../../ext/lzf/JitLzf.php';
 require_once __DIR__.'/../../../ext/lzf/LzfJitHelper.php';
