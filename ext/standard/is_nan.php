@@ -13,10 +13,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathIsNan;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /**
@@ -52,10 +52,7 @@ final class is_nan extends Internal
             return $context->constantFromBool(false);
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'is_nan', 'float');
-        $fn = $context->lookupFunction('isnan');
-        $raw = $context->builder->call($fn, $asFloat);
-        $zero = $raw->typeOf()->constInt(0, false);
 
-        return $context->builder->icmp(Builder::INT_NE, $raw, $zero);
+        return MathIsNan::invoke($context, $asFloat);
     }
 }
