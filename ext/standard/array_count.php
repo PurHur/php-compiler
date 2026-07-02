@@ -63,7 +63,7 @@ final class array_count extends Internal
                 ? VmArray::countRecursive($ht, $frame)
                 : $ht->getNumElements();
         } else {
-            $result = VmArray::countValue($frame->vmContext, $v);
+            $result = VmArray::countValue($frame->vmContext, $v, $this->name);
         }
         if (null !== $frame->returnVar) {
             $frame->returnVar->int($result);
@@ -129,7 +129,7 @@ final class array_count extends Internal
     {
         TypeErrorRaise::emitRaise(
             $context,
-            'count(): Argument #1 ($value) must be of type Countable|array, '
+            $this->name.'(): Argument #1 ($value) must be of type Countable|array, '
             .$this->jitArgTypeLabel($arg).' given'
         );
     }

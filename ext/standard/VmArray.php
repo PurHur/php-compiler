@@ -1424,7 +1424,7 @@ final class VmArray
     /**
      * count() for arrays and Countable objects (Zend php_count parity, #3364).
      */
-    public static function countValue(Context $ctx, Variable $value): int
+    public static function countValue(Context $ctx, Variable $value, string $fn = 'count'): int
     {
         $v = $value->resolveIndirect();
         if (Variable::TYPE_ARRAY === $v->type) {
@@ -1434,7 +1434,7 @@ final class VmArray
             $entry = $v->toObject()->class;
             if (!InterfaceCheck::entryImplements($entry, 'countable', $ctx)) {
                 throw new \TypeError(
-                    'count(): Argument #1 ($value) must be of type Countable|array, '
+                    $fn.'(): Argument #1 ($value) must be of type Countable|array, '
                     . $entry->name . ' given'
                 );
             }
@@ -1447,7 +1447,7 @@ final class VmArray
         }
 
         throw new \TypeError(
-            'count(): Argument #1 ($value) must be of type Countable|array, '
+            $fn.'(): Argument #1 ($value) must be of type Countable|array, '
             . self::valueTypeLabel($v) . ' given'
         );
     }
