@@ -815,6 +815,12 @@ final class VmMath
         return \ceil($num);
     }
 
+    /** asin() — arc sine (php-src ext/standard/math.c). */
+    public static function asin(float $num): float
+    {
+        return \asin($num);
+    }
+
     /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
     public static function atan2(float $y, float $x): float
     {
