@@ -497,7 +497,8 @@ class VMTest extends BaseTest {
             // 8.4-target reject gate; skipped when asymmetric visibility enabled (#12508).
             if (CompilerVersion::supportsAsymmetricVisibility()
                 && (str_contains($name, 'private_set_reference_profile')
-                    || str_contains($name, 'asymmetric_double_modifier_reference_profile'))) {
+                    || str_contains($name, 'asymmetric_double_modifier_reference_profile')
+                    || str_contains($name, 'asymmetric_visibility_reference_profile'))) {
                 continue;
             }
             if (!CompilerVersion::supportsAsymmetricVisibility()
@@ -506,7 +507,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'reflection_property_asymmetric')
                     || str_contains($name, 'promoted_private_set'))
                 && !str_contains($name, 'private_set_reference_profile')
-                && !str_contains($name, 'asymmetric_double_modifier_reference_profile')) {
+                && !str_contains($name, 'asymmetric_double_modifier_reference_profile')
+                && !str_contains($name, 'asymmetric_visibility_reference_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when property hooks enabled (#12574, #14432).
