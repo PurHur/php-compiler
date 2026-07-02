@@ -6,9 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\Web\Superglobals;
 
 /**
- * array_map() single-array paths for compiled JIT/AOT modules (#10183, php-in-PHP).
+ * array_map() paths for compiled JIT/AOT modules (#10183, #14977, php-in-PHP).
  *
  * SSOT: {@see array_map} VM execute path
  * php-src: ext/standard/array.c — php_array_map()
@@ -50,6 +51,66 @@ final class ArrayMapJitHelper
         }
 
         return self::mapWithBuiltinMultipleTables($tables, $builtinName);
+    }
+
+    public static function mapWithClosure(HashTable $src, Variable $closure): HashTable
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'ArrayMapJitHelper::mapWithClosure() requires an active VM context in this compiler build'
+            );
+        }
+        $closureState = VmClosureCall::resolve($closure);
+        $out = new HashTable();
+        foreach ($src->iterateKeyed(true) as [$key, $value]) {
+            $mapped = VmClosureCall::invokeOne($ctx, $closureState, $value);
+            self::appendKeyed($out, $key, $mapped);
+        }
+
+        return $out;
+    }
+
+    /**
+     * @param HashTable $sources packed list of source arrays (JIT bridge)
+     */
+    public static function mapWithClosureMultiple(HashTable $sources, Variable $closure): HashTable
+    {
+        $ctx = Superglobals::getActiveContext();
+        if (null === $ctx) {
+            throw new \LogicException(
+                'ArrayMapJitHelper::mapWithClosureMultiple() requires an active VM context in this compiler build'
+            );
+        }
+        $tables = [];
+        foreach ($sources->iterate(true) as $value) {
+            $tables[] = $value->resolveIndirect()->toArray();
+        }
+
+        return self::mapWithClosureMultipleTables($ctx, $tables, VmClosureCall::resolve($closure));
+    }
+
+    /**
+     * @param list<HashTable> $sources
+     */
+    private static function mapWithClosureMultipleTables(
+        \PHPCompiler\VM\Context $ctx,
+        array $sources,
+        \PHPCompiler\VM\ClosureState $closure
+    ): HashTable {
+        $out = new HashTable();
+        $first = $sources[0];
+        $destIdx = 0;
+        foreach ($first->iterateKeyed(true) as [$key, $_value]) {
+            $rowArgs = [];
+            foreach ($sources as $ht) {
+                $rowArgs[] = self::valueAtKey($ht, $key);
+            }
+            $mapped = VmClosureCall::invoke($ctx, $closure, ...$rowArgs);
+            $out->addIndex($destIdx++, $mapped);
+        }
+
+        return $out;
     }
 
     /**

@@ -4,26 +4,36 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNestedHelperCoerce;
-use PHPCompiler\JIT\NestedJitCompileScope;
+use PHPCompiler\JIT\JitValueBox;
+use PHPCompiler\JIT\JitVmHelperLink;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 use PHPLLVM\Value\Function_ as LlvmFunction;
 
 /**
- * JIT/AOT link for array_map() single-array paths via ArrayMapJitHelper PHP (#10183).
+ * JIT/AOT link for array_map() via ArrayMapJitHelper PHP (#10183, #14977).
  *
- * Standalone AOT compiles {@see ArrayMapJitHelper} via nested JIT bridges (#14277); closure callbacks keep LLVM until VM bridge exists.
+ * Standalone AOT compiles {@see ArrayMapJitHelper} via nested JIT bridges (#14277); closure callbacks route through PHP (#14977).
  * SSOT: {@see \PHPCompiler\ext\standard\array_map}
  * php-src: ext/standard/array.c — php_array_map()
  */
 final class ArrayMapRuntime
 {
+    private const ABI_MAP_NULL = '__array_map__null';
+
+    private const ABI_MAP_BUILTIN = '__array_map__builtin';
+
+    private const ABI_MAP_BUILTIN_MULTI = '__array_map__builtin_multi';
+
+    private const ABI_MAP_CLOSURE = '__array_map__closure';
+
+    private const ABI_MAP_CLOSURE_MULTI = '__array_map__closure_multi';
+
     private const HELPER_PATH = '/ext/standard/ArrayMapJitHelper.php';
 
     private const MAP_NULL = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapNullIdentity';
@@ -32,11 +42,17 @@ final class ArrayMapRuntime
 
     private const MAP_BUILTIN_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithBuiltinMultiple';
 
+    private const MAP_CLOSURE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithClosure';
+
+    private const MAP_CLOSURE_MULTIPLE = 'PHPCompiler\\ext\\standard\\ArrayMapJitHelper::mapWithClosureMultiple';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::MAP_NULL,
         self::MAP_BUILTIN,
         self::MAP_BUILTIN_MULTIPLE,
+        self::MAP_CLOSURE,
+        self::MAP_CLOSURE_MULTIPLE,
     ];
 
     public static function mapSingle(Context $context, JITVariable $callback, JITVariable $array): Value
@@ -45,7 +61,10 @@ final class ArrayMapRuntime
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
-            return ArrayBuiltinHelper::buildMapArrayWithClosure($context, $callback, $array);
+            self::ensureLinked($context);
+            $ht = self::argToHashtable($context, $array);
+
+            return self::callMapClosure($context, $ht, $callback);
         }
 
         self::ensureLinked($context);
@@ -76,6 +95,24 @@ final class ArrayMapRuntime
         return self::callMapBuiltinMultiple($context, $packed, $context->constantFromString($builtinName));
     }
 
+    /**
+     * @param list<JITVariable> $arrays
+     */
+    public static function mapMultipleWithClosure(Context $context, JITVariable $callback, array $arrays): Value
+    {
+        if (!ArrayMapCallbackPolicy::isClosureJitLowerable($callback)) {
+            throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
+        }
+        self::ensureLinked($context);
+        $sources = [];
+        foreach ($arrays as $array) {
+            $sources[] = self::argToHashtable($context, $array);
+        }
+        $packed = self::packHashtablePtrArray($context, $sources);
+
+        return self::callMapClosureMultiple($context, $packed, $callback);
+    }
+
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
@@ -88,8 +125,7 @@ final class ArrayMapRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction('__array_map__null');
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -102,9 +138,10 @@ final class ArrayMapRuntime
         }
 
         self::ensureJitHelperCompiled($context);
-        self::implementIfMissing($context, '__array_map__null', self::implementMapNullBridge(...));
-        self::implementIfMissing($context, '__array_map__builtin', self::implementMapBuiltinBridge(...));
-        self::implementIfMissing($context, '__array_map__builtin_multi', self::implementMapBuiltinMultipleBridge(...));
+        self::implementIfMissing($context, self::ABI_MAP_NULL, self::implementMapNullBridge(...));
+        self::implementIfMissing($context, self::ABI_MAP_BUILTIN, self::implementMapBuiltinBridge(...));
+        self::implementIfMissing($context, self::ABI_MAP_BUILTIN_MULTI, self::implementMapBuiltinMultipleBridge(...));
+        self::implementClosureBridges($context);
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -112,6 +149,34 @@ final class ArrayMapRuntime
         } else {
             $context->builder->clearInsertionPosition();
         }
+    }
+
+    private static function implementClosureBridges(Context $context): void
+    {
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $valuePtr = $context->getTypeFromString('__value__*');
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_MAP_CLOSURE,
+            'array_map_closure_bridge_entry',
+            [$htPtr, $valuePtr],
+            $htPtr,
+            self::MAP_CLOSURE,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14977'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_MAP_CLOSURE_MULTI,
+            'array_map_closure_multi_bridge_entry',
+            [$htPtr, $valuePtr],
+            $htPtr,
+            self::MAP_CLOSURE_MULTIPLE,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14977'
+        );
     }
 
     /**
@@ -149,9 +214,9 @@ final class ArrayMapRuntime
                 $htPtr,
                 false,
                 ...match ($name) {
-                    '__array_map__null' => [$htPtr],
-                    '__array_map__builtin' => [$htPtr, $strPtr],
-                    '__array_map__builtin_multi' => [$htPtr, $strPtr],
+                    self::ABI_MAP_NULL => [$htPtr],
+                    self::ABI_MAP_BUILTIN => [$htPtr, $strPtr],
+                    self::ABI_MAP_BUILTIN_MULTI => [$htPtr, $strPtr],
                     default => throw new \LogicException('unknown array_map bridge: '.$name),
                 }
             )
@@ -199,7 +264,7 @@ final class ArrayMapRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_map__null'),
+            $context->lookupFunction(self::ABI_MAP_NULL),
             $ht
         );
     }
@@ -209,7 +274,7 @@ final class ArrayMapRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_map__builtin'),
+            $context->lookupFunction(self::ABI_MAP_BUILTIN),
             $ht,
             $namePtr
         );
@@ -220,9 +285,31 @@ final class ArrayMapRuntime
         self::ensureLinked($context);
 
         return $context->builder->call(
-            $context->lookupFunction('__array_map__builtin_multi'),
+            $context->lookupFunction(self::ABI_MAP_BUILTIN_MULTI),
             HashTableHelper::loadHashtablePointer($context, $sources),
             $namePtr
+        );
+    }
+
+    private static function callMapClosure(Context $context, Value $ht, JITVariable $callback): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_MAP_CLOSURE),
+            $ht,
+            JitValueBox::valuePtrFromVariable($context, $callback)
+        );
+    }
+
+    private static function callMapClosureMultiple(Context $context, JITVariable $sources, JITVariable $callback): Value
+    {
+        self::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction(self::ABI_MAP_CLOSURE_MULTI),
+            HashTableHelper::loadHashtablePointer($context, $sources),
+            JitValueBox::valuePtrFromVariable($context, $callback)
         );
     }
 
@@ -262,41 +349,44 @@ final class ArrayMapRuntime
 
     private static function ensureJitHelperCompiled(Context $context): void
     {
-        $missing = false;
-        foreach (self::COMPILED_HELPERS as $logical) {
-            if (!isset($context->functions[\strtolower($logical)])) {
-                $missing = true;
-                break;
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14977'
+        );
+    }
+
+    private static function bridgesComplete(Context $context): bool
+    {
+        foreach ([
+            self::ABI_MAP_NULL,
+            self::ABI_MAP_BUILTIN,
+            self::ABI_MAP_BUILTIN_MULTI,
+            self::ABI_MAP_CLOSURE,
+            self::ABI_MAP_CLOSURE_MULTI,
+        ] as $name) {
+            $probe = $context->module->getNamedFunction($name);
+            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+                return false;
             }
-        }
-        if (!$missing) {
-            return;
         }
 
-        $runtime = $context->runtime;
-        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
-        NestedJitCompileScope::run($context, static function () use ($context, $runtime, $path): void {
-            $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'ArrayMapJitHelper.php');
-            if (null === $block) {
-                throw new \LogicException('ArrayMapJitHelper.php parseAndCompile failed (#10183)');
-            }
-            $jit = new JIT($context);
-            $jit->compile($block);
-        });
-        foreach (self::COMPILED_HELPERS as $logical) {
-            $lc = \strtolower($logical);
-            if (!isset($context->functions[$lc])) {
-                throw new \LogicException($lc.' was not compiled for JIT (#10183)');
-            }
-        }
+        return true;
     }
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        foreach (['__array_map__null', '__array_map__builtin', '__array_map__builtin_multi'] as $name) {
+        foreach ([
+            self::ABI_MAP_NULL,
+            self::ABI_MAP_BUILTIN,
+            self::ABI_MAP_BUILTIN_MULTI,
+            self::ABI_MAP_CLOSURE,
+            self::ABI_MAP_CLOSURE_MULTI,
+        ] as $name) {
             $fn = $context->module->getNamedFunction($name);
             if (null === $fn || 0 === $fn->countBasicBlocks()) {
-                throw new \LogicException($name.' missing after ArrayMapRuntime bridge (#10183)');
+                throw new \LogicException($name.' missing after ArrayMapRuntime bridge (#14977)');
             }
             $context->registerFunction($name, $fn);
         }
