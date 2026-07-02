@@ -339,20 +339,64 @@ final class VmReflection
             return self::$internalFunctionNames;
         }
         $names = [];
+        $seen = [];
         foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
             foreach ($module->getFunctions() as $func) {
                 $name = $func->getName();
-                if (self::isCompilerAbiHelperName($name)) {
+                $lc = strtolower($name);
+                if (isset($seen[$lc]) || !self::isVisibleToFunctionExists($name)) {
                     continue;
                 }
+                $seen[$lc] = true;
                 $names[] = $name;
             }
         }
-        $names = array_values(array_unique($names));
-        sort($names);
-        self::$internalFunctionNames = $names;
+        self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
 
         return self::$internalFunctionNames;
+    }
+
+    /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
+    private const INTERNAL_INTROSPECTION_HEAD = [
+        'zend_version',
+        'func_num_args',
+        'func_get_args',
+        'func_get_arg',
+    ];
+
+    /**
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    private static function orderInternalFunctionNamesForIntrospection(array $names): array
+    {
+        $byLc = [];
+        foreach ($names as $name) {
+            $byLc[strtolower($name)] = $name;
+        }
+        $ordered = [];
+        foreach (self::INTERNAL_INTROSPECTION_HEAD as $headLc) {
+            if (isset($byLc[$headLc])) {
+                $ordered[] = $byLc[$headLc];
+                unset($byLc[$headLc]);
+            }
+        }
+        foreach (CoreExtensionFunctions::FUNCTIONS as $coreLc) {
+            if (isset($byLc[$coreLc])) {
+                $ordered[] = $byLc[$coreLc];
+                unset($byLc[$coreLc]);
+            }
+        }
+        foreach ($names as $name) {
+            $lc = strtolower($name);
+            if (isset($byLc[$lc])) {
+                $ordered[] = $name;
+                unset($byLc[$lc]);
+            }
+        }
+
+        return $ordered;
     }
 
     /**
