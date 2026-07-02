@@ -325,18 +325,18 @@ final class VmCallable
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
-
-            return VmInternalCall::invoke($internal, ...$args);
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
-        }
-        try {
-            $fn = VmUserCall::resolveStringCallback($ctx, $name);
-        } catch (\LogicException) {
-            throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            try {
+                $fn = VmUserCall::resolveStringCallback($ctx, $name);
+            } catch (\LogicException) {
+                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            }
+
+            return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
         }
 
-        return $ctx->runtime->vm->invokePhpFunction($fn, ...$args);
+        return VmInternalCall::invokeInContext($ctx, $internal, ...$args);
     }
 
     /**
@@ -351,22 +351,22 @@ final class VmCallable
         }
         try {
             $internal = VmInternalCall::resolveStringCallback($name);
-            $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
-            $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
-            $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
-            ksort($resolved);
-
-            return VmInternalCall::invoke($internal, ...array_values($resolved));
         } catch (\LogicException) {
             // Not a registered string builtin — try a user-defined function.
-        }
-        try {
-            $fn = VmUserCall::resolveStringCallback($ctx, $name);
-        } catch (\LogicException) {
-            throw new \TypeError(self::invalidStringCallbackTypeError($name));
-        }
+            try {
+                $fn = VmUserCall::resolveStringCallback($ctx, $name);
+            } catch (\LogicException) {
+                throw new \TypeError(self::invalidStringCallbackTypeError($name));
+            }
 
-        return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
+            return $ctx->runtime->vm->invokePhpFunctionWithArgEntries($fn, $entries);
+        }
+        $paramNames = \PHPCompiler\BuiltinParamNames::forFunction($name) ?? [];
+        $variadicIndex = \PHPCompiler\BuiltinParamNames::variadicParamIndexForFunction($name);
+        $resolved = NamedArgs::resolve($entries, $paramNames, $variadicIndex, $name);
+        ksort($resolved);
+
+        return VmInternalCall::invokeInContext($ctx, $internal, ...array_values($resolved));
     }
 
     /**
