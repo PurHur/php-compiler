@@ -1001,6 +1001,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'static_typed_property_typeerror')) {
                 continue;
             }
+            // isset() on uninitialized static typed property: VM (#15112); MCJIT file-scope declare segfault (#4908).
+            if (str_contains($name, 'isset_static_typed_uninit')) {
+                continue;
+            }
             // Scalar union static properties: VM + TYPE_VALUE lowering (#8726); MCJIT declare/echo segfault until stable (#98).
             if (str_contains($name, 'static_property_union_type')) {
                 continue;

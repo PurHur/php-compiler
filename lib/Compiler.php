@@ -2078,6 +2078,13 @@ class Compiler {
                     ) {
                         // Lowered by compileIsset via TYPE_ISSET(container, name) (#3298).
                         break;
+                    } elseif (
+                        $child instanceof Op\Expr\StaticPropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isStaticPropertyFetchOnlyIssetVar($child, $ops[$i + 1])
+                    ) {
+                        // Lowered by compileIsset via TYPE_ISSET(class, name) (#15112).
+                        break;
                     } elseif ($child instanceof Op\Terminal\StaticVar) {
                         [$staticOps, $nextBlock] = $this->compileFunctionStaticVar($child, $block);
                         foreach ($staticOps as $staticOp) {
@@ -2141,6 +2148,13 @@ class Compiler {
                         && $this->isPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
                     ) {
                         // Lowered by compileExpr Empty_ via TYPE_EMPTY_OBJECT_PROPERTY (#4912).
+                        break;
+                    } elseif (
+                        $child instanceof Op\Expr\StaticPropertyFetch
+                        && $i + 1 < $opCount
+                        && $this->isStaticPropertyFetchOnlyEmptyVar($child, $ops[$i + 1], $block)
+                    ) {
+                        // Lowered by compileExpr Empty_ via TYPE_EMPTY_STATIC_PROPERTY (#15112).
                         break;
                     } elseif (
                         (
@@ -3377,6 +3391,38 @@ class Compiler {
         return false;
     }
 
+    /**
+     * php-cfg emits StaticPropertyFetch as its own stmt before Isset_; skip duplicate lowering (#15112).
+     */
+    private function isStaticPropertyFetchOnlyIssetVar(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Op $next
+    ): bool {
+        if (!$next instanceof Op\Expr\Isset_) {
+            return false;
+        }
+        foreach ($next->vars as $var) {
+            if ($var === $fetch) {
+                return true;
+            }
+            $target = $var;
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     private function isPropertyFetchOnlyEmptyVar(
         Op\Expr\PropertyFetch $fetch,
         Op $next,
@@ -3409,8 +3455,60 @@ class Compiler {
         return false;
     }
 
+    private function isStaticPropertyFetchOnlyEmptyVar(
+        Op\Expr\StaticPropertyFetch $fetch,
+        Op $next,
+        Block $block
+    ): bool {
+        if ($next instanceof Op\Expr\Empty_) {
+            $target = $next->expr;
+            if ($target === $fetch || $target === $fetch->result) {
+                return true;
+            }
+            while ($target instanceof Temporary) {
+                if ($target === $fetch->result) {
+                    return true;
+                }
+                if (null === $target->original) {
+                    break;
+                }
+                $target = $target->original;
+            }
+            if ($target === $fetch->result) {
+                return true;
+            }
+
+            return $this->findCoalesceStaticPropertyFetch($target, $block) === $fetch;
+        }
+        if ($this->isInlineExprCallArgConsumer($next)) {
+            return $this->funcCallHasEmptyArgUsingStaticPropertyFetch($next, $fetch, $block);
+        }
+
+        return false;
+    }
+
     private function funcCallHasEmptyArgUsingPropertyFetch(Op $call, Op\Expr\PropertyFetch $fetch, Block $block): bool
     {
+        if (!property_exists($call, 'args') || !is_array($call->args)) {
+            return false;
+        }
+        foreach ($call->args as $arg) {
+            if (!$arg instanceof Operand\Temporary || !$arg->original instanceof Op\Expr\Empty_) {
+                continue;
+            }
+            if ($this->emptyExprDependsOnOperand($arg->original, $fetch->result, $block)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function funcCallHasEmptyArgUsingStaticPropertyFetch(
+        Op $call,
+        Op\Expr\StaticPropertyFetch $fetch,
+        Block $block
+    ): bool {
         if (!property_exists($call, 'args') || !is_array($call->args)) {
             return false;
         }
@@ -8122,6 +8220,24 @@ class Compiler {
                         $this->compileOperand($propFetch->name, $block, true),
                     )];
                 }
+                $staticPropFetch = null !== $emptyOperand
+                    ? $this->findCoalesceStaticPropertyFetch($emptyOperand, $block)
+                    : null;
+                if (null === $staticPropFetch && null !== $emptyOperand) {
+                    $staticPropFetch = $this->unwrapStaticPropertyFetch($emptyOperand);
+                }
+                if (null !== $staticPropFetch) {
+                    $resultSlot = $this->compileOperand($expr->result, $block, false);
+                    [$classSlot, $nameSlot] = $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block);
+                    $issetSlot = $this->compileBoolTemporary($block);
+                    $issetOp = $this->makeIssetOpCode($issetSlot, $classSlot, $nameSlot, false);
+                    $issetOp->issetOnStaticProperty = true;
+
+                    return [
+                        $issetOp,
+                        new OpCode(OpCode::TYPE_BOOLEAN_NOT, $resultSlot, $issetSlot, null),
+                    ];
+                }
                 $dimFetch = null !== $emptyOperand
                     ? $this->findCoalesceArrayDimFetch($emptyOperand, $block)
                     : null;
@@ -8703,10 +8819,16 @@ class Compiler {
         if (null !== $this->findCoalescePropertyFetch($operand, $block)) {
             return;
         }
+        if (null !== $this->findCoalesceStaticPropertyFetch($operand, $block)) {
+            return;
+        }
         if (null !== $this->findCoalesceArrayDimFetch($operand, $block)) {
             return;
         }
         if (null !== $this->unwrapVariableOperand($operand)) {
+            return;
+        }
+        if (null !== $this->unwrapStaticPropertyFetch($operand)) {
             return;
         }
 
@@ -8722,22 +8844,34 @@ class Compiler {
         $this->assertIssetVariableOperand($expr->vars[0], $block);
         $resultSlot = $this->compileOperand($expr->result, $block, false);
         $propFetch = $this->findCoalescePropertyFetch($expr->vars[0], $block);
-        $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
+        $staticPropFetch = null !== $propFetch
+            ? null
+            : $this->findCoalesceStaticPropertyFetch($expr->vars[0], $block);
+        $dimFetch = null !== $propFetch || null !== $staticPropFetch
+            ? null
+            : $this->findCoalesceArrayDimFetch($expr->vars[0], $block);
         if (null !== $dimFetch) {
             $this->rejectArrayEmptyOffsetRead($dimFetch, $block);
         }
         [$containerSlot, $dimSlot] = null !== $propFetch
             ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $block)
-            : (null !== $dimFetch
-                ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
-                : $this->resolveIssetTarget($expr->vars[0], $block));
+            : (null !== $staticPropFetch
+                ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $block)
+                : (null !== $dimFetch
+                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $block)
+                    : $this->resolveIssetTarget($expr->vars[0], $block)));
         if (null === $containerSlot) {
             $varSlot = $this->compileOperand($expr->vars[0], $block, true);
 
             return [new OpCode(OpCode::TYPE_ISSET, $resultSlot, $varSlot, null)];
         }
 
-        return [$this->makeIssetOpCode($resultSlot, $containerSlot, $dimSlot, null !== $propFetch)];
+        $issetOp = $this->makeIssetOpCode($resultSlot, $containerSlot, $dimSlot, null !== $propFetch);
+        if (null !== $staticPropFetch) {
+            $issetOp->issetOnStaticProperty = true;
+        }
+
+        return [$issetOp];
     }
 
     protected function compileIncludeOp(Op\Expr\Include_ $expr, Block $block): OpCode
@@ -10583,6 +10717,9 @@ class Compiler {
             if ($child instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyEmptyVar($child, $expr, $block)) {
                 return $child->result;
             }
+            if ($child instanceof Op\Expr\StaticPropertyFetch && $this->isStaticPropertyFetchOnlyEmptyVar($child, $expr, $block)) {
+                return $child->result;
+            }
             if ($child instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyEmptyVar($child, $expr, $block)) {
                 return $child->result;
             }
@@ -11119,12 +11256,19 @@ class Compiler {
         foreach ($vars as $i => $var) {
             $this->assertIssetVariableOperand($var, $block);
             $propFetch = $this->findCoalescePropertyFetch($var, $block);
-            $dimFetch = null !== $propFetch ? null : $this->findCoalesceArrayDimFetch($var, $block);
+            $staticPropFetch = null !== $propFetch
+                ? null
+                : $this->findCoalesceStaticPropertyFetch($var, $block);
+            $dimFetch = null !== $propFetch || null !== $staticPropFetch
+                ? null
+                : $this->findCoalesceArrayDimFetch($var, $block);
             [$containerSlot, $dimSlot] = null !== $propFetch
                 ? $this->resolveIssetTargetFromPropertyFetch($propFetch, $current)
-                : (null !== $dimFetch
-                    ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $current)
-                    : $this->resolveIssetTarget($var, $current));
+                : (null !== $staticPropFetch
+                    ? $this->resolveIssetTargetFromStaticPropertyFetch($staticPropFetch, $current)
+                    : (null !== $dimFetch
+                        ? $this->resolveIssetTargetFromArrayDimFetch($dimFetch, $current)
+                        : $this->resolveIssetTarget($var, $current)));
             $checkSlot = $resultSlot;
             if ($i < $last) {
                 $checkSlot = $this->compileBoolTemporary($current);
@@ -11133,12 +11277,16 @@ class Compiler {
                 $varSlot = $this->compileOperand($var, $current, true);
                 $current->addOpCode(new OpCode(OpCode::TYPE_ISSET, $checkSlot, $varSlot, null));
             } else {
-                $current->addOpCode($this->makeIssetOpCode(
+                $issetOp = $this->makeIssetOpCode(
                     $checkSlot,
                     $containerSlot,
                     $dimSlot,
                     null !== $propFetch
-                ));
+                );
+                if (null !== $staticPropFetch) {
+                    $issetOp->issetOnStaticProperty = true;
+                }
+                $current->addOpCode($issetOp);
             }
             if ($i < $last) {
                 $next = new Block($block->orig);
