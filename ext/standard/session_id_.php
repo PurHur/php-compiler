@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
+use PHPCompiler\VM\ErrorReporter;
 use PHPLLVM\Value;
 
 /** session_id() — get or set the active session id (issue #1183). */
@@ -37,6 +38,23 @@ class session_id_ extends Internal
             if (null !== $frame->returnVar) {
                 $frame->returnVar->string(VmSession::getId());
             }
+
+            return;
+        }
+        if (VmSession::isActive()) {
+            if (null !== $frame->vmContext) {
+                $frame->vmContext->errors->triggerError(
+                    VmSession::ACTIVE_ID_CHANGE_WARNING,
+                    ErrorReporter::E_WARNING,
+                    '' !== $frame->scriptPath ? $frame->scriptPath : null,
+                    $frame->vmContext,
+                    $frame
+                );
+            }
+            if (null === $frame->returnVar) {
+                return;
+            }
+            $frame->returnVar->bool(false);
 
             return;
         }
