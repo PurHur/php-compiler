@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3694 |
-| Phase A inventory files (M2 ratio SSOT) | 3694 |
+| PHP files on vm.php path | 3698 |
+| Phase A inventory files (M2 ratio SSOT) | 3698 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10084 |
+| Source constructs flagged (warnings) | 10090 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -452,6 +452,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayDiffAssocJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayDiffJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayDiffKeyJitHelper.php` | 0 | 1 |
+| `ext/standard/ArrayElemJitHelper.php` | 0 | 3 |
 | `ext/standard/ArrayFillJitHelper.php` | 0 | 3 |
 | `ext/standard/ArrayFillKeysJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayFilterJitHelper.php` | 0 | 2 |
@@ -1046,6 +1047,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/NetInterfacesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesJitHelper.php` | 0 | 1 |
 | `ext/standard/NetworkServicesNameLookupJitHelper.php` | 0 | 1 |
+| `ext/standard/NextafterJitHelper.php` | 0 | 1 |
 | `ext/standard/Nl2brJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerJitHelper.php` | 0 | 1 |
 | `ext/standard/ObGzhandlerServerJitHelper.php` | 0 | 1 |
@@ -2448,6 +2450,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ArrayDiffAssocRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayDiffKeyRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/ArrayDiffRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/ArrayElemRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillKeysRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFillRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/ArrayFilterRuntime.php` | 0 | 1 |
@@ -2579,6 +2582,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvert.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvertRuntime.php` | 0 | 3 |
+| `lib/JIT/Builtin/MathNextafter.php` | 0 | 1 |
 | `lib/JIT/Builtin/MbStrcut.php` | 0 | 2 |
 | `lib/JIT/Builtin/MbStrwidth.php` | 0 | 2 |
 | `lib/JIT/Builtin/MemoryManager.php` | 0 | 4 |
@@ -6789,6 +6793,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/ArrayElemJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- new Variable (line 22)
+- new Variable (line 36)
+- 2 class method(s)
+
 ### `ext/standard/ArrayFillJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7562,7 +7573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitArrayElem.php`
 
 **Warnings** (review for bootstrap subset):
-- 12 class method(s)
+- 11 class method(s)
 
 ### `ext/standard/JitArrayFill.php`
 
@@ -10801,6 +10812,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `ext/standard/NextafterJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/Nl2brJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -12860,11 +12876,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Variable (line 111)
 - new Variable (line 149)
-- new HashTable (line 434)
-- new Variable (line 447)
-- new HashTable (line 454)
+- new HashTable (line 431)
+- new Variable (line 444)
+- new HashTable (line 451)
+- new Variable (line 452)
 - new Variable (line 455)
-- new Variable (line 458)
 - 21 class method(s)
 
 ### `ext/standard/VmPregEngine.php`
@@ -16750,9 +16766,9 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/preg_replace.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 119)
-- new Variable (line 121)
-- new Variable (line 127)
+- new HashTable (line 124)
+- new Variable (line 126)
+- new Variable (line 132)
 - 6 class method(s)
 
 ### `ext/standard/preg_replace_callback.php`
@@ -19996,6 +20012,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 14 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/ArrayElemRuntime.php`
+
+**Warnings** (review for bootstrap subset):
+- 6 class method(s)
+
 ### `lib/JIT/Builtin/ArrayFillKeysRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -20776,6 +20797,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new JIT (line 295)
 - 10 class method(s)
 - 1 closure(s)
+
+### `lib/JIT/Builtin/MathNextafter.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/MbStrcut.php`
 
