@@ -195,6 +195,20 @@ final class VmDebugBacktrace
     }
 
     /**
+     * Generator resume throw-site row — Zend labels user generator as internal (#14992, zend_generators.c).
+     */
+    public static function internalFunctionFrameEntry(string $functionName): Variable
+    {
+        $entry = new Variable();
+        $entry->newArray();
+        $fnVar = new Variable(Variable::TYPE_STRING);
+        $fnVar->string($functionName);
+        $entry->toArray()->add('function', $fnVar);
+
+        return $entry;
+    }
+
+    /**
      * Synthetic trace row for an internal builtin throw (Zend zend_exceptions.c, #11677).
      */
     public static function builtinInvokeFrameEntry(

@@ -50,6 +50,9 @@ final class ExceptionTraceFormat
         if ('' !== $file) {
             return "#{$index} {$file}({$line}): {$call}";
         }
+        if ('' !== $function) {
+            return "#{$index} [internal function]: {$call}";
+        }
 
         return "#{$index} {$call}";
     }

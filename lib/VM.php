@@ -3014,28 +3014,13 @@ class VM {
         }
         $gen = $this->findGeneratorState($frame);
         if (null !== $gen) {
-            $generatorThrowTrace = null;
-            $thrownObj = $thrown->resolveIndirect();
-            if (Variable::TYPE_OBJECT === $thrownObj->type) {
-                $resolvedTrace = VM\ExceptionTrace::resolveTraceVariable($thrownObj->toObject());
-                if (Variable::TYPE_ARRAY === $resolvedTrace->type && $resolvedTrace->toArray()->getNumElements() > 0) {
-                    $generatorThrowTrace = new Variable();
-                    $generatorThrowTrace->duplicateFrom($resolvedTrace);
-                }
-            }
             $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+            VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
             if (null !== $catchFrame) {
                 $catchFrame->generatorState = $gen;
                 $gen->frame = $catchFrame;
 
                 return $catchFrame;
-            }
-            if (null !== $generatorThrowTrace) {
-                $thrownObj->toObject()
-                    ->getProperty(VM\ExceptionSupport::PROP_TRACE)
-                    ->duplicateFrom($generatorThrowTrace);
-            } else {
-                VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
             }
             $gen->frame = null;
             $gen->markClosedWithoutReturn();
@@ -11671,29 +11656,13 @@ restart:
         $thrown->copyFrom($gen->pendingThrow);
         $gen->hasPendingThrow = false;
         $frame = $gen->frame;
-        VM\ExceptionTrace::captureOnThrow($this->context, $frame, $thrown);
-        $generatorThrowTrace = null;
-        $thrownObj = $thrown->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $thrownObj->type) {
-            $resolvedTrace = VM\ExceptionTrace::resolveTraceVariable($thrownObj->toObject());
-            if (Variable::TYPE_ARRAY === $resolvedTrace->type && $resolvedTrace->toArray()->getNumElements() > 0) {
-                $generatorThrowTrace = new Variable();
-                $generatorThrowTrace->duplicateFrom($resolvedTrace);
-            }
-        }
         $catchFrame = $this->findCatchFrameForGeneratorThrow($gen, $thrown);
+        VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
         if (null !== $catchFrame) {
             $catchFrame->generatorState = $gen;
             $gen->frame = $catchFrame;
 
             return;
-        }
-        if (null !== $generatorThrowTrace) {
-            $thrownObj->toObject()
-                ->getProperty(VM\ExceptionSupport::PROP_TRACE)
-                ->duplicateFrom($generatorThrowTrace);
-        } else {
-            VM\ExceptionTrace::captureGeneratorThrowSite($this->context, $frame, $thrown);
         }
         $gen->frame = null;
         $gen->markClosedWithoutReturn();
