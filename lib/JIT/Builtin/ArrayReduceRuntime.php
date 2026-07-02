@@ -13,24 +13,28 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * JIT/AOT link for array_reduce() string-builtin path via ArrayReduceJitHelper PHP (#12646).
+ * JIT/AOT link for array_reduce() via ArrayReduceJitHelper PHP (#12646, #14979).
  *
- * Standalone AOT compiles {@see ArrayReduceJitHelper} via JitVmHelperLink bridge (#14438) for string-builtin callbacks.
- * Closure callbacks still use LLVM until a VM bridge exists.
+ * Standalone AOT compiles {@see ArrayReduceJitHelper} via JitVmHelperLink bridge (#14438); closure callbacks route through PHP (#14979).
  * SSOT: {@see \PHPCompiler\ext\standard\array_reduce}
  * php-src: ext/standard/array.c — php_array_reduce()
  */
 final class ArrayReduceRuntime
 {
-    private const ABI_REDUCE = '__array_reduce__builtin';
+    private const ABI_REDUCE_BUILTIN = '__array_reduce__builtin';
+
+    private const ABI_REDUCE_CLOSURE = '__array_reduce__closure';
 
     private const HELPER_PATH = '/ext/standard/ArrayReduceJitHelper.php';
 
-    private const REDUCE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithBuiltin';
+    private const REDUCE_BUILTIN_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithBuiltin';
+
+    private const REDUCE_CLOSURE_HELPER = 'PHPCompiler\\ext\\standard\\ArrayReduceJitHelper::reduceWithClosure';
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
-        self::REDUCE_HELPER,
+        self::REDUCE_BUILTIN_HELPER,
+        self::REDUCE_CLOSURE_HELPER,
     ];
 
     public static function reduce(
@@ -45,8 +49,16 @@ final class ArrayReduceRuntime
         if (!ArrayReduceCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
+        self::ensureLinked($context);
+        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
+        $initialPtr = self::initialPtr($context, $initial);
         if (ArrayReduceCallbackPolicy::isClosureJitLowerable($callback)) {
-            return ArrayBuiltinHelper::buildReduceArrayWithClosure($context, $array, $callback, $initial);
+            return $context->builder->call(
+                $context->lookupFunction(self::ABI_REDUCE_CLOSURE),
+                $ht,
+                JitValueBox::valuePtrFromVariable($context, $callback),
+                $initialPtr
+            );
         }
 
         $name = $callback->compileTimeString;
@@ -54,12 +66,8 @@ final class ArrayReduceRuntime
             throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
         }
 
-        self::ensureLinked($context);
-        $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
-        $initialPtr = self::initialPtr($context, $initial);
-
         return $context->builder->call(
-            $context->lookupFunction(self::ABI_REDUCE),
+            $context->lookupFunction(self::ABI_REDUCE_BUILTIN),
             $ht,
             $context->constantFromString($name),
             $initialPtr
@@ -78,8 +86,7 @@ final class ArrayReduceRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_REDUCE);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (self::bridgesComplete($context)) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -96,14 +103,25 @@ final class ArrayReduceRuntime
         $valuePtr = $context->getTypeFromString('__value__*');
         JitVmHelperLink::ensureBridge(
             $context,
-            self::ABI_REDUCE,
-            'array_reduce_bridge_entry',
+            self::ABI_REDUCE_BUILTIN,
+            'array_reduce_builtin_bridge_entry',
             [$htPtr, $strPtr, $valuePtr],
             $valuePtr,
-            self::REDUCE_HELPER,
+            self::REDUCE_BUILTIN_HELPER,
             self::HELPER_PATH,
             self::COMPILED_HELPERS,
-            '#12646'
+            '#14979'
+        );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_REDUCE_CLOSURE,
+            'array_reduce_closure_bridge_entry',
+            [$htPtr, $valuePtr, $valuePtr],
+            $valuePtr,
+            self::REDUCE_CLOSURE_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14979'
         );
         self::registerLinkedRuntime($context);
 
@@ -129,12 +147,26 @@ final class ArrayReduceRuntime
         return JitValueBox::valuePtrFromVariable($context, $initial);
     }
 
+    private static function bridgesComplete(Context $context): bool
+    {
+        foreach ([self::ABI_REDUCE_BUILTIN, self::ABI_REDUCE_CLOSURE] as $name) {
+            $probe = $context->module->getNamedFunction($name);
+            if (null === $probe || 0 === $probe->countBasicBlocks()) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     private static function registerLinkedRuntime(Context $context): void
     {
-        $fn = $context->module->getNamedFunction(self::ABI_REDUCE);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_REDUCE.' missing after ArrayReduceRuntime bridge (#12646)');
+        foreach ([self::ABI_REDUCE_BUILTIN, self::ABI_REDUCE_CLOSURE] as $name) {
+            $fn = $context->module->getNamedFunction($name);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($name.' missing after ArrayReduceRuntime bridge (#14979)');
+            }
+            $context->registerFunction($name, $fn);
         }
-        $context->registerFunction(self::ABI_REDUCE, $fn);
     }
 }
