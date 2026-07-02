@@ -460,12 +460,27 @@ final class VmArray
     {
         $needle = $needle->resolveIndirect();
         foreach ($haystack->iterate(true) as $value) {
-            if (in_array::looseEquals($needle, $value->resolveIndirect())) {
+            if (self::looseValuesEqualForArraySetOps($needle, $value->resolveIndirect())) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /**
+     * Loose value compare for array_diff/array_intersect (php-src zend_hash_compare NaN branch).
+     */
+    private static function looseValuesEqualForArraySetOps(Variable $left, Variable $right): bool
+    {
+        if (Variable::TYPE_FLOAT === $left->type
+            && Variable::TYPE_FLOAT === $right->type
+            && \is_nan($left->toFloat())
+            && \is_nan($right->toFloat())) {
+            return true;
+        }
+
+        return in_array::looseEquals($left, $right);
     }
 
     /**
