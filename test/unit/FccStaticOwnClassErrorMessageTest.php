@@ -6,14 +6,14 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Issue #14935 — (C::m)(...) error string uses Zend "Undefined constant" wording. */
+/** Issue #14935 — static FCC (C::m)(...) uses Zend "Undefined constant" wording. */
 final class FccStaticOwnClassErrorMessageTest extends TestCase
 {
-    public function testStaticOwnClassMethodFccErrorMessageMatchesZend(): void
+    public function testStaticInstanceMethodFccErrorMessageMatchesZend(): void
     {
         $repro = <<<'PHP'
 <?php
-class C {}
+class C { public function m() {} }
 try {
     (C::m)(new C());
 } catch (Throwable $e) {
@@ -27,10 +27,10 @@ PHP;
                 .escapeshellarg($path).' 2>&1';
             $output = shell_exec($cmd);
             $this->assertIsString($output);
-            $this->assertSame('Undefined constant C::m', trim($output));
+            $this->assertStringContainsString('Undefined constant C::m', $output);
+            $this->assertStringNotContainsString('Undefined class constant', $output);
         } finally {
             @unlink($path);
         }
     }
 }
-

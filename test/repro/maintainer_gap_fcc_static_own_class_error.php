@@ -2,7 +2,7 @@
 
 class C
 {
-    public static function m(): void
+    public function m(): void
     {
     }
 }
@@ -12,4 +12,3 @@ try {
 } catch (Throwable $e) {
     echo $e->getMessage(), "\n";
 }
-
