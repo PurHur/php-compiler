@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathFmod;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -42,7 +43,7 @@ final class fmod extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\fmod($num1, $num2));
+        $frame->returnVar->float(VmMath::fmod($num1, $num2));
     }
 
     public Context $context;
@@ -54,9 +55,8 @@ final class fmod extends Internal
             throw new \LogicException('fmod() requires exactly two arguments');
         }
         [$left, $right] = JitFdiv::lowerOperands($context, $args[0], $args[1], 'fmod', 'num1', 'num2', 'float');
-        $fn = $context->lookupFunction('fmod');
 
-        return $context->builder->call($fn, $left, $right);
+        return MathFmod::invoke($context, $left, $right);
     }
 
 }
