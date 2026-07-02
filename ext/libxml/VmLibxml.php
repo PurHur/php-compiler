@@ -23,6 +23,8 @@ final class VmLibxml
 
     private static bool $useInternalErrors = false;
 
+    private static ?Variable $streamsContext = null;
+
     /** @var list<array{level: int, code: int, column: int, message: string, file: string, line: int}> */
     private static array $errors = [];
 
@@ -53,6 +55,17 @@ final class VmLibxml
         }
 
         return $previous;
+    }
+
+    /** php-src ext/libxml/libxml.c — libxml_set_streams_context() global IO context (#14495). */
+    public static function setStreamsContext(Variable $context): void
+    {
+        self::$streamsContext = $context->resolveIndirect();
+    }
+
+    public static function streamsContext(): ?Variable
+    {
+        return self::$streamsContext;
     }
 
     public static function getErrors(Context $ctx): HashTable
