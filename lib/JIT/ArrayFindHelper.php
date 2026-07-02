@@ -7,6 +7,7 @@ namespace PHPCompiler\JIT;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayElem;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\ArrayFindRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPLLVM\BasicBlock;
 use PHPLLVM\Builder;
@@ -54,6 +55,13 @@ final class ArrayFindHelper
         }
         if (!ArrayFindCallbackPolicy::isJitLowerable($callback)) {
             throw new \LogicException(ArrayFindCallbackPolicy::jitRejectionMessage());
+        }
+        if (ArrayMapCallbackPolicy::isJitLowerableScalar(
+            $callback->type,
+            $callback->isNullConstant,
+            $callback->compileTimeString
+        )) {
+            return ArrayFindRuntime::walk($context, $array, $callback, $mode);
         }
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             return self::buildFromNativeArray($context, $array, $callback, $mode);
