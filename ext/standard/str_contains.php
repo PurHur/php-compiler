@@ -33,18 +33,8 @@ final class str_contains extends Internal
         $this->requireExactArgCount($frame, 'str_contains', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_contains', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_contains', 'needle', 1, $frame);
-        $haystackStr = VmString::coerceStringBuiltinArgNoObject(
-            $frame->calledArgs[0],
-            'str_contains',
-            0,
-            'haystack'
-        );
-        $needleStr = VmString::coerceStringBuiltinArgNoObject(
-            $frame->calledArgs[1],
-            'str_contains',
-            1,
-            'needle'
-        );
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         BuiltinExecute::writeReturn(
             $frame,
             static function (Variable $ret) use ($haystackStr, $needleStr): void {
@@ -68,9 +58,23 @@ final class str_contains extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_contains', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_contains', 'needle', 2);
-        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_contains', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_contains', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_contains', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_contains', 1, 'needle');
 
         return StringStrContains::invokeContains($context, $hay, $needle);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_contains', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_contains',
+            $argIndex,
+            $paramName
+        );
     }
 }

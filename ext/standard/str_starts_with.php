@@ -33,18 +33,8 @@ final class str_starts_with extends Internal
         $this->requireExactArgCount($frame, 'str_starts_with', 2);
         InternalStrictArg::rejectNullString($frame->calledArgs[0], 'str_starts_with', 'haystack', 0, $frame);
         InternalStrictArg::rejectNullString($frame->calledArgs[1], 'str_starts_with', 'needle', 1, $frame);
-        $haystackStr = VmString::coerceStringBuiltinArgNoObject(
-            $frame->calledArgs[0],
-            'str_starts_with',
-            0,
-            'haystack'
-        );
-        $needleStr = VmString::coerceStringBuiltinArgNoObject(
-            $frame->calledArgs[1],
-            'str_starts_with',
-            1,
-            'needle'
-        );
+        $haystackStr = self::vmStringArg($frame, 0, 'haystack');
+        $needleStr = self::vmStringArg($frame, 1, 'needle');
         BuiltinExecute::writeReturn(
             $frame,
             static fn (Variable $ret) => $ret->bool(VmString::startsWith($haystackStr, $needleStr))
@@ -58,9 +48,23 @@ final class str_starts_with extends Internal
         }
         JitInternalStrictArg::rejectNullString($context, $args[0], 'str_starts_with', 'haystack', 1);
         JitInternalStrictArg::rejectNullString($context, $args[1], 'str_starts_with', 'needle', 2);
-        $hay = JitStringBuiltinArg::lower($context, $args[0], 'str_starts_with', 0, 'haystack');
-        $needle = JitStringBuiltinArg::lower($context, $args[1], 'str_starts_with', 1, 'needle');
+        $hay = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'str_starts_with', 0, 'haystack');
+        $needle = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'str_starts_with', 1, 'needle');
 
         return StringStrContains::invokeStartsWith($context, $hay, $needle);
+    }
+
+    private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
+    {
+        if (InternalStrictArg::isCallerStrict($frame)) {
+            return InternalStrictArg::requireString($frame, $argIndex, 'str_starts_with', $paramName)->toString();
+        }
+
+        return VmString::coerceStringBuiltinArg(
+            $frame->calledArgs[$argIndex],
+            'str_starts_with',
+            $argIndex,
+            $paramName
+        );
     }
 }
