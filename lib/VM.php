@@ -8965,6 +8965,21 @@ restart:
                 }
                 $handler->scope[$op->arg3]->copyFrom($caught);
             }
+            // php-cfg may fuse an empty catch body with the merge block (no TYPE_JUMP edge out of
+            // the catch). Ensure finally still runs before resuming the merge (#14959).
+            if (
+                null !== $op->block2
+                && $op->block1 === $op->block2
+                && $this->hasPendingFinally($handler)
+            ) {
+                $this->skipTryCatchHandlerTail($handler);
+                $this->context->activeCatchHandlerFrame = $handler;
+                $this->context->pendingMergeAfterFinally = $op->block2;
+                $this->context->truncateRunStackForCatch($handler);
+                $this->clearThrowDispatchState();
+
+                return $this->enterFinallyHandlerForUnwind($handler, false);
+            }
             $catchFrame = $op->block1->getFrame($this->context, $handler);
             $this->bindCatchVariableToFrame($catchFrame, $op->arg3, $caught);
             $gen = $this->findGeneratorState($handler);
@@ -9014,9 +9029,8 @@ restart:
     /** Run finally after a matching catch body before the try/catch merge block (Zend order). */
     private function beginCatchExitFinallyUnwind(Frame $frame, Block $target): ?Frame
     {
-        if (null === $this->resolveActiveCatchException($frame) && null === $frame->activeCatchException) {
-            return null;
-        }
+        // Catch bodies may reparent to the merge frame (handler frame is not necessarily in the
+        // current parent chain); rely on the tracked active catch handler instead (#14959).
         if (!isset($this->context->tryMergeBlockIds[spl_object_id($target)])) {
             return null;
         }
@@ -9239,6 +9253,15 @@ restart:
 
     private function findNextFinallyHandlerForReturn(Frame $from): ?Frame
     {
+        // Catch frames may skip the handler frame in their parent chain; still need to run the
+        // handler finally on `return` from catch (#14959).
+        if (
+            null !== $this->context->activeCatchHandlerFrame
+            && null !== $this->resolveActiveCatchException($from)
+            && $this->hasPendingFinally($this->context->activeCatchHandlerFrame)
+        ) {
+            return $this->context->activeCatchHandlerFrame;
+        }
         for ($handler = $from->parent; null !== $handler; $handler = $handler->parent) {
             if ($this->hasPendingFinally($handler)) {
                 return $handler;
