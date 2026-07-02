@@ -785,6 +785,12 @@ final class VmMath
         return \log10($num);
     }
 
+    /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
+    public static function atan2(float $y, float $x): float
+    {
+        return \atan2($y, $x);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */
