@@ -803,6 +803,12 @@ final class VmMath
         return \log10($num);
     }
 
+    /** floor() — round toward negative infinity (php-src ext/standard/math.c). */
+    public static function floor(float $num): float
+    {
+        return \floor($num);
+    }
+
     /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
     public static function atan2(float $y, float $x): float
     {
