@@ -10,6 +10,7 @@
 namespace PHPCompiler\VM;
 
 use php\MaskedArray;
+use PHPCompiler\ext\standard\StdlibConstants;
 
 final class HashTable {
     const OKAY                     = 0b0000000;
@@ -1280,13 +1281,57 @@ final class HashTable {
 
     /**
      * Pad a packed list to {@param $length} elements with {@param $value} (array_pad subset).
+     *
+     * When {@param $padType} is set (PHP 8.4+ 4-arg form), {@param $length} is absolute size and
+     * {@param $padType} selects ARRAY_PAD_LEFT/RIGHT/BOTH. Otherwise sign of {@param $length}
+     * selects prepend vs append (legacy 3-arg form).
      */
-    public function padCopy(int $length, Variable $value): HashTable
+    public function padCopy(int $length, Variable $value, ?int $padType = null): HashTable
     {
         if (!$this->isWithoutHoles()) {
             throw new \LogicException('padCopy() only supports packed list arrays without holes');
         }
         $count = $this->numElements;
+        if (null !== $padType) {
+            $target = abs($length);
+            if ($target <= $count) {
+                return $this->copyAllKeyedEntries();
+            }
+            $padCount = $target - $count;
+            $pad = new Variable();
+            $pad->copyFrom($value);
+
+            if (StdlibConstants::ARRAY_PAD_BOTH === $padType) {
+                $leftCount = intdiv($padCount + 1, 2);
+                $rightCount = $padCount - $leftCount;
+                $prepend = [];
+                for ($i = 0; $i < $leftCount; ++$i) {
+                    $copy = new Variable();
+                    $copy->copyFrom($pad);
+                    $prepend[] = $copy;
+                }
+                $out = new self();
+                $out->unshiftPrepend(...$prepend);
+                foreach ($this->iterate(true) as $element) {
+                    $copy = new Variable();
+                    $copy->copyFrom($element);
+                    $out->append($copy);
+                }
+                for ($i = 0; $i < $rightCount; ++$i) {
+                    $copy = new Variable();
+                    $copy->copyFrom($pad);
+                    $out->append($copy);
+                }
+
+                return $out;
+            }
+            if (StdlibConstants::ARRAY_PAD_LEFT === $padType) {
+                return $this->padCopy(-$target, $value, null);
+            }
+
+            return $this->padCopy($target, $value, null);
+        }
+
         $target = abs($length);
         if ($target <= $count) {
             return $this->copyAllKeyedEntries();

@@ -22,6 +22,8 @@ final class ArrayPadRuntime
 {
     private const ABI_PAD = '__array_pad__copy';
 
+    private const ABI_PAD_TYPED = '__array_pad__copy_typed';
+
     private const HELPER_PATH = '/ext/standard/ArrayPadJitHelper.php';
 
     private const PAD_HELPER = 'PHPCompiler\\ext\\standard\\ArrayPadJitHelper::padCopy';
@@ -37,15 +39,34 @@ final class ArrayPadRuntime
         Value $length,
         JITVariable $value
     ): Value {
+        return self::padWithType($context, $array, $length, $value, null);
+    }
+
+    public static function padWithType(
+        Context $context,
+        JITVariable $array,
+        Value $length,
+        JITVariable $value,
+        ?Value $padType
+    ): Value {
         self::ensureLinked($context);
         $ht = ArrayBuiltinHelper::loadHashTable($context, $array);
         $valuePtr = JitValueBox::valuePtrFromVariable($context, $value);
+        if (null === $padType) {
+            return $context->builder->call(
+                $context->lookupFunction(self::ABI_PAD),
+                $ht,
+                $length,
+                $valuePtr
+            );
+        }
 
         return $context->builder->call(
-            $context->lookupFunction(self::ABI_PAD),
+            $context->lookupFunction(self::ABI_PAD_TYPED),
             $ht,
             $length,
-            $valuePtr
+            $valuePtr,
+            $padType
         );
     }
 
@@ -61,8 +82,10 @@ final class ArrayPadRuntime
 
     public static function implement(Context $context): void
     {
-        $probe = $context->module->getNamedFunction(self::ABI_PAD);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        $probePad = $context->module->getNamedFunction(self::ABI_PAD);
+        $probeTyped = $context->module->getNamedFunction(self::ABI_PAD_TYPED);
+        if (null !== $probePad && $probePad->countBasicBlocks() > 0
+            && null !== $probeTyped && $probeTyped->countBasicBlocks() > 0) {
             self::registerLinkedRuntime($context);
 
             return;
@@ -88,6 +111,17 @@ final class ArrayPadRuntime
             self::COMPILED_HELPERS,
             '#12476'
         );
+        JitVmHelperLink::ensureBridge(
+            $context,
+            self::ABI_PAD_TYPED,
+            'array_pad_typed_bridge_entry',
+            [$htPtr, $i64, $valuePtr, $i64],
+            $htPtr,
+            self::PAD_HELPER,
+            self::HELPER_PATH,
+            self::COMPILED_HELPERS,
+            '#14993'
+        );
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -99,10 +133,12 @@ final class ArrayPadRuntime
 
     private static function registerLinkedRuntime(Context $context): void
     {
-        $fn = $context->module->getNamedFunction(self::ABI_PAD);
-        if (null === $fn || 0 === $fn->countBasicBlocks()) {
-            throw new \LogicException(self::ABI_PAD.' missing after ArrayPadRuntime bridge (#12476)');
+        foreach ([self::ABI_PAD, self::ABI_PAD_TYPED] as $abi) {
+            $fn = $context->module->getNamedFunction($abi);
+            if (null === $fn || 0 === $fn->countBasicBlocks()) {
+                throw new \LogicException($abi.' missing after ArrayPadRuntime bridge (#12476)');
+            }
+            $context->registerFunction($abi, $fn);
         }
-        $context->registerFunction(self::ABI_PAD, $fn);
     }
 }

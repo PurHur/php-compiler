@@ -571,6 +571,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.4+ array_pad() optional $pad_type + ARRAY_PAD_* constants (ext/standard/array.c, #14993).
+     *
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14983 reference gate).
+     */
+    public static function supportsArrayPadPadType(): bool
+    {
+        return self::advertisesBuiltinSince('8.4.0');
+    }
+
+    /**
      * PHP 8.4+ mb_trim/ltrim/rtrim (ext/mbstring/mbstring.c, issue #11901, #12797).
      *
      * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
