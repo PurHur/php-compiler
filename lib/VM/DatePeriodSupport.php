@@ -48,7 +48,7 @@ final class DatePeriodSupport
         if ($recurrences < 1) {
             throw new \Exception('DatePeriod::__construct(): Recurrence count must be greater than 0');
         }
-        self::setObjectProperty($period, 'start', $start);
+        self::setObjectProperty($period, 'start', self::cloneDateTimeForStorage($start, $ctx));
         self::setNullProperty($period, 'current');
         self::setNullProperty($period, 'end');
         self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
@@ -68,9 +68,9 @@ final class DatePeriodSupport
         int $options = 0,
         ?Context $ctx = null
     ): void {
-        self::setObjectProperty($period, 'start', $start);
+        self::setObjectProperty($period, 'start', self::cloneDateTimeForStorage($start, $ctx));
         self::setNullProperty($period, 'current');
-        self::setObjectProperty($period, 'end', $end);
+        self::setObjectProperty($period, 'end', self::cloneDateTimeForStorage($end, $ctx));
         self::setObjectProperty($period, 'interval', self::cloneIntervalForStorage($interval, $ctx));
         self::requireIntProperty($period, 'recurrences')->int(self::RECURRENCES_END_DATE);
         self::requireBoolProperty($period, 'include_start_date')->bool(0 === ($options & self::OPTION_EXCLUDE_START_DATE));
@@ -168,6 +168,18 @@ final class DatePeriodSupport
         }
 
         return DateIntervalSupport::createFromState($ctx, DateIntervalSupport::readState($interval));
+    }
+
+    /**
+     * Retain DateTime/DateTimeImmutable clones — inline ctor temps lose backing slots after dead-temp release (#15124).
+     */
+    private static function cloneDateTimeForStorage(ObjectEntry $dt, ?Context $ctx): ObjectEntry
+    {
+        if (!$dt->constructed || null === $ctx) {
+            return $dt;
+        }
+
+        return DateTimeSupport::cloneDateTimeLike($dt);
     }
 
     private static function requireDatePeriodFromObject(ObjectEntry $period): void
