@@ -13,7 +13,7 @@ use PHPCompiler\VM\Variable;
 final class VmFilestatArg
 {
     /**
-     * Z_PARAM_PATH filename — null coerces to "" (php-src filestat.c; #13354, same as touch()).
+     * Z_PARAM_PATH filename — typed string (reject null) + reject embedded NUL (php-src filestat.c; #14597).
      *
      * @throws \TypeError when the operand cannot be converted like Zend PHP 8.x
      */
@@ -24,11 +24,7 @@ final class VmFilestatArg
         string $paramName = 'filename',
         ?Frame $frame = null
     ): string {
-        if (null !== $frame) {
-            InternalStrictArg::rejectNullString($var, $function, $paramName, $argIndex, $frame);
-        }
-
-        return VmString::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
+        return VmString::coercePathBuiltinArg($var, $function, $argIndex, $paramName);
     }
 
     /**
