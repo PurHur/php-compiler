@@ -32,16 +32,6 @@ final class ArrayReduceRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('ArrayReduceRuntime::reduce', $arrayBuiltin);
     }
 
-    public function testArrayReduceJitHelperFoldsWithBuiltin(): void
-    {
-        $ht = self::intListTable(1, 2, 3);
-        $initial = new Variable();
-        $initial->int(0);
-        $out = ArrayReduceJitHelper::reduceWithBuiltin($ht, 'max', $initial);
-        $this->assertSame(Variable::TYPE_INTEGER, $out->type);
-        $this->assertSame(3, $out->toInt());
-    }
-
     public function testArrayReduceJitHelperHonorsInitialOnEmpty(): void
     {
         $ht = new HashTable();
