@@ -13,8 +13,8 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathLog;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -37,7 +37,7 @@ final class log extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\log($num));
+        $frame->returnVar->float(VmMath::log($num));
     }
 
     public Context $context;
@@ -48,11 +48,9 @@ final class log extends Internal
         if (1 !== count($args)) {
             throw new \LogicException('log() requires exactly one argument');
         }
-        $double = $context->getTypeFromString('double');
-        $asFloat = pow::toJitDouble($context, $args[0], $double);
-        $fn = $context->lookupFunction('log');
+        $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'log', 'float');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathLog::invoke($context, $asFloat);
     }
 
 }

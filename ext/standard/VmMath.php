@@ -791,6 +791,12 @@ final class VmMath
         return \sqrt($num);
     }
 
+    /** log() — natural logarithm (php-src ext/standard/math.c). */
+    public static function log(float $num): float
+    {
+        return \log($num);
+    }
+
     /** log10() — base-10 logarithm (php-src ext/standard/math.c). */
     public static function log10(float $num): float
     {
