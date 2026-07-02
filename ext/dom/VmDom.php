@@ -121,6 +121,12 @@ final class VmDom
         $node->properties[] = new ClassProperty(self::PROP_PARENT_NODE, $nullProto, $objProto);
         $node->methods['clonenode'] = new NodeCloneNode();
         $node->methodVisibility['clonenode'] = $pub;
+        $node->methods['replacechild'] = new NodeReplaceChild();
+        $node->methodVisibility['replacechild'] = $pub;
+        $node->methods['insertbefore'] = new NodeInsertBefore();
+        $node->methodVisibility['insertbefore'] = $pub;
+        $node->methods['removechild'] = new NodeRemoveChild();
+        $node->methodVisibility['removechild'] = $pub;
         $node->methods['issamenode'] = new NodeIsSameNode();
         $node->methodVisibility['issamenode'] = $pub;
         $node->methods['haschildnodes'] = new NodeHasChildNodes();
@@ -1219,6 +1225,104 @@ final class VmDom
         return $child;
     }
 
+    public static function replaceChild(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ObjectEntry $oldChild
+    ): ObjectEntry {
+        self::assertMutationParent($parent);
+        if (self::isDocumentFragment($newChild)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        if (!self::isElement($newChild)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        self::assertChildOfParent($parent, $oldChild, 'DOMNode::replaceChild()');
+        self::assertSameDocument($parent, $newChild);
+        self::detachNodeIfAttached($ctx, $newChild);
+        $parentState = DomRegistry::state($parent);
+        $index = self::childIndex($parentState->childIds, $oldChild->id);
+        if (null === $index) {
+            throw new \DOMException('Not found error');
+        }
+        $parentState->childIds[$index] = $newChild->id;
+        self::linkChildToParent($oldChild, null);
+        self::linkChildToParent($newChild, $parent);
+        if (self::isDocument($parent)) {
+            $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+            $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            self::propagateDocumentId($newChild, $parent->id);
+        }
+        self::syncSubtree($ctx, $parent);
+
+        return $oldChild;
+    }
+
+    public static function insertBefore(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ?ObjectEntry $refChild
+    ): ObjectEntry {
+        self::assertMutationParent($parent);
+        if (self::isDocumentFragment($newChild)) {
+            return self::appendFragmentChildren($ctx, $parent, $newChild);
+        }
+        if (!self::isElement($newChild)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        self::assertSameDocument($parent, $newChild);
+        if (null !== $refChild) {
+            self::assertChildOfParent($parent, $refChild, 'DOMNode::insertBefore()');
+        }
+        self::detachNodeIfAttached($ctx, $newChild);
+        $parentState = DomRegistry::state($parent);
+        if (null === $refChild) {
+            $parentState->childIds[] = $newChild->id;
+        } else {
+            $index = self::childIndex($parentState->childIds, $refChild->id);
+            if (null === $index) {
+                throw new \DOMException('Not found error');
+            }
+            \array_splice($parentState->childIds, $index, 0, [$newChild->id]);
+        }
+        self::linkChildToParent($newChild, $parent);
+        if (self::isDocument($parent)) {
+            $existing = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_NULL === $existing->type) {
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+                $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            }
+            self::propagateDocumentId($newChild, $parent->id);
+        }
+        self::syncSubtree($ctx, $parent);
+
+        return $newChild;
+    }
+
+    public static function removeChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): ObjectEntry
+    {
+        self::assertMutationParent($parent);
+        self::assertChildOfParent($parent, $child, 'DOMNode::removeChild()');
+        $parentState = DomRegistry::state($parent);
+        $parentState->childIds = \array_values(\array_filter(
+            $parentState->childIds,
+            static fn (int $id): bool => $id !== $child->id
+        ));
+        self::linkChildToParent($child, null);
+        if (self::isDocument($parent)) {
+            $docEl = $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $docEl->type && $docEl->toObject()->id === $child->id) {
+                $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->null();
+                $parentState->documentElementName = null;
+            }
+        }
+        self::syncSubtree($ctx, $parent);
+
+        return $child;
+    }
+
     private static function appendFragmentChildren(
         Context $ctx,
         ObjectEntry $parent,
@@ -1562,6 +1666,78 @@ final class VmDom
                 $childState->documentId = $parentState->documentId;
             }
         }
+    }
+
+    private static function assertMutationParent(ObjectEntry $parent): void
+    {
+        if (!DomRegistry::has($parent)) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        $nodeType = DomRegistry::state($parent)->nodeType;
+        if (DomConstants::XML_ELEMENT_NODE !== $nodeType
+            && DomConstants::XML_DOCUMENT_NODE !== $nodeType
+            && DomConstants::XML_DOCUMENT_FRAG_NODE !== $nodeType
+        ) {
+            throw new \DOMException('Hierarchy request error');
+        }
+    }
+
+    private static function assertChildOfParent(ObjectEntry $parent, ObjectEntry $child, string $label): void
+    {
+        if (!DomRegistry::has($child)) {
+            throw new \DOMException('Not found error');
+        }
+        $childState = DomRegistry::state($child);
+        if ($childState->parentId !== $parent->id) {
+            throw new \DOMException('Not found error');
+        }
+        if (!\in_array($child->id, DomRegistry::state($parent)->childIds, true)) {
+            throw new \DOMException('Not found error');
+        }
+    }
+
+    private static function assertSameDocument(ObjectEntry $parent, ObjectEntry $child): void
+    {
+        $parentDocId = self::resolveDocumentId($parent);
+        $childDocId = self::resolveDocumentId($child);
+        if (null !== $parentDocId && null !== $childDocId && $parentDocId !== $childDocId) {
+            throw new \DOMException('Wrong Document Error');
+        }
+    }
+
+    private static function resolveDocumentId(ObjectEntry $node): ?int
+    {
+        if (self::isDocument($node)) {
+            return $node->id;
+        }
+        if (!DomRegistry::has($node)) {
+            return null;
+        }
+
+        return DomRegistry::state($node)->documentId;
+    }
+
+    private static function detachNodeIfAttached(Context $ctx, ObjectEntry $node): void
+    {
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            return;
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent) {
+            self::linkChildToParent($node, null);
+
+            return;
+        }
+        self::removeChild($ctx, $parent, $node);
+    }
+
+    /** @param list<int> $childIds */
+    private static function childIndex(array $childIds, int $childId): ?int
+    {
+        $index = \array_search($childId, $childIds, true);
+
+        return false === $index ? null : (int) $index;
     }
 
     private static function propagateDocumentId(ObjectEntry $node, int $documentId): void
