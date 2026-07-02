@@ -111,6 +111,11 @@ final class preg_replace extends Internal
 
             return;
         }
+        if (null === $result) {
+            $frame->returnVar->null();
+
+            return;
+        }
         if (\is_string($result)) {
             $frame->returnVar->string($result);
 

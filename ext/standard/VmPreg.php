@@ -262,7 +262,7 @@ final class VmPreg
      * @param string|list<string>        $replacement
      * @param string|list<string>        $subject
      *
-     * @return string|list<string>|false
+     * @return string|list<string>|false|null
      */
     public static function pregReplace(
         string|array $pattern,
@@ -289,9 +289,6 @@ final class VmPreg
 
         $result = VmPregNative::pregReplace($pattern, $replacement, $subject, $limit, $count);
         self::syncLastErrorFromNative();
-        if (null === $result) {
-            return false;
-        }
 
         return $result;
     }
@@ -328,8 +325,8 @@ final class VmPreg
                 }
                 $elemCount = 0;
                 $replaced = self::pregReplaceArrayPatterns($pattern, $replacements, $item, $limit, $elemCount);
-                if (false === $replaced) {
-                    return false;
+                if (false === $replaced || null === $replaced) {
+                    return $replaced;
                 }
                 $out[$key] = $replaced;
                 $totalCount += $elemCount;

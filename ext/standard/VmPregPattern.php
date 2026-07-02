@@ -48,6 +48,9 @@ final class VmPregPattern
         }
 
         for ($j = $i + 1; $j < $len; $j++) {
+            if ('e' === $pattern[$j]) {
+                return 'The /e modifier is no longer supported, use preg_replace_callback instead';
+            }
             $mod = match ($pattern[$j]) {
                 'i', 'm', 's', 'x', 'A', 'D', 'U', 'u' => true,
                 default => null,
