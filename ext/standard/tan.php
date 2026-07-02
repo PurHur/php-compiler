@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathTan;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class tan extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\tan($num));
+        $frame->returnVar->float(VmMath::tan($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class tan extends Internal
             throw new \LogicException('tan() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'tan', 'float');
-        $fn = $context->lookupFunction('tan');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathTan::invoke($context, $asFloat);
     }
 
 }
