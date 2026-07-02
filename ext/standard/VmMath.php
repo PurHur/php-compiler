@@ -761,6 +761,12 @@ final class VmMath
         return \hypot($x, $y);
     }
 
+    /** sin() — sine (php-src ext/standard/math.c). */
+    public static function sin(float $num): float
+    {
+        return \sin($num);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */

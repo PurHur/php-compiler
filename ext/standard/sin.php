@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathSin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class sin extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\sin($num));
+        $frame->returnVar->float(VmMath::sin($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class sin extends Internal
             throw new \LogicException('sin() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'sin', 'float');
-        $fn = $context->lookupFunction('sin');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathSin::invoke($context, $asFloat);
     }
 
 }
