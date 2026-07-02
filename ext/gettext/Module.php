@@ -15,6 +15,7 @@ class Module extends ModuleAbstract
     {
         return [
             new gettext(),
+            new _(),
             new bindtextdomain(),
             new textdomain(),
             new dgettext(),
