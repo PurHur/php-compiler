@@ -75,6 +75,17 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
     }
 
+    public function testRandomIntervalBoundaryWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRandomIntervalBoundary());
+    }
+
+    public function testVmDoesNotRegisterRandomIntervalBoundaryOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
+    }
+
     public function testReadonlyBuiltinWithheldOnReferenceProfileUntilStable84(): void
     {
         $this->assertFalse(CompilerVersion::supportsReadonlyBuiltin());
