@@ -1,0 +1,2 @@
+# Applied via apply_php_cfg_list_mix_keyed_unkeyed_overlay() in script/apply-patches.sh (#14879).
+# Zend zend_compile.c — reject mixing keyed and unkeyed list/[] destructuring slots.
