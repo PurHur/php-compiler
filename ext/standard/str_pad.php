@@ -15,6 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Builtin\PadTypeJit;
+use PHPCompiler\JIT\Builtin\StringStrPad;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -24,6 +25,8 @@ use PHPLLVM\Value;
 
 /**
  * str_pad() for strings (STR_PAD_LEFT, STR_PAD_RIGHT, STR_PAD_BOTH).
+ *
+ * VM: {@see VmString::strPad()}; JIT/AOT: {@see StringStrPad} + {@see StrPadJitHelper}.
  */
 final class str_pad extends Internal
 {
@@ -87,8 +90,14 @@ final class str_pad extends Internal
         } else {
             $padType = $context->getTypeFromString('int64')->constInt(1, false);
         }
-        JitStrPad::emitRuntimeEmptyPadStringGuard($context, $padString);
+        StringStrPad::ensureLinked($context);
 
-        return JitStrPad::pad($context, $input, $padLength, $padString, $padType);
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_str_pad'),
+            $input,
+            $padLength,
+            $padString,
+            $padType
+        );
     }
 }
