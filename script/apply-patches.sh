@@ -525,8 +525,8 @@ PY
 
 apply_php_cfg_loop_resolver_continue_switch_warning_overlay() {
   local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php"
-  if patch_already_applied "$PATCH_DIR/php-cfg-loop-resolver-continue-switch-warning.patch"; then
-    echo "Skip php-cfg-loop-resolver-continue-switch-warning.patch (already applied)"
+  if grep -q 'continue %d' "$target" 2>/dev/null; then
+    echo "Skip php-cfg-loop-resolver-continue-switch-warning level overlay (already applied)"
     return 0
   fi
   if ! grep -q 'compiler_language_warning' "$target" 2>/dev/null; then
