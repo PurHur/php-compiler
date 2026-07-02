@@ -210,6 +210,9 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
+        $document->methods['loadhtml'] = new DocumentLoadHTML();
+        $document->methodVisibility['loadhtml'] = $pub;
+        $document->methodNames['loadhtml'] = 'loadHTML';
         $document->methods['createelement'] = new DocumentCreateElement();
         $document->methodVisibility['createelement'] = $pub;
         $document->methods['createelementns'] = new DocumentCreateElementNS();
@@ -220,6 +223,9 @@ final class VmDom
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
         $document->methodVisibility['savexml'] = $pub;
+        $document->methods['savehtml'] = new DocumentSaveHTML();
+        $document->methodVisibility['savehtml'] = $pub;
+        $document->methodNames['savehtml'] = 'saveHTML';
         $document->methods['getelementsbytagname'] = new DocumentGetElementsByTagName();
         $document->methodVisibility['getelementsbytagname'] = $pub;
         $document->methods['getelementbyid'] = new DocumentGetElementById();
@@ -1381,6 +1387,243 @@ final class VmDom
         }
 
         return implode("\n", $lines)."\n";
+    }
+
+    public static function loadHTML(Context $ctx, ObjectEntry $document, string $html, int $options = 0): bool
+    {
+        self::ensureDocument($document);
+
+        $source = self::normalizeHtmlLoadSource($html, $options);
+        $root = self::parseHtmlElementTree($ctx, $source, $document);
+        if (null === $root) {
+            return false;
+        }
+
+        $state = DomRegistry::state($document);
+        $state->isHtmlDocument = true;
+        $state->childIds = [$root->id];
+        $state->idAttrByElement = [];
+        $state->elementIds = [];
+        $state->xmlVersion = '1.0';
+        $state->encoding = null;
+        $state->xmlStandalone = false;
+        $state->doctypeName = 'html';
+        $state->doctypePublicId = '-//W3C//DTD HTML 4.0 Transitional//EN';
+        $state->doctypeSystemId = 'http://www.w3.org/TR/REC-html40/loose.dtd';
+        $state->documentElementName = DomRegistry::state($root)->nodeName;
+        $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
+        self::linkChildToParent($root, $document);
+        self::propagateDocumentId($root, $document->id);
+        self::syncSubtree($ctx, $document);
+        self::reindexDocumentIds($document, $root);
+        $state->documentUri = self::defaultDocumentUri();
+
+        return true;
+    }
+
+    public static function saveHTML(ObjectEntry $document, ?ObjectEntry $node = null): string
+    {
+        $state = self::ensureDocument($document);
+        if (DomConstants::XML_DOCUMENT_NODE !== $state->nodeType) {
+            throw new \LogicException('DOMDocument::saveHTML() called on non-document node in this compiler build');
+        }
+
+        if (null !== $node) {
+            if (!self::isDomNode($node)) {
+                throw new \TypeError('DOMDocument::saveHTML(): Argument #1 ($node) must be of type ?DOMNode');
+            }
+
+            return self::serializeHtmlNode($node);
+        }
+
+        $lines = [self::serializeHtmlDoctype()];
+
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT === $rootVar->type) {
+            $lines[] = self::serializeHtmlNode($rootVar->toObject());
+        } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
+            $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+        }
+
+        return implode('', $lines)."\n";
+    }
+
+    private static function normalizeHtmlLoadSource(string $html, int $options): string
+    {
+        $trimmed = trim($html);
+        if (0 !== ($options & \PHPCompiler\ext\libxml\LibxmlConstants::LIBXML_HTML_NOIMPLIED)) {
+            return $trimmed;
+        }
+        if (preg_match('/^\s*<(?:!DOCTYPE|html\b)/i', $trimmed)) {
+            return preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/i', '', $trimmed) ?? $trimmed;
+        }
+
+        return '<html><body>'.$trimmed.'</body></html>';
+    }
+
+    private static function parseHtmlElementTree(Context $ctx, string $html, ObjectEntry $ownerDocument): ?ObjectEntry
+    {
+        $trimmed = trim($html);
+        if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
+            return self::createHtmlElementFromTag($ctx, $selfClose[1], $selfClose[2] ?? '', '', $ownerDocument);
+        }
+        if (!preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?>(.*)<\/\1>\s*$/is', $trimmed, $matches)) {
+            return null;
+        }
+
+        $entry = self::createHtmlElementFromTag($ctx, $matches[1], $matches[2] ?? '', $matches[3], $ownerDocument);
+        self::syncSubtree($ctx, $entry);
+
+        return $entry;
+    }
+
+    private static function createHtmlElementFromTag(
+        Context $ctx,
+        string $tagName,
+        string $attrPart,
+        string $inner,
+        ObjectEntry $ownerDocument,
+    ): ObjectEntry {
+        $localName = strtolower($tagName);
+        $entry = self::createElement($ctx, $localName)->toObject();
+        $state = DomRegistry::state($entry);
+        $state->attributes = self::parseAttributes($attrPart);
+        self::applyQualifiedElementNames($state, $localName);
+        $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        self::appendHtmlChildren($ctx, $entry, $inner, $ownerDocument);
+
+        return $entry;
+    }
+
+    private static function appendHtmlChildren(
+        Context $ctx,
+        ObjectEntry $parent,
+        string $inner,
+        ObjectEntry $ownerDocument,
+    ): void {
+        $state = DomRegistry::state($parent);
+        $pos = 0;
+        $len = \strlen($inner);
+        while ($pos < $len) {
+            if (preg_match('/\G\s+/s', $inner, $m, 0, $pos)) {
+                $pos += \strlen($m[0]);
+
+                continue;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            if ('<' !== $inner[$pos]) {
+                $next = strpos($inner, '<', $pos);
+                $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
+                if ('' !== $text) {
+                    $textNode = self::createTextNode($ctx, $text, $ownerDocument);
+                    $state->childIds[] = $textNode->id;
+                    self::linkChildToParent($textNode, $parent);
+                }
+                $pos = false === $next ? $len : $next;
+
+                continue;
+            }
+            $end = self::findHtmlElementEnd($inner, $pos);
+            if (null === $end) {
+                return;
+            }
+            $childHtml = substr($inner, $pos, $end - $pos);
+            $child = self::parseHtmlElementTree($ctx, $childHtml, $ownerDocument);
+            if (null === $child) {
+                return;
+            }
+            $state->childIds[] = $child->id;
+            self::linkChildToParent($child, $parent);
+            self::resolveElementNamespaceUri($child);
+            $pos = $end;
+        }
+    }
+
+    /** @return null|int byte offset after one HTML element starting at $pos */
+    private static function findHtmlElementEnd(string $content, int $pos): ?int
+    {
+        if (!isset($content[$pos]) || '<' !== $content[$pos]) {
+            return null;
+        }
+        if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $selfClose, 0, $pos)) {
+            return $pos + \strlen($selfClose[0]);
+        }
+        if (!preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $open, 0, $pos)) {
+            return null;
+        }
+
+        $tag = strtolower($open[1]);
+        /** @var list<string> $stack */
+        $stack = [$tag];
+        $scan = $pos + \strlen($open[0]);
+        $len = \strlen($content);
+        while ($scan < $len && [] !== $stack) {
+            if (preg_match('/\G<\/([A-Za-z_][\w:.-]*)>/is', $content, $close, 0, $scan)) {
+                $name = strtolower($close[1]);
+                if ([] === $stack || end($stack) !== $name) {
+                    return null;
+                }
+                array_pop($stack);
+                $scan += \strlen($close[0]);
+                if ([] === $stack) {
+                    return $scan;
+                }
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>/is', $content, $nestedSelf, 0, $scan)) {
+                $scan += \strlen($nestedSelf[0]);
+
+                continue;
+            }
+            if (preg_match('/\G<([A-Za-z_][\w:.-]*)(\s[^>]*)?>/is', $content, $nestedOpen, 0, $scan)) {
+                $stack[] = strtolower($nestedOpen[1]);
+                $scan += \strlen($nestedOpen[0]);
+
+                continue;
+            }
+            ++$scan;
+        }
+
+        return null;
+    }
+
+    private static function serializeHtmlDoctype(): string
+    {
+        return '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">'."\n";
+    }
+
+    private static function serializeHtmlNode(ObjectEntry $entry): string
+    {
+        if (self::isElement($entry)) {
+            return self::serializeHtmlElement($entry);
+        }
+        if (self::isTextNode($entry)) {
+            return DomRegistry::state($entry)->textContent ?? '';
+        }
+
+        throw new \DOMException('Cannot serialize node type in this compiler build');
+    }
+
+    private static function serializeHtmlElement(ObjectEntry $entry): string
+    {
+        $state = DomRegistry::state($entry);
+        $name = self::escapeName($state->nodeName);
+        $attrPart = self::serializeAttributes($state);
+        if ([] === $state->childIds) {
+            return '<'.$name.$attrPart.'/>';
+        }
+        $parts = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                $parts[] = self::serializeHtmlNode($child);
+            }
+        }
+
+        return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
     }
 
     private static function elementVariable(ObjectEntry $entry): Variable
