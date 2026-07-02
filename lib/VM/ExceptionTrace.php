@@ -14,6 +14,9 @@ use PHPCompiler\VM\Builtin\VmClassMethod;
  */
 final class ExceptionTrace
 {
+    /** Zend exception traces omit call arguments (zend_exception_get_trace); unlike debug_backtrace(). */
+    private const TRACE_OPTIONS = VmDebugBacktrace::IGNORE_ARGS;
+
     /**
      * Snapshot caller frame for manual `new Throwable()` (not thrown) — Zend object_init_ex (#9905).
      */
@@ -26,7 +29,9 @@ final class ExceptionTrace
         if (null === $caller) {
             return;
         }
-        $object->manualConstructTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($caller));
+        $object->manualConstructTrace = self::sanitizeCapturedTrace(
+            VmDebugBacktrace::build($caller, self::TRACE_OPTIONS)
+        );
     }
 
     public static function captureOnThrow(Context $ctx, Frame $frame, Variable $thrown): void
@@ -45,10 +50,10 @@ final class ExceptionTrace
         if (Variable::TYPE_ARRAY === $existing->type && $existing->toArray()->getNumElements() > 0) {
             return;
         }
-        $built = VmDebugBacktrace::build($frame);
+        $built = VmDebugBacktrace::build($frame, self::TRACE_OPTIONS);
         if (0 === $built->toArray()->getNumElements()) {
             // #14369 / #14132: bridge throws (return-type TypeError) run off runStack — anchor throw-site frame.
-            $built = VmDebugBacktrace::buildFromFrames([$frame]);
+            $built = VmDebugBacktrace::buildFromFrames([$frame], self::TRACE_OPTIONS);
         }
         $traceProp->duplicateFrom(self::sanitizeCapturedTrace($built));
     }
@@ -86,7 +91,9 @@ final class ExceptionTrace
         if ('' !== $builtinName) {
             $ht->append(VmDebugBacktrace::builtinInvokeFrameEntry($callerFrame, $builtinName));
         }
-        $userTrace = self::sanitizeCapturedTrace(VmDebugBacktrace::build($callerFrame));
+        $userTrace = self::sanitizeCapturedTrace(
+            VmDebugBacktrace::build($callerFrame, self::TRACE_OPTIONS)
+        );
         foreach ($userTrace->toArray()->iterate(true) as $frameVar) {
             $ht->append($frameVar);
         }
