@@ -7565,6 +7565,15 @@ class JIT {
                 case OpCode::TYPE_ISSET:
                     $containerOp = $block->getOperand($op->arg2);
                     $dimOp = null !== $op->arg3 ? $block->getOperand($op->arg3) : null;
+                    if ($op->issetOnStaticProperty) {
+                        $issetResult = IssetHelper::compileStaticProperty(
+                            $this->context,
+                            $containerOp,
+                            $dimOp
+                        );
+                        $this->assignOperandValue($block->getOperand($op->arg1), $issetResult);
+                        break;
+                    }
                     $container = $this->context->getVariableFromOp($containerOp);
                     $dim = null !== $dimOp ? $this->context->getVariableFromOp($dimOp) : null;
                     $issetResult = IssetHelper::compile(

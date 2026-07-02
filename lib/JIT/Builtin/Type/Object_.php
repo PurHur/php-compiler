@@ -4549,6 +4549,48 @@ class Object_ extends Type {
     }
 
     /**
+     * isset(Class::$prop) without reading uninitialized typed slots (#15112, zend_object_handlers.c).
+     */
+    public function compileStaticPropertyIsSet(int $classId, string $name): Value
+    {
+        $key = strtolower($name);
+        $i1 = $this->context->getTypeFromString('int1');
+        $false = $i1->constInt(0, false);
+        if (!isset($this->staticPropertyGlobals[$classId][$key])) {
+            return $false;
+        }
+        $entry = $this->staticPropertyGlobals[$classId][$key];
+        if (!empty($entry['typedWithoutDefault']) && null !== ($entry['initGlobal'] ?? null)) {
+            return $this->context->builder->icmp(
+                PHPLLVM\Builder::INT_EQ,
+                $this->context->builder->load($entry['initGlobal']),
+                $i1->constInt(1, false)
+            );
+        }
+        $loaded = $this->context->builder->load($entry['global']);
+        if (Variable::TYPE_VALUE === $entry['type']) {
+            return $this->compileValueBoxIsSet($loaded);
+        }
+        if (Variable::TYPE_STRING === $entry['type']) {
+            $null = $this->context->getTypeFromString('__string__*')->constNull();
+
+            return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $loaded, $null);
+        }
+
+        return $i1->constInt(1, false);
+    }
+
+    private function compileValueBoxIsSet(\PHPLLVM\Value $valuePtr): Value
+    {
+        $nullType = $this->context->getTypeFromString('int8')->constInt(0, false);
+        $typeByte = $this->context->builder->load(
+            $this->context->builder->structGep($valuePtr, $this->context->structFieldMap['__value__']['type'])
+        );
+
+        return $this->context->builder->icmp(PHPLLVM\Builder::INT_NE, $typeByte, $nullType);
+    }
+
+    /**
      * Runtime static property name (`Class::$$name`, issue #4597).
      */
     public function staticPropertyFetchDynamic(int $classId, Variable $nameVar): Variable
