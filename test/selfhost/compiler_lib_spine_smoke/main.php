@@ -467,6 +467,7 @@ require_once __DIR__.'/../../../ext/spl/ParentIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/RecursiveArrayIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/RecursiveCallbackFilterIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/RecursiveTreeIteratorBuiltin.php';
+require_once __DIR__.'/../../../ext/spl/RegexIteratorBuiltin.php';
 require_once __DIR__.'/../../../ext/spl/SplArraySerializeSupport.php';
 require_once __DIR__.'/../../../ext/spl/SplArrayStorage.php';
 require_once __DIR__.'/../../../ext/spl/SplClassConstants.php';
