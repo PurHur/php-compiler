@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3662 |
-| Phase A inventory files (M2 ratio SSOT) | 3662 |
+| PHP files on vm.php path | 3664 |
+| Phase A inventory files (M2 ratio SSOT) | 3664 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 9991 |
+| Source constructs flagged (warnings) | 9995 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -548,6 +548,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/HttpStatusEnumData.php` | 0 | 1 |
 | `ext/standard/IdateJitHelper.php` | 0 | 1 |
 | `ext/standard/Ieee754.php` | 0 | 1 |
+| `ext/standard/ImageTypeToExtensionJitHelper.php` | 0 | 1 |
 | `ext/standard/InArrayJitHelper.php` | 0 | 1 |
 | `ext/standard/IncludeBindingJitHelper.php` | 0 | 2 |
 | `ext/standard/IncludeJitHelper.php` | 0 | 1 |
@@ -757,7 +758,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitHttpLastResponseHeaders.php` | 0 | 1 |
 | `ext/standard/JitHttpResponseCode.php` | 0 | 1 |
 | `ext/standard/JitIdate.php` | 0 | 1 |
-| `ext/standard/JitImageTypeToExtension.php` | 0 | 1 |
+| `ext/standard/JitImageTypeArg.php` | 0 | 1 |
 | `ext/standard/JitImageTypeToMimeType.php` | 0 | 1 |
 | `ext/standard/JitImplode.php` | 0 | 1 |
 | `ext/standard/JitIncludePath.php` | 0 | 1 |
@@ -2743,6 +2744,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringHtmlspecialcharsDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringHttpBuildQuery.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringImageTypeToExtension.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php` | 0 | 1 |
@@ -7290,6 +7292,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 15 class method(s)
 
+### `ext/standard/ImageTypeToExtensionJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `ext/standard/InArrayJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8415,10 +8422,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
-### `ext/standard/JitImageTypeToExtension.php`
+### `ext/standard/JitImageTypeArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/JitImageTypeToMimeType.php`
 
@@ -21679,6 +21686,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 99)
 - 4 class method(s)
+- 1 closure(s)
+
+### `lib/JIT/Builtin/StringImageTypeToExtension.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 191)
+- 7 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringInfo.php`

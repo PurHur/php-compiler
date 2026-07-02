@@ -6,8 +6,10 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringImageTypeToExtension;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitBoolArg;
+use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
@@ -59,12 +61,23 @@ final class image_type_to_extension extends Internal
         if ($argc < 1 || $argc > 2) {
             throw new \LogicException('image_type_to_extension() accepts one or two arguments in this compiler build');
         }
-        $includeDot = $context->constantFromBool(true);
+        $includeDotI8 = $context->getTypeFromString('int8')->constInt(1, false);
         if (2 === $argc) {
-            $includeDot = JitBoolArg::lower($context, $args[1], 'image_type_to_extension() include_dot');
+            $includeDotBool = JitBoolArg::lower($context, $args[1], 'image_type_to_extension() include_dot');
+            $includeDotI8 = $context->builder->zext($includeDotBool, $context->getTypeFromString('int8'));
         }
 
-        return JitImageTypeToExtension::invoke($context, $args[0], $includeDot);
+        StringImageTypeToExtension::ensureLinked($context);
+        $slot = JitValueBox::alloc($context);
+        $outPtr = JitValueBox::pointer($context, $slot);
+        $context->builder->call(
+            $context->lookupFunction('__compiler_image_type_to_extension'),
+            JitImageTypeArg::lowerImageType($context, $args[0], 'image_type_to_extension'),
+            $includeDotI8,
+            $outPtr
+        );
+
+        return $outPtr;
     }
 
     private static function coerceIncludeDotOperand(Variable $flag): bool
