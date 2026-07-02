@@ -33,6 +33,8 @@ final class VmSession
 
     public const EMPTY_NAME_WARNING = 'session.name "%s" cannot be numeric or empty';
 
+    public const ACTIVE_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed when a session is active';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;
