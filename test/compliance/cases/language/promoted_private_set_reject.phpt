@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted constructor public private(set) — parses and reads publicly (#14946, Zend/zend_compile.c)
+Language: promoted constructor public private(set) — compile fatal (#15184, Zend/zend_compile.c)
 --FILE--
 <?php
 class D {
@@ -7,5 +7,5 @@ class D {
 }
 $d = new D();
 echo $d->x, "\n";
---EXPECT--
-1
+--EXPECT_EXIT--
+255

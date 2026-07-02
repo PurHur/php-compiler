@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted public private(set) — parses and reads publicly (#14946, Zend/zend_compile.c)
+Language: promoted public private(set) — compile fatal (#15184, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -9,5 +9,5 @@ class C {
     }
 }
 echo (new C('alice'))->name, "\n";
---EXPECT--
-alice
+--EXPECT_EXIT--
+255
