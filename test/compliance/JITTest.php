@@ -458,16 +458,6 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'typed_class_const_reject')) {
                 continue;
             }
-            // 8.4-target reject gate; skipped when CompilerVersion 8.4.0+ enables final global typed constants (#10324).
-            if (CompilerVersion::supportsFinalGlobalTypedConstants()
-                && str_contains($name, 'final_global_typed_constant_reject')) {
-                continue;
-            }
-            if (!CompilerVersion::supportsFinalGlobalTypedConstants()
-                && str_contains($name, 'final_global_typed_constant')
-                && !str_contains($name, 'final_global_typed_constant_reject')) {
-                continue;
-            }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
             if (CompilerVersion::supportsExitFunctionForm()
                 && (str_contains($name, 'exit_named_status_reference_profile')

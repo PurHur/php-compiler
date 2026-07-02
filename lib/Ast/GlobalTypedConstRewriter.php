@@ -20,7 +20,7 @@ final class GlobalTypedConstRewriter
     /** @internal Marker embedded in source for PHPCfg to recover declared type. */
     public const MARKER_PATTERN = '/\/\*\s*phpc-global-typed-const:([^*]+?)\s*\*\//';
 
-    /** Zend PHP ≤8.3: `final const` at compile-unit scope is invalid (#10324, zend_compile.c). */
+    /** Zend/php-src: `final const` at compile-unit scope is invalid at all versions (#10324, #15185). */
     public const FINAL_GLOBAL_CONST_REJECT_MESSAGE = 'syntax error, unexpected token "const", expecting "abstract" or "final" or "readonly" or "class"';
 
     public static function rewrite(string $source): string
@@ -51,17 +51,7 @@ final class GlobalTypedConstRewriter
                 } elseif ('}' === $text && $classLikeDepth > 0) {
                     --$classLikeDepth;
                 } elseif (T_FINAL === $tok[0] && 0 === $classLikeDepth) {
-                    if (!CompilerVersion::supportsFinalGlobalTypedConstants()) {
-                        self::rejectFinalGlobalConstIfPresent($tokens, $i + 1);
-                    }
-                    $typed = self::tryParseFinalTypedConst($tokens, $i + 1);
-                    if (null !== $typed) {
-                        [$typeExpr, $end] = $typed;
-                        self::rejectDisallowedGlobalConstType($typeExpr, $tok[2] ?? 1);
-                        $out .= '/*'.self::MARKER_PREFIX.'final:'.$typeExpr.'*/ const ';
-                        $i = $end - 1;
-                        continue;
-                    }
+                    self::rejectFinalGlobalConstIfPresent($tokens, $i + 1);
                 } elseif (T_CONST === $tok[0] && 0 === $classLikeDepth) {
                     $typed = self::tryParseTypedConst($tokens, $i + 1);
                     if (null !== $typed) {
@@ -105,21 +95,6 @@ final class GlobalTypedConstRewriter
         }
 
         return [$payload, $isFinal];
-    }
-
-    /**
-     * @param list<array{0: int, 1: string, 2: int}|string> $tokens
-     *
-     * @return array{0: string, 1: int}|null [type expression, index of const name token]
-     */
-    private static function tryParseFinalTypedConst(array $tokens, int $start): ?array
-    {
-        $j = self::skipIgnorable($tokens, $start, \count($tokens));
-        if ($j >= \count($tokens) || !\is_array($tokens[$j]) || T_CONST !== $tokens[$j][0]) {
-            return null;
-        }
-
-        return self::tryParseTypedConst($tokens, $j + 1);
     }
 
     /**
