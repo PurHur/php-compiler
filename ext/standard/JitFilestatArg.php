@@ -25,7 +25,7 @@ final class JitFilestatArg
         JITVariable $arg,
         string $function
     ): Value {
-        return JitStringBuiltinArg::lowerTypedString($context, $arg, $function, 0, 'filename');
+        return JitStringBuiltinArg::lowerPath($context, $arg, $function, 0, 'filename');
     }
 
     /** Z_PARAM_PATH for touch() — null coerces to "" (#12878, php_touch). */

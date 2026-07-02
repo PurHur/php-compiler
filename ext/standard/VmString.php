@@ -245,7 +245,7 @@ final class VmString
         int $argIndex = 0,
         string $paramName = 'path'
     ): string {
-        $str = self::coerceTypedStringBuiltinArg($var, $function, $argIndex, $paramName);
+        $str = self::coerceStringBuiltinArg($var, $function, $argIndex, $paramName);
         if (str_contains($str, "\0")) {
             throw new \ValueError(
                 sprintf(
