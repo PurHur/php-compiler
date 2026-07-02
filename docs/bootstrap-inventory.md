@@ -12313,11 +12313,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmIni.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 613)
-- new HashTable (line 620)
-- new Variable (line 628)
-- new Variable (line 641)
+- new HashTable (line 621)
+- new HashTable (line 628)
+- new Variable (line 636)
 - new Variable (line 649)
+- new Variable (line 657)
 - 42 class method(s)
 
 ### `ext/standard/VmIniIntrospection.php`
