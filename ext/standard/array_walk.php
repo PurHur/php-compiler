@@ -8,6 +8,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
+use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\HashTable;
@@ -88,7 +89,7 @@ final class array_walk extends Internal
             $this->jitString($context, $args[1], 'array_walk() callback');
         }
 
-        return ArrayBuiltinHelper::walkInPlace($context, $args[0], $args[1]);
+        return ArrayWalkRuntime::walkInPlaceWithStringBuiltin($context, $args[0], $args[1]);
     }
 
     private static function walkArraySubject(
