@@ -119,4 +119,25 @@ final class VmFsGlobTest extends TestCase
             $this->assertFalse(str_ends_with($entry, '/'));
         }
     }
+
+    /** Issue #14881 — glob('.') returns current directory entry. */
+    public function testVmFsGlobDotPatternReturnsDot(): void
+    {
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob('.');
+        $this->assertSame(['.'], $matches);
+    }
+
+    /** Issue #14881 — absolute directory path without double leading slash. */
+    public function testVmFsGlobAbsoluteDirNormalizesLeadingSlash(): void
+    {
+        $tmp = sys_get_temp_dir();
+        if (!is_dir($tmp)) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp);
+        $this->assertIsArray($matches);
+        $this->assertCount(1, $matches);
+        $this->assertSame($tmp, $matches[0]);
+        $this->assertStringNotContainsString('//', $matches[0]);
+    }
 }
