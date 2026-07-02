@@ -42,20 +42,13 @@ final class CastArrayShared
         return $array;
     }
 
-    /** Zend convert_to_array(IS_RESOURCE) — array(0 => NULL) (#15002). */
-    public static function wrapNullInArray(Context $context): Variable
+    /** Zend convert_to_array(IS_RESOURCE) — array(0 => resource zval) (#15012, #15013). */
+    public static function wrapResourceInArray(Context $context, Variable $src): Variable
     {
-        $ht = HashTableHelper::alloc($context);
-        $zero = $context->getTypeFromString('size_t')->constInt(0, false);
-        $null = new Variable($context, Variable::TYPE_NULL, Variable::KIND_VALUE);
-        HashTableHelper::setAtIndex($context, $ht, $zero, $null);
-        $array = HashTableHelper::emptyVariable($context);
-        HashTableHelper::storeHashtableInArrayVariable($context, $array, $ht);
-
-        return $array;
+        return self::wrapScalarInArray($context, $src);
     }
 
-    /** Zend convert_to_array: Resource pseudo-class wraps NULL at index 0 (#15002). */
+    /** Zend convert_to_array: Resource pseudo-class embeds resource at index 0 (#15012, #15013). */
     public static function emitObjectOperandToArray(Context $context, Variable $src, bool $mangledKeys = true): Variable
     {
         $resourceClassId = self::resourceClassIdIfRegistered($context);
@@ -82,7 +75,7 @@ final class CastArrayShared
         $context->builder->branchIf($isResource, $resourceBlock, $plainBlock);
 
         $context->builder->positionAtEnd($resourceBlock);
-        $wrapped = self::wrapNullInArray($context);
+        $wrapped = self::wrapResourceInArray($context, $src);
         $context->builder->branch($mergeBlock);
 
         $context->builder->positionAtEnd($plainBlock);

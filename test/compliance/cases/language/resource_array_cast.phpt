@@ -1,5 +1,5 @@
 --TEST--
-language (array) cast on stream resource — one-element NULL slot (#15002)
+language (array) cast on stream resource — one-element array with resource slot (#15012, Zend/zend_operators.c)
 --FILE--
 <?php
 $h = fopen('php://memory', 'r+');
