@@ -189,6 +189,7 @@ use PHPCompiler\VM\Builtin\ReflectionMethodHasReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodHasTentativeReturnType;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvoke;
 use PHPCompiler\VM\Builtin\ReflectionMethodInvokeArgs;
+use PHPCompiler\VM\Builtin\ReflectionMethodGetDeclaringClass;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetDocComment;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetEndLine;
 use PHPCompiler\VM\Builtin\ReflectionMethodGetExtensionName;
@@ -525,6 +526,8 @@ final class BuiltinClasses
         $rm->methodVisibility['getnumberofparameters'] = $pub;
         $rm->methods['getname'] = new ReflectionMethodGetName();
         $rm->methodVisibility['getname'] = $pub;
+        $rm->methods['getdeclaringclass'] = new ReflectionMethodGetDeclaringClass();
+        $rm->methodVisibility['getdeclaringclass'] = $pub;
         $rm->methods['isdeprecated'] = new ReflectionMethodIsDeprecated();
         $rm->methodVisibility['isdeprecated'] = $pub;
         $rm->methods['getdeprecatedmessage'] = new ReflectionMethodGetDeprecatedMessage();

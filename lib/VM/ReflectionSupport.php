@@ -1369,8 +1369,10 @@ final class ReflectionSupport
         if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
         }
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
+        $declEntry = $ctx->classes[$declLc] ?? $entry;
 
-        return [$entry, $methodName];
+        return [$declEntry, $methodName];
     }
 
     /**
