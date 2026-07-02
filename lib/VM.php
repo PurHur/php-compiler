@@ -10677,6 +10677,26 @@ restart:
 
                 return null;
             }
+            if ($owner->hasProperty($prop)) {
+                $slot = $owner->getProperty($prop);
+                if (!VM\TypedPropertyCheck::isUninitialized($slot)) {
+                    $thrown = VM\BuiltinExceptionSupport::materializeError(
+                        $this->context,
+                        $this->readonlyPropertyWriteErrorMessage($owner, $prop, $declaringClass, $frame)
+                    );
+                    $catchFrame = $this->findCatchFrameForThrow($frame, $thrown);
+                    if (null !== $catchFrame) {
+                        if ($this->stashPropertyHookSetExternalCatch($frame, $catchFrame)) {
+                            return null;
+                        }
+
+                        return $catchFrame;
+                    }
+                    $this->raiseUncaughtException($thrown);
+
+                    return null;
+                }
+            }
 
             return null;
         }
