@@ -31,6 +31,7 @@ final class GetDeclaredClassesTraitsFunctionsBuiltinTest extends BaseTest
             'get_declared_functions_jit.phpt',
             'get_defined_functions.phpt',
             'get_defined_functions_jit.phpt',
+            'get_defined_functions_compiler_leak.phpt',
         ] as $file) {
             yield $file => self::parsePHPT($root.'/'.$file, $file);
         }

@@ -339,16 +339,66 @@ final class VmReflection
             return self::$internalFunctionNames;
         }
         $names = [];
+        $seen = [];
         foreach ([new Module(), new \PHPCompiler\ext\types\Module()] as $module) {
             foreach ($module->getFunctions() as $func) {
-                $names[] = $func->getName();
+                $name = $func->getName();
+                $lc = strtolower($name);
+                if (isset($seen[$lc]) || !self::isVisibleToGetDefinedFunctions($name)) {
+                    continue;
+                }
+                $seen[$lc] = true;
+                $names[] = $name;
             }
         }
-        $names = array_values(array_unique($names));
-        sort($names);
-        self::$internalFunctionNames = $names;
+        self::$internalFunctionNames = self::orderInternalFunctionNamesForIntrospection($names);
 
         return self::$internalFunctionNames;
+    }
+
+    /** Zend internal bucket starts with engine introspection builtins (php-src zend_builtin_functions). */
+    private const INTERNAL_INTROSPECTION_HEAD = [
+        'zend_version',
+        'func_num_args',
+        'func_get_args',
+        'func_get_arg',
+    ];
+
+    /**
+     * Zend-parity ordering: engine head builtins, then Core list, then remaining internals in registration order.
+     *
+     * @param list<string> $names
+     *
+     * @return list<string>
+     */
+    private static function orderInternalFunctionNamesForIntrospection(array $names): array
+    {
+        $byLc = [];
+        foreach ($names as $name) {
+            $byLc[strtolower($name)] = $name;
+        }
+        $ordered = [];
+        foreach (self::INTERNAL_INTROSPECTION_HEAD as $headLc) {
+            if (isset($byLc[$headLc])) {
+                $ordered[] = $byLc[$headLc];
+                unset($byLc[$headLc]);
+            }
+        }
+        foreach (CoreExtensionFunctions::FUNCTIONS as $coreLc) {
+            if (isset($byLc[$coreLc])) {
+                $ordered[] = $byLc[$coreLc];
+                unset($byLc[$coreLc]);
+            }
+        }
+        foreach ($names as $name) {
+            $lc = strtolower($name);
+            if (isset($byLc[$lc])) {
+                $ordered[] = $name;
+                unset($byLc[$lc]);
+            }
+        }
+
+        return $ordered;
     }
 
     /**
@@ -409,10 +459,21 @@ final class VmReflection
         'exit',
     ];
 
+    /** Whether get_defined_functions()['internal'] may list a registered builtin (php-src basic_functions.c). */
+    public static function isVisibleToGetDefinedFunctions(string $functionName): bool
+    {
+        return self::isVisibleToFunctionExists($functionName);
+    }
+
     /** Whether function_exists() may report true — excludes constructs Zend omits from the function table. */
     public static function isVisibleToFunctionExists(string $functionName): bool
     {
-        return !\in_array(\strtolower($functionName), self::FUNCTION_EXISTS_EXCLUDED, true);
+        $lc = \strtolower($functionName);
+        if (\str_starts_with($lc, '__compiler_')) {
+            return false;
+        }
+
+        return !\in_array($lc, self::FUNCTION_EXISTS_EXCLUDED, true);
     }
 
     public static function functionExists(Context $ctx, string $functionName): bool
