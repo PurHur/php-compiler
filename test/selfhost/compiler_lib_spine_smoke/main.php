@@ -588,6 +588,7 @@ require_once __DIR__.'/../../../ext/standard/HtmlEntitiesJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HtmlEntityDecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HtmlEntityTable.php';
 require_once __DIR__.'/../../../ext/standard/HtmlspecialcharsJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/HtmlspecialcharsDecodeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpBuildQueryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpResponseJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/HttpStatusEnumData.php';

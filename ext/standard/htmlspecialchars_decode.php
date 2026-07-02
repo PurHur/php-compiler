@@ -16,7 +16,7 @@ use PHPLLVM\Value;
 /**
  * htmlspecialchars_decode() — decode HTML entities (subset of PHP; issue #2454).
  *
- * VM: {@see VmString::htmlspecialchars_decode()}; JIT/AOT: phpc_htmlspecialchars_decode.c.
+ * VM: {@see VmString::htmlspecialchars_decode()}; JIT/AOT: {@see HtmlspecialcharsDecodeJitHelper} (#14820).
  */
 final class htmlspecialchars_decode extends Internal
 {
