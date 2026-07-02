@@ -666,4 +666,15 @@ final class CompilerVersion
     {
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
+
+    /**
+     * PHP 8.3+ parenthesized DNF intersection-only types `(I1&I2) $param` / `(): (I1&I2)`.
+     *
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 (#14904).
+     * php-src: Zend/zend_compile.c zend_compile_type / DNF normalization.
+     */
+    public static function supportsParenthesizedDnfIntersectionTypes(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
 }

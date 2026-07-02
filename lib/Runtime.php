@@ -370,6 +370,7 @@ class Runtime {
     {
         AsymmetricVisibilityRejector::reject($code, $filename);
         CloneWithSyntaxRejector::reject($code, $filename);
+        DnfParenIntersectionSyntaxRejector::reject($code, $filename);
         ExitFunctionSyntaxRejector::reject($code, $filename);
         PropertyHookSyntaxRejector::reject($code, $filename);
         $sealedPreprocessor = new SealedClassPreprocessor();
