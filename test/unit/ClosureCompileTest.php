@@ -45,4 +45,22 @@ PHP;
         $rt->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** Regression: inline closure bindTo($obj, null) must send null scope not receiver (#14893). */
+    public function testVmInlineClosureBindToNullScope(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+class C { public int $p = 9; }
+$c = new C();
+$readPublic = (function (): int { return $this->p; })->bindTo($c, null);
+echo $readPublic(), "\n";
+PHP;
+        $rt = new PHPCompiler\Runtime();
+        $block = $rt->parseAndCompile($code, 'test.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame("9\n", ob_get_clean());
+    }
 }
