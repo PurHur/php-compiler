@@ -2432,6 +2432,7 @@ require_once __DIR__.'/../../../lib/Compiler/ImplementsHierarchyCompileCheck.php
 require_once __DIR__.'/../../../lib/Compiler/InheritanceVariance.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceConstVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceImplementationCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodBodyCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodVisibilityCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodReturnTypeCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/NewCtorParens.php';
