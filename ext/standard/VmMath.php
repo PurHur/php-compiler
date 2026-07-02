@@ -767,6 +767,12 @@ final class VmMath
         return \sin($num);
     }
 
+    /** cos() — cosine (php-src ext/standard/math.c). */
+    public static function cos(float $num): float
+    {
+        return \cos($num);
+    }
+
     /**
      * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
      */

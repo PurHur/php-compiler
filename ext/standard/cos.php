@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathCos;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class cos extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\cos($num));
+        $frame->returnVar->float(VmMath::cos($num));
     }
 
     public Context $context;
@@ -48,9 +49,8 @@ final class cos extends Internal
             throw new \LogicException('cos() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'cos', 'float');
-        $fn = $context->lookupFunction('cos');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathCos::invoke($context, $asFloat);
     }
 
 }
