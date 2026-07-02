@@ -8,13 +8,14 @@ use PHPCompiler\ext\standard\VmEnv;
 use PHPCompiler\ext\standard\VmIniIntrospection;
 use PHPUnit\Framework\TestCase;
 
-/** VmIniIntrospection host seed + env fallback (#9175). */
+/** VmIniIntrospection host seed + env fallback (#9175, #15111). */
 final class VmIniIntrospectionTest extends TestCase
 {
     protected function tearDown(): void
     {
         putenv('PHP_COMPILER_INI_LOADED_FILE');
         putenv('PHP_COMPILER_INI_SCANNED_FILES');
+        VmIniIntrospection::resetIniSnapshotForTesting();
     }
 
     public function testSeedHostIniEnvFromZendPopulatesWhenUnset(): void
@@ -44,9 +45,11 @@ final class VmIniIntrospectionTest extends TestCase
         $this->assertSame('/explicit/a.ini,', VmIniIntrospection::scannedFiles());
     }
 
-    public function testLoadedFileReadsVmEnvPutenvOverlay(): void
+    public function testLoadedFileIgnoresVmEnvPutenvOverlayAfterFreeze(): void
     {
+        VmIniIntrospection::seedHostIniEnvFromZend();
+        $before = VmIniIntrospection::loadedFile();
         VmEnv::putenv('PHP_COMPILER_INI_LOADED_FILE=/etc/custom/php.ini');
-        $this->assertSame('/etc/custom/php.ini', VmIniIntrospection::loadedFile());
+        $this->assertSame($before, VmIniIntrospection::loadedFile());
     }
 }
