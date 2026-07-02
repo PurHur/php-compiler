@@ -19,6 +19,21 @@ final class JumpIfInsertBlockAfterNullsafeMergeTest extends TestCase
             $source,
             'TYPE_JUMPIF must recover a null/cleared LLVM insert block before branchIf (#15149)'
         );
+        $this->assertMatchesRegularExpression(
+            '/case OpCode::TYPE_JUMPIF:[\s\S]*?tryGetInsertBlock\(\$this->context\)/',
+            $source,
+            'TYPE_JUMPIF must read insert block via tryGetInsertBlock after recovery (#15149)'
+        );
+    }
+
+    public function testNullsafeMergeBreaksInIncludeScope(): void
+    {
+        $source = (string) file_get_contents(dirname(__DIR__, 2).'/lib/JIT.php');
+        $this->assertMatchesRegularExpression(
+            '/case OpCode::TYPE_NULLSAFE:[\s\S]*?inlineIncludeDepth > 0[\s\S]*?break;/',
+            $source,
+            'Nullsafe block3 merge must break (not return) inside nested includes (#15149)'
+        );
     }
 
     public function testPopScopeIgnoresEmptyStackDuringUnwind(): void
