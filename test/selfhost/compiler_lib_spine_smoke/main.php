@@ -1016,6 +1016,7 @@ require_once __DIR__.'/../../../ext/standard/JitStripTags.php';
 require_once __DIR__.'/../../../ext/standard/JitStripWhitespace.php';
 require_once __DIR__.'/../../../ext/standard/JitStripcslashes.php';
 require_once __DIR__.'/../../../ext/standard/StripslashesJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/StringBitwiseNotJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitStrpbrk.php';
 require_once __DIR__.'/../../../ext/standard/StrContainsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrposJitHelper.php';
