@@ -63,6 +63,11 @@ final class VmFilestatFailure
         self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): No such file or directory', $function));
     }
 
+    public static function warnInvalidArgument(Frame $frame, string $function): void
+    {
+        self::triggerWarningWithHandlerFirst($frame, \sprintf('%s(): Invalid argument', $function));
+    }
+
     public static function warnOpendirFailed(Frame $frame, string $path): void
     {
         self::warnPathOpenDirFailed($frame, 'opendir', $path);
