@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -61,6 +62,6 @@ final class fpow extends Internal
         }
         [$base, $exp] = JitFdiv::lowerOperands($context, $args[0], $args[1], self::FUNCTION, 'num', 'exponent');
 
-        return $context->builder->call($context->lookupFunction('pow'), $base, $exp);
+        return MathFpow::invoke($context, $base, $exp);
     }
 }

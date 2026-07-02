@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Builtin\PowIntRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitEnumNumericOperandGuard;
@@ -72,7 +73,7 @@ final class JitPow
         $double = $context->getTypeFromString('double');
         $baseD = pow::toJitDouble($context, $args[0], $double);
         $expD = pow::toJitDouble($context, $args[1], $double);
-        $result = $context->builder->call($context->lookupFunction('pow'), $baseD, $expD);
+        $result = MathFpow::invoke($context, $baseD, $expD);
         $context->builder->call(
             $context->lookupFunction('__value__writeDouble'),
             $slotPtr,

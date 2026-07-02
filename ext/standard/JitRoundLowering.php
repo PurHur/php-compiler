@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MathFpow;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -202,8 +203,8 @@ final class JitRoundLowering
             $absPlaces,
             $i32->constInt(22, false)
         );
-        $powResult = $context->builder->call(
-            $context->lookupFunction('pow'),
+        $powResult = MathFpow::invoke(
+            $context,
             $f64->constReal(10.0),
             $context->builder->sitofp($absPlaces, $f64)
         );
