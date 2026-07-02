@@ -236,7 +236,8 @@ patch_already_applied() {
       grep -q 'array_slice(\$stack, -\$num, 1)' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
       ;;
     php-cfg-loop-resolver-continue-switch-warning.patch)
-      grep -q 'compiler_language_warning' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
+      grep -q 'compiler_language_warning' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null \
+        && grep -q 'continue %d' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
       ;;
     php-cfg-loop-resolver-break-outside-context.patch)
       grep -q "not in the 'loop' or 'switch' context" "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php" 2>/dev/null
@@ -520,6 +521,70 @@ if needle not in text:
 path.write_text(text.replace(needle, insert, 1))
 PY
   echo "Applied php-cfg-assignop-coalesce.patch (overlay)"
+}
+
+apply_php_cfg_loop_resolver_continue_switch_warning_overlay() {
+  local target="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/AstVisitor/LoopResolver.php"
+  if patch_already_applied "$PATCH_DIR/php-cfg-loop-resolver-continue-switch-warning.patch"; then
+    echo "Skip php-cfg-loop-resolver-continue-switch-warning.patch (already applied)"
+    return 0
+  fi
+  if ! grep -q 'compiler_language_warning' "$target" 2>/dev/null; then
+    return 1
+  fi
+  python3 - "$target" <<'PY'
+import sys
+from pathlib import Path
+
+path = Path(sys.argv[1])
+text = path.read_text()
+if 'continue %d' in text:
+    raise SystemExit(0)
+old = """    protected function makeContinueSwitchWarning(Node $node): Expression
+    {
+        $attrs = $node->getAttributes();
+        $line = isset($attrs['startLine']) ? (int) $attrs['startLine'] : 0;
+        $args = [
+            new Arg(new String_('\"continue\" targeting switch is equivalent to \"break\"', $attrs)),
+        ];
+        if ($line > 0) {
+            $args[] = new Arg(new LNumber($line, $attrs), false, false, $attrs);
+        }
+
+        return new Expression(
+            new FuncCall(new Name('compiler_language_warning'), $args, $attrs),
+            $attrs
+        );
+    }"""
+new = """    protected function makeContinueSwitchWarning(Node $node): Expression
+    {
+        $attrs = $node->getAttributes();
+        $line = isset($attrs['startLine']) ? (int) $attrs['startLine'] : 0;
+        $level = 1;
+        if ($node->num instanceof LNumber) {
+            $level = $node->num->value;
+        }
+        $message = $level > 1
+            ? \\sprintf('\"continue %d\" targeting switch is equivalent to \"break %d\"', $level, $level)
+            : '\"continue\" targeting switch is equivalent to \"break\"';
+        $args = [
+            new Arg(new String_($message, $attrs)),
+        ];
+        if ($line > 0) {
+            $args[] = new Arg(new LNumber($line, $attrs), false, false, $attrs);
+        }
+
+        return new Expression(
+            new FuncCall(new Name('compiler_language_warning'), $args, $attrs),
+            $attrs
+        );
+    }"""
+if old not in text:
+    sys.stderr.write("php-cfg-loop-resolver-continue-switch-warning: level-1 anchor not found in LoopResolver.php\n")
+    raise SystemExit(1)
+path.write_text(text.replace(old, new, 1))
+PY
+  echo "Applied php-cfg-loop-resolver-continue-switch-warning.patch (level overlay)"
 }
 
 apply_php_cfg_arrow_function_overlay() {
@@ -5518,6 +5583,11 @@ apply_patch() {
   if [[ "$(basename "$patch")" == "php-cfg-incdec-expr.patch" ]]; then
     apply_php_cfg_incdec_expr_overlay
     return $?
+  fi
+  if [[ "$(basename "$patch")" == "php-cfg-loop-resolver-continue-switch-warning.patch" ]]; then
+    if apply_php_cfg_loop_resolver_continue_switch_warning_overlay; then
+      return 0
+    fi
   fi
   if [[ "$(basename "$patch")" == "php-cfg-yield-keyed.patch" ]]; then
     apply_php_cfg_yield_keyed_overlay
