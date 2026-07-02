@@ -827,6 +827,12 @@ final class VmMath
         return \acos($num);
     }
 
+    /** atan() — arc tangent (php-src ext/standard/math.c). */
+    public static function atan(float $num): float
+    {
+        return \atan($num);
+    }
+
     /** atan2() — arc tangent of y/x (php-src ext/standard/math.c). */
     public static function atan2(float $y, float $x): float
     {
