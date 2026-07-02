@@ -100,6 +100,8 @@ final class AsymmetricVisibilityCompileCheck
         if (!$this->propertyHasDeclaredType($declaredType)) {
             throw new \CompileError(sprintf(self::ASYMMETRIC_REQUIRES_TYPE_MESSAGE, $classDisplay, $propertyName));
         }
+        // php-src: set visibility must not be weaker than read visibility.
+        // (E.g. `private public(set)` is invalid because writes would be less restricted than reads.)
         if (self::visibilityRank($readVisibility) > self::visibilityRank($setVisibility)) {
             throw new \CompileError(sprintf(self::WEAKER_THAN_SET_MESSAGE, $classDisplay, $propertyName));
         }

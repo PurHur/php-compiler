@@ -315,7 +315,9 @@ final class CompilerVersion
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        // Enable on the 8.4 development line; php-src treats this as core syntax in 8.4+.
+        // (Unlike some other gates that intentionally keep 8.4.0-dev matching Zend 8.2.)
+        return version_compare(self::VERSION, '8.4', '>=');
     }
 
     /**

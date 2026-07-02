@@ -503,6 +503,10 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPropertyHooks()
+                && str_contains($name, 'asymmetric_visibility_set_modifier')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when bare rethrow enabled (#3508, #14239).
             if (CompilerVersion::supportsBareRethrow()
                 && str_contains($name, 'bare_throw_reference_profile')) {

@@ -274,8 +274,9 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        return self::lineViolatesDuplicateSetModifierRules($line)
-            || self::lineHasExplicitReadPlusSetModifier($line);
+        // Forward PHP 8.4+ syntax allows explicit read visibility plus set visibility
+        // (e.g. `public private(set)`). Only reject true duplicate modifier cases.
+        return self::lineViolatesDuplicateSetModifierRules($line);
     }
 
     /**
@@ -283,7 +284,8 @@ final class AsymmetricVisibilityRewriter
      */
     private static function lineViolatesMultipleSetModifierRulesForReferenceProfile(string $line): bool
     {
-        return self::lineViolatesMultipleSetModifierRules($line);
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
     }
 
     private static function lineViolatesDuplicateSetModifierRules(string $line): bool
