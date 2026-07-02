@@ -14,14 +14,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertSame('8.4.0-dev', CompilerVersion::VERSION);
     }
 
-    public function testSupportsStrIncrementFalseOnReferenceProfile(): void
+    public function testSupportsStrIncrementTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsStrIncrement());
+        $this->assertTrue(CompilerVersion::supportsStrIncrement());
     }
 
-    public function testSupportsClassHasFunctionsFalseOnReferenceProfile(): void
+    public function testSupportsClassHasFunctionsTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsClassHasFunctions());
+        $this->assertTrue(CompilerVersion::supportsClassHasFunctions());
     }
 
     public function testSupportsPhp84ReflectionProbeBuiltinsFalseOnReferenceProfile(): void
@@ -39,9 +39,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
-    public function testSupportsFpowFalseOnReferenceProfile(): void
+    public function testSupportsFpowTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsFpow());
+        $this->assertTrue(CompilerVersion::supportsFpow());
     }
 
     public function testSupportsNextafterFalseOnReferenceProfile(): void
@@ -49,14 +49,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsNextafter());
     }
 
-    public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
+    public function testSupportsRoundingModeEnumTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
+        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
     }
 
-    public function testSupportsJsonValidateFalseOnReferenceProfile(): void
+    public function testSupportsJsonValidateTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsJsonValidate());
+        $this->assertTrue(CompilerVersion::supportsJsonValidate());
     }
 
     public function testAdvertisesReflectionConstantClassFalseOnReferenceProfile(): void
@@ -169,20 +169,20 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFinalGlobalTypedConstants());
     }
 
-    public function testVmDoesNotRegisterStrIncrementOnReferenceProfile(): void
+    public function testVmRegistersStrIncrementOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        $this->assertFalse(isset($ctx->functions['str_decrement']));
-        $this->assertFalse(isset($ctx->functions['str_increment']));
+        $this->assertTrue(isset($ctx->functions['str_decrement']));
+        $this->assertTrue(isset($ctx->functions['str_increment']));
     }
 
-    public function testVmDoesNotRegisterClassHasFunctionsOnReferenceProfile(): void
+    public function testVmRegistersClassHasFunctionsOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['class_has_method', 'class_has_property', 'class_has_constant'] as $fn) {
-            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
+            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
         }
     }
 
@@ -200,10 +200,10 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($ctx->classes['clockinterface']));
     }
 
-    public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
+    public function testVmRegistersRoundingModeOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
+        $this->assertTrue(isset($runtime->vmContext->classes['roundingmode']));
     }
 
     public function testSupportsRandomIntervalBoundaryFalseOnReferenceProfile(): void
@@ -217,10 +217,10 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['random\\intervalboundary']));
     }
 
-    public function testVmDoesNotRegisterJsonValidateOnReferenceProfile(): void
+    public function testVmRegistersJsonValidateOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertFalse(isset($runtime->vmContext->functions['json_validate']));
+        $this->assertTrue(isset($runtime->vmContext->functions['json_validate']));
     }
 
     public function testSupportsMbTrimFunctionsFalseOnReferenceProfile(): void
