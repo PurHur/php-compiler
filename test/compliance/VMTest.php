@@ -36,6 +36,11 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter')
+                && !str_contains($name, 'php84_math_string_builtins_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsRoundingModeEnum()
                 && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
                 && !str_contains($name, 'rounding_mode_reference_profile')) {
@@ -63,7 +68,7 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'get_declared_exclude_deprecated_reference_profile')) {
                 continue;
             }
-            if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow())
+            if ((CompilerVersion::supportsStrIncrement() || CompilerVersion::supportsFpow() || CompilerVersion::supportsNextafter())
                 && str_contains($name, 'php84_math_string_builtins_phantom')) {
                 continue;
             }

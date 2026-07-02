@@ -245,6 +245,12 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /** PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241). */
+    public static function supportsNextafter(): bool
+    {
+        return version_compare(self::VERSION, '8.4.0', '>=');
+    }
+
     /**
      * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846).
      *

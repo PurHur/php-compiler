@@ -87,6 +87,10 @@ class AotTest extends BaseTest
                 && (str_contains($name, 'fpow') || str_contains($name, 'fmin') || str_contains($name, 'fmax'))) {
                 continue;
             }
+            if (!CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter')) {
+                continue;
+            }
             if (!CompilerVersion::supportsRoundingModeEnum()
                 && (str_contains($name, 'rounding_mode') || str_contains($name, 'bcround'))
                 && !str_contains($name, 'rounding_mode_reference_profile')) {

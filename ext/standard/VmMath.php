@@ -749,6 +749,40 @@ final class VmMath
         return \pow($num, $exponent);
     }
 
+    /**
+     * nextafter() — IEEE next representable float toward $next (php-src ext/standard/math.c; #9241).
+     */
+    public static function nextafter(float $num, float $next): float
+    {
+        if (\function_exists('nextafter')) {
+            return \nextafter($num, $next);
+        }
+        if (\is_nan($num)) {
+            return $num;
+        }
+        if (\is_nan($next)) {
+            return $next;
+        }
+        if ($num === $next) {
+            return $next;
+        }
+        if (0.0 === $num || -0.0 === $num) {
+            if ($next > 0.0) {
+                return \unpack('d', \pack('P', 1))[1];
+            }
+
+            return \unpack('d', \pack('P', 0x8000000000000001))[1];
+        }
+        $bits = \unpack('P', \pack('d', $num))[1];
+        if (($num > 0.0) === ($next > $num)) {
+            ++$bits;
+        } else {
+            --$bits;
+        }
+
+        return \unpack('d', \pack('P', $bits))[1];
+    }
+
     /** IEEE fmin pair (php-src ext/standard/math.c zend_fmin; #11728). */
     public static function fminPair(float $a, float $b): float
     {

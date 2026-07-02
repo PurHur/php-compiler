@@ -201,6 +201,7 @@ class Module extends ModuleAbstract
             new frexp(),
             new fdiv(),
             ...(CompilerVersion::supportsFpow() ? [new fpow(), new fmin(), new fmax()] : []),
+            ...(CompilerVersion::supportsNextafter() ? [new nextafter()] : []),
             new intval(),
             new floatval(),
             new doubleval(),
