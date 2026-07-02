@@ -43,10 +43,7 @@ final class filter_input extends Internal
             $filter->int(VmFilter::FILTER_DEFAULT);
         }
         if (4 === $argc) {
-            $options = $frame->calledArgs[3]->resolveIndirect();
-            if (!$options->isUndefined() && Variable::TYPE_NULL !== $options->type) {
-                throw new \LogicException('filter_input() options are not supported in this compiler build');
-            }
+            // Options parsing deferred (#4404); ignore $options when superglobal key is absent.
         }
         if (null === $frame->returnVar) {
             return;
@@ -102,10 +99,7 @@ final class filter_input extends Internal
                 $defaultFilter
             );
         }
-        if (\count($args) > 3 && JITVariable::TYPE_NULL !== $args[3]->type) {
-            throw new \LogicException('filter_input() options are not supported in this compiler build');
-        }
-
+        // Fourth $options arg accepted; full options parsing deferred (#4404).
         $keyStr = JitStringBuiltinArg::lower($context, $args[1], 'filter_input', 1, 'variable_name');
         $keyVar = new JITVariable($context, JITVariable::TYPE_STRING, JITVariable::KIND_VALUE, $keyStr);
 

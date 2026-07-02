@@ -23428,6 +23428,10 @@ class Compiler {
                         && 'var_export' === $this->resolveCfgFuncCallName($cfgCallOp)
                         && 0 === (int) $argIndex
                     )
+                    && !(
+                        null !== $cfgCallOp
+                        && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                    )
                 ) {
                 $callArgProbe = $cfgCallOp->args[(int) $argIndex] ?? $arg;
                 foreach ($trailingProducers as $producer) {
@@ -23645,6 +23649,64 @@ class Compiler {
                 }
                 if (null !== $adjacentArgSlot) {
                     $valueSlot = $adjacentArgSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+            ) {
+                $hoisted = [];
+                $callIndex = null;
+                foreach ($block->orig->children as $i => $child) {
+                    if ($child === $cfgCallOp) {
+                        $callIndex = $i;
+                        break;
+                    }
+                }
+                if (null !== $callIndex) {
+                    for ($i = $callIndex - 1; $i >= 0; --$i) {
+                        $child = $block->orig->children[$i];
+                        if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\Array_) {
+                            array_unshift($hoisted, $child);
+                            continue;
+                        }
+                        if ($child instanceof Op\Expr\Assign) {
+                            break;
+                        }
+                        break;
+                    }
+                }
+                $constFetches = array_values(array_filter(
+                    $hoisted,
+                    static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ConstFetch
+                ));
+                $arrayProducers = array_values(array_filter(
+                    $hoisted,
+                    static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                ));
+                $target = match ((int) $argIndex) {
+                    0 => $constFetches[0] ?? null,
+                    2 => $constFetches[1] ?? null,
+                    3 => $arrayProducers[\count($arrayProducers) - 1] ?? null,
+                    default => null,
+                };
+                if ($target instanceof Op\Expr\ConstFetch) {
+                    $folded = $this->tryFoldGlobalConstFetch($target);
+                    if (null !== $folded) {
+                        $valueSlot = (string) $block->registerConstant(new Operand\Temporary(), $folded);
+                    }
+                } elseif ($target instanceof Op\Expr\Array_) {
+                    $slot = $block->slotForOperand($target->result);
+                    if (null === $slot) {
+                        foreach ($this->compileArrayLiteral($target, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $slot = $block->slotForOperand($target->result);
+                    }
+                    if (null !== $slot) {
+                        $valueSlot = (string) $slot;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

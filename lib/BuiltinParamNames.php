@@ -211,6 +211,10 @@ final class BuiltinParamNames
                 return ['value', 'flags', 'depth'];
             case 'json_decode':
                 return ['json', 'associative', 'depth', 'flags'];
+            case 'filter_var':
+                return ['value', 'filter', 'options'];
+            case 'filter_input':
+                return ['type', 'variable_name', 'filter', 'options'];
             case 'explode':
                 return ['separator', 'string', 'limit'];
             case 'implode':
