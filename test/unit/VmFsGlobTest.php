@@ -140,4 +140,18 @@ final class VmFsGlobTest extends TestCase
         $this->assertSame($tmp, $matches[0]);
         $this->assertStringNotContainsString('//', $matches[0]);
     }
+
+    /** Issue #14914 — directory path with trailing slash returns the path itself. */
+    public function testVmFsGlobTrailingSlashDirectoryPath(): void
+    {
+        $tmp = rtrim(sys_get_temp_dir(), '/').'/';
+        if (!is_dir(rtrim($tmp, '/'))) {
+            $this->markTestSkipped('sys_get_temp_dir() is not a directory');
+        }
+        $matches = \PHPCompiler\ext\standard\VmFsGlob::glob($tmp);
+        $this->assertSame([$tmp], $matches);
+
+        $rel = \PHPCompiler\ext\standard\VmFsGlob::glob('ext/');
+        $this->assertSame(['ext/'], $rel);
+    }
 }

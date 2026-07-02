@@ -80,6 +80,18 @@ final class VmFsGlobPure
             $filePattern = substr($pattern, $dirEnd + 1);
         }
 
+        if ('' === $filePattern && str_ends_with($pattern, '/')) {
+            $dirPath = rtrim($pattern, '/');
+            if ('' === $dirPath) {
+                $dirPath = '/';
+            }
+            if (!self::pathIsDir($dirPath)) {
+                return [];
+            }
+
+            return [self::normalizePath($pattern)];
+        }
+
         if (!self::pathIsDir($dir) && '.' !== $dir) {
             return false;
         }
