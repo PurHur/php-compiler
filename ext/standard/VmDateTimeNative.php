@@ -762,7 +762,8 @@ final class VmDateTimeNative
         $hour = false === $matched['hour'] ? 0 : $matched['hour'];
         $minute = false === $matched['minute'] ? 0 : $matched['minute'];
         $second = false === $matched['second'] ? 0 : $matched['second'];
-        $microsecond = (int) \round(($matched['fraction'] ?? 0.0) * 1_000_000);
+        $fraction = $matched['fraction'] ?? false;
+        $microsecond = false === $fraction ? 0 : (int) \round($fraction * 1_000_000);
         $useTz = isset($matched['timezone']) && \is_string($matched['timezone'])
             ? $matched['timezone']
             : $tzName;
@@ -1081,7 +1082,7 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float,
+     *   fraction: float|false,
      *   timezone?: string
      * }|false
      */
@@ -1094,6 +1095,7 @@ final class VmDateTimeNative
         }
         $pos = 0;
         $timeLen = \strlen($time);
+        $formatHasFractionToken = false;
         $components = [
             'year' => false,
             'month' => false,
@@ -1101,7 +1103,7 @@ final class VmDateTimeNative
             'hour' => false,
             'minute' => false,
             'second' => false,
-            'fraction' => 0.0,
+            'fraction' => false,
         ];
         $formatLen = \strlen($format);
         for ($i = 0; $i < $formatLen; ++$i) {
@@ -1201,6 +1203,7 @@ final class VmDateTimeNative
 
                     break;
                 case 'u':
+                    $formatHasFractionToken = true;
                     $digits = self::readDigits($time, $pos, 1, 6);
                     if (false === $digits) {
                         return false;
@@ -1281,6 +1284,9 @@ final class VmDateTimeNative
                 }
             }
         }
+        if (!$formatHasFractionToken) {
+            $components['fraction'] = false;
+        }
 
         return $components;
     }
@@ -1293,10 +1299,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function warnInvalidCalendarComponents(array $components): array
     {
@@ -1320,10 +1326,10 @@ final class VmDateTimeNative
      *   hour: int|false,
      *   minute: int|false,
      *   second: int|false,
-     *   fraction: float
+     *   fraction: float|false
      * } $components
      *
-     * @return array{components: array<string, int|false|float>, warnings: array<int, string>}
+     * @return array{components: array<string, int|false|float|false>, warnings: array<int, string>}
      */
     private static function normalizeMatchedComponents(array $components): array
     {
