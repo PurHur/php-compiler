@@ -353,6 +353,23 @@ final class IniJitHelper
         if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
         }
+        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
+            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
+        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
+            return self::READONLY_STRING_DEFAULTS[$key];
+        }
+        if ('engine' === $key) {
+            return '1';
+        }
+        if ('zend.exception_ignore_args' === $key) {
+            return '1';
+        }
+        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+            $value = VmAssertState::iniGet($option);
+
+            return false === $value ? null : $value;
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return null;
         }
@@ -406,9 +423,6 @@ final class IniJitHelper
         }
         if ('pcre.recursion_limit' === $key) {
             return self::CFG_PCRE_RECURSION_LIMIT;
-        }
-        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
-            return VmIni::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
         }
 
         return null;

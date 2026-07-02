@@ -236,6 +236,21 @@ final class VmIni
         if (in_array($key, self::EMPTY_STRING_INI_KEYS, true)) {
             return '';
         }
+        if (isset(self::READONLY_BOOL_DEFAULTS[$key])) {
+            return self::formatBoolIniGet(self::READONLY_BOOL_DEFAULTS[$key]);
+        }
+        if (isset(self::READONLY_STRING_DEFAULTS[$key])) {
+            return self::READONLY_STRING_DEFAULTS[$key];
+        }
+        if ('engine' === $key) {
+            return '1';
+        }
+        if ('zend.exception_ignore_args' === $key) {
+            return '1';
+        }
+        if (in_array($key, VmAssertState::SUPPORTED_INI_KEYS, true)) {
+            return VmAssertState::iniGet($option);
+        }
         if (!in_array($key, self::SUPPORTED_KEYS, true)) {
             return false;
         }
