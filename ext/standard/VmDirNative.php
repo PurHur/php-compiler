@@ -30,6 +30,16 @@ final class VmDirNative
     /** @return list<string>|false */
     public static function listSorted(string $path): array|false
     {
+        if (str_contains($path, "\0")) {
+            return false;
+        }
+
+        return VmDirPure::listSorted($path);
+    }
+
+    /** @return list<string>|false */
+    public static function listUnsorted(string $path): array|false
+    {
         return self::scanPath($path);
     }
 
@@ -105,7 +115,7 @@ final class VmDirNative
             return false;
         }
 
-        return VmDirPure::listSorted($path);
+        return VmDirPure::listUnsorted($path);
     }
 
     /** @return int|null */
