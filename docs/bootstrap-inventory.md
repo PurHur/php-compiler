@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3720 |
-| Phase A inventory files (M2 ratio SSOT) | 3720 |
+| PHP files on vm.php path | 3722 |
+| Phase A inventory files (M2 ratio SSOT) | 3722 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10116 |
+| Source constructs flagged (warnings) | 10118 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -529,6 +529,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
 | `ext/standard/ExpJitHelper.php` | 0 | 1 |
 | `ext/standard/ExplodeJitHelper.php` | 0 | 3 |
+| `ext/standard/FloorJitHelper.php` | 0 | 1 |
 | `ext/standard/FmodJitHelper.php` | 0 | 1 |
 | `ext/standard/FsDirJitHelper.php` | 0 | 1 |
 | `ext/standard/FsGlobJitHelper.php` | 0 | 1 |
@@ -2596,6 +2597,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathBaseConvertRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/MathCos.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathExp.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathHypot.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLdexp.php` | 0 | 1 |
@@ -4486,33 +4488,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new DOMException (line 524)
 - new DOMException (line 528)
 - new DOMException (line 532)
-- new ObjectEntry (line 815)
-- new DomNodeState (line 820)
-- new ObjectEntry (line 839)
-- new DomNodeState (line 844)
-- new Variable (line 849)
-- new DOMException (line 1198)
-- new DOMException (line 1224)
-- new DOMException (line 1242)
-- new DOMException (line 1245)
-- new DOMException (line 1253)
-- new DOMException (line 1279)
-- new DOMException (line 1292)
-- new DOMException (line 1607)
-- new Variable (line 1631)
-- new DOMException (line 1760)
-- new ObjectEntry (line 1842)
-- new DomNodeState (line 1846)
-- new Variable (line 1852)
-- new DOMException (line 1917)
-- new DOMException (line 1924)
-- new DOMException (line 1931)
-- new DOMException (line 1935)
-- new DOMException (line 1938)
-- new DOMException (line 1947)
-- new Variable (line 2457)
-- new DOMException (line 2471)
-- 124 class method(s)
+- new ObjectEntry (line 860)
+- new DomNodeState (line 865)
+- new ObjectEntry (line 884)
+- new DomNodeState (line 889)
+- new Variable (line 894)
+- new DOMException (line 1243)
+- new DOMException (line 1269)
+- new DOMException (line 1287)
+- new DOMException (line 1290)
+- new DOMException (line 1298)
+- new DOMException (line 1324)
+- new DOMException (line 1337)
+- new DOMException (line 1652)
+- new Variable (line 1676)
+- new DOMException (line 1805)
+- new ObjectEntry (line 1887)
+- new DomNodeState (line 1891)
+- new Variable (line 1897)
+- new DOMException (line 1962)
+- new DOMException (line 1969)
+- new DOMException (line 1976)
+- new DOMException (line 1980)
+- new DOMException (line 1983)
+- new DOMException (line 1992)
+- new Variable (line 2502)
+- new DOMException (line 2516)
+- 125 class method(s)
 - 1 closure(s)
 
 ### `ext/filter/BuiltinEnums.php`
@@ -7299,6 +7301,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 28)
 - new Variable (line 30)
 - 2 class method(s)
+
+### `ext/standard/FloorJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/FmodJitHelper.php`
 
@@ -12742,7 +12749,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 60 class method(s)
+- 61 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -20890,6 +20897,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathExp.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathFloor.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
