@@ -17,6 +17,14 @@ final class VmIniIntrospection
     /** @var array<string, string>|null */
     private static ?array $phpinfoGeneralRows = null;
 
+    /** Bootstrap snapshot of loaded php.ini path — not updated by runtime putenv() (#15111). */
+    private static string|false|null $frozenLoadedFile = null;
+
+    /** Bootstrap snapshot of scanned ini paths — not updated by runtime putenv() (#15111). */
+    private static string|false|null $frozenScannedFiles = null;
+
+    private static bool $iniSnapshotFrozen = false;
+
     /**
      * Registered string ini directives mirrored from host Zend ini_get() (#14187).
      *
@@ -64,6 +72,15 @@ final class VmIniIntrospection
             }
         }
         self::seedHostPhpinfoGeneralEnvFromZend();
+        self::freezeIniSnapshot();
+    }
+
+    /** Unit tests — reset bootstrap ini snapshot between cases (#15111). */
+    public static function resetIniSnapshotForTesting(): void
+    {
+        self::$iniSnapshotFrozen = false;
+        self::$frozenLoadedFile = null;
+        self::$frozenScannedFiles = null;
     }
 
     /**
@@ -191,16 +208,53 @@ final class VmIniIntrospection
 
     public static function loadedFile(): string|false
     {
-        $path = self::envString(self::ENV_LOADED_FILE);
+        self::ensureIniSnapshotFrozen();
 
-        return '' === $path ? false : $path;
+        return self::$frozenLoadedFile ?? false;
     }
 
     public static function scannedFiles(): string|false
     {
-        $paths = self::envString(self::ENV_SCANNED_FILES);
+        self::ensureIniSnapshotFrozen();
 
-        return '' === $paths ? false : $paths;
+        return self::$frozenScannedFiles ?? false;
+    }
+
+    private static function ensureIniSnapshotFrozen(): void
+    {
+        if (!self::$iniSnapshotFrozen) {
+            self::freezeIniSnapshot();
+        }
+    }
+
+    /**
+     * Capture ini paths at bootstrap — php-src ignores user putenv for these (#15111, ext/standard/ini.c).
+     */
+    private static function freezeIniSnapshot(): void
+    {
+        if (self::$iniSnapshotFrozen) {
+            return;
+        }
+        self::$iniSnapshotFrozen = true;
+        $loaded = self::bootstrapEnvString(self::ENV_LOADED_FILE);
+        self::$frozenLoadedFile = '' === $loaded ? false : $loaded;
+        $scanned = self::bootstrapEnvString(self::ENV_SCANNED_FILES);
+        self::$frozenScannedFiles = '' === $scanned ? false : $scanned;
+    }
+
+    /** Harness/bootstrap environ only — excludes VmEnv putenv() overlay (#15111). */
+    private static function bootstrapEnvString(string $name): string
+    {
+        $val = VmEnvPutenvNative::getenv($name);
+        if (false !== $val && '' !== $val) {
+            return $val;
+        }
+        $val = \getenv($name);
+        if (false === $val || '' === $val) {
+            return '';
+        }
+
+        return $val;
     }
 
     private static function envString(string $name): string
