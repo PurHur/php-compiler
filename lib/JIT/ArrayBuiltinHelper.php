@@ -23,6 +23,7 @@ use PHPCompiler\ext\standard\VmInternalCall;
 use PHPCompiler\ext\types\strlen;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayMapRuntime;
+use PHPCompiler\JIT\Builtin\ArrayReduceRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Call;
@@ -1325,7 +1326,7 @@ final class ArrayBuiltinHelper
     }
 
     /**
-     * array_reduce() with closure / arrow callback (issue #142, #3531).
+     * array_reduce() with closure / arrow callback — delegates to ArrayReduceRuntime PHP (#14979).
      */
     public static function buildReduceArrayWithClosure(
         Context $context,
@@ -1333,18 +1334,7 @@ final class ArrayBuiltinHelper
         Variable $callback,
         ?Variable $initial
     ): Value {
-        $closureCall = $callback->closureCall;
-        if (null === $closureCall) {
-            throw new \LogicException(ArrayReduceCallbackPolicy::jitRejectionMessage());
-        }
-
-        return self::buildReduceFromHashTableWithClosure(
-            $context,
-            self::loadHashTable($context, $array),
-            $closureCall,
-            self::closureMapReturnTypeTag($context, $closureCall),
-            $initial
-        );
+        return ArrayReduceRuntime::reduce($context, $array, $callback, $initial);
     }
 
     public static function resolveMapCallbackForFind(Variable $callback): Internal
