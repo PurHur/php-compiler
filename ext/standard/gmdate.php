@@ -29,7 +29,7 @@ final class gmdate extends Internal
         $format = self::vmFormatArg($frame);
         $timestamp = null;
         if (2 === $argc) {
-            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[1], 'gmdate', 2, 'timestamp');
+            $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 1, 'gmdate', 2, 'timestamp');
         }
         $frame->returnVar->string(VmDate::gmdate($format, $timestamp));
     }

@@ -29,7 +29,7 @@ final class gmgetdate extends Internal
         }
         $timestamp = null;
         if (1 === $argc) {
-            $timestamp = VmDate::coerceNullableTimestampArg($frame->calledArgs[0], 'gmgetdate', 1, 'timestamp');
+            $timestamp = VmDate::coerceNullableTimestampArgForFrame($frame, 0, 'gmgetdate', 1, 'timestamp');
         }
         $frame->returnVar->array(VmDate::gmgetdate($timestamp));
     }
