@@ -75,9 +75,16 @@ final class VmFilestatFailure
 
     public static function warnOpendirFailed(Frame $frame, string $path): void
     {
+        self::warnPathOpenDirFailed($frame, 'opendir', $path);
+    }
+
+    /** php-src dir.c php_opendir — distinguish file vs missing path (#14861). */
+    public static function warnPathOpenDirFailed(Frame $frame, string $function, string $path): void
+    {
+        $reason = VmStatPath::isFile($path) ? 'Not a directory' : 'No such file or directory';
         self::triggerWarningWithHandlerFirst(
             $frame,
-            \sprintf('opendir(%s): Failed to open directory: No such file or directory', $path)
+            \sprintf('%s(%s): Failed to open directory: %s', $function, $path, $reason)
         );
     }
 
