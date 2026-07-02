@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ResourceState;
 use PHPCompiler\VM\ResourceSupport;
 use PHPCompiler\VM\Variable;
 
@@ -36,6 +37,10 @@ final class VmDirArg
                 return $handle;
             }
 
+            throw self::invalidDirTypeError($functionName);
+        }
+        $state = ResourceSupport::stateFromVariable($v);
+        if (null !== $state && ResourceState::KIND_DIR === $state->kind) {
             throw self::invalidDirTypeError($functionName);
         }
 
