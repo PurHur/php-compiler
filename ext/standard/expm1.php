@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathExpm1;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -22,7 +23,7 @@ final class expm1 extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\expm1(VmMath::parseDoubleBuiltinArg($v, 'expm1', 1, 'num')));
+        $frame->returnVar->float(VmMath::expm1(VmMath::parseDoubleBuiltinArg($v, 'expm1', 1, 'num')));
     }
 
     public Context $context;
@@ -35,6 +36,6 @@ final class expm1 extends Internal
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'expm1', 'float');
 
-        return $context->builder->call($context->lookupFunction('expm1'), $asFloat);
+        return MathExpm1::invoke($context, $asFloat);
     }
 }

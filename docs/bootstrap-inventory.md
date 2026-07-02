@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3740 |
-| Phase A inventory files (M2 ratio SSOT) | 3740 |
+| PHP files on vm.php path | 3744 |
+| Phase A inventory files (M2 ratio SSOT) | 3744 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10136 |
+| Source constructs flagged (warnings) | 10140 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -535,6 +535,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ExecutionLimitsJitHelper.php` | 0 | 1 |
 | `ext/standard/ExpJitHelper.php` | 0 | 1 |
 | `ext/standard/ExplodeJitHelper.php` | 0 | 3 |
+| `ext/standard/Expm1JitHelper.php` | 0 | 1 |
 | `ext/standard/FloorJitHelper.php` | 0 | 1 |
 | `ext/standard/FmodJitHelper.php` | 0 | 1 |
 | `ext/standard/FsDirJitHelper.php` | 0 | 1 |
@@ -1045,6 +1046,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/LevenshteinJitHelper.php` | 0 | 1 |
 | `ext/standard/LocaltimeJitHelper.php` | 0 | 1 |
 | `ext/standard/Log10JitHelper.php` | 0 | 1 |
+| `ext/standard/Log1pJitHelper.php` | 0 | 1 |
 | `ext/standard/LogJitHelper.php` | 0 | 1 |
 | `ext/standard/MathBaseConvertJitHelper.php` | 0 | 1 |
 | `ext/standard/MemoryJitHelper.php` | 0 | 1 |
@@ -2612,12 +2614,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathCosh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathDeg2rad.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathExp.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathExpm1.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathHypot.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLdexp.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLog.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLog10.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathLog1p.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathNextafter.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathRad2deg.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSin.php` | 0 | 1 |
@@ -6376,11 +6380,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClassEntry (line 34)
 - new FilterIteratorConstruct (line 43)
 - new FilterIteratorAccept (line 46)
-- new ClassEntry (line 118)
-- new RecursiveFilterIteratorConstruct (line 127)
-- new ArgumentCountError (line 151)
-- new ArgumentCountError (line 183)
-- new BadMethodCallException (line 214)
+- new ClassEntry (line 120)
+- new RecursiveFilterIteratorConstruct (line 129)
+- new ArgumentCountError (line 153)
+- new ArgumentCountError (line 185)
+- new BadMethodCallException (line 216)
 - 15 class method(s)
 
 ### `ext/spl/GlobIteratorBuiltin.php`
@@ -6410,14 +6414,14 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new IteratorIteratorGetInnerIterator (line 53)
 - new ClassEntry (line 99)
 - new RecursiveIteratorIteratorConstruct (line 108)
-- new OutOfBoundsException (line 217)
-- new OutOfBoundsException (line 224)
-- new UnexpectedValueException (line 367)
-- new Variable (line 413)
-- new UnexpectedValueException (line 586)
-- new ArgumentCountError (line 648)
-- new ArgumentCountError (line 680)
-- 61 class method(s)
+- new OutOfBoundsException (line 233)
+- new OutOfBoundsException (line 240)
+- new UnexpectedValueException (line 383)
+- new Variable (line 432)
+- new UnexpectedValueException (line 605)
+- new ArgumentCountError (line 667)
+- new ArgumentCountError (line 699)
+- 62 class method(s)
 - 1 closure(s)
 
 ### `ext/spl/JitSplClasses.php`
@@ -7349,6 +7353,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new HashTable (line 28)
 - new Variable (line 30)
 - 2 class method(s)
+
+### `ext/standard/Expm1JitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/FloorJitHelper.php`
 
@@ -10056,6 +10065,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/Log10JitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/Log1pJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -12812,7 +12826,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 70 class method(s)
+- 72 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -20994,6 +21008,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MathExpm1.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/MathFloor.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21020,6 +21039,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathLog10.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathLog1p.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
