@@ -25,9 +25,9 @@ final class array_pad extends Internal
     public function execute(Frame $frame): void
     {
         $argc = \count($frame->calledArgs);
-        if (3 !== $argc && 4 !== $argc) {
+        if (3 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'array_pad() expects 3 or 4 arguments, %d given',
+                'array_pad() expects exactly 3 arguments, %d given',
                 $argc
             ));
         }
@@ -38,21 +38,17 @@ final class array_pad extends Internal
         $length = $frame->calledArgs[1]->resolveIndirect();
         $value = $frame->calledArgs[2]->resolveIndirect();
         $lengthInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_pad', 2, 'length');
-        $padType = 0;
-        if (4 === $argc) {
-            $padType = VmMath::parseIntBuiltinArgForFrame($frame, 3, 'array_pad', 4, 'pad_type');
-        }
         $frame->returnVar->array(
-            VmArray::pad($ht, $lengthInt, $value, $padType)
+            VmArray::pad($ht, $lengthInt, $value)
         );
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         $argc = \count($args);
-        if (3 !== $argc && 4 !== $argc) {
+        if (3 !== $argc) {
             throw new \ArgumentCountError(\sprintf(
-                'array_pad() expects 3 or 4 arguments, %d given',
+                'array_pad() expects exactly 3 arguments, %d given',
                 $argc
             ));
         }
@@ -64,11 +60,7 @@ final class array_pad extends Internal
             }
         }
         $length = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[1], 'array_pad', 2, 'length');
-        $padType = $context->getTypeFromString('int64')->constInt(0, false);
-        if (4 === $argc) {
-            $padType = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[3], 'array_pad', 4, 'pad_type');
-        }
 
-        return ArrayPadRuntime::pad($context, $args[0], $length, $args[2], $padType);
+        return ArrayPadRuntime::pad($context, $args[0], $length, $args[2]);
     }
 }
