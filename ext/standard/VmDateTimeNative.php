@@ -268,6 +268,28 @@ final class VmDateTimeNative
         )) {
             return self::weekdayParseResult('bare', strtolower($matches[1]), $base, $tzName);
         }
+        if (1 === preg_match(
+            '/^(first|last)\s+(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+of\s+([A-Za-z]+)\s+(\d{4})$/i',
+            $time,
+            $matches
+        )) {
+            return self::weekdayOfMonthParseResult(
+                strtolower($matches[1]),
+                strtolower($matches[2]),
+                $matches[3],
+                (int) $matches[4],
+                $tzName
+            );
+        }
+        if (1 === preg_match('/^midnight$/i', $time)) {
+            return self::timeOfDayOnBase($base, 0, 0, 0, $tzName);
+        }
+        if (1 === preg_match('/^noon$/i', $time)) {
+            return self::timeOfDayOnBase($base, 12, 0, 0, $tzName);
+        }
+        if (1 === preg_match('/^(today|tomorrow|yesterday)\s+(.+)$/i', $time, $matches)) {
+            return self::dayWordWithTimeParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
+        }
         if (1 === preg_match('/^last day of ([A-Za-z]+)\s+(\d{4})$/i', $time, $matches)) {
             $month = self::englishMonthToNumber($matches[1]);
             if (null === $month) {
@@ -801,6 +823,12 @@ final class VmDateTimeNative
             return false;
         }
         $base = $now ?? self::readNow()['timestamp'];
+        if (str_starts_with($time, '+') || str_starts_with($time, '-')) {
+            $compound = self::tryApplyCompoundSignedRelativeDelta($base, $time, $tzName);
+            if (null !== $compound) {
+                return $compound;
+            }
+        }
         if (1 === preg_match(
             '/^[+-]?\d+\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)$/i',
             $time
@@ -1597,8 +1625,226 @@ final class VmDateTimeNative
         if (false === $timestamp) {
             return null;
         }
+        $tm = self::localtime($timestamp);
+        if (null === $tm) {
+            return null;
+        }
 
-        return ['timestamp' => $timestamp, 'microsecond' => 0];
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                0,
+                0,
+                0,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * php-src timelib — first/last weekday of named month (#15058, ext/standard/parsdate.c).
+     *
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function weekdayOfMonthParseResult(
+        string $which,
+        string $weekday,
+        string $monthName,
+        int $year,
+        string $tzName
+    ): ?array {
+        $month = self::englishMonthToNumber($monthName);
+        $target = self::weekdayNameToNumber($weekday);
+        if (null === $month || $target < 0) {
+            return null;
+        }
+        $day = self::weekdayInMonth($year, $month, $target, 'last' === $which);
+        if ($day < 1) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function dayWordWithTimeParseResult(
+        string $dayWord,
+        string $timePart,
+        int $base,
+        string $tzName
+    ): ?array {
+        $clock = self::tryParseClockTime($timePart);
+        if (null === $clock) {
+            return null;
+        }
+        $offset = match ($dayWord) {
+            'today' => 0,
+            'tomorrow' => 1,
+            'yesterday' => -1,
+            default => 999,
+        };
+        if (999 === $offset) {
+            return null;
+        }
+        try {
+            $dayBase = self::modifyRelative($base, ($offset >= 0 ? '+' : '').$offset.' day', $tzName);
+        } catch (NativeDateMalformedStringException) {
+            return null;
+        }
+        $tm = self::localtime($dayBase);
+        if (null === $tm) {
+            return null;
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                $clock[0],
+                $clock[1],
+                $clock[2],
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}
+     */
+    private static function timeOfDayOnBase(int $base, int $hour, int $minute, int $second, string $tzName): array
+    {
+        $tm = self::localtime($base);
+        if (null === $tm) {
+            return ['timestamp' => $base, 'microsecond' => 0];
+        }
+
+        return [
+            'timestamp' => self::mktimeInTimezone(
+                self::tmInt($tm, 'tm_year') + 1900,
+                self::tmInt($tm, 'tm_mon') + 1,
+                self::tmInt($tm, 'tm_mday'),
+                $hour,
+                $minute,
+                $second,
+                $tzName
+            ),
+            'microsecond' => 0,
+        ];
+    }
+
+    /** @return array{0: int, 1: int, 2: int}|null [hour, minute, second] */
+    private static function tryParseClockTime(string $time): ?array
+    {
+        $time = trim($time);
+        if (1 === preg_match('/^(\d{1,2})(?::(\d{2})(?::(\d{2}))?)?\s*(am|pm)$/i', $time, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = isset($matches[2]) && '' !== $matches[2] ? (int) $matches[2] : 0;
+            $second = isset($matches[3]) && '' !== $matches[3] ? (int) $matches[3] : 0;
+            $ampm = strtolower($matches[4]);
+            if ($hour < 1 || $hour > 12 || $minute > 59 || $second > 59) {
+                return null;
+            }
+            if ('pm' === $ampm && $hour < 12) {
+                $hour += 12;
+            }
+            if ('am' === $ampm && 12 === $hour) {
+                $hour = 0;
+            }
+
+            return [$hour, $minute, $second];
+        }
+        if (1 === preg_match('/^(\d{1,2}):(\d{2})(?::(\d{2}))?$/', $time, $matches)) {
+            $hour = (int) $matches[1];
+            $minute = (int) $matches[2];
+            $second = isset($matches[3]) && '' !== $matches[3] ? (int) $matches[3] : 0;
+            if ($hour > 23 || $minute > 59 || $second > 59) {
+                return null;
+            }
+
+            return [$hour, $minute, $second];
+        }
+
+        return null;
+    }
+
+    private static function weekdayInMonth(int $year, int $month, int $targetWday, bool $last): int
+    {
+        if ($last) {
+            for ($day = self::daysInMonth($year, $month); $day >= 1; --$day) {
+                $tm = self::localtime(self::mktimeInTimezone($year, $month, $day, 12, 0, 0, 'UTC'));
+                if (null !== $tm && self::tmInt($tm, 'tm_wday') === $targetWday) {
+                    return $day;
+                }
+            }
+
+            return 0;
+        }
+        $max = self::daysInMonth($year, $month);
+        for ($day = 1; $day <= $max; ++$day) {
+            $tm = self::localtime(self::mktimeInTimezone($year, $month, $day, 12, 0, 0, 'UTC'));
+            if (null !== $tm && self::tmInt($tm, 'tm_wday') === $targetWday) {
+                return $day;
+            }
+        }
+
+        return 0;
+    }
+
+    /**
+     * php-src timelib — compound signed relative modifiers (#15058).
+     */
+    private static function tryApplyCompoundSignedRelativeDelta(int $base, string $modifier, string $tzName): ?int
+    {
+        $modifier = trim($modifier);
+        if ('' === $modifier) {
+            return null;
+        }
+        $pos = 0;
+        $len = \strlen($modifier);
+        $timestamp = $base;
+        $matched = false;
+        $requireSign = true;
+        while ($pos < $len) {
+            while ($pos < $len && \ctype_space($modifier[$pos])) {
+                ++$pos;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            $tail = \substr($modifier, $pos);
+            $pattern = $requireSign
+                ? '/^([+-])\s*(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i'
+                : '/^(\d+)\s+(second|seconds|minute|minutes|hour|hours|day|days|week|weeks|month|months|year|years)\b/i';
+            if (!preg_match($pattern, $tail, $matches)) {
+                return $matched ? $timestamp : null;
+            }
+            if ($requireSign) {
+                $chunk = ($matches[1] ?? '+').' '.($matches[2] ?? '').' '.($matches[3] ?? '');
+                $requireSign = false;
+            } else {
+                $chunk = '+'.($matches[1] ?? '').' '.($matches[2] ?? '');
+            }
+            $chunk = preg_replace('/\s+/', ' ', trim($chunk)) ?? trim($chunk);
+            $pos += \strlen($matches[0]);
+            try {
+                $timestamp = self::modifyRelative($timestamp, $chunk, $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+            $matched = true;
+        }
+
+        return $matched ? $timestamp : null;
     }
 
     /**
