@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\ArrayMapCallbackPolicy;
 use PHPCompiler\JIT\Builtin\ArrayWalkRuntime;
 use PHPCompiler\JIT\Context;
@@ -81,7 +80,7 @@ final class array_walk_recursive extends Internal
             throw new \LogicException(ArrayMapCallbackPolicy::jitRejectionMessage());
         }
         if (ArrayMapCallbackPolicy::isClosureJitLowerable($args[1])) {
-            return ArrayBuiltinHelper::walkRecursiveInPlaceWithClosure($context, $args[0], $args[1], null);
+            return ArrayWalkRuntime::walkRecursiveInPlaceWithClosure($context, $args[0], $args[1], null);
         }
         if (JITVariable::TYPE_STRING === $args[1]->type || JITVariable::TYPE_VALUE === $args[1]->type) {
             $this->jitString($context, $args[1], 'array_walk_recursive() callback');
