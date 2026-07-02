@@ -1,10 +1,10 @@
 --TEST--
-PHP 8.4 asymmetric visibility: promoted public private(set) compile fatal (#13960, zend_compile.c)
+PHP 8.4 asymmetric visibility: promoted public private(set) parses and reads publicly (#14946, zend_compile.c)
 --FILE--
 <?php
 class C {
     public function __construct(public private(set) int $x = 1) {}
 }
 echo (new C())->x, "\n";
---EXPECT_EXIT--
-255
+--EXPECT--
+1
