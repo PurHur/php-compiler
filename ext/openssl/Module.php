@@ -16,23 +16,6 @@ use PHPCompiler\VM;
  */
 class Module extends ModuleAbstract
 {
-    public function getExtensionName(): string
-    {
-        return 'standard';
-    }
-
-    /**
-     * @return list<string>
-     */
-    public function getAdditionalExtensionNames(): array
-    {
-        if (!OpensslExtensionPolicy::advertisesExtension()) {
-            return [];
-        }
-
-        return ['openssl'];
-    }
-
     public function init(Runtime $runtime): void
     {
         parent::init($runtime);

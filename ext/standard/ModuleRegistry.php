@@ -72,7 +72,13 @@ final class ModuleRegistry
         self::register('core');
         $moduleVersion = $module->getExtensionVersion();
         $additionalVersions = $module->getAdditionalExtensionVersions();
-        self::register($module->getExtensionName(), $moduleVersion);
+        $primary = strtolower($module->getExtensionName());
+        $withholdOpensslSurface = 'openssl' === $primary
+            && !\PHPCompiler\ext\openssl\OpensslExtensionPolicy::advertisesExtension();
+
+        if (!$withholdOpensslSurface) {
+            self::register($module->getExtensionName(), $moduleVersion);
+        }
         $additional = $module->getAdditionalExtensionNames();
         foreach ($additional as $name) {
             $logical = strtolower($name);
@@ -80,12 +86,16 @@ final class ModuleRegistry
             self::register($name, $version);
         }
 
-        $primary = strtolower($module->getExtensionName());
         foreach ($module->getFunctions() as $func) {
             if (!$func instanceof Internal) {
                 continue;
             }
             $fnName = strtolower($func->getName());
+            if ($withholdOpensslSurface) {
+                self::registerBuiltinLookup($fnName);
+
+                continue;
+            }
             $logical = self::logicalExtensionForFunction($fnName, $primary, $additional);
             self::registerModuleFunction($logical, $fnName);
             if (CoreExtensionFunctions::isCoreFunction($fnName)) {
@@ -178,6 +188,11 @@ final class ModuleRegistry
     public static function isRegisteredBuiltinFunction(string $functionName): bool
     {
         return isset(self::$registeredFunctionLookup[strtolower($functionName)]);
+    }
+
+    private static function registerBuiltinLookup(string $functionName): void
+    {
+        self::$registeredFunctionLookup[strtolower($functionName)] = true;
     }
 
     private static function registerModuleFunction(string $extension, string $functionName): void
