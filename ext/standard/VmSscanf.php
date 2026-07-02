@@ -46,6 +46,10 @@ final class VmSscanf
         for ($fpos = 0; $fpos < $fmtLen; ++$fpos) {
             $ch = $format[$fpos];
             if ('%' !== $ch) {
+                if (self::isSpace($ch)) {
+                    $inPos = self::skipSpace($input, $inPos, $inLen);
+                    continue;
+                }
                 if ($inPos >= $inLen || $input[$inPos] !== $ch) {
                     return [$assigned, $inPos];
                 }
@@ -216,6 +220,16 @@ final class VmSscanf
                         ++$assigned;
                     }
                     $inPos += $consumed;
+                    break;
+                case 'n':
+                    if (!$suppress) {
+                        if ($outIdx >= \count($outVars)) {
+                            return [$assigned, $inPos];
+                        }
+                        self::assignInt($outVars[$outIdx], $inPos);
+                        ++$outIdx;
+                    }
+                    ++$assigned;
                     break;
                 default:
                     throw new \ValueError('Bad scan conversion character "'.$spec.'"');
@@ -466,7 +480,7 @@ final class VmSscanf
 
     private static function isSupportedConversionSpec(string $spec): bool
     {
-        return \in_array($spec, ['d', 'D', 'i', 'u', 'f', 'e', 'E', 'g', 'G', 's', 'x', 'X', 'o', 'c'], true);
+        return \in_array($spec, ['d', 'D', 'i', 'u', 'f', 'e', 'E', 'g', 'G', 's', 'x', 'X', 'o', 'c', 'n'], true);
     }
 
     /**
