@@ -797,11 +797,45 @@ final class VmArray
     /**
      * array_pad() — pad packed list {@param $array} to abs({@param $length}) with {@param $value}.
      *
-     * Padding direction follows the sign of {@param $length} (php-src ext/standard/array.c).
+     * Padding direction follows the sign of {@param $length} (php-src ext/standard/array.c), or
+     * optional {@param $padType} when PHP 8.4+ 4-arg form is used (#14993).
      */
-    public static function pad(HashTable $array, int $length, Variable $value): HashTable
+    public static function pad(HashTable $array, int $length, Variable $value, ?int $padType = null): HashTable
     {
-        return $array->padCopy($length, $value);
+        return $array->padCopy($length, $value, $padType);
+    }
+
+    /**
+     * array_pad() 4th parameter pad type (PHP 8.4+, ext/standard/array.c, #14993).
+     */
+    public static function resolvePadTypeArg(Variable $var): int
+    {
+        $var = $var->resolveIndirect();
+        $padFromEnum = VmString::tryPadTypeInt($var);
+        if (null !== $padFromEnum) {
+            return $padFromEnum;
+        }
+        if (EnumCaseSupport::isEnumCaseVariable($var)) {
+            throw new \TypeError(\sprintf(
+                'array_pad(): Argument #4 ($pad_type) must be of type PadType|int, %s given',
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
+        }
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            throw new \LogicException('array_pad() pad type must be an integer in this compiler build');
+        }
+        $padType = $var->toInt();
+        if (!\in_array($padType, [
+            StdlibConstants::ARRAY_PAD_LEFT,
+            StdlibConstants::ARRAY_PAD_RIGHT,
+            StdlibConstants::ARRAY_PAD_BOTH,
+        ], true)) {
+            throw new \ValueError(
+                'array_pad(): Argument #4 ($pad_type) must be ARRAY_PAD_LEFT, ARRAY_PAD_RIGHT, or ARRAY_PAD_BOTH'
+            );
+        }
+
+        return $padType;
     }
 
     /**

@@ -2,6 +2,11 @@
 
 declare(strict_types=1);
 
+if (\defined('ARRAY_PAD_RIGHT')) {
+    echo "skip: 4-arg array_pad enabled on PHP 8.4+ profile\n";
+    exit(0);
+}
+
 $fail = 0;
 
 try {
