@@ -274,9 +274,9 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        // Forward PHP 8.4+ syntax allows explicit read visibility plus set visibility
-        // (e.g. `public private(set)`). Only reject true duplicate modifier cases.
-        return self::lineViolatesDuplicateSetModifierRules($line);
+        // php-src: zend_add_member_modifier() — explicit read plus set is a compile fatal (#15184).
+        return self::lineViolatesDuplicateSetModifierRules($line)
+            || self::lineHasExplicitReadPlusSetModifier($line);
     }
 
     /**
