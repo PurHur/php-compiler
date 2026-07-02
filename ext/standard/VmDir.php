@@ -66,14 +66,16 @@ final class VmDir
         if (!VmDirNative::available()) {
             return false;
         }
+        if (\SCANDIR_SORT_NONE === $sortingOrder) {
+            return VmDirNative::listUnsorted($path);
+        }
+
         $names = VmDirNative::listSorted($path);
         if (false === $names) {
             return false;
         }
-        if (\SCANDIR_SORT_NONE !== $sortingOrder) {
-            if (\SCANDIR_SORT_DESCENDING === $sortingOrder) {
-                $names = \array_reverse($names, false);
-            }
+        if (\SCANDIR_SORT_DESCENDING === $sortingOrder) {
+            $names = \array_reverse($names, false);
         }
 
         return $names;
