@@ -87,4 +87,7 @@ final class DomNodeState
 
     /** libxml line number (php-src dom_node_line_no; #14407). */
     public int $lineNo = 1;
+
+    /** True after DOMDocument::loadHTML() (php-src ext/dom/document.c; #14356). */
+    public bool $isHtmlDocument = false;
 }
