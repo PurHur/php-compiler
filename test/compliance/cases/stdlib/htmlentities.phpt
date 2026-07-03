@@ -1,5 +1,5 @@
 --TEST--
-stdlib htmlentities() default ENT_COMPAT (#2472)
+stdlib htmlentities() default ENT_QUOTES|ENT_SUBSTITUTE (#2472, #15272)
 --FILE--
 <?php
 echo htmlentities(''), "\n";
