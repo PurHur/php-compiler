@@ -596,6 +596,7 @@ require_once __DIR__.'/../../../ext/standard/FindSubstrJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ExpJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Expm1JitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FileGetContentsJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/FilePutContentsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FsDirJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FsGlobJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/FstatJitHelper.php';
