@@ -13,7 +13,9 @@ try {
     json_decode('[]', true, 512, '1');
     echo "flags_no_error\n";
 } catch (TypeError $e) {
-    echo str_contains($e->getMessage(), 'flags') ? "flags_type_error\n" : "flags_bad_msg\n";
+    echo str_contains($e->getMessage(), 'json_decode(): Argument #4 ($flags) must be of type int, string given')
+        ? "flags_type_error\n"
+        : "flags_bad_msg\n";
 }
 --EXPECT--
 depth_type_error
