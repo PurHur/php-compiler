@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** usleep() — microsecond delay (VM via VmSleepPure; JIT/AOT via usleep(3)). */
+/** usleep() — microsecond delay (VM via VmSleepPure; JIT/AOT via SleepJitHelper PHP #15212). */
 final class usleep extends Internal
 {
     public function execute(Frame $frame): void

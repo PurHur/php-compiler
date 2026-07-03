@@ -12,10 +12,26 @@ final class SleepJitRuntimeShrinkTest extends TestCase
     public function testSleepJitHelperDelegatesToVmSleepPure(): void
     {
         $source = (string) \file_get_contents(__DIR__.'/../../ext/standard/SleepJitHelper.php');
+        $this->assertStringContainsString('VmSleepPure::sleep', $source);
+        $this->assertStringContainsString('VmSleepPure::usleep', $source);
         $this->assertStringContainsString('VmSleepPure::timeNanosleep', $source);
         $this->assertStringContainsString('VmSleepPure::timeSleepUntil', $source);
         $this->assertStringNotContainsString('lookupFunction(\'nanosleep\')', $source);
         $this->assertStringNotContainsString('lookupFunction(\'gettimeofday\')', $source);
+    }
+
+    public function testJitSleepRoutesThroughMathSleepNotLibc(): void
+    {
+        $jitSleep = (string) \file_get_contents(__DIR__.'/../../ext/standard/JitSleep.php');
+        $this->assertStringContainsString('MathSleep::invokeSleep', $jitSleep);
+        $this->assertStringContainsString('MathSleep::invokeUsleep', $jitSleep);
+        $this->assertStringNotContainsString("lookupFunction('sleep')", $jitSleep);
+        $this->assertStringNotContainsString("lookupFunction('usleep')", $jitSleep);
+
+        $bridge = (string) \file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathSleep.php');
+        $this->assertStringContainsString('SleepJitHelper', $bridge);
+        $this->assertStringContainsString('phpc_sleep', $bridge);
+        $this->assertStringContainsString('phpc_usleep', $bridge);
     }
 
     public function testTimeSleepRuntimeRoutesThroughSleepJitHelper(): void
