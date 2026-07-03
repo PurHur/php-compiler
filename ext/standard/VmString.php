@@ -2443,7 +2443,7 @@ final class VmString
             }
             $string = self::utf8SubstituteInvalidSequences($string);
         }
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $out = '';
@@ -2583,7 +2583,7 @@ final class VmString
      */
     private static function htmlEntitiesMapForFlags(int $flags): array
     {
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entries = HtmlEntityTable::entitiesEntQuotes();
         if (!$quoteBoth && !$quoteDouble) {
@@ -2603,7 +2603,8 @@ final class VmString
         string $string,
         int $flags = ENT_QUOTES | ENT_SUBSTITUTE
     ): string {
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
+        $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $out = '';
         $len = self::byteLength($string);
         $i = 0;
@@ -2622,7 +2623,7 @@ final class VmString
             } elseif (self::entityAt($string, $i, $len, '&gt;', 4)) {
                 $out .= '>';
                 $i += 4;
-            } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&quot;', 6)) {
+            } elseif (($quoteBoth || $quoteDouble) && self::entityAt($string, $i, $len, '&quot;', 6)) {
                 $out .= '"';
                 $i += 6;
             } elseif ($quoteBoth && self::entityAt($string, $i, $len, '&#039;', 6)) {
