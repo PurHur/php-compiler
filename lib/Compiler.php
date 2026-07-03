@@ -22818,6 +22818,25 @@ class Compiler {
     }
 
     /**
+     * Pending call-arg opcodes — nested FUNCCALL_EXEC_RETURN not yet on the block (#9292).
+     *
+     * @param list<OpCode> $opcodes
+     */
+    private function slotForLastPendingInlineCallResultBeforeFuncCallInit(array $opcodes): ?int
+    {
+        for ($i = \count($opcodes) - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $opcodes[$i]->type) {
+                return (int) $opcodes[$i]->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $opcodes[$i]->type) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg dead call-arg temp for inline eval() — TYPE_EVAL producer slot (#10661, zif_eval).
      */
     private function resolvePrecedingEvalCallArgSlot(
@@ -25348,6 +25367,27 @@ class Compiler {
                         if (null !== $mergeSlot) {
                             $valueSlot = (string) $mergeSlot;
                         }
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+            ) {
+                $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
+                if (
+                    null !== $andPhi
+                    && null !== $valueSlot
+                    && (string) $valueSlot === (string) $andPhi
+                ) {
+                    $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                        ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                    $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                    if (
+                        null !== $pendingNested
+                        && !\in_array($calleeLower, ['exit', 'die'], true)
+                    ) {
+                        $valueSlot = (string) $pendingNested;
                     }
                 }
             }
