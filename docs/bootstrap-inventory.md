@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3843 |
-| Phase A inventory files (M2 ratio SSOT) | 3843 |
+| PHP files on vm.php path | 3846 |
+| Phase A inventory files (M2 ratio SSOT) | 3846 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10342 |
+| Source constructs flagged (warnings) | 10348 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -299,7 +299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbstringEncodingRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 35 |
+| `ext/mbstring/Module.php` | 0 | 36 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbstring.php` | 0 | 3 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
@@ -321,6 +321,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_scrub.php` | 0 | 2 |
 | `ext/mbstring/mb_split.php` | 0 | 3 |
 | `ext/mbstring/mb_str_pad.php` | 0 | 3 |
+| `ext/mbstring/mb_str_split.php` | 0 | 3 |
 | `ext/mbstring/mb_strcut.php` | 0 | 3 |
 | `ext/mbstring/mb_strimwidth.php` | 0 | 3 |
 | `ext/mbstring/mb_stripos.php` | 0 | 3 |
@@ -1247,6 +1248,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/TriggerErrorJitHelper.php` | 0 | 1 |
 | `ext/standard/UcwordsJitHelper.php` | 0 | 1 |
 | `ext/standard/UniqidJitHelper.php` | 0 | 1 |
+| `ext/standard/UnlinkJitHelper.php` | 0 | 1 |
 | `ext/standard/UnpackEngine.php` | 0 | 1 |
 | `ext/standard/UnpackJitHelper.php` | 0 | 1 |
 | `ext/standard/UnserializeJitHelper.php` | 0 | 3 |
@@ -2994,6 +2996,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringTrimModeJit.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUcwords.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUniqid.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringUnlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringUnpack.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUnserialize.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringUrldecode.php` | 0 | 3 |
@@ -5656,36 +5659,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new mb_check_encoding (line 34)
 - new mb_list_encodings (line 35)
 - new mb_strlen (line 36)
-- new mb_strwidth (line 37)
-- new mb_strimwidth (line 38)
-- new mb_str_pad (line 39)
-- new mb_substr (line 40)
-- new mb_strcut (line 41)
-- new mb_substr_count (line 42)
-- new mb_strpos (line 43)
-- new mb_strtolower (line 44)
-- new mb_strtoupper (line 45)
-- new mb_convert_case (line 46)
-- new mb_convert_encoding (line 47)
-- new mb_stripos (line 48)
-- new mb_strrpos (line 49)
-- new mb_strrichr (line 50)
-- new mb_trim (line 52)
-- new mb_ltrim (line 53)
-- new mb_rtrim (line 54)
-- new mb_scrub (line 56)
-- new mb_encode_numericentity (line 57)
-- new mb_decode_numericentity (line 58)
-- new mb_encode_mimeheader (line 59)
-- new mb_decode_mimeheader (line 60)
-- new mb_http_output (line 61)
-- new mb_internal_encoding (line 62)
-- new mb_detect_order (line 63)
-- new mb_substitute_character (line 64)
-- new mb_preferred_mime_name (line 65)
-- new mb_encoding_aliases (line 66)
-- new mb_convert_kana (line 67)
-- new mb_split (line 68)
+- new mb_str_split (line 37)
+- new mb_strwidth (line 38)
+- new mb_strimwidth (line 39)
+- new mb_str_pad (line 40)
+- new mb_substr (line 41)
+- new mb_strcut (line 42)
+- new mb_substr_count (line 43)
+- new mb_strpos (line 44)
+- new mb_strtolower (line 45)
+- new mb_strtoupper (line 46)
+- new mb_convert_case (line 47)
+- new mb_convert_encoding (line 48)
+- new mb_stripos (line 49)
+- new mb_strrpos (line 50)
+- new mb_strrichr (line 51)
+- new mb_trim (line 53)
+- new mb_ltrim (line 54)
+- new mb_rtrim (line 55)
+- new mb_scrub (line 57)
+- new mb_encode_numericentity (line 58)
+- new mb_decode_numericentity (line 59)
+- new mb_encode_mimeheader (line 60)
+- new mb_decode_mimeheader (line 61)
+- new mb_http_output (line 62)
+- new mb_internal_encoding (line 63)
+- new mb_detect_order (line 64)
+- new mb_substitute_character (line 65)
+- new mb_preferred_mime_name (line 66)
+- new mb_encoding_aliases (line 67)
+- new mb_convert_kana (line 68)
+- new mb_split (line 69)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -5698,7 +5702,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 1053)
 - new ArgumentCountError (line 1061)
-- 98 class method(s)
+- 100 class method(s)
 
 ### `ext/mbstring/mb_check_encoding.php`
 
@@ -5812,6 +5816,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 31)
+- 2 class method(s)
+- 1 closure(s)
+
+### `ext/mbstring/mb_str_split.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 30)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -12093,6 +12104,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `ext/standard/UniqidJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/UnlinkJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -23365,6 +23381,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 3 class method(s)
+
+### `lib/JIT/Builtin/StringUnlink.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringUnpack.php`
 

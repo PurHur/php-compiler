@@ -350,6 +350,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_strlen.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strpos.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrichr.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrpos.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_str_split.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strtolower.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strtoupper.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strwidth.php';
