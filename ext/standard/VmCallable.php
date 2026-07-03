@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\NamedArgs;
 use PHPCompiler\VM\Variable;
@@ -22,11 +23,13 @@ final class VmCallable
         Context $ctx,
         Variable $var,
         bool $syntaxOnly = false,
-        ?Variable $callableNameOut = null
+        ?Variable $callableNameOut = null,
+        ?Frame $scopeFrame = null
     ): bool {
         $var = $var->resolveIndirect();
         $name = null;
-        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name);
+        $callerClassLc = null !== $scopeFrame ? VmReflection::callerClassLcFromFrame($scopeFrame) : null;
+        $ok = self::probeCallable($ctx, $var, $syntaxOnly, $name, $callerClassLc);
         if (null !== $callableNameOut && null !== $name) {
             self::writeCallableName($callableNameOut, $name);
         }
@@ -170,7 +173,8 @@ final class VmCallable
         Context $ctx,
         Variable $var,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         if (VmClosureCall::isClosure($var)) {
             $callableName = '{closure}';
@@ -178,10 +182,10 @@ final class VmCallable
             return true;
         }
         if (Variable::TYPE_STRING === $var->type) {
-            return self::probeStringCallable($ctx, $var->toString(), $syntaxOnly, $callableName);
+            return self::probeStringCallable($ctx, $var->toString(), $syntaxOnly, $callableName, $callerClassLc);
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            return self::probeArrayCallable($ctx, $var, $syntaxOnly, $callableName);
+            return self::probeArrayCallable($ctx, $var, $syntaxOnly, $callableName, $callerClassLc);
         }
         if (Variable::TYPE_OBJECT === $var->type) {
             $object = $var->toObject();
@@ -228,7 +232,8 @@ final class VmCallable
         Context $ctx,
         string $name,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         if ('' === $name) {
             $callableName = '';
@@ -246,7 +251,7 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
         }
         $callableName = $name;
         if (!self::isValidFunctionName($name)) {
@@ -266,7 +271,8 @@ final class VmCallable
         Context $ctx,
         Variable $callback,
         bool $syntaxOnly,
-        ?string &$callableName
+        ?string &$callableName,
+        ?string $callerClassLc = null
     ): bool {
         $table = $callback->toArray();
         $idx0 = new Variable(Variable::TYPE_INTEGER);
@@ -294,8 +300,7 @@ final class VmCallable
                 return true;
             }
 
-            return $ctx->runtime->vm->hasInstanceMethod($target->toObject()->class, $method)
-                || self::hasInstanceMagicCall($ctx, $target->toObject()->class);
+            return self::isInstanceMethodCallable($ctx, $target->toObject()->class, $method, $callerClassLc);
         }
         if (Variable::TYPE_STRING === $target->type) {
             $class = $target->toString();
@@ -307,10 +312,37 @@ final class VmCallable
                 return true;
             }
 
-            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method);
+            return VmReflection::isStaticallyCallableMethod($ctx, $class, $method, $callerClassLc);
         }
 
         return false;
+    }
+
+    /**
+     * php-src zend_is_callable — instance method exists and is visible from scope (#9334).
+     */
+    private static function isInstanceMethodCallable(
+        Context $ctx,
+        \PHPCompiler\VM\ClassEntry $objectClass,
+        string $method,
+        ?string $callerClassLc
+    ): bool {
+        if (!$ctx->runtime->vm->hasInstanceMethod($objectClass, $method)) {
+            return self::hasInstanceMagicCall($ctx, $objectClass);
+        }
+        try {
+            [$declaring, $methodLc] = $ctx->runtime->vm->resolveInstanceMethod($objectClass, $method);
+        } catch (\LogicException) {
+            return self::hasInstanceMagicCall($ctx, $objectClass);
+        }
+        $vis = $declaring->methodVisibility[$methodLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
+
+        return VmReflection::isMethodCallableFromScope(
+            $ctx,
+            $vis,
+            strtolower($declaring->name),
+            $callerClassLc
+        );
     }
 
     private static function invokeStringCallable(Context $ctx, string $name, Variable ...$args): Variable

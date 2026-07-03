@@ -63,4 +63,38 @@ final class VmArrayValueCallback
     {
         return boolval::isTruthy($result->resolveIndirect());
     }
+
+    /**
+     * array_find-family predicate success (php-src ext/standard/array.c — php_is_true vs strict true).
+     */
+    public static function predicateMatches(Variable $result, bool $strict): bool
+    {
+        $result = $result->resolveIndirect();
+        if (!$strict) {
+            return self::isTruthy($result);
+        }
+
+        return Variable::TYPE_BOOLEAN === $result->type && $result->toBool();
+    }
+
+    /**
+     * @param list<Variable> $calledArgs
+     */
+    public static function parseOptionalStrictArg(array $calledArgs, string $fn, int $minArgs = 2, int $maxArgs = 3): bool
+    {
+        $argc = \count($calledArgs);
+        if ($argc < $minArgs || $argc > $maxArgs) {
+            throw new \LogicException(\sprintf(
+                '%s() requires %d or %d arguments in this compiler build',
+                $fn,
+                $minArgs,
+                $maxArgs
+            ));
+        }
+        if ($argc === $maxArgs) {
+            return $calledArgs[$maxArgs - 1]->resolveIndirect()->toBool();
+        }
+
+        return false;
+    }
 }
