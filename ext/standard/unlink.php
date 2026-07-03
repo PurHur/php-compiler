@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** unlink() — VM via VmFs; JIT/AOT via libc unlink(2). */
+/** unlink() — VM via VmFs; JIT/AOT via UnlinkJitHelper PHP (#15471). */
 final class unlink extends Internal
 {
     public function execute(Frame $frame): void
