@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3785 |
-| Phase A inventory files (M2 ratio SSOT) | 3785 |
+| PHP files on vm.php path | 3789 |
+| Phase A inventory files (M2 ratio SSOT) | 3789 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10214 |
+| Source constructs flagged (warnings) | 10218 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1102,6 +1102,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ParseUrlJitHelper.php` | 0 | 1 |
 | `ext/standard/PasswordJitHelper.php` | 0 | 1 |
 | `ext/standard/PathJitHelper.php` | 0 | 1 |
+| `ext/standard/PathinfoJitHelper.php` | 0 | 1 |
 | `ext/standard/PendingHeadersJitHelper.php` | 0 | 1 |
 | `ext/standard/PhpUserFilterBuiltin.php` | 0 | 9 |
 | `ext/standard/PhpinfoJitHelper.php` | 0 | 1 |
@@ -1127,6 +1128,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/RangeIntJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadfileJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadonlyRaiseJitHelper.php` | 0 | 1 |
+| `ext/standard/RealpathJitHelper.php` | 0 | 1 |
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/ResolveSidecarJitHelper.php` | 0 | 1 |
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
@@ -2880,6 +2882,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringParseStr.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPasswordCrypto.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPath.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringPathinfo.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPhpinfoRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringPosixTimes.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringPregMatch.php` | 0 | 1 |
@@ -2890,6 +2893,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringQuotemeta.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringRandomBytes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
+| `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringSimilarTextJit.php` | 0 | 1 |
@@ -9300,7 +9304,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitPathinfo.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 10 class method(s)
 
 ### `ext/standard/JitPclose.php`
 
@@ -9511,7 +9515,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/JitRealpath.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 1 class method(s)
 
 ### `ext/standard/JitRealpathCache.php`
 
@@ -11200,6 +11204,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `ext/standard/PathinfoJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/PendingHeadersJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11345,6 +11354,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 5 class method(s)
+
+### `ext/standard/RealpathJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/RequestMethodEnumData.php`
 
@@ -12262,11 +12276,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 102)
-- new RecursiveIteratorIterator (line 2639)
-- new RecursiveDirectoryIterator (line 2640)
-- new RecursiveIteratorIterator (line 2741)
-- new RecursiveDirectoryIterator (line 2742)
-- 94 class method(s)
+- new RecursiveIteratorIterator (line 2666)
+- new RecursiveDirectoryIterator (line 2667)
+- new RecursiveIteratorIterator (line 2768)
+- new RecursiveDirectoryIterator (line 2769)
+- 95 class method(s)
 - 11 closure(s)
 
 ### `ext/standard/VmDebugBacktrace.php`
@@ -22611,6 +22625,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 10 class method(s)
 
+### `lib/JIT/Builtin/StringPathinfo.php`
+
+**Warnings** (review for bootstrap subset):
+- 8 class method(s)
+
 ### `lib/JIT/Builtin/StringPhpinfoRuntime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22672,6 +22691,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new JIT (line 95)
 - 5 class method(s)
+
+### `lib/JIT/Builtin/StringRealpath.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringSerialize.php`
 
