@@ -287,6 +287,9 @@ final class VmDateTimeNative
         if (1 === preg_match('/^noon$/i', $time)) {
             return self::timeOfDayOnBase($base, 12, 0, 0, $tzName);
         }
+        if (1 === preg_match('/^(today|tomorrow|yesterday)$/i', $time, $matches)) {
+            return self::dayWordMidnightParseResult(strtolower($matches[1]), $base, $tzName);
+        }
         if (1 === preg_match('/^(today|tomorrow|yesterday)\s+(.+)$/i', $time, $matches)) {
             return self::dayWordWithTimeParseResult(strtolower($matches[1]), trim($matches[2]), $base, $tzName);
         }
@@ -1670,6 +1673,31 @@ final class VmDateTimeNative
             'timestamp' => self::mktimeInTimezone($year, $month, $day, 0, 0, 0, $tzName),
             'microsecond' => 0,
         ];
+    }
+
+    /**
+     * @return array{timestamp: int, microsecond: int}|null
+     */
+    private static function dayWordMidnightParseResult(string $dayWord, int $base, string $tzName): ?array
+    {
+        $offset = match ($dayWord) {
+            'today' => 0,
+            'tomorrow' => 1,
+            'yesterday' => -1,
+            default => 999,
+        };
+        if (999 === $offset) {
+            return null;
+        }
+        if (0 !== $offset) {
+            try {
+                $base = self::modifyRelative($base, ($offset > 0 ? '+' : '').$offset.' day', $tzName);
+            } catch (NativeDateMalformedStringException) {
+                return null;
+            }
+        }
+
+        return self::timeOfDayOnBase($base, 0, 0, 0, $tzName);
     }
 
     /**
