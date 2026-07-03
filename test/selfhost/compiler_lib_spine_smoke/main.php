@@ -379,6 +379,8 @@ require_once __DIR__.'/../../../ext/openssl/openssl_get_cipher_methods.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_md_methods.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_new.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_sign.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_verify.php';
+require_once __DIR__.'/../../../ext/openssl/VmOpensslSignNative.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_x509_read.php';
 require_once __DIR__.'/../../../ext/posix/JitPosix.php';
 require_once __DIR__.'/../../../ext/posix/JitPosixTimes.php';

@@ -99,6 +99,11 @@ final class VmOpensslObjects
         return $var;
     }
 
+    public static function keyPem(\PHPCompiler\VM\ObjectEntry $entry): string
+    {
+        return self::$keyStore[$entry->id] ?? '';
+    }
+
     public static function isCertificate(Variable $var): bool
     {
         $var = $var->resolveIndirect();
