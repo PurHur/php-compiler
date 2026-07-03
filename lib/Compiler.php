@@ -11926,6 +11926,13 @@ class Compiler {
                 || $directCall instanceof Op\Expr\StaticCall
                 || $directCall instanceof Op\Expr\MethodCall
             ) {
+                if (
+                    'array_combine' === $this->resolveCfgFuncCallName($callOp)
+                    && 0 === $argIndex
+                    && null !== $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                ) {
+                    return null;
+                }
                 $embedded = $this->unwrapArrayLiteralExpr($positionalCallArg);
                 if (null === $embedded) {
                     $embeddedProducer = $this->findCfgProducerExprForOperand($positionalCallArg);
@@ -12051,6 +12058,14 @@ class Compiler {
         }
         // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
         $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        if (
+            $matched instanceof Op\Expr\FuncCall
+            || $matched instanceof Op\Expr\NsFuncCall
+            || $matched instanceof Op\Expr\StaticCall
+            || $matched instanceof Op\Expr\MethodCall
+        ) {
+            return $matched;
+        }
         if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
             return $matched;
         }
@@ -19423,23 +19438,38 @@ class Compiler {
      */
     private function matchArrayCombineInlineProducers(array $producers, int $argIndex): ?Op\Expr
     {
-        if (2 !== \count($producers) || $argIndex < 0 || $argIndex > 1) {
+        if ($argIndex < 0 || $argIndex > 1) {
             return null;
         }
         $arrayProducers = [];
         $funcProducer = null;
-        foreach ($producers as $producer) {
+        $funcPos = null;
+        foreach ($producers as $pi => $producer) {
             if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                 $funcProducer = $producer;
+                $funcPos = $pi;
             } elseif ($producer instanceof Op\Expr\Array_) {
                 $arrayProducers[] = $producer;
             }
         }
-        if (2 === \count($arrayProducers)) {
+        if (2 === \count($producers) && 2 === \count($arrayProducers) && null === $funcProducer) {
             return $arrayProducers[$argIndex];
         }
-        if (null !== $funcProducer && 1 === \count($arrayProducers)) {
+        if (2 === \count($producers) && null !== $funcProducer && 1 === \count($arrayProducers)) {
             return 0 === $argIndex ? $funcProducer : $arrayProducers[0];
+        }
+        // array_combine(array_keys(['a'=>1,'b'=>2]), [10,20]) — inner Array_ + FuncCall + trailing Array_ (#15558, #13776).
+        if (null !== $funcProducer && null !== $funcPos && \count($producers) >= 3) {
+            if (0 === $argIndex) {
+                return $funcProducer;
+            }
+            for ($j = $funcPos + 1, $n = \count($producers); $j < $n; ++$j) {
+                if ($producers[$j] instanceof Op\Expr\Array_) {
+                    return $producers[$j];
+                }
+            }
+
+            return null;
         }
 
         return null;
