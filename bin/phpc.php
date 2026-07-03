@@ -82,6 +82,8 @@ php-compiler CLI
       --json fields: file, line, kind, message, issue, issue_url (when tracked)
   phpc init [--profile default|miniwebapp|sessionsweb|apijson|fileupload|throwsweb|selfhostprobe|fastcgiweb] [--force] [target-dir]
                                               Scaffold web project (default, miniwebapp, sessionsweb, apijson, fileupload, throwsweb, selfhostprobe, or fastcgiweb)
+  phpc bootstrap init [--with-composer] [--skip-verify]
+                                              Bootstrap SDK cold start (gen-0 prelink, Tier 1; #15600)
   phpc test [--fast] [args...]                  Run ci-local.sh (full) or ci-fast.sh (no LLVM)
   phpc test --bootstrap [--strict]              Bootstrap subset (inventory + spine sync; #1961)
   phpc doctor [--gates] [--selfhost] [--no-lint] [--jit-probe] [--aot-project-probe [dir]]
@@ -286,6 +288,23 @@ switch ($command) {
 
     case 'init':
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/init.php'], $args), $repoRoot));
+
+    case 'bootstrap':
+        if ([] === $args) {
+            fwrite(STDERR, "phpc bootstrap: missing subcommand (try: phpc bootstrap init)\n");
+            exit(1);
+        }
+        $sub = array_shift($args);
+        if ('init' !== $sub) {
+            fwrite(STDERR, "phpc bootstrap: unknown subcommand: {$sub}\n");
+            exit(1);
+        }
+        $initScript = $repoRoot.'/script/bootstrap-init.sh';
+        if (!is_executable($initScript)) {
+            fwrite(STDERR, "phpc bootstrap: {$initScript} is not executable\n");
+            exit(1);
+        }
+        exit(runProcess(array_merge([$initScript], $args), $repoRoot));
 
     case 'test':
         $fast = false;

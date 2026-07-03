@@ -46,6 +46,14 @@ on:
         options:
           - 'false'
           - 'true'
+      honest_compile_gate:
+        description: 'Fail bootstrap-loop on gen-0 sidecar recovery (BOOTSTRAP_HONEST_COMPILE_GATE=1, #15603)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
 
 concurrency:
   group: bootstrap-spine-gate-${{ github.workflow }}-${{ github.ref }}
@@ -113,15 +121,19 @@ jobs:
 
       - name: bootstrap-loop-probe
         run: |
+          HONEST_ARGS=""
+          if [[ "${{ github.event.inputs.honest_compile_gate }}" == "true" ]]; then
+            HONEST_ARGS="--honest-compile"
+          fi
           docker run --rm -m 10g \
             -e PHP_COMPILER_LLVM_PATH=/opt/llvm9 \
             -e PHP_COMPILER_MEMORY_LIMIT=1536M \
             -e PHP_COMPILER_LLVM_MEMORY_LIMIT=4096M \
             -e PHP_COMPILER_CI_RAM_GB=8 \
             -v "$PWD:/compiler" -w /compiler \
-            php-compiler:22.04-dev bash -lc '
+            php-compiler:22.04-dev bash -lc "
               set -euo pipefail
               composer install --no-interaction --ignore-platform-reqs -q
               script/apply-patches.sh
-              ./script/bootstrap-loop-probe.sh
-            '
+              ./script/bootstrap-loop-probe.sh ${HONEST_ARGS}
+            "

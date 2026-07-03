@@ -13,6 +13,7 @@ FULL_SPINE_EMIT="${ROOT}/script/bootstrap-loop-gen1-full-spine-emit.sh"
 GEN2_RECOMPILE="${ROOT}/script/bootstrap-loop-gen2-recompile-spine.sh"
 FULL_REVISION_PROBE="${ROOT}/script/bootstrap-selfhost-full-revision-probe.sh"
 DRY_RUN=0
+HONEST_COMPILE=0
 SPINE_RATIO="725/725"
 
 m4_spine_ratio_label() {
@@ -28,6 +29,8 @@ Usage: script/bootstrap-loop-probe.sh [--dry-run]
 
 M4 bootstrap-loop probe (#1498). Runs M0 link + M2 spine + M3 HelloWorld with the same strict env as
 \`make bootstrap-selfhost-helloworld\` (#2612), then gen-1 link / gen-2 attempt, then gen-2→gen-3 spine recompile.
+
+  --honest-compile   Set BOOTSTRAP_HONEST_COMPILE_GATE=1 — fail gen-2→gen-3 on sidecar recovery (#15603)
 
 Exit codes:
   0  --dry-run: lint + M0 link + M2 spine + M3 HelloWorld strict + gen-1 link with emit_path=native
@@ -47,6 +50,7 @@ EOF
 for arg in "$@"; do
   case "${arg}" in
     --dry-run) DRY_RUN=1 ;;
+    --honest-compile) HONEST_COMPILE=1 ;;
     -h|--help)
       usage
       exit 0
@@ -67,6 +71,10 @@ ci_apply_llvm_memory_env
 
 selfhost_preflight bootstrap-loop-probe php-or-docker
 SPINE_RATIO="$(m4_spine_ratio_label)"
+if [[ "${HONEST_COMPILE}" == "1" ]]; then
+  export BOOTSTRAP_HONEST_COMPILE_GATE=1
+  echo "bootstrap-loop-probe: honest compile gate ON (BOOTSTRAP_HONEST_COMPILE_GATE=1, #15603)"
+fi
 
 m4_probe_tail() {
   local file=$1

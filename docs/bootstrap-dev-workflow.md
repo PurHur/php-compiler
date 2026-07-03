@@ -56,6 +56,11 @@ Harness hosts: use `./script/docker-exec.sh` — never raw `docker run -v "$(pwd
 git clone https://github.com/PurHur/php-compiler.git && cd php-compiler
 make docker-build-22   # once
 
+# Tier 1 only (no composer):
+./phpc bootstrap init --skip-verify
+# or with Tier 0 harness:
+./phpc bootstrap init --with-composer
+
 ./script/docker-exec.sh -- bash -lc '
   composer install --ignore-platform-reqs -q
   script/apply-patches.sh
@@ -235,6 +240,37 @@ Track regression when stderr contains `native parse spine null — recovered via
 | Local full | `./script/ci-local.sh` | Pre-merge compiler changes |
 
 Remote GHA was paused ([#394](https://github.com/PurHur/php-compiler/issues/394)); `bootstrap-spine-gate.yml` is the **minimal re-enabled** workflow for bootstrap contributors. Other workflows remain under [`.github/workflows-disabled/`](../.github/workflows-disabled/).
+
+---
+
+## Gen-1+ release epic (GitHub issues)
+
+Track progress toward **gen-1+ only** development ([#1492](https://github.com/PurHur/php-compiler/issues/1492)):
+
+| # | Issue | Theme |
+|---|-------|--------|
+| 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
+| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources |
+| 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) |
+| 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
+| 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
+| 6 | [#15602](https://github.com/PurHur/php-compiler/issues/15602) | Bootstrap SDK release tarball |
+| 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile` |
+| 8 | [#15604](https://github.com/PurHur/php-compiler/issues/15604) | Inventory argv driver without emit-helper sidecar |
+| 9 | [#15605](https://github.com/PurHur/php-compiler/issues/15605) | Flip default onboarding to gen-1+ tiers |
+| 10 | [#15606](https://github.com/PurHur/php-compiler/issues/15606) | Bootstrap SDK platform contract |
+
+### Shipped in this epic (starter)
+
+```bash
+# Tier 1 cold start without composer ( #15600 )
+phpc bootstrap init
+make bootstrap-init
+
+# Honest compile gate — opt-in; fails until #15597 closes (#15603)
+BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
+./script/bootstrap-loop-probe.sh --honest-compile
+```
 
 ---
 

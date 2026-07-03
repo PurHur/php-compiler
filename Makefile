@@ -347,6 +347,8 @@ bootstrap-selfhost-lib-spine-smoke:
 	./script/bootstrap-selfhost-lib-spine-smoke-link.sh
 bootstrap-gen0-refresh-sidecar:
 	./script/bootstrap-refresh-gen0-sidecar.sh
+bootstrap-init:
+	./script/bootstrap-init.sh
 bootstrap-selfhost-lib-spine-smoke-lint:
 	./script/bootstrap-selfhost-lib-spine-smoke-lint.sh
 bootstrap-selfhost-lib-spine-vm-smoke:
