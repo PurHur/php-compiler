@@ -246,6 +246,8 @@ final class VmDom
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
+        $document->methods['load'] = new DocumentLoad();
+        $document->methodVisibility['load'] = $pub;
         $document->methods['loadhtml'] = new DocumentLoadHTML();
         $document->methodVisibility['loadhtml'] = $pub;
         $document->methodNames['loadhtml'] = 'loadHTML';
@@ -1211,6 +1213,31 @@ final class VmDom
         $state->documentUri = self::defaultDocumentUri();
 
         return true;
+    }
+
+    public static function load(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        int $options = 0,
+        ?\PHPCompiler\Frame $frame = null
+    ): bool {
+        unset($options);
+        $contents = @file_get_contents($filename);
+        if (false === $contents) {
+            VmLibxml::handleError($ctx, [
+                'level' => 2,
+                'code' => 4,
+                'column' => 0,
+                'message' => 'failed to load external entity "'.$filename.'"',
+                'file' => $filename,
+                'line' => 0,
+            ], $frame, null, 'DOMDocument::load(): I/O warning : failed to load external entity "'.$filename.'"');
+
+            return false;
+        }
+
+        return self::loadXML($ctx, $document, $contents, $frame);
     }
 
     /** Zend dom_document_documenturi_read default for in-memory documents (ext/dom/document.c; #14468). */
