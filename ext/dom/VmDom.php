@@ -430,9 +430,7 @@ final class VmDom
             $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
             $state->nodeName = '#document';
             DomRegistry::attach($document, $state);
-            if (!$document->hasProperty(self::PROP_FORMAT_OUTPUT)) {
-                $document->getProperty(self::PROP_FORMAT_OUTPUT)->bool(false);
-            }
+            self::ensureDomDocumentBoolProperty($document, self::PROP_FORMAT_OUTPUT, false);
             self::initNodePropertySlots($document);
         }
 
@@ -1872,7 +1870,31 @@ final class VmDom
 
     private static function documentFormatOutput(ObjectEntry $document): bool
     {
-        return $document->getProperty(self::PROP_FORMAT_OUTPUT)->resolveIndirect()->toBool();
+        return self::ensureDomDocumentBoolProperty($document, self::PROP_FORMAT_OUTPUT, false);
+    }
+
+    private static function ensureDomDocumentBoolProperty(
+        ObjectEntry $document,
+        string $propName,
+        bool $default
+    ): bool {
+        if (!$document->hasProperty($propName)) {
+            return $default;
+        }
+        $slot = $document->getProperty($propName);
+        $prop = $slot->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $prop->type) {
+            $slot->bool($default);
+
+            return $default;
+        }
+        try {
+            return $prop->toBool();
+        } catch (\Error) {
+            $slot->bool($default);
+
+            return $default;
+        }
     }
 
     public static function loadHTML(Context $ctx, ObjectEntry $document, string $html, int $options = 0): bool
