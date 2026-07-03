@@ -5285,7 +5285,20 @@ restart:
 
                             return self::EXCEPTION;
                         }
-                        throw new \LogicException('Method call on non-object');
+                        $catchFrame = $this->dispatchVmError(
+                            sprintf(
+                                'Call to a member function %s() on %s',
+                                $methodName,
+                                $this->valueDebugTypeLabel($receiver)
+                            ),
+                            $frame
+                        );
+                        if (null !== $catchFrame) {
+                            $frame = $catchFrame;
+                            goto restart;
+                        }
+
+                        return self::EXCEPTION;
                     }
                     $receiver = VM\EnumCaseSupport::receiverForInstanceMethod($receiver);
                     $catchFrame = $this->initMethodCall($frame, $receiver, $methodName);
