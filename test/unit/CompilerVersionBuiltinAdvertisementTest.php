@@ -121,9 +121,46 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsAdvertisedOnForwardProfile(): void
+    public function testPhp83ArrayKeyFunctionsWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertFalse(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+    }
+
+    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+    }
+
+    public function testPhp83ArrayKeyFunctionsTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+            $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp84ArraySearchFunctionsTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+            $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
@@ -226,12 +263,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
-    public function testVmRegistersArrayFindFamilyOnForwardProfile(): void
+    public function testVmDoesNotRegisterArrayFindFamilyOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
         foreach (['array_find', 'array_find_key', 'array_any', 'array_any_key', 'array_all', 'array_all_key', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
-            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
     }
 
