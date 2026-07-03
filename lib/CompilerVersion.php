@@ -295,13 +295,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15503).
+     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15572).
      *
-     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#12327).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsRoundingModeEnum(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**
