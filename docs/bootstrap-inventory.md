@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3861 |
-| Phase A inventory files (M2 ratio SSOT) | 3861 |
+| PHP files on vm.php path | 3865 |
+| Phase A inventory files (M2 ratio SSOT) | 3865 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10387 |
+| Source constructs flagged (warnings) | 10402 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -431,11 +431,15 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 4 |
+| `ext/sodium/Module.php` | 0 | 6 |
+| `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
+| `ext/sodium/SodiumAuthVerifyFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumExtensionPolicy.php` | 0 | 1 |
 | `ext/sodium/SodiumFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumJitHelper.php` | 0 | 1 |
-| `ext/sodium/VmSodium.php` | 0 | 6 |
+| `ext/sodium/VmSodium.php` | 0 | 9 |
+| `ext/sodium/sodium_crypto_auth.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_auth_verify.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox_open.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 4 |
@@ -6594,15 +6598,33 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 3 class method(s)
 
 ### `ext/sodium/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 29)
-- new sodium_crypto_secretbox (line 42)
-- new sodium_crypto_secretbox_open (line 43)
+- new VM\Variable (line 31)
+- new sodium_crypto_secretbox (line 44)
+- new sodium_crypto_secretbox_open (line 45)
+- new sodium_crypto_auth (line 46)
+- new sodium_crypto_auth_verify (line 47)
 - 2 class method(s)
+
+### `ext/sodium/SodiumAuthFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 44)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumAuthVerifyFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 45)
+- 3 class method(s)
+- 1 closure(s)
 
 ### `ext/sodium/SodiumExtensionPolicy.php`
 
@@ -6620,17 +6642,30 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/SodiumJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 59)
-- new Exception (line 71)
-- new Exception (line 80)
-- new Exception (line 89)
-- new Exception (line 92)
-- 10 class method(s)
+- new Exception (line 83)
+- new Exception (line 95)
+- new Exception (line 104)
+- new Exception (line 120)
+- new Exception (line 146)
+- new Exception (line 149)
+- new SodiumException (line 167)
+- new Exception (line 169)
+- 16 class method(s)
+
+### `ext/sodium/sodium_crypto_auth.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_auth_verify.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/sodium/sodium_crypto_secretbox.php`
 
@@ -23222,8 +23257,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 101)
-- 4 class method(s)
+- new JIT (line 175)
+- 6 class method(s)
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringSoundex.php`
