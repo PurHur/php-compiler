@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 
@@ -156,9 +157,25 @@ final class ArrayColumnJitHelper
 
             return $cell->resolveIndirect();
         }
+        if (Variable::TYPE_ENUM_CASE === $row->type) {
+            $propName = \is_string($field) ? $field : (string) $field;
+            $entry = $row->toEnumCase();
+            if (!EnumCaseSupport::propertyExistsOnCase($entry->enumClass, $propName)) {
+                return null;
+            }
+
+            return $entry->fetchProperty($propName);
+        }
         if (Variable::TYPE_OBJECT === $row->type) {
             $propName = \is_string($field) ? $field : (string) $field;
             $object = $row->toObject();
+            if ($object->isEnumCase) {
+                if (!EnumCaseSupport::propertyExistsOnCase($object->class, $propName)) {
+                    return null;
+                }
+
+                return EnumCaseSupport::getProperty($object, $propName);
+            }
             if (!$object->hasProperty($propName)) {
                 return null;
             }

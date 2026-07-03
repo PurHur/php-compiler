@@ -162,6 +162,9 @@ class ObjectEntry {
 
     public function hasProperty(string $name): bool
     {
+        if ($this->isEnumCase) {
+            return EnumCaseSupport::propertyExistsOnCase($this->class, $name);
+        }
         if (\PHPCompiler\ext\dom\DomNodePropertySupport::isManagedProperty($this, $name)) {
             return true;
         }

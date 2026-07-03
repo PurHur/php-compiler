@@ -70,4 +70,29 @@ final class ArrayColumnRuntimeShrinkTest extends TestCase
             $runtimeOut->findIndex(1)?->resolveIndirect()->toInt()
         );
     }
+
+    public function testArrayColumnJitHelperEnumCasesNameValue(): void
+    {
+        $ht = new HashTable();
+        $enumClass = new \PHPCompiler\VM\ClassEntry('BackedE');
+        $enumClass->isEnum = true;
+        $enumClass->backedType = 'string';
+        foreach ([['One', '1'], ['Two', '2']] as $i => [$caseName, $backing]) {
+            $object = new \PHPCompiler\VM\ObjectEntry($enumClass);
+            $object->isEnumCase = true;
+            $object->enumCaseName = $caseName;
+            $backingVar = new Variable();
+            $backingVar->string($backing);
+            $object->enumCaseValue = $backingVar;
+            $caseVar = new Variable();
+            $caseVar->object($object);
+            $ht->addIndex($i, $caseVar);
+        }
+        $names = ArrayColumnJitHelper::columnWithKey($ht, 'name');
+        $this->assertSame('One', $names->findIndex(0)?->resolveIndirect()->toString());
+        $this->assertSame('Two', $names->findIndex(1)?->resolveIndirect()->toString());
+        $values = ArrayColumnJitHelper::columnWithKey($ht, 'value');
+        $this->assertSame('1', $values->findIndex(0)?->resolveIndirect()->toString());
+        $this->assertSame('2', $values->findIndex(1)?->resolveIndirect()->toString());
+    }
 }
