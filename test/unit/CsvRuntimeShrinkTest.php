@@ -57,6 +57,18 @@ final class CsvRuntimeShrinkTest extends TestCase
         $this->assertSame($fields, $rebuilt);
     }
 
+    public function testFputcsvFormatLineDoesNotDoubleBackslashEscape(): void
+    {
+        $line = \PHPCompiler\ext\standard\VmCsv::formatLine(['a\b'], ',', '"', '\\');
+        $this->assertSame('"a\b"', $line);
+        $ht = new \PHPCompiler\VM\HashTable();
+        $cell = new \PHPCompiler\VM\Variable();
+        $cell->string('a\b');
+        $ht->append($cell);
+        $jitLine = CsvJitHelper::formatFieldsArgv($ht, ',', '"', '\\');
+        $this->assertSame($line, $jitLine);
+    }
+
     public function testSpineBundleIncludesCsvJitHelper(): void
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
