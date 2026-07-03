@@ -246,8 +246,12 @@ final class VmDom
         $element->methodVisibility['getattribute'] = $pub;
         $element->methods['getattributens'] = new ElementGetAttributeNS();
         $element->methodVisibility['getattributens'] = $pub;
+        $element->methods['hasattribute'] = new ElementHasAttribute();
+        $element->methodVisibility['hasattribute'] = $pub;
         $element->methods['hasattributens'] = new ElementHasAttributeNS();
         $element->methodVisibility['hasattributens'] = $pub;
+        $element->methods['removeattribute'] = new ElementRemoveAttribute();
+        $element->methodVisibility['removeattribute'] = $pub;
         $element->methods['setattribute'] = new ElementSetAttribute();
         $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributens'] = new ElementSetAttributeNS();
@@ -257,6 +261,8 @@ final class VmDom
         $element->methods['setidattribute'] = new ElementSetIdAttribute();
         $element->methodVisibility['setidattribute'] = $pub;
         $element->methodNames['setidattribute'] = 'setIdAttribute';
+        $element->methods['getelementsbytagname'] = new ElementGetElementsByTagName();
+        $element->methodVisibility['getelementsbytagname'] = $pub;
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -1391,7 +1397,7 @@ final class VmDom
     ): ObjectEntry {
         self::assertMutationParent($parent);
         if (self::isDocumentFragment($newChild)) {
-            return self::appendFragmentChildren($ctx, $parent, $newChild);
+            return self::insertFragmentChildrenBefore($ctx, $parent, $newChild, $refChild);
         }
         if (!self::isElement($newChild)) {
             throw new \DOMException('Hierarchy request error');
@@ -1452,8 +1458,17 @@ final class VmDom
         ObjectEntry $parent,
         ObjectEntry $fragment
     ): ObjectEntry {
+        return self::insertFragmentChildrenBefore($ctx, $parent, $fragment, null);
+    }
+
+    private static function insertFragmentChildrenBefore(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $fragment,
+        ?ObjectEntry $refChild
+    ): ObjectEntry {
         if (!self::isDocumentFragment($fragment)) {
-            throw new \LogicException('appendFragmentChildren() expects a DOMDocumentFragment');
+            throw new \LogicException('insertFragmentChildrenBefore() expects a DOMDocumentFragment');
         }
 
         $fragState = DomRegistry::state($fragment);
@@ -1465,9 +1480,14 @@ final class VmDom
                 continue;
             }
             self::linkChildToParent($child, null);
-            self::appendChild($ctx, $parent, $child);
+            if (null === $refChild) {
+                self::appendChild($ctx, $parent, $child);
+            } else {
+                self::insertBeforeLiveStandard($ctx, $parent, $child, $refChild);
+            }
         }
         self::syncSubtree($ctx, $fragment);
+        self::syncSubtree($ctx, $parent);
 
         return $fragment;
     }
@@ -2117,7 +2137,19 @@ final class VmDom
             return self::createNodeList($ctx, []);
         }
 
-        return self::createNodeList($ctx, self::collectElementsByTagName($rootVar->toObject(), $tagName));
+        return self::getElementsByTagNameFromNode($ctx, $rootVar->toObject(), $tagName);
+    }
+
+    public static function getElementsByTagNameFromNode(
+        Context $ctx,
+        ObjectEntry $node,
+        string $tagName
+    ): Variable {
+        if (!self::isElement($node)) {
+            throw new \DOMException('Not an element node');
+        }
+
+        return self::createNodeList($ctx, self::collectElementsByTagName($node, $tagName));
     }
 
     public static function nodeListItem(ObjectEntry $nodeList, int $index): ?ObjectEntry
