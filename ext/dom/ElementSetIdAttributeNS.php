@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\dom;
+
+use PHPCompiler\Frame;
+use PHPCompiler\VM\Variable;
+
+/** DOMElement::setIdAttributeNS() — VM (php-src ext/dom/element.c; #15300). */
+final class ElementSetIdAttributeNS extends DomClassMethod
+{
+    public function __construct()
+    {
+        parent::__construct('setIdAttributeNS');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $element = $this->receiver($frame, VmDom::CLASS_ELEMENT, 'DOMElement::setIdAttributeNS()');
+        if (\count($frame->calledArgs) < 4) {
+            throw new \LogicException('DOMElement::setIdAttributeNS() expects at least 3 arguments');
+        }
+        $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::setIdAttributeNS()', 0);
+        $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::setIdAttributeNS()', 1);
+        $isIdVar = $frame->calledArgs[3]->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $isIdVar->type) {
+            throw new \TypeError(
+                'DOMElement::setIdAttributeNS(): Argument #3 ($isId) must be of type bool, '
+                .VmDom::typeLabel($isIdVar).' given'
+            );
+        }
+        VmDom::setIdAttributeNS($element, $namespace, $localName, $isIdVar->toBool());
+    }
+}

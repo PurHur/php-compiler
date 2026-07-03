@@ -261,6 +261,9 @@ final class VmDom
         $element->methods['setidattribute'] = new ElementSetIdAttribute();
         $element->methodVisibility['setidattribute'] = $pub;
         $element->methodNames['setidattribute'] = 'setIdAttribute';
+        $element->methods['setidattributens'] = new ElementSetIdAttributeNS();
+        $element->methodVisibility['setidattributens'] = $pub;
+        $element->methodNames['setidattributens'] = 'setIdAttributeNS';
         $element->methods['getelementsbytagname'] = new ElementGetElementsByTagName();
         $element->methodVisibility['getelementsbytagname'] = $pub;
         $ctx->classes[self::CLASS_ELEMENT] = $element;
@@ -576,17 +579,64 @@ final class VmDom
         if (!\array_key_exists($name, $state->attributes)) {
             throw new \DOMException('Not Found Error', 8);
         }
+        self::applyIdAttributeRegistration($element, $name, $isId);
+    }
+
+    /** DOMElement::setIdAttributeNS() — namespaced ID map (php-src ext/dom/element.c; #15300). */
+    public static function setIdAttributeNS(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName,
+        bool $isId
+    ): void {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $qName = self::findAttributeQNameByNsAndLocal($element, $namespace, $localName);
+        if (null === $qName) {
+            throw new \DOMException('Not Found Error', 8);
+        }
+        self::applyIdAttributeRegistration($element, $qName, $isId);
+    }
+
+    private static function applyIdAttributeRegistration(ObjectEntry $element, string $qName, bool $isId): void
+    {
+        $state = DomRegistry::state($element);
         $document = self::ownerDocumentEntry($element);
         if (null === $document) {
             throw new \DOMException('Not Found Error', 8);
         }
         self::unregisterElementId($document, $element);
         if ($isId) {
-            $state->idAttributeName = $name;
+            $state->idAttributeName = $qName;
             self::registerElementId($document, $element);
         } else {
             $state->idAttributeName = null;
         }
+    }
+
+    private static function findAttributeQNameByNsAndLocal(
+        ObjectEntry $element,
+        ?string $namespace,
+        string $localName
+    ): ?string {
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($element);
+        foreach ($state->attributes as $qName => $value) {
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            [$prefix, $local] = self::splitQualifiedName($qName);
+            if ($local !== $localName) {
+                continue;
+            }
+            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            if ($attrNs === $wantNs) {
+                return $qName;
+            }
+        }
+
+        return null;
     }
 
     private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
