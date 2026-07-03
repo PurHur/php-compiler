@@ -17866,6 +17866,9 @@ class Compiler {
      * php-cfg `next($a); var_export(next($a), true)` hoists only the inner call — do not fold the
      * statement-level callee into {@see firstSiblingInlineFuncCallProducerIndex()}.
      *
+     * Also true when only Array_/UnaryMinus preludes sit between a prior UDF call and the consumer
+     * (`hold([]); array_pad([...], -N, 0)` — #15421).
+     *
      * @param list<Op> $cfgChildren
      */
     private function statementLevelFuncCallBeforeHoistedSiblingChain(
@@ -17876,6 +17879,7 @@ class Compiler {
         if ($producerIndex >= $consumerIndex - 1) {
             return false;
         }
+        $onlySkippablePreludes = true;
         for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
             $mid = $cfgChildren[$j] ?? null;
             if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
@@ -17895,11 +17899,18 @@ class Compiler {
             if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
                 continue;
             }
-
-            return $this->isSiblingInlineCallProducerExpr($mid);
+            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                return true;
+            }
+            $onlySkippablePreludes = false;
+            break;
         }
+        if (!$onlySkippablePreludes) {
+            return false;
+        }
+        $producer = $cfgChildren[$producerIndex] ?? null;
 
-        return false;
+        return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
     }
 
     /**
