@@ -14006,6 +14006,10 @@ restart:
                         (int) ($op->propertyGetVisibility ?? 0)
                     );
                     $prop->fromConstructorPromotion = $op->propertyFromConstructorPromotion;
+                    // readonly-class promoted props are readonly even without `readonly` on the param (#15409).
+                    if ($entry->readonly) {
+                        $prop->readonly = true;
+                    }
                     $entry->properties[] = $prop;
                     if ([] !== $op->attributeNames) {
                         $entry->propertyAttributeNames[$propLc] = $op->attributeNames;
