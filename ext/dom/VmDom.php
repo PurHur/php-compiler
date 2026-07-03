@@ -329,6 +329,8 @@ final class VmDom
         $document->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
         $document->methods['getelementbyid'] = new DocumentGetElementById();
         $document->methodVisibility['getelementbyid'] = $pub;
+        $document->methods['importnode'] = new DocumentImportNode();
+        $document->methodVisibility['importnode'] = $pub;
         $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
         $document->methodVisibility['registernodeclass'] = $pub;
         $document->methodNames['registernodeclass'] = 'registerNodeClass';
@@ -4036,6 +4038,94 @@ final class VmDom
         $var->object($cloned);
 
         return $var;
+    }
+
+    public static function importNode(Context $ctx, ObjectEntry $document, ObjectEntry $node, bool $deep): Variable
+    {
+        self::ensureDocument($document);
+        if (!self::isDomNode($node)) {
+            throw new \TypeError('DOMDocument::importNode(): Argument #1 ($importedNode) must be of type DOMNode');
+        }
+        $imported = self::importNodeEntry($ctx, $document, $node, $deep);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($imported);
+
+        return $var;
+    }
+
+    private static function importNodeEntry(
+        Context $ctx,
+        ObjectEntry $document,
+        ObjectEntry $node,
+        bool $deep
+    ): ObjectEntry {
+        if (self::isTextNode($node)) {
+            $state = DomRegistry::state($node);
+            $text = self::createTextNode($ctx, $state->textContent ?? '', $document);
+            self::linkChildToParent($text, null);
+
+            return $text;
+        }
+        if (self::isAttr($node)) {
+            $state = DomRegistry::state($node);
+            $attr = self::createAttributeNS($ctx, $state->namespaceUri, $state->nodeName, $document)->toObject();
+            self::syncAttributeNodeValue($attr, $state->textContent ?? '');
+            self::linkChildToParent($attr, null);
+
+            return $attr;
+        }
+        if (self::isElement($node)) {
+            $sourceState = DomRegistry::state($node);
+            $imported = self::createElement($ctx, $sourceState->nodeName)->toObject();
+            self::linkChildToParent($imported, null);
+            $importedState = DomRegistry::state($imported);
+            $importedState->documentId = $document->id;
+            $importedState->attributes = $sourceState->attributes;
+            $importedState->attributeNamespaces = $sourceState->attributeNamespaces;
+            $importedState->namespaceDeclarations = $sourceState->namespaceDeclarations;
+            $importedState->localName = $sourceState->localName;
+            $importedState->prefix = $sourceState->prefix;
+            $importedState->namespaceUri = $sourceState->namespaceUri;
+            if ($deep) {
+                foreach ($sourceState->childIds as $childId) {
+                    $child = DomRegistry::entry($childId);
+                    if (null === $child) {
+                        continue;
+                    }
+                    $importedChild = self::importNodeEntry($ctx, $document, $child, true);
+                    $importedState->childIds[] = $importedChild->id;
+                    self::linkChildToParent($importedChild, $imported);
+                }
+            }
+            self::syncSubtree($ctx, $imported);
+            self::propagateDocumentId($imported, $document->id);
+
+            return $imported;
+        }
+        if (self::isDocumentFragment($node)) {
+            $imported = self::createDocumentFragment($ctx)->toObject();
+            self::linkChildToParent($imported, null);
+            $importedState = DomRegistry::state($imported);
+            $importedState->documentId = $document->id;
+            if ($deep) {
+                $sourceState = DomRegistry::state($node);
+                foreach ($sourceState->childIds as $childId) {
+                    $child = DomRegistry::entry($childId);
+                    if (null === $child) {
+                        continue;
+                    }
+                    $importedChild = self::importNodeEntry($ctx, $document, $child, true);
+                    $importedState->childIds[] = $importedChild->id;
+                    self::linkChildToParent($importedChild, $imported);
+                }
+            }
+            self::syncSubtree($ctx, $imported);
+            self::propagateDocumentId($imported, $document->id);
+
+            return $imported;
+        }
+
+        throw new \DOMException('Not supported importNode for this node type in this compiler build');
     }
 
     private static function cloneNodeEntry(Context $ctx, ObjectEntry $source, bool $deep): ObjectEntry
