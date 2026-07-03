@@ -191,6 +191,12 @@ final class Variable {
         return self::TYPE_INDIRECT === $this->type;
     }
 
+    /** ZEND_SEND_REF wrapper — inner lvalue for by-ref builtin writeback (#15151). */
+    public function byRefTarget(): self
+    {
+        return $this->isIndirect() ? $this->indirect : $this;
+    }
+
     /**
      * By-value foreach must not write through a leftover by-ref loop variable (#5419).
      */
