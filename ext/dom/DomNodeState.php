@@ -67,6 +67,13 @@ final class DomNodeState
     /** @var array<string, string> */
     public array $attributes = [];
 
+    /**
+     * Explicit namespace URI per attribute qName from setAttributeNS() (php-src ext/dom/element.c; #15380).
+     *
+     * @var array<string, string>
+     */
+    public array $attributeNamespaces = [];
+
     /** Attribute local name registered via setIdAttribute() (php-src dom_object attr->id). */
     public ?string $idAttributeName = null;
 
