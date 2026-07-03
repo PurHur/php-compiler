@@ -1,5 +1,5 @@
 --TEST--
-JIT: chmod() via libc chmod(2)
+JIT: chmod() via ChmodJitHelper PHP (#15458)
 --FILE--
 <?php
 $path = 'test/compliance/cases/stdlib/chmod_fixture/jit_data.txt';

@@ -11,7 +11,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** chmod() — VM via VmFs; JIT/AOT via libc chmod(2). */
+/** chmod() — VM via VmFs; JIT/AOT via ChmodJitHelper PHP (#15458). */
 final class chmod_ extends Internal
 {
     public function __construct()
