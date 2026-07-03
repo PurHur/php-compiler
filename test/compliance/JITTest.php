@@ -793,6 +793,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_asymmetric')) {
                 continue;
             }
+            // ReflectionProperty::{isReadable,isWritable} profile gates: VM-only (#15664).
+            if (str_contains($name, 'reflection_property_isreadable')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;
