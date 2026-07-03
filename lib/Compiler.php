@@ -13892,16 +13892,24 @@ class Compiler {
     private function resolveInlineFirstClassCallableCallArgSlot(
         Operand $arg,
         Block $block,
-        ?Op $cfgCallOp
+        ?Op $cfgCallOp,
+        ?int $knownArgIndex = null
     ): ?int {
         if (null === $block->orig || null === $cfgCallOp) {
             return null;
         }
+        $callOp = $cfgCallOp;
+        $argIndex = $knownArgIndex;
         $callSite = $this->findCfgCallSiteForArg($block->orig->children, $arg, $cfgCallOp);
-        if (null === $callSite) {
+        if (null !== $callSite) {
+            [$callOp, $foundArgIndex] = $callSite;
+            if (null === $knownArgIndex) {
+                $argIndex = $foundArgIndex;
+            }
+        }
+        if (null === $argIndex) {
             return null;
         }
-        [$callOp, $argIndex] = $callSite;
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
@@ -13921,10 +13929,58 @@ class Compiler {
                 return $this->slotForInlineFirstClassCallableProducer($fccMatch, $block);
             }
         }
+        $leadingFcc = null;
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null !== $callIndex) {
+            for ($i = $callIndex - 1; $i >= 0; --$i) {
+                $prev = $block->orig->children[$i];
+                if ($prev instanceof Op\Expr\FirstClassCallable) {
+                    $leadingFcc = $prev;
+                    break;
+                }
+                if ($prev instanceof Op\Expr\Assign) {
+                    break;
+                }
+                if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                    continue;
+                }
+                if (!$this->isInlineExprCallArgProducer($prev)) {
+                    break;
+                }
+            }
+        }
+        if ($leadingFcc instanceof Op\Expr\FirstClassCallable) {
+            $fccMatch = $this->matchSingleFirstClassCallableInlineProducer(
+                $leadingFcc,
+                $callOp->args,
+                $argIndex,
+                $funcName
+            );
+            if (null !== $fccMatch) {
+                return $this->slotForInlineFirstClassCallableProducer($fccMatch, $block);
+            }
+        }
         if (1 === count($callOp->args)) {
             $last = $producers[\count($producers) - 1] ?? null;
             if ($last instanceof Op\Expr\FirstClassCallable) {
                 return $this->slotForInlineFirstClassCallableProducer($last, $block);
+            }
+        }
+        if (0 === $this->inlineClosureArrayPairCallbackArgIndex($funcName) && 0 === $argIndex) {
+            for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+                $scanOp = $block->opCodes[$i];
+                if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
+                    break;
+                }
+                if (OpCode::TYPE_FROM_CALLABLE === $scanOp->type) {
+                    return (int) $scanOp->arg1;
+                }
             }
         }
 
@@ -14027,14 +14083,16 @@ class Compiler {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
-        $closureProducer = null;
+        $callbackProducer = null;
         foreach ($producers as $candidate) {
-            if ($candidate instanceof Op\Expr\ArrowFunction || $candidate instanceof Op\Expr\Closure) {
-                $closureProducer = $candidate;
+            if ($candidate instanceof Op\Expr\ArrowFunction
+                || $candidate instanceof Op\Expr\Closure
+                || $candidate instanceof Op\Expr\FirstClassCallable) {
+                $callbackProducer = $candidate;
                 break;
             }
         }
-        if (null === $closureProducer) {
+        if (null === $callbackProducer) {
             $callIndex = null;
             foreach ($block->orig->children as $i => $child) {
                 if ($child === $cfgCallOp) {
@@ -14045,9 +14103,17 @@ class Compiler {
             if (null !== $callIndex) {
                 for ($i = $callIndex - 1; $i >= 0; --$i) {
                     $prev = $block->orig->children[$i];
-                    if ($prev instanceof Op\Expr\ArrowFunction || $prev instanceof Op\Expr\Closure) {
-                        $closureProducer = $prev;
+                    if ($prev instanceof Op\Expr\ArrowFunction
+                        || $prev instanceof Op\Expr\Closure
+                        || $prev instanceof Op\Expr\FirstClassCallable) {
+                        $callbackProducer = $prev;
                         break;
+                    }
+                    if ($prev instanceof Op\Expr\Assign) {
+                        break;
+                    }
+                    if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                        continue;
                     }
                     if (!$this->isInlineExprCallArgProducer($prev)) {
                         break;
@@ -14055,29 +14121,47 @@ class Compiler {
                 }
             }
         }
-        if (null === $closureProducer) {
+        if (null === $callbackProducer) {
             return null;
         }
-        $matched = $this->matchSingleClosureInlineProducer(
-            $closureProducer,
-            $callArgs,
-            $argIndex,
-            $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName)
-        );
+        $funcName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        $matched = $callbackProducer instanceof Op\Expr\FirstClassCallable
+            ? $this->matchSingleFirstClassCallableInlineProducer(
+                $callbackProducer,
+                $callArgs,
+                $argIndex,
+                $funcName
+            )
+            : $this->matchSingleClosureInlineProducer(
+                $callbackProducer,
+                $callArgs,
+                $argIndex,
+                $funcName
+            );
         if (null === $matched) {
             $matched = $this->matchInlineCallArgProducer($producers, $callArgs, $argIndex, $cfgCallOp, $block, $calleeName);
-            if ($matched !== $closureProducer) {
+            if ($matched !== $callbackProducer) {
                 return null;
             }
         }
-        $slot = $this->slotForInlineClosureProducer($closureProducer, $block);
-        if (null !== $slot) {
-            return $slot;
+        if ($callbackProducer instanceof Op\Expr\FirstClassCallable) {
+            $fccSlot = $this->slotForInlineFirstClassCallableProducer($callbackProducer, $block);
+            if (null !== $fccSlot) {
+                return $fccSlot;
+            }
+        } else {
+            $slot = $this->slotForInlineClosureProducer($callbackProducer, $block);
+            if (null !== $slot) {
+                return $slot;
+            }
         }
         for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
             $scanOp = $block->opCodes[$i];
             if (OpCode::TYPE_FUNCCALL_INIT === $scanOp->type) {
                 break;
+            }
+            if (OpCode::TYPE_FROM_CALLABLE === $scanOp->type) {
+                return (int) $scanOp->arg1;
             }
             if (OpCode::TYPE_CLOSURE === $scanOp->type) {
                 return (int) $scanOp->arg1;
@@ -14150,6 +14234,19 @@ class Compiler {
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        if (
+            'array_map' === $inlineFuncName
+            && 0 === $argIndex
+            && 2 === $argCount
+            && null !== $block
+        ) {
+            $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+            if ($leadingCallback instanceof Op\Expr\ArrowFunction
+                || $leadingCallback instanceof Op\Expr\Closure
+                || $leadingCallback instanceof Op\Expr\FirstClassCallable) {
+                return $leadingCallback;
+            }
+        }
         if (0 === $producerCount) {
             return null;
         }
@@ -14742,6 +14839,16 @@ class Compiler {
                     ) {
                         $allSiblingFuncCalls = false;
                         break;
+                    }
+                }
+                if ($allSiblingFuncCalls) {
+                    foreach ($producers as $candidate) {
+                        if ($candidate instanceof Op\Expr\ArrowFunction
+                            || $candidate instanceof Op\Expr\Closure
+                            || $candidate instanceof Op\Expr\FirstClassCallable) {
+                            $allSiblingFuncCalls = false;
+                            break;
+                        }
                     }
                 }
                 if ($allSiblingFuncCalls) {
@@ -15460,6 +15567,25 @@ class Compiler {
                 }
 
                 return null;
+            }
+            // array_map(intval(...), str_split(...)) — leading callback + inline FuncCall haystack (#15487).
+            if ('array_map' === $inlineFuncName && null !== $closureProducerIndex && null === $arrayProducerIndex) {
+                $funcCallHaystackIndex = null;
+                foreach ($producers as $pi => $producer) {
+                    if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                        $funcCallHaystackIndex = $pi;
+                    }
+                }
+                if (null !== $funcCallHaystackIndex && 2 === \count($callArgs)) {
+                    if (0 === $argIndex) {
+                        return $producers[$closureProducerIndex];
+                    }
+                    if (1 === $argIndex) {
+                        return $producers[$funcCallHaystackIndex];
+                    }
+
+                    return null;
+                }
             }
         }
         // array_column([[..],[..]], 'name', null) — outer Array_ + trailing null ConstFetch (#9305).
@@ -17132,7 +17258,162 @@ class Compiler {
             array_unshift($producers, $child);
         }
 
+        $producers = $this->prependLeadingCallbackFirstInlineProducer($producers, $cfgChildren, $callOp);
+
         return $this->filterDeadVoidStatementMethodCallProducers($producers, $callOp, $cfgChildren);
+    }
+
+    /**
+     * array_map(intval(...), str_split(...)) — php-cfg emits callback before nested haystack FuncCalls (#15487).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Op>       $cfgChildren
+     *
+     * @return list<Op\Expr>
+     */
+    private function prependLeadingCallbackFirstInlineProducer(
+        array $producers,
+        array $cfgChildren,
+        Op $callOp
+    ): array {
+        if (!($callOp instanceof Op\Expr\FuncCall || $callOp instanceof Op\Expr\NsFuncCall)) {
+            return $producers;
+        }
+        $funcName = $this->resolveInlineCallArgFuncName($callOp);
+        if (0 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return $producers;
+        }
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\ArrowFunction
+                || $producer instanceof Op\Expr\Closure
+                || $producer instanceof Op\Expr\FirstClassCallable) {
+                return $producers;
+            }
+        }
+        $hasFuncCallProducer = false;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $hasFuncCallProducer = true;
+                break;
+            }
+        }
+        if (!$hasFuncCallProducer) {
+            return $producers;
+        }
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 2) {
+            return $producers;
+        }
+        $haystackFuncCallIndex = $callIndex;
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            foreach ($cfgChildren as $i => $child) {
+                if ($child === $producer && $i < $haystackFuncCallIndex) {
+                    $haystackFuncCallIndex = $i;
+                }
+            }
+        }
+        $leading = null;
+        $outerHaystack = $cfgChildren[$haystackFuncCallIndex] ?? null;
+        for ($i = $haystackFuncCallIndex - 1; $i >= 0; --$i) {
+            $candidate = $cfgChildren[$i] ?? null;
+            if (!$candidate instanceof Op\Expr) {
+                break;
+            }
+            if ($candidate instanceof Op\Expr\ArrowFunction
+                || $candidate instanceof Op\Expr\Closure
+                || $candidate instanceof Op\Expr\FirstClassCallable) {
+                $leading = $candidate;
+                break;
+            }
+            if ($candidate instanceof Op\Expr\FuncCall || $candidate instanceof Op\Expr\NsFuncCall) {
+                $nestedInHaystack = ($outerHaystack instanceof Op\Expr\FuncCall || $outerHaystack instanceof Op\Expr\NsFuncCall)
+                    && $this->isAdjacentNestedFuncCallProducer(
+                        $candidate,
+                        $outerHaystack,
+                        $i,
+                        $haystackFuncCallIndex
+                    );
+                if (
+                    \in_array($candidate, $producers, true)
+                    || $this->isNestedCallArgProducerForConsumer(
+                        $candidate,
+                        $callOp,
+                        $i,
+                        $callIndex,
+                        $cfgChildren
+                    )
+                    || $nestedInHaystack
+                ) {
+                    continue;
+                }
+
+                break;
+            }
+            if ($this->isInlineExprCallArgProducer($candidate)) {
+                break;
+            }
+        }
+        if (!$leading instanceof Op\Expr\ArrowFunction
+            && !$leading instanceof Op\Expr\Closure
+            && !$leading instanceof Op\Expr\FirstClassCallable) {
+            return $producers;
+        }
+
+        array_unshift($producers, $leading);
+
+        return $producers;
+    }
+
+    /**
+     * array_map(intval(...), f()) — callback compiled before nested haystack FuncCalls (#15487).
+     */
+    private function leadingCallbackFirstInlineProducerBeforeCfgCall(?Op $cfgCallOp, ?Block $block): ?Op\Expr
+    {
+        if (null === $cfgCallOp || null === $block || null === $block->orig) {
+            return null;
+        }
+        $funcName = $this->resolveInlineCallArgFuncName($cfgCallOp);
+        if (0 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $prev = $block->orig->children[$i];
+            if ($prev instanceof Op\Expr\ArrowFunction
+                || $prev instanceof Op\Expr\Closure
+                || $prev instanceof Op\Expr\FirstClassCallable) {
+                return $prev;
+            }
+            if ($prev instanceof Op\Expr\Assign) {
+                return null;
+            }
+            if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            if (!$this->isInlineExprCallArgProducer($prev)) {
+                return null;
+            }
+        }
+
+        return null;
     }
 
     /**
@@ -21892,6 +22173,9 @@ class Compiler {
         if ($this->operandDerivesFromClosure($operand)) {
             return true;
         }
+        if ($this->unwrapOperandChain($operand) instanceof Op\Expr\FirstClassCallable) {
+            return true;
+        }
         if ($this->callArgOperandIsAssignedClosure($operand, $block)) {
             return true;
         }
@@ -23251,7 +23535,7 @@ class Compiler {
                     );
                 }
                 if (null === $valueSlot) {
-                    $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp);
+                    $valueSlot = $this->resolveInlineFirstClassCallableCallArgSlot($arg, $block, $cfgCallOp, (int) $argIndex);
                 }
                 if (null === $valueSlot && $this->isCallArgDirectArrayDimFetch($arg)) {
                     $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
@@ -23805,7 +24089,7 @@ class Compiler {
                                     ? $this->slotForInlineNewProducer($block, $matched)
                                     : $block->slotForOperand($matched->result)
                             );
-                        if (null !== $matchedSlot) {
+                        if (null !== $matchedSlot && null === $valueSlot) {
                             $valueSlot = $matchedSlot;
                         }
                     }
@@ -24653,6 +24937,26 @@ class Compiler {
                     }
                     if (null !== $slot) {
                         $valueSlot = (string) $slot;
+                    }
+                }
+            }
+            if (
+                'array_map' === strtolower($calleeName ?? '')
+                && 0 === (int) $argIndex
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+                if ($leadingCallback instanceof Op\Expr\FirstClassCallable) {
+                    $fccSlot = $this->slotForInlineFirstClassCallableProducer($leadingCallback, $block);
+                    if (null !== $fccSlot) {
+                        $valueSlot = (string) $fccSlot;
+                    }
+                } elseif ($leadingCallback instanceof Op\Expr\ArrowFunction
+                    || $leadingCallback instanceof Op\Expr\Closure) {
+                    $closureSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
+                    if (null !== $closureSlot) {
+                        $valueSlot = (string) $closureSlot;
                     }
                 }
             }
