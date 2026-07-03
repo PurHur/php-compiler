@@ -2545,6 +2545,7 @@ require_once __DIR__.'/../../../lib/Compiler/InterfaceMethodVisibilityCheck.php'
 require_once __DIR__.'/../../../lib/Compiler/MagicMethodReturnTypeCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/NewCtorParens.php';
 require_once __DIR__.'/../../../lib/Compiler/NewWithoutParensCompileCheck.php';
+require_once __DIR__.'/../../../lib/Compiler/NonEnumBuiltinInterfaceCompileCheck.php';
 require_once __DIR__.'/../../../lib/Compiler/NoDiscardMetadata.php';
 require_once __DIR__.'/../../../lib/Compiler/OverrideValidator.php';
 require_once __DIR__.'/../../../lib/Compiler/ParameterMetadata.php';
