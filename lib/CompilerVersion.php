@@ -291,13 +291,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584).
+     * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584, #15677).
      *
-     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#13284).
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsNextafter(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**

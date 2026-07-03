@@ -69,15 +69,46 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testNextafterWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNextafter());
+    }
+
     public function testNextafterAdvertisedOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsNextafter());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsNextafter());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterNextafterOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
     }
 
     public function testVmRegistersNextafterOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testRoundingModeEnumWithheldOnReferenceProfileUntilStable84(): void
