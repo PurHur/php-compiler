@@ -1158,6 +1158,7 @@ require_once __DIR__.'/../../../ext/standard/JitTraitExists.php';
 require_once __DIR__.'/../../../ext/standard/JitUmask.php';
 require_once __DIR__.'/../../../ext/standard/CharInMaskJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/UniqidJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/UsortJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitUnitEnumExists.php';
 require_once __DIR__.'/../../../ext/standard/UnlinkJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/RmdirJitHelper.php';

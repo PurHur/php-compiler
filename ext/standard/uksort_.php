@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
-use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\UsortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\JIT\Variable as JITVariable;
@@ -89,15 +89,6 @@ final class uksort_ extends Internal
         if (2 !== \count($args)) {
             throw new \LogicException('uksort() requires exactly two arguments');
         }
-        if (!UsortCallbackPolicy::isJitLowerable($args[1])) {
-            throw new \LogicException(UsortCallbackPolicy::jitRejectionMessage());
-        }
-        if (UsortCallbackPolicy::isClosureJitLowerable($args[1])) {
-            ArrayBuiltinHelper::sortStringKeysWithClosure($context, $args[0], $args[1]);
-        } else {
-            ArrayBuiltinHelper::ksortByKey($context, $args[0]);
-        }
-
-        return $context->getTypeFromString('int1')->constInt(1, false);
+        return UsortRuntime::uksortKeys($context, $args[0], $args[1]);
     }
 }
