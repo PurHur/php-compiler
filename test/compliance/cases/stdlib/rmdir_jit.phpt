@@ -1,5 +1,5 @@
 --TEST--
-JIT: rmdir() via libc rmdir(2)
+JIT: rmdir() via RmdirJitHelper PHP (#15481)
 --FILE--
 <?php
 $base = 'test/compliance/cases/stdlib/rmdir_fixture';
