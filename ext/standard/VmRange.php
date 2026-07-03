@@ -342,17 +342,35 @@ final class VmRange
     {
         $ht = new HashTable();
         $index = 0;
+        // php-src ext/standard/array.c — index * step from start, size from round span (#15326).
         if ($step > 0.0) {
-            for ($i = $start; $i <= $end; $i += $step) {
+            if ($end < $start) {
+                return $ht;
+            }
+            $size = (int) \round((($end - $start) / $step) + 1.0, \PHP_ROUND_HALF_UP);
+            for ($i = 0; $i < $size; ++$i) {
+                $element = $start + ($i * $step);
+                if ($element > $end) {
+                    break;
+                }
                 $stored = new Variable();
-                $stored->float($i);
+                $stored->float($element);
                 $ht->addIndex($index, $stored);
                 ++$index;
             }
         } else {
-            for ($i = $start; $i >= $end; $i += $step) {
+            if ($end > $start) {
+                return $ht;
+            }
+            $stepAbs = abs($step);
+            $size = (int) \round((($start - $end) / $stepAbs) + 1.0, \PHP_ROUND_HALF_UP);
+            for ($i = 0; $i < $size; ++$i) {
+                $element = $start + ($i * $step);
+                if ($element < $end) {
+                    break;
+                }
                 $stored = new Variable();
-                $stored->float($i);
+                $stored->float($element);
                 $ht->addIndex($index, $stored);
                 ++$index;
             }
