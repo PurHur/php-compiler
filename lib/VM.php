@@ -8306,6 +8306,8 @@ restart:
             return $this->dispatchVmReflectionException($e, $callerFrame);
         } catch (\JsonException $e) {
             return $this->dispatchVmJsonException($e, $callerFrame);
+        } catch (\DOMException $e) {
+            return $this->dispatchVmDomException($e, $callerFrame);
         } catch (VM\NativeDateInvalidTimeZoneException $e) {
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
@@ -8659,6 +8661,21 @@ restart:
     {
         [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
         $thrown = VM\BuiltinExceptionSupport::materializeJsonException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line,
+            $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native DOMException from ext/dom builtins into user catch handlers (#15430). */
+    private function dispatchVmDomException(\DOMException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeDomException(
             $this->context,
             $error->getMessage(),
             $file,

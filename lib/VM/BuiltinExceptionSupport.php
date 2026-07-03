@@ -24,6 +24,7 @@ final class BuiltinExceptionSupport
     public const CLASS_PARSE_ERROR = 'parseerror';
     public const CLASS_REFLECTION_EXCEPTION = 'reflectionexception';
     public const CLASS_JSON_EXCEPTION = 'jsonexception';
+    public const CLASS_DOM_EXCEPTION = 'domexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
@@ -127,6 +128,19 @@ final class BuiltinExceptionSupport
         int $code = 0
     ): Variable {
         $var = self::materializeThrowable($ctx, self::CLASS_JSON_EXCEPTION, $message, $file, $line);
+        $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
+
+        return $var;
+    }
+
+    public static function materializeDomException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0,
+        int $code = 0
+    ): Variable {
+        $var = self::materializeThrowable($ctx, self::CLASS_DOM_EXCEPTION, $message, $file, $line);
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
 
         return $var;

@@ -99,6 +99,10 @@ final class DomDocumentVMTest extends BaseTest
                 'php84_dom_node_get_root_node_phantom.phpt'
             );
         }
+        yield 'dom_exception.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_exception.phpt',
+            'dom_exception.phpt'
+        );
     }
 
     public function setUp(): void
