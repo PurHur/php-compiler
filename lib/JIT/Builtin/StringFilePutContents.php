@@ -2,176 +2,98 @@
 
 declare(strict_types=1);
 
-/**
- * LLVM implementation of __compiler_file_put_contents — write a __string__* to a path.
- *
- * Returns total bytes written, or -1 when the path cannot be opened or a write error occurs.
- * flags: 0 = truncate ("w"), 8 = FILE_APPEND ("a"), 2 = LOCK_EX (flock before write).
- */
-
 namespace PHPCompiler\JIT\Builtin;
 
-use PHPCompiler\JIT\Builtin;
-use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
+use PHPLLVM\Value\Function_ as LlvmFunction;
 
+/**
+ * JIT/AOT link for __compiler_file_put_contents via FilePutContentsJitHelper PHP (#15310).
+ *
+ * Replaces ~177 LOC inline libc fopen/flock/fwrite LLVM.
+ * SSOT: {@see \PHPCompiler\ext\standard\VmFs::filePutContents()}.
+ * php-src: ext/standard/streamsfuncs.c — php_stream_copy_to_stream_ex
+ */
 final class StringFilePutContents
 {
-    private const LOCK_EX = 2;
+    private const ABI = '__compiler_file_put_contents';
 
-    private const FILE_APPEND = 8;
+    private const HELPER_PATH = '/ext/standard/FilePutContentsJitHelper.php';
+
+    private const WRITE_HELPER = 'PHPCompiler\\ext\\standard\\FilePutContentsJitHelper::writePathArgv';
+
+    /** @var list<string> */
+    private const COMPILED_HELPERS = [
+        self::WRITE_HELPER,
+    ];
 
     public static function implement(Context $context): void
     {
-        $fn = $context->lookupFunction('__compiler_file_put_contents');
-        $entry = $fn->appendBasicBlock('fpc_entry');
+        $probe = $context->module->getNamedFunction(self::ABI);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction(self::ABI, $probe);
+
+            return;
+        }
+
+        $fn = null !== $probe
+            ? $probe
+            : $context->lookupFunction(self::ABI);
+
+        self::ensureJitHelperCompiled($context);
+
+        $entry = $fn->appendBasicBlock('fpc_bridge_entry');
         $context->builder->positionAtEnd($entry);
-
-        $path = $fn->getParam(0);
-        $data = $fn->getParam(1);
-        $flags = $fn->getParam(2);
-        $strMap = $context->structFieldMap['__string__'];
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $i64 = $context->getTypeFromString('int64');
-        $sizeT = $context->getTypeFromString('size_t');
-        $oneI64 = $i64->constInt(1, false);
-        $oneSizeT = $sizeT->constInt(1, false);
-        $minusOne = $i64->constInt(-1, false);
-        $lockEx = $i64->constInt(self::LOCK_EX, false);
-        $fileAppend = $i64->constInt(self::FILE_APPEND, false);
-        $nullPtr = $i8p->constNull();
-        $zeroI32 = $i32->constInt(0, false);
-
-        $pathLen = $context->builder->load(
-            $context->builder->structGep($path, $strMap['length'])
+        $result = $context->builder->call(
+            self::helperFunction($context),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
         );
-        $pathBytes = $context->builder->structGep($path, $strMap['value']);
-        $bufLen = $context->builder->add($pathLen, $oneI64);
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $pathBuf = $context->builder->call($context->lookupFunction('__mm__malloc'), $bufLen);
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        } else {
-            $pathBuf = $context->builder->alloca($i8, $bufLen, 'fpc_path');
-            $pathCStr = $context->builder->pointerCast($pathBuf, $i8p);
-        }
-        $context->intrinsic->memcpy($pathCStr, $pathBytes, $pathLen, false);
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($pathCStr, $pathLen)
-        );
-
-        $modeW = self::modeCString($context, 'w');
-        $modeA = self::modeCString($context, 'a');
-        $isAppend = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->and($flags, $fileAppend),
-            $i64->constInt(0, false)
-        );
-        $mode = $context->builder->select($isAppend, $modeA, $modeW);
-
-        $stream = $context->builder->call(
-            $context->lookupFunction('fopen'),
-            $pathCStr,
-            $mode
-        );
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $context->builder->call($context->lookupFunction('__mm__free'), $pathBuf);
-        }
-
-        $openFail = $context->builder->icmp(Builder::INT_EQ, $stream, $nullPtr);
-        $failBlock = $fn->appendBasicBlock('fpc_open_fail');
-        $okBlock = $fn->appendBasicBlock('fpc_open_ok');
-        $context->builder->branchIf($openFail, $failBlock, $okBlock);
-
-        $context->builder->positionAtEnd($failBlock);
-        $context->builder->returnValue($minusOne);
-
-        $context->builder->positionAtEnd($okBlock);
-        $wantLock = $context->builder->icmp(
-            Builder::INT_NE,
-            $context->builder->and($flags, $lockEx),
-            $i64->constInt(0, false)
-        );
-        $flockBlock = $fn->appendBasicBlock('fpc_flock');
-        $writeBlock = $fn->appendBasicBlock('fpc_write');
-        $lockFailBlock = $fn->appendBasicBlock('fpc_lock_fail');
-        $context->builder->branchIf($wantLock, $flockBlock, $writeBlock);
-
-        $context->builder->positionAtEnd($flockBlock);
-        $fd = $context->builder->call($context->lookupFunction('fileno'), $stream);
-        $lockRc = $context->builder->call(
-            $context->lookupFunction('flock'),
-            $fd,
-            $i32->constInt(self::LOCK_EX, false)
-        );
-        $lockFailed = $context->builder->icmp(Builder::INT_NE, $lockRc, $zeroI32);
-        $context->builder->branchIf($lockFailed, $lockFailBlock, $writeBlock);
-
-        $context->builder->positionAtEnd($lockFailBlock);
-        $context->builder->call($context->lookupFunction('fclose'), $stream);
-        $context->builder->returnValue($minusOne);
-
-        $context->builder->positionAtEnd($writeBlock);
-        $dataLen = $context->builder->load(
-            $context->builder->structGep($data, $strMap['length'])
-        );
-        $dataPtr = $context->builder->pointerCast(
-            $context->builder->structGep($data, $strMap['value']),
-            $i8p
-        );
-        $dataSizeT = $context->builder->truncOrBitCast($dataLen, $sizeT);
-        $nWritten = $context->builder->call(
-            $context->lookupFunction('fwrite'),
-            $dataPtr,
-            $oneSizeT,
-            $dataSizeT,
-            $stream
-        );
-        $context->builder->call($context->lookupFunction('fclose'), $stream);
-
-        $writeFail = $context->builder->icmp(Builder::INT_NE, $nWritten, $dataSizeT);
-        $writeFailBlock = BasicBlockHelper::append($context, 'fpc_write_fail');
-        $writeOkBlock = BasicBlockHelper::append($context, 'fpc_write_ok');
-        $context->builder->branchIf($writeFail, $writeFailBlock, $writeOkBlock);
-
-        $context->builder->positionAtEnd($writeFailBlock);
-        $context->builder->returnValue($minusOne);
-
-        $context->builder->positionAtEnd($writeOkBlock);
-        $context->builder->returnValue($context->builder->truncOrBitCast($nWritten, $i64));
-
+        $context->builder->returnValue($result);
+        $context->registerFunction(self::ABI, $fn);
         $context->builder->clearInsertionPosition();
     }
 
-    private static function modeCString(Context $context, string $mode): \PHPLLVM\Value
+    private static function helperFunction(Context $context): LlvmFunction
     {
-        $i8 = $context->getTypeFromString('int8');
-        $i8p = $context->getTypeFromString('int8*');
-        $len = strlen($mode) + 1;
-        if (Builtin::LOAD_TYPE_STANDALONE === $context->loadType) {
-            $buf = $context->builder->call(
-                $context->lookupFunction('__mm__malloc'),
-                $context->getTypeFromString('int64')->constInt($len, false)
-            );
-            $ptr = $context->builder->pointerCast($buf, $i8p);
-        } else {
-            $buf = $context->builder->alloca($i8, $len, 'fpc_mode_'.$mode);
-            $ptr = $context->builder->pointerCast($buf, $i8p);
+        self::ensureJitHelperCompiled($context);
+        $lc = \strtolower(self::WRITE_HELPER);
+        $fn = $context->functions[$lc] ?? null;
+        if (null === $fn) {
+            throw new \LogicException(self::WRITE_HELPER.' missing after FilePutContentsJitHelper compile (#15310)');
         }
-        for ($i = 0; $i < strlen($mode); ++$i) {
-            $context->builder->store(
-                $i8->constInt(ord($mode[$i]), false),
-                $context->builder->inBoundsGEP($ptr, $context->getTypeFromString('int64')->constInt($i, false))
-            );
-        }
-        $context->builder->store(
-            $i8->constInt(0, false),
-            $context->builder->inBoundsGEP($ptr, $context->getTypeFromString('int64')->constInt(strlen($mode), false))
-        );
 
-        return $ptr;
+        return $fn;
+    }
+
+    private static function ensureJitHelperCompiled(Context $context): void
+    {
+        $missing = false;
+        foreach (self::COMPILED_HELPERS as $logical) {
+            if (!isset($context->functions[\strtolower($logical)])) {
+                $missing = true;
+                break;
+            }
+        }
+        if (!$missing) {
+            return;
+        }
+
+        $runtime = $context->runtime;
+        $path = \dirname(__DIR__, 3).self::HELPER_PATH;
+        $block = $runtime->parseAndCompile((string) \file_get_contents($path), 'FilePutContentsJitHelper.php');
+        if (null === $block) {
+            throw new \LogicException('FilePutContentsJitHelper.php parseAndCompile failed (#15310)');
+        }
+        $jit = new JIT($context);
+        $jit->compile($block);
+        foreach (self::COMPILED_HELPERS as $logical) {
+            $lc = \strtolower($logical);
+            if (!isset($context->functions[$lc])) {
+                throw new \LogicException($lc.' was not compiled for JIT (#15310)');
+            }
+        }
     }
 }
