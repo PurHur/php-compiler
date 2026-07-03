@@ -38,7 +38,7 @@ final class ClassConstFetchRuntime
         ?\PHPCompiler\JIT $jit = null
     ): Variable {
         $context = $objectType->jitContext();
-        self::ensureStrCaseCmp($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         ReadonlyBridge::ensureLinked($context);
 
         $nativeName = JitStringArg::lower($context, $nameVar, 'class constant name');
@@ -159,19 +159,6 @@ final class ClassConstFetchRuntime
             Variable::KIND_VARIABLE,
             $resultSlot
         );
-    }
-
-    private static function ensureStrCaseCmp(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-        try {
-            $context->lookupFunction('strcasecmp');
-        } catch (\Throwable) {
-            $fn = $context->module->addFunction('strcasecmp', $ft);
-            $context->registerFunction('strcasecmp', $fn);
-        }
     }
 
     private static function stringDataPtr(Context $context, Value $strPtr): Value
