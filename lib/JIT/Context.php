@@ -825,6 +825,7 @@ class Context {
 
         $this->functionProxies['reflectionclass::__construct'] = new Call\ReflectionClassConstruct();
         $this->functionProxies['reflectionclass::getname'] = new Call\ReflectionClassGetName();
+        $this->functionProxies['reflectionclass::getshortname'] = new Call\ReflectionClassGetShortName();
         $this->functionProxies['reflectionclass::getattributes'] = new Call\ReflectionClassGetAttributes();
         $this->functionProxies['reflectionclass::getmethod'] = new Call\ReflectionClassGetMethod();
         $this->functionProxies['reflectionclass::getreflectionconstant'] = new Call\ReflectionClassGetReflectionConstant();
