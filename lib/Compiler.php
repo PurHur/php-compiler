@@ -17346,6 +17346,9 @@ class Compiler {
         }
         if (!$this->operandsReferToSameVariable($producer->result, $targetArg)) {
             $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null === $firstSibling) {
+                $firstSibling = $this->nearestHoistedFuncCallProducerBeforeConsumer($consumerIndex, $cfgChildren);
+            }
             if (null === $firstSibling || $producerIndex !== $firstSibling) {
                 return false;
             }
@@ -18423,12 +18426,9 @@ class Compiler {
                 $this->callArgIsDeadInlineTemporary($callArg)
                 && (
                     $candidate instanceof Op\Expr\StaticCall
-                    || (
-                        !$this->callArgOperandExpectsArrayProducer($callArg)
-                        && ($candidate instanceof Op\Expr\FuncCall
-                            || $candidate instanceof Op\Expr\NsFuncCall
-                            || $candidate instanceof Op\Expr\MethodCall)
-                    )
+                    || $candidate instanceof Op\Expr\FuncCall
+                    || $candidate instanceof Op\Expr\NsFuncCall
+                    || $candidate instanceof Op\Expr\MethodCall
                 )
             );
         if (!$feedsCallArg) {
@@ -25000,26 +25000,110 @@ class Compiler {
         if (null === $producerIndex) {
             return false;
         }
-        $consumerIndex = $producerIndex + 1;
-        $consumer = $cfgChildren[$consumerIndex] ?? null;
-        if (null === $consumer || !$this->isInlineExprCallArgConsumer($consumer)) {
-            return false;
-        }
         if (!$cfgCallOp instanceof Op\Expr) {
             return false;
         }
-
-        if ($this->isAdjacentNestedFuncCallProducer(
-            $cfgCallOp,
-            $consumer,
-            $producerIndex,
-            $consumerIndex
-        )) {
+        $consumerIndex = $producerIndex + 1;
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (
+            null !== $consumer
+            && $this->isInlineExprCallArgConsumer($consumer)
+            && $this->isAdjacentNestedFuncCallProducer(
+                $cfgCallOp,
+                $consumer,
+                $producerIndex,
+                $consumerIndex
+            )
+        ) {
             return true;
         }
 
         return $this->siblingFuncCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex)
-            || $this->siblingMethodCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex);
+            || $this->siblingMethodCallFeedsVarExportConsumer($cfgCallOp, $block, $producerIndex)
+            || $this->hoistedProducerFeedsConsumerThroughLiteralGap($cfgCallOp, $block);
+    }
+
+    /**
+     * php-cfg `in_array('x', g(), true)` — lone hoisted FuncCall before literal prelude + consumer (#15438, #13507).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function nearestHoistedFuncCallProducerBeforeConsumer(int $consumerIndex, array $cfgChildren): ?int
+    {
+        for ($i = $consumerIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\Array_
+            ) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                return $i;
+            }
+
+            break;
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg hoists zero-arg builtins before multi-arg consumers with ConstFetch preludes (#15438, #13507).
+     */
+    private function hoistedProducerFeedsConsumerThroughLiteralGap(Op $cfgCallOp, Block $block): bool
+    {
+        if (!$cfgCallOp instanceof Op\Expr || null === $block->orig) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        $producerIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $producerIndex = $i;
+                break;
+            }
+        }
+        if (null === $producerIndex) {
+            return false;
+        }
+        for ($i = $producerIndex + 1, $n = \count($cfgChildren); $i < $n; ++$i) {
+            $child = $cfgChildren[$i];
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+                || $child instanceof Op\Expr\Array_
+            ) {
+                continue;
+            }
+            if (!$this->isInlineExprCallArgConsumer($child)) {
+                return false;
+            }
+            if (!property_exists($child, 'args') || !\is_array($child->args)) {
+                return false;
+            }
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $child);
+            foreach ($child->args as $argIndex => $callArg) {
+                if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                    continue;
+                }
+                $matched = $this->matchInlineCallArgProducer(
+                    $producers,
+                    $child->args,
+                    (int) $argIndex,
+                    $child,
+                    $block
+                );
+                if ($matched === $cfgCallOp) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     /**
