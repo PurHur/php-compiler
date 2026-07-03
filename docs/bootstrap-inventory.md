@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3756 |
-| Phase A inventory files (M2 ratio SSOT) | 3756 |
+| PHP files on vm.php path | 3761 |
+| Phase A inventory files (M2 ratio SSOT) | 3761 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10167 |
+| Source constructs flagged (warnings) | 10177 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -543,6 +543,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/FloorJitHelper.php` | 0 | 1 |
 | `ext/standard/FmodJitHelper.php` | 0 | 1 |
 | `ext/standard/FpowJitHelper.php` | 0 | 1 |
+| `ext/standard/FrexpJitHelper.php` | 0 | 1 |
 | `ext/standard/FsDirJitHelper.php` | 0 | 1 |
 | `ext/standard/FsGlobJitHelper.php` | 0 | 1 |
 | `ext/standard/FstatJitHelper.php` | 0 | 1 |
@@ -927,7 +928,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRewind.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
 | `ext/standard/JitRound.php` | 0 | 1 |
-| `ext/standard/JitRoundLowering.php` | 0 | 1 |
 | `ext/standard/JitRoundModeResolve.php` | 0 | 1 |
 | `ext/standard/JitScalarEnumCoerce.php` | 0 | 1 |
 | `ext/standard/JitScalarTypeCoerce.php` | 0 | 2 |
@@ -1063,6 +1063,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/MicrotimeJitHelper.php` | 0 | 1 |
 | `ext/standard/MimeContentTypeJitHelper.php` | 0 | 1 |
 | `ext/standard/MktimeJitHelper.php` | 0 | 1 |
+| `ext/standard/ModfJitHelper.php` | 0 | 1 |
 | `ext/standard/Module.php` | 0 | 776 |
 | `ext/standard/ModuleRegistry.php` | 0 | 1 |
 | `ext/standard/NativeLastError.php` | 0 | 7 |
@@ -1116,6 +1117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/ResolveSidecarJitHelper.php` | 0 | 1 |
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
+| `ext/standard/RoundJitHelper.php` | 0 | 1 |
 | `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 3 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
 | `ext/standard/SessionCreateIdJitHelper.php` | 0 | 1 |
@@ -2396,7 +2398,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/Cli/PhpcInit.php` | 0 | 1 |
 | `lib/Cli/PhpcRun.php` | 0 | 1 |
 | `lib/CloneWithSyntaxRejector.php` | 0 | 2 |
-| `lib/Compiler.php` | 0 | 361 |
+| `lib/Compiler.php` | 0 | 362 |
 | `lib/Compiler/AbstractMethodVisibilityCheck.php` | 0 | 3 |
 | `lib/Compiler/AsymmetricVisibilityCompileCheck.php` | 0 | 4 |
 | `lib/Compiler/AttributeClassRegistry.php` | 0 | 1 |
@@ -2627,6 +2629,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathFloor.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathFpow.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathFrexp.php` | 0 | 3 |
 | `lib/JIT/Builtin/MathHypot.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsFinite.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathIsInfinite.php` | 0 | 1 |
@@ -2635,8 +2638,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathLog.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLog10.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathLog1p.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathModf.php` | 0 | 3 |
 | `lib/JIT/Builtin/MathNextafter.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathRad2deg.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathRound.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSin.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSinh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSqrt.php` | 0 | 1 |
@@ -4677,11 +4682,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Variable (line 42)
-- new Variable (line 65)
-- new JITVariable (line 98)
-- new JITVariable (line 110)
-- new array_key_exists (line 227)
-- new JITVariable (line 249)
+- new Variable (line 62)
+- new JITVariable (line 95)
+- new JITVariable (line 104)
+- new array_key_exists (line 221)
+- new JITVariable (line 243)
 - 3 class method(s)
 
 ### `ext/filter/filter_list.php`
@@ -7423,6 +7428,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/FrexpJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
+
 ### `ext/standard/FsDirJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -9453,11 +9463,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
-### `ext/standard/JitRoundLowering.php`
-
-**Warnings** (review for bootstrap subset):
-- 11 class method(s)
-
 ### `ext/standard/JitRoundModeResolve.php`
 
 **Warnings** (review for bootstrap subset):
@@ -10182,6 +10187,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
+
+### `ext/standard/ModfJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 3 class method(s)
 
 ### `ext/standard/Module.php`
 
@@ -11255,6 +11265,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/RoundJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
@@ -19064,7 +19079,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 361)
+- new ArgumentCountError (line 365)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -19449,36 +19464,37 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 22352)
 - new Operand\Literal (line 22959)
 - new Variable (line 22961)
-- new Operand\Temporary (line 23573)
-- new Operand\Temporary (line 23605)
-- new OpCode (line 23650)
-- new OpCode (line 23842)
-- new OpCode (line 24123)
-- new OpCode (line 24324)
-- new OpCode (line 24334)
-- new OpCode (line 24337)
-- new Operand\Temporary (line 24374)
-- new OpCode (line 24376)
-- new OpCode (line 24387)
-- new Operand\Temporary (line 24390)
-- new OpCode (line 24392)
-- new OpCode (line 24400)
-- new OpCode (line 24407)
-- new OpCode (line 24415)
-- new OpCode (line 24418)
-- new OpCode (line 24435)
-- new OpCode (line 24463)
-- new OpCode (line 24470)
-- new OpCode (line 24742)
-- new Literal (line 24774)
-- new OpCode (line 24873)
-- new Variable (line 24880)
-- new Temporary (line 24882)
-- new OpCode (line 24885)
-- new CompileFatal (line 25183)
-- new CompileFatal (line 25438)
+- new Operand\Temporary (line 23577)
+- new Operand\Temporary (line 23609)
+- new Operand\Temporary (line 23697)
+- new OpCode (line 23712)
+- new OpCode (line 23904)
+- new OpCode (line 24185)
+- new OpCode (line 24386)
+- new OpCode (line 24396)
+- new OpCode (line 24399)
+- new Operand\Temporary (line 24436)
+- new OpCode (line 24438)
+- new OpCode (line 24449)
+- new Operand\Temporary (line 24452)
+- new OpCode (line 24454)
+- new OpCode (line 24462)
+- new OpCode (line 24469)
+- new OpCode (line 24477)
+- new OpCode (line 24480)
+- new OpCode (line 24497)
+- new OpCode (line 24525)
+- new OpCode (line 24532)
+- new OpCode (line 24804)
+- new Literal (line 24836)
+- new OpCode (line 24935)
+- new Variable (line 24942)
+- new Temporary (line 24944)
+- new OpCode (line 24947)
+- new CompileFatal (line 25245)
+- new CompileFatal (line 25500)
 - 687 class method(s)
-- 21 closure(s)
+- 23 closure(s)
 
 ### `lib/Compiler/AbstractMethodVisibilityCheck.php`
 
@@ -21100,6 +21116,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MathFrexp.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 150)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/MathHypot.php`
 
 **Warnings** (review for bootstrap subset):
@@ -21140,12 +21163,24 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MathModf.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 149)
+- 6 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/MathNextafter.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathRad2deg.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathRound.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)

@@ -1,0 +1,50 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\Test\Unit;
+
+use PHPCompiler\ext\standard\RoundJitHelper;
+use PHPCompiler\ext\standard\StdlibConstants;
+use PHPCompiler\ext\standard\VmRound;
+use PHPUnit\Framework\TestCase;
+
+/** round() JIT routes through RoundJitHelper PHP not JitRoundLowering LLVM (#15211). */
+final class RoundRuntimeShrinkTest extends TestCase
+{
+    public function testRoundUsesJitHelperNotLoweringMonolith(): void
+    {
+        $jitRound = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRound.php');
+        $this->assertStringContainsString('MathRound::invoke', $jitRound);
+        $this->assertStringNotContainsString('JitRoundLowering', $jitRound);
+
+        $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathRound.php');
+        $this->assertStringContainsString('RoundJitHelper', $bridge);
+        $this->assertStringContainsString('phpc_round', $bridge);
+
+        $this->assertFileDoesNotExist(__DIR__.'/../../ext/standard/JitRoundLowering.php');
+    }
+
+    public function testRoundJitHelperDelegatesToVmRound(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/RoundJitHelper.php');
+        $this->assertStringContainsString('VmRound::mathRound', $source);
+
+        $this->assertSame(
+            VmRound::mathRound(1.5, 0, StdlibConstants::PHP_ROUND_HALF_UP),
+            RoundJitHelper::roundArgv(1.5, 0, StdlibConstants::PHP_ROUND_HALF_UP)
+        );
+        $this->assertSame(
+            VmRound::mathRound(2.675, 2, StdlibConstants::PHP_ROUND_HALF_UP),
+            RoundJitHelper::roundArgv(2.675, 2, StdlibConstants::PHP_ROUND_HALF_UP)
+        );
+    }
+
+    public function testSpineBundleIncludesRoundJitHelper(): void
+    {
+        $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
+        $this->assertStringContainsString('RoundJitHelper.php', $spine);
+        $this->assertStringContainsString('MathRound.php', $spine);
+        $this->assertStringNotContainsString('JitRoundLowering.php', $spine);
+    }
+}
