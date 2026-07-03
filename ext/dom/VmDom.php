@@ -311,6 +311,9 @@ final class VmDom
         $fragment->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $fragment->methods['appendchild'] = new FragmentAppendChild();
         $fragment->methodVisibility['appendchild'] = $pub;
+        $fragment->methods['appendxml'] = new FragmentAppendXML();
+        $fragment->methodVisibility['appendxml'] = $pub;
+        $fragment->methodNames['appendxml'] = 'appendXML';
         $ctx->classes[self::CLASS_DOCUMENT_FRAGMENT] = $fragment;
     }
 
@@ -1142,6 +1145,33 @@ final class VmDom
         return $var;
     }
 
+    public static function appendXML(
+        Context $ctx,
+        ObjectEntry $fragment,
+        string $data,
+        ?\PHPCompiler\Frame $frame = null
+    ): bool {
+        self::ensureDocumentFragment($fragment);
+        if ('' === $data) {
+            return false;
+        }
+        $trimmed = trim($data);
+        if ('' === $trimmed) {
+            return true;
+        }
+        $children = self::parseFragmentXmlChildren($ctx, $trimmed);
+        if (null === $children) {
+            VmXml::validateAndReport($ctx, $trimmed, $frame);
+
+            return false;
+        }
+        foreach ($children as $child) {
+            self::appendChild($ctx, $fragment, $child);
+        }
+
+        return true;
+    }
+
     public static function loadXML(Context $ctx, ObjectEntry $document, string $xml, ?\PHPCompiler\Frame $frame = null): bool
     {
         self::ensureDocument($document);
@@ -1517,7 +1547,7 @@ final class VmDom
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
 
-        if (!self::isElement($child) && !self::isEntityReference($child)) {
+        if (!self::isElement($child) && !self::isEntityReference($child) && !self::isTextNode($child)) {
             throw new \DOMException('Hierarchy request error');
         }
 
@@ -2184,6 +2214,47 @@ final class VmDom
         $var->object($entry);
 
         return $var;
+    }
+
+    /**
+     * @return null|list<ObjectEntry>
+     */
+    private static function parseFragmentXmlChildren(Context $ctx, string $xml): ?array
+    {
+        $children = [];
+        $pos = 0;
+        $len = \strlen($xml);
+        while ($pos < $len) {
+            if (preg_match('/\G\s+/s', $xml, $m, 0, $pos)) {
+                $pos += \strlen($m[0]);
+
+                continue;
+            }
+            if ($pos >= $len) {
+                break;
+            }
+            if ('<' !== $xml[$pos]) {
+                $next = strpos($xml, '<', $pos);
+                $text = false === $next ? substr($xml, $pos) : substr($xml, $pos, $next - $pos);
+                $children[] = self::createTextNode($ctx, $text, null);
+                $pos = false === $next ? $len : $next;
+
+                continue;
+            }
+            $end = self::findElementEnd($xml, $pos);
+            if (null === $end) {
+                return null;
+            }
+            $childXml = substr($xml, $pos, $end - $pos);
+            $child = self::parseElementTree($ctx, $childXml, $xml, $pos);
+            if (null === $child) {
+                return null;
+            }
+            $children[] = $child;
+            $pos = $end;
+        }
+
+        return $children;
     }
 
     private static function parseElementTree(
