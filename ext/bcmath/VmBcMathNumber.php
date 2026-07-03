@@ -95,6 +95,16 @@ final class VmBcMathNumber
         return $var->toString();
     }
 
+    public static function objectScale(ObjectEntry $entry): int
+    {
+        $var = $entry->getProperty(self::PROP_SCALE)->resolveIndirect();
+        if (Variable::TYPE_INTEGER !== $var->type) {
+            return 0;
+        }
+
+        return $var->toInt();
+    }
+
     public static function requireNumberReceiver(Variable $var, string $method): ObjectEntry
     {
         $var = $var->resolveIndirect();
