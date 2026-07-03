@@ -65,10 +65,7 @@ final class VmSessionSerializer
 
     public static function decodePhp(Context $ctx, string $payload): bool
     {
-        $sessionVar = $ctx->ensureSuperglobal('_SESSION');
-        $ht = Variable::TYPE_ARRAY === $sessionVar->type
-            ? $sessionVar->toArray()
-            : new HashTable();
+        $ht = new HashTable();
 
         $pos = 0;
         $len = \strlen($payload);
@@ -100,7 +97,7 @@ final class VmSessionSerializer
             $ht->add($key, $slot);
             $pos += $span;
         }
-        $sessionVar->array($ht);
+        $ctx->ensureSuperglobal('_SESSION')->array($ht);
 
         return true;
     }
