@@ -226,6 +226,8 @@ final class BuiltinParamNames
                 return ['haystack', 'needle'];
             case 'preg_match':
                 return ['pattern', 'subject', 'matches', 'flags', 'offset'];
+            case 'preg_match_all':
+                return ['pattern', 'subject', 'matches', 'flags', 'offset'];
             case 'preg_split':
                 return ['pattern', 'subject', 'limit', 'flags'];
             case 'preg_replace':
