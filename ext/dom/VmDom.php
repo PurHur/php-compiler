@@ -37,6 +37,8 @@ final class VmDom
 
     public const CLASS_TEXT = 'domtext';
 
+    public const CLASS_ATTR = 'domattr';
+
     public const CLASS_DOCUMENT_FRAGMENT = 'domdocumentfragment';
 
     public const CLASS_NODE = 'domnode';
@@ -95,6 +97,10 @@ final class VmDom
 
     public const PROP_NAME = 'name';
 
+    public const PROP_VALUE = 'value';
+
+    public const PROP_OWNER_ELEMENT = 'ownerElement';
+
     public const PROP_PUBLIC_ID = 'publicId';
 
     public const PROP_SYSTEM_ID = 'systemId';
@@ -135,6 +141,8 @@ final class VmDom
         $node->methodVisibility['removechild'] = $pub;
         $node->methods['issamenode'] = new NodeIsSameNode();
         $node->methodVisibility['issamenode'] = $pub;
+        $node->methods['isequalnode'] = new NodeIsEqualNode();
+        $node->methodVisibility['isequalnode'] = $pub;
         $node->methods['haschildnodes'] = new NodeHasChildNodes();
         $node->methodVisibility['haschildnodes'] = $pub;
         if (CompilerVersion::supportsDomNodeContains()) {
@@ -180,6 +188,15 @@ final class VmDom
         $text->parentLc = self::CLASS_NODE;
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $ctx->classes[self::CLASS_TEXT] = $text;
+
+        $attr = new ClassEntry('DOMAttr');
+        $attr->isInternal = true;
+        $attr->parentLc = self::CLASS_NODE;
+        $attr->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(self::PROP_NAME, null, $strProto);
+        $attr->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
+        $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
+        $ctx->classes[self::CLASS_ATTR] = $attr;
 
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
@@ -228,6 +245,8 @@ final class VmDom
         $document->methodVisibility['createelement'] = $pub;
         $document->methods['createelementns'] = new DocumentCreateElementNS();
         $document->methodVisibility['createelementns'] = $pub;
+        $document->methods['createattributens'] = new DocumentCreateAttributeNS();
+        $document->methodVisibility['createattributens'] = $pub;
         $document->methods['createdocumentfragment'] = new DocumentCreateDocumentFragment();
         $document->methodVisibility['createdocumentfragment'] = $pub;
         $document->methods['appendchild'] = new DocumentAppendChild();
@@ -498,6 +517,44 @@ final class VmDom
         if ('' !== $value) {
             self::writeTextContent($ctx, $entry, $value);
         }
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
+    }
+
+    public static function createAttributeNS(
+        Context $ctx,
+        ?string $namespace,
+        string $qualifiedName,
+        ?ObjectEntry $ownerDocument = null
+    ): Variable {
+        $class = $ctx->classes[self::CLASS_ATTR] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMAttr is not registered in this compiler build');
+        }
+
+        [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
+        $entry->getProperty(self::PROP_NAME)->string($qualifiedName);
+        $entry->getProperty(self::PROP_VALUE)->string('');
+        $entry->getProperty(self::PROP_OWNER_ELEMENT)->null();
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ATTRIBUTE_NODE;
+        $state->nodeName = $qualifiedName;
+        $state->localName = $localName;
+        $state->prefix = '' !== $prefix ? $prefix : null;
+        $state->namespaceUri = $namespace;
+        $state->textContent = '';
+        if (null !== $ownerDocument && self::isDocument($ownerDocument)) {
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
@@ -787,11 +844,17 @@ final class VmDom
 
     public static function readNamespaceUri(ObjectEntry $node): ?string
     {
-        if (!self::isElement($node)) {
+        if (!DomRegistry::has($node)) {
             return null;
         }
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_ELEMENT_NODE === $state->nodeType
+            || DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType
+        ) {
+            return $state->namespaceUri;
+        }
 
-        return DomRegistry::state($node)->namespaceUri;
+        return null;
     }
 
     public static function readLocalName(ObjectEntry $node): string
@@ -2630,6 +2693,81 @@ final class VmDom
         return $node->id === $other->id;
     }
 
+    public static function isEqualNode(ObjectEntry $node, ObjectEntry $other): bool
+    {
+        if ($node->id === $other->id) {
+            return true;
+        }
+        if (!DomRegistry::has($node) || !DomRegistry::has($other)) {
+            return false;
+        }
+        $stateA = DomRegistry::state($node);
+        $stateB = DomRegistry::state($other);
+        if ($stateA->nodeType !== $stateB->nodeType) {
+            return false;
+        }
+        if ($stateA->nodeName !== $stateB->nodeName) {
+            return false;
+        }
+        if (self::readNamespaceUri($node) !== self::readNamespaceUri($other)) {
+            return false;
+        }
+        if (self::readLocalName($node) !== self::readLocalName($other)) {
+            return false;
+        }
+        if (self::readPrefix($node) !== self::readPrefix($other)) {
+            return false;
+        }
+
+        if (DomConstants::XML_ATTRIBUTE_NODE === $stateA->nodeType) {
+            return self::readNodeValue($node) === self::readNodeValue($other);
+        }
+        if (DomConstants::XML_TEXT_NODE === $stateA->nodeType) {
+            return ($stateA->textContent ?? '') === ($stateB->textContent ?? '');
+        }
+        if (DomConstants::XML_DOCUMENT_TYPE_NODE === $stateA->nodeType) {
+            return ($stateA->publicId ?? '') === ($stateB->publicId ?? '')
+                && ($stateA->systemId ?? '') === ($stateB->systemId ?? '');
+        }
+        if (self::isElement($node)) {
+            if (!self::elementAttributesEqual($node, $other)) {
+                return false;
+            }
+        }
+
+        if (\count($stateA->childIds) !== \count($stateB->childIds)) {
+            return false;
+        }
+        foreach ($stateA->childIds as $i => $childIdA) {
+            $childIdB = $stateB->childIds[$i];
+            $childA = DomRegistry::entry($childIdA);
+            $childB = DomRegistry::entry($childIdB);
+            if (null === $childA || null === $childB) {
+                return false;
+            }
+            if (!self::isEqualNode($childA, $childB)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** @return array<string, string> */
+    private static function normalizedElementAttributes(ObjectEntry $element): array
+    {
+        $state = DomRegistry::state($element);
+        $attrs = $state->attributes;
+        ksort($attrs);
+
+        return $attrs;
+    }
+
+    private static function elementAttributesEqual(ObjectEntry $a, ObjectEntry $b): bool
+    {
+        return self::normalizedElementAttributes($a) === self::normalizedElementAttributes($b);
+    }
+
     public static function hasChildNodes(ObjectEntry $node): bool
     {
         if (!DomRegistry::has($node)) {
@@ -2810,6 +2948,9 @@ final class VmDom
         if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
+        if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
+            return $state->textContent ?? '';
+        }
         if (DomConstants::XML_ELEMENT_NODE === $state->nodeType) {
             $parts = [];
             foreach ($state->childIds as $childId) {
@@ -2835,6 +2976,17 @@ final class VmDom
             return;
         }
         $state = DomRegistry::state($node);
+        if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
+            $state->textContent = $value;
+            if ($node->hasProperty(self::PROP_VALUE)) {
+                $node->getProperty(self::PROP_VALUE)->string($value);
+            }
+            if ($node->hasProperty(self::PROP_NODE_VALUE)) {
+                $node->getProperty(self::PROP_NODE_VALUE)->string($value);
+            }
+
+            return;
+        }
         if (DomConstants::XML_ELEMENT_NODE !== $state->nodeType) {
             return;
         }
@@ -2855,6 +3007,9 @@ final class VmDom
         }
         $state = DomRegistry::state($node);
         if (DomConstants::XML_TEXT_NODE === $state->nodeType) {
+            return $state->textContent ?? '';
+        }
+        if (DomConstants::XML_ATTRIBUTE_NODE === $state->nodeType) {
             return $state->textContent ?? '';
         }
         $parts = [];
@@ -2885,6 +3040,13 @@ final class VmDom
         return self::CLASS_TEXT === strtolower($entry->class->name)
             && DomRegistry::has($entry)
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
+    public static function isAttr(ObjectEntry $entry): bool
+    {
+        return self::CLASS_ATTR === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_ATTRIBUTE_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isDocument(ObjectEntry $entry): bool
@@ -2938,6 +3100,13 @@ final class VmDom
         self::linkChildToParent($cloned, null);
         $clonedState = DomRegistry::state($cloned);
         $clonedState->documentId = $sourceState->documentId;
+        if (self::isElement($source)) {
+            $clonedState->attributes = $sourceState->attributes;
+            $clonedState->namespaceDeclarations = $sourceState->namespaceDeclarations;
+            $clonedState->localName = $sourceState->localName;
+            $clonedState->prefix = $sourceState->prefix;
+            $clonedState->namespaceUri = $sourceState->namespaceUri;
+        }
         if ($deep) {
             $cloneState = DomRegistry::state($cloned);
             foreach ($sourceState->childIds as $childId) {

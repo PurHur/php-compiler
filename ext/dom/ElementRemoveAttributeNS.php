@@ -22,9 +22,10 @@ final class ElementRemoveAttributeNS extends DomClassMethod
         }
         $namespace = $this->nullableStringArg($frame->calledArgs[1], 'DOMElement::removeAttributeNS()', 0);
         $localName = $this->stringArg($frame->calledArgs[2], 'DOMElement::removeAttributeNS()', 1);
-        if (null === $frame->returnVar) {
-            return;
+        VmDom::removeAttributeNS($element, $namespace, $localName);
+        if (null !== $frame->returnVar) {
+            // php-src dom_element_remove_attribute_ns() returns SUCCESS → null (#15358).
+            $frame->returnVar->null();
         }
-        $frame->returnVar->bool(VmDom::removeAttributeNS($element, $namespace, $localName));
     }
 }
