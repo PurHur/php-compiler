@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\ext\standard\InfoJitHelper;
 use PHPCompiler\ext\standard\ModuleRegistry;
+use PHPCompiler\ext\standard\VmInfo;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
@@ -39,6 +42,16 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame('1', ob_get_clean());
+    }
+
+    /** php-src ext/dom/php_dom.h DOM_API_VERSION — not PHP runtime (#15439). */
+    public function test_dom_phpversion_returns_libxml_module_version(): void
+    {
+        new Runtime();
+        self::assertSame('20031129', VmInfo::phpversion('dom'));
+        self::assertSame('20031129', InfoJitHelper::phpversion('dom'));
+        self::assertSame(CompilerVersion::VERSION, VmInfo::phpversion('pcre'));
+        self::assertSame(CompilerVersion::VERSION, InfoJitHelper::phpversion('pcre'));
     }
 
     public function test_dom_node_is_same_node_identity(): void
