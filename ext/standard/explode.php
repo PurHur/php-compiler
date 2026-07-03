@@ -93,20 +93,29 @@ final class explode extends Internal
 
             return HashTableHelper::alloc($context);
         }
+
+        $delimLit = $args[0]->compileTimeString ?? null;
+        $hayLit = $args[1]->compileTimeString ?? null;
+        if (3 === $argc) {
+            $limitLit = self::compileTimeLimit($context, $args[2]);
+            if (null !== $limitLit && null !== $delimLit && null !== $hayLit) {
+                return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, $limitLit);
+            }
+        } elseif (null !== $delimLit && null !== $hayLit) {
+            return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, \PHP_INT_MAX);
+        }
+
         StringExplode::ensureLinked($context);
         $delimiter = JitStringBuiltinArg::lower($context, $args[0], 'explode', 0, 'separator');
         $haystack = JitStringBuiltinArg::lower($context, $args[1], 'explode', 1, 'string');
         $i64 = $context->getTypeFromString('int64');
         if (3 === $argc) {
             $limitLit = self::compileTimeLimit($context, $args[2]);
-            $delimLit = $args[0]->compileTimeString ?? null;
-            $hayLit = $args[1]->compileTimeString ?? null;
-            if (null !== $limitLit && null !== $delimLit && null !== $hayLit) {
-                return JitExplode::buildPackedStrings($context, $delimLit, $hayLit, $limitLit);
+            if (null !== $limitLit) {
+                $limit = $context->constantFromInteger($limitLit, 'int64');
+            } else {
+                $limit = JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'explode', 3, 'limit');
             }
-            $limit = null !== $limitLit
-                ? $context->constantFromInteger($limitLit, 'int64')
-                : JitIntdiv::lowerIntBuiltinArgForCaller($context, $args[2], 'explode', 3, 'limit');
 
             return StringExplode::invoke($context, $delimiter, $haystack, $limit);
         }
