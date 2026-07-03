@@ -566,13 +566,13 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ Closure::getCurrent() (Zend/zend_closures.c, issue #13981, #14061, #14188, #14221, #14371, #14433, #14515, #14533, #15167, #15197).
+     * PHP 8.4+ Closure::getCurrent() (Zend/zend_closures.c, issue #13981, #14061, #14188, #14221, #14371, #14433, #14515, #14533, #15167, #15197, #15239).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
      */
     public static function supportsClosureGetCurrent(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**

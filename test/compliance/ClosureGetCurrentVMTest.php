@@ -22,7 +22,7 @@ final class ClosureGetCurrentVMTest extends BaseTest
             return;
         }
         yield 'closure_get_current.phpt' => self::parsePHPT(
-            __DIR__.'/cases/stdlib/closure_get_current.phpt',
+            __DIR__.'/cases/language/closure_get_current.phpt',
             'closure_get_current.phpt'
         );
     }
