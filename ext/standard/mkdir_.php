@@ -14,7 +14,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** mkdir() — VM via VmFs; JIT/AOT via __compiler_mkdir (libc mkdir(2), recursive in C). */
+/** mkdir() — VM via VmFs; JIT/AOT via MkdirJitHelper PHP (#15586). */
 final class mkdir_ extends Internal
 {
     public function __construct()
