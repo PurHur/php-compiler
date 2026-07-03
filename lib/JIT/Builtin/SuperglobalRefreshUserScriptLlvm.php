@@ -39,7 +39,7 @@ final class SuperglobalRefreshUserScriptLlvm
     public static function ensurePrerequisites(Context $context): void
     {
         LibcExtern::register($context);
-        ParseStrRuntime::ensureLinked($context);
+        ParseStrRuntime::ensureUserScriptLinked($context);
         EnvironMirrorUserScriptLlvm::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);

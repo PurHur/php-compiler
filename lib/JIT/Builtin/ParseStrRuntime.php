@@ -20,12 +20,14 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
 /**
  * JIT/AOT link for __compiler_parse_str via ParseStrJitHelper PHP (#9295, #14217).
  *
- * Embed and user-script AOT compile {@see ParseStrJitHelper::parseIntoNative} via JitVmHelperLink.
+ * Embed compiles {@see ParseStrJitHelper}; user-script thin AOT uses {@see ParseStrNativeJitHelper} (#15417).
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
  */
 final class ParseStrRuntime
 {
     private const HELPER_PATH = '/ext/standard/ParseStrJitHelper.php';
+
+    private const USER_SCRIPT_HELPER_PATH = '/ext/standard/ParseStrNativeJitHelper.php';
 
     private const PARSE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseInto';
 
@@ -34,6 +36,16 @@ final class ParseStrRuntime
     private const PARSE_COOKIE_INTO_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderInto';
 
     private const PARSE_COOKIE_INTO_NATIVE_HELPER = 'PHPCompiler\\ext\\standard\\ParseStrJitHelper::parseCookieHeaderIntoNative';
+
+    private const USER_SCRIPT_PARSE_INTO_NATIVE = 'PHPCompiler\\ext\\standard\\ParseStrNativeJitHelper::parseIntoNative';
+
+    private const USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE = 'PHPCompiler\\ext\\standard\\ParseStrNativeJitHelper::parseCookieHeaderIntoNative';
+
+    /** @var list<string> */
+    private const USER_SCRIPT_COMPILED_HELPERS = [
+        self::USER_SCRIPT_PARSE_INTO_NATIVE,
+        self::USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE,
+    ];
 
     /** @var list<string> */
     private const COMPILED_HELPERS = [
@@ -52,6 +64,42 @@ final class ParseStrRuntime
     public static function ensureLinked(Context $context): void
     {
         self::implement($context);
+    }
+
+    /** User-script AOT: native parse_str without full ParseStrJitHelper nested JIT (#15417). */
+    public static function ensureUserScriptLinked(Context $context): void
+    {
+        self::implementUserScript($context);
+    }
+
+    public static function implementUserScript(Context $context): void
+    {
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
+        self::ensureNativeHtInternalProxies($context);
+        JitVmHelperLink::ensureCompiled(
+            $context,
+            self::USER_SCRIPT_HELPER_PATH,
+            self::USER_SCRIPT_COMPILED_HELPERS,
+            '#15417'
+        );
+        self::implementIfMissing($context, '__compiler_parse_str', static function (Context $context, LlvmFunction $fn): void {
+            self::implementParseBridge($context, $fn, self::USER_SCRIPT_PARSE_INTO_NATIVE);
+        });
+        self::implementIfMissing($context, '__compiler_parse_cookie_header', static function (Context $context, LlvmFunction $fn): void {
+            self::implementCookieBridge($context, $fn, self::USER_SCRIPT_PARSE_COOKIE_INTO_NATIVE);
+        });
+        self::registerLinkedRuntime($context);
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /** User-script AOT init: linkable parse_str ABI without nested ParseStrJitHelper JIT (#15417). */
@@ -110,8 +158,12 @@ final class ParseStrRuntime
             self::COMPILED_HELPERS,
             '#9299'
         );
-        self::implementIfMissing($context, '__compiler_parse_str', self::implementParseBridge(...));
-        self::implementIfMissing($context, '__compiler_parse_cookie_header', self::implementCookieBridge(...));
+        self::implementIfMissing($context, '__compiler_parse_str', static function (Context $context, LlvmFunction $fn): void {
+            self::implementParseBridge($context, $fn, self::PARSE_INTO_NATIVE_HELPER);
+        });
+        self::implementIfMissing($context, '__compiler_parse_cookie_header', static function (Context $context, LlvmFunction $fn): void {
+            self::implementCookieBridge($context, $fn, self::PARSE_COOKIE_INTO_NATIVE_HELPER);
+        });
         self::registerLinkedRuntime($context);
 
         if (null !== $savedBlock) {
@@ -127,13 +179,13 @@ final class ParseStrRuntime
     private static function implementIfMissing(Context $context, string $name, callable $emit): void
     {
         $probe = $context->module->getNamedFunction($name);
-        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+        if (null !== $probe && self::bridgeBodyComplete($probe)) {
             $context->registerFunction($name, $probe);
 
             return;
         }
 
-        $fn = self::declareFunction($context, $name);
+        $fn = null !== $probe && $probe->countBasicBlocks() > 0 ? $probe : self::declareFunction($context, $name);
         $emit($context, $fn);
         $context->registerFunction($name, $fn);
         $context->builder->clearInsertionPosition();
@@ -151,7 +203,7 @@ final class ParseStrRuntime
         );
     }
 
-    private static function implementParseBridge(Context $context, LlvmFunction $fn): void
+    private static function implementParseBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
     {
         $entry = $fn->appendBasicBlock('parse_str_bridge_entry');
         $early = $fn->appendBasicBlock('parse_str_bridge_early');
@@ -168,7 +220,7 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_INTO_NATIVE_HELPER, '#13827');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $encodedArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
@@ -179,7 +231,7 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
     }
 
-    private static function implementCookieBridge(Context $context, LlvmFunction $fn): void
+    private static function implementCookieBridge(Context $context, LlvmFunction $fn, string $helperLogical): void
     {
         $entry = $fn->appendBasicBlock('parse_cookie_bridge_entry');
         $early = $fn->appendBasicBlock('parse_cookie_bridge_early');
@@ -196,7 +248,7 @@ final class ParseStrRuntime
         $context->builder->returnVoid();
 
         $context->builder->positionAtEnd($work);
-        $helperFn = JitVmHelperLink::lookupCompiled($context, self::PARSE_COOKIE_INTO_NATIVE_HELPER, '#13827');
+        $helperFn = JitVmHelperLink::lookupCompiled($context, $helperLogical, '#13827');
         $destI64 = JitNestedHelperCoerce::ptrToI64($context, $dest);
         $headerArg = JitNestedHelperCoerce::coerceArgForHelper(
             $context,
@@ -205,6 +257,27 @@ final class ParseStrRuntime
         );
         $context->builder->call($helperFn, $destI64, $headerArg);
         $context->builder->returnVoid();
+    }
+
+    private static function bridgeBodyComplete(LlvmFunction $fn): bool
+    {
+        if (0 === $fn->countBasicBlocks()) {
+            return false;
+        }
+        try {
+            foreach ($fn->getBasicBlocks() as $block) {
+                $name = $block->getName();
+                if (
+                    (str_contains($name, '_work') || str_contains($name, '_bridge_work'))
+                    && null !== $block->getTerminator()
+                ) {
+                    return true;
+                }
+            }
+        } catch (\Throwable) {
+        }
+
+        return false;
     }
 
     private static function registerLinkedRuntime(Context $context): void
