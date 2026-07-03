@@ -66,6 +66,44 @@ PHP;
         $this->assertStringNotContainsString('Segmentation fault', $stderr);
     }
 
+    /** Nested array class constants (ProcessOpenJitHelper::DEFAULT_PIPE_DESCRIPTOR) must JIT (#1492 bootstrap). */
+    public function testProcessOpenJitHelperNestedArrayClassConstCompiles(): void
+    {
+        $this->skipUnlessLlvmReady();
+        $repoRoot = dirname(__DIR__, 2);
+        $sourcePath = $repoRoot.'/ext/standard/ProcessOpenJitHelper.php';
+        $outfile = tempnam(sys_get_temp_dir(), 'bootstrap_aot_process_open_');
+        $this->assertNotFalse($outfile);
+        unlink($outfile);
+
+        $env = [];
+        foreach (array_merge($_ENV, $_SERVER) as $key => $value) {
+            if (is_string($value)) {
+                $env[$key] = $value;
+            }
+        }
+        LlvmToolchain::applyProcessEnv($env, $repoRoot);
+
+        $compileArgv = array_merge(
+            LlvmToolchain::envPrefix($repoRoot),
+            [PHP_BINARY, $repoRoot.'/bin/compile.php', '-o', $outfile, $sourcePath]
+        );
+        $descriptorSpec = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+        $compile = proc_open($compileArgv, $descriptorSpec, $pipes, $repoRoot, $env);
+        $this->assertIsResource($compile);
+        fclose($pipes[0]);
+        fclose($pipes[1]);
+        $stderr = stream_get_contents($pipes[2]);
+        fclose($pipes[2]);
+        $exitCode = proc_close($compile);
+        $stderr = trim($stderr !== false ? $stderr : '');
+        if (is_file($outfile)) {
+            @unlink($outfile);
+        }
+        $this->assertSame(0, $exitCode, 'ProcessOpenJitHelper AOT compile: '.$stderr);
+        $this->assertStringNotContainsString('not jittable', $stderr);
+    }
+
     public function testLoadJitContextStandaloneInitCompletes(): void
     {
         $this->skipUnlessLlvmReady();

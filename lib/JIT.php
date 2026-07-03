@@ -11019,6 +11019,8 @@ class JIT {
                 case OpCode::TYPE_CONST_FETCH:
                 case OpCode::TYPE_CLASS_CONST_FETCH:
                 case OpCode::TYPE_INIT_ARRAY:
+                case OpCode::TYPE_ADD_ARRAY_ELEMENT:
+                case OpCode::TYPE_ARRAY_SPREAD:
                 case OpCode::TYPE_ARG_SEND:
                 case OpCode::TYPE_FUNCCALL_EXEC_NORETURN:
                 case OpCode::TYPE_FUNCCALL_EXEC_RETURN:
@@ -11204,7 +11206,9 @@ class JIT {
                     if ($this->shouldSkipExternalClassBodyLowering($classId)) {
                         break;
                     }
-                    throw new \LogicException('Other class body types are not jittable for now');
+                    throw new \LogicException(
+                        'Other class body types are not jittable for now: '.opcode_type_name($op->type)
+                    );
             }
         }
         $this->flushPendingJitTraitUses(
