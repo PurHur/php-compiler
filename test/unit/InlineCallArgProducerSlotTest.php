@@ -2374,6 +2374,46 @@ PHP;
         self::assertStringContainsString('1', $out);
     }
 
+    /** Issue #15421 — array_pad negative literal after UDF array param must not mis-bind length to haystack. */
+    public function testArrayPadNegativeLiteralAfterUdfArrayParamUsesDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+function hold(array $v): void
+{
+}
+hold([]);
+$r = array_pad([1, 2], -4, 0);
+var_export($r);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_after_udf_array.php');
+
+        $padSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $padSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $padSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $padSends);
+        self::assertNotSame($padSends[0], $padSends[1], 'arg sends='.json_encode($padSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('0', $out);
+        self::assertStringContainsString('1', $out);
+        self::assertStringContainsString('2', $out);
+    }
+
     /** Issue #10495 — var_export(get_debug_type(null), true) wires nested scalar-return FuncCall producer. */
     public function testVarExportNestedScalarBuiltinUsesFuncCallProducerSlot(): void
     {
