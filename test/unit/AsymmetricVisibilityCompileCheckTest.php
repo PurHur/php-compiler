@@ -28,7 +28,7 @@ class C {
     protected public(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
@@ -41,7 +41,7 @@ class C {
     private protected(set) string $x = 'a';
 }
 PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
+            AsymmetricVisibilityCompileCheck::WEAKER_THAN_SET_MESSAGE
         );
     }
 
@@ -58,45 +58,42 @@ PHP,
         );
     }
 
-    public function testPublicPrivateSetCompileErrors(): void
+    public function testPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
     public private(set) string $name = 'a';
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'asymmetric_public_private_set.php');
+        $this->assertNotNull($block);
     }
 
-    public function testPromotedPublicPrivateSetCompileErrors(): void
+    public function testPromotedPublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class User {
     public function __construct(
         public private(set) string $name,
     ) {}
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'asymmetric_promoted_public_private_set.php');
+        $this->assertNotNull($block);
     }
 
-    public function testPromotedSingleLinePublicPrivateSetCompileErrors(): void
+    public function testPromotedSingleLinePublicPrivateSetCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class D {
     public function __construct(public private(set) int $x = 1) {}
 }
-PHP,
-            AsymmetricVisibilityCompileCheck::MULTIPLE_MODIFIERS_MESSAGE
-        );
+PHP, 'asymmetric_promoted_single_line.php');
+        $this->assertNotNull($block);
     }
 
     public function testValidPrivateSetStillCompiles(): void
