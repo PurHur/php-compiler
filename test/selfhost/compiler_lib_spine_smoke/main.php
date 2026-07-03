@@ -147,6 +147,7 @@ require_once __DIR__.'/../../../ext/dom/ElementGetAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementHasAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetAttribute.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetAttributeNS.php';
+require_once __DIR__.'/../../../ext/dom/ElementRemoveAttributeNS.php';
 require_once __DIR__.'/../../../ext/dom/ElementSetIdAttribute.php';
 require_once __DIR__.'/../../../ext/dom/FragmentAppendChild.php';
 require_once __DIR__.'/../../../ext/dom/ImplementationCreateDocument.php';
