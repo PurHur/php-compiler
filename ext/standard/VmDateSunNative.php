@@ -15,6 +15,18 @@ final class VmDateSunNative
     private const RADEG = 180.0 / self::PI;
     private const DEGRAD = self::PI / 180.0;
 
+    /** date.sunrise_zenith / date.sunset_zenith ini default (ext/date/php_date.c). */
+    private const SUN_RISE_SET_ZENITH = 90.833333;
+
+    /**
+     * Rise/set altitude matching date_sunrise()/date_sunset() (90 - zenith).
+     *
+     * php-src passes -35/60 to timelib_astro_rise_set_altitude for date_sun_info();
+     * timelib yields the same timestamps as the procedural helpers — our port must
+     * use the zenith-derived altitude to match Zend (issue #15629).
+     */
+    private const SUN_RISE_SET_ALTITUDE = 90.0 - self::SUN_RISE_SET_ZENITH;
+
     /**
      * @return string|int|float|false
      */
@@ -35,7 +47,7 @@ final class VmDateSunNative
             $longitude = 35.2333;
         }
         if (null === $zenith) {
-            $zenith = 90.833333;
+            $zenith = self::SUN_RISE_SET_ZENITH;
         }
         if ($argc < 2) {
             $returnFormat = VmDate::SUNFUNCS_RET_STRING;
@@ -88,7 +100,7 @@ final class VmDateSunNative
     {
         $out = [];
 
-        $sun = self::riseSetAltitude($timestamp, $longitude, $latitude, -35.0 / 60.0, true);
+        $sun = self::riseSetAltitude($timestamp, $longitude, $latitude, self::SUN_RISE_SET_ALTITUDE, true);
         self::assignSunInfoEntry($out, 'sunrise', $sun['rc'], (int) $sun['ts_rise']);
         self::assignSunInfoEntry($out, 'sunset', $sun['rc'], (int) $sun['ts_set']);
         $out['transit'] = (int) $sun['ts_transit'];

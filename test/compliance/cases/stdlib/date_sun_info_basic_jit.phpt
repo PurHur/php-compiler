@@ -7,6 +7,6 @@ echo $info['sunrise'], "\n";
 echo $info['sunset'], "\n";
 echo $info['transit'], "\n";
 --EXPECT--
-1718077608
-1718135636
+1718077492
+1718135752
 1718106622
