@@ -471,6 +471,10 @@ class Type extends Builtin {
         $fntypeStreamSocketGetName = $this->context->context->functionType($strPtr, false, $i64, $i64);
         $fnStreamSocketGetName = $this->context->module->addFunction('__compiler_stream_socket_get_name', $fntypeStreamSocketGetName);
         $this->context->registerFunction('__compiler_stream_socket_get_name', $fnStreamSocketGetName);
+        $double = $this->context->getTypeFromString('double');
+        $fntypeStreamSocketAccept = $this->context->context->functionType($i64, false, $i64, $i64, $double);
+        $fnStreamSocketAccept = $this->context->module->addFunction('__compiler_stream_socket_accept', $fntypeStreamSocketAccept);
+        $this->context->registerFunction('__compiler_stream_socket_accept', $fnStreamSocketAccept);
         $fntypeFtruncate = $this->context->context->functionType($i32, false, $i64, $i64);
         $fnFtruncate = $this->context->module->addFunction('__compiler_ftruncate', $fntypeFtruncate);
         $this->context->registerFunction('__compiler_ftruncate', $fnFtruncate);
@@ -1370,6 +1374,7 @@ class Type extends Builtin {
         ProcessOpen::ensureLinked($this->context);
         StreamSocketPair::ensureLinked($this->context);
         StreamSocketGetNameRuntime::ensureLinked($this->context);
+        StreamSocketAccept::ensureLinked($this->context);
         StringMicrotime::ensureLinked($this->context);
         StringGettimeofday::ensureLinked($this->context);
         StringGetrusage::ensureLinked($this->context);
