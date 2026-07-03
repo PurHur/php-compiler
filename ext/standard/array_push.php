@@ -17,7 +17,6 @@ use PHPCompiler\JIT\ArrayBuiltinHelper;
 use PHPCompiler\JIT\Builtin\ArrayPushRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -25,19 +24,12 @@ use PHPLLVM\Value;
  */
 final class array_push extends Internal
 {
-    private const BY_REF_ERROR =
-        'array_push(): Argument #1 ($array) cannot be passed by reference';
-
     public function execute(Frame $frame): void
     {
         if (\count($frame->calledArgs) < 1) {
             throw new \LogicException('array_push() requires at least one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \Error(self::BY_REF_ERROR);
-        }
-        $ht = $array->toArray();
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_push', 1, 'array');
         $values = [];
         for ($i = 1, $n = \count($frame->calledArgs); $i < $n; ++$i) {
             $values[] = $frame->calledArgs[$i]->resolveIndirect();
@@ -60,6 +52,7 @@ final class array_push extends Internal
             return ArrayBuiltinHelper::pushMergedCallUnpack($context, $args[0]);
         }
         $array = $args[0];
+        JitArrayElem::requireArrayParam($context, $array, 'array_push', 1, 'array');
         if (!JitArrayPush::requireByRefArrayArg($context, $array)) {
             return $context->constantFromInteger(0, 'int64');
         }
