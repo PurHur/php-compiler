@@ -27,6 +27,14 @@ class Module extends ModuleAbstract
             'SODIUM_CRYPTO_SECRETBOX_MACBYTES' => VmSodium::CRYPTO_SECRETBOX_MACBYTES,
             'SODIUM_CRYPTO_AUTH_KEYBYTES' => VmSodium::CRYPTO_AUTH_KEYBYTES,
             'SODIUM_CRYPTO_AUTH_BYTES' => VmSodium::CRYPTO_AUTH_BYTES,
+            'SODIUM_CRYPTO_STREAM_KEYBYTES' => VmSodium::CRYPTO_STREAM_KEYBYTES,
+            'SODIUM_CRYPTO_STREAM_NONCEBYTES' => VmSodium::CRYPTO_STREAM_NONCEBYTES,
+            'SODIUM_CRYPTO_STREAM_XCHACHA20_KEYBYTES' => VmSodium::CRYPTO_STREAM_XCHACHA20_KEYBYTES,
+            'SODIUM_CRYPTO_STREAM_XCHACHA20_NONCEBYTES' => VmSodium::CRYPTO_STREAM_XCHACHA20_NONCEBYTES,
+            'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_KEYBYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_KEYBYTES,
+            'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES,
+            'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NSECRETBYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NSECRETBYTES,
+            'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -45,6 +53,15 @@ class Module extends ModuleAbstract
             new sodium_crypto_secretbox_open(),
             new sodium_crypto_auth(),
             new sodium_crypto_auth_verify(),
+            new sodium_crypto_stream(),
+            new sodium_crypto_stream_xor(),
+            new sodium_crypto_stream_keygen(),
+            new sodium_crypto_stream_xchacha20(),
+            new sodium_crypto_stream_xchacha20_xor(),
+            new sodium_crypto_stream_xchacha20_xor_ic(),
+            new sodium_crypto_stream_xchacha20_keygen(),
+            new sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(),
+            new sodium_crypto_aead_xchacha20poly1305_ietf_decrypt(),
         ];
     }
 }

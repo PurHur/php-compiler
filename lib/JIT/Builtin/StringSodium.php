@@ -26,12 +26,18 @@ final class StringSodium
 
     private const AUTH_VERIFY_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::authVerify';
 
+    private const STREAM_XOR_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::streamXor';
+
+    private const STREAM_XCHACHA20_XOR_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::streamXchacha20Xor';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
         self::SECRETBOX_OPEN_HELPER,
         self::AUTH_HELPER,
         self::AUTH_VERIFY_HELPER,
+        self::STREAM_XOR_HELPER,
+        self::STREAM_XCHACHA20_XOR_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -40,6 +46,8 @@ final class StringSodium
         self::implementBridge($context, '__compiler_sodium_secretbox_open', self::SECRETBOX_OPEN_HELPER);
         self::implementAuthBridge($context);
         self::implementAuthVerifyBridge($context);
+        self::implementBridge($context, '__compiler_sodium_stream_xor', self::STREAM_XOR_HELPER);
+        self::implementBridge($context, '__compiler_sodium_stream_xchacha20_xor', self::STREAM_XCHACHA20_XOR_HELPER);
     }
 
     private static function implementBridge(Context $context, string $abiName, string $helper): void
