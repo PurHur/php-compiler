@@ -14234,9 +14234,10 @@ class Compiler {
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
         if (
-            'array_map' === $inlineFuncName
-            && 0 === $argIndex
+            $callbackArgIndex >= 0
+            && $argIndex === $callbackArgIndex
             && 2 === $argCount
             && null !== $block
         ) {
@@ -14245,6 +14246,18 @@ class Compiler {
                 || $leadingCallback instanceof Op\Expr\Closure
                 || $leadingCallback instanceof Op\Expr\FirstClassCallable) {
                 return $leadingCallback;
+            }
+        }
+        if (
+            1 === $callbackArgIndex
+            && 0 === $argIndex
+            && 2 === $argCount
+            && null !== $block
+        ) {
+            $haystackProducer = $this->trailingInlineFuncCallHaystackBeforeCfgCall($cfgCallOp, $block);
+            if ($haystackProducer instanceof Op\Expr\FuncCall
+                || $haystackProducer instanceof Op\Expr\NsFuncCall) {
+                return $haystackProducer;
             }
         }
         if (0 === $producerCount) {
@@ -15568,19 +15581,25 @@ class Compiler {
 
                 return null;
             }
-            // array_map(intval(...), str_split(...)) — leading callback + inline FuncCall haystack (#15487).
-            if ('array_map' === $inlineFuncName && null !== $closureProducerIndex && null === $arrayProducerIndex) {
+            // array_map(intval(...), str_split(...)) / array_filter(str_split(...), is_numeric(...)) — FCC + inline FuncCall haystack (#15487, #15490).
+            if (null !== $closureProducerIndex && null === $arrayProducerIndex) {
                 $funcCallHaystackIndex = null;
                 foreach ($producers as $pi => $producer) {
                     if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                         $funcCallHaystackIndex = $pi;
                     }
                 }
-                if (null !== $funcCallHaystackIndex && 2 === \count($callArgs)) {
-                    if (0 === $argIndex) {
+                $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
+                if (
+                    null !== $funcCallHaystackIndex
+                    && $callbackArgIndex >= 0
+                    && 2 === \count($callArgs)
+                ) {
+                    $arrayArgIndex = 1 - $callbackArgIndex;
+                    if ($argIndex === $callbackArgIndex) {
                         return $producers[$closureProducerIndex];
                     }
-                    if (1 === $argIndex) {
+                    if ($argIndex === $arrayArgIndex) {
                         return $producers[$funcCallHaystackIndex];
                     }
 
@@ -17374,7 +17393,7 @@ class Compiler {
     }
 
     /**
-     * array_map(intval(...), f()) — callback compiled before nested haystack FuncCalls (#15487).
+     * array_map(intval(...), f()) / array_filter(f(), is_numeric(...)) — callback before nested haystack (#15487, #15490).
      */
     private function leadingCallbackFirstInlineProducerBeforeCfgCall(?Op $cfgCallOp, ?Block $block): ?Op\Expr
     {
@@ -17382,7 +17401,7 @@ class Compiler {
             return null;
         }
         $funcName = $this->resolveInlineCallArgFuncName($cfgCallOp);
-        if (0 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+        if ($this->inlineClosureArrayPairCallbackArgIndex($funcName) < 0) {
             return null;
         }
         $callIndex = null;
@@ -17407,6 +17426,54 @@ class Compiler {
             }
             if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
                 continue;
+            }
+            if (!$this->isInlineExprCallArgProducer($prev)) {
+                return null;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * array_filter(str_split(...), is_numeric(...)) — haystack FuncCall immediately before trailing FCC (#15490).
+     */
+    private function trailingInlineFuncCallHaystackBeforeCfgCall(?Op $cfgCallOp, ?Block $block): ?Op\Expr
+    {
+        if (null === $cfgCallOp || null === $block || null === $block->orig) {
+            return null;
+        }
+        $funcName = $this->resolveInlineCallArgFuncName($cfgCallOp);
+        if (1 !== $this->inlineClosureArrayPairCallbackArgIndex($funcName)) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $skippedCallback = false;
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $prev = $block->orig->children[$i];
+            if (
+                !$skippedCallback
+                && ($prev instanceof Op\Expr\ArrowFunction
+                    || $prev instanceof Op\Expr\Closure
+                    || $prev instanceof Op\Expr\FirstClassCallable)
+            ) {
+                $skippedCallback = true;
+                continue;
+            }
+            if ($prev instanceof Op\Expr\FuncCall || $prev instanceof Op\Expr\NsFuncCall) {
+                return $prev;
+            }
+            if ($prev instanceof Op\Expr\Assign) {
+                return null;
             }
             if (!$this->isInlineExprCallArgProducer($prev)) {
                 return null;
