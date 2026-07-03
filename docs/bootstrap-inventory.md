@@ -13370,11 +13370,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmReadline.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 165)
-- new Variable (line 167)
-- new HashTable (line 180)
-- new Variable (line 182)
-- 17 class method(s)
+- new HashTable (line 207)
+- new Variable (line 209)
+- new HashTable (line 222)
+- new Variable (line 224)
+- 18 class method(s)
 
 ### `ext/standard/VmRealpathCache.php`
 
@@ -13578,10 +13578,10 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmSessionSerializer.php`
 
 **Warnings** (review for bootstrap subset):
-- new HashTable (line 71)
-- new Variable (line 94)
-- new HashTable (line 110)
-- new Variable (line 132)
+- new HashTable (line 68)
+- new Variable (line 91)
+- new HashTable (line 107)
+- new Variable (line 129)
 - 6 class method(s)
 
 ### `ext/standard/VmSetcookie.php`
@@ -13871,8 +13871,8 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new Error (line 1418)
 - new Error (line 1429)
-- new Error (line 3601)
-- new Error (line 3626)
+- new Error (line 3602)
+- new Error (line 3627)
 - 204 class method(s)
 
 ### `ext/standard/VmStripWhitespace.php`
