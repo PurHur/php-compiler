@@ -499,8 +499,12 @@ final class VmDom
         return DomRegistry::state($fragment);
     }
 
-    public static function createElement(Context $ctx, string $name, ?ObjectEntry $ownerDocument = null): Variable
-    {
+    public static function createElement(
+        Context $ctx,
+        string $name,
+        ?ObjectEntry $ownerDocument = null,
+        string $value = ''
+    ): Variable {
         $class = $ctx->classes[self::CLASS_ELEMENT] ?? null;
         if (null === $class) {
             throw new \LogicException('DOMElement is not registered in this compiler build');
@@ -520,6 +524,9 @@ final class VmDom
             $state->documentId = $ownerDocument->id;
         }
         DomRegistry::attach($entry, $state);
+        if ('' !== $value) {
+            self::writeTextContent($ctx, $entry, $value);
+        }
 
         $var = new Variable(Variable::TYPE_OBJECT);
         $var->object($entry);
