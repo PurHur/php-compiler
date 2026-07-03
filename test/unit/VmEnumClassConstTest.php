@@ -41,9 +41,12 @@ PHP;
 
     public function testBackedEnumTypedClassConst(): void
     {
-        if (!CompilerVersion::supportsTypedClassConstants()) {
-            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
-        }
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+            }
         $code = <<<'PHP'
 <?php
 enum E: int {
@@ -62,6 +65,13 @@ PHP;
         $entry = $runtime->vmContext->classes['e'];
         $this->assertArrayHasKey('foo', $entry->constants);
         $this->assertSame(2, $entry->constants['foo']->toInt());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testUnitEnumClassConst(): void
@@ -85,10 +95,13 @@ PHP;
 
     public function testTypedClassConstWithEnumType(): void
     {
-        if (!CompilerVersion::supportsTypedClassConstants()) {
-            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
-        }
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+            }
+            $code = <<<'PHP'
 <?php
 enum Color: string { case Red = 'r'; case Blue = 'b'; }
 class Palette {
@@ -98,20 +111,27 @@ var_export(Palette::PRIMARY);
 echo "\n";
 echo Palette::PRIMARY->name, "\n";
 PHP;
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'typed_enum_class_const.php');
-        ob_start();
-        $runtime->run($block);
-        $output = ob_get_clean();
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'typed_enum_class_const.php');
+            ob_start();
+            $runtime->run($block);
+            $output = ob_get_clean();
 
-        $this->assertSame("\\Color::Red\nRed\n", $output);
-        $entry = $runtime->vmContext->classes['palette'];
-        $this->assertArrayHasKey('primary', $entry->constants);
-        $stored = $entry->constants['primary']->resolveIndirect();
-        $this->assertTrue(
-            Variable::TYPE_ENUM_CASE === $stored->type
-            || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)
-        );
+            $this->assertSame("\\Color::Red\nRed\n", $output);
+            $entry = $runtime->vmContext->classes['palette'];
+            $this->assertArrayHasKey('primary', $entry->constants);
+            $stored = $entry->constants['primary']->resolveIndirect();
+            $this->assertTrue(
+                Variable::TYPE_ENUM_CASE === $stored->type
+                || (Variable::TYPE_OBJECT === $stored->type && $stored->toObject()->isEnumCase)
+            );
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testClassConstEnumCaseForwardReference(): void
