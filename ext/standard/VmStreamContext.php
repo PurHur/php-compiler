@@ -22,8 +22,39 @@ final class VmStreamContext
 
     private static int $nextId = 0;
 
+    /** @var array<int, HashTable> live stream-context handles for get_resources() (#11104) */
+    private static array $activeById = [];
+
     /** Process-wide default context (php-src php_stream_context_get(), #6367). */
     private static ?Variable $defaultContext = null;
+
+    /**
+     * php-src ext/standard/streams.c — first stream open materializes default context (#11104).
+     */
+    public static function ensureDefaultForStreamOpen(): void
+    {
+        self::ensureDefaultContext();
+    }
+
+    /**
+     * @return list<Variable>
+     */
+    public static function activeContextVariables(): array
+    {
+        $out = [];
+        foreach (self::$activeById as $ht) {
+            $var = new Variable();
+            $var->array($ht);
+            $out[] = $var;
+        }
+
+        return $out;
+    }
+
+    private static function registerActive(int $id, HashTable $ht): void
+    {
+        self::$activeById[$id] = $ht;
+    }
 
     /**
      * Build a VM stream-context array from caller options (issue #1377, #2457, #6815).
@@ -87,6 +118,7 @@ final class VmStreamContext
             self::attachParamsHashTable($ht, $hostParams);
         }
         $ht->markResourceLikeHandle();
+        self::registerActive($id, $ht);
 
         return $ht;
     }
@@ -108,6 +140,7 @@ final class VmStreamContext
             self::attachParamsHashTable($ht, $params);
         }
         $ht->markResourceLikeHandle();
+        self::registerActive($id, $ht);
 
         return $ht;
     }
