@@ -1,9 +1,9 @@
 --TEST--
-Language: private(set) read + write enforcement (#12856, Zend/zend_execute.c)
+Language: public private(set) read + write enforcement (#12856, Zend/zend_execute.c)
 --FILE--
 <?php
 class C {
-    private(set) int $x = 1;
+    public private(set) int $x = 1;
 }
 $c = new C();
 echo $c->x, "\n";
@@ -14,4 +14,4 @@ try {
 }
 --EXPECT--
 1
-Error: Cannot modify private(set) property C::$x from global scope
+Error: Cannot modify public private(set) property C::$x from global scope

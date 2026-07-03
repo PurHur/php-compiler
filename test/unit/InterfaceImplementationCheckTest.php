@@ -166,7 +166,7 @@ PHP;
         $code = <<<'PHP'
 <?php
 interface I {
-    private(set) string $slug;
+    public private(set) string $slug;
 }
 class C implements I {
     public string $slug = 'b';
@@ -185,7 +185,7 @@ PHP;
         ob_start();
         $runtime->run($block);
         $this->assertSame(
-            "b\nCannot modify private(set) property C::\$slug from global scope\n",
+            "b\nCannot modify public private(set) property C::\$slug from global scope\n",
             ob_get_clean()
         );
     }

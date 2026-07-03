@@ -1,5 +1,5 @@
 --TEST--
-Language: private(set) get-only property hook write — asymmetric Error not read-only (#9842, zend_property_hooks.c)
+Language: public private(set) get-only property hook write — asymmetric Error not read-only (#9842, zend_property_hooks.c)
 --FILE--
 <?php
 class C {
@@ -18,4 +18,4 @@ try {
 }
 --EXPECT--
 hi
-Cannot modify private(set) property C::$x from global scope
+Cannot modify public private(set) property C::$x from global scope

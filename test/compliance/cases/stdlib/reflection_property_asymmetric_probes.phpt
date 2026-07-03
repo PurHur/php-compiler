@@ -5,8 +5,8 @@ ReflectionProperty asymmetric visibility probes (issue #6977, ext/reflection/php
 declare(strict_types=1);
 
 class C {
-    private(set) string $p = 'x';
-    protected(set) int $q = 1;
+    public private(set) string $p = 'x';
+    public protected(set) int $q = 1;
     public int $plain = 0;
 }
 
@@ -26,7 +26,7 @@ echo 'plain_pubSet=', $plain->isPublicSet() ? '1' : '0', "\n";
 echo 'plain_privSet=', $plain->isPrivateSet() ? '1' : '0', "\n";
 
 class S {
-    protected(set) static string $sp = 'y';
+    public protected(set) static string $sp = 'y';
 }
 $sp = new ReflectionProperty(S::class, 'sp');
 echo 'sp_protSet=', $sp->isProtectedSet() ? '1' : '0', "\n";

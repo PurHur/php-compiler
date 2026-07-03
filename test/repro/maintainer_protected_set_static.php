@@ -1,6 +1,6 @@
 <?php
 class Demo {
-    protected(set) static string $tag = 'a';
+    public protected(set) static string $tag = 'a';
 }
 
 echo Demo::$tag, "\n";

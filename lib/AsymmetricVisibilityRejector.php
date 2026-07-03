@@ -20,10 +20,16 @@ final class AsymmetricVisibilityRejector
 
     public static function reject(string $code, string $filename = 'unknown'): string
     {
-        if (CompilerVersion::supportsAsymmetricVisibility()) {
+        if (!AsymmetricVisibilityRewriter::containsAsymmetricVisibilitySyntax($code)) {
             return $code;
         }
-        if (!AsymmetricVisibilityRewriter::containsAsymmetricVisibilitySyntax($code)) {
+
+        if (CompilerVersion::supportsAsymmetricVisibility()) {
+            $bareLine = AsymmetricVisibilityRewriter::findBareSetModifierLine($code);
+            if ($bareLine > 0) {
+                throw new CompileFatal($filename, $bareLine, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
+            }
+
             return $code;
         }
 

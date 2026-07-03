@@ -1,6 +1,6 @@
 <?php
 class Demo {
-    private(set) static string $name = 'a';
+    public private(set) static string $name = 'a';
 }
 
 echo Demo::$name, "\n";

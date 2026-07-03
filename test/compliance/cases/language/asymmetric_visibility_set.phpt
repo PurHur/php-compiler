@@ -1,9 +1,9 @@
 --TEST--
-PHP 8.4 asymmetric visibility: private(set) metadata preserved (#6377)
+PHP 8.4 asymmetric visibility: public private(set) metadata preserved (#6377)
 --FILE--
 <?php
 class Demo {
-    private(set) string $name = 'a';
+    public private(set) string $name = 'a';
 }
 $d = new Demo();
 echo $d->name, "\n";

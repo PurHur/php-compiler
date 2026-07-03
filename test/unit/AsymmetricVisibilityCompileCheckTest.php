@@ -51,7 +51,7 @@ PHP,
             <<<'PHP'
 <?php
 class C {
-    private(set) $x = 1;
+    public private(set) $x = 1;
 }
 PHP,
             'must have type'
@@ -102,7 +102,7 @@ PHP, 'asymmetric_promoted_single_line.php');
         $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class Demo {
-    private(set) string $name = 'a';
+    public private(set) string $name = 'a';
 }
 PHP, 'asymmetric_ok.php');
         $this->assertNotNull($block);
@@ -127,16 +127,17 @@ PHP, 'static_asymmetric_reject.php');
         }
     }
 
-    public function testSetBeforeReadStillCompiles(): void
+    public function testSetBeforeReadCompileErrors(): void
     {
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile(<<<'PHP'
+        $this->expectCompileError(
+            <<<'PHP'
 <?php
 class C {
     private(set) public string $x = 'a';
 }
-PHP, 'asymmetric_order.php');
-        $this->assertNotNull($block);
+PHP,
+            AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE
+        );
     }
 
     private function expectCompileError(string $code, string $messageNeedle): void
