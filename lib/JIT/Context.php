@@ -904,6 +904,7 @@ class Context {
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
+        Builtin\StringHtmlspecialcharsStandaloneLlvm::implement($this);
     }
 
     /** bootstrap-aot-link fixtures: minimal init + CLI argv / superglobal refresh for standalone main (#14459). */

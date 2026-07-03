@@ -9,15 +9,15 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPUnit\Framework\TestCase;
 
-/** count() COUNT_NORMAL JIT routes through ArrayCountJitHelper PHP not ArrayBuiltinHelper LLVM (#13276, #14486). */
+/** count() COUNT_NORMAL JIT uses thin LLVM bridge (#13276, #15417). */
 final class ArrayCountRuntimeShrinkTest extends TestCase
 {
-    public function testArrayCountRuntimeUsesJitHelperNotDirectLlvmMonolith(): void
+    public function testArrayCountRuntimeUsesDirectLlvmBridgeNotNestedJitHelper(): void
     {
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayCountRuntime.php');
-        $this->assertStringContainsString('ArrayCountJitHelper', $runtime);
         $this->assertStringContainsString('ArrayBuiltinHelper::getNumElements', $runtime);
-        $this->assertStringNotContainsString('LOAD_TYPE_STANDALONE', $runtime);
+        $this->assertStringContainsString('implementDirectLlvmBridge', $runtime);
+        $this->assertStringNotContainsString('JitVmHelperLink', $runtime);
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_count.php');
         $this->assertStringContainsString('ArrayCountRuntime::numElements', $builtin);

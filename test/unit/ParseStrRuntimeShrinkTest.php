@@ -53,28 +53,18 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     public function testParseStrJitHelperDelegatesToParseStrEngine(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrJitHelper.php');
+        $native = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrNativeJitHelper.php');
         $this->assertStringContainsString('ParseStrEngine::parse', $source);
-        $this->assertStringContainsString('parseDelimitedIntoNative', $source);
-        $this->assertStringContainsString('VmParseStr::mergeInto', $source);
-        $this->assertStringContainsString('parseCookieHeaderInto', $source);
-    }
-
-    public function testParseStrNativeMergeBridgeUsesNativeHelpers(): void
-    {
-        $runtime = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
-        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', $runtime);
-        $this->assertStringContainsString('ptrToI64', $runtime);
-
-        $helper = (string) file_get_contents($this->repoRoot.'/ext/standard/ParseStrJitHelper.php');
-        $this->assertStringContainsString('parseIntoNative', $helper);
-        $this->assertStringContainsString('phpc_native_ht_set_string_key', $helper);
+        $this->assertStringContainsString('ParseStrNativeJitHelper', $source);
+        $this->assertStringContainsString('parseIntoNative', $native);
+        $this->assertStringContainsString('phpc_native_ht_set_string_key', $native);
         $this->assertFileExists($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeOpsJit.php');
 
         // User-script refresh routes via ParseStrRuntime init-safe bridge (#13900).
         $userScript = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $userScript);
+        $this->assertStringContainsString('ParseStrRuntime::ensureUserScriptLinked', $userScript);
         $this->assertStringContainsString('__compiler_parse_str', $userScript);
-        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php'));
+        $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php'));
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrNativeLlvm.php');
         $this->assertFileDoesNotExist($this->repoRoot.'/lib/JIT/Builtin/ParseStrUserScriptDelimitedJit.php');
     }
@@ -87,7 +77,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     public function testParseStrRuntimeRoutesUserScriptThroughNativeHelper(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
-        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', $source);
+        $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', $source);
+        $this->assertStringContainsString('ensureUserScriptLinked', $source);
         $this->assertStringNotContainsString('ParseStrUserScriptDelimitedJit', $source);
         $this->assertStringNotContainsString('emitUserScriptDelimitedParse', $source);
     }
@@ -133,7 +124,8 @@ final class ParseStrRuntimeShrinkTest extends TestCase
     public function testParseStrBridgeAppendsBlocksOnDeclaredFunction(): void
     {
         $source = (string) file_get_contents($this->repoRoot.'/lib/JIT/Builtin/ParseStrRuntime.php');
-        $this->assertStringContainsString('PARSE_INTO_NATIVE_HELPER', $source);
+        $this->assertStringContainsString('USER_SCRIPT_PARSE_INTO_NATIVE', $source);
+        $this->assertStringContainsString('ensureUserScriptLinked', $source);
         $this->assertStringContainsString('ptrToI64', $source);
         $this->assertStringContainsString('$early = $fn->appendBasicBlock', $source);
         $this->assertStringNotContainsString('BasicBlockHelper::append($context, \'parse_str_bridge', $source);
