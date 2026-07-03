@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3762 |
-| Phase A inventory files (M2 ratio SSOT) | 3762 |
+| PHP files on vm.php path | 3768 |
+| Phase A inventory files (M2 ratio SSOT) | 3768 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10178 |
+| Source constructs flagged (warnings) | 10183 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -445,6 +445,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/spl/spl_classes.php` | 0 | 2 |
 | `ext/standard/AbsJitHelper.php` | 0 | 1 |
 | `ext/standard/AcosJitHelper.php` | 0 | 1 |
+| `ext/standard/AcoshJitHelper.php` | 0 | 1 |
 | `ext/standard/AddslashesJitHelper.php` | 0 | 1 |
 | `ext/standard/ApacheNoteJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayChangeKeyCaseJitHelper.php` | 0 | 1 |
@@ -491,9 +492,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ArrayValuesJitHelper.php` | 0 | 1 |
 | `ext/standard/ArrayWalkJitHelper.php` | 0 | 1 |
 | `ext/standard/AsinJitHelper.php` | 0 | 1 |
+| `ext/standard/AsinhJitHelper.php` | 0 | 1 |
 | `ext/standard/AssertOptionsJitHelper.php` | 0 | 1 |
 | `ext/standard/Atan2JitHelper.php` | 0 | 1 |
 | `ext/standard/AtanJitHelper.php` | 0 | 1 |
+| `ext/standard/AtanhJitHelper.php` | 0 | 1 |
 | `ext/standard/AttributeRegistryArgsJitHelper.php` | 0 | 6 |
 | `ext/standard/AttributeRegistryJitHelper.php` | 0 | 1 |
 | `ext/standard/Bin2hexJitHelper.php` | 0 | 1 |
@@ -1567,7 +1570,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/array_pad.php` | 0 | 5 |
 | `ext/standard/array_pop.php` | 0 | 1 |
 | `ext/standard/array_product.php` | 0 | 2 |
-| `ext/standard/array_push.php` | 0 | 3 |
+| `ext/standard/array_push.php` | 0 | 2 |
 | `ext/standard/array_rand.php` | 0 | 1 |
 | `ext/standard/array_reduce.php` | 0 | 5 |
 | `ext/standard/array_replace.php` | 0 | 3 |
@@ -2615,9 +2618,12 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/ListUnpackRuntime.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAbs.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAcos.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathAcosh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAsin.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathAsinh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAtan.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathAtan2.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathAtanh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvert.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathBaseConvertRuntime.php` | 0 | 3 |
 | `lib/JIT/Builtin/MathCeil.php` | 0 | 1 |
@@ -6825,6 +6831,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/AcoshJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/AddslashesJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7106,6 +7117,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/AsinhJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/AssertOptionsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -7117,6 +7133,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/AtanJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/AtanhJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -12909,7 +12930,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmMath.php`
 
 **Warnings** (review for bootstrap subset):
-- 72 class method(s)
+- 75 class method(s)
 
 ### `ext/standard/VmMemory.php`
 
@@ -14358,7 +14379,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/array_push.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 38)
 - 2 class method(s)
 - 1 closure(s)
 
@@ -21045,7 +21065,17 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/MathAcosh.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/MathAsin.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathAsinh.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
@@ -21056,6 +21086,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathAtan2.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathAtanh.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
@@ -27890,7 +27925,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new Error (line 262)
-- 19 class method(s)
+- 20 class method(s)
 
 ### `lib/VM/ReflectionPropertyHookSupport.php`
 

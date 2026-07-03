@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAsinh;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class asinh extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\asinh($num));
+        $frame->returnVar->float(VmMath::asinh($num));
     }
 
     public Context $context;
@@ -48,8 +49,7 @@ final class asinh extends Internal
             throw new \LogicException('asinh() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'asinh', 'float');
-        $fn = $context->lookupFunction('asinh');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathAsinh::invoke($context, $asFloat);
     }
 }
