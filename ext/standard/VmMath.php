@@ -250,7 +250,12 @@ final class VmMath
             throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::nullableIntBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::nullableIntBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             $f = $var->toFloat();
@@ -276,7 +281,12 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::intBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             $f = $var->toFloat();
@@ -360,7 +370,12 @@ final class VmMath
             throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'array'));
         }
         if (Variable::TYPE_OBJECT === $var->type) {
-            throw new \TypeError(self::intBuiltinTypeError($function, $argIndex, $paramName, 'object'));
+            throw new \TypeError(self::intBuiltinTypeError(
+                $function,
+                $argIndex,
+                $paramName,
+                EnumCaseSupport::typeNameForVariable($var)
+            ));
         }
         if (Variable::TYPE_FLOAT === $var->type) {
             return self::floatToZendLong($var->toFloat());
