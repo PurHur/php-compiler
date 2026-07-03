@@ -33,11 +33,9 @@ final class array_splice extends Internal
             throw new \LogicException('array_splice() requires two to four arguments in this compiler build');
         }
         $arrayArg = $frame->calledArgs[0];
+        VmArray::requireArrayParam($arrayArg, 'array_splice', 1, 'array');
         $arrayArg->separateArrayForWrite();
         $array = $arrayArg->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_splice() first argument must be an array in this compiler build');
-        }
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'array_splice', 2, 'offset');
 
         $length = null;

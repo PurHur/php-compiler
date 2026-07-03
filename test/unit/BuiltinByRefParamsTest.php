@@ -70,8 +70,11 @@ final class BuiltinByRefParamsTest extends TestCase
 
     public function testArrayPointerFirstArgument(): void
     {
-        foreach (['next', 'prev', 'reset', 'end', 'current', 'key'] as $fn) {
+        foreach (['next', 'prev', 'reset', 'end'] as $fn) {
             $this->assertSame([0], BuiltinByRefParams::forFunction($fn), $fn);
+        }
+        foreach (['current', 'key'] as $fn) {
+            $this->assertSame([], BuiltinByRefParams::forFunction($fn), $fn);
         }
     }
 

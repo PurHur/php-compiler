@@ -190,7 +190,13 @@ final class ReferencableCheck
                 if (Variable::TYPE_NULL === $calledArgs[$paramIdx]->resolveIndirect()->type) {
                     $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
                     self::assertArgument($fn, $paramIdx, $paramName, $calledArgs[$paramIdx], $caller);
-                } elseif (!self::isReferenceable($calledArgs[$paramIdx], $caller)) {
+                } elseif (
+                    !self::isReferenceable($calledArgs[$paramIdx], $caller)
+                    && !(
+                        'array_splice' === strtolower($fn)
+                        && self::isObjectOperand($calledArgs[$paramIdx])
+                    )
+                ) {
                     // #13435: shuffle/sort* on non-lvalue (e.g. new stdClass()) — E_NOTICE then TypeError.
                     self::emitNonVariableByRefNotice($caller);
                 }
@@ -286,7 +292,10 @@ final class ReferencableCheck
 
     public static function skipsByRefWhenNotArray(string $fn): bool
     {
-        return \in_array(strtolower($fn), self::arraySortMutatorFunctions(), true);
+        $lc = strtolower($fn);
+
+        return \in_array($lc, self::arraySortMutatorFunctions(), true)
+            || 'array_splice' === $lc;
     }
 
     /** array_walk* accepts object operands — non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
