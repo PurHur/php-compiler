@@ -50,6 +50,31 @@ final class StrGetcsvBuiltinTest extends TestCase
         $this->assertSame(['hello', 'world'], $vals);
     }
 
+    /** Issue #9303 — escape=enclosure uses doubled-quote unescaping only (php-src file.c). */
+    public function testEscapeEqualsEnclosureDoubledQuotes(): void
+    {
+        $runtime = new Runtime();
+        $fn = new str_getcsv();
+        $frame = $fn->getFrame($runtime->vmContext);
+        $arg = new VMVariable();
+        $arg->string('a,"b""c",d');
+        $sep = new VMVariable();
+        $sep->string(',');
+        $enc = new VMVariable();
+        $enc->string('"');
+        $esc = new VMVariable();
+        $esc->string('"');
+        $frame->calledArgs = [$arg, $sep, $enc, $esc];
+        $frame->returnVar = new VMVariable();
+        $fn->execute($frame);
+        $ht = $frame->returnVar->toArray();
+        $vals = [];
+        foreach ($ht->iterate(true) as $v) {
+            $vals[] = $v->resolveIndirect()->toString();
+        }
+        $this->assertSame(['a', 'b"c', 'd'], $vals);
+    }
+
     public function testEnumCaseOperandTypeError(): void
     {
         $runtime = new Runtime();
