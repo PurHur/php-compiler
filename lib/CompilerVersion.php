@@ -113,6 +113,30 @@ final class CompilerVersion
     }
 
     /**
+     * Effective language-syntax profile for php-src-strict gates (#15357).
+     *
+     * {@see getenv()} `PHP_COMPILER_PROFILE` (`8.2`, `8.4`, …) overrides {@see VERSION} for
+     * version-gated syntax (bare `throw;`, typed const, …). Unset uses VERSION — 8.4.0-dev
+     * reference matches Zend 8.2 for PHP 8.4-only syntax.
+     */
+    public static function languageProfileVersion(): string
+    {
+        $raw = getenv('PHP_COMPILER_PROFILE');
+        if (!\is_string($raw) || '' === $raw) {
+            return self::VERSION;
+        }
+        $raw = trim($raw);
+        if (preg_match('/^\d+\.\d+$/', $raw)) {
+            return $raw.'.0';
+        }
+        if (preg_match('/^\d+\.\d+\.\d+/', $raw, $m)) {
+            return $m[0];
+        }
+
+        return self::VERSION;
+    }
+
+    /**
      * PHP 8.3+ str_increment() / str_decrement() (ext/standard/string.c, issue #5697, #12378, #14518, #14709, #15026).
      *
      * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
@@ -578,11 +602,12 @@ final class CompilerVersion
     /**
      * PHP 8.4+ bare `throw;` catch rethrow (Zend/zend_compile.c, issue #3508, #14239, #15299, #15357).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects bare rethrow like Zend 8.2.
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile rejects
+     * bare rethrow like Zend 8.2 (#14239).
      */
     public static function supportsBareRethrow(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
