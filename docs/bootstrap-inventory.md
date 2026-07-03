@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3768 |
-| Phase A inventory files (M2 ratio SSOT) | 3768 |
+| PHP files on vm.php path | 3772 |
+| Phase A inventory files (M2 ratio SSOT) | 3772 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10183 |
+| Source constructs flagged (warnings) | 10189 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -504,6 +504,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/BuiltinClasses.php` | 0 | 1 |
 | `ext/standard/BuiltinEnums.php` | 0 | 19 |
 | `ext/standard/BuiltinRegistry.php` | 0 | 3 |
+| `ext/standard/CaseCompareJitHelper.php` | 0 | 1 |
 | `ext/standard/CeilJitHelper.php` | 0 | 1 |
 | `ext/standard/CharInMaskJitHelper.php` | 0 | 1 |
 | `ext/standard/CheckdateJitHelper.php` | 0 | 1 |
@@ -2793,6 +2794,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringBin2hex.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBitwiseNot.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringBz2.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringCaseCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
@@ -2893,6 +2895,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStrReplace.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrRot13.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrWordCount.php` | 0 | 4 |
+| `lib/JIT/Builtin/StringStrcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStreamCsv.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrftime.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStripTags.php` | 0 | 3 |
@@ -2900,6 +2903,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringStripslashes.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringStrnatcasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrnatcmp.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringStrncasecmp.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrpbrk.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrpos.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringStrptime.php` | 0 | 3 |
@@ -7222,6 +7226,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Module (line 35)
 - new Module (line 57)
 - 3 class method(s)
+
+### `ext/standard/CaseCompareJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
 
 ### `ext/standard/CeilJitHelper.php`
 
@@ -22070,6 +22079,13 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
+### `lib/JIT/Builtin/StringCaseCompare.php`
+
+**Warnings** (review for bootstrap subset):
+- new JIT (line 203)
+- 10 class method(s)
+- 1 closure(s)
+
 ### `lib/JIT/Builtin/StringChunkSplit.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22677,6 +22693,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new Variable (line 120)
 - 6 class method(s)
 
+### `lib/JIT/Builtin/StringStrcasecmp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
 ### `lib/JIT/Builtin/StringStreamCsv.php`
 
 **Warnings** (review for bootstrap subset):
@@ -22714,6 +22735,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 2 class method(s)
 
 ### `lib/JIT/Builtin/StringStrnatcmp.php`
+
+**Warnings** (review for bootstrap subset):
+- 2 class method(s)
+
+### `lib/JIT/Builtin/StringStrncasecmp.php`
 
 **Warnings** (review for bootstrap subset):
 - 2 class method(s)
