@@ -2,29 +2,21 @@
 
 declare(strict_types=1);
 
+/**
+ * JIT/AOT helper for rename() via RenameJitHelper PHP (#15533).
+ */
+
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringRename;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for rename() via libc rename(2). */
 final class JitRename
 {
     /** @return Value */
     public static function invoke(Context $context, Value $fromStr, Value $toStr): Value
     {
-        $map = $context->structFieldMap['__string__'];
-        $fromPtr = $context->builder->structGep($fromStr, $map['value']);
-        $toPtr = $context->builder->structGep($toStr, $map['value']);
-        $i32 = $context->getTypeFromString('int32');
-        $ret = $context->builder->call(
-            $context->lookupFunction('rename'),
-            $fromPtr,
-            $toPtr
-        );
-        $zero = $i32->constInt(0, false);
-
-        return $context->builder->icmp(Builder::INT_EQ, $ret, $zero);
+        return StringRename::invoke($context, $fromStr, $toStr);
     }
 }
