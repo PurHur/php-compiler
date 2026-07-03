@@ -72,7 +72,7 @@ final class VmSocket
      *
      * @return Variable|false
      */
-    public static function importStreamHandle(int $handle, Context $ctx): Variable|false
+    public static function canImportStreamHandle(int $handle): bool
     {
         if (!VmFs::isValidHandle($handle)) {
             return false;
@@ -83,12 +83,41 @@ final class VmSocket
             return false;
         }
 
+        return \is_resource(VmFs::lookupResource($handle));
+    }
+
+    public static function importStreamHandle(int $handle, Context $ctx): Variable|false
+    {
+        if (!self::canImportStreamHandle($handle)) {
+            return false;
+        }
+
         $stream = VmFs::lookupResource($handle);
         if (!\is_resource($stream)) {
             return false;
         }
 
         return self::wrapImportedStream($handle, $stream, $ctx);
+    }
+
+    /** Register JIT-allocated Socket object keyed by object address (#9217). */
+    public static function registerJitImportedStream(int $objAddr, int $streamHandle): void
+    {
+        if ($objAddr <= 0 || !self::canImportStreamHandle($streamHandle)) {
+            return;
+        }
+
+        $stream = VmFs::lookupResource($streamHandle);
+        if (!\is_resource($stream)) {
+            return;
+        }
+
+        self::$streamResources[$objAddr] = $stream;
+        self::$streamHandles[$objAddr] = $streamHandle;
+        $fd = VmFs::socketFdForHandle($streamHandle);
+        if (null !== $fd) {
+            self::$hostSocketFds[$objAddr] = $fd;
+        }
     }
 
     private static function wrapImportedStream(int $handle, mixed $stream, Context $ctx): Variable
