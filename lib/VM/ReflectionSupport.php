@@ -693,6 +693,18 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    /** ReflectionClass::getShortName() — unqualified class name (ext/reflection/php_reflection.c). */
+    public static function shortClassNameFromReflection(ObjectEntry $reflection): string
+    {
+        $name = self::classNameFromReflection($reflection);
+        $pos = strrpos($name, '\\');
+        if (false === $pos) {
+            return $name;
+        }
+
+        return substr($name, $pos + 1);
+    }
+
     /**
      * ReflectionClass::newLazyGhost/Proxy — class name string or ReflectionClass receiver (#6399).
      */

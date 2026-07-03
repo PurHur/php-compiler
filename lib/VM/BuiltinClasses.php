@@ -93,6 +93,7 @@ use PHPCompiler\VM\Builtin\ReflectionClassGetLazyInitializationException;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyPropertyNames;
 use PHPCompiler\VM\Builtin\ReflectionClassGetLazyProxyFactory;
 use PHPCompiler\VM\Builtin\ReflectionClassGetName;
+use PHPCompiler\VM\Builtin\ReflectionClassGetShortName;
 use PHPCompiler\VM\Builtin\ReflectionClassInitializeLazyObject;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethod;
 use PHPCompiler\VM\Builtin\ReflectionClassGetMethods;
@@ -594,6 +595,8 @@ final class BuiltinClasses
         $rc->methodVisibility['getattributes'] = $pub;
         $rc->methods['getname'] = new ReflectionClassGetName();
         $rc->methodVisibility['getname'] = $pub;
+        $rc->methods['getshortname'] = new ReflectionClassGetShortName();
+        $rc->methodVisibility['getshortname'] = $pub;
         $rc->methods['getmethod'] = new ReflectionClassGetMethod();
         $rc->methodVisibility['getmethod'] = $pub;
         $rc->methods['hasmethod'] = new ReflectionClassHasMethod();
