@@ -14256,6 +14256,15 @@ class Compiler {
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            $argCount,
+            $inlineFuncName
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
         if (
             $callbackArgIndex >= 0
@@ -15315,6 +15324,37 @@ class Compiler {
      * @param list<Op\Expr> $producers
      * @param list<Operand> $callArgs
      */
+    private function matchArraySpliceUnaryOffsetReplacementProducers(
+        array $producers,
+        int $argIndex,
+        int $argCount,
+        ?string $inlineFuncName
+    ): ?Op\Expr {
+        if ('array_splice' !== $inlineFuncName || $argCount < 4 || 2 !== \count($producers)) {
+            return null;
+        }
+        $unaryProducer = null;
+        $arrayProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $unaryProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            }
+        }
+        if (null === $unaryProducer || null === $arrayProducer) {
+            return null;
+        }
+        if (1 === $argIndex) {
+            return $unaryProducer;
+        }
+        if ($argIndex === $argCount - 1) {
+            return $arrayProducer;
+        }
+
+        return null;
+    }
+
     private function matchInlineCallArgProducerWithEmbeddedLiterals(
         array $producers,
         array $callArgs,
@@ -15324,6 +15364,15 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $inlineFuncName
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         // array_combine([...], [...]) — sibling Array_ producers map to keys/values by order (#10214).
         if (
             'array_combine' === $inlineFuncName
@@ -17290,6 +17339,11 @@ class Compiler {
                 ) {
                     array_unshift($producers, $child);
                     continue;
+                }
+                // array_splice($a, -2, 1, ['x']) — UnaryMinus offset prelude before replacement Array_ (#9329).
+                if ($prev instanceof Op\Expr\UnaryMinus || $prev instanceof Op\Expr\UnaryPlus) {
+                    array_unshift($producers, $prev);
+                    break;
                 }
                 break;
             }
@@ -20032,6 +20086,15 @@ class Compiler {
         }
         $callArgs = $callOp->args;
         $callArg = $callArgs[$argIndex] ?? null;
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $this->resolveCfgFuncCallName($callOp)
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
             if ($child === $callOp) {
