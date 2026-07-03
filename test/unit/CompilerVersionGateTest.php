@@ -164,10 +164,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassConstObjectExpressionsTrueOnDevForwardProfile(): void
+    public function testSupportsClassConstObjectExpressionsAlwaysFalse(): void
     {
-        // 8.4.0-dev forward line enables ZEND_CONST_EXPR_NEW (#15583).
-        $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+        // php-src rejects `new` in class constants in all versions (#15608, Zend/zend_compile.c).
+        $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
     }
 
     public function testSupportsClassConstObjectExpressionsFalseWhenProfile82(): void

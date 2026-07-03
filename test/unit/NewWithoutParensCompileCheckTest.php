@@ -5,29 +5,20 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
-use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
 /** `new` in property initializers and class constants rejected (#10391, #12940, Zend/zend_compile.c). */
 final class NewWithoutParensCompileCheckTest extends TestCase
 {
-    public function testClassConstNewWithoutParensCompileErrorsOrSucceedsOn83(): void
+    public function testClassConstNewWithoutParensCompileErrors(): void
     {
-        $code = <<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     const X = new stdClass;
 }
-PHP;
-        if (CompilerVersion::supportsClassConstObjectExpressions()) {
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'class_const_new.php');
-            $this->assertNotNull($block);
-
-            return;
-        }
-        $this->expectCompileError($code);
+PHP);
     }
 
     public function testStaticPropertyDefaultNewWithoutParensCompileErrors(): void
@@ -92,9 +83,9 @@ PHP, 'promoted_new_with_parens.php');
         $this->assertNotNull($block);
     }
 
-    public function testClassConstNewWithParensCompileErrorsOrSucceedsOn83(): void
+    public function testClassConstNewWithParensCompileErrors(): void
     {
-        $code = <<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public function __construct(public int $n = 0) {}
@@ -102,33 +93,17 @@ class C {
 class Holder {
     public const X = new C(1);
 }
-PHP;
-        if (CompilerVersion::supportsClassConstObjectExpressions()) {
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'class_const_new_ctor.php');
-            $this->assertNotNull($block);
-
-            return;
-        }
-        $this->expectCompileError($code);
+PHP);
     }
 
-    public function testClassConstNewEmptyArgsWithParensCompileErrorsOrSucceedsOn83(): void
+    public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
-        $code = <<<'PHP'
+        $this->expectCompileError(<<<'PHP'
 <?php
 class C {
     public const X = new stdClass();
 }
-PHP;
-        if (CompilerVersion::supportsClassConstObjectExpressions()) {
-            $runtime = new Runtime();
-            $block = $runtime->parseAndCompile($code, 'class_const_new_empty.php');
-            $this->assertNotNull($block);
-
-            return;
-        }
-        $this->expectCompileError($code);
+PHP);
     }
 
     public function testClassConstArrayWithNewCompileErrors(): void

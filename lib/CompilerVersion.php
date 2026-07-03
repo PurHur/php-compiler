@@ -235,19 +235,16 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ object class constants (`public const X = new Class(...)`).
+     * Whether class constants may use top-level `new Class(...)` initializers.
      *
-     * Zend ZEND_CONST_EXPR_NEW (#12940, #15517, #15583). Enabled on the 8.4.0-dev forward line
-     * when {@see languageProfileVersion()} is 8.3+; set `PHP_COMPILER_PROFILE=8.2` to match Zend 8.2
-     * compile-time rejection (#14123).
+     * php-src rejects all `new` in class constant expressions with
+     * "New expressions are not supported in this context" (Zend/zend_compile.c —
+     * zend_compile_const_expr). ZEND_CONST_EXPR_NEW applies to other constant-expression
+     * contexts (e.g. parameter defaults), not class constants (#15608, #10391).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        if (version_compare(self::VERSION, '8.3', '<')) {
-            return false;
-        }
-
-        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
+        return false;
     }
 
     /** PHP 8.4+ hexadecimal floating-point literals (Zend/zend_language_scanner.l, issue #7041). */
