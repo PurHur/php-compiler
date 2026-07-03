@@ -1233,6 +1233,7 @@ require_once __DIR__.'/../../../ext/standard/StreamSocketGetNameJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamSocketPairJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StreamSyncJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/SqrtJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/FormatDatetimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StrftimeJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StripTagsJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/StripWhitespaceJitHelper.php';
