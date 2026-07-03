@@ -288,10 +288,14 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241). */
+    /**
+     * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584).
+     *
+     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#13284).
+     */
     public static function supportsNextafter(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**

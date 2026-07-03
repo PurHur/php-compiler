@@ -109,10 +109,10 @@ final class InternalStrictArg
         if (!$context->callerStrictTypes) {
             return;
         }
-        if (JITVariable::TYPE_NATIVE_LONG === $arg->type || JITVariable::TYPE_NATIVE_DOUBLE === $arg->type) {
+        if (Variable::TYPE_NATIVE_LONG === $arg->type || Variable::TYPE_NATIVE_DOUBLE === $arg->type) {
             return;
         }
-        if (JITVariable::TYPE_VALUE === $arg->type) {
+        if (Variable::TYPE_VALUE === $arg->type) {
             self::enforceFloatValueBox($context, $arg, $function, $paramName, $argNumber);
 
             return;
