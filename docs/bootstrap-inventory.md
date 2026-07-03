@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3760 |
-| Phase A inventory files (M2 ratio SSOT) | 3760 |
+| PHP files on vm.php path | 3761 |
+| Phase A inventory files (M2 ratio SSOT) | 3761 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10176 |
+| Source constructs flagged (warnings) | 10177 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -928,7 +928,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/JitRewind.php` | 0 | 1 |
 | `ext/standard/JitRmdir.php` | 0 | 1 |
 | `ext/standard/JitRound.php` | 0 | 1 |
-| `ext/standard/JitRoundLowering.php` | 0 | 1 |
 | `ext/standard/JitRoundModeResolve.php` | 0 | 1 |
 | `ext/standard/JitScalarEnumCoerce.php` | 0 | 1 |
 | `ext/standard/JitScalarTypeCoerce.php` | 0 | 2 |
@@ -1118,6 +1117,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/ResolveSidecarJitHelper.php` | 0 | 1 |
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
+| `ext/standard/RoundJitHelper.php` | 0 | 1 |
 | `ext/standard/ScopeBuiltinJitHelper.php` | 0 | 3 |
 | `ext/standard/SerializeJitHelper.php` | 0 | 2 |
 | `ext/standard/SessionCreateIdJitHelper.php` | 0 | 1 |
@@ -2641,6 +2641,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/MathModf.php` | 0 | 3 |
 | `lib/JIT/Builtin/MathNextafter.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathRad2deg.php` | 0 | 1 |
+| `lib/JIT/Builtin/MathRound.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSin.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSinh.php` | 0 | 1 |
 | `lib/JIT/Builtin/MathSqrt.php` | 0 | 1 |
@@ -9462,11 +9463,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
-### `ext/standard/JitRoundLowering.php`
-
-**Warnings** (review for bootstrap subset):
-- 11 class method(s)
-
 ### `ext/standard/JitRoundModeResolve.php`
 
 **Warnings** (review for bootstrap subset):
@@ -11269,6 +11265,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 6 class method(s)
+
+### `ext/standard/RoundJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/standard/ScopeBuiltinJitHelper.php`
 
@@ -21175,6 +21176,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 4 class method(s)
 
 ### `lib/JIT/Builtin/MathRad2deg.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/MathRound.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\MathRound;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\InternalStrictArg as JitInternalStrictArg;
 use PHPCompiler\JIT\JitRoundModeArg;
@@ -11,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * LLVM JIT/AOT helper for round() (int/float, precision, PHP_ROUND_* mode).
+ * JIT/AOT helper for round() (int/float, precision, PHP_ROUND_* mode) via RoundJitHelper (#15211).
  */
 final class JitRound
 {
@@ -30,7 +31,7 @@ final class JitRound
             ? JitRoundModeArg::lower($context, $args[2], 'round')
             : $context->getTypeFromString('int64')->constInt(StdlibConstants::PHP_ROUND_HALF_UP, false);
 
-        return JitRoundLowering::lower($context, $number, $precision, $mode);
+        return MathRound::invoke($context, $number, $precision, $mode);
     }
 
     public static function roundWithModeInt(
@@ -45,7 +46,7 @@ final class JitRound
             : $context->getTypeFromString('int64')->constInt(0, false);
         $modeVal = $context->getTypeFromString('int64')->constInt($mode, false);
 
-        return JitRoundLowering::lower($context, $number, $prec, $modeVal);
+        return MathRound::invoke($context, $number, $prec, $modeVal);
     }
 
     private static function lowerPrecisionArg(Context $context, JITVariable $arg): Value

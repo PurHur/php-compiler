@@ -20,10 +20,6 @@ final class FpowRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('MathFpow::invoke', $jitPow);
         $this->assertStringNotContainsString("lookupFunction('pow')", $jitPow);
 
-        $round = (string) file_get_contents(__DIR__.'/../../ext/standard/JitRoundLowering.php');
-        $this->assertStringContainsString('MathFpow::invoke', $round);
-        $this->assertStringNotContainsString("lookupFunction('pow')", $round);
-
         $bridge = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/MathFpow.php');
         $this->assertStringContainsString('FpowJitHelper', $bridge);
         $this->assertStringContainsString('phpc_fpow', $bridge);
