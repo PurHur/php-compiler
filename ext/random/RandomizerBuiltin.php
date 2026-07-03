@@ -17,15 +17,39 @@ use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 use PHPCfg\Func as CfgFunc;
 
-/** Per-object engine state for Random\Engine\* (#13191). */
+/** Per-object engine state for Random\Engine\* (#13191, #11550). */
 final class RandomEngineStorage
 {
     /** @var array<int, Mt19937Instance> */
     private static array $mt19937 = [];
 
+    /** @var array<int, SecureInstance> */
+    private static array $secure = [];
+
+    /** @var array<int, Xoshiro256StarStarInstance> */
+    private static array $xoshiro = [];
+
+    /** @var array<int, PcgOneseq128XslRr64Instance> */
+    private static array $pcg = [];
+
     public static function attachMt19937(ObjectEntry $object, Mt19937Instance $engine): void
     {
         self::$mt19937[$object->id] = $engine;
+    }
+
+    public static function attachSecure(ObjectEntry $object, SecureInstance $engine): void
+    {
+        self::$secure[$object->id] = $engine;
+    }
+
+    public static function attachXoshiro(ObjectEntry $object, Xoshiro256StarStarInstance $engine): void
+    {
+        self::$xoshiro[$object->id] = $engine;
+    }
+
+    public static function attachPcg(ObjectEntry $object, PcgOneseq128XslRr64Instance $engine): void
+    {
+        self::$pcg[$object->id] = $engine;
     }
 
     public static function mt19937(ObjectEntry $object): Mt19937Instance
@@ -43,6 +67,36 @@ final class RandomEngineStorage
         return self::$mt19937[$object->id] ?? null;
     }
 
+    public static function secure(ObjectEntry $object): SecureInstance
+    {
+        return self::$secure[$object->id] ??= new SecureInstance();
+    }
+
+    public static function xoshiro(ObjectEntry $object): Xoshiro256StarStarInstance
+    {
+        $engine = self::$xoshiro[$object->id] ?? null;
+        if (null === $engine) {
+            throw new \LogicException('Random engine state missing');
+        }
+
+        return $engine;
+    }
+
+    public static function tryXoshiro(ObjectEntry $object): ?Xoshiro256StarStarInstance
+    {
+        return self::$xoshiro[$object->id] ?? null;
+    }
+
+    public static function pcg(ObjectEntry $object): PcgOneseq128XslRr64Instance
+    {
+        $engine = self::$pcg[$object->id] ?? null;
+        if (null === $engine) {
+            throw new \LogicException('Random engine state missing');
+        }
+
+        return $engine;
+    }
+
     public static function engineObject(ObjectEntry $randomizer): ObjectEntry
     {
         $engineVar = RandomizerStorage::engine($randomizer);
@@ -55,22 +109,69 @@ final class RandomEngineStorage
 
     public static function generate(ObjectEntry $engineObject): int
     {
-        $lc = strtolower(ltrim($engineObject->class->name, '\\'));
-        if ('random\\engine\\mt19937' === $lc) {
-            return self::mt19937($engineObject)->generate();
-        }
-
-        throw new \LogicException('Unsupported random engine: '.$engineObject->class->name);
+        return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
+            'random\\engine\\mt19937' => self::mt19937($engineObject)->generate(),
+            'random\\engine\\secure' => self::secure($engineObject)->generate(),
+            'random\\engine\\xoshiro256starstar' => self::xoshiro($engineObject)->generate(),
+            'random\\engine\\pcgoneseq128xslrr64' => self::pcg($engineObject)->generate(),
+            default => throw new \LogicException('Unsupported random engine: '.$engineObject->class->name),
+        };
     }
 
     public static function range(ObjectEntry $engineObject, int $min, int $max): int
     {
-        $lc = strtolower(ltrim($engineObject->class->name, '\\'));
-        if ('random\\engine\\mt19937' === $lc) {
-            return self::mt19937($engineObject)->range($min, $max);
+        return match (strtolower(ltrim($engineObject->class->name, '\\'))) {
+            'random\\engine\\mt19937' => self::mt19937($engineObject)->range($min, $max),
+            'random\\engine\\secure' => self::secure($engineObject)->range($min, $max),
+            'random\\engine\\xoshiro256starstar', 'random\\engine\\pcgoneseq128xslrr64' => self::rangeFromGenerate($engineObject, $min, $max),
+            default => throw new \LogicException('Unsupported random engine: '.$engineObject->class->name),
+        };
+    }
+
+    private static function rangeFromGenerate(ObjectEntry $engineObject, int $min, int $max): int
+    {
+        if ($max < $min) {
+            throw new \ValueError('Random\\Randomizer::getInt(): Argument #2 ($max) must be greater than or equal to argument #1 ($min)');
+        }
+        if ($min === $max) {
+            return $min;
+        }
+        $umax = $max - $min;
+        if ($umax > 0xFFFFFFFF) {
+            return $min + self::rangeFromGenerate64($engineObject, $umax);
         }
 
-        throw new \LogicException('Unsupported random engine: '.$engineObject->class->name);
+        return $min + self::rangeFromGenerate32($engineObject, $umax);
+    }
+
+    private static function rangeFromGenerate32(ObjectEntry $engineObject, int $umax): int
+    {
+        if (0xFFFFFFFF === $umax) {
+            return self::generate($engineObject);
+        }
+        ++$umax;
+        if (($umax & ($umax - 1)) === 0) {
+            return self::generate($engineObject) & ($umax - 1);
+        }
+        $limit = 0xFFFFFFFF - (int) (0xFFFFFFFF % $umax) - 1;
+        $result = self::generate($engineObject);
+        while ($result > $limit) {
+            $result = self::generate($engineObject);
+        }
+
+        return $result % $umax;
+    }
+
+    private static function rangeFromGenerate64(ObjectEntry $engineObject, int $umax): int
+    {
+        ++$umax;
+        $limit = \PHP_INT_MAX - (int) (\PHP_INT_MAX % $umax) - 1;
+        $result = self::generate($engineObject);
+        while ($result > $limit) {
+            $result = self::generate($engineObject);
+        }
+
+        return $result % $umax;
     }
 }
 
@@ -100,6 +201,7 @@ final class RandomizerBuiltin
     public static function registerClasses(Context $ctx): void
     {
         self::registerMt19937($ctx);
+        AdditionalEnginesBuiltin::registerClasses($ctx);
         self::registerRandomizer($ctx);
     }
 
