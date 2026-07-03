@@ -2269,6 +2269,10 @@ class VM {
         $savedExternalCatch = $this->context->cloneMagicExternalCatchFrame;
         $this->context->cloneMagicExternalCatchFrame = null;
         $this->context->invokingCloneMagic = true;
+        VM\CloneWithSupport::beginCloneMagicReinit(
+            $object,
+            fn (ObjectEntry $owner, string $prop): ?string => $this->readonlyPropertyDeclaringClass($owner, $prop)
+        );
         try {
             $child = $func->getFrame($this->context, $parentFrame);
             $child->calledArgs = [$thisVar];
@@ -2298,6 +2302,7 @@ class VM {
 
             return null;
         } finally {
+            VM\CloneWithSupport::endReinit($object);
             $this->context->invokingCloneMagic = false;
             $this->context->cloneMagicExternalCatchFrame = $savedExternalCatch;
             if (null !== $savedStack) {
