@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** strrchr() for two strings (subset of PHP; LLVM via libc strrchr + slice). */
+/** strrchr() for two strings (VM: VmString; JIT/AOT: StrrchrJitHelper PHP #15406). */
 final class strrchr extends Internal
 {
     public function execute(Frame $frame): void
