@@ -605,11 +605,59 @@ final class VmReflection
     }
 
     /**
+     * Lexical class scope for is_callable() visibility (php-src zend_is_callable_at_frame, #9334).
+     */
+    public static function callerClassLcFromFrame(Frame $frame): ?string
+    {
+        $scopeFrame = self::reflectionCallerFrame($frame);
+        if (
+            null !== $scopeFrame->block
+            && null !== $scopeFrame->block->func
+            && (($scopeFrame->block->func->flags ?? 0) & CfgFunc::FLAG_CLOSURE) !== 0
+            && null !== $scopeFrame->calledClass
+            && '' !== $scopeFrame->calledClass
+        ) {
+            return strtolower($scopeFrame->calledClass);
+        }
+        if (null !== $scopeFrame->block && null !== $scopeFrame->block->func && null !== $scopeFrame->block->func->class) {
+            return strtolower($scopeFrame->block->func->class->value);
+        }
+        if (null !== $scopeFrame->calledClass && '' !== $scopeFrame->calledClass) {
+            return strtolower($scopeFrame->calledClass);
+        }
+
+        return null;
+    }
+
+    /**
+     * is_callable() visibility probe for a resolved method (#9334).
+     */
+    public static function isMethodCallableFromScope(
+        Context $ctx,
+        int $visibilityFlags,
+        string $declaringClassLc,
+        ?string $callerClassLc
+    ): bool {
+        return MethodVisibility::isCallable(
+            $visibilityFlags,
+            $callerClassLc,
+            $declaringClassLc,
+            false,
+            fn (string $classLc, string $ancestorLc): bool => self::isSameOrSubclassOf($ctx, $classLc, $ancestorLc)
+        );
+    }
+
+    /**
      * is_callable() class-string probe — instance methods are not statically invokable (#12545).
      *
      * php-src: ext/standard/basic_functions.c — zend_is_callable_at_frame
      */
-    public static function isStaticallyCallableMethod(Context $ctx, string $className, string $method): bool
+    public static function isStaticallyCallableMethod(
+        Context $ctx,
+        string $className,
+        string $method,
+        ?string $callerClassLc = null
+    ): bool
     {
         $lcClass = strtolower(ltrim($className, '\\'));
         $methodLc = strtolower($method);
@@ -649,13 +697,13 @@ final class VmReflection
             if (isset($class->methods[$methodLc])) {
                 $vis = $class->methodVisibility[$methodLc] ?? CfgFunc::FLAG_PUBLIC;
                 if (($vis & CfgFunc::FLAG_STATIC) !== 0) {
-                    return true;
+                    return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
                 }
                 $func = $class->methods[$methodLc];
                 if ($func instanceof Func\PHP) {
                     $decl = $func->block->func;
                     if (null !== $decl && (($decl->flags ?? 0) & CfgFunc::FLAG_STATIC) !== 0) {
-                        return true;
+                        return self::isMethodCallableFromScope($ctx, $vis, $walk, $callerClassLc);
                     }
                 }
 

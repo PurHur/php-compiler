@@ -163,6 +163,35 @@ final class MethodVisibility
     }
 
     /**
+     * Non-throwing is_callable() / zend_is_callable_at_frame probe (#9334).
+     */
+    public static function isCallable(
+        int $visibilityFlags,
+        ?string $callerClassLc,
+        string $declaringClassLc,
+        bool $parentScopeAllows = false,
+        ?callable $isSameOrSubclassOf = null
+    ): bool {
+        try {
+            self::assertCallableInternal(
+                $visibilityFlags,
+                $callerClassLc,
+                $declaringClassLc,
+                '',
+                '',
+                $parentScopeAllows,
+                $isSameOrSubclassOf,
+                null,
+                false
+            );
+
+            return true;
+        } catch (\LogicException) {
+            return false;
+        }
+    }
+
+    /**
      * Compile-time JIT guard: true when a runtime visibility check must be emitted.
      */
     public static function needsRuntimeCheck(
