@@ -267,6 +267,9 @@ final class VmDom
         $document->methods['savehtml'] = new DocumentSaveHTML();
         $document->methodVisibility['savehtml'] = $pub;
         $document->methodNames['savehtml'] = 'saveHTML';
+        $document->methods['savehtmlfile'] = new DocumentSaveHTMLFile();
+        $document->methodVisibility['savehtmlfile'] = $pub;
+        $document->methodNames['savehtmlfile'] = 'saveHTMLFile';
         $document->methods['getelementsbytagname'] = new DocumentGetElementsByTagName();
         $document->methodVisibility['getelementsbytagname'] = $pub;
         $document->methods['getelementbyid'] = new DocumentGetElementById();
@@ -2028,6 +2031,17 @@ final class VmDom
         }
 
         return implode('', $lines)."\n";
+    }
+
+    public static function saveHTMLFile(ObjectEntry $document, string $filename): int
+    {
+        $html = self::saveHTML($document);
+        $written = file_put_contents($filename, $html);
+        if (false === $written) {
+            return 0;
+        }
+
+        return $written;
     }
 
     private static function normalizeHtmlLoadSource(string $html, int $options): string
