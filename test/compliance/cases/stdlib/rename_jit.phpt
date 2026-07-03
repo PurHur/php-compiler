@@ -1,5 +1,5 @@
 --TEST--
-JIT: rename() via libc rename(2)
+JIT: rename() via RenameJitHelper PHP (#15533)
 --FILE--
 <?php
 $base = 'test/compliance/cases/stdlib/rename_fixture';

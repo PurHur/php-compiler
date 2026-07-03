@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** rename() — VM via VmFs; JIT/AOT via libc rename(2). */
+/** rename() — VM via VmFs; JIT/AOT via RenameJitHelper PHP (#15533). */
 final class rename_ extends Internal
 {
     public function __construct()

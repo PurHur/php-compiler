@@ -1199,15 +1199,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('fnmatch', $fn);
         }
         try {
-            $context->lookupFunction('rename');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('rename', $ft);
-            $context->registerFunction('rename', $fn);
-        }
-        try {
             $context->lookupFunction('linkat');
         } catch (\Throwable $e) {
             $i8p = $context->getTypeFromString('int8*');
