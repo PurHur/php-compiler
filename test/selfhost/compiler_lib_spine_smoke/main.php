@@ -678,6 +678,7 @@ require_once __DIR__.'/../../../ext/standard/JitArrayFill.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayIsList.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayKey.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayMergeRecursive.php';
+require_once __DIR__.'/../../../ext/standard/ArrayPointerJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayPointer.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayPush.php';
 require_once __DIR__.'/../../../ext/standard/JitArrayRand.php';
