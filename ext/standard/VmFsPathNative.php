@@ -9,7 +9,7 @@ namespace PHPCompiler\ext\standard;
  *
  * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(rename), copy, link
  * php-src: ext/standard/filestat.c — readlink, symlink
- * JIT/AOT: JitRename / JitCopy / JitSymlink / JitReadlink (unchanged).
+ * JIT/AOT: JitRename / JitCopy / JitSymlink / JitReadlink via PHP helpers (#15353).
  */
 final class VmFsPathNative
 {
