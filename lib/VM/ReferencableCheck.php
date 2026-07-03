@@ -290,11 +290,22 @@ final class ReferencableCheck
         ];
     }
 
+    /**
+     * array_pop/shift/unshift — non-array operands get TypeError in the builtin (#15216).
+     *
+     * @return list<string>
+     */
+    public static function arrayStackMutatorFunctions(): array
+    {
+        return ['array_pop', 'array_shift', 'array_unshift'];
+    }
+
     public static function skipsByRefWhenNotArray(string $fn): bool
     {
         $lc = strtolower($fn);
 
         return \in_array($lc, self::arraySortMutatorFunctions(), true)
+            || \in_array($lc, self::arrayStackMutatorFunctions(), true)
             || 'array_splice' === $lc;
     }
 

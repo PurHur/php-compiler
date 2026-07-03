@@ -15,10 +15,7 @@ use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Builtin\ArrayPopRuntime;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitReferencableCheck;
-use PHPCompiler\JIT\JitValueBox;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
@@ -31,11 +28,7 @@ final class array_pop extends Internal
         if (1 !== \count($frame->calledArgs)) {
             throw new \LogicException('array_pop() requires exactly one argument');
         }
-        $array = $frame->calledArgs[0]->resolveIndirect();
-        if (Variable::TYPE_ARRAY !== $array->type) {
-            throw new \LogicException('array_pop() argument must be an array in this compiler build');
-        }
-        $ht = $array->toArray();
+        $ht = VmArray::requireArrayParam($frame->calledArgs[0], 'array_pop', 1, 'array');
         $popped = ArrayPopJitHelper::pop($ht);
         if (null === $frame->returnVar) {
             return;
@@ -50,9 +43,7 @@ final class array_pop extends Internal
         if (1 !== \count($args)) {
             throw new \LogicException('array_pop() requires exactly one argument');
         }
-        if (!JitReferencableCheck::guardArrayMutatorByRefArg($context, 'array_pop', $args[0])) {
-            return JitValueBox::pointer($context, JitValueBox::alloc($context));
-        }
+        JitArrayElem::requireArrayParam($context, $args[0], 'array_pop', 1, 'array');
 
         foreach ($args as $i => $arg) {
             if (JITVariable::TYPE_STRING === $arg->type || JITVariable::TYPE_VALUE === $arg->type) {
