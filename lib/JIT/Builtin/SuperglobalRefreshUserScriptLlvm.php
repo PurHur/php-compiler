@@ -40,7 +40,7 @@ final class SuperglobalRefreshUserScriptLlvm
 
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
-        ParseStrRuntime::ensureLinked($context);
+        ParseStrRuntime::ensureDeferredStubsForUserScriptRefresh($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
 

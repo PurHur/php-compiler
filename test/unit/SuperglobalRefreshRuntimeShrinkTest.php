@@ -35,7 +35,7 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
     public function testUserScriptRefreshRoutesThroughParseStrRuntimeBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/SuperglobalRefreshUserScriptLlvm.php');
-        $this->assertStringContainsString('ParseStrRuntime::ensureLinked', $source);
+        $this->assertStringContainsString('ensureDeferredStubsForUserScriptRefresh', $source);
         $this->assertStringContainsString('__compiler_parse_str', $source);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
         $this->assertStringContainsString('emitEnvironWalkIntoHashtable', $source);

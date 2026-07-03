@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+
 /**
  * Nested JIT lowering for {@see \PHPCompiler\VM\HashTable} instance helpers (#14601).
  *
