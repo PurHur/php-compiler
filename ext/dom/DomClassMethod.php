@@ -80,6 +80,12 @@ abstract class DomClassMethod extends VmClassMethod
             ));
         }
         $object = $var->toObject();
+        $classLc = strtolower($object->class->name);
+        if (VmDom::CLASS_DOCUMENT === $classLc) {
+            VmDom::ensureDocument($object);
+        } elseif (VmDom::CLASS_DOCUMENT_FRAGMENT === $classLc) {
+            VmDom::ensureDocumentFragment($object);
+        }
         if (!VmDom::isDomNode($object)) {
             throw new \TypeError(sprintf(
                 '%s must be called on a DOMNode instance',
