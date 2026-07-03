@@ -134,7 +134,7 @@ final class HashTable {
                 }
             }
         }
-        if ($maxIntKey > 0) {
+        if ($maxIntKey > 0 && $maxIntKey < \PHP_INT_MAX) {
             $out->ensureHashSlotCapacity($maxIntKey);
         }
         foreach ($this->iterateKeyed(false) as [$key, $value]) {
@@ -168,9 +168,7 @@ final class HashTable {
         $bucket->value->next = $this->indexes->read($index);
         $this->indexes->write($index, $id);
         $bucket->value->duplicateFrom($data);
-        if ($index >= $this->nextFreeElement) {
-            $this->nextFreeElement = $index + 1;
-        }
+        $this->bumpNextFreeElementForIndex($index);
     }
 
     private function insertDuplicatedKey(string $key, Variable $data): void
@@ -2011,6 +2009,9 @@ final class HashTable {
         if ($this->flags & self::FLAG_UNINITIALIZED) {
             $this->initMixed();
         }
+        if ($maxHashIndex >= \PHP_INT_MAX) {
+            return;
+        }
         while ($maxHashIndex >= $this->indexes->size()) {
             $this->resize();
         }
@@ -2114,10 +2115,22 @@ final class HashTable {
         } else {
             $bucket->value->copyFrom($data);
         }
-        if (is_null($key) && $hash >= $this->nextFreeElement) {
-            $this->nextFreeElement = $hash + 1;
+        if (is_null($key)) {
+            $this->bumpNextFreeElementForIndex($hash);
         }
         return $bucket->value;
+    }
+
+    /**
+     * Advance nextFreeElement after storing integer key $index (php-src nNextFreeElement; #9534).
+     * PHP int cannot represent PHP_INT_MAX + 1 — skip bump so append finds the first free slot.
+     */
+    private function bumpNextFreeElementForIndex(int $index): void
+    {
+        if ($index < $this->nextFreeElement || $index >= \PHP_INT_MAX) {
+            return;
+        }
+        $this->nextFreeElement = $index + 1;
     }
 
     private function findBucket(int $hash, ?string $key): ?HashTableBucket
@@ -2251,7 +2264,7 @@ final class HashTable {
             if ($bucket->value->isUndefined()) {
                 continue;
             }
-            if (null === $bucket->key && $bucket->hash >= $next) {
+            if (null === $bucket->key && $bucket->hash >= $next && $bucket->hash < \PHP_INT_MAX) {
                 $next = $bucket->hash + 1;
             }
         }
