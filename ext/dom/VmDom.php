@@ -1044,6 +1044,9 @@ final class VmDom
         if (null === $idAttr && null !== $nodeState->idAttributeName) {
             $idAttr = $nodeState->idAttributeName;
         }
+        if (null === $idAttr && $docState->isHtmlDocument && isset($nodeState->attributes['id'])) {
+            $idAttr = 'id';
+        }
         if (null !== $idAttr) {
             $value = $nodeState->attributes[$idAttr] ?? null;
             if (null !== $value && '' !== $value) {
