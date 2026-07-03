@@ -6263,6 +6263,11 @@ restart:
                                 }
                                 $this->tagReadonlyPropertyDimWriteContainer($result, $propertyObject, $name);
                             }
+                            $catchFrame = $this->enforceDomDocumentReadOnlyPropertyWrite($propertyObject, $name, $frame);
+                            if (null !== $catchFrame) {
+                                $frame = $catchFrame;
+                                goto restart;
+                            }
                             $result->indirect($this->fetchObjectPropertyWriteLvalue($propertyObject, $name, $frame));
                             break;
                         }
@@ -8494,6 +8499,14 @@ restart:
         try {
             $resolved = $dst->resolveIndirect();
             if (null !== $resolved->objectPropertyOwner && null !== $resolved->objectPropertyName) {
+                try {
+                    ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite(
+                        $resolved->objectPropertyOwner,
+                        $resolved->objectPropertyName
+                    );
+                } catch (\Error $e) {
+                    return $this->dispatchVmError($e->getMessage(), $frame);
+                }
                 if (ext\dom\DomNodePropertySupport::tryAssign(
                     $resolved->objectPropertyOwner,
                     $resolved->objectPropertyName,
@@ -8628,6 +8641,21 @@ restart:
         $thrown = VM\BuiltinExceptionSupport::materializeError($this->context, $message, $file, $line);
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** php-src ext/dom/php_dom.c — DOMDocument::$documentElement rejects user writes (#15550). */
+    private function enforceDomDocumentReadOnlyPropertyWrite(
+        ObjectEntry $object,
+        string $name,
+        Frame $frame
+    ): ?Frame {
+        try {
+            ext\dom\DomDocumentPropertySupport::rejectReadOnlyPropertyWrite($object, $name);
+        } catch (\Error $e) {
+            return $this->dispatchVmError($e->getMessage(), $frame);
+        }
+
+        return null;
     }
 
     private function dispatchVmCompileError(\CompileError $error, Frame $frame): ?Frame
