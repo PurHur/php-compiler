@@ -129,6 +129,7 @@
         "ext/dom/ElementHasAttributeNS.php",
         "ext/dom/ElementSetAttribute.php",
         "ext/dom/ElementSetAttributeNS.php",
+        "ext/dom/ElementRemoveAttributeNS.php",
         "ext/dom/ElementSetIdAttribute.php",
         "ext/dom/FragmentAppendChild.php",
         "ext/dom/ImplementationCreateDocument.php",

@@ -252,6 +252,8 @@ final class VmDom
         $element->methodVisibility['setattribute'] = $pub;
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
+        $element->methods['removeattributens'] = new ElementRemoveAttributeNS();
+        $element->methodVisibility['removeattributens'] = $pub;
         $element->methods['setidattribute'] = new ElementSetIdAttribute();
         $element->methodVisibility['setidattribute'] = $pub;
         $element->methodNames['setidattribute'] = 'setIdAttribute';
@@ -519,6 +521,43 @@ final class VmDom
         if (null !== $state->idAttributeName && $qualifiedName === $state->idAttributeName) {
             self::syncElementIdRegistration($element);
         }
+    }
+
+    public static function removeAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): bool
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $wantNs = $namespace ?? '';
+        $state = DomRegistry::state($element);
+        $removedQName = null;
+        foreach ($state->attributes as $qName => $value) {
+            if (self::isXmlnsAttributeName($qName)) {
+                continue;
+            }
+            [$prefix, $local] = self::splitQualifiedName($qName);
+            if ($local !== $localName) {
+                continue;
+            }
+            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            if ($attrNs === $wantNs) {
+                $removedQName = $qName;
+                break;
+            }
+        }
+        if (null === $removedQName) {
+            return false;
+        }
+        unset($state->attributes[$removedQName]);
+        if (null !== $state->idAttributeName && $removedQName === $state->idAttributeName) {
+            $document = self::ownerDocumentEntry($element);
+            if (null !== $document) {
+                self::unregisterElementId($document, $element);
+            }
+            $state->idAttributeName = null;
+        }
+
+        return true;
     }
 
     /** DOMElement::setIdAttribute() — manual ID map for getElementById() (php-src ext/dom/node.c; #14493). */
