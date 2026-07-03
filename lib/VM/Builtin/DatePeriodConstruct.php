@@ -39,6 +39,7 @@ final class DatePeriodConstruct extends VmClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DatePeriod::__construct() requires VM context in this compiler build');
         }
+        DatePeriodSupport::assertConstructorOverload($frame, $argc, $frame->vmContext);
         $start = DateTimeSupport::requireDateTimeInterface(
             $frame->calledArgs[1],
             'DatePeriod::__construct()',

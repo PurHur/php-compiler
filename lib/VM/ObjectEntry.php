@@ -141,6 +141,9 @@ class ObjectEntry {
     public function destroyForGc(): void
     {
         foreach ($this->properties as $prop) {
+            if (TypedPropertyCheck::isUninitialized($prop)) {
+                continue;
+            }
             ObjectLifetime::releaseDirectObject($prop);
             if (Variable::TYPE_INDIRECT === $prop->type) {
                 $prop->resolveIndirect()->null();

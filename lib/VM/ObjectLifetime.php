@@ -80,7 +80,7 @@ final class ObjectLifetime
             self::releaseRef($var->toObject());
         } catch (DestructorThrowCatchSignal $signal) {
             throw $signal;
-        } catch (\LogicException) {
+        } catch (\LogicException|\Error) {
         }
     }
 
