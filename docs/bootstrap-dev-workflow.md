@@ -23,6 +23,7 @@ Ship **Bootstrap SDK v1.x** only when `BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-loo
 ```text
 Tier 0 — Harness (Zend)     composer, apply-patches, phpunit, ci-fast
 Tier 1 — Daily compile      build/bin-compile-aot-inventory (gen-2 argv driver)
+Tier 1.5 — Native smoke     make bootstrap-native-test (no Zend PHPUnit assertions)
 Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 ```
 
@@ -30,6 +31,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 |------|------|-------|
 | **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/ci-fast.sh` |
 | **1** | Compiling fixtures, examples, local AOT during feature work | `./build/bin-compile-aot-inventory -o OUT SOURCE.php` |
+| **1.5** | Curated native smoke without host PHPUnit ([#15599](https://github.com/PurHur/php-compiler/issues/15599)) | `make bootstrap-native-test`, `./script/bootstrap-native-test.sh` |
 | **2** | Before merge; after spine or gen-0 edits | `make north-star5-verify-fast`, `make bootstrap-loop-probe` |
 
 **Rule:** Do not aim for “Zend-free development” yet. Aim for **Zend-free compile** on the paths you are bootstrapping.
@@ -251,12 +253,12 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 |---|-------|--------|
 | 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
 | 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources |
-| 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) |
+| 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) — **starter landed:** `make bootstrap-native-test` (one fixture; full matrix later) |
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
 | 6 | [#15602](https://github.com/PurHur/php-compiler/issues/15602) | Bootstrap SDK release tarball |
 | 7 | [#15603](https://github.com/PurHur/php-compiler/issues/15603) | Honest compile CI gate — **landed:** `BOOTSTRAP_HONEST_COMPILE_GATE=1`, `bootstrap-loop-probe --honest-compile` |
-| 8 | [#15604](https://github.com/PurHur/php-compiler/issues/15604) | Inventory argv driver without emit-helper sidecar |
+| 8 | [#15604](https://github.com/PurHur/php-compiler/issues/15604) | Inventory argv driver without emit-helper sidecar — **starter:** `make bootstrap-inventory-argv-probe` |
 | 9 | [#15605](https://github.com/PurHur/php-compiler/issues/15605) | Flip default onboarding to gen-1+ tiers |
 | 10 | [#15606](https://github.com/PurHur/php-compiler/issues/15606) | Bootstrap SDK platform contract |
 
@@ -270,7 +272,27 @@ make bootstrap-init
 # Honest compile gate — opt-in; fails until #15597 closes (#15603)
 BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
 ./script/bootstrap-loop-probe.sh --honest-compile
+
+# Native test harness — one bootstrap-aot smoke without Zend PHPUnit (#15599)
+make bootstrap-native-test
+./script/bootstrap-native-test.sh
+
+# Inventory argv sidecar gap probe — reports sidecar_free=ok|blocked (#15604)
+make bootstrap-inventory-argv-probe
+./script/bootstrap-inventory-argv-probe.sh --check
 ```
+
+### Known gap: inventory argv still uses emit-helper sidecars (#15604)
+
+`build/bin-compile-aot-inventory` is built via inventory argv link (`PHP_COMPILER_M3_INVENTORY_EMIT_DRIVER=1`, no `PHP_COMPILER_EMIT_HELPER_LINK`), but link-time still registers M3 emit-helper sidecars (compiler_lib spine blob, HelloWorld smoke, etc.) unless `PHP_COMPILER_M3_INVENTORY_NO_EMIT_HELPER_SIDECAR=1` is set for probing.
+
+| Probe | Meaning |
+|-------|---------|
+| `sidecar_free=ok` | bin/compile.php inventory argv link succeeded without sidecar prep or recovery |
+| `sidecar_free=blocked` (exit 3) | Gap still open — sidecar / emit-helper TU dependency remains |
+| `--strict` | Exit 1 when blocked (future CI gate after #15604 closes) |
+
+Acceptance for closing #15604: `bootstrap-inventory-argv-probe` reports `sidecar_free=ok` **and** `bootstrap-selfhost-full-revision-probe` green without prelinked byte match.
 
 ---
 
