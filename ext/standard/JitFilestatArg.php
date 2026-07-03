@@ -118,7 +118,7 @@ final class JitFilestatArg
         );
     }
 
-    /** chmod()/mkdir() mode — strict int or weak numeric-string Z_PARAM_LONG decimal cast (#15060). */
+    /** chmod()/mkdir() mode — strict int or weak numeric-string octal parse (#15081, ext/standard/filestat.c). */
     public static function lowerFileMode(
         Context $context,
         JITVariable $arg,
@@ -138,6 +138,9 @@ final class JitFilestatArg
                     self::intTypeError($function, $argIndex, $paramName, 'string')
                 );
             }
+            $i64 = $context->getTypeFromString('int64');
+
+            return $i64->constInt(octdec($raw), false);
         }
 
         return JitLongArg::lower($context, $arg, $function.'() '.$paramName);

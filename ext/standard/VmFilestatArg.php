@@ -229,7 +229,7 @@ final class VmFilestatArg
     }
 
     /**
-     * Weak-mode file mode coercion — Z_PARAM_LONG decimal cast for numeric strings (#15060, ext/standard/filestat.c).
+     * Weak-mode file mode coercion — numeric strings are octal (php-src filestat.c; #15081).
      *
      * @throws \TypeError
      */
@@ -239,6 +239,21 @@ final class VmFilestatArg
         int $argIndex,
         string $paramName
     ): int {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            $s = $var->toString();
+            if ('' === $s || !is_numeric($s)) {
+                throw new \TypeError(self::intTypeError(
+                    $function,
+                    $argIndex,
+                    $paramName,
+                    'string'
+                ));
+            }
+
+            return octdec($s);
+        }
+
         return VmMath::parseIntBuiltinArg($var, $function, $argIndex + 1, $paramName);
     }
 
