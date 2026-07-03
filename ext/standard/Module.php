@@ -614,6 +614,7 @@ class Module extends ModuleAbstract
             new stream_context_set_params(),
             new stream_socket_client(),
             new stream_socket_server(),
+            new stream_socket_accept(),
             new stream_socket_pair(),
             new stream_socket_get_name(),
             new fsockopen(),
