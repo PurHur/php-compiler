@@ -14263,6 +14263,16 @@ class Compiler {
         if (0 === $producerCount) {
             return null;
         }
+        if (
+            \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)
+            && 2 === $argCount
+            && $argIndex < $producerCount
+        ) {
+            $mergeMapped = $this->matchArrayMergeFamilyInlineCallArgProducer($producers, $argIndex);
+            if (null !== $mergeMapped) {
+                return $mergeMapped;
+            }
+        }
         $trailingComparator = $this->matchTrailingComparatorInlineCallArgProducer(
             $producers,
             $callArgs,
@@ -15256,12 +15266,18 @@ class Compiler {
                     return $producers[$producerCount - 1];
                 }
                 $lastArray = null;
+                $arrayProducerCount = 0;
                 foreach ($producers as $producer) {
                     if ($producer instanceof Op\Expr\Array_) {
+                        ++$arrayProducerCount;
                         $lastArray = $producer;
                     }
                 }
-                if (null !== $lastArray) {
+                // array_merge([1], [2]) — one hoisted Array_ per arg; do not wire arg #0 to trailing (#10093, #15552).
+                if (
+                    null !== $lastArray
+                    && !($arrayProducerCount >= 2 && $argCount === $producerCount)
+                ) {
                     $callArg = $callArgs[$argIndex] ?? null;
                     if (
                         null !== $callArg
@@ -15304,11 +15320,11 @@ class Compiler {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
         // array_merge(array_keys($src), ['b']) / array_merge(['a'=>1], array_keys(...)) (#12450, #13704, #13760).
         if (
-            \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)
+            \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)
             && 2 === \count($callArgs)
-            && 2 === \count($producers)
+            && \count($producers) >= 2
         ) {
-            $arrayMergePair = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+            $arrayMergePair = $this->matchArrayMergeFamilyInlineCallArgProducer($producers, $argIndex);
             if (null !== $arrayMergePair) {
                 return $arrayMergePair;
             }
@@ -16053,9 +16069,13 @@ class Compiler {
             ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
             && $this->callArgOperandExpectsArrayProducer($callArgProbe)
         ) {
+            $callee = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
             if (
-                'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
-                && 0 === $argIndex
+                0 === $argIndex
+                && (
+                    'array_combine' === $callee
+                    || \in_array($callee, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)
+                )
             ) {
                 return $matched;
             }
@@ -17647,6 +17667,14 @@ class Compiler {
                 if ($nonEmbedded >= 2) {
                     return true;
                 }
+                // array_merge(array_keys($src), ['b']) — nested FuncCall + trailing embedded Array_ (#15551).
+                $consumerName = $this->resolveCfgFuncCallName($consumer);
+                if (
+                    \in_array($consumerName, ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'], true)
+                    && $nonEmbedded >= 1
+                ) {
+                    return true;
+                }
             }
         }
         if ($this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
@@ -18143,7 +18171,26 @@ class Compiler {
     {
         $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
         if ($immediate instanceof Op\Expr\Array_) {
-            return $immediate;
+            if (null !== $block->orig) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+                if (2 === \count($producers)) {
+                    $mapped = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+                    if ($mapped instanceof Op\Expr\Array_ && $mapped === $immediate) {
+                        return $immediate;
+                    }
+                    if ($mapped instanceof Op\Expr\FuncCall || $mapped instanceof Op\Expr\NsFuncCall) {
+                        return null;
+                    }
+                }
+            }
+            $callArg = $callOp->args[$argIndex] ?? null;
+            if (
+                null !== $callArg
+                && null !== $immediate->result
+                && $this->operandsReferToSameVariable($immediate->result, $callArg)
+            ) {
+                return $immediate;
+            }
         }
         $callArg = $callOp->args[$argIndex] ?? null;
         if (!$callArg instanceof Operand) {
@@ -19384,6 +19431,54 @@ class Compiler {
         }
 
         return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+    }
+
+    /**
+     * array_merge(array_keys($src), ['b']) — nested FuncCall + trailing Array_, optional stmt Array_ (#15551).
+     * array_merge_recursive(['a'=>1], ['a'=>2]) — sibling flat Array_ literals (#15552).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchArrayMergeFamilyInlineCallArgProducer(array $producers, int $argIndex): ?Op\Expr
+    {
+        if (2 === \count($producers)) {
+            $pair = $this->matchArrayMergeFuncCallAndArrayInlineProducers($producers, $argIndex);
+            if (null !== $pair) {
+                return $pair;
+            }
+        }
+        $funcProducer = null;
+        $funcPos = null;
+        $arrayProducers = [];
+        foreach ($producers as $pi => $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $funcProducer = $producer;
+                $funcPos = $pi;
+            } elseif ($producer instanceof Op\Expr\Array_) {
+                $arrayProducers[] = $producer;
+            }
+        }
+        if (null !== $funcProducer && null !== $funcPos && [] !== $arrayProducers) {
+            if (0 === $argIndex) {
+                return $funcProducer;
+            }
+            for ($j = $funcPos + 1, $n = \count($producers); $j < $n; ++$j) {
+                if ($producers[$j] instanceof Op\Expr\Array_) {
+                    return $producers[$j];
+                }
+            }
+
+            return null;
+        }
+        if (
+            \count($arrayProducers) === 2
+            && 2 === \count($producers)
+            && null === $funcProducer
+        ) {
+            return $producers[$argIndex] ?? null;
+        }
+
+        return null;
     }
 
     /**
@@ -25045,6 +25140,54 @@ class Compiler {
                     $closureSlot = $this->slotForInlineClosureProducer($leadingCallback, $block);
                     if (null !== $closureSlot) {
                         $valueSlot = (string) $closureSlot;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && \in_array(
+                    strtolower($calleeName ?? ''),
+                    ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                    true
+                )
+            ) {
+                $mergeProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $mergeArgCount = \count($cfgCallOp->args ?? []);
+                if ($mergeArgCount >= 2 && \count($mergeProducers) >= 2) {
+                    $mergeMapped = $this->matchArrayMergeFamilyInlineCallArgProducer(
+                        $mergeProducers,
+                        (int) $argIndex
+                    );
+                    if (null === $mergeMapped) {
+                        $mergeMapped = $this->matchSiblingNestedArrayLiteralCallArgProducer(
+                            $mergeProducers,
+                            (int) $argIndex,
+                            $mergeArgCount
+                        );
+                    }
+                    if (null === $mergeMapped && is_array($cfgCallOp->args ?? null)) {
+                        $mergeMapped = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
+                            $mergeProducers,
+                            (int) $argIndex,
+                            $mergeArgCount,
+                            $cfgCallOp->args
+                        );
+                    }
+                    if ($mergeMapped instanceof Op\Expr) {
+                        $mergeSlot = $block->slotForOperand($mergeMapped->result);
+                        if (null === $mergeSlot) {
+                            foreach ($this->compileExpr($mergeMapped, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $mergeSlot = $block->slotForOperand($mergeMapped->result);
+                        }
+                        if (null !== $mergeSlot) {
+                            $valueSlot = (string) $mergeSlot;
+                        }
                     }
                 }
             }
