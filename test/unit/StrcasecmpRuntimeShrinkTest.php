@@ -89,4 +89,11 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
         $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
     }
+
+    public function testObjectTypeRoutesStrncasecmpThroughCaseCompare(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/Type/Object_.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrncasecmpLinked', $source);
+        $this->assertStringNotContainsString("addFunction('strncasecmp'", $source);
+    }
 }

@@ -23,6 +23,7 @@ use PHPCompiler\JIT\EnumFromHelper;
 use PHPCompiler\JIT\FiberHelper;
 use PHPCompiler\JIT\GeneratorHelper;
 use PHPCompiler\JIT\Builtin\Refcount;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\Type;
 use PHPCompiler\JIT\HashTableHelper;
 use PHPCompiler\JIT\JitNativeString;
@@ -517,15 +518,7 @@ class Object_ extends Type {
      */
     private static function ensureStrNcasecmp(Context $context): void
     {
-        $i8p = $context->getTypeFromString('int8*');
-        $sizeT = $context->getTypeFromString('size_t');
-        $i32 = $context->getTypeFromString('int32');
-        if (null !== $context->module->getNamedFunction('strncasecmp')) {
-            return;
-        }
-        $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-        $fn = $context->module->addFunction('strncasecmp', $ft);
-        $context->registerFunction('strncasecmp', $fn);
+        StringCaseCompare::ensureStrncasecmpLinked($context);
     }
 
     /** Resolve declared class id from runtime class name cstring (#4940). */
