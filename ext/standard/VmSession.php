@@ -46,6 +46,10 @@ final class VmSession
     /** php-src ext/session/session.c — PS(cache_expire) / session.cache_expire default (minutes). */
     public const DEFAULT_CACHE_EXPIRE = 180;
 
+    public const ACTIVE_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed when a session is active';
+
+    public const HEADERS_SENT_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed after headers have already been sent';
+
     private static bool $active = false;
 
     private static string $name = self::DEFAULT_NAME;
@@ -56,6 +60,18 @@ final class VmSession
 
     private static int $cacheExpire = self::DEFAULT_CACHE_EXPIRE;
 
+    private static int $cookieLifetime = 0;
+
+    private static string $cookiePath = '/';
+
+    private static string $cookieDomain = '';
+
+    private static bool $cookieSecure = false;
+
+    private static bool $cookieHttponly = false;
+
+    private static string $cookieSamesite = '';
+
     public static function reset(): void
     {
         self::$active = false;
@@ -63,6 +79,106 @@ final class VmSession
         self::$id = '';
         self::$moduleName = self::DEFAULT_MODULE;
         self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+        self::resetCookieParams();
+    }
+
+    public static function resetCookieParams(): void
+    {
+        self::$cookieLifetime = 0;
+        self::$cookiePath = '/';
+        self::$cookieDomain = '';
+        self::$cookieSecure = false;
+        self::$cookieHttponly = false;
+        self::$cookieSamesite = '';
+    }
+
+    /**
+     * @return array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * }
+     */
+    public static function getCookieParams(): array
+    {
+        return [
+            'lifetime' => self::$cookieLifetime,
+            'path' => self::$cookiePath,
+            'domain' => self::$cookieDomain,
+            'secure' => self::$cookieSecure,
+            'httponly' => self::$cookieHttponly,
+            'samesite' => self::$cookieSamesite,
+        ];
+    }
+
+    public static function cookieParamsHashTable(): HashTable
+    {
+        $ht = new HashTable();
+        $params = self::getCookieParams();
+        $lifetime = new Variable(Variable::TYPE_INTEGER);
+        $lifetime->int($params['lifetime']);
+        $ht->add('lifetime', $lifetime);
+        $path = new Variable(Variable::TYPE_STRING);
+        $path->string($params['path']);
+        $ht->add('path', $path);
+        $domain = new Variable(Variable::TYPE_STRING);
+        $domain->string($params['domain']);
+        $ht->add('domain', $domain);
+        $secure = new Variable(Variable::TYPE_BOOLEAN);
+        $secure->bool($params['secure']);
+        $ht->add('secure', $secure);
+        $httponly = new Variable(Variable::TYPE_BOOLEAN);
+        $httponly->bool($params['httponly']);
+        $ht->add('httponly', $httponly);
+        $samesite = new Variable(Variable::TYPE_STRING);
+        $samesite->string($params['samesite']);
+        $ht->add('samesite', $samesite);
+
+        return $ht;
+    }
+
+    /**
+     * @param array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * } $params
+     */
+    public static function applyCookieParams(?Frame $frame, array $params): bool
+    {
+        if (!self::canChangeCookieParams($frame)) {
+            return false;
+        }
+        self::$cookieLifetime = $params['lifetime'];
+        self::$cookiePath = $params['path'];
+        self::$cookieDomain = $params['domain'];
+        self::$cookieSecure = $params['secure'];
+        self::$cookieHttponly = $params['httponly'];
+        self::$cookieSamesite = $params['samesite'];
+
+        return true;
+    }
+
+    public static function canChangeCookieParams(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function getCacheExpire(): int
@@ -261,7 +377,7 @@ final class VmSession
         } else {
             self::$id = self::generateId();
             ResponseContext::addHeader(
-                SetcookieLine::build(self::$name, self::$id, 0, '/'),
+                self::buildSessionSetCookieLine(self::$id),
                 false
             );
         }
@@ -315,7 +431,7 @@ final class VmSession
         }
         self::$id = self::generateId();
         ResponseContext::addHeader(
-            SetcookieLine::build(self::$name, self::$id, 0, '/'),
+            self::buildSessionSetCookieLine(self::$id),
             false
         );
 
@@ -466,6 +582,25 @@ final class VmSession
         }
 
         return $deleted;
+    }
+
+    private static function buildSessionSetCookieLine(string $sessionId): string
+    {
+        $expires = 0;
+        if (self::$cookieLifetime > 0) {
+            $expires = time() + self::$cookieLifetime;
+        }
+
+        return SetcookieLine::build(
+            self::$name,
+            $sessionId,
+            $expires,
+            self::$cookiePath,
+            self::$cookieDomain,
+            self::$cookieSecure,
+            self::$cookieHttponly,
+            self::$cookieSamesite
+        );
     }
 
     private static function readCookieId(Context $ctx): string
