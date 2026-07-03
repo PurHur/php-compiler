@@ -44,14 +44,14 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
-    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    public function testSupportsNextafterTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsNextafter());
+        $this->assertTrue(CompilerVersion::supportsNextafter());
     }
 
-    public function testSupportsRoundingModeEnumTrueOnForwardProfile(): void
+    public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
+        $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
     }
 
     public function testSupportsJsonValidateTrueOnForwardProfile(): void
@@ -144,17 +144,17 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
-    public function testSupportsTypedClassConstantsFalseOnReferenceProfile(): void
+    public function testSupportsTypedClassConstantsTrueOnDevForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
+        $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
     }
 
-    public function testSupportsTypedClassConstantsTrueWhenProfile84(): void
+    public function testSupportsTypedClassConstantsFalseWhenProfile82(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.2');
         try {
-            $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+            $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -164,10 +164,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassConstObjectExpressionsFalseOnDevReferenceProfile(): void
+    public function testSupportsClassConstObjectExpressionsTrueOnDevForwardProfile(): void
     {
-        // 8.4.0-dev matches Zend 8.2 rejection until stable 8.4.0 (#15559).
-        $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
+        // 8.4.0-dev forward line enables ZEND_CONST_EXPR_NEW (#15583).
+        $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
     }
 
     public function testSupportsClassConstObjectExpressionsFalseWhenProfile82(): void
@@ -231,10 +231,16 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($ctx->classes['clockinterface']));
     }
 
-    public function testVmRegistersRoundingModeOnForwardProfile(): void
+    public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->classes['roundingmode']));
+        $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
+    }
+
+    public function testVmRegistersNextafterOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
     }
 
     public function testVmDoesNotRegisterFpowOnReferenceProfile(): void

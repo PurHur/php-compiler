@@ -17,9 +17,6 @@ $root = dirname(__DIR__);
 require $root . '/vendor/autoload.php';
 require __DIR__ . '/capability-syntax-lib.php';
 
-$check = in_array('--check', $argv, true);
-$outFile = $root . '/docs/capabilities.md';
-
 /** @return array<string, array{vm: bool, jit: bool, aot: bool, notes: list<string>, module: string}> */
 function collectCapabilities(string $root): array
 {
@@ -322,26 +319,46 @@ function renderBuiltinMarkdown(array $capabilities, array $phpt): string
     return implode("\n", $lines);
 }
 
-$capabilities = applyBuiltinCapabilityCurations(collectCapabilities($root));
-$phpt = collectPhptCoverage($root);
-$markdown = renderBuiltinMarkdown($capabilities, $phpt);
+/** @param list<string> $argv */
+function runCapabilityMatrixCli(array $argv): int
+{
+    global $root;
 
-if ($check) {
-    if (!is_file($outFile)) {
-        fwrite(STDERR, "Missing $outFile — run: php script/capability-matrix.php\n");
-        exit(1);
+    $check = in_array('--check', $argv, true);
+    $outFile = $root.'/docs/capabilities.md';
+
+    $capabilities = applyBuiltinCapabilityCurations(
+        applyBuiltinAdvertisementParity(collectCapabilities($root), $root)
+    );
+    $phpt = collectPhptCoverage($root);
+    $markdown = renderBuiltinMarkdown($capabilities, $phpt);
+
+    if ($check) {
+        if (!is_file($outFile)) {
+            fwrite(STDERR, "Missing $outFile — run: php script/capability-matrix.php\n");
+
+            return 1;
+        }
+        $committed = (string) file_get_contents($outFile);
+        if ($committed !== $markdown) {
+            fwrite(STDERR, "docs/capabilities.md is out of date — run: php script/capability-matrix.php\n");
+
+            return 1;
+        }
+        fwrite(STDOUT, 'docs/capabilities.md is up to date ('.count($capabilities)." builtins).\n");
+
+        return 0;
     }
-    $committed = (string) file_get_contents($outFile);
-    if ($committed !== $markdown) {
-        fwrite(STDERR, "docs/capabilities.md is out of date — run: php script/capability-matrix.php\n");
-        exit(1);
+
+    if (!is_dir(dirname($outFile))) {
+        mkdir(dirname($outFile), 0755, true);
     }
-    fwrite(STDOUT, 'docs/capabilities.md is up to date (' . count($capabilities) . " builtins).\n");
-    exit(0);
+    file_put_contents($outFile, $markdown);
+    fwrite(STDOUT, "Wrote $outFile (".count($capabilities)." builtins).\n");
+
+    return 0;
 }
 
-if (!is_dir(dirname($outFile))) {
-    mkdir(dirname($outFile), 0755, true);
+if (PHP_SAPI === 'cli' && isset($argv[0]) && realpath($argv[0]) === realpath(__FILE__)) {
+    exit(runCapabilityMatrixCli($argv));
 }
-file_put_contents($outFile, $markdown);
-fwrite(STDOUT, "Wrote $outFile (" . count($capabilities) . " builtins).\n");

@@ -57,21 +57,16 @@ final class CompilerVersion
     /**
      * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367).
      *
-     * Unset {@see languageProfileVersion()} on the 8.4.0-dev line matches Zend 8.2 (reject at compile).
-     * Set `PHP_COMPILER_PROFILE=8.3` or `8.4` to enable forward syntax (#15560).
+     * Enabled on the 8.4.0-dev forward line when {@see languageProfileVersion()} is 8.3+; set
+     * `PHP_COMPILER_PROFILE=8.2` to match Zend 8.2 compile-time rejection (#12798, #15581).
      */
     public static function supportsTypedClassConstants(): bool
     {
-        $profile = self::languageProfileVersion();
-        if (version_compare($profile, '8.3.0', '<')) {
-            return false;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if ((!is_string($raw) || '' === trim($raw)) && version_compare(self::VERSION, '8.4.0', '<')) {
+        if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
 
-        return true;
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /** PHP 8.3+ typed constants at compile-unit scope (Zend/zend_compile.c, issue #7081). */
@@ -242,15 +237,16 @@ final class CompilerVersion
     /**
      * PHP 8.3+ object class constants (`public const X = new Class(...)`).
      *
-     * Zend ZEND_CONST_EXPR_NEW (#12940, #15517). Stable 8.4.0+ only — 8.4.0-dev reference
-     * profile matches Zend 8.2 compile-time rejection (#14985, #14123, #15559). Forward syntax
-     * also requires {@see languageProfileVersion()} 8.3+ (unset `PHP_COMPILER_PROFILE=8.2`).
+     * Zend ZEND_CONST_EXPR_NEW (#12940, #15517, #15583). Enabled on the 8.4.0-dev forward line
+     * when {@see languageProfileVersion()} is 8.3+; set `PHP_COMPILER_PROFILE=8.2` to match Zend 8.2
+     * compile-time rejection (#14123).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '<')) {
+        if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
+
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
@@ -288,20 +284,24 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
-    /** PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241). */
+    /**
+     * PHP 8.4+ nextafter() IEEE next representable float (ext/standard/math.c; #9241, #15584).
+     *
+     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#13284).
+     */
     public static function supportsNextafter(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return self::advertisesBuiltinSince('8.4.0');
     }
 
     /**
-     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15503).
+     * PHP 8.4+ RoundingMode builtin enum (ext/standard/basic_functions.stub.php; #5934, #14846, #15572).
      *
-     * Forward profile on 8.4.0-dev — {@see advertisesBuiltinSince} treats -dev as 8.4.0 (#12327).
+     * Gated on stable 8.4.0 so 8.4.0-dev reference profile matches Zend 8.2 phantom gate.
      */
     public static function supportsRoundingModeEnum(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
     /**

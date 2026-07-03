@@ -2452,6 +2452,20 @@ PHP;
         self::assertStringContainsString("'b' => 20", $out);
     }
 
+    /** Issue #15558 — maintainer_gap repro: assignment form matches var_export probe (#13776). */
+    public function testArrayCombineInlineArrayKeysMaintainerGapRepro(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_combine_inline_array_keys.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_combine_inline_array_keys.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #10214 — array_combine([1, 2], [3]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayCombineSiblingInlineLiteralLengthMismatchRuntime(): void
     {
@@ -4529,5 +4543,57 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Issue #9329 — array_splice($a, -2, 1, ['x']) wires UnaryMinus offset + replacement Array_. */
+    public function testArraySpliceNegativeOffsetReplacementRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+$a = [0, 1, 2, 3, 4];
+array_splice($a, -2, 1, ['x']);
+var_export($a);
+echo "\n";
+
+$b = [0, 1, 2, 3, 4];
+array_splice($b, 2, 1, ['x']);
+var_export($b);
+echo "\n";
+
+$c = [0, 1, 2, 3, 4];
+array_splice($c, -2, 1);
+var_export($c);
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_splice_neg_repl.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame(
+            "array (\n  0 => 0,\n  1 => 1,\n  2 => 2,\n  3 => 'x',\n  4 => 4,\n)\n"
+            ."array (\n  0 => 0,\n  1 => 1,\n  2 => 'x',\n  3 => 3,\n  4 => 4,\n)\n"
+            ."array (\n  0 => 0,\n  1 => 1,\n  2 => 2,\n  3 => 4,\n)\n",
+            ob_get_clean()
+        );
+    }
+
+    /** Issue #9292 — && merge phi must not clobber nested stream_set_blocking var_dump arg. */
+    public function testStreamSetBlockingAfterLogicalAndUsesNestedCallSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$f = tmpfile();
+$meta = stream_get_meta_data($f);
+$x = isset($meta['wrapper_type']) && isset($meta['stream_type']);
+var_dump(stream_set_blocking($f, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'stream_set_blocking_after_and.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("bool(true)\n", ob_get_clean());
     }
 }

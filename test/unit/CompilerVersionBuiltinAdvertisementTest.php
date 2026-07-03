@@ -69,20 +69,26 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
-    public function testNextafterWithheldOnReferenceProfileUntilStable84(): void
+    public function testNextafterAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsNextafter());
+        $this->assertTrue(CompilerVersion::supportsNextafter());
     }
 
-    public function testRoundingModeEnumAdvertisedOnForwardProfile(): void
-    {
-        $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
-    }
-
-    public function testVmRegistersRoundingModeOnForwardProfile(): void
+    public function testVmRegistersNextafterOnForwardProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->classes['roundingmode']));
+        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+    }
+
+    public function testRoundingModeEnumWithheldOnReferenceProfileUntilStable84(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsRoundingModeEnum());
+    }
+
+    public function testVmDoesNotRegisterRoundingModeOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
     }
 
     public function testVmDoesNotRegisterFpowOnReferenceProfile(): void

@@ -11926,6 +11926,13 @@ class Compiler {
                 || $directCall instanceof Op\Expr\StaticCall
                 || $directCall instanceof Op\Expr\MethodCall
             ) {
+                if (
+                    'array_combine' === $this->resolveCfgFuncCallName($callOp)
+                    && 0 === $argIndex
+                    && null !== $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                ) {
+                    return null;
+                }
                 $embedded = $this->unwrapArrayLiteralExpr($positionalCallArg);
                 if (null === $embedded) {
                     $embeddedProducer = $this->findCfgProducerExprForOperand($positionalCallArg);
@@ -12051,6 +12058,14 @@ class Compiler {
         }
         // Nested / sibling inline Array_ chains — flat unassigned[] index is wrong (#12729, #12730).
         $matched = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
+        if (
+            $matched instanceof Op\Expr\FuncCall
+            || $matched instanceof Op\Expr\NsFuncCall
+            || $matched instanceof Op\Expr\StaticCall
+            || $matched instanceof Op\Expr\MethodCall
+        ) {
+            return $matched;
+        }
         if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
             return $matched;
         }
@@ -14241,6 +14256,15 @@ class Compiler {
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            $argCount,
+            $inlineFuncName
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         $callbackArgIndex = $this->inlineClosureArrayPairCallbackArgIndex($inlineFuncName);
         if (
             $callbackArgIndex >= 0
@@ -15300,6 +15324,37 @@ class Compiler {
      * @param list<Op\Expr> $producers
      * @param list<Operand> $callArgs
      */
+    private function matchArraySpliceUnaryOffsetReplacementProducers(
+        array $producers,
+        int $argIndex,
+        int $argCount,
+        ?string $inlineFuncName
+    ): ?Op\Expr {
+        if ('array_splice' !== $inlineFuncName || $argCount < 4 || 2 !== \count($producers)) {
+            return null;
+        }
+        $unaryProducer = null;
+        $arrayProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\UnaryMinus || $producer instanceof Op\Expr\UnaryPlus) {
+                $unaryProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\Array_) {
+                $arrayProducer = $producer;
+            }
+        }
+        if (null === $unaryProducer || null === $arrayProducer) {
+            return null;
+        }
+        if (1 === $argIndex) {
+            return $unaryProducer;
+        }
+        if ($argIndex === $argCount - 1) {
+            return $arrayProducer;
+        }
+
+        return null;
+    }
+
     private function matchInlineCallArgProducerWithEmbeddedLiterals(
         array $producers,
         array $callArgs,
@@ -15309,6 +15364,15 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $inlineFuncName
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         // array_combine([...], [...]) — sibling Array_ producers map to keys/values by order (#10214).
         if (
             'array_combine' === $inlineFuncName
@@ -17276,6 +17340,11 @@ class Compiler {
                     array_unshift($producers, $child);
                     continue;
                 }
+                // array_splice($a, -2, 1, ['x']) — UnaryMinus offset prelude before replacement Array_ (#9329).
+                if ($prev instanceof Op\Expr\UnaryMinus || $prev instanceof Op\Expr\UnaryPlus) {
+                    array_unshift($producers, $prev);
+                    break;
+                }
                 break;
             }
             // echo floor(-2.5) . ' ' . ceil(-2.5) — inner Concat does not feed outer FuncCall args (#13494).
@@ -18080,6 +18149,16 @@ class Compiler {
             $next = $cfgChildren[$j + 1] ?? null;
             if (
                 $j + 1 < $consumerIndex
+                && ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+                && null !== $child->result
+                && null !== $next->expr
+                && $this->operandsReferToSameVariable($child->result, $next->expr)
+            ) {
+                // $loose = in_array(...); array_search(null, [null]) — stmt-level callee, not outer arg (#11058).
+                continue;
+            }
+            if (
+                $j + 1 < $consumerIndex
                 && ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
                 && $this->isAdjacentNestedFuncCallProducer($child, $next, $j, $j + 1)
             ) {
@@ -18193,6 +18272,20 @@ class Compiler {
                 null !== $callArg
                 && null !== $immediate->result
                 && $this->operandsReferToSameVariable($immediate->result, $callArg)
+            ) {
+                return $immediate;
+            }
+            // array_keys([...]) / array_diff_assoc(array_keys(...), array_keys(...)) — stmt-before Array_
+            // for dead php-cfg temps without shared cfgVar roots (#13778, #13779, #15569).
+            if (
+                null !== $callArg
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && $this->callArgOperandExpectsArrayProducer($callArg)
+                && !$this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+                    $callOp,
+                    $argIndex,
+                    $block
+                )
             ) {
                 return $immediate;
             }
@@ -18633,7 +18726,7 @@ class Compiler {
                 }
             }
 
-            // date_sun_info(strtotime(...), lat, -lon) — lone hoisted FuncCall + UnaryMinus prelude (#11336).
+            // date_sun_info(strtotime(...), lat, -lon) / substr(sprintf(...), -N) — inline hoisted producers (#11336, #10673, #13801).
             return false;
         }
 
@@ -19427,23 +19520,38 @@ class Compiler {
      */
     private function matchArrayCombineInlineProducers(array $producers, int $argIndex): ?Op\Expr
     {
-        if (2 !== \count($producers) || $argIndex < 0 || $argIndex > 1) {
+        if ($argIndex < 0 || $argIndex > 1) {
             return null;
         }
         $arrayProducers = [];
         $funcProducer = null;
-        foreach ($producers as $producer) {
+        $funcPos = null;
+        foreach ($producers as $pi => $producer) {
             if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
                 $funcProducer = $producer;
+                $funcPos = $pi;
             } elseif ($producer instanceof Op\Expr\Array_) {
                 $arrayProducers[] = $producer;
             }
         }
-        if (2 === \count($arrayProducers)) {
+        if (2 === \count($producers) && 2 === \count($arrayProducers) && null === $funcProducer) {
             return $arrayProducers[$argIndex];
         }
-        if (null !== $funcProducer && 1 === \count($arrayProducers)) {
+        if (2 === \count($producers) && null !== $funcProducer && 1 === \count($arrayProducers)) {
             return 0 === $argIndex ? $funcProducer : $arrayProducers[0];
+        }
+        // array_combine(array_keys(['a'=>1,'b'=>2]), [10,20]) — inner Array_ + FuncCall + trailing Array_ (#15558, #13776).
+        if (null !== $funcProducer && null !== $funcPos && \count($producers) >= 3) {
+            if (0 === $argIndex) {
+                return $funcProducer;
+            }
+            for ($j = $funcPos + 1, $n = \count($producers); $j < $n; ++$j) {
+                if ($producers[$j] instanceof Op\Expr\Array_) {
+                    return $producers[$j];
+                }
+            }
+
+            return null;
         }
 
         return null;
@@ -19992,6 +20100,15 @@ class Compiler {
         }
         $callArgs = $callOp->args;
         $callArg = $callArgs[$argIndex] ?? null;
+        $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
+            $producers,
+            $argIndex,
+            \count($callArgs),
+            $this->resolveCfgFuncCallName($callOp)
+        );
+        if (null !== $mappedArraySplice) {
+            return $mappedArraySplice;
+        }
         $callIndex = null;
         foreach ($cfgChildren as $i => $child) {
             if ($child === $callOp) {
@@ -22715,6 +22832,25 @@ class Compiler {
     }
 
     /**
+     * Pending call-arg opcodes — nested FUNCCALL_EXEC_RETURN not yet on the block (#9292).
+     *
+     * @param list<OpCode> $opcodes
+     */
+    private function slotForLastPendingInlineCallResultBeforeFuncCallInit(array $opcodes): ?int
+    {
+        for ($i = \count($opcodes) - 1; $i >= 0; --$i) {
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $opcodes[$i]->type) {
+                return (int) $opcodes[$i]->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $opcodes[$i]->type) {
+                break;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg dead call-arg temp for inline eval() — TYPE_EVAL producer slot (#10661, zif_eval).
      */
     private function resolvePrecedingEvalCallArgSlot(
@@ -25248,6 +25384,27 @@ class Compiler {
                     }
                 }
             }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+            ) {
+                $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
+                if (
+                    null !== $andPhi
+                    && null !== $valueSlot
+                    && (string) $valueSlot === (string) $andPhi
+                ) {
+                    $pendingNested = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($sends)
+                        ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+                    $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+                    if (
+                        null !== $pendingNested
+                        && !\in_array($calleeLower, ['exit', 'die'], true)
+                    ) {
+                        $valueSlot = (string) $pendingNested;
+                    }
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -26137,12 +26294,7 @@ class Compiler {
                 )) {
                     return true;
                 }
-                if (
-                    null === $firstSibling
-                    || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
-                ) {
-                    continue;
-                }
+                // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset (#10673, #13801).
                 if ($this->isSiblingMultiArgFuncCallProducer(
                     $producer,
                     $consumer,
@@ -26151,6 +26303,12 @@ class Compiler {
                     $cfgChildren
                 )) {
                     return true;
+                }
+                if (
+                    null === $firstSibling
+                    || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
+                ) {
+                    continue;
                 }
             }
         }
