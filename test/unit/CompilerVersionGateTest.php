@@ -366,9 +366,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
     }
 
+    public function testSupportsClosureGetCurrentFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
+    }
+
     public function testSupportsClosureGetCurrentTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsBareRethrowFalseOnReferenceProfile(): void
@@ -416,12 +431,30 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
-        $this->assertTrue(isset($closure->methods['getcurrent']));
+        $this->assertFalse(isset($closure->methods['getcurrent']));
+    }
+
+    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $closure = $runtime->vmContext->classes['closure'] ?? null;
+            $this->assertNotNull($closure);
+            $this->assertTrue(isset($closure->methods['getcurrent']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsDomNodeContainsOnForwardProfile(): void
