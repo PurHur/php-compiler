@@ -2544,7 +2544,7 @@ final class VmString
     /** htmlentities() — full HTML_ENTITIES table for UTF-8 (#10734, ext/standard/html.c). */
     public static function htmlentities(
         string $string,
-        int $flags = ENT_COMPAT,
+        int $flags = ENT_QUOTES | ENT_SUBSTITUTE,
         string $encoding = 'UTF-8',
         bool $doubleEncode = true
     ): string {
