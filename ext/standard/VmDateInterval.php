@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
+use PHPCompiler\VM\NativeDateMalformedIntervalException;
+
 /**
  * DateInterval ISO-8601 duration parse/format (php-src ext/date/php_date.c, issue #7278).
  */
@@ -227,7 +230,11 @@ final class VmDateInterval
 
     private static function throwBadFormat(string $spec): never
     {
-        throw new \Exception('Unknown or bad format ('.$spec.')');
+        $message = 'Unknown or bad format ('.$spec.')';
+        if (CompilerVersion::advertisesDateExceptionHierarchy()) {
+            throw new NativeDateMalformedIntervalException($message);
+        }
+        throw new \Exception($message);
     }
 
     /**
