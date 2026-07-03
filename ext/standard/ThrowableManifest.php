@@ -93,6 +93,8 @@ final class ThrowableManifest
 
     public const LC_DOM_EXCEPTION = 'domexception';
 
+    public const LC_SODIUM_EXCEPTION = 'sodiumexception';
+
     /**
      * Parent map in registration order: child => parent name, or null when implementing Throwable directly.
      *
@@ -138,6 +140,7 @@ final class ThrowableManifest
         'AssertionError' => 'Error',
         'JsonException' => 'Exception',
         'DOMException' => 'Exception',
+        'SodiumException' => 'Exception',
     ];
 
     /** @var array<string, class-string> */
@@ -172,6 +175,7 @@ final class ThrowableManifest
         'AssertionError' => \AssertionError::class,
         'JsonException' => \JsonException::class,
         'DOMException' => \DOMException::class,
+        'SodiumException' => \SodiumException::class,
     ];
 
     /** @return list<string> */

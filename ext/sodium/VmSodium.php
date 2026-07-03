@@ -176,6 +176,20 @@ final class VmSodium
         return self::ffiAuthVerify($mac, $message, $key);
     }
 
+    public static function memcmp(string $string1, string $string2): int
+    {
+        if (\strlen($string1) !== \strlen($string2)) {
+            self::throwSodium(
+                'sodium_memcmp(): Argument #1 ($string1) and argument #2 ($string_2) must have the same length'
+            );
+        }
+        if (\function_exists('sodium_memcmp')) {
+            return \sodium_memcmp($string1, $string2);
+        }
+
+        return self::ffiMemcmp($string1, $string2);
+    }
+
     public static function secretbox(string $message, string $nonce, string $key): string
     {
         if (\function_exists('sodium_crypto_secretbox')) {
@@ -264,6 +278,16 @@ final class VmSodium
         $kBuf = self::stringToUnsignedCharArray($ffi, $key);
 
         return 0 === $ffi->crypto_auth_verify($hBuf, $mBuf, $mlen, $kBuf);
+    }
+
+    private static function ffiMemcmp(string $string1, string $string2): int
+    {
+        $ffi = self::requireFfi();
+        $len = \strlen($string1);
+        $s1 = self::stringToUnsignedCharArray($ffi, $string1);
+        $s2 = self::stringToUnsignedCharArray($ffi, $string2);
+
+        return $ffi->sodium_memcmp($s1, $s2, $len);
     }
 
     private static function ffiStream(int $length, string $nonce, string $key): string
@@ -576,7 +600,8 @@ final class VmSodium
                     int crypto_stream_xchacha20_xor(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char *k);
                     int crypto_stream_xchacha20_xor_ic(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char k[32], unsigned long long ic);
                     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
-                    int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);',
+                    int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
+                    int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);',
                     $lib
                 );
                 $ffi->sodium_init();

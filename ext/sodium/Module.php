@@ -17,6 +17,7 @@ class Module extends ModuleAbstract
 {
     public function init(Runtime $runtime): void
     {
+        require_once __DIR__.'/bootstrap_sodiumexception.php';
         parent::init($runtime);
         if (!SodiumExtensionPolicy::advertisesExtension()) {
             return;
@@ -53,6 +54,7 @@ class Module extends ModuleAbstract
             new sodium_crypto_secretbox_open(),
             new sodium_crypto_auth(),
             new sodium_crypto_auth_verify(),
+            new sodium_memcmp(),
             new sodium_crypto_stream(),
             new sodium_crypto_stream_xor(),
             new sodium_crypto_stream_keygen(),
