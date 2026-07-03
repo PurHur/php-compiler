@@ -26,6 +26,7 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMAttr'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
         self::assertTrue(ModuleRegistry::extensionLoaded('dom'));
@@ -354,6 +355,8 @@ $ref = $doc->createEntityReference('amp');
 echo get_class($ref), "\n";
 echo $ref->nodeType, "\n";
 echo $ref->nodeName, "\n";
+echo var_export($ref->nodeValue, true), "\n";
+echo (int) ($ref->ownerDocument === $doc), "\n";
 $root = $doc->createElement('root');
 $root->appendChild($ref);
 echo $root->firstChild->nodeName, "\n";
@@ -361,7 +364,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'dom_create_entity_reference.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("DOMEntityReference\n5\namp\namp\n", ob_get_clean());
+        self::assertSame("DOMEntityReference\n5\namp\nNULL\n1\namp\n", ob_get_clean());
     }
 
     public function test_dom_document_fragment_append_xml(): void

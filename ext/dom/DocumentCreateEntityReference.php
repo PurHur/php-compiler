@@ -20,7 +20,8 @@ final class DocumentCreateEntityReference extends DomClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DOMDocument::createEntityReference() expects exactly 1 argument');
         }
-        $name = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createEntityReference()', 0);
+        VmDom::ensureDocument($document);
+        $name = $this->stringArg($frame->calledArgs[1], 'DOMDocument::createEntityReference()', 0, $frame, 'name');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createEntityReference() requires VM context in this compiler build');
         }

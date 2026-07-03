@@ -5,7 +5,7 @@ declare(strict_types=1);
 $doc = new DOMDocument();
 $ref = $doc->createEntityReference('amp');
 if (!$ref instanceof DOMEntityReference) {
-    echo 'fail: not DOMEntityReference ', get_class($ref), "\n";
+    echo 'fail: not DOMEntityReference ', get_debug_type($ref), "\n";
     exit(1);
 }
 if (5 !== $ref->nodeType) {
@@ -14,6 +14,14 @@ if (5 !== $ref->nodeType) {
 }
 if ('amp' !== $ref->nodeName) {
     echo 'fail: nodeName ', $ref->nodeName, "\n";
+    exit(1);
+}
+if (null !== $ref->nodeValue) {
+    echo 'fail: nodeValue ', var_export($ref->nodeValue, true), "\n";
+    exit(1);
+}
+if ($ref->ownerDocument !== $doc) {
+    echo "fail: ownerDocument mismatch\n";
     exit(1);
 }
 
