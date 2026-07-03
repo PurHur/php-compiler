@@ -103,6 +103,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_exception.phpt',
             'dom_exception.phpt'
         );
+        yield 'dom_register_node_class.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_register_node_class.phpt',
+            'dom_register_node_class.phpt'
+        );
     }
 
     public function setUp(): void

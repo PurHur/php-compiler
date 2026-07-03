@@ -13,6 +13,7 @@ use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\InterfaceCheck;
 use PHPCompiler\VM\ObjectEntry;
 use PHPCompiler\VM\Variable;
 
@@ -300,6 +301,9 @@ final class VmDom
         $document->methodVisibility['getelementsbytagname'] = $pub;
         $document->methods['getelementbyid'] = new DocumentGetElementById();
         $document->methodVisibility['getelementbyid'] = $pub;
+        $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
+        $document->methodVisibility['registernodeclass'] = $pub;
+        $document->methodNames['registernodeclass'] = 'registerNodeClass';
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -352,10 +356,7 @@ final class VmDom
         string $publicId,
         string $systemId
     ): Variable {
-        $class = $ctx->classes[self::CLASS_DOCUMENT_TYPE] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMDocumentType is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, null, self::CLASS_DOCUMENT_TYPE);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -505,10 +506,7 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null,
         string $value = ''
     ): Variable {
-        $class = $ctx->classes[self::CLASS_ELEMENT] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMElement is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -541,12 +539,9 @@ final class VmDom
         ?ObjectEntry $ownerDocument = null,
         string $value = ''
     ): Variable {
-        $class = $ctx->classes[self::CLASS_ELEMENT] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMElement is not registered in this compiler build');
-        }
-
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ELEMENT);
+
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
         $entry->getProperty(self::PROP_NODE_NAME)->string($qualifiedName);
@@ -578,10 +573,7 @@ final class VmDom
         string $qualifiedName,
         ?ObjectEntry $ownerDocument = null
     ): Variable {
-        $class = $ctx->classes[self::CLASS_ATTR] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMAttr is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ATTR);
 
         [$prefix, $localName] = self::splitQualifiedName($qualifiedName);
         $entry = new ObjectEntry($class);
@@ -1120,10 +1112,7 @@ final class VmDom
 
     public static function createTextNode(Context $ctx, string $data, ?ObjectEntry $ownerDocument = null): ObjectEntry
     {
-        $class = $ctx->classes[self::CLASS_TEXT] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMText is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_TEXT);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -1149,10 +1138,7 @@ final class VmDom
     ): Variable {
         self::assertValidEntityReferenceName($name);
 
-        $class = $ctx->classes[self::CLASS_ENTITY_REFERENCE] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMEntityReference is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_ENTITY_REFERENCE);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -1174,12 +1160,9 @@ final class VmDom
         return $var;
     }
 
-    public static function createDocumentFragment(Context $ctx): Variable
+    public static function createDocumentFragment(Context $ctx, ?ObjectEntry $ownerDocument = null): Variable
     {
-        $class = $ctx->classes[self::CLASS_DOCUMENT_FRAGMENT] ?? null;
-        if (null === $class) {
-            throw new \LogicException('DOMDocumentFragment is not registered in this compiler build');
-        }
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_DOCUMENT_FRAGMENT);
 
         $entry = new ObjectEntry($class);
         $entry->constructed = true;
@@ -3451,43 +3434,37 @@ final class VmDom
 
     public static function isElement(ObjectEntry $entry): bool
     {
-        return self::CLASS_ELEMENT === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_ELEMENT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isTextNode(ObjectEntry $entry): bool
     {
-        return self::CLASS_TEXT === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isEntityReference(ObjectEntry $entry): bool
     {
-        return self::CLASS_ENTITY_REFERENCE === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_ENTITY_REF_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isAttr(ObjectEntry $entry): bool
     {
-        return self::CLASS_ATTR === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_ATTRIBUTE_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isDocument(ObjectEntry $entry): bool
     {
-        return self::CLASS_DOCUMENT === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_DOCUMENT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
     public static function isDocumentFragment(ObjectEntry $entry): bool
     {
-        return self::CLASS_DOCUMENT_FRAGMENT === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_DOCUMENT_FRAG_NODE === DomRegistry::state($entry)->nodeType;
     }
 
@@ -3600,8 +3577,93 @@ final class VmDom
         }
     }
 
-    public static function requireReceiver(Variable $var, string $classLc, string $label): ObjectEntry
+    public static function registerNodeClass(
+        Context $ctx,
+        ObjectEntry $document,
+        string $baseClassName,
+        ?string $extendedClassName
+    ): void {
+        self::ensureDocument($document);
+        $baseEntry = self::resolveClassByName($ctx, $baseClassName);
+        if (null === $baseEntry) {
+            throw new \TypeError(sprintf(
+                'DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must be a valid class name, %s given',
+                $baseClassName
+            ));
+        }
+        if (!InterfaceCheck::entryIsInstanceOf($baseEntry, self::CLASS_NODE, $ctx)) {
+            throw new \TypeError(sprintf(
+                'DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must be a valid class name, %s given',
+                $baseClassName
+            ));
+        }
+        if ($baseEntry->isAbstract) {
+            throw new \ValueError('DOMDocument::registerNodeClass(): Argument #1 ($baseClass) must not be an abstract class');
+        }
+        $baseLc = strtolower($baseEntry->name);
+        if (null === $extendedClassName) {
+            unset(DomRegistry::state($document)->nodeClassMap[$baseLc]);
+
+            return;
+        }
+        $extendedEntry = self::resolveClassByName($ctx, $extendedClassName);
+        if (null === $extendedEntry) {
+            throw new \TypeError(sprintf(
+                'DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                $baseEntry->name,
+                $extendedClassName
+            ));
+        }
+        if (!InterfaceCheck::entryIsInstanceOf($extendedEntry, $baseLc, $ctx)) {
+            throw new \TypeError(sprintf(
+                'DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must be a class name derived from %s or null, %s given',
+                $baseEntry->name,
+                $extendedClassName
+            ));
+        }
+        if ($extendedEntry->isAbstract) {
+            throw new \ValueError('DOMDocument::registerNodeClass(): Argument #2 ($extendedClass) must not be an abstract class');
+        }
+        DomRegistry::state($document)->nodeClassMap[$baseLc] = strtolower($extendedEntry->name);
+    }
+
+    public static function resolveNodeClass(
+        Context $ctx,
+        ?ObjectEntry $ownerDocument,
+        string $baseLc
+    ): ClassEntry {
+        $baseLc = strtolower($baseLc);
+        $default = $ctx->classes[$baseLc] ?? null;
+        if (null === $default) {
+            throw new \LogicException(self::classNameFromLc($baseLc).' is not registered in this compiler build');
+        }
+        if (null === $ownerDocument || !self::isDocument($ownerDocument)) {
+            return $default;
+        }
+        $extendedLc = DomRegistry::state($ownerDocument)->nodeClassMap[$baseLc] ?? null;
+        if (null === $extendedLc) {
+            return $default;
+        }
+
+        return $ctx->classes[$extendedLc] ?? $default;
+    }
+
+    private static function resolveClassByName(Context $ctx, string $name): ?ClassEntry
     {
+        $lc = strtolower(ltrim($name, '\\'));
+        if (!isset($ctx->classes[$lc])) {
+            $ctx->autoloadClass($name);
+        }
+
+        return $ctx->classes[$lc] ?? null;
+    }
+
+    public static function requireReceiver(
+        Variable $var,
+        string $classLc,
+        string $label,
+        ?Context $ctx = null
+    ): ObjectEntry {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_OBJECT !== $var->type) {
             throw new \TypeError(sprintf(
@@ -3611,6 +3673,9 @@ final class VmDom
             ));
         }
         $object = $var->toObject();
+        if (null !== $ctx && InterfaceCheck::entryIsInstanceOf($object->class, $classLc, $ctx)) {
+            return $object;
+        }
         if ($classLc !== strtolower($object->class->name)) {
             throw new \TypeError(sprintf('%s must be called on a %s instance', $label, self::classNameFromLc($classLc)));
         }
@@ -3620,8 +3685,7 @@ final class VmDom
 
     public static function isDocumentType(ObjectEntry $entry): bool
     {
-        return self::CLASS_DOCUMENT_TYPE === strtolower($entry->class->name)
-            && DomRegistry::has($entry)
+        return DomRegistry::has($entry)
             && DomConstants::XML_DOCUMENT_TYPE_NODE === DomRegistry::state($entry)->nodeType;
     }
 

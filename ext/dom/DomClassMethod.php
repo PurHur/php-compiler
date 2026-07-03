@@ -19,7 +19,7 @@ abstract class DomClassMethod extends VmClassMethod
             throw new \LogicException($label.' called without $this');
         }
 
-        return VmDom::requireReceiver($frame->calledArgs[0], $classLc, $label);
+        return VmDom::requireReceiver($frame->calledArgs[0], $classLc, $label, $frame->vmContext);
     }
 
     protected function stringArg(
