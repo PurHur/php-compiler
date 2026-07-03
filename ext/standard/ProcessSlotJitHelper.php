@@ -60,10 +60,9 @@ final class ProcessSlotJitHelper
         self::$slots[$slot] = $entry;
 
         if ($entry['statusKnown']) {
-            $status = $entry['status'];
             unset(self::$slots[$slot]);
 
-            return self::exitCodeFromStatus($status);
+            return -1;
         }
 
         try {
