@@ -6,7 +6,7 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
-use PHPCompiler\ErrorReporter;
+use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
