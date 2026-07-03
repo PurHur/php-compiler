@@ -4638,4 +4638,57 @@ PHP;
         $runtime->run($block);
         self::assertSame("bool(true)\n", ob_get_clean());
     }
+
+    /** Issue #15611 — get_defined_constants(true) assign must not steal firstSibling from get_declared_traits haystack. */
+    public function testInArrayNestedGetDeclaredTraitsAfterGetDefinedConstantsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+function probe(string $label, mixed $result): void {
+    echo $label . ': ' . (is_bool($result) ? ($result ? 'true' : 'false') : json_encode($result)) . "\n";
+}
+
+$c = get_defined_constants(true);
+probe('declared_traits_has', in_array('Traversable', get_declared_traits(), true));
+
+class CV { public static int $s = 1; }
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_declared_traits_after_defined_constants.php');
+
+        $traitsReturnSlot = null;
+        $inArrayHaystackSend = null;
+        $fcallOrdinal = 0;
+        $inArraySends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $traitsReturnSlot = null;
+                }
+                if (3 === $fcallOrdinal) {
+                    $inArraySends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $traitsReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $inArraySends[] = $op->arg1;
+            }
+        }
+        $inArrayHaystackSend = $inArraySends[1] ?? null;
+
+        self::assertNotNull($traitsReturnSlot, 'get_declared_traits() must EXEC_RETURN before in_array haystack send');
+        self::assertNotNull($inArrayHaystackSend);
+        self::assertSame($traitsReturnSlot, $inArrayHaystackSend, 'in_array haystack must reuse get_declared_traits() slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('declared_traits_has: false', $out);
+    }
 }
