@@ -297,7 +297,7 @@ final class ReferencableCheck
      */
     public static function arrayStackMutatorFunctions(): array
     {
-        return ['array_pop', 'array_shift', 'array_unshift'];
+        return ['array_pop', 'array_push', 'array_shift', 'array_unshift'];
     }
 
     public static function skipsByRefWhenNotArray(string $fn): bool
