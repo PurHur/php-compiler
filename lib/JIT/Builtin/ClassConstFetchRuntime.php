@@ -35,7 +35,8 @@ final class ClassConstFetchRuntime
         Variable $nameVar,
         Operand $classOp,
         ?Block $block = null,
-        ?\PHPCompiler\JIT $jit = null
+        ?\PHPCompiler\JIT $jit = null,
+        ?Variable $classVar = null
     ): Variable {
         $context = $objectType->jitContext();
         StringCaseCompare::ensureStrcasecmpLinked($context);
@@ -65,7 +66,15 @@ final class ClassConstFetchRuntime
         );
 
         $context->builder->positionAtEnd($classMatch);
-        $classNameStr = ClassConstFetchHelper::emitClassNameStringFromClassId($objectType, $classIdVal);
+        if (null !== $classVar) {
+            $classNameStr = ClassConstFetchHelper::emitClassPseudoConstStringValue($objectType, $block, $classVar);
+        } elseif ($classOp instanceof Operand\Literal) {
+            $classNameStr = $context->builder->load(
+                $context->constantStringFromString($classOp->value)
+            );
+        } else {
+            $classNameStr = ClassConstFetchHelper::emitClassNameStringFromClassId($objectType, $classIdVal);
+        }
         $context->builder->call(
             $context->lookupFunction('__value__writeString'),
             JitValueBox::pointer($context, $resultSlot),

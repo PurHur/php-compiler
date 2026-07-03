@@ -1884,6 +1884,11 @@ class Object_ extends Type {
         return array_keys($this->classes);
     }
 
+    public function classIdForLowerName(string $lc): ?int
+    {
+        return $this->classes[$lc] ?? null;
+    }
+
     /**
      * @return list<string>
      */
