@@ -35,6 +35,10 @@ final class VmSession
 
     public const ACTIVE_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed when a session is active';
 
+    public const ACTIVE_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed when a session is active';
+
+    public const HEADERS_SENT_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed after headers have already been sent';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;
@@ -132,7 +136,7 @@ final class VmSession
     public static function canChangeSaveHandler(?Frame $frame): bool
     {
         if (self::$active) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed when a session is active'
             );
@@ -140,10 +144,26 @@ final class VmSession
             return false;
         }
         if (SapiOutput::headersSent()) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed after headers have already been sent'
             );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function canChangeName(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_NAME_CHANGE_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_NAME_CHANGE_WARNING);
 
             return false;
         }
@@ -166,7 +186,7 @@ final class VmSession
         return $previous;
     }
 
-    private static function triggerSaveHandlerWarning(?Frame $frame, string $message): void
+    private static function triggerSessionWarning(?Frame $frame, string $message): void
     {
         if (null === $frame || null === $frame->vmContext) {
             return;
@@ -198,9 +218,6 @@ final class VmSession
      * previous name, or false when session is active
      */
     public static function setName(string $name) {
-        if (self::$active) {
-            return false;
-        }
         if (self::isRejectedSessionName($name)) {
             return self::$name;
         }
