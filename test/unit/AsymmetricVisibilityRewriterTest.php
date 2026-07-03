@@ -94,20 +94,18 @@ PHP;
         self::assertStringContainsString('/*phpc-asymmetric-set:public*/ private string $name', preg_replace('/\s+/', ' ', $rewritten));
     }
 
-    public function testBarePrivateSetWithoutReadCompileErrors(): void
+    public function testBarePrivateSetWithoutReadRewritesWithImplicitPublicRead(): void
     {
         $source = 'private(set) string $x;';
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString('/*phpc-asymmetric-set:private*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
     }
 
-    public function testBareProtectedSetWithoutReadCompileErrors(): void
+    public function testBareProtectedSetWithoutReadRewritesWithImplicitPublicRead(): void
     {
         $source = 'protected(set) string $x;';
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString('/*phpc-asymmetric-set:protected*/ public string $x', preg_replace('/\s+/', ' ', $rewritten));
     }
 
     public function testRewritePrivateGet(): void
@@ -219,7 +217,7 @@ PHP;
         AsymmetricVisibilityRewriter::rewrite($source);
     }
 
-    public function testStaticPrivateSetWithoutExplicitReadCompileErrors(): void
+    public function testStaticPrivateSetWithoutExplicitReadRewrites(): void
     {
         $source = <<<'PHP'
 <?php
@@ -227,9 +225,11 @@ class C {
     private(set) static string $name = 'x';
 }
 PHP;
-        $this->expectException(\CompileError::class);
-        $this->expectExceptionMessage(AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
-        AsymmetricVisibilityRewriter::rewrite($source);
+        $rewritten = AsymmetricVisibilityRewriter::rewrite($source);
+        self::assertStringContainsString(
+            '/*phpc-asymmetric-set:private*/ public static string $name',
+            preg_replace('/\s+/', ' ', $rewritten)
+        );
     }
 
     public function testPromotedParenthesizedPrivateSetRewrites(): void
