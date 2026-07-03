@@ -64,4 +64,24 @@ final class JitSodium
             $i32->constInt(0, false)
         );
     }
+
+    public static function invokeStreamXor(
+        Context $context,
+        string $name,
+        Value $message,
+        Value $nonce,
+        Value $key
+    ): Value {
+        StringSodium::ensureLinked($context);
+        $abi = 'sodium_crypto_stream_xchacha20_xor' === $name
+            ? '__compiler_sodium_stream_xchacha20_xor'
+            : '__compiler_sodium_stream_xor';
+
+        return $context->builder->call(
+            $context->lookupFunction($abi),
+            $message,
+            $nonce,
+            $key
+        );
+    }
 }

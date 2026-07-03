@@ -32,4 +32,14 @@ final class SodiumJitHelper
     {
         return VmSodium::authVerify($mac, $message, $key);
     }
+
+    public static function streamXor(string $message, string $nonce, string $key): string
+    {
+        return VmSodium::streamXor($message, $nonce, $key);
+    }
+
+    public static function streamXchacha20Xor(string $message, string $nonce, string $key): string
+    {
+        return VmSodium::streamXchacha20Xor($message, $nonce, $key);
+    }
 }
