@@ -2452,6 +2452,34 @@ PHP;
         self::assertStringContainsString("'b' => 20", $out);
     }
 
+    /** Issue #10214 — array_combine([1, 2], [3]) sibling inline Array_ literals use distinct producer slots. */
+    public function testArrayCombineSiblingInlineLiteralLengthMismatchRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_combine([1, 2], [3]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_combine_inline_literal_mismatch.php');
+
+        $combineSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $combineSends[] = $op->arg1;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                break;
+            }
+        }
+
+        self::assertCount(2, $combineSends);
+        self::assertNotSame($combineSends[0], $combineSends[1], 'combine sends='.json_encode($combineSends));
+    }
+
     /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayMergeSiblingInlineLiteralRuntime(): void
     {

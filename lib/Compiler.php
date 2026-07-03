@@ -11811,6 +11811,13 @@ class Compiler {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
         }
+        if ('array_combine' === $this->resolveCfgFuncCallName($callOp)) {
+            $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+            $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, $argIndex);
+            if ($combineMatch instanceof Op\Expr\Array_) {
+                return $combineMatch;
+            }
+        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $callOp) {
@@ -14290,17 +14297,9 @@ class Compiler {
             return $foldedFirstNested;
         }
         if ('array_combine' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
-            $funcProducer = null;
-            $valueArrayProducer = null;
-            foreach ($producers as $producer) {
-                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                    $funcProducer = $producer;
-                } elseif ($producer instanceof Op\Expr\Array_) {
-                    $valueArrayProducer = $producer;
-                }
-            }
-            if (null !== $funcProducer && null !== $valueArrayProducer) {
-                return 0 === $argIndex ? $funcProducer : $valueArrayProducer;
+            $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+            if (null !== $arrayCombinePair) {
+                return $arrayCombinePair;
             }
         }
         if ($this->callIncludesNamedParameter($cfgCallOp)) {
@@ -14774,19 +14773,11 @@ class Compiler {
                     return $arrayMergePair;
                 }
             }
-            // array_combine(array_keys(...), [...]) — arg #0 FuncCall, arg #1 sibling Array_ (#13776).
+            // array_combine(array_keys(...), [...]) / array_combine([...], [...]) (#13776, #10214).
             if ('array_combine' === $inlineFuncName && 2 === $producerCount && 2 === $argCount) {
-                $funcIdx = null;
-                $arrayIdx = null;
-                foreach ($producers as $pi => $producer) {
-                    if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
-                        $funcIdx = $pi;
-                    } elseif ($producer instanceof Op\Expr\Array_) {
-                        $arrayIdx = $pi;
-                    }
-                }
-                if (null !== $funcIdx && null !== $arrayIdx) {
-                    return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+                $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+                if (null !== $arrayCombinePair) {
+                    return $arrayCombinePair;
                 }
             }
             // var_export(C::__set_state([]), true) — arg #0 is sibling call result, nested Array_ is callee arg (#11896).
@@ -15302,6 +15293,17 @@ class Compiler {
         ?string $calleeName = null
     ): ?Op\Expr {
         $inlineFuncName = $this->resolveInlineCallArgFuncName($cfgCallOp, $calleeName);
+        // array_combine([...], [...]) — sibling Array_ producers map to keys/values by order (#10214).
+        if (
+            'array_combine' === $inlineFuncName
+            && 2 === \count($callArgs)
+            && 2 === \count($producers)
+        ) {
+            $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+            if (null !== $arrayCombinePair) {
+                return $arrayCombinePair;
+            }
+        }
         // array_merge(array_keys($src), ['b']) / array_merge(['a'=>1], array_keys(...)) (#12450, #13704, #13760).
         if (
             \in_array($inlineFuncName, ['array_merge', 'array_merge_recursive'], true)
@@ -19355,6 +19357,35 @@ class Compiler {
         $slot = $block->slotForOperand($trailingArray->result);
 
         return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * array_combine() with sibling inline producers — FuncCall+Array_ or Array_+Array_ (#13776, #10214).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchArrayCombineInlineProducers(array $producers, int $argIndex): ?Op\Expr
+    {
+        if (2 !== \count($producers) || $argIndex < 0 || $argIndex > 1) {
+            return null;
+        }
+        $arrayProducers = [];
+        $funcProducer = null;
+        foreach ($producers as $producer) {
+            if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                $funcProducer = $producer;
+            } elseif ($producer instanceof Op\Expr\Array_) {
+                $arrayProducers[] = $producer;
+            }
+        }
+        if (2 === \count($arrayProducers)) {
+            return $arrayProducers[$argIndex];
+        }
+        if (null !== $funcProducer && 1 === \count($arrayProducers)) {
+            return 0 === $argIndex ? $funcProducer : $arrayProducers[0];
+        }
+
+        return null;
     }
 
     /**
@@ -23532,25 +23563,37 @@ class Compiler {
                 ? $this->findInlineArrayProducerForCallArg($arg, $block, $cfgCallOp, (int) $argIndex)
                 : null;
             if (null === $inlineArray && null !== $cfgCallOp) {
-                $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
-                if ($stmtBeforeArray instanceof Op\Expr\Array_) {
-                    $callArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
-                    if (
-                        $this->callArgIsDeadInlineTemporary($callArgProbe)
-                        && $this->callArgOperandExpectsArrayProducer($callArgProbe)
-                        && $this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
-                            $cfgCallOp,
-                            (int) $argIndex,
-                            $block
-                        )
-                    ) {
-                        // array_combine(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#15553, #13776).
-                    } elseif (
-                        $this->callArgIsDeadInlineTemporary($callArgProbe)
-                        || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
-                        || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
-                    ) {
-                        $inlineArray = $stmtBeforeArray;
+                if ('array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)) {
+                    $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                        $block->orig->children,
+                        $cfgCallOp
+                    );
+                    $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
+                    if ($combineMatch instanceof Op\Expr\Array_) {
+                        $inlineArray = $combineMatch;
+                    }
+                }
+                if (null === $inlineArray) {
+                    $stmtBeforeArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if ($stmtBeforeArray instanceof Op\Expr\Array_) {
+                        $callArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                        if (
+                            $this->callArgIsDeadInlineTemporary($callArgProbe)
+                            && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            && $this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+                                $cfgCallOp,
+                                (int) $argIndex,
+                                $block
+                            )
+                        ) {
+                            // array_combine(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#15553, #13776).
+                        } elseif (
+                            $this->callArgIsDeadInlineTemporary($callArgProbe)
+                            || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
+                            || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                        ) {
+                            $inlineArray = $stmtBeforeArray;
+                        }
                     }
                 }
             }
