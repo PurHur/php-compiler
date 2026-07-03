@@ -19029,8 +19029,30 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
-                --$i;
-                continue;
+                // $c = get_defined_constants(true); in_array(..., get_declared_traits(), …) — stmt assign
+                // is not part of the hoisted sibling chain (#15611, re-#14237).
+                $assignFeedsCallArg = false;
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if (
+                    $consumer instanceof Op\Expr
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    foreach ($consumer->args as $callArg) {
+                        if (
+                            $this->operandsReferToSameVariable($child->var, $callArg)
+                            || $this->operandsReferToSameVariable($child->result, $callArg)
+                        ) {
+                            $assignFeedsCallArg = true;
+                            break;
+                        }
+                    }
+                }
+                if ($assignFeedsCallArg) {
+                    --$i;
+                    continue;
+                }
+                break;
             }
             break;
         }
