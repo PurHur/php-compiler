@@ -18715,6 +18715,26 @@ class Compiler {
             // json_decode(g(), true, 512, JSON_THROW_ON_ERROR) — arg0 producer, not a stmt-level callee (#12009, #15441).
             return false;
         }
+        // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset, not stmt-level (#10673, #13801).
+        if (
+            $onlySkippablePreludes
+            && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
+            && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+            && property_exists($consumer, 'args')
+            && \is_array($consumer->args)
+            && \count($consumer->args) >= 2
+        ) {
+            $distance = $consumerIndex - $producerIndex;
+            $mid = $cfgChildren[$producerIndex + 1] ?? null;
+            if (
+                2 === $distance
+                && $this->isUnaryInlineSiblingCallArgExpr($mid)
+                && $this->callArgIsDeadInlineTemporary($consumer->args[0] ?? null)
+                && $this->callArgIsDeadInlineTemporary($consumer->args[1] ?? null)
+            ) {
+                return false;
+            }
+        }
 
         return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
     }
@@ -26280,12 +26300,7 @@ class Compiler {
                 )) {
                     return true;
                 }
-                if (
-                    null === $firstSibling
-                    || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
-                ) {
-                    continue;
-                }
+                // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset (#10673, #13801).
                 if ($this->isSiblingMultiArgFuncCallProducer(
                     $producer,
                     $consumer,
@@ -26294,6 +26309,12 @@ class Compiler {
                     $cfgChildren
                 )) {
                     return true;
+                }
+                if (
+                    null === $firstSibling
+                    || $this->countSiblingInlineFuncCallProducers($firstSibling, $consumerIndex, $cfgChildren) < 2
+                ) {
+                    continue;
                 }
             }
         }
