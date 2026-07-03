@@ -30,6 +30,8 @@ final class StringSodium
 
     private const STREAM_XCHACHA20_XOR_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::streamXchacha20Xor';
 
+    private const MEMCMP_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::memcmp';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
@@ -38,6 +40,7 @@ final class StringSodium
         self::AUTH_VERIFY_HELPER,
         self::STREAM_XOR_HELPER,
         self::STREAM_XCHACHA20_XOR_HELPER,
+        self::MEMCMP_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
@@ -46,6 +49,7 @@ final class StringSodium
         self::implementBridge($context, '__compiler_sodium_secretbox_open', self::SECRETBOX_OPEN_HELPER);
         self::implementAuthBridge($context);
         self::implementAuthVerifyBridge($context);
+        self::implementMemcmpBridge($context);
         self::implementBridge($context, '__compiler_sodium_stream_xor', self::STREAM_XOR_HELPER);
         self::implementBridge($context, '__compiler_sodium_stream_xchacha20_xor', self::STREAM_XCHACHA20_XOR_HELPER);
     }
@@ -144,6 +148,39 @@ final class StringSodium
             $fn->getParam(2)
         );
         $context->builder->returnValue($context->builder->zext($result, $i32));
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementMemcmpBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_memcmp';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $strPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_memcmp_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::MEMCMP_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($result);
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }

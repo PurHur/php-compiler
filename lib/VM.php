@@ -8321,6 +8321,8 @@ restart:
             return $this->dispatchVmJsonException($e, $callerFrame);
         } catch (\DOMException $e) {
             return $this->dispatchVmDomException($e, $callerFrame);
+        } catch (\SodiumException $e) {
+            return $this->dispatchVmSodiumException($e, $callerFrame);
         } catch (VM\NativeDateInvalidTimeZoneException $e) {
             return $this->dispatchVmDateInvalidTimeZoneException($e, $callerFrame);
         } catch (VM\NativeDateMalformedStringException $e) {
@@ -8694,6 +8696,20 @@ restart:
             $file,
             $line,
             $error->getCode()
+        );
+
+        return $this->dispatchBuiltinThrowable($frame, $thrown);
+    }
+
+    /** Bridge native SodiumException from ext/sodium builtins into user catch handlers (#15531). */
+    private function dispatchVmSodiumException(\SodiumException $error, Frame $frame): ?Frame
+    {
+        [$file, $line] = VM\ExceptionSupport::userFatalSite($frame);
+        $thrown = VM\BuiltinExceptionSupport::materializeSodiumException(
+            $this->context,
+            $error->getMessage(),
+            $file,
+            $line
         );
 
         return $this->dispatchBuiltinThrowable($frame, $thrown);

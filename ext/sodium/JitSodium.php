@@ -65,6 +65,17 @@ final class JitSodium
         );
     }
 
+    public static function invokeMemcmp(Context $context, Value $string1, Value $string2): Value
+    {
+        StringSodium::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_memcmp'),
+            $string1,
+            $string2
+        );
+    }
+
     public static function invokeStreamXor(
         Context $context,
         string $name,

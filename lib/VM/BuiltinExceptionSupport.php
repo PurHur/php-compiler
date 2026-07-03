@@ -25,6 +25,7 @@ final class BuiltinExceptionSupport
     public const CLASS_REFLECTION_EXCEPTION = 'reflectionexception';
     public const CLASS_JSON_EXCEPTION = 'jsonexception';
     public const CLASS_DOM_EXCEPTION = 'domexception';
+    public const CLASS_SODIUM_EXCEPTION = 'sodiumexception';
     public const CLASS_EXCEPTION = 'exception';
     public const CLASS_LOGIC_EXCEPTION = 'logicexception';
     public const CLASS_BAD_METHOD_CALL_EXCEPTION = 'badmethodcallexception';
@@ -144,6 +145,15 @@ final class BuiltinExceptionSupport
         $var->toObject()->getProperty(ExceptionSupport::PROP_CODE)->int($code);
 
         return $var;
+    }
+
+    public static function materializeSodiumException(
+        Context $ctx,
+        string $message,
+        string $file = '',
+        int $line = 0
+    ): Variable {
+        return self::materializeThrowable($ctx, self::CLASS_SODIUM_EXCEPTION, $message, $file, $line);
     }
 
     public static function materializeDateInvalidTimeZoneException(

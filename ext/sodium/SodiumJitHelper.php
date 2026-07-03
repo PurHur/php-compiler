@@ -42,4 +42,9 @@ final class SodiumJitHelper
     {
         return VmSodium::streamXchacha20Xor($message, $nonce, $key);
     }
+
+    public static function memcmp(string $string1, string $string2): int
+    {
+        return VmSodium::memcmp($string1, $string2);
+    }
 }
