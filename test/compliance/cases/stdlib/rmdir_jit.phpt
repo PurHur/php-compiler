@@ -30,7 +30,9 @@ if (rmdir('/no/such/phpc-rmdir-path')) {
 } else {
     echo "nogone\n";
 }
---EXPECT--
+--EXPECTF--
+PHP Warning:  rmdir(%s): No such file or directory in %s on line %d
+PHP Warning:  rmdir(/no/such/phpc-rmdir-path): No such file or directory in %s on line %d
 ok
 gone
 nogone
