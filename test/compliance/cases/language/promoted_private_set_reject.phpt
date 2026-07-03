@@ -1,5 +1,5 @@
 --TEST--
-Language: promoted constructor public private(set) — compile fatal (#15184, Zend/zend_compile.c)
+Language: promoted constructor public private(set) (#15368, Zend/zend_compile.c)
 --FILE--
 <?php
 class D {
@@ -7,5 +7,11 @@ class D {
 }
 $d = new D();
 echo $d->x, "\n";
---EXPECT_EXIT--
-255
+try {
+    $d->x = 2;
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+1
+Error: Cannot modify private(set) property D::$x from global scope

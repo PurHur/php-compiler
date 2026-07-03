@@ -1,10 +1,17 @@
 --TEST--
-Language: public private(set) — compile fatal (#15184, Zend/zend_compile.c)
+Language: public private(set) — read public, write private (#15368, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
     public private(set) int $x = 1;
 }
-echo (new C())->x, "\n";
---EXPECT_EXIT--
-255
+$c = new C();
+echo $c->x, "\n";
+try {
+    $c->x = 2;
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+1
+Error: Cannot modify private(set) property C::$x from global scope
