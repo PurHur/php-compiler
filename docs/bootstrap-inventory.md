@@ -27384,7 +27384,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/CycleCollector.php`
 
 **Warnings** (review for bootstrap subset):
-- 18 class method(s)
+- 23 class method(s)
 - 2 closure(s)
 
 ### `lib/VM/DateIntervalSupport.php`
