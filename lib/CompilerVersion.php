@@ -736,23 +736,36 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723).
+     * PHP 8.4+ DOMNode::contains() (ext/dom/node.c, #14447, #14535, #14723, #15613).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14599).
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate (#14599).
      */
     public static function supportsDomNodeContains(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
-     * PHP 8.4+ DOMNode::getRootNode() (ext/dom/node.c, #14449).
+     * PHP 8.4+ DOMNode::compareDocumentPosition() (ext/dom/node.c, #14448, #15613).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#14599).
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate.
+     */
+    public static function supportsDomNodeCompareDocumentPosition(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
+    /**
+     * PHP 8.4+ DOMNode::getRootNode() (ext/dom/node.c, #14449, #14599).
+     *
+     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile
+     * matches Zend 8.2 phantom gate.
      */
     public static function supportsDomNodeGetRootNode(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
