@@ -111,7 +111,17 @@ final class DomNodePropertySupport
             return $var;
         }
         if (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc) {
-            $var->null();
+            $ownerId = DomRegistry::state($object)->ownerElementId;
+            if (null === $ownerId) {
+                $var->null();
+            } else {
+                $owner = DomRegistry::entry($ownerId);
+                if (null === $owner) {
+                    $var->null();
+                } else {
+                    $var->object($owner);
+                }
+            }
 
             return $var;
         }

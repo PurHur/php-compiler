@@ -83,6 +83,16 @@ final class DomNodeState
     /** Attribute local name registered via setIdAttribute() (php-src dom_object attr->id). */
     public ?string $idAttributeName = null;
 
+    /**
+     * Live DOMAttr object ids per attribute qName (php-src ext/dom/attr.c; #14455).
+     *
+     * @var array<string, int>
+     */
+    public array $attributeNodeIds = [];
+
+    /** Owning element object id for {@see DomConstants::XML_ATTRIBUTE_NODE} (#14455). */
+    public ?int $ownerElementId = null;
+
     /** @var array<string, string> */
     public array $idAttrByElement = [];
 
