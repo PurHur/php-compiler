@@ -142,24 +142,27 @@ final class JitStrlen
         $typeKind = $context->builder->and($typeByte, $i8->constInt(0x7f, false));
         $nullErrBlock = BasicBlockHelper::append($context, 'strlen_null_typeerror');
         $okBlock = BasicBlockHelper::append($context, 'strlen_value_ok');
+        $mergeBlock = BasicBlockHelper::append($context, 'strlen_value_done');
         $isNull = $context->builder->icmp(
             Builder::INT_EQ,
             $typeKind,
             $i8->constInt(VmVariable::TYPE_NULL, false)
         );
+        $i64 = $context->getTypeFromString('int64');
+        $nullLenBlock = null;
+        $useNullMerge = !$context->callerStrictTypes;
         if ($context->callerStrictTypes) {
             $context->builder->branchIf($isNull, $nullErrBlock, $okBlock);
             $context->builder->positionAtEnd($nullErrBlock);
             self::emitTypeErrorAndAbort($context, 'null');
-            $context->builder->positionAtEnd($okBlock);
         } else {
-            $coerceFromNullBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
-            $context->builder->branchIf($isNull, $coerceFromNullBlock, $okBlock);
-            $context->builder->positionAtEnd($coerceFromNullBlock);
+            $nullLenBlock = BasicBlockHelper::append($context, 'strlen_value_null_len');
+            $context->builder->branchIf($isNull, $nullLenBlock, $okBlock);
+            $context->builder->positionAtEnd($nullLenBlock);
             self::emitNullStringDeprecation($context);
-
-            return $context->getTypeFromString('int64')->constInt(0, false);
+            $context->builder->branch($mergeBlock);
         }
+        $context->builder->positionAtEnd($okBlock);
         $arrayTy = $i8->constInt(JITVariable::TYPE_HASHTABLE & 0x7f, false);
         $objectTy = $i8->constInt(VmVariable::TYPE_OBJECT, false);
         $enumCaseTy = $i8->constInt(VmVariable::TYPE_ENUM_CASE, false);
@@ -186,8 +189,18 @@ final class JitStrlen
         }
         $context->builder->positionAtEnd($coerceBlock);
         $argValue = JitStringArg::lower($context, $arg, 'strlen() string');
+        $coerceLen = self::loadStringLength($context, $argValue);
+        if ($useNullMerge) {
+            $context->builder->branch($mergeBlock);
+            $context->builder->positionAtEnd($mergeBlock);
+            $phi = $context->builder->phi($i64, 'strlen_value_len');
+            $phi->addIncoming($i64->constInt(0, false), $nullLenBlock);
+            $phi->addIncoming($coerceLen, $coerceBlock);
 
-        return self::loadStringLength($context, $argValue);
+            return $phi;
+        }
+
+        return $coerceLen;
     }
 
     private static function loadStringLength(Context $context, Value $strPtr): Value
