@@ -242,15 +242,16 @@ final class CompilerVersion
     /**
      * PHP 8.3+ object class constants (`public const X = new Class(...)`).
      *
-     * Zend ZEND_CONST_EXPR_NEW (#12940, #15517). Stable 8.4.0+ only — 8.4.0-dev reference
-     * profile matches Zend 8.2 compile-time rejection (#14985, #14123, #15559). Forward syntax
-     * also requires {@see languageProfileVersion()} 8.3+ (unset `PHP_COMPILER_PROFILE=8.2`).
+     * Zend ZEND_CONST_EXPR_NEW (#12940, #15517, #15583). Enabled on the 8.4.0-dev forward line
+     * when {@see languageProfileVersion()} is 8.3+; set `PHP_COMPILER_PROFILE=8.2` to match Zend 8.2
+     * compile-time rejection (#14123).
      */
     public static function supportsClassConstObjectExpressions(): bool
     {
-        if (version_compare(self::VERSION, '8.4.0', '<')) {
+        if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
+
         return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
