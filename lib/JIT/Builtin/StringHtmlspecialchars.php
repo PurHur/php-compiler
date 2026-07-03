@@ -45,6 +45,12 @@ final class StringHtmlspecialchars
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            StringHtmlspecialcharsUserScriptLlvm::ensureLinked($context);
+
+            return;
+        }
+
         self::implementBridge($context, '__string__htmlspecialchars', self::HTMLSPECIALCHARS_HELPER);
     }
 

@@ -75,6 +75,22 @@ final class SuperglobalRefreshRuntime
         SuperglobalRefreshUserScriptLlvm::implement($context);
     }
 
+    public static function ensureUserScriptRefreshPrerequisites(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($context);
+    }
+
+    public static function ensureUserScriptRefreshEmit(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        SuperglobalRefreshUserScriptLlvm::emitRefresh($context);
+    }
+
     public static function implement(Context $context): void
     {
         $probe = $context->module->getNamedFunction('__superglobals__refresh');

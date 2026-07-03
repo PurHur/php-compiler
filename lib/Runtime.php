@@ -336,6 +336,11 @@ class Runtime {
             if (!is_null($this->debugFile)) {
                 $this->jitContext->setDebugFile($this->debugFile);
             }
+            // User-script ParseStr/environ nested JIT before registerModule — post-module nested JIT segfaults (#15417).
+            if (JIT\Builtin::LOAD_TYPE_STANDALONE === $this->jitContext->loadType
+                && $this->jitContext->isThinStandaloneAotMain()) {
+                JIT\Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshPrerequisites($this->jitContext);
+            }
             foreach ($this->modules as $module) {
                 $this->jitContext->registerModule($module);
             }
