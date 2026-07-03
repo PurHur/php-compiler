@@ -32,6 +32,12 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $expected = \PHPCompiler\ext\standard\VmString::htmlspecialchars($input, $flags);
         $actual = \PHPCompiler\ext\standard\HtmlspecialcharsJitHelper::htmlspecialchars($input, $flags);
         $this->assertSame($expected, $actual);
+
+        $compat = ENT_COMPAT;
+        $this->assertSame(
+            \PHPCompiler\ext\standard\VmString::htmlspecialchars($input, $compat),
+            \PHPCompiler\ext\standard\HtmlspecialcharsJitHelper::htmlspecialchars($input, $compat)
+        );
     }
 
     public function testSpineBundleIncludesHtmlspecialcharsJitHelper(): void

@@ -20,7 +20,7 @@ final class HtmlspecialcharsJitHelper
             }
             $string = self::substituteInvalidUtf8($string);
         }
-        $quoteBoth = 0 !== ($flags & ENT_QUOTES);
+        $quoteBoth = ENT_QUOTES === ($flags & ENT_QUOTES);
         $quoteDouble = !$quoteBoth && (0 !== ($flags & ENT_COMPAT));
         $entHtml5 = 0 !== ($flags & ENT_HTML5);
         $out = '';
