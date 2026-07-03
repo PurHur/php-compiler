@@ -65,7 +65,8 @@ final class VmProcessProcOpenNative
             return false;
         }
 
-        $commandLabel = implode(' ', $argv);
+        // php-src: proc_get_status()['command'] is argv[0], not the joined command line.
+        $commandLabel = $argv[0];
 
         $ffi = self::ffi();
         if (null === $ffi) {
