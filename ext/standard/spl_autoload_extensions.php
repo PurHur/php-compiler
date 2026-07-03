@@ -52,8 +52,6 @@ final class spl_autoload_extensions extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \LogicException(
-            'spl_autoload_extensions() is not implemented for JIT in this compiler build (#4256)'
-        );
+        return JitSplAutoloadDefault::extensions($context, ...$args);
     }
 }
