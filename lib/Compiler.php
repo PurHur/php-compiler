@@ -18203,6 +18203,20 @@ class Compiler {
             ) {
                 return $immediate;
             }
+            // array_keys([...]) / array_diff_assoc(array_keys(...), array_keys(...)) — stmt-before Array_
+            // for dead php-cfg temps without shared cfgVar roots (#13778, #13779, #15569).
+            if (
+                null !== $callArg
+                && $this->callArgIsDeadInlineTemporary($callArg)
+                && $this->callArgOperandExpectsArrayProducer($callArg)
+                && !$this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+                    $callOp,
+                    $argIndex,
+                    $block
+                )
+            ) {
+                return $immediate;
+            }
         }
         $callArg = $callOp->args[$argIndex] ?? null;
         if (!$callArg instanceof Operand) {
