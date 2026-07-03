@@ -856,6 +856,28 @@ final class ReflectionSupport
         return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
     }
 
+    /** php-src ext/reflection/php_reflection.c — ReflectionMethod::getDeclaringClass() (#15658). */
+    public static function declaringClassNameFromReflectionMethod(ObjectEntry $reflection, Context $ctx): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+        }
+        $methodLc = strtolower($methodName);
+        // Trait-imported methods (incl. aliases) report the composing class, not the trait (#15658).
+        if (isset($entry->traitMethodSources[$methodLc])) {
+            return $entry->name;
+        }
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
+        if (isset($ctx->classes[$declLc])) {
+            return $ctx->classes[$declLc]->name;
+        }
+
+        return $entry->name;
+    }
+
     public static function functionNameFromReflection(ObjectEntry $reflection): string
     {
         $nameVar = $reflection->getProperty(self::PROP_FUNC_NAME)->resolveIndirect();
