@@ -2799,7 +2799,11 @@ final class VmDom
             }
             if ('<' !== $inner[$pos]) {
                 $next = strpos($inner, '<', $pos);
-                $pos = (false === $next) ? $len : $next;
+                $text = false === $next ? substr($inner, $pos) : substr($inner, $pos, $next - $pos);
+                $textNode = self::createTextNode($ctx, $text, null);
+                $state->childIds[] = $textNode->id;
+                self::linkChildToParent($textNode, $entry);
+                $pos = false === $next ? $len : $next;
 
                 continue;
             }
