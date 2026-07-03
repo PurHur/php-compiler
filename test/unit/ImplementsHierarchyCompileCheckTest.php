@@ -273,4 +273,46 @@ PHP;
         $this->expectExceptionMessage('S cannot implement stdClass - it is not an interface');
         $runtime->parseAndCompile($code, 'implements_stdclass.php');
     }
+
+    /** @covers issue #15447 */
+    public function testClassImplementsUnitEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C implements UnitEnum {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-enum class C cannot implement interface UnitEnum');
+        $runtime->parseAndCompile($code, 'implements_unitenum.php');
+    }
+
+    /** @covers issue #15447 */
+    public function testClassImplementsBackedEnumFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C implements BackedEnum {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('Non-enum class C cannot implement interface BackedEnum');
+        $runtime->parseAndCompile($code, 'implements_backedenum.php');
+    }
+
+    /** @covers issue #15447 */
+    public function testBackedEnumWithoutExplicitUnitEnumStillCompiles(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+enum E: int { case A = 1; }
+echo E::A->value, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'backed_enum_ok.php');
+        $this->assertNotNull($block);
+        ob_start();
+        $runtime->run($block);
+        $this->assertSame("1\n", ob_get_clean());
+    }
 }
