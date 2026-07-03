@@ -285,6 +285,10 @@ final class VmDom
         $document = new ClassEntry('DOMDocument');
         $document->isInternal = true;
         $document->parentLc = self::CLASS_NODE;
+        $documentConstruct = new DocumentConstruct();
+        $document->constructor = $documentConstruct;
+        $document->methods['__construct'] = $documentConstruct;
+        $document->methodVisibility['__construct'] = $pub;
         $document->properties[] = new ClassProperty(self::PROP_FORMAT_OUTPUT, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_VALIDATE_ON_PARSE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
