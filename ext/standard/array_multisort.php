@@ -7,6 +7,8 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\MultisortRuntime;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
@@ -101,9 +103,9 @@ final class array_multisort extends Internal
         if (1 === \count($entries)) {
             $entry = $entries[0];
             if (StdlibConstants::SORT_DESC === $entry['sortOrder']) {
-                ArrayBuiltinHelper::sortPackedReverse($context, $entry['array']);
+                SortRuntime::sortPackedReverse($context, $entry['array']);
             } else {
-                ArrayBuiltinHelper::sortPacked($context, $entry['array']);
+                SortRuntime::sortPacked($context, $entry['array']);
             }
 
             return $context->getTypeFromString('int1')->constInt(1, false);
@@ -111,7 +113,7 @@ final class array_multisort extends Internal
 
         $arrays = array_column($entries, 'array');
         $descending = StdlibConstants::SORT_DESC === $entries[0]['sortOrder'];
-        ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
+        MultisortRuntime::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
