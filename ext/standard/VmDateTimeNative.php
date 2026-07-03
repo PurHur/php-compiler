@@ -1933,7 +1933,6 @@ final class VmDateTimeNative
             return null;
         }
         [$year, $month] = self::shiftYearMonth($year, $month, $monthDelta);
-        $day = min($day, self::daysInMonth($year, $month));
 
         return [
             'timestamp' => self::mktimeInTimezone($year, $month, $day, $hour, $minute, $second, $tzName),
