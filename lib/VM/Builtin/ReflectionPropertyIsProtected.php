@@ -34,6 +34,13 @@ final class ReflectionPropertyIsProtected extends VmClassMethod
 
             return;
         }
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
             ReflectionSupport::throwReflectionException(

@@ -76,6 +76,9 @@ final class ReflectionSupport
     /** Declaring class name on ReflectionProperty instances (#9878). */
     public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
 
+    /** Runtime dynamic property introspection (#15540, ext/reflection/php_reflection.c). */
+    public const PROP_IS_DYNAMIC = 'isDynamicFlag';
+
     public const PROP_FUNCTION_NAME = 'function';
 
     public const PROP_CONSTANT_NAME = 'constant';
@@ -822,6 +825,16 @@ final class ReflectionSupport
         }
 
         return $nameVar->toString();
+    }
+
+    public static function isDynamicReflectionProperty(ObjectEntry $reflection): bool
+    {
+        $flag = $reflection->getProperty(self::PROP_IS_DYNAMIC)->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $flag->type) {
+            return false;
+        }
+
+        return $flag->toBool();
     }
 
     /**

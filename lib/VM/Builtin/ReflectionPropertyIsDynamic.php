@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\VM\Builtin;
 
 use PHPCompiler\Frame;
-use PHPCompiler\VM\ReflectionPropertyHookSupport;
+use PHPCompiler\VM\ReflectionSupport;
 
 /** ReflectionProperty::isDynamic() — VM (#7295, ext/reflection/php_reflection.c). */
 final class ReflectionPropertyIsDynamic extends VmClassMethod
@@ -17,9 +17,9 @@ final class ReflectionPropertyIsDynamic extends VmClassMethod
 
     public function execute(Frame $frame): void
     {
-        ReflectionPropertyHookSupport::resolveProperty($frame, $frame->calledArgs[0]);
+        $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->bool(ReflectionPropertyHookSupport::isDynamic());
+            $frame->returnVar->bool(ReflectionSupport::isDynamicReflectionProperty($receiver));
         }
     }
 }

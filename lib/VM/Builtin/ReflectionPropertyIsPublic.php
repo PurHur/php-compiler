@@ -34,6 +34,13 @@ final class ReflectionPropertyIsPublic extends VmClassMethod
 
             return;
         }
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(true);
+            }
+
+            return;
+        }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta) {
             ReflectionSupport::throwReflectionException(

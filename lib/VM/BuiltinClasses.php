@@ -698,6 +698,7 @@ final class BuiltinClasses
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
         \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
