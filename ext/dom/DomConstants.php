@@ -19,6 +19,8 @@ final class DomConstants
 
     public const XML_DOCUMENT_FRAG_NODE = 11;
 
+    public const XML_ENTITY_REF_NODE = 5;
+
     /** Internal marker for {@see VmDom::createNodeList()} handles. */
     public const XML_NODELIST = -1;
 

@@ -24,6 +24,7 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocument'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocumentType'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMEntityReference'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMAttr'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
@@ -341,6 +342,26 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("DOMAttr\nfoo\nx\n", ob_get_clean());
+    }
+
+    public function test_dom_create_entity_reference(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$ref = $doc->createEntityReference('amp');
+echo get_class($ref), "\n";
+echo $ref->nodeType, "\n";
+echo $ref->nodeName, "\n";
+$root = $doc->createElement('root');
+$root->appendChild($ref);
+echo $root->firstChild->nodeName, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_create_entity_reference.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DOMEntityReference\n5\namp\namp\n", ob_get_clean());
     }
 
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
