@@ -72,6 +72,7 @@ final class SuperglobalRefreshRuntime
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
+        StringHtmlspecialcharsUserScriptLlvm::implement($context);
         SuperglobalRefreshUserScriptLlvm::implement($context);
     }
 

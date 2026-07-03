@@ -45,6 +45,12 @@ final class StringHtmlspecialchars
             return;
         }
 
+        if (StringHtmlspecialcharsUserScriptLlvm::shouldUse($context)) {
+            StringHtmlspecialcharsUserScriptLlvm::implement($context);
+
+            return;
+        }
+
         self::implementBridge($context, '__string__htmlspecialchars', self::HTMLSPECIALCHARS_HELPER);
     }
 

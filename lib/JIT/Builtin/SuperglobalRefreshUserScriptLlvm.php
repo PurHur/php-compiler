@@ -102,7 +102,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $queryStr = self::cstrToPhpcString($context, $queryCstr);
         $getHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $context->builder->store($getHt, self::sgGlobalPtr($context, 'sg_GET'));
-        self::parseFormEncoded($context, $getHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $fn, $getHt, $queryCstr);
 
         $postHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
         $filesHt = $context->builder->call($context->lookupFunction('__hashtable__alloc'));
@@ -114,7 +114,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $afterPostBb = $fn->appendBasicBlock('sg_user_refresh_after_post');
         $context->builder->branchIf($postBodyEmpty, $afterPostBb, $populatePostBb);
         $context->builder->positionAtEnd($populatePostBb);
-        self::parseFormEncodedFromCstrSlot($context, $postHt, $postBodyCstr);
+        self::parseFormEncodedFromCstrSlot($context, $fn, $postHt, $postBodyCstr);
         $context->builder->branch($afterPostBb);
         $context->builder->positionAtEnd($afterPostBb);
 
@@ -125,14 +125,14 @@ final class SuperglobalRefreshUserScriptLlvm
         $reqAfterQsBb = $fn->appendBasicBlock('sg_user_refresh_req_after_qs');
         $context->builder->branchIf($queryNonEmpty, $reqQsBb, $reqAfterQsBb);
         $context->builder->positionAtEnd($reqQsBb);
-        self::parseFormEncoded($context, $requestHt, $queryStr);
+        self::parseFormEncodedFromCstrSlot($context, $fn, $requestHt, $queryCstr);
         $context->builder->branch($reqAfterQsBb);
         $context->builder->positionAtEnd($reqAfterQsBb);
         $reqPostBb = $fn->appendBasicBlock('sg_user_refresh_req_post');
         $reqDoneBb = $fn->appendBasicBlock('sg_user_refresh_req_done');
         $context->builder->branchIf($postBodyEmpty, $reqDoneBb, $reqPostBb);
         $context->builder->positionAtEnd($reqPostBb);
-        self::parseFormEncodedFromCstrSlot($context, $requestHt, $postBodyCstr);
+        self::parseFormEncodedFromCstrSlot($context, $fn, $requestHt, $postBodyCstr);
         $context->builder->branch($reqDoneBb);
         $context->builder->positionAtEnd($reqDoneBb);
 
@@ -304,9 +304,132 @@ final class SuperglobalRefreshUserScriptLlvm
         );
     }
 
-    private static function parseFormEncodedFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
-    {
+    private static function parseFormEncodedFromCstrSlot(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ht,
+        Value $cstrSlot
+    ): void {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::emitFormCstrWalkIntoHashtable($context, $fn, $ht, $context->builder->load($cstrSlot));
+
+            return;
+        }
+
         self::parseFormEncoded($context, $ht, self::cstrToPhpcString($context, $cstrSlot));
+    }
+
+    /**
+     * Native {@code key=value&…} scan on a libc cstr (#15417). Mirrors {@see emitEnvironWalkIntoHashtable}.
+     * php-src: ext/standard/basic_functions.c — PHP_FUNCTION(parse_str)
+     */
+    private static function emitFormCstrWalkIntoHashtable(
+        Context $context,
+        LlvmFunction $fn,
+        Value $ht,
+        Value $lineCstr
+    ): void {
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8 = $context->getTypeFromString('int8');
+        $i8p = $context->getTypeFromString('int8*');
+
+        $curSlot = BasicBlockHelper::entryAlloca($context, $i8p);
+        $context->builder->store($lineCstr, $curSlot);
+
+        $loopHead = $fn->appendBasicBlock('sg_user_refresh_form_head');
+        $loopBody = $fn->appendBasicBlock('sg_user_refresh_form_body');
+        $doneBb = $fn->appendBasicBlock('sg_user_refresh_form_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $cur = $context->builder->load($curSlot);
+        $curEmpty = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($cur),
+            $i8->constInt(0, false)
+        );
+        $context->builder->branchIf($curEmpty, $doneBb, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $eq = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $cur,
+            $i32->constInt(61, false)
+        );
+        $amp = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $cur,
+            $i32->constInt(38, false)
+        );
+        $noEqBb = $fn->appendBasicBlock('sg_user_refresh_form_no_eq');
+        $haveEqBb = $fn->appendBasicBlock('sg_user_refresh_form_have_eq');
+        $eqNull = $context->builder->icmp(Builder::INT_EQ, $eq, $i8p->constNull());
+        $context->builder->branchIf($eqNull, $noEqBb, $haveEqBb);
+
+        $context->builder->positionAtEnd($haveEqBb);
+        $eqBeforeAmp = $context->builder->or(
+            $context->builder->icmp(Builder::INT_EQ, $amp, $i8p->constNull()),
+            $context->builder->icmp(Builder::INT_ULT, $eq, $amp)
+        );
+        $skipPairBb = $fn->appendBasicBlock('sg_user_refresh_form_skip_pair');
+        $setPairBb = $fn->appendBasicBlock('sg_user_refresh_form_set_pair');
+        $context->builder->branchIf($eqBeforeAmp, $setPairBb, $skipPairBb);
+
+        $context->builder->positionAtEnd($setPairBb);
+        $keyLen = $context->builder->sub(
+            $context->builder->ptrToInt($eq, $i64),
+            $context->builder->ptrToInt($cur, $i64)
+        );
+        $value = $context->builder->inBoundsGEP($eq, $i64->constInt(1, false));
+        $valueEnd = $context->builder->select(
+            $context->builder->icmp(Builder::INT_EQ, $amp, $i8p->constNull()),
+            $context->builder->call($context->lookupFunction('strchr'), $cur, $i32->constInt(0, false)),
+            $amp
+        );
+        $valLen = $context->builder->sub(
+            $context->builder->ptrToInt($valueEnd, $i64),
+            $context->builder->ptrToInt($value, $i64)
+        );
+        $emptyKeyBb = $fn->appendBasicBlock('sg_user_refresh_form_empty_key');
+        $storeBb = $fn->appendBasicBlock('sg_user_refresh_form_store');
+        $keyEmpty = $context->builder->icmp(Builder::INT_EQ, $keyLen, $i64->constInt(0, false));
+        $context->builder->branchIf($keyEmpty, $emptyKeyBb, $storeBb);
+        $context->builder->positionAtEnd($storeBb);
+        $charPtr = $context->getTypeFromString('char*');
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $keyLen,
+            $context->builder->pointerCast($cur, $charPtr)
+        );
+        $valStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $valLen,
+            $context->builder->pointerCast($value, $charPtr)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $valStr
+        );
+        $context->builder->branch($noEqBb);
+        $context->builder->positionAtEnd($emptyKeyBb);
+        $context->builder->branch($noEqBb);
+        $context->builder->positionAtEnd($skipPairBb);
+        $context->builder->branch($noEqBb);
+
+        $context->builder->positionAtEnd($noEqBb);
+        $ampNull = $context->builder->icmp(Builder::INT_EQ, $amp, $i8p->constNull());
+        $advanceBb = $fn->appendBasicBlock('sg_user_refresh_form_advance');
+        $context->builder->branchIf($ampNull, $doneBb, $advanceBb);
+        $context->builder->positionAtEnd($advanceBb);
+        $context->builder->store(
+            $context->builder->inBoundsGEP($amp, $i64->constInt(1, false)),
+            $curSlot
+        );
+        $context->builder->branch($loopHead);
+        $context->builder->positionAtEnd($doneBb);
     }
 
     private static function parseCookieFromCstrSlot(Context $context, Value $ht, Value $cstrSlot): void
