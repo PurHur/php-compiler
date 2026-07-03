@@ -25,6 +25,9 @@ final class ReflectionPropertyHookSupport
             throw new \LogicException('ReflectionProperty refers to unknown class in this compiler build');
         }
         $property = ReflectionSupport::propertyNameFromReflection($receiver);
+        if (ReflectionSupport::isDynamicReflectionProperty($receiver)) {
+            return [$ctx, $entry, null, $className, $property];
+        }
         $meta = VmReflection::findClassProperty($entry, $property, $ctx);
         if (null === $meta && null === VmReflection::findStaticPropertyKey($entry, $property, $ctx)) {
             ReflectionSupport::throwReflectionException(
@@ -53,15 +56,13 @@ final class ReflectionPropertyHookSupport
         return is_array($propMeta) && !empty($propMeta['virtual']);
     }
 
-    public static function isDynamic(): bool
-    {
-        return false;
-    }
-
     public static function getMangledName(ClassEntry $entry, ?ClassProperty $meta, string $property, Context $ctx): string
     {
         if (null !== $meta) {
             return VmReflection::manglePropertyKey($meta, $ctx);
+        }
+        if (null === VmReflection::findStaticPropertyKey($entry, $property, $ctx)) {
+            return $property;
         }
         $propLc = strtolower($property);
         $visibility = $entry->staticPropertyVisibility[$propLc] ?? \PHPCfg\Func::FLAG_PUBLIC;
