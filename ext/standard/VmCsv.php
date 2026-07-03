@@ -148,11 +148,8 @@ final class VmCsv
         for ($i = 0, $len = \strlen($field); $i < $len; ++$i) {
             $c = $field[$i];
             if ($c === $enc) {
+                // php-src ext/standard/file.c — only enclosure is doubled inside quotes.
                 $out .= $enc.$enc;
-                continue;
-            }
-            if ($c === $esc) {
-                $out .= $esc.$esc;
                 continue;
             }
             $out .= $c;
