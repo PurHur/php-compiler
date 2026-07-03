@@ -79,6 +79,30 @@ final class substr extends Internal
                 $argc
             ));
         }
+
+        $strLit = $args[0]->compileTimeString ?? null;
+        if (null !== $strLit) {
+            $offsetLit = self::compileTimeSignedLong($context, $args[1]);
+            if (null !== $offsetLit) {
+                $folded = null;
+                if (3 === $argc) {
+                    if (JITVariable::TYPE_VALUE === $args[2]->type && ($args[2]->isNullConstant ?? false)) {
+                        $folded = VmString::substr($strLit, $offsetLit, null);
+                    } else {
+                        $lengthLit = self::compileTimeSignedLong($context, $args[2]);
+                        if (null !== $lengthLit) {
+                            $folded = VmString::substr($strLit, $offsetLit, $lengthLit);
+                        }
+                    }
+                } else {
+                    $folded = VmString::substr($strLit, $offsetLit);
+                }
+                if (null !== $folded) {
+                    return $context->builder->load($context->constantStringFromString($folded));
+                }
+            }
+        }
+
         $str = JitStringBuiltinArg::lower($context, $args[0], 'substr', 0, 'string');
         $structName = $str->typeOf()->getElementType()->getName();
         $map = $context->structFieldMap[$structName];
@@ -99,8 +123,16 @@ final class substr extends Internal
                 $lengthArg = JitIntdiv::lowerIntBuiltinArg($context, $args[2], 'substr', 3, 'length');
                 $negLen = $context->builder->icmp(Builder::INT_SLT, $lengthArg, $zero);
                 $remaining = $context->builder->sub($len, $start);
-                $maxLen = $context->builder->select($negLen, $zero, $lengthArg);
-                $sliceLen = JitStringIndex::min($context, $maxLen, $remaining);
+                $adjustedLen = $context->builder->select(
+                    $negLen,
+                    $context->builder->add($remaining, $lengthArg),
+                    $lengthArg
+                );
+                $sliceLen = JitStringIndex::min(
+                    $context,
+                    JitStringIndex::max($context, $adjustedLen, $zero),
+                    $remaining
+                );
             }
         } else {
             $sliceLen = $context->builder->sub($len, $start);
@@ -108,6 +140,18 @@ final class substr extends Internal
         }
 
         return string_trim::jitCopySlice($context, $str, $charPtr, $start, $sliceLen);
+    }
+
+    private static function compileTimeSignedLong(Context $context, JITVariable $arg): ?int
+    {
+        if (JITVariable::TYPE_NATIVE_LONG === $arg->type && JITVariable::KIND_VALUE === $arg->kind) {
+            $lib = $context->llvm->lib;
+            if (null !== $lib->LLVMIsAConstantInt($arg->value->value)) {
+                return (int) $lib->LLVMConstIntGetSExtValue($arg->value->value);
+            }
+        }
+
+        return null;
     }
 
 }

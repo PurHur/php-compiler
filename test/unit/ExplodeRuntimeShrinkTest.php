@@ -26,6 +26,7 @@ final class ExplodeRuntimeShrinkTest extends TestCase
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/explode.php');
         $this->assertStringContainsString('StringExplode::ensureLinked', $builtin);
         $this->assertStringContainsString('StringExplode::invoke', $builtin);
+        $this->assertStringContainsString('buildPackedStrings($context, $delimLit, $hayLit, \\PHP_INT_MAX)', $builtin);
         $this->assertStringNotContainsString('JitExplode::explode', $builtin);
     }
 

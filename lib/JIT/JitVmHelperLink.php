@@ -83,6 +83,12 @@ final class JitVmHelperLink
             return;
         }
 
+        $savedBlock = null;
+        try {
+            $savedBlock = $context->builder->getInsertBlock();
+        } catch (\Throwable) {
+        }
+
         self::ensureCompiled($context, $relativeHelperPath, $compiledHelpers, $issueTag);
 
         $helperFn = self::lookupCompiled($context, $helperLogical, $issueTag);
@@ -107,7 +113,12 @@ final class JitVmHelperLink
             $context->builder->returnValue($ret);
         }
         $context->registerFunction($abiName, $fn);
-        $context->builder->clearInsertionPosition();
+
+        if (null !== $savedBlock) {
+            $context->builder->positionAtEnd($savedBlock);
+        } else {
+            $context->builder->clearInsertionPosition();
+        }
     }
 
     /**
