@@ -2706,6 +2706,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/MathRad2deg.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathRound.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathSin.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathSinh.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/MathSleep.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathSqrt.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathTan.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/MathTanh.php';

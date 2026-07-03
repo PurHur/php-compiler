@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** sleep() — delay execution (VM via VmSleepPure; JIT/AOT via sleep(3)). */
+/** sleep() — delay execution (VM via VmSleepPure; JIT/AOT via SleepJitHelper PHP #15212). */
 final class sleep extends Internal
 {
     public function execute(Frame $frame): void

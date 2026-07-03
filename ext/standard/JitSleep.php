@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\MathSleep;
 use PHPCompiler\JIT\Builtin\TimeSleepRuntime;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
@@ -23,20 +24,14 @@ final class JitSleep
     public static function sleep(Context $context, JITVariable $arg): Value
     {
         $seconds = self::lowerZParamLong($context, $arg, 'sleep', 1, 'seconds');
-        $i32 = $context->getTypeFromString('int32');
-        $secs = $context->builder->trunc($seconds, $i32);
-        $remaining = $context->builder->call($context->lookupFunction('sleep'), $secs);
-        $i64 = $context->getTypeFromString('int64');
 
-        return $context->builder->zExt($remaining, $i64);
+        return MathSleep::invokeSleep($context, $seconds);
     }
 
     public static function usleep(Context $context, JITVariable $arg): Value
     {
         $microseconds = self::lowerZParamLong($context, $arg, 'usleep', 1, 'microseconds');
-        $i32 = $context->getTypeFromString('int32');
-        $usec = $context->builder->trunc($microseconds, $i32);
-        $context->builder->call($context->lookupFunction('usleep'), $usec);
+        MathSleep::invokeUsleep($context, $microseconds);
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
         $context->builder->call($context->lookupFunction('__value__writeNull'), $ptr);
