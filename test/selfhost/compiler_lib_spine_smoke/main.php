@@ -552,6 +552,7 @@ require_once __DIR__.'/../../../ext/standard/AttributeRegistryArgsJitHelper.php'
 require_once __DIR__.'/../../../ext/standard/AttributeRegistryJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Bin2hexJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/CaseCompareJitHelper.php';
+require_once __DIR__.'/../../../ext/standard/NCompareJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/ChunkSplitJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/Hex2binJitHelper.php';
 require_once __DIR__.'/../../../ext/standard/BuiltinAttributes.php';
@@ -2936,6 +2937,7 @@ require_once __DIR__.'/../../../lib/JIT/Builtin/StringMetaphone.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMicrotime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringMktime.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringCaseCompare.php';
+require_once __DIR__.'/../../../lib/JIT/Builtin/StringNCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNaturalCompare.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetInterfacesJit.php';
 require_once __DIR__.'/../../../lib/JIT/Builtin/StringNetworkServices.php';

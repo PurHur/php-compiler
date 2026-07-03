@@ -13,14 +13,16 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringMemcmp;
 use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * memcmp() — binary-safe length-limited string compare (php-src ext/standard/string.c, #7118).
+ * memcmp() — binary-safe length-limited string compare (JIT via NCompareJitHelper PHP #15364).
  */
 final class memcmp extends Internal
 {
@@ -52,18 +54,11 @@ final class memcmp extends Internal
         if (JITVariable::TYPE_NATIVE_LONG !== $args[2]->type) {
             throw new \LogicException('memcmp() length must be an integer in this compiler build');
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[0], 'memcmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lower($context, $args[1], 'memcmp', 1, 'string2'));
-        $length = $context->builder->zExt(
-            $context->builder->trunc(
-                $context->helper->loadValue($args[2]),
-                $context->getTypeFromString('int32')
-            ),
-            $context->getTypeFromString('size_t')
-        );
-        $raw = $context->builder->call($context->lookupFunction('memcmp'), $p0, $p1, $length);
-        $i64 = $context->getTypeFromString('int64');
+        StringMemcmp::ensureLinked($context);
+        $left = JitStringBuiltinArg::lower($context, $args[0], 'memcmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lower($context, $args[1], 'memcmp', 1, 'string2');
+        $length = JitLongArg::lower($context, $args[2], 'memcmp() length');
 
-        return $context->builder->sExt($raw, $i64);
+        return StringMemcmp::invoke($context, $left, $right, $length);
     }
 }

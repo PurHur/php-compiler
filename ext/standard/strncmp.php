@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\StringStrncmp;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -21,7 +22,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
 /**
- * strncmp() for two strings and an integer length (subset of PHP).
+ * strncmp() for two strings and an integer length (JIT via NCompareJitHelper PHP #15364).
  */
 final class strncmp extends Internal
 {
@@ -45,19 +46,12 @@ final class strncmp extends Internal
         if (!$this->requireExactJitArgCount($context, $args, 'strncmp', 3)) {
             return $context->getTypeFromString('int64')->constInt(0, false);
         }
-        $p0 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncmp', 0, 'string1'));
-        $p1 = $this->stringDataPtr($context, JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncmp', 1, 'string2'));
-        $length = $context->builder->zExt(
-            $context->builder->trunc(
-                JitLongArg::lower($context, $args[2], 'strncmp() length'),
-                $context->getTypeFromString('int32')
-            ),
-            $context->getTypeFromString('size_t')
-        );
-        $raw = $context->builder->call($context->lookupFunction('strncmp'), $p0, $p1, $length);
-        $i64 = $context->getTypeFromString('int64');
+        StringStrncmp::ensureLinked($context);
+        $left = JitStringBuiltinArg::lowerCoercible($context, $args[0], 'strncmp', 0, 'string1');
+        $right = JitStringBuiltinArg::lowerCoercible($context, $args[1], 'strncmp', 1, 'string2');
+        $length = JitLongArg::lower($context, $args[2], 'strncmp() length');
 
-        return $context->builder->sExt($raw, $i64);
+        return StringStrncmp::invoke($context, $left, $right, $length);
     }
 
     private static function vmStringArg(Frame $frame, int $argIndex, string $paramName): string
