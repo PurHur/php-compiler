@@ -14154,7 +14154,8 @@ class Compiler {
                     $cfgCallOp,
                     $argIndex,
                     $producers,
-                    $block->orig->children
+                    $block->orig->children,
+                    $block
                 );
                 if (null !== $byIndex) {
                     $trailingUnaryProducer = $producers[$producerCount - 1] ?? null;
@@ -14222,7 +14223,8 @@ class Compiler {
                 $cfgCallOp,
                 $argIndex,
                 $producers,
-                $block->orig->children
+                $block->orig->children,
+                $block
             );
             if (null !== $byIndex) {
                 $trailingUnaryProducer = $producers[$producerCount - 1] ?? null;
@@ -15152,7 +15154,8 @@ class Compiler {
                         $cfgCallOp,
                         $argIndex,
                         $producers,
-                        $block->orig->children
+                        $block->orig->children,
+                        $block
                     );
                     if ($byIndex instanceof Op\Expr) {
                         return $byIndex;
@@ -15193,9 +15196,17 @@ class Compiler {
         // php-cfg dead call-arg temps: hoisted producers align to non-embedded arg slots (#9324).
         $nonEmbeddedArgIndices = [];
         foreach ($callArgs as $i => $arg) {
-            if (null !== $arg && !$this->isEmbeddedCallLiteralArg($arg)) {
-                $nonEmbeddedArgIndices[] = $i;
+            if (null === $arg || $this->isEmbeddedCallLiteralArg($arg)) {
+                continue;
             }
+            if (
+                null !== $cfgCallOp
+                && null !== $block
+                && $this->callArgUsesInlineArrayNotInHoistedProducers($arg, $block, $cfgCallOp, $i, $producers)
+            ) {
+                continue;
+            }
+            $nonEmbeddedArgIndices[] = $i;
         }
         // preg_match(..., $matches, PREG_OFFSET_CAPTURE) — ConstFetch/BitwiseOr only for flags/offset, not &$matches (#13714).
         if (\in_array($inlineFuncName, ['preg_match', 'preg_match_all'], true)) {
@@ -18768,6 +18779,72 @@ class Compiler {
         return true;
     }
 
+    /**
+     * Assign-in-arg Array_ is compiled via findInlineArrayProducerForCallArg but omitted from hoisted producers (#15154).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function callArgUsesInlineArrayNotInHoistedProducers(
+        Operand $arg,
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array $producers
+    ): bool {
+        if (!$this->callArgIsDeadInlineTemporary($arg) || !$this->callArgOperandExpectsArrayProducer($arg)) {
+            return false;
+        }
+        if (null === $block->orig) {
+            return false;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\Array_) {
+                continue;
+            }
+            $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
+            if (
+                null !== $producer->result
+                && (
+                    $this->operandsReferToSameVariable($producer->result, $callArg)
+                    || $this->operandsReferToSameVariable($producer->result, $arg)
+                )
+            ) {
+                return false;
+            }
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                break;
+            }
+            if ($child instanceof Op\Expr\BinaryOp\Plus) {
+                return false;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                return !\in_array($child, $producers, true);
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                $prior = $block->orig->children[$i - 1] ?? null;
+                if ($prior instanceof Op\Expr\Array_) {
+                    return !\in_array($prior, $producers, true);
+                }
+                break;
+            }
+        }
+
+        return false;
+    }
+
     /** php-cfg dead call-arg slot — Temporary or unnamed inferred Variable wrapper (#10917). */
     private function callArgIsDeadInlineTemporary(?Operand $arg): bool
     {
@@ -18793,8 +18870,12 @@ class Compiler {
      *
      * @param list<Operand> $callArgs
      */
-    private function inlineHoistedProducerSlotIndexForCallArg(array $callArgs, int $argIndex): ?int
-    {
+    private function inlineHoistedProducerSlotIndexForCallArg(
+        array $callArgs,
+        int $argIndex,
+        ?Block $block = null,
+        ?Op $cfgCallOp = null
+    ): ?int {
         $callArg = $callArgs[$argIndex] ?? null;
         if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
@@ -18804,6 +18885,21 @@ class Compiler {
             $arg = $callArgs[$i] ?? null;
             if (null === $arg || $this->isEmbeddedCallLiteralArg($arg)) {
                 continue;
+            }
+            if (
+                null !== $block
+                && null !== $cfgCallOp
+                && property_exists($cfgCallOp, 'args')
+                && \is_array($cfgCallOp->args)
+            ) {
+                $producers = null !== $block->orig
+                    ? $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)
+                    : [];
+                if (
+                    $this->callArgUsesInlineArrayNotInHoistedProducers($arg, $block, $cfgCallOp, $i, $producers)
+                ) {
+                    continue;
+                }
             }
             if ($this->callArgIsDeadInlineTemporary($arg)) {
                 ++$slot;
@@ -18823,7 +18919,8 @@ class Compiler {
         Op $callOp,
         int $argIndex,
         array $producers,
-        array $cfgChildren
+        array $cfgChildren,
+        ?Block $block = null
     ): ?Op\Expr {
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
@@ -18837,7 +18934,12 @@ class Compiler {
                 break;
             }
         }
-        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg($callOp->args, $argIndex);
+        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg(
+            $callOp->args,
+            $argIndex,
+            $block,
+            $callOp
+        );
         if (null === $producerSlotIndex) {
             return null;
         }
@@ -22104,7 +22206,9 @@ class Compiler {
                         }
                         $producerSlot = $this->inlineHoistedProducerSlotIndexForCallArg(
                             $callOp->args,
-                            $argIndex
+                            $argIndex,
+                            $block,
+                            $callOp
                         );
                         if (null !== $producerSlot) {
                             // Single hoisted dead-temp unary arg (#13508): producer walk skips immediate
