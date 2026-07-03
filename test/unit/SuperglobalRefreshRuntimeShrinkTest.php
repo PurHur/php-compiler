@@ -39,6 +39,7 @@ final class SuperglobalRefreshRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('EnvironMirrorUserScriptLlvm', $source);
         $this->assertStringContainsString('ensurePrerequisites', $source);
         $this->assertStringContainsString('__compiler_parse_str', $source);
+        $this->assertStringContainsString('__compiler_multipart_populate_post_body', $source);
         $this->assertStringContainsString('__compiler_parse_cookie_header', $source);
         $this->assertStringNotContainsString('StringGetenvAll::ensureLinked', $source);
         $this->assertStringNotContainsString('GetenvJitHelper::fillAllEnvironmentHashtable', $source);
