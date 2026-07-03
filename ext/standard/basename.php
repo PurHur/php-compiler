@@ -38,13 +38,12 @@ final class basename extends Internal
             throw new \LogicException('basename() expects 1 or 2 arguments');
         }
         $path = JitStringBuiltinArg::lowerPath($context, $args[0], 'basename', 0, 'path');
-        $base = JitPath::basename($context, $path);
         if (2 === $argc) {
             $suffix = JitStringBuiltinArg::lower($context, $args[1], 'basename', 1, 'suffix');
 
-            return JitPath::stripSuffixIfPresent($context, $base, $suffix);
+            return JitPath::basenameWithSuffix($context, $path, $suffix);
         }
 
-        return $base;
+        return JitPath::basename($context, $path);
     }
 }
