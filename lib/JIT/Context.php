@@ -886,6 +886,8 @@ class Context {
     /** examples/000–009 user-script AOT: thin LLVM bridges only — no nested-JIT stdlib during init (#13571). */
     private function ensureMinimalUserStandaloneBodies(): void
     {
+        Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);

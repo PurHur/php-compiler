@@ -16,6 +16,7 @@ use PHPLLVM\Value\Function_ as LlvmFunction;
  *
  * Nested {@see SuperglobalRefreshJitHelper} JIT during init segfaults (#13571); the PHP
  * bridge returns VM {@see __object__*} handles that cannot populate native sg_* (#12039).
+ * Process environ mirror uses {@see EnvironMirrorUserScriptLlvm} (no nested GetenvJitHelper JIT, #15417).
  * Form/cookie parsing routes through {@see ParseStrRuntime} + {@see __compiler_parse_str}
  * ({@see ParseStrJitHelper::parseIntoNative} streaming materializer — #13900).
  * php-src: main/php_variables.c
@@ -40,7 +41,7 @@ final class SuperglobalRefreshUserScriptLlvm
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
         ParseStrRuntime::ensureLinked($context);
-        StringGetenvAll::ensureLinked($context);
+        EnvironMirrorUserScriptLlvm::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
 
@@ -354,13 +355,8 @@ final class SuperglobalRefreshUserScriptLlvm
 
     private static function fillServerFromProcessEnviron(Context $context, LlvmFunction $fn, Value $serverHt): void
     {
-        $logical = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::fillAllEnvironmentHashtable';
-        $lc = \strtolower($logical);
-        $fillFn = $context->functions[$lc] ?? null;
-        if (null === $fillFn) {
-            throw new \LogicException($logical.' missing after StringGetenvAll compile (#14209)');
-        }
-        $context->builder->call($fillFn, $serverHt);
+        unset($fn);
+        EnvironMirrorUserScriptLlvm::emitFillCall($context, $serverHt);
     }
 
     private static function setServerKeyFromCstr(Context $context, Value $ht, string $key, Value $valCstrSlot): void
