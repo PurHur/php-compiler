@@ -127,17 +127,28 @@ PHP, 'static_asymmetric_reject.php');
         }
     }
 
-    public function testSetBeforeReadCompileErrors(): void
+    public function testSetBeforeReadCompiles(): void
     {
-        $this->expectCompileError(
-            <<<'PHP'
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
 <?php
 class C {
     private(set) public string $x = 'a';
 }
-PHP,
-            AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE
-        );
+PHP, 'asymmetric_set_before_read.php');
+        $this->assertNotNull($block);
+    }
+
+    public function testBarePrivateSetCompiles(): void
+    {
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile(<<<'PHP'
+<?php
+class C {
+    private(set) string $p = 'x';
+}
+PHP, 'asymmetric_bare_private_set.php');
+        $this->assertNotNull($block);
     }
 
     private function expectCompileError(string $code, string $messageNeedle): void

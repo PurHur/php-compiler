@@ -25,11 +25,6 @@ final class AsymmetricVisibilityRejector
         }
 
         if (CompilerVersion::supportsAsymmetricVisibility()) {
-            $bareLine = AsymmetricVisibilityRewriter::findBareSetModifierLine($code);
-            if ($bareLine > 0) {
-                throw new CompileFatal($filename, $bareLine, AsymmetricVisibilityRewriter::BARE_SET_WITHOUT_READ_MESSAGE);
-            }
-
             return $code;
         }
 
