@@ -105,22 +105,61 @@ final class VmArrayUserSetOps
         bool $dualCompare
     ): void {
         $argc = \count($frame->calledArgs);
-        $minArgs = $dualCompare ? 4 : 3;
-        if ($argc < $minArgs) {
-            throw new \ArgumentCountError(
-                $fn.'() expects at least '.$minArgs.' arguments, '.$argc.' given'
+        $arrayCount = self::countLeadingArrayArgs($frame->calledArgs);
+        $callbackCount = $argc - $arrayCount;
+
+        if ($dualCompare) {
+            if ($callbackCount < 2) {
+                if ($argc < 3) {
+                    throw new \ArgumentCountError(
+                        $fn.'() expects at least 3 arguments, '.$argc.' given'
+                    );
+                }
+                // php-src "+ff": missing key comparator → TypeError on arg #2 when 2+ arrays given.
+                if ($arrayCount >= 2) {
+                    VmArraySortCallback::requireUassocCallback(
+                        $frame->calledArgs[1],
+                        $fn,
+                        2
+                    );
+                } else {
+                    VmArraySortCallback::requireUassocCallback(
+                        $frame->calledArgs[$argc - 1],
+                        $fn,
+                        $argc + 1
+                    );
+                }
+
+                return;
+            }
+            $dataCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$arrayCount],
+                $fn,
+                $arrayCount + 1
             );
+            $keyCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$arrayCount + 1],
+                $fn,
+                $arrayCount + 2
+            );
+            $arrayEnd = $arrayCount;
+        } else {
+            if ($argc < 3) {
+                throw new \ArgumentCountError(
+                    $fn.'() expects at least 3 arguments, '.$argc.' given'
+                );
+            }
+            $keyCompare = self::resolveCompareCallback(
+                $frame,
+                $frame->calledArgs[$argc - 1],
+                $fn,
+                $argc
+            );
+            $dataCompare = null;
+            $arrayEnd = $argc - 1;
         }
-        $keyCompare = self::resolveCompareCallback(
-            $frame,
-            $frame->calledArgs[$argc - 1],
-            $fn,
-            $argc
-        );
-        $dataCompare = $dualCompare
-            ? self::resolveCompareCallback($frame, $frame->calledArgs[$argc - 2], $fn, $argc - 1)
-            : null;
-        $arrayEnd = $dualCompare ? $argc - 2 : $argc - 1;
         $first = VmArray::requireArrayParam($frame->calledArgs[0], $fn, 1, 'array');
         $others = self::collectOtherArrays($frame, $fn, 1, $arrayEnd);
         if (null === $frame->returnVar) {
@@ -394,7 +433,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**
@@ -440,7 +479,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     /**
@@ -472,7 +511,7 @@ final class VmArrayUserSetOps
             }
         }
 
-        return [] !== $others;
+        return true;
     }
 
     private static function valueAtExactKey(HashTable $table, Variable $key): ?Variable
@@ -501,5 +540,22 @@ final class VmArrayUserSetOps
         } else {
             $out->add($key->toString(), $stored);
         }
+    }
+
+    /**
+     * @param list<Variable> $args
+     */
+    private static function countLeadingArrayArgs(array $args): int
+    {
+        $count = 0;
+        foreach ($args as $arg) {
+            if (Variable::TYPE_ARRAY === $arg->resolveIndirect()->type) {
+                ++$count;
+            } else {
+                break;
+            }
+        }
+
+        return $count;
     }
 }
