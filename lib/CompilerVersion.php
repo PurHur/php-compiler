@@ -623,14 +623,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.4+ bare `throw;` catch rethrow (Zend/zend_compile.c, issue #3508, #14239, #15299, #15357).
+     * PHP 8.0+ bare `throw;` catch rethrow (Zend/zend_compile.c, issue #3508, #15299, #15630).
      *
-     * Gated on stable 8.4.0 / PHP_COMPILER_PROFILE=8.4 so 8.4.0-dev reference profile rejects
-     * bare rethrow like Zend 8.2 (#14239).
+     * Enabled on the forward 8.4.0-dev line and explicit PHP_COMPILER_PROFILE=8.4+.
+     * Rejected only when PHP_COMPILER_PROFILE pins 8.2 (reference gate #14239).
      */
     public static function supportsBareRethrow(): bool
     {
-        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.3', '>=');
     }
 
     /**
