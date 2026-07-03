@@ -14802,11 +14802,11 @@ class Compiler {
             return $paired;
         }
         if (1 === $producerCount) {
-            // preg_replace_callback($pat, fn(...), $subj) — lone hoisted closure maps to arg 1 (#12755).
+            // preg_replace_callback($pat, fn(...), $subj) / iterator_apply($it, fn(...)) — lone hoisted closure maps to arg 1 (#12755, #15182).
             if (
                 ($producers[0] instanceof Op\Expr\ArrowFunction || $producers[0] instanceof Op\Expr\Closure)
                 && $argCount >= 2
-                && 'preg_replace_callback' === $inlineFuncName
+                && \in_array($inlineFuncName, ['preg_replace_callback', 'iterator_apply'], true)
             ) {
                 if (1 === $argIndex) {
                     return $producers[0];
@@ -15276,11 +15276,11 @@ class Compiler {
 
                 return null;
             }
-            // preg_replace_callback($pat, fn(...), $arr) — closure arg 1, array arg 2 (#10652).
+            // preg_replace_callback($pat, fn(...), $arr) / iterator_apply($it, fn(...), [$it]) — closure arg 1, array arg 2 (#10652, #15182).
             if (
                 null !== $closureProducerIndex
                 && null !== $arrayProducerIndex
-                && 'preg_replace_callback' === $inlineFuncName
+                && \in_array($inlineFuncName, ['preg_replace_callback', 'iterator_apply'], true)
             ) {
                 if (1 === $argIndex) {
                     return $producers[$closureProducerIndex];
@@ -19688,6 +19688,7 @@ class Compiler {
             'array_walk',
             'array_walk_recursive',
             'array_filter',
+            'iterator_apply',
         ], true)) {
             return 1;
         }
