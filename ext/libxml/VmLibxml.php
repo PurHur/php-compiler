@@ -164,10 +164,12 @@ final class VmLibxml
             return;
         }
 
+        // libxml record line is XML entity line; PHP warning cites user call site via Frame (#11163, #15140).
+        $warningLine = null !== $frame ? 0 : $record['line'];
         $ctx->errors->languageWarning(
             $warningMessage ?? $record['message'],
             '' !== $record['file'] ? $record['file'] : $file,
-            $record['line'],
+            $warningLine,
             $ctx,
             $frame
         );
