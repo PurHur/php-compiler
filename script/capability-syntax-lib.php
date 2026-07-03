@@ -333,12 +333,12 @@ function syntaxRowDefinitions(): array
         ],
         [
             'id' => 'class_const_object',
-            'construct' => 'Class constants with `new` object expressions (PHP 8.3+)',
+            'construct' => 'Class constants with `new` object expressions',
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_NEW'],
-            'issue' => 9850,
+            'issue' => 15608,
             'notes' => [
-                'Zend zend_compile_const_expr allows top-level `new Class(...)` in class constants on 8.3+ (#9850)',
-                'NewWithoutParensCompileCheck rejects bare `new` without `()` and `new` nested in arrays; VM ClassConstMaterializer + JIT immortal singleton (#3196)',
+                'php-src rejects all `new` in class constant expressions (#15608, Zend/zend_compile.c)',
+                'NewWithoutParensCompileCheck rejects bare `new`, `new()` with args, and `new` nested in arrays',
             ],
             'probe' => 'class C { public const X = new stdClass(); } var_export(C::X);',
         ],
