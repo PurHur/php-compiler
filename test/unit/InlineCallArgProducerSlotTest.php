@@ -367,6 +367,43 @@ PHP;
         self::assertSame('100', ob_get_clean());
     }
 
+    /** Issue #15488 — array_intersect(str_split(str_repeat(...)), str_split(str_repeat(...))) wires outer producers. */
+    public function testArrayIntersectDiffInlineNestedStrSplitRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_intersect_diff_inline_nested.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_intersect_diff_inline_nested.php');
+
+        $splitReturnSlots = [];
+        $intersectSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (5 === $fcallOrdinal) {
+                    $intersectSends = [];
+                }
+            }
+            if (\in_array($fcallOrdinal, [3, 4], true) && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $splitReturnSlots[] = $op->arg1;
+            }
+            if (5 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $intersectSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $splitReturnSlots);
+        self::assertCount(2, $intersectSends);
+        self::assertSame($splitReturnSlots[0], $intersectSends[0], 'intersect sends='.json_encode($intersectSends));
+        self::assertSame($splitReturnSlots[1], $intersectSends[1], 'intersect sends='.json_encode($intersectSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
     public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
     {
