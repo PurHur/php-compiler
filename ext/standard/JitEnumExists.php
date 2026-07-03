@@ -25,10 +25,12 @@ final class JitEnumExists
 
         $candidates = $context->type->object->allDeclaredEnumLowerNames();
         if (null !== $context->runtime->vmContext) {
-            $candidates = array_values(array_unique(array_merge(
-                $candidates,
-                array_keys($context->runtime->vmContext->enums)
-            )));
+            foreach ($context->runtime->vmContext->classes as $lc => $entry) {
+                if ($entry->isEnum) {
+                    $candidates[] = $lc;
+                }
+            }
+            $candidates = array_values(array_unique($candidates));
         }
 
         foreach ($candidates as $lc) {

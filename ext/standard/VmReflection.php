@@ -149,12 +149,12 @@ final class VmReflection
 
     public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
     {
-        $lc = strtolower(self::normalizeGlobalIntrospectionName($enumName));
-        if ($autoload && !isset($ctx->enums[$lc]) && null === self::resolveClassEntry($ctx, $enumName)) {
+        if ($autoload && null === self::resolveClassEntry($ctx, $enumName)) {
             $ctx->autoloadClass($enumName);
         }
+        $entry = self::resolveClassEntry($ctx, $enumName);
 
-        return isset($ctx->enums[$lc]);
+        return null !== $entry && $entry->isEnum;
     }
 
     /**
