@@ -2460,6 +2460,49 @@ PHP;
         self::assertStringContainsString("'stdClass'", $out);
     }
 
+    /** Issue #15438 — var_export(sys_getloadavg(), true) wires zero-arg array-return FuncCall producer. */
+    public function testVarExportNestedZeroArgArrayBuiltinUsesFuncCallProducerSlot(): void
+    {
+        if (!\function_exists('sys_getloadavg') && !\is_readable('/proc/loadavg')) {
+            self::markTestSkipped('sys_getloadavg and /proc/loadavg unavailable');
+        }
+
+        $code = <<<'PHP'
+<?php
+echo var_export(sys_getloadavg(), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_nested_sys_getloadavg.php');
+
+        $loadavgReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $loadavgReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($loadavgReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($loadavgReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('array (', $out);
+        self::assertStringNotContainsString('NULL', $out);
+    }
+
     /** Issue #11399 — var_export(in_array(..., true), true) wires nested FuncCall + dual ConstFetch true slots. */
     public function testVarExportNestedBuiltinDualTrueLiteralUsesFuncCallProducerSlot(): void
     {
