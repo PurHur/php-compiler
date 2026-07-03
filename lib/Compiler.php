@@ -11845,6 +11845,11 @@ class Compiler {
                             || (
                                 $this->callArgIsDeadInlineTemporary($callArgProbe)
                                 && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                                && !$this->inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+                                    $callOp,
+                                    $argIndex,
+                                    $block
+                                )
                             )
                         )
                     ) {
@@ -15830,6 +15835,12 @@ class Compiler {
             ($matched instanceof Op\Expr\FuncCall || $matched instanceof Op\Expr\NsFuncCall)
             && $this->callArgOperandExpectsArrayProducer($callArgProbe)
         ) {
+            if (
+                'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 0 === $argIndex
+            ) {
+                return $matched;
+            }
             $embeddedArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, $argIndex, $block);
             if ($embeddedArray instanceof Op\Expr\Array_) {
                 return $embeddedArray;
@@ -15837,6 +15848,33 @@ class Compiler {
         }
 
         return $matched;
+    }
+
+    private function inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
+        Op $cfgCallOp,
+        int $argIndex,
+        Block $block
+    ): bool {
+        if (null === $block->orig) {
+            return false;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        if ([] === $producers) {
+            return false;
+        }
+        $producerMatch = $this->matchInlineCallArgProducer(
+            $producers,
+            $cfgCallOp->args ?? [],
+            $argIndex,
+            $cfgCallOp,
+            $block,
+            $this->resolveCfgFuncCallName($cfgCallOp)
+        );
+
+        return $producerMatch instanceof Op\Expr\FuncCall
+            || $producerMatch instanceof Op\Expr\NsFuncCall
+            || $producerMatch instanceof Op\Expr\MethodCall
+            || $producerMatch instanceof Op\Expr\StaticCall;
     }
 
     /**
@@ -24917,6 +24955,7 @@ class Compiler {
             || $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
             || $this->cfgCallOpImmediatelyVoidDiscarded($cfgCallOp, $block)
             || $this->siblingInlineCallArgProducerNeedsReturnSlot($cfgCallOp, $block)
+            || $this->cfgCallIsHoistedArrayKeysForArrayCombine($cfgCallOp, $block)
             || $this->cfgCallImmediatelyFeedsAdjacentConsumer($cfgCallOp, $block)
         ) {
             return new OpCode(
@@ -24975,6 +25014,41 @@ class Compiler {
                 )) {
                     return true;
                 }
+            }
+        }
+
+        return false;
+    }
+
+    private function cfgCallIsHoistedArrayKeysForArrayCombine(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        if (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if ('array_keys' !== $this->resolveCfgFuncCallName($cfgCallOp)) {
+            return false;
+        }
+        foreach ($block->orig->children as $child) {
+            if (!$child instanceof Op\Expr\FuncCall && !$child instanceof Op\Expr\NsFuncCall) {
+                continue;
+            }
+            if ('array_combine' !== $this->resolveCfgFuncCallName($child)) {
+                continue;
+            }
+            $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $child);
+            $matched = $this->matchInlineCallArgProducer(
+                $producers,
+                $child->args ?? [],
+                0,
+                $child,
+                $block,
+                'array_combine'
+            );
+            if ($matched === $cfgCallOp) {
+                return true;
             }
         }
 
