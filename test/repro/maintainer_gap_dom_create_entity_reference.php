@@ -4,29 +4,44 @@ declare(strict_types=1);
 
 $doc = new DOMDocument();
 $ref = $doc->createEntityReference('amp');
-if (false === $ref) {
-    echo "fail: createEntityReference returned false\n";
-    exit(1);
-}
-if (!($ref instanceof DOMEntityReference)) {
-    echo 'fail: expected DOMEntityReference, got ', get_debug_type($ref), "\n";
+if (!$ref instanceof DOMEntityReference) {
+    echo 'fail: not DOMEntityReference ', get_debug_type($ref), "\n";
     exit(1);
 }
 if (5 !== $ref->nodeType) {
-    echo 'fail: nodeType=', $ref->nodeType, "\n";
+    echo 'fail: nodeType ', $ref->nodeType, "\n";
     exit(1);
 }
 if ('amp' !== $ref->nodeName) {
-    echo 'fail: nodeName=', $ref->nodeName, "\n";
+    echo 'fail: nodeName ', $ref->nodeName, "\n";
     exit(1);
 }
 if (null !== $ref->nodeValue) {
-    echo 'fail: nodeValue=', var_export($ref->nodeValue, true), "\n";
+    echo 'fail: nodeValue ', var_export($ref->nodeValue, true), "\n";
     exit(1);
 }
 if ($ref->ownerDocument !== $doc) {
     echo "fail: ownerDocument mismatch\n";
     exit(1);
+}
+
+$root = $doc->createElement('root');
+$doc->appendChild($root);
+$root->appendChild($ref);
+if (5 !== $root->firstChild->nodeType || 'amp' !== $root->firstChild->nodeName) {
+    echo 'fail: appendChild child ', $root->firstChild->nodeName, ' type=', $root->firstChild->nodeType, "\n";
+    exit(1);
+}
+
+try {
+    $doc->createEntityReference('');
+    echo "fail: empty name should throw\n";
+    exit(1);
+} catch (Throwable $e) {
+    if ('Invalid Character Error' !== $e->getMessage()) {
+        echo 'fail: empty name message ', $e->getMessage(), "\n";
+        exit(1);
+    }
 }
 
 echo "ok\n";

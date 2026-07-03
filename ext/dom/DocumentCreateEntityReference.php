@@ -25,9 +25,9 @@ final class DocumentCreateEntityReference extends DomClassMethod
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createEntityReference() requires VM context in this compiler build');
         }
-        $entityRef = VmDom::createEntityReference($frame->vmContext, $name, $document);
+        $ref = VmDom::createEntityReference($frame->vmContext, $name, $document);
         if (null !== $frame->returnVar) {
-            $frame->returnVar->copyFrom($entityRef);
+            $frame->returnVar->copyFrom($ref);
         }
     }
 }

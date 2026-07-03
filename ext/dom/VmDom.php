@@ -191,6 +191,12 @@ final class VmDom
         $text->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
         $ctx->classes[self::CLASS_TEXT] = $text;
 
+        $entityRef = new ClassEntry('DOMEntityReference');
+        $entityRef->isInternal = true;
+        $entityRef->parentLc = self::CLASS_NODE;
+        $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
+
         $attr = new ClassEntry('DOMAttr');
         $attr->isInternal = true;
         $attr->parentLc = self::CLASS_NODE;
@@ -199,12 +205,6 @@ final class VmDom
         $attr->properties[] = new ClassProperty(self::PROP_VALUE, null, $strProto);
         $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
         $ctx->classes[self::CLASS_ATTR] = $attr;
-
-        $entityRef = new ClassEntry('DOMEntityReference');
-        $entityRef->isInternal = true;
-        $entityRef->parentLc = self::CLASS_NODE;
-        $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
-        $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
 
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
@@ -1516,7 +1516,7 @@ final class VmDom
             return self::appendFragmentChildren($ctx, $parent, $child);
         }
 
-        if (!self::isElement($child)) {
+        if (!self::isElement($child) && !self::isEntityReference($child)) {
             throw new \DOMException('Hierarchy request error');
         }
 
@@ -1723,7 +1723,7 @@ final class VmDom
 
             return;
         }
-        if (!self::isElement($child) && !self::isTextNode($child)) {
+        if (!self::isElement($child) && !self::isTextNode($child) && !self::isEntityReference($child)) {
             throw new \DOMException('Hierarchy request error');
         }
         self::assertSameDocument($parent, $child);
@@ -3141,6 +3141,14 @@ final class VmDom
     public static function isAppendableNode(ObjectEntry $entry): bool
     {
         return self::isElement($entry) || self::isDocumentFragment($entry);
+    }
+
+    public static function isAppendChildCandidate(ObjectEntry $entry): bool
+    {
+        return self::isElement($entry)
+            || self::isDocumentFragment($entry)
+            || self::isTextNode($entry)
+            || self::isEntityReference($entry);
     }
 
     public static function isCloneableNode(ObjectEntry $entry): bool
