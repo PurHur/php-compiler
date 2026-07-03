@@ -365,12 +365,14 @@ final class CompilerVersion
     /**
      * PHP 8.4+ asymmetric property visibility (private(set), protected(set), …).
      *
-     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#12508, #14946, #15164).
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * rejects asymmetric syntax like Zend 8.2 (#12508, #12576, #15663). Enable forward profile
+     * on dev via `PHP_COMPILER_PROFILE=8.4`.
      * php-src: Zend/zend_language_parser.y T_PRIVATE_SET; Zend/zend_compile.c ZEND_ACC_*_SET.
      */
     public static function supportsAsymmetricVisibility(): bool
     {
-        return self::advertisesBuiltinSince('8.4.0');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
