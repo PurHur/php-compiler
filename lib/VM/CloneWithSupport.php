@@ -9,7 +9,8 @@ namespace PHPCompiler\VM;
  *
  * php-src unlocks IS_PROP_REINITABLE in zend_objects_clone_obj_with() before applying
  * the with property list, then clears after the block (Zend/zend_objects.c).
- * Readonly amendments allow one reinit per readonly property during __clone (zend_readonly.c).
+ * Readonly amendments allow one reinit per explicit `readonly` property during __clone()
+ * (zend_readonly.c); `readonly class` properties are not reinitable in __clone() (#15409).
  */
 final class CloneWithSupport
 {
@@ -37,6 +38,10 @@ final class CloneWithSupport
      */
     public static function beginCloneMagicReinit(ObjectEntry $object, callable $isReadonlyProperty): void
     {
+        // zend_readonly.c: readonly-class instance props stay immutable in __clone() (#15409).
+        if ($object->class->readonly) {
+            return;
+        }
         $names = [];
         foreach (array_keys($object->propertiesWithNames()) as $propName) {
             if (null !== $isReadonlyProperty($object, $propName)) {
