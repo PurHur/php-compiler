@@ -57,6 +57,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_node_append_prepend.phpt',
             'dom_node_append_prepend.phpt'
         );
+        yield 'dom_document_append_prepend.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_document_append_prepend.phpt',
+            'dom_document_append_prepend.phpt'
+        );
         if (CompilerVersion::supportsDomNodeContains()) {
             yield 'dom_node_contains.phpt' => self::parsePHPT(
                 __DIR__.'/cases/stdlib/dom_node_contains.phpt',

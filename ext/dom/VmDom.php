@@ -420,6 +420,25 @@ final class VmDom
         return DomRegistry::state($document);
     }
 
+    public static function ensureDocumentFragment(ObjectEntry $fragment): DomNodeState
+    {
+        if (!DomRegistry::has($fragment)) {
+            if (self::CLASS_DOCUMENT_FRAGMENT !== strtolower($fragment->class->name)) {
+                throw new \LogicException('ensureDocumentFragment() expects a DOMDocumentFragment in this compiler build');
+            }
+            if ($fragment->hasProperty(self::PROP_NODE_NAME)) {
+                $fragment->getProperty(self::PROP_NODE_NAME)->string('#document-fragment');
+            }
+            self::initNodePropertySlots($fragment);
+            $state = new DomNodeState();
+            $state->nodeType = DomConstants::XML_DOCUMENT_FRAG_NODE;
+            $state->nodeName = '#document-fragment';
+            DomRegistry::attach($fragment, $state);
+        }
+
+        return DomRegistry::state($fragment);
+    }
+
     public static function createElement(Context $ctx, string $name, ?ObjectEntry $ownerDocument = null): Variable
     {
         $class = $ctx->classes[self::CLASS_ELEMENT] ?? null;
@@ -1706,6 +1725,12 @@ final class VmDom
             if (Variable::TYPE_NULL === $existing->type) {
                 $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
                 $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+            } elseif (null !== $refChild && Variable::TYPE_OBJECT === $existing->type) {
+                $docEl = $existing->toObject();
+                if ($docEl->id === $refChild->id) {
+                    $parent->getProperty(self::PROP_DOCUMENT_ELEMENT)->object($newChild);
+                    $parentState->documentElementName = DomRegistry::state($newChild)->nodeName;
+                }
             }
             self::propagateDocumentId($newChild, $parent->id);
         }
