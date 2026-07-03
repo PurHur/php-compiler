@@ -214,6 +214,9 @@ final class VmJsonFormat
 
     private static function encodeStringValue(string $value, int $flags): string
     {
+        if (VmJsonFlags::substitutesInvalidUtf8($flags) && !VmJsonUtf8::isValidUtf8($value)) {
+            $value = VmJsonUtf8::substituteInvalidUtf8($value);
+        }
         if (0 !== ($flags & VmJsonFlags::NUMERIC_CHECK)) {
             $numeric = self::tryEncodeNumericStringValue($value, $flags);
             if (null !== $numeric) {

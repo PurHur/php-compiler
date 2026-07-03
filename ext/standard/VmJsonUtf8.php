@@ -89,6 +89,62 @@ final class VmJsonUtf8
         return true;
     }
 
+    /**
+     * php-src ext/standard/php_unicode.c — replacement character for malformed UTF-8 (#9964).
+     */
+    public static function substituteInvalidUtf8(string $string): string
+    {
+        $out = '';
+        $len = \strlen($string);
+        for ($i = 0; $i < $len; ) {
+            $byte = \ord($string[$i]);
+            if ($byte < 0x80) {
+                $out .= $string[$i];
+                ++$i;
+                continue;
+            }
+            $need = 0;
+            $valid = true;
+            if (($byte & 0xE0) === 0xC0) {
+                $need = 1;
+                $min = 0x80;
+            } elseif (($byte & 0xF0) === 0xE0) {
+                $need = 2;
+                $min = 0x800;
+            } elseif (($byte & 0xF8) === 0xF0) {
+                $need = 3;
+                $min = 0x10000;
+            } else {
+                $valid = false;
+            }
+            if ($valid && $i + $need < $len) {
+                $cp = $byte & (0xFF >> (2 + $need));
+                for ($j = 1; $j <= $need; ++$j) {
+                    $next = \ord($string[$i + $j]);
+                    if (($next & 0xC0) !== 0x80) {
+                        $valid = false;
+                        break;
+                    }
+                    $cp = ($cp << 6) | ($next & 0x3F);
+                }
+                if ($valid && ($cp < $min || ($cp >= 0xD800 && $cp <= 0xDFFF))) {
+                    $valid = false;
+                }
+            } else {
+                $valid = false;
+            }
+            if ($valid) {
+                $out .= \substr($string, $i, $need + 1);
+                $i += $need + 1;
+            } else {
+                $out .= "\xEF\xBF\xBD";
+                ++$i;
+            }
+        }
+
+        return $out;
+    }
+
     private static function encodeCodepoint(int $cp): string
     {
         if ($cp <= 0x7F) {

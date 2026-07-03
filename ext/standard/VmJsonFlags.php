@@ -72,7 +72,8 @@ final class VmJsonFlags
         | self::THROW_ON_ERROR
         | self::FORCE_OBJECT
         | self::NUMERIC_CHECK
-        | self::PRESERVE_ZERO_FRACTION;
+        | self::PRESERVE_ZERO_FRACTION
+        | self::INVALID_UTF8_SUBSTITUTE;
 
     /** Flags honored by json_decode() in this compiler build (issue #3267, #11778, #12496). */
     public const DECODE_SUPPORTED = self::OBJECT_AS_ARRAY
@@ -129,6 +130,11 @@ final class VmJsonFlags
     public static function ignoreInvalidUtf8(int $flags): bool
     {
         return 0 !== ($flags & (self::INVALID_UTF8_IGNORE | self::INVALID_UTF8_SUBSTITUTE));
+    }
+
+    public static function substitutesInvalidUtf8(int $flags): bool
+    {
+        return 0 !== ($flags & self::INVALID_UTF8_SUBSTITUTE);
     }
 
     public static function throwsOnError(int $flags): bool
