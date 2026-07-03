@@ -14,7 +14,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** link() — VM via VmFs; JIT/AOT via libc linkat(2) (issue #3589). */
+/** link() — VM via VmFs; JIT/AOT via LinkJitHelper PHP (#15544). */
 final class link_ extends Internal
 {
     public function __construct()

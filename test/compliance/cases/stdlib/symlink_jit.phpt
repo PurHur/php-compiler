@@ -1,5 +1,5 @@
 --TEST--
-JIT: symlink() via libc symlinkat(2) (issue #3227)
+JIT: symlink() via SymlinkJitHelper PHP (#15544)
 --SKIPIF--
 <?php if (!function_exists('symlink')) { die('skip symlinks unavailable'); } ?>
 --FILE--
