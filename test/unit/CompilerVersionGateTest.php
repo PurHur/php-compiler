@@ -164,9 +164,10 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassConstObjectExpressionsTrueOnForwardProfile(): void
+    public function testSupportsClassConstObjectExpressionsFalseOnDevReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+        // 8.4.0-dev matches Zend 8.2 rejection until stable 8.4.0 (#15559).
+        $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
     }
 
     public function testSupportsClassConstObjectExpressionsFalseWhenProfile82(): void
