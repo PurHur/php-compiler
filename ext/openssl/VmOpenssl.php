@@ -118,6 +118,29 @@ final class VmOpenssl
         return VmOpensslSignNative::verify($data, $signature, $publicKeyPem, $digestName);
     }
 
+    /**
+     * openssl_pkey_derive() — ECDH/X25519 shared secret (EVP_PKEY_derive; issue #15428).
+     *
+     * @return string|false
+     */
+    public static function pkeyDerive(
+        string $publicKeyPem,
+        string $privateKeyPem,
+        int $keyLength = 0,
+        ?Frame $frame = null
+    ): string|false {
+        if (!VmOpensslPkeyDeriveNative::available()) {
+            self::userWarning(
+                'openssl_pkey_derive(): OpenSSL key derivation is unavailable in this compiler build',
+                $frame
+            );
+
+            return false;
+        }
+
+        return VmOpensslPkeyDeriveNative::derive($publicKeyPem, $privateKeyPem, $keyLength);
+    }
+
     public static function coercePkeyPem(Variable $var, string $function, int $argIndex, string $paramName): string
     {
         $var = $var->resolveIndirect();

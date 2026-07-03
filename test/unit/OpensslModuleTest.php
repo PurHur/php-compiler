@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_pkey_derive', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -32,6 +32,7 @@ echo (int) function_exists('openssl_verify');
 echo (int) function_exists('openssl_get_cipher_methods');
 echo (int) function_exists('openssl_get_md_methods');
 echo (int) function_exists('openssl_pkey_new');
+echo (int) function_exists('openssl_pkey_derive');
 echo (int) function_exists('openssl_cipher_iv_length');
 echo (int) function_exists('openssl_cipher_key_length');
 echo (int) function_exists('openssl_digest');
@@ -45,7 +46,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('1111111111111217', ob_get_clean());
+        self::assertSame('11111111111111217', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void
@@ -142,5 +143,44 @@ PEM;
         $verifyFrame->returnVar = new \PHPCompiler\VM\Variable();
         $verifyFn->execute($verifyFrame);
         self::assertSame(1, $verifyFrame->returnVar->toInt());
+    }
+
+    public function test_openssl_pkey_derive_ecdh_when_ffi_available(): void
+    {
+        if (!\PHPCompiler\ext\openssl\VmOpensslPkeyDeriveNative::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable');
+        }
+
+        $alicePrivate = <<<'PEM'
+-----BEGIN EC PRIVATE KEY-----
+MHcCAQEEINECSnzz+DNYkIONFEHxZYkuDmKPGSJi6YLFh/S6KcazoAoGCCqGSM49
+AwEHoUQDQgAEBIfnBb99kI2pwkDZEJvzby+Kx3QLSW5Q3vk1RgH78kLbLeR/r5E2
+FoQhKi3UU7e5wD9eUgQkgPTSVG62qLg43A==
+-----END EC PRIVATE KEY-----
+PEM;
+        $bobPublic = <<<'PEM'
+-----BEGIN PUBLIC KEY-----
+MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEycQC9/n88uWz5TfRBpVbiWAfOn5A
+TiLVZcDrF6mzgco+dPRy/rk/Bu6oqH3EU0RTqD8y4tlWdRl2u2GCW37RBg==
+-----END PUBLIC KEY-----
+PEM;
+
+        $runtime = new Runtime();
+        $deriveFn = new \PHPCompiler\ext\openssl\openssl_pkey_derive();
+        $frame = $deriveFn->getFrame($runtime->vmContext);
+        $pubVar = new \PHPCompiler\VM\Variable();
+        $pubVar->string($bobPublic);
+        $privVar = new \PHPCompiler\VM\Variable();
+        $privVar->string($alicePrivate);
+        $frame->calledArgs = [$pubVar, $privVar];
+        $frame->returnVar = new \PHPCompiler\VM\Variable();
+        $deriveFn->execute($frame);
+
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $frame->returnVar->type);
+        self::assertSame(32, \strlen($frame->returnVar->toString()));
+        self::assertSame(
+            'a89ceecb80ea0e5b66a50bb93ca3bb8f9a490c67897cc56734d28061a086d6b5',
+            \bin2hex($frame->returnVar->toString())
+        );
     }
 }
