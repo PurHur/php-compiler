@@ -178,8 +178,23 @@ final class CycleCollector
             ++$collected;
         }
 
-        foreach ($arrayCandidates as $table) {
+        foreach ($arrayCandidates as $arrayId => $table) {
+            if (self::referencesCandidateArrayObjectPeer($table, $candidates)) {
+                HashTableRegistry::release($table);
+                ++$collected;
+
+                continue;
+            }
             if (!self::referencesCandidateArrayPeer($table, $candidates, $arrayCandidates)) {
+                // Unreachable compiler literal temp — reclaim registry slot (#15139).
+                HashTableRegistry::release($table);
+
+                continue;
+            }
+            if (!self::arrayCandidateInArrayCycle($arrayId, $arrayCandidates)) {
+                // Nested literal tree (array→array) without a cycle — not Zend GC (#15139).
+                HashTableRegistry::release($table);
+
                 continue;
             }
             HashTableRegistry::release($table);
@@ -235,6 +250,125 @@ final class CycleCollector
         }
 
         return false;
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     */
+    private static function referencesCandidateArrayObjectPeer(
+        HashTable $table,
+        array $objectCandidates
+    ): bool {
+        foreach ($table->iterate(false) as $element) {
+            if (self::variableReferencesObjectCandidates($element, $objectCandidates)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when an unreachable array candidate participates in an array-only reference cycle.
+     *
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function arrayCandidateInArrayCycle(int $startId, array $arrayCandidates): bool
+    {
+        if (!isset($arrayCandidates[$startId])) {
+            return false;
+        }
+        $visited = [];
+
+        return self::arrayCycleDfs($startId, $arrayCandidates, $visited, []);
+    }
+
+    /**
+     * @param array<int, true> $visited
+     * @param array<int, true> $stack
+     * @param array<int, HashTable> $arrayCandidates
+     */
+    private static function arrayCycleDfs(
+        int $nodeId,
+        array $arrayCandidates,
+        array &$visited,
+        array $stack
+    ): bool {
+        if (isset($stack[$nodeId])) {
+            return true;
+        }
+        if (isset($visited[$nodeId])) {
+            return false;
+        }
+        $visited[$nodeId] = true;
+        $stack[$nodeId] = true;
+        $table = $arrayCandidates[$nodeId];
+        foreach ($table->iterate(false) as $element) {
+            foreach (self::arrayCandidatePeerIds($element, $arrayCandidates, $nodeId) as $peerId) {
+                if (self::arrayCycleDfs($peerId, $arrayCandidates, $visited, $stack)) {
+                    return true;
+                }
+            }
+        }
+        unset($stack[$nodeId]);
+
+        return false;
+    }
+
+    /**
+     * @param array<int, HashTable> $arrayCandidates
+     *
+     * @return list<int>
+     */
+    private static function arrayCandidatePeerIds(
+        Variable $var,
+        array $arrayCandidates,
+        int $selfArrayId
+    ): array {
+        if ($var->isUndefined()) {
+            return [];
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::arrayCandidatePeerIds($var->resolveIndirect(), $arrayCandidates, $selfArrayId);
+        }
+        if (Variable::TYPE_ARRAY !== $var->type) {
+            return [];
+        }
+        try {
+            $arrayId = \spl_object_id($var->toArray());
+        } catch (\LogicException) {
+            return [];
+        }
+        if (!isset($arrayCandidates[$arrayId])) {
+            return [];
+        }
+
+        return [$arrayId];
+    }
+
+    /**
+     * @param array<int, ObjectEntry> $objectCandidates
+     */
+    private static function variableReferencesObjectCandidates(
+        Variable $var,
+        array $objectCandidates
+    ): bool {
+        if ($var->isUndefined()) {
+            return false;
+        }
+        if (Variable::TYPE_INDIRECT === $var->type) {
+            return self::variableReferencesObjectCandidates($var->resolveIndirect(), $objectCandidates);
+        }
+        if (Variable::TYPE_OBJECT !== $var->type) {
+            return false;
+        }
+        try {
+            $objectId = $var->toObject()->id;
+        } catch (\LogicException) {
+            return false;
+        }
+
+        return isset($objectCandidates[$objectId]);
     }
 
     /**
