@@ -2128,6 +2128,9 @@ class Compiler {
                         // Hoisted sibling call-arg producers compile at the consumer via
                         // resolveSiblingInlineCallArgProducerSlot (#9463, #10981, #12421, #13788).
                         break;
+                    } elseif ($this->isDeferredTrailingComparatorFirstClassCallable($child, $ops, $i)) {
+                        // strcmp(...) trailing FCC with deferred sibling array_keys — emit at consumer (#15475).
+                        break;
                     } elseif ($this->isForeachLoopVarAssignRefFusion($ops, $i)) {
                         /** @var Op\Iterator\Value $iter */
                         $iter = $ops[$i];
@@ -17434,6 +17437,51 @@ class Compiler {
     }
 
     /**
+     * Defer trailing strcmp(...) FCC until sibling array_keys producers compile at the consumer (#15475).
+     *
+     * Early TYPE_FROM_CALLABLE before deferred EXEC_RETURN slots breaks JIT closure wiring for array_udiff().
+     *
+     * @param Op[] $ops
+     */
+    private function isDeferredTrailingComparatorFirstClassCallable(Op $op, array $ops, int $producerIndex): bool
+    {
+        if (!$op instanceof Op\Expr\FirstClassCallable) {
+            return false;
+        }
+        $opCount = \count($ops);
+        for ($j = $producerIndex + 1; $j < $opCount; ++$j) {
+            $consumer = $ops[$j] ?? null;
+            if ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall) {
+                $funcName = $this->resolveCfgFuncCallName($consumer);
+                if (!$this->builtinUsesTrailingComparatorCallback($funcName)) {
+                    break;
+                }
+                $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($j, $ops);
+                if (
+                    null !== $firstSibling
+                    && $this->countSiblingInlineFuncCallProducers($firstSibling, $j, $ops) >= 2
+                ) {
+                    return true;
+                }
+                break;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($consumer)) {
+                continue;
+            }
+            if ($consumer instanceof Op\Expr\Array_
+                || $consumer instanceof Op\Expr\ConstFetch
+                || $consumer instanceof Op\Expr\ClassConstFetch
+                || $this->isUnaryInlineSiblingCallArgExpr($consumer)
+            ) {
+                continue;
+            }
+            break;
+        }
+
+        return false;
+    }
+
+    /**
      * @param Op[] $ops
      */
     private function deferredSiblingInlineCallArgConsumerIndex(Op $op, array $ops, int $producerIndex): ?int
@@ -17482,6 +17530,12 @@ class Compiler {
                 continue;
             }
             if ($next instanceof Op\Expr\New_ || $next instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if ($next instanceof Op\Expr\ArrowFunction
+                || $next instanceof Op\Expr\Closure
+                || $next instanceof Op\Expr\FirstClassCallable) {
+                // array_udiff(array_keys(...), array_keys(...), strcmp(...)) — trailing FCC (#15475, #13990).
                 continue;
             }
             break;
@@ -18010,6 +18064,10 @@ class Compiler {
             if ($stmt instanceof Op\Expr\New_ || $stmt instanceof Op\Expr\Clone_) {
                 continue;
             }
+            if ($stmt instanceof Op\Expr\Assign || $stmt instanceof Op\Expr\AssignRef) {
+                // $expected = [...] before array_udiff(array_keys(...), …) — not part of hoisted chain (#15475).
+                continue;
+            }
             if ($this->isSiblingInlineCallProducerExpr($stmt)) {
                 // array_intersect_assoc(array_keys([...]), array_keys([...])) — literal callees with
                 // hoisted Array_ args (#13778, #13954). var_dump(acosh(1.5), …) / str_repeat('a', $n) (#14119, #10917).
@@ -18179,6 +18237,10 @@ class Compiler {
                 --$i;
                 continue;
             }
+            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+                --$i;
+                continue;
+            }
             break;
         }
         $first = $i + 1;
@@ -18203,7 +18265,17 @@ class Compiler {
                 ++$first;
                 continue;
             }
+            if ($skip instanceof Op\Expr\ArrowFunction
+                || $skip instanceof Op\Expr\Closure
+                || $skip instanceof Op\Expr\FirstClassCallable) {
+                ++$first;
+                continue;
+            }
             if ($skip instanceof Op\Expr\New_ || $skip instanceof Op\Expr\Clone_) {
+                ++$first;
+                continue;
+            }
+            if ($skip instanceof Op\Expr\Assign || $skip instanceof Op\Expr\AssignRef) {
                 ++$first;
                 continue;
             }
