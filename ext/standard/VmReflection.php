@@ -1163,6 +1163,112 @@ final class VmReflection
     }
 
     /**
+     * ReflectionClass::getInterfaceNames() / ReflectionEnum::getInterfaceNames() (#9692).
+     *
+     * php-src: ext/reflection/php_reflection.c — zim_ReflectionClass_getInterfaceNames
+     * walks ce->interfaces (direct implements + inherited parent interfaces).
+     *
+     * @return Variable list<string> indexed interface names in zend order
+     */
+    public static function reflectionClassInterfaceNamesArray(ClassEntry $entry, Context $ctx): Variable
+    {
+        $result = new Variable();
+        $result->newArray();
+        $ht = $result->toArray();
+        foreach (self::reflectionClassInterfaceNamesList($entry, $ctx) as $ifaceName) {
+            $slot = new Variable();
+            $slot->string($ifaceName);
+            $ht->append($slot);
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return list<string> interface display names in zend ce->interfaces order
+     */
+    public static function reflectionClassInterfaceNamesList(ClassEntry $entry, Context $ctx): array
+    {
+        $ordered = [];
+        $seen = [];
+        foreach ($entry->interfaces as $ifaceLc) {
+            self::appendReflectionInterfaceName($ifaceLc, $ctx, $ordered, $seen);
+        }
+
+        $names = [];
+        foreach ($ordered as $lc) {
+            $names[] = self::interfaceDisplayNameForReflection($lc, $ctx);
+        }
+
+        return $names;
+    }
+
+    private static function interfaceDisplayNameForReflection(string $ifaceLc, Context $ctx): string
+    {
+        $builtin = self::builtinEnumInterfaceDisplayName($ifaceLc);
+        if (null !== $builtin) {
+            return $builtin;
+        }
+        if (isset($ctx->classes[$ifaceLc])) {
+            return $ctx->classes[$ifaceLc]->name;
+        }
+
+        return $ifaceLc;
+    }
+
+    /** @param list<string> $ordered */
+    private static function appendReflectionInterfaceName(
+        string $ifaceLc,
+        Context $ctx,
+        array &$ordered,
+        array &$seen
+    ): void {
+        if (isset($seen[$ifaceLc])) {
+            return;
+        }
+        $seen[$ifaceLc] = true;
+        $ordered[] = $ifaceLc;
+
+        if (!isset($ctx->classes[$ifaceLc])) {
+            return;
+        }
+
+        $parents = $ctx->classes[$ifaceLc]->interfaces;
+        for ($i = count($parents) - 1; $i >= 0; --$i) {
+            $parentLc = $parents[$i];
+            if (isset($seen[$parentLc])) {
+                continue;
+            }
+            $seen[$parentLc] = true;
+            $ordered[] = $parentLc;
+            self::appendReflectionInterfaceParents($parentLc, $ctx, $ordered, $seen);
+        }
+    }
+
+    /** @param list<string> $ordered */
+    private static function appendReflectionInterfaceParents(
+        string $ifaceLc,
+        Context $ctx,
+        array &$ordered,
+        array &$seen
+    ): void {
+        if (!isset($ctx->classes[$ifaceLc])) {
+            return;
+        }
+
+        $parents = $ctx->classes[$ifaceLc]->interfaces;
+        for ($i = count($parents) - 1; $i >= 0; --$i) {
+            $parentLc = $parents[$i];
+            if (isset($seen[$parentLc])) {
+                continue;
+            }
+            $seen[$parentLc] = true;
+            $ordered[] = $parentLc;
+            self::appendReflectionInterfaceParents($parentLc, $ctx, $ordered, $seen);
+        }
+    }
+
+    /**
      * ReflectionClass::getTraitAliases() result array (#6661).
      */
     public static function reflectionClassTraitAliasesMap(ClassEntry $entry): Variable
