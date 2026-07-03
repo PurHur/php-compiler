@@ -404,6 +404,48 @@ PHP;
         self::assertStringContainsString('ok', $out);
     }
 
+    /** Issue #15487 — array_map(intval(...), str_split(str_repeat(...))) wires FCC + haystack slots. */
+    public function testArrayMapFccInlineNestedHaystackRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_map_fcc_inline_nested.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_map_fcc_inline_nested.php');
+
+        $fccSlot = null;
+        $splitReturnSlot = null;
+        $mapSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FROM_CALLABLE === $op->type) {
+                $fccSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $mapSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $splitReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mapSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($fccSlot);
+        self::assertNotNull($splitReturnSlot);
+        self::assertCount(2, $mapSends, 'map sends='.json_encode($mapSends));
+        self::assertSame($fccSlot, $mapSends[0], 'callback slot');
+        self::assertSame($splitReturnSlot, $mapSends[1], 'haystack slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
     public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
     {
