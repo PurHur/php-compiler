@@ -317,6 +317,53 @@ PHP;
         self::assertSame("bool(false)\nbool(true)\nbool(true)\n", ob_get_clean());
     }
 
+    /** Issue #15646 — var_dump(property_exists(), isset()) on uninitialized typed property. */
+    public function testVarDumpPropertyExistsIssetUninitTypedProperty(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x;
+}
+$o = new C();
+var_dump(property_exists($o, 'x'), isset($o->x));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_dump_property_exists_isset.php');
+
+        $returnSlots = [];
+        $issetSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ISSET === $op->type) {
+                $issetSlots[] = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_PROPERTY_FETCH === $op->type) {
+                self::fail('must not emit PROPERTY_FETCH for var_dump isset arg');
+            }
+        }
+        self::assertCount(2, $sendSlots);
+        self::assertContains($sendSlots[0], $returnSlots, 'property_exists return feeds arg 0');
+        self::assertContains($sendSlots[1], $issetSlots, 'isset return feeds arg 1');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("bool(true)\nbool(false)\n", ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
