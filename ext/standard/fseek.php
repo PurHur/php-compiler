@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** fseek() — VM via VmFs; JIT/AOT via __compiler_fseek (issue #1191). */
@@ -34,11 +33,7 @@ final class fseek extends Internal
         $offsetInt = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'fseek', 2, 'offset');
         $whence = \SEEK_SET;
         if (3 === $argc) {
-            $whenceVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $whenceVar->type) {
-                throw new \LogicException('fseek() whence must be an integer in this compiler build');
-            }
-            $whence = $whenceVar->toInt();
+            $whence = VmMath::parseIntBuiltinArgForFrame($frame, 2, 'fseek', 3, 'whence');
         }
         $frame->returnVar->int(VmFs::fseek($handle, $offsetInt, $whence));
     }

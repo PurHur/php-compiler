@@ -9,7 +9,6 @@ use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitLongArg;
 use PHPCompiler\JIT\Variable as JITVariable;
-use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /** gzseek() — seek within gzip stream (ext/zlib/zlib.c, #14585). */
@@ -34,11 +33,7 @@ final class gzseek extends Internal
         $offset = VmMath::parseIntBuiltinArgForFrame($frame, 1, $fn, 2, 'offset');
         $whence = \SEEK_SET;
         if (3 === $argc) {
-            $whenceVar = $frame->calledArgs[2]->resolveIndirect();
-            if (Variable::TYPE_INTEGER !== $whenceVar->type) {
-                throw new \LogicException($fn.'() whence must be an integer in this compiler build');
-            }
-            $whence = $whenceVar->toInt();
+            $whence = VmMath::parseIntBuiltinArgForFrame($frame, 2, $fn, 3, 'whence');
         }
         $frame->returnVar->int(VmGzStream::gzseek($handle, $offset, $whence));
     }
