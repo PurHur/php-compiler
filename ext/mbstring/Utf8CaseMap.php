@@ -13,8 +13,8 @@ final class Utf8CaseMap
     private const UPPER_SPECIAL = [
         0xB5 => 0x39C, // micro sign -> Greek capital Mu
         0xFF => 0x178, // Latin small letter y with diaeresis -> capital
-        0x130 => 0x49, // Turkish dotless i -> I
-        0x131 => 0x49, // Turkish dotless i -> I (duplicate path)
+        0x130 => 0x49, // LATIN CAPITAL LETTER I WITH DOT ABOVE -> I (libmbfl simple map)
+        0x131 => 0x49, // LATIN SMALL LETTER DOTLESS I -> I
         0x17F => 0x53, // long s -> S
         0x3C2 => 0x3A3, // Greek final sigma -> Sigma
     ];
@@ -32,6 +32,11 @@ final class Utf8CaseMap
         0x3A3 => 0x3C3,
     ];
 
+    /** @var array<int, list<int>> Unicode simple lower expansions (1:N codepoints). */
+    private const LOWER_EXPANSION = [
+        0x130 => [0x69, 0x307], // LATIN CAPITAL LETTER I WITH DOT ABOVE -> i + combining dot (php-src libmbfl)
+    ];
+
     /**
      * @return list<int>
      */
@@ -42,6 +47,18 @@ final class Utf8CaseMap
         }
 
         return [self::toUpper($codepoint)];
+    }
+
+    /**
+     * @return list<int>
+     */
+    public static function toLowerCodepoints(int $codepoint): array
+    {
+        if (isset(self::LOWER_EXPANSION[$codepoint])) {
+            return self::LOWER_EXPANSION[$codepoint];
+        }
+
+        return [self::toLower($codepoint)];
     }
 
     public static function toUpper(int $codepoint): int
