@@ -45,6 +45,23 @@ final class HashTableSpliceTest extends TestCase
         $this->assertSame(2, $ht->findIndex(2)->toInt());
     }
 
+    public function testSpliceInsertBeyondLengthAppends(): void
+    {
+        $ht = $this->packedList([1, 2, 3]);
+        $nine = new Variable();
+        $nine->int(99);
+        $repl = new HashTable();
+        $repl->append($nine);
+        $removed = $ht->spliceInPlace(10, 0, $repl);
+
+        $this->assertSame(0, $removed->getNumElements());
+        $this->assertSame(4, $ht->getNumElements());
+        $this->assertSame(1, $ht->findIndex(0)->toInt());
+        $this->assertSame(2, $ht->findIndex(1)->toInt());
+        $this->assertSame(3, $ht->findIndex(2)->toInt());
+        $this->assertSame(99, $ht->findIndex(3)->toInt());
+    }
+
     public function testSpliceInsertWithoutRemoving(): void
     {
         $ht = $this->packedList([0, 1, 2]);
