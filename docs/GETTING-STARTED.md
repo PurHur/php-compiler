@@ -15,6 +15,44 @@ Guide for **aligned collaborators** and **demo presenters**. For the public narr
 
 **Docker-only host:** `make test` builds `php-compiler:22.04-dev` and runs the full suite inside the container.
 
+## Bootstrap contributors (default onboarding)
+
+**Audience:** Compiler / self-host contributors working on bootstrap, spine inventory, or gen-1+ compile loops ([#1492](https://github.com/PurHur/php-compiler/issues/1492)). **App authors** on the User SDK (`phpc run` / `phpc build` for examples 000–009) can skip to [Five-minute demo script](#five-minute-demo-script).
+
+The **tiered workflow** keeps Zend on the **test harness** (Tier 0) while the **native gen-2 driver** owns day-to-day compile work (Tier 1). Full ladder: [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) · platform contract: [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md).
+
+### Cold start (Tier 1 — no Composer required)
+
+```bash
+git clone https://github.com/PurHur/php-compiler.git && cd php-compiler
+make docker-build-22   # once — recommended (LLVM 9 + Linux x86_64 prelinks)
+
+./phpc bootstrap init
+# Tier 0 harness (PHPUnit / ci-fast) when you need vendor/:
+./phpc bootstrap init --with-composer
+```
+
+`phpc bootstrap init` seeds from committed `prelinked/bootstrap-gen0/`, runs `BOOTSTRAP_M5_NO_ZEND=1 make bootstrap-selfhost-link`, and (when LLVM 9 is present) `north-star5-verify-fast`. Use `--skip-verify` to skip the fast verify tail.
+
+### Verify and daily compile
+
+```bash
+./phpc doctor --selfhost
+./script/docker-exec.sh -- bash -lc 'make north-star5-verify-fast'
+
+# Tier 1 argv driver (gen-2):
+./build/bin-compile-aot-inventory -o /tmp/out test/bootstrap-aot/compiler_smoke.php
+```
+
+| Next | Doc / command |
+|------|----------------|
+| Tiered daily loop | [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) |
+| Platform (LLVM 9, RAM, Docker) | [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) |
+| Spine PR checklist | [bootstrap-dev-workflow.md § Spine entry edits](bootstrap-dev-workflow.md#spine-entry-edits--mandatory-checklist) |
+| Presenter demos | §6–7b below |
+
+**Rule:** Do not aim for Zend-free development yet — aim for **Zend-free compile** on the paths you are bootstrapping ([#15605](https://github.com/PurHur/php-compiler/issues/15605)).
+
 ## Five-minute demo script
 
 Use this order when showing the project to visitors.
@@ -184,6 +222,7 @@ Needs LLVM + ~8 GiB RAM; includes JIT/AOT lint/link and example smokes.
 | `./phpc init --profile apijson dir/` | Scaffold 004-ApiJson layout (flat `example.php`) |
 | `./phpc init --profile sessionsweb dir/` | Scaffold 005-SessionsWeb layout (flat `example.php`) |
 | `./phpc init --profile fileupload dir/` | Scaffold 006-FileUploadWeb layout (flat `example.php`) |
+| `./phpc bootstrap init [--with-composer]` | Bootstrap SDK cold start — gen-1+ Tier 1 ([#15600](https://github.com/PurHur/php-compiler/issues/15600), [#15605](https://github.com/PurHur/php-compiler/issues/15605)) |
 | `./phpc doctor` | Environment + optional gate probe |
 | `./phpc doctor --gates` | Example web gates + self-host presenter steps ([#1752](https://github.com/PurHur/php-compiler/issues/1752), [#1857](https://github.com/PurHur/php-compiler/issues/1857), [#1871](https://github.com/PurHur/php-compiler/issues/1871)); 005 ladder: `grep -i sessions` ([#1903](https://github.com/PurHur/php-compiler/issues/1903)); 006 ladder: `grep -i file_upload` ([#2010](https://github.com/PurHur/php-compiler/issues/2010)); 007 ThrowsWeb: `grep -i throws` ([#2102](https://github.com/PurHur/php-compiler/issues/2102)) |
 | `make north-star1-verify` | Example web regression bundle (legacy name; [#1044](https://github.com/PurHur/php-compiler/issues/1044) closed) ([#1845](https://github.com/PurHur/php-compiler/issues/1845)) |
@@ -206,6 +245,8 @@ Legacy entrypoints (`bin/vm.php`, `bin/jit.php`, `bin/compile.php`) still work.
 | [README.md](../README.md) | Everyone | Quick start, north star + CI |
 | [docs/pages/](pages/) | **Public** | GitHub Pages — overview + `development-status.md` |
 | [docs/deploy-web-aot.md](deploy-web-aot.md) | Operators | AOT deploy + nginx CGI sketch |
+| [docs/bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) | Bootstrap contributors | Tiered gen-1+ daily path (default onboarding) |
+| [docs/bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) | Bootstrap contributors | Linux x86_64 / LLVM 9 platform contract |
 | [docs/bootstrap-selfhost.md](bootstrap-selfhost.md) | Contributors | Self-host gates and workflow |
 | [docs/miniwebapp-gates.md](miniwebapp-gates.md) | Contributors | Reference app gate ladder |
 | [examples/README.md](../examples/README.md) | Everyone | Per-example commands |

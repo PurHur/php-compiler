@@ -44,7 +44,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 | **Host PHP 8.1+** | For Tier 0 only; 8.2 matches locked `composer.json` |
 | **LLVM 9** | Required for Tier 1–2; host: `./script/install-llvm9.sh` → `.llvm/` |
 | **RAM** | 8 GiB CI floor; spine link benefits from 10 GiB Docker (`PHP_COMPILER_DOCKER_MEM`) |
-| **Platform** | Prelinked blobs are **Linux x86_64** today |
+| **Platform** | **Linux x86_64** + LLVM 9 — see [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) ([#15606](https://github.com/PurHur/php-compiler/issues/15606)) |
 
 Harness hosts: use `./script/docker-exec.sh` — never raw `docker run -v "$(pwd):/compiler"` on Runforge ([#245](https://github.com/PurHur/php-compiler/issues/245)).
 
@@ -272,7 +272,7 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 | # | Issue | Theme |
 |---|-------|--------|
 | 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
-| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **landed:** `make bootstrap-changed-sources-probe` |
+| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **landed:** `make bootstrap-changed-sources-probe` (also `bootstrap-changed-tree-probe` fixture scaffold) |
 | 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) |
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
@@ -289,12 +289,23 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 phpc bootstrap init
 make bootstrap-init
 
+# Native lint via gen-2 driver -l (#15601)
+phpc lint --native test/bootstrap-aot/compiler_smoke.php
+./script/bootstrap-native-lint.sh path/to/file.php
+# Fallback when build/bin-compile-aot-inventory is missing: php bin/compile.php -l
+
+# Bootstrap SDK release tarball (#15602)
+make bootstrap-sdk-pack
+# → build/php-compiler-bootstrap-{spine-sha-prefix}.tar.gz
+# Extract at repo root to seed prelinked/bootstrap-gen0/ + vendor *.o
+
 # Honest compile gate — opt-in; fails until #15597 closes (#15603)
 BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
 ./script/bootstrap-loop-probe.sh --honest-compile
 
 # Changed-sources guard — gen-2 must emit working-tree edits (#15598)
 make bootstrap-changed-sources-probe
+# Fixture-only scaffold (legacy): make bootstrap-changed-tree-probe
 ```
 
 ---
@@ -303,6 +314,7 @@ make bootstrap-changed-sources-probe
 
 | Doc | Content |
 |-----|---------|
+| [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) | Linux x86_64 / LLVM 9 platform contract ([#15606](https://github.com/PurHur/php-compiler/issues/15606)) |
 | [bootstrap-generations.md](bootstrap-generations.md) | Gen-0…gen-3 artifacts |
 | [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md) | M3 allowlist, ~20 ms probes |
 | [bootstrap-selfhost.md](bootstrap-selfhost.md) | Full gate table |

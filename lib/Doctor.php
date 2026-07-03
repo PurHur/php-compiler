@@ -197,6 +197,11 @@ final class Doctor
 
         fwrite(STDOUT, "North star — self-host gates (#1492, #1056):\n\n");
 
+        fwrite(STDOUT, "Bootstrap SDK onboarding (#15605)\n");
+        fwrite(STDOUT, "   Cold start: ./phpc bootstrap init  (Tier 1; add --with-composer for PHPUnit/ci-fast)\n");
+        fwrite(STDOUT, "   Tiered workflow: docs/bootstrap-dev-workflow.md\n");
+        fwrite(STDOUT, "   Platform contract: docs/bootstrap-sdk-platform.md (Linux x86_64, LLVM 9)\n\n");
+
         fwrite(STDOUT, "1. Inventory\n");
         fwrite(STDOUT, "   {$inventoryDetail}\n");
         fwrite(STDOUT, "   php script/bootstrap-spine-count.php  → {$spine}/{$inventory}\n");
@@ -274,7 +279,7 @@ final class Doctor
         if ($llvmReady) {
             fwrite(STDOUT, "   phpc doctor --jit-probe  (MCJIT smoke)\n");
         }
-        fwrite(STDOUT, "\nDocs: docs/bootstrap-selfhost.md · docs/bootstrap-m5-fast-path.md · docs/self-host-target.md\n");
+        fwrite(STDOUT, "\nDocs: docs/bootstrap-dev-workflow.md · docs/bootstrap-sdk-platform.md · docs/bootstrap-selfhost.md · docs/bootstrap-m5-fast-path.md · docs/self-host-target.md\n");
 
         return 0;
     }

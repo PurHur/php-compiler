@@ -22,6 +22,7 @@ declare(strict_types=1);
  *   phpc cgi [binary]                           CGI wrapper for AOT binary (issue #665)
  *   phpc fcgi [--listen host:port] [--project dir] [docroot]  FastCGI worker (#2427, #173)
  *   phpc lint [-r 'code'] [--json] entry.php
+ *   phpc lint --native <file.php>                 Gen-2 driver compile lint (#15601)
  *   phpc lint --project <entry.php> [--json]
  *   phpc lint --all <dir-or-file> [--json]
  *   phpc lint --bootstrap-inventory [--check] [--json]
@@ -75,6 +76,7 @@ php-compiler CLI
       --binary path                             Force AOT binary path
       phpc fcgi --help                          Full flags and examples
   phpc lint [-r 'code'] [--json] <entry.php>    Report unsupported syntax (line-accurate)
+  phpc lint --native <file.php>                 Parse/compile lint via gen-2 driver -l (#15601)
   phpc lint --project <entry.php> [--json]    Entry + literal include/require chain
   phpc lint --all <dir-or-file> [--json]      All .php under a tree (aggregated)
   phpc lint --bootstrap-inventory [--check]   Lint all bin/vm.php-path files (#2208)
@@ -284,7 +286,32 @@ switch ($command) {
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/compile.php'], $args), $repoRoot));
 
     case 'lint':
-        exit(runProcess(array_merge($php, [$repoRoot.'/bin/lint.php'], $args), $repoRoot));
+        $nativeLint = false;
+        $lintArgs = [];
+        foreach ($args as $arg) {
+            if ('--native' === $arg) {
+                $nativeLint = true;
+                continue;
+            }
+            $lintArgs[] = $arg;
+        }
+        if ($nativeLint) {
+            if ([] === $lintArgs) {
+                fwrite(STDERR, "phpc lint --native: missing file.php\n");
+                exit(1);
+            }
+            if (count($lintArgs) > 1) {
+                fwrite(STDERR, "phpc lint --native: single file only\n");
+                exit(1);
+            }
+            $nativeLintScript = $repoRoot.'/script/bootstrap-native-lint.sh';
+            if (!is_executable($nativeLintScript)) {
+                fwrite(STDERR, "phpc lint --native: {$nativeLintScript} is not executable\n");
+                exit(1);
+            }
+            exit(runProcess([$nativeLintScript, $lintArgs[0]], $repoRoot));
+        }
+        exit(runProcess(array_merge($php, [$repoRoot.'/bin/lint.php'], $lintArgs), $repoRoot));
 
     case 'init':
         exit(runProcess(array_merge($php, [$repoRoot.'/bin/init.php'], $args), $repoRoot));

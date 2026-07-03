@@ -63,6 +63,7 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 | Doc | Content |
 |-----|---------|
 | [**bootstrap-dev-workflow.md**](bootstrap-dev-workflow.md) | **Tiered gen-1+ daily path**, spine checklist, sidecar refresh, CI |
+| [**bootstrap-sdk-platform.md**](bootstrap-sdk-platform.md) | **Bootstrap SDK platform contract** — Linux x86_64, LLVM 9, RAM, Docker ([#15606](https://github.com/PurHur/php-compiler/issues/15606)) |
 | [bootstrap-selfhost.md](bootstrap-selfhost.md) | Gates, waves, stub policy |
 | [bootstrap-generations.md](bootstrap-generations.md) | Gen-0…gen-3 ladder, artifacts, presenter commands |
 | [bootstrap-inventory.md](bootstrap-inventory.md) | `lib/` inventory (`php script/bootstrap-inventory.php`) |
