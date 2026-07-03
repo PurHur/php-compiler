@@ -14297,6 +14297,17 @@ class Compiler {
                     if ($castProducer instanceof Op\Expr\Cast) {
                         return $castProducer;
                     }
+                    // error_reporting(E_ALL & ~E_NOTICE) — ConstFetch prelude + trailing BitwiseAnd (#15391).
+                    if (1 === $argCount) {
+                        $last = $producers[$producerCount - 1] ?? null;
+                        if (
+                            $last instanceof Op\Expr\BinaryOp\BitwiseOr
+                            || $last instanceof Op\Expr\BinaryOp\BitwiseAnd
+                            || $last instanceof Op\Expr\BinaryOp\BitwiseXor
+                        ) {
+                            return $last;
+                        }
+                    }
 
                     return $byIndex;
                 }
