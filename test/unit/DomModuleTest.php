@@ -367,6 +367,46 @@ PHP;
         self::assertSame("DOMEntityReference\n5\namp\nNULL\n1\namp\n", ob_get_clean());
     }
 
+    public function test_dom_document_fragment_append_xml(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$frag = $doc->createDocumentFragment();
+$ok = $frag->appendXML('<a/><b/>');
+echo (int) $ok, "\n";
+echo $frag->childNodes->length, "\n";
+echo $frag->firstChild->nodeName, "\n";
+echo $frag->lastChild->nodeName, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_fragment_append_xml.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n2\na\nb\n", ob_get_clean());
+    }
+
+    public function test_dom_save_html_file(): void
+    {
+        $runtime = new Runtime();
+        $path = sys_get_temp_dir().'/dom_module_savehtmlfile_test.html';
+        $code = <<<PHP
+<?php
+\$d = new DOMDocument();
+\$d->loadHTML('<p>hi</p>');
+\$bytes = \$d->saveHTMLFile('{$path}');
+echo \$bytes, "\\n";
+echo (int) str_contains((string) file_get_contents('{$path}'), '<p>hi</p>'), "\\n";
+@unlink('{$path}');
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_save_html_file.php');
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertMatchesRegularExpression('/^\d+\n1\n$/', $out);
+        self::assertGreaterThan(0, (int) explode("\n", $out)[0]);
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
