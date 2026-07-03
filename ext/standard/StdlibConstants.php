@@ -48,6 +48,8 @@ final class StdlibConstants
     /** htmlspecialchars() / htmlentities() flags (ext/standard/html.c). */
     public const ENT_COMPAT = 2;
     public const ENT_QUOTES = 3;
+    /** php-src default for htmlentities() / html_entity_decode() ($flags parameter). */
+    public const ENT_HTML_DEFAULT = self::ENT_QUOTES | self::ENT_SUBSTITUTE;
     public const ENT_NOQUOTES = 0;
     public const ENT_IGNORE = 4;
     public const ENT_SUBSTITUTE = 8;

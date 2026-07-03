@@ -14,7 +14,7 @@ use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
 /**
- * html_entity_decode() — decode HTML entities (subset; default ENT_COMPAT, issue #2472).
+ * html_entity_decode() — decode HTML entities; default ENT_QUOTES | ENT_SUBSTITUTE (php-src html.c).
  */
 final class html_entity_decode extends Internal
 {
@@ -38,7 +38,7 @@ final class html_entity_decode extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $encoding = 'UTF-8';
         if ($argc >= 2) {
             $flags = VmMath::parseIntBuiltinArg(
@@ -71,13 +71,13 @@ final class html_entity_decode extends Internal
                 JitStringBuiltinArg::lower($context, $args[0], 'html_entity_decode', 0, 'string'),
                 $argc >= 2
                     ? JitLongArg::lower($context, $args[1], 'html_entity_decode() flags')
-                    : $context->getTypeFromString('int64')->constInt(ENT_COMPAT, false),
+                    : $context->getTypeFromString('int64')->constInt(ENT_QUOTES | ENT_SUBSTITUTE, false),
                 JitStringBuiltinArg::lower($context, $args[2], 'html_entity_decode', 2, 'encoding')
             );
         }
 
         $literal = $args[0]->compileTimeString ?? null;
-        $flags = ENT_COMPAT;
+        $flags = ENT_QUOTES | ENT_SUBSTITUTE;
         $flagsKnown = $argc < 2;
         if ($argc >= 2) {
             $ct = self::tryCompileTimeFlags($context, $args[1]);
