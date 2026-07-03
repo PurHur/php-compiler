@@ -16,11 +16,11 @@ final class DocumentCreateDocumentFragment extends DomClassMethod
 
     public function execute(Frame $frame): void
     {
-        $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createDocumentFragment()');
+        $document = $this->receiver($frame, VmDom::CLASS_DOCUMENT, 'DOMDocument::createDocumentFragment()');
         if (null === $frame->vmContext) {
             throw new \LogicException('DOMDocument::createDocumentFragment() requires VM context in this compiler build');
         }
-        $fragment = VmDom::createDocumentFragment($frame->vmContext);
+        $fragment = VmDom::createDocumentFragment($frame->vmContext, $document);
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($fragment);
         }

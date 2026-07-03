@@ -100,4 +100,11 @@ final class DomNodeState
 
     /** True after DOMDocument::loadHTML() (php-src ext/dom/document.c; #14356). */
     public bool $isHtmlDocument = false;
+
+    /**
+     * Per-document custom node class map: base builtin lc => extended class lc (php-src dom_set_doc_classmap; #15334).
+     *
+     * @var array<string, string>
+     */
+    public array $nodeClassMap = [];
 }
