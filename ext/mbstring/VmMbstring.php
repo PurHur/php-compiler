@@ -187,7 +187,9 @@ final class VmMbstring
     {
         $out = '';
         foreach (self::codepointsInString($source, 'UTF-8') as $cp) {
-            $out .= self::encodeUtf8Codepoint(Utf8CaseMap::toLower($cp));
+            foreach (Utf8CaseMap::toLowerCodepoints($cp) as $lowerCp) {
+                $out .= self::encodeUtf8Codepoint($lowerCp);
+            }
         }
 
         return $out;
@@ -206,8 +208,9 @@ final class VmMbstring
                 }
                 $upperNext = false;
             } else {
-                $cp = Utf8CaseMap::toLower($cp);
-                $out .= self::encodeUtf8Codepoint($cp);
+                foreach (Utf8CaseMap::toLowerCodepoints($cp) as $lowerCp) {
+                    $out .= self::encodeUtf8Codepoint($lowerCp);
+                }
             }
             if (Utf8CaseMap::isTitleDelimiter($cp)) {
                 $upperNext = true;

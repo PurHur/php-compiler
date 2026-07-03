@@ -24,6 +24,11 @@ final class Utf8CaseMap
         0xDF => [0x53, 0x53], // Latin small letter sharp S -> SS (php-src libmbfl)
     ];
 
+    /** @var array<int, list<int>> Unicode simple lower expansions (1:N codepoints). */
+    private const LOWER_EXPANSION = [
+        0x130 => [0x69, 0x307], // LATIN CAPITAL LETTER I WITH DOT ABOVE -> i + combining dot
+    ];
+
     /** @var array<int, int> */
     private const LOWER_SPECIAL = [
         0x39C => 0xB5,
@@ -42,6 +47,18 @@ final class Utf8CaseMap
         }
 
         return [self::toUpper($codepoint)];
+    }
+
+    /**
+     * @return list<int>
+     */
+    public static function toLowerCodepoints(int $codepoint): array
+    {
+        if (isset(self::LOWER_EXPANSION[$codepoint])) {
+            return self::LOWER_EXPANSION[$codepoint];
+        }
+
+        return [self::toLower($codepoint)];
     }
 
     public static function toUpper(int $codepoint): int
