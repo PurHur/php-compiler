@@ -571,6 +571,16 @@ final class CompilerVersion
     }
 
     /**
+     * PHP 8.3+ array_first_key()/array_last_key() (ext/standard/array.c, issue #15539).
+     *
+     * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
+     */
+    public static function supportsPhp83ArrayKeyFunctions(): bool
+    {
+        return self::advertisesBuiltinSince('8.3.0');
+    }
+
+    /**
      * PHP 8.4+ array_all/any/find/find_key/first/last (ext/standard/array.c, issue #11845, #12796, #14505, #14516, #14621, #14622, #15027).
      *
      * Forward profile on 8.4.0-dev — advertisesBuiltinSince treats -dev as 8.4.0 (#13284 phantom withheld on 8.2).
