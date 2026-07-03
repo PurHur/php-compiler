@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\JIT\Builtin\StreamIoRuntime;
+
 /**
  * Nested JIT lowering for {@see \PHPCompiler\VM\HashTable} instance helpers (#14601).
  *
@@ -24,6 +26,10 @@ final class NestedVmHashTableMethodLlvm
 
     public static function ensureMethod(Context $context, string $methodLc): bool
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+            && ('keyscopy' === $methodLc || 'valuescopy' === $methodLc)) {
+            return false;
+        }
         $handler = self::METHOD_HANDLERS[$methodLc] ?? null;
         if (null === $handler) {
             return false;
