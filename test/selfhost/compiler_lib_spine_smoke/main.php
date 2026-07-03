@@ -490,7 +490,6 @@ require_once __DIR__.'/../../../ext/sodium/SodiumBoxSealOpenFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumMemcmpFunction.php';
 require_once __DIR__.'/../../../ext/sodium/SodiumJitHelper.php';
-require_once __DIR__.'/../../../ext/sodium/SodiumMemcmpFunction.php';
 require_once __DIR__.'/../../../ext/sodium/VmSodium.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth.php';
 require_once __DIR__.'/../../../ext/sodium/sodium_crypto_auth_verify.php';

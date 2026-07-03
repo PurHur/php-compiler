@@ -53,7 +53,7 @@ else
   stale_patterns=(
     'tracked in #764'
     'tracked in [#764]'
-    'blocked #764'
+    'blocked #764' # stale-issue-ok: closed #764 pattern catalog
     'empty stdout until'
   )
   for pattern in "${stale_patterns[@]}"; do

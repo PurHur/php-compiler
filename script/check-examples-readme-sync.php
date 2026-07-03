@@ -26,11 +26,11 @@ $body = (string) file_get_contents($readme);
 /** Phrases that imply #764 execute is still open. */
 $stale = [
     'empty stdout until [#764]',
-    'empty stdout until #764',
+    'empty stdout until #764', // stale-issue-ok: closed #764 pattern catalog
     'execute still returns empty stdout',
     'native execute 📋',
     'execute blocked',
-    'blocked #764',
+    'blocked #764', // stale-issue-ok: closed #764 pattern catalog
     'until [#764](https://github.com/PurHur/php-compiler/issues/764)',
 ];
 
