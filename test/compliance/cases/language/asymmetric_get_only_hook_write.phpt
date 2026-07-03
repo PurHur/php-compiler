@@ -1,9 +1,9 @@
 --TEST--
-Language: private(set) get-only hook write enforcement (#13983, Zend/zend_execute.c)
+Language: public private(set) get-only hook write enforcement (#13983, Zend/zend_execute.c)
 --FILE--
 <?php
 class C {
-    private(set) string $x {
+    public private(set) string $x {
         get => 'hi';
     }
 }
@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 hi
-Error: Cannot modify private(set) property C::$x from global scope
+Error: Cannot modify public private(set) property C::$x from global scope

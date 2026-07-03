@@ -24,6 +24,9 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
+    /** php-src: Zend/zend_language_scanner.l — bare private(set)/protected(set) without read modifier (#15446). */
+    public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
+
     /**
      * @internal Marker embedded in source for PHPCfg to recover set visibility.
      */
@@ -81,6 +84,45 @@ final class AsymmetricVisibilityRewriter
 
         return 0;
     }
+
+    /** 1-based line of first bare `(set)` without explicit read visibility, or 0 (#15446). */
+    public static function findBareSetModifierLine(string $source): int
+    {
+        $lineNum = 0;
+        foreach (explode("\n", $source) as $line) {
+            ++$lineNum;
+            if (!self::isInspectableAsymmetricLine($line, self::SET_MODIFIER_NEEDLE)) {
+                continue;
+            }
+            if (self::lineIsHookBlockSetModifier($line)) {
+                continue;
+            }
+            if (self::lineHasBareSetModifierWithoutRead($line)) {
+                return $lineNum;
+            }
+        }
+
+        if (!preg_match('/\b__construct\b/i', $source) || !preg_match('/\(\s*set\s*\)/i', $source)) {
+            return 0;
+        }
+
+        $offset = 0;
+        while (preg_match('/\bfunction\s+__construct\s*\(/i', $source, $m, PREG_OFFSET_CAPTURE, $offset)) {
+            $openPos = $m[0][1] + strlen($m[0][0]) - 1;
+            $paramsText = self::extractBalancedParenContent($source, $openPos);
+            if (null !== $paramsText) {
+                $relative = self::offsetOfBareSetModifierInParams($paramsText);
+                if ($relative >= 0) {
+                    return substr_count(substr($source, 0, $openPos), "\n") + 1
+                        + substr_count(substr($paramsText, 0, $relative), "\n");
+                }
+            }
+            $offset = $openPos + 1;
+        }
+
+        return 0;
+    }
+
 
     public static function rewrite(string $source): string
     {
@@ -153,6 +195,7 @@ final class AsymmetricVisibilityRewriter
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
+        self::rejectBareSetModifierWithoutRead($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
@@ -217,6 +260,88 @@ final class AsymmetricVisibilityRewriter
                 throw new \CompileError(self::MULTIPLE_MODIFIERS_MESSAGE);
             }
         });
+    }
+
+
+    /** Bare private(set)/protected(set) without read modifier is a parse error on php-src 8.4 (#15446). */
+    private static function rejectBareSetModifierWithoutRead(string $source): void
+    {
+        if (self::findBareSetModifierLine($source) > 0) {
+            throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
+        }
+    }
+
+    private static function lineIsHookBlockSetModifier(string $line): bool
+    {
+        return 1 === preg_match('/\b(?:private|protected|public)\s*\(\s*set\s*\)\s*;/i', $line);
+    }
+
+    private static function lineHasBareSetModifierWithoutRead(string $line): bool
+    {
+        if (!preg_match('/\(\s*set\s*\)/i', $line)) {
+            return false;
+        }
+
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(public|protected|private)\s+(?:static\s+)?(?:'
+            .'\((?:public|protected|private)\s*\(\s*set\s*\)\)|'
+            .'(?:public|protected|private)\s*\(\s*set\s*\)'
+            .')/i',
+            $line
+        )) {
+            return false;
+        }
+
+        if (preg_match(
+            '/(?<![a-zA-Z0-9_])(private|protected)\s*\(\s*set\s*\)/i',
+            $line
+        )) {
+            return true;
+        }
+
+        return 1 === preg_match(
+            '/(?<![a-zA-Z0-9_])\(\s*(private|protected)\s*\(\s*set\s*\)\s*\)/i',
+            $line
+        );
+    }
+
+    private static function offsetOfBareSetModifierInParams(string $paramsText): int
+    {
+        $offset = 0;
+        $len = strlen($paramsText);
+        while ($offset < $len) {
+            $nextComma = self::findTopLevelComma($paramsText, $offset);
+            $segment = false === $nextComma
+                ? substr($paramsText, $offset)
+                : substr($paramsText, $offset, $nextComma - $offset);
+            if (self::lineHasBareSetModifierWithoutRead($segment)) {
+                return $offset;
+            }
+            if (false === $nextComma) {
+                break;
+            }
+            $offset = $nextComma + 1;
+        }
+
+        return -1;
+    }
+
+    private static function findTopLevelComma(string $text, int $start): int|false
+    {
+        $depth = 0;
+        $len = strlen($text);
+        for ($i = $start; $i < $len; ++$i) {
+            $char = $text[$i];
+            if ('(' === $char || '[' === $char) {
+                ++$depth;
+            } elseif (')' === $char || ']' === $char) {
+                --$depth;
+            } elseif (',' === $char && 0 === $depth) {
+                return $i;
+            }
+        }
+
+        return false;
     }
 
     /** Promoted constructor parameters reject duplicate set modifiers (#10237, #11656, #12088). */

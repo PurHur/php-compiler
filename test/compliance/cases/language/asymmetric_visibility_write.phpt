@@ -3,7 +3,7 @@ PHP 8.4 asymmetric visibility: write scope Error parity (#5635, zend_object_hand
 --FILE--
 <?php
 class PrivateSet {
-    private(set) string $name = 'x';
+    public private(set) string $name = 'x';
 
     public function mutate(): void {
         $this->name = 'y';
@@ -11,7 +11,7 @@ class PrivateSet {
 }
 
 class ProtectedSet {
-    protected(set) string $tag = 'a';
+    public protected(set) string $tag = 'a';
 
     public function mutate(): void {
         $this->tag = 'b';
@@ -38,9 +38,9 @@ echo $q->tag, "\n";
 $q->mutate();
 echo $q->tag, "\n";
 --EXPECT--
-Error: Cannot modify private(set) property PrivateSet::$name from global scope
+Error: Cannot modify public private(set) property PrivateSet::$name from global scope
 x
 y
-Error: Cannot modify protected(set) property ProtectedSet::$tag from global scope
+Error: Cannot modify public protected(set) property ProtectedSet::$tag from global scope
 a
 b

@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 class C
 {
-    private(set) string $p = 'x';
+    public private(set) string $p = 'x';
 }
 
 $r = new ReflectionProperty(C::class, 'p');
@@ -14,7 +14,7 @@ echo $r->isPrivateSet() ? "private-set\n" : "not-private-set\n";
 
 class S
 {
-    protected(set) static string $sp = 'y';
+    public protected(set) static string $sp = 'y';
 }
 $rs = new ReflectionProperty(S::class, 'sp');
 echo 'static_isProtectedSet: ', $rs->isProtectedSet() ? 'yes' : 'no', "\n";

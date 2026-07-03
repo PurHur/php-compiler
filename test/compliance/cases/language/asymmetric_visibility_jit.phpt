@@ -1,10 +1,10 @@
 --TEST--
-PHP 8.4 asymmetric visibility: JIT read + catchable Error on private(set) write (#4020)
+PHP 8.4 asymmetric visibility: JIT read + catchable Error on public private(set) write (#4020)
 --JIT--
 --FILE--
 <?php
 class Demo {
-    private(set) string $name = 'x';
+    public private(set) string $name = 'x';
 }
 $d = new Demo();
 echo $d->name, "\n";
@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 x
-Cannot modify private(set) property Demo::$name from global scope
+Cannot modify public private(set) property Demo::$name from global scope

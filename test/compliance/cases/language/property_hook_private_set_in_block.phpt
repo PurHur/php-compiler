@@ -1,5 +1,5 @@
 --TEST--
-Language: property hook block private(set) asymmetric visibility (#9872, Zend/zend_compile.c)
+Language: property hook block public private(set) asymmetric visibility (#9872, Zend/zend_compile.c)
 --FILE--
 <?php
 class C {
@@ -18,4 +18,4 @@ try {
 }
 --EXPECT--
 g
-Cannot modify private(set) property C::$x from global scope
+Cannot modify public private(set) property C::$x from global scope

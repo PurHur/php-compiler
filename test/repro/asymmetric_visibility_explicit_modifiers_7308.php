@@ -1,6 +1,6 @@
 <?php
 class A {
-    private(set) string $x = 'a';
+    public private(set) string $x = 'a';
 }
 class B {
     public protected(set) string $y = 'b';

@@ -1,6 +1,6 @@
 <?php
 class Demo {
-    private(set) string $name = 'a';
+    public private(set) string $name = 'a';
 }
 
 $d = new Demo();

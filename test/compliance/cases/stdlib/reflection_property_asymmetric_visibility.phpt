@@ -5,14 +5,14 @@ ReflectionProperty::getAsymmetricVisibility() — instance + static (#5060, #677
 declare(strict_types=1);
 
 class C {
-    private(set) string $name = 'x';
-    protected(set) int $q = 1;
+    public private(set) string $name = 'x';
+    public protected(set) int $q = 1;
     public int $plain = 0;
 }
 
 class S {
-    private(set) static int $sx = 1;
-    protected(set) static string $sp = 'y';
+    public private(set) static int $sx = 1;
+    public protected(set) static string $sp = 'y';
 }
 
 $r = new ReflectionProperty(C::class, 'name');

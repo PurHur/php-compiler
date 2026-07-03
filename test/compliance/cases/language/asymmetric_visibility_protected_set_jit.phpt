@@ -1,10 +1,10 @@
 --TEST--
-Language: protected(set) JIT read + catchable Error on write (#9310)
+Language: public protected(set) JIT read + catchable Error on write (#9310)
 --JIT--
 --FILE--
 <?php
 class A {
-    protected(set) string $x = 'ok';
+    public protected(set) string $x = 'ok';
 }
 $a = new A();
 echo $a->x, "\n";
@@ -16,4 +16,4 @@ try {
 }
 --EXPECT--
 ok
-Cannot modify protected(set) property A::$x from global scope
+Cannot modify public protected(set) property A::$x from global scope
