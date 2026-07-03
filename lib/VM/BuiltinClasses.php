@@ -150,6 +150,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
@@ -891,6 +892,8 @@ final class BuiltinClasses
         $reuc->methodVisibility['getvalue'] = $pub;
         $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
         $reuc->methodVisibility['isbacked'] = $pub;
+        $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
+        $reuc->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
 
         $rebc = new ClassEntry('ReflectionEnumBackedCase');
