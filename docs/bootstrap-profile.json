@@ -2534,6 +2534,7 @@
         "lib/Compiler/MagicMethodReturnTypeCheck.php",
         "lib/Compiler/NewCtorParens.php",
         "lib/Compiler/NewWithoutParensCompileCheck.php",
+        "lib/Compiler/NonEnumBuiltinInterfaceCompileCheck.php",
         "lib/Compiler/NoDiscardMetadata.php",
         "lib/Compiler/OverrideValidator.php",
         "lib/Compiler/ParameterMetadata.php",
