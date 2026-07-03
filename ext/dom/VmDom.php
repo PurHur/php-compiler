@@ -305,6 +305,8 @@ final class VmDom
         $document->methodVisibility['createelementns'] = $pub;
         $document->methods['createattributens'] = new DocumentCreateAttributeNS();
         $document->methodVisibility['createattributens'] = $pub;
+        $document->methods['createattribute'] = new DocumentCreateAttribute();
+        $document->methodVisibility['createattribute'] = $pub;
         $document->methods['createdocumentfragment'] = new DocumentCreateDocumentFragment();
         $document->methodVisibility['createdocumentfragment'] = $pub;
         $document->methods['createentityreference'] = new DocumentCreateEntityReference();
@@ -340,6 +342,8 @@ final class VmDom
         $element->methodVisibility['appendchild'] = $pub;
         $element->methods['getattribute'] = new ElementGetAttribute();
         $element->methodVisibility['getattribute'] = $pub;
+        $element->methods['getattributenode'] = new ElementGetAttributeNode();
+        $element->methodVisibility['getattributenode'] = $pub;
         $element->methods['getattributens'] = new ElementGetAttributeNS();
         $element->methodVisibility['getattributens'] = $pub;
         $element->methods['hasattribute'] = new ElementHasAttribute();
@@ -348,8 +352,12 @@ final class VmDom
         $element->methodVisibility['hasattributens'] = $pub;
         $element->methods['removeattribute'] = new ElementRemoveAttribute();
         $element->methodVisibility['removeattribute'] = $pub;
+        $element->methods['removeattributenode'] = new ElementRemoveAttributeNode();
+        $element->methodVisibility['removeattributenode'] = $pub;
         $element->methods['setattribute'] = new ElementSetAttribute();
         $element->methodVisibility['setattribute'] = $pub;
+        $element->methods['setattributenode'] = new ElementSetAttributeNode();
+        $element->methodVisibility['setattributenode'] = $pub;
         $element->methods['setattributens'] = new ElementSetAttributeNS();
         $element->methodVisibility['setattributens'] = $pub;
         $element->methods['removeattributens'] = new ElementRemoveAttributeNS();
@@ -631,6 +639,164 @@ final class VmDom
         return $var;
     }
 
+    public static function createAttribute(
+        Context $ctx,
+        string $name,
+        ?ObjectEntry $ownerDocument = null
+    ): Variable {
+        return self::createAttributeNS($ctx, null, $name, $ownerDocument);
+    }
+
+    public static function getAttributeNode(Context $ctx, ObjectEntry $element, string $name): Variable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        $state = DomRegistry::state($element);
+        if (!\array_key_exists($name, $state->attributes)) {
+            $var = new Variable(Variable::TYPE_BOOL);
+            $var->bool(false);
+
+            return $var;
+        }
+        $attr = self::attributeNodeForElement($ctx, $element, $name, $state->attributes[$name]);
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($attr);
+
+        return $var;
+    }
+
+    public static function setAttributeNode(ObjectEntry $element, ObjectEntry $attr): Variable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::setAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $name = $attrState->nodeName;
+        $value = $attrState->textContent ?? '';
+        $elementState = DomRegistry::state($element);
+        $replaced = null;
+        if (\array_key_exists($name, $elementState->attributes)) {
+            $cachedId = $elementState->attributeNodeIds[$name] ?? null;
+            if (null !== $cachedId) {
+                $cached = DomRegistry::entry($cachedId);
+                if (null !== $cached && $cached->id !== $attr->id) {
+                    $replaced = $cached;
+                    self::detachAttributeNode($replaced);
+                }
+            }
+        }
+        $elementState->attributes[$name] = $value;
+        $elementState->attributeNamespaces[$name] = $attrState->namespaceUri ?? '';
+        $elementState->attributeNodeIds[$name] = $attr->id;
+        $attrState->ownerElementId = $element->id;
+        $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
+            self::syncElementIdRegistration($element);
+        }
+        $var = new Variable();
+        if (null === $replaced) {
+            $var->null();
+        } else {
+            $var->object($replaced);
+        }
+
+        return $var;
+    }
+
+    public static function removeAttributeNode(ObjectEntry $element, ObjectEntry $attr): Variable
+    {
+        if (!self::isElement($element)) {
+            throw new \DOMException('Not an element node');
+        }
+        if (!self::isAttr($attr)) {
+            throw new \TypeError('DOMElement::removeAttributeNode(): Argument #1 ($attr) must be of type DOMAttr');
+        }
+        $attrState = DomRegistry::state($attr);
+        $name = $attrState->nodeName;
+        $elementState = DomRegistry::state($element);
+        $cachedId = $elementState->attributeNodeIds[$name] ?? null;
+        if (!\array_key_exists($name, $elementState->attributes)
+            || $attrState->ownerElementId !== $element->id
+            || (null !== $cachedId && $cachedId !== $attr->id)
+        ) {
+            throw new \DOMException('Not Found Error', 8);
+        }
+        unset($elementState->attributes[$name], $elementState->attributeNamespaces[$name], $elementState->attributeNodeIds[$name]);
+        self::detachAttributeNode($attr);
+        if (null !== $elementState->idAttributeName && $name === $elementState->idAttributeName) {
+            $document = self::ownerDocumentEntry($element);
+            if (null !== $document) {
+                self::unregisterElementId($document, $element);
+            }
+            $elementState->idAttributeName = null;
+        }
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($attr);
+
+        return $var;
+    }
+
+    private static function attributeNodeForElement(
+        Context $ctx,
+        ObjectEntry $element,
+        string $name,
+        string $value
+    ): ObjectEntry {
+        $state = DomRegistry::state($element);
+        $cachedId = $state->attributeNodeIds[$name] ?? null;
+        if (null !== $cachedId) {
+            $cached = DomRegistry::entry($cachedId);
+            if (null !== $cached && self::isAttr($cached)) {
+                self::syncAttributeNodeValue($cached, $value);
+                $cachedState = DomRegistry::state($cached);
+                $cachedState->ownerElementId = $element->id;
+                $cached->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+
+                return $cached;
+            }
+        }
+        $ownerDocument = self::ownerDocumentEntry($element);
+        $attrVar = self::createAttributeNS(
+            $ctx,
+            $state->attributeNamespaces[$name] ?? null,
+            $name,
+            $ownerDocument
+        );
+        $attr = $attrVar->toObject();
+        self::syncAttributeNodeValue($attr, $value);
+        $attrState = DomRegistry::state($attr);
+        $attrState->ownerElementId = $element->id;
+        $attr->getProperty(self::PROP_OWNER_ELEMENT)->object($element);
+        $state->attributeNodeIds[$name] = $attr->id;
+
+        return $attr;
+    }
+
+    private static function syncAttributeNodeValue(ObjectEntry $attr, string $value): void
+    {
+        $attrState = DomRegistry::state($attr);
+        $attrState->textContent = $value;
+        if ($attr->hasProperty(self::PROP_VALUE)) {
+            $attr->getProperty(self::PROP_VALUE)->string($value);
+        }
+        if ($attr->hasProperty(self::PROP_NODE_VALUE)) {
+            $attr->getProperty(self::PROP_NODE_VALUE)->string($value);
+        }
+    }
+
+    private static function detachAttributeNode(ObjectEntry $attr): void
+    {
+        $attrState = DomRegistry::state($attr);
+        $attrState->ownerElementId = null;
+        if ($attr->hasProperty(self::PROP_OWNER_ELEMENT)) {
+            $attr->getProperty(self::PROP_OWNER_ELEMENT)->null();
+        }
+    }
+
     public static function getAttributeNS(ObjectEntry $element, ?string $namespace, string $localName): string
     {
         if (!self::isElement($element)) {
@@ -692,6 +858,12 @@ final class VmDom
         $state = DomRegistry::state($element);
         $state->attributes[$qualifiedName] = $value;
         $state->attributeNamespaces[$qualifiedName] = $namespace ?? '';
+        if (isset($state->attributeNodeIds[$qualifiedName])) {
+            $cached = DomRegistry::entry($state->attributeNodeIds[$qualifiedName]);
+            if (null !== $cached && self::isAttr($cached)) {
+                self::syncAttributeNodeValue($cached, $value);
+            }
+        }
         if (self::isXmlnsAttributeName($qualifiedName)) {
             $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
         }
@@ -724,6 +896,13 @@ final class VmDom
         }
         if (null === $removedQName) {
             return false;
+        }
+        if (isset($state->attributeNodeIds[$removedQName])) {
+            $cached = DomRegistry::entry($state->attributeNodeIds[$removedQName]);
+            if (null !== $cached && self::isAttr($cached)) {
+                self::detachAttributeNode($cached);
+            }
+            unset($state->attributeNodeIds[$removedQName]);
         }
         unset($state->attributes[$removedQName], $state->attributeNamespaces[$removedQName]);
         if (null !== $state->idAttributeName && $removedQName === $state->idAttributeName) {
