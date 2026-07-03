@@ -16,5 +16,13 @@ final class ClassConstFetchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('class_const_dyn_try_', $helper);
         $this->assertFileExists(__DIR__.'/../../lib/JIT/Builtin/ClassConstFetchRuntime.php');
     }
+
+    public function testRuntimeRoutesStrcasecmpThroughCaseCompareJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ClassConstFetchRuntime.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
+        $this->assertStringNotContainsString('ensureStrCaseCmp', $source);
+        $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
+    }
 }
 
