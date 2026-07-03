@@ -36,6 +36,7 @@ class Module extends ModuleAbstract
             new openssl_encrypt(),
             new openssl_decrypt(),
             new openssl_sign(),
+            new openssl_verify(),
             new openssl_get_cipher_methods(),
             new openssl_get_md_methods(),
             new openssl_pkey_new(),

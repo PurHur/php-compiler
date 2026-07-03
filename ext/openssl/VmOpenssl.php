@@ -78,6 +78,136 @@ final class VmOpenssl
         }
     }
 
+    /**
+     * openssl_sign() — EVP_DigestSign via libcrypto FFI (#11535).
+     *
+     * @return string|false signature bytes
+     */
+    public static function sign(string $data, string $privateKeyPem, int|string $algorithm, ?Frame $frame = null): string|false
+    {
+        $digestName = self::resolveDigestName($algorithm, 'openssl_sign', $frame);
+        if (false === $digestName) {
+            return false;
+        }
+        if (!VmOpensslSignNative::available()) {
+            self::userWarning('openssl_sign(): OpenSSL signing is unavailable in this compiler build', $frame);
+
+            return false;
+        }
+
+        return VmOpensslSignNative::sign($data, $privateKeyPem, $digestName);
+    }
+
+    /**
+     * openssl_verify() — EVP_DigestVerify via libcrypto FFI (#11535).
+     *
+     * @return int 1 valid, 0 invalid, -1 error
+     */
+    public static function verify(string $data, string $signature, string $publicKeyPem, int|string $algorithm, ?Frame $frame = null): int
+    {
+        $digestName = self::resolveDigestName($algorithm, 'openssl_verify', $frame);
+        if (false === $digestName) {
+            return -1;
+        }
+        if (!VmOpensslSignNative::available()) {
+            self::userWarning('openssl_verify(): OpenSSL verification is unavailable in this compiler build', $frame);
+
+            return -1;
+        }
+
+        return VmOpensslSignNative::verify($data, $signature, $publicKeyPem, $digestName);
+    }
+
+    public static function coercePkeyPem(Variable $var, string $function, int $argIndex, string $paramName): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+        if (Variable::TYPE_OBJECT === $var->type) {
+            $pem = VmOpensslObjects::keyPem($var->toObject());
+            if ('' !== $pem) {
+                return $pem;
+            }
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type OpenSSLAsymmetricKey|string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => $var->toObject()->class->name,
+                default => 'mixed',
+            }
+        ));
+    }
+
+    public static function coerceSignatureArg(Variable $var, string $function, int $argIndex, string $paramName): string
+    {
+        $var = $var->resolveIndirect();
+        if (Variable::TYPE_STRING === $var->type) {
+            return $var->toString();
+        }
+
+        throw new \TypeError(\sprintf(
+            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            $function,
+            $argIndex + 1,
+            $paramName,
+            match ($var->type) {
+                Variable::TYPE_NULL => 'null',
+                Variable::TYPE_BOOLEAN => 'bool',
+                Variable::TYPE_INTEGER => 'int',
+                Variable::TYPE_FLOAT => 'float',
+                Variable::TYPE_ARRAY => 'array',
+                Variable::TYPE_OBJECT => 'object',
+                default => 'mixed',
+            }
+        ));
+    }
+
+    /**
+     * @return string|false EVP digest name
+     */
+    public static function resolveDigestName(int|string $algorithm, string $function, ?Frame $frame = null): string|false
+    {
+        if (\is_int($algorithm)) {
+            $name = match ($algorithm) {
+                OpensslConstants::OPENSSL_ALGO_MD4 => 'md4',
+                OpensslConstants::OPENSSL_ALGO_MD5 => 'md5',
+                OpensslConstants::OPENSSL_ALGO_SHA1 => 'sha1',
+                OpensslConstants::OPENSSL_ALGO_SHA224 => 'sha224',
+                OpensslConstants::OPENSSL_ALGO_SHA256 => 'sha256',
+                OpensslConstants::OPENSSL_ALGO_SHA384 => 'sha384',
+                OpensslConstants::OPENSSL_ALGO_SHA512 => 'sha512',
+                OpensslConstants::OPENSSL_ALGO_RMD160 => 'ripemd160',
+                default => null,
+            };
+            if (null === $name) {
+                self::userWarning($function.'(): Unknown signature algorithm', $frame);
+
+                return false;
+            }
+
+            return $name;
+        }
+
+        $name = strtolower($algorithm);
+        if (!OpensslCipherRegistry::digestImplemented($name) && !\in_array($name, ['sha224', 'sha384', 'sha512', 'ripemd160', 'md4'], true)) {
+            self::userWarning($function.'(): Unknown signature algorithm', $frame);
+
+            return false;
+        }
+
+        return $name;
+    }
+
     public static function coerceBoolArg(Variable $var, string $function, int $argIndex, string $paramName): bool
     {
         $var = $var->resolveIndirect();

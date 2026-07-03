@@ -12,13 +12,13 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * openssl_sign() — EVP_DigestSign (php-src ext/openssl/openssl.c; #11535).
+ * openssl_verify() — EVP_DigestVerify (php-src ext/openssl/openssl.c; #11535).
  */
-final class openssl_sign extends Internal
+final class openssl_verify extends Internal
 {
     public function __construct()
     {
-        parent::__construct('openssl_sign');
+        parent::__construct('openssl_verify');
     }
 
     public function execute(Frame $frame): void
@@ -26,36 +26,28 @@ final class openssl_sign extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 3 || $argc > 4) {
             throw new \ArgumentCountError(
-                'openssl_sign() expects 3 or 4 arguments, '.$argc.' given'
+                'openssl_verify() expects 3 or 4 arguments, '.$argc.' given'
             );
         }
         if (null === $frame->returnVar) {
             return;
         }
 
-        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_sign', 0, 'data');
-        $keyPem = VmOpenssl::coercePkeyPem($frame->calledArgs[2], 'openssl_sign', 2, 'key');
+        $data = VmString::coerceStringBuiltinArg($frame->calledArgs[0], 'openssl_verify', 0, 'data');
+        $signature = VmOpenssl::coerceSignatureArg($frame->calledArgs[1], 'openssl_verify', 1, 'signature');
+        $keyPem = VmOpenssl::coercePkeyPem($frame->calledArgs[2], 'openssl_verify', 2, 'key');
         $algorithm = OpensslConstants::OPENSSL_ALGO_SHA1;
         if (4 === $argc) {
-            $algorithm = self::coerceAlgorithmArg($frame->calledArgs[3], 'openssl_sign', 3, 'algorithm');
+            $algorithm = self::coerceAlgorithmArg($frame->calledArgs[3], 'openssl_verify', 3, 'algorithm');
         }
 
-        $signature = VmOpenssl::sign($data, $keyPem, $algorithm, $frame);
-        if (false === $signature) {
-            $frame->returnVar->bool(false);
-
-            return;
-        }
-
-        $sigOut = $frame->calledArgs[1]->resolveIndirect();
-        $sigOut->string($signature);
-        $frame->returnVar->bool(true);
+        $frame->returnVar->int(VmOpenssl::verify($data, $signature, $keyPem, $algorithm, $frame));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
         throw new \LogicException(
-            'openssl_sign() is not implemented for JIT in this compiler build (issue #3324)'
+            'openssl_verify() is not implemented for JIT in this compiler build (issue #11535)'
         );
     }
 

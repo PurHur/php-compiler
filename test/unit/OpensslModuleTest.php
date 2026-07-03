@@ -19,7 +19,7 @@ final class OpensslModuleTest extends TestCase
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
 
-        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest'] as $fn) {
+        foreach (['openssl_encrypt', 'openssl_decrypt', 'openssl_sign', 'openssl_verify', 'openssl_get_cipher_methods', 'openssl_get_md_methods', 'openssl_pkey_new', 'openssl_cipher_iv_length', 'openssl_cipher_key_length', 'openssl_digest'] as $fn) {
             self::assertTrue(VmReflection::functionExists($ctx, $fn), $fn);
         }
 
@@ -28,6 +28,7 @@ final class OpensslModuleTest extends TestCase
 echo (int) function_exists('openssl_encrypt');
 echo (int) function_exists('openssl_decrypt');
 echo (int) function_exists('openssl_sign');
+echo (int) function_exists('openssl_verify');
 echo (int) function_exists('openssl_get_cipher_methods');
 echo (int) function_exists('openssl_get_md_methods');
 echo (int) function_exists('openssl_pkey_new');
@@ -44,7 +45,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'openssl_module.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame('111111111111217', ob_get_clean());
+        self::assertSame('1111111111111217', ob_get_clean());
     }
 
     public function test_openssl_cipher_key_length_aes_256_cbc(): void
@@ -90,5 +91,56 @@ PHP;
         $this->expectException(\LogicException::class);
         $this->expectExceptionMessage('openssl_encrypt() is not implemented in this compiler build (issue #3324)');
         $fn->execute($frame);
+    }
+
+    public function test_openssl_sign_verify_roundtrip_when_ffi_available(): void
+    {
+        if (!\PHPCompiler\ext\openssl\VmOpensslSignNative::available()) {
+            self::markTestSkipped('libcrypto FFI unavailable');
+        }
+
+        $privateKey = <<<'PEM'
+-----BEGIN PRIVATE KEY-----
+MIIBVAIBADANBgkqhkiG9w0BAQEFAASCAT4wggE6AgEAAkEAs/agkMDOJDS7Udfu
+b2zoYYZdjXjmjEGVAKQ0jcNsjzx8UizZZdezyq9Cb/a1Z8epPFm0KPXWO/DrfaO/
+pJdN0wIDAQABAkEAqAYbsisiDLHjNy35o7U2Xl/6lu0LrGZK/TdTDg0pHa2Tg2bU
+sRDsUL7mG+Sg7nXUkGQnMOc6PjHwRlF1v5i6EQIhAO6cRDOKu4OzmpsFpDz8RcAb
+fKcHtRGQoqNiHGkjOrd7AiEAwRQwNwDjClD+3IMkLHR/1d2MSRunQ/mYf+SHs51Y
+R4kCIA4uXWNO0HwwVXT3Ld6uA5s6RvtKWvmTRgc90oBxJpE3AiAXGnVSf5arS1nT
+xRV1BFOvoZ0Bun9fUOSAmTXrti40EQIgd7h1Ch05DM18TUSosFD/valTgZyBNqO5
+YQqYKeRM/Yk=
+-----END PRIVATE KEY-----
+PEM;
+        $publicKey = <<<'PEM'
+-----BEGIN PUBLIC KEY-----
+MFwwDQYJKoZIhvcNAQEBBQADSwAwSAJBALP2oJDAziQ0u1HX7m9s6GGGXY145oxB
+lQCkNI3DbI88fFIs2WXXs8qvQm/2tWfHqTxZtCj11jvw632jv6SXTdMCAwEAAQ==
+-----END PUBLIC KEY-----
+PEM;
+
+        $runtime = new Runtime();
+        $signFn = new \PHPCompiler\ext\openssl\openssl_sign();
+        $signFrame = $signFn->getFrame($runtime->vmContext);
+        $dataVar = new \PHPCompiler\VM\Variable();
+        $dataVar->string('probe');
+        $sigVar = new \PHPCompiler\VM\Variable();
+        $keyVar = new \PHPCompiler\VM\Variable();
+        $keyVar->string($privateKey);
+        $algoVar = new \PHPCompiler\VM\Variable();
+        $algoVar->int(\PHPCompiler\ext\openssl\OpensslConstants::OPENSSL_ALGO_SHA256);
+        $signFrame->calledArgs = [$dataVar, $sigVar, $keyVar, $algoVar];
+        $signFrame->returnVar = new \PHPCompiler\VM\Variable();
+        $signFn->execute($signFrame);
+        self::assertTrue($signFrame->returnVar->toBool());
+        self::assertSame(\PHPCompiler\VM\Variable::TYPE_STRING, $sigVar->type);
+
+        $verifyFn = new \PHPCompiler\ext\openssl\openssl_verify();
+        $verifyFrame = $verifyFn->getFrame($runtime->vmContext);
+        $pubVar = new \PHPCompiler\VM\Variable();
+        $pubVar->string($publicKey);
+        $verifyFrame->calledArgs = [$dataVar, $sigVar, $pubVar, $algoVar];
+        $verifyFrame->returnVar = new \PHPCompiler\VM\Variable();
+        $verifyFn->execute($verifyFrame);
+        self::assertSame(1, $verifyFrame->returnVar->toInt());
     }
 }
