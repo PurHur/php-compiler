@@ -159,6 +159,41 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsHttpLastResponseHeaders());
     }
 
+    public function testSupportsHttpLastResponseHeadersTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsHttpLastResponseHeaders());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsStreamContextSetOptionsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStreamContextSetOptions());
+    }
+
+    public function testSupportsStreamContextSetOptionsTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsPipeOperatorFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsPipeOperator());
