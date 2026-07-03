@@ -1021,7 +1021,7 @@ final class VmDate
 
                     break;
                 case 'T':
-                    $out .= self::timezoneAbbreviation($tzName, $timestamp, $isdst);
+                    $out .= self::timezoneAbbreviation($tzName, $timestamp, $offsetSeconds);
 
                     break;
                 case 'Z':
@@ -1108,13 +1108,36 @@ final class VmDate
         return $sign.self::padInt($hours, 2).':'.self::padInt($minutes, 2);
     }
 
-    private static function timezoneAbbreviation(string $tzName, int $timestamp, int $isdst): string
+    private static function timezoneAbbreviation(string $tzName, int $timestamp, int $offsetSeconds): string
     {
         if ('UTC' === $tzName) {
             return 'UTC';
         }
 
+        if (null !== VmDateTimeNative::parseNumericTimezoneOffset($tzName)) {
+            return self::formatGmtOffsetAbbreviation($offsetSeconds);
+        }
+
+        $abbr = self::libcStrftime('%Z', $timestamp, false);
+        if ('' !== $abbr) {
+            return $abbr;
+        }
+
         return $tzName;
+    }
+
+    /** php-src timelib offset-zone abbreviation (e.g. GMT+0400 for +04:00). */
+    private static function formatGmtOffsetAbbreviation(int $offsetSeconds): string
+    {
+        if (0 === $offsetSeconds) {
+            return 'GMT';
+        }
+        $sign = $offsetSeconds >= 0 ? '+' : '-';
+        $abs = \abs($offsetSeconds);
+        $hours = intdiv($abs, 3600);
+        $minutes = intdiv($abs % 3600, 60);
+
+        return 'GMT'.$sign.self::padInt($hours, 2).self::padInt($minutes, 2);
     }
 
     private static function hour12(int $hour): int
