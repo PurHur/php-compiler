@@ -34,6 +34,7 @@ class Module extends ModuleAbstract
             new mb_check_encoding(),
             new mb_list_encodings(),
             new mb_strlen(),
+            new mb_str_split(),
             new mb_strwidth(),
             new mb_strimwidth(),
             ...(CompilerVersion::supportsMbStrPad() ? [new mb_str_pad()] : []),

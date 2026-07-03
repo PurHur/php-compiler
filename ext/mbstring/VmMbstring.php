@@ -1961,6 +1961,47 @@ final class VmMbstring
     }
 
     /**
+     * mb_str_split() — split string into multibyte chunks (php-src ext/mbstring/mbstring.c; #3299).
+     *
+     * @return list<string>
+     */
+    public static function strSplit(string $string, int $length = 1, string $encoding = 'UTF-8'): array
+    {
+        if ($length <= 0) {
+            throw new \ValueError('mb_str_split(): Argument #2 ($length) must be greater than 0');
+        }
+        self::assertSubstrCountEncoding($encoding, 'mb_str_split');
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return self::strSplitSingleByte($string, $length);
+        }
+        $charLen = VmString::utf8CharLength($string);
+        if (0 === $charLen) {
+            return [];
+        }
+        $result = [];
+        for ($i = 0; $i < $charLen; $i += $length) {
+            $result[] = VmString::utf8CharSubstr($string, $i, min($length, $charLen - $i));
+        }
+
+        return $result;
+    }
+
+    /** @return list<string> */
+    private static function strSplitSingleByte(string $string, int $length): array
+    {
+        $byteLen = VmString::byteLength($string);
+        if (0 === $byteLen) {
+            return [];
+        }
+        $result = [];
+        for ($i = 0; $i < $byteLen; $i += $length) {
+            $result[] = \substr($string, $i, min($length, $byteLen - $i));
+        }
+
+        return $result;
+    }
+
+    /**
      * mb_split() — multibyte regex split (php-src ext/mbstring/php_mbregex.c; #13367).
      *
      * UTF-8 / ASCII via PCRE u-flag; Onig-specific patterns may differ from Zend.
