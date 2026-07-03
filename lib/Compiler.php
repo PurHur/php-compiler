@@ -19424,6 +19424,101 @@ class Compiler {
     }
 
     /**
+     * hold(); in_array(..., ['a','b'], true) — stmt-level UDF then hoisted Array_ prelude only (#15422, #15609).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        $producer = $cfgChildren[$producerIndex] ?? null;
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if ($this->inlineCallArgProducerFeedsConsumer($producer, $consumer)) {
+            return false;
+        }
+        $hasArrayPrelude = false;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\Array_) {
+                $hasArrayPrelude = true;
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                return false;
+            }
+
+            return false;
+        }
+
+        return $hasArrayPrelude;
+    }
+
+    /** Void stmt-level call before hoisted Array_ consumer args — skip EXEC_RETURN slot (#15609). */
+    private function stmtLevelVoidCallBeforeHoistedArrayConsumerPrelude(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        if (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        for ($j = $callIndex + 1; $j < \count($cfgChildren); ++$j) {
+            $next = $cfgChildren[$j] ?? null;
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                $callee = $this->resolveCfgFuncCallName($next);
+                if (!\in_array(strtolower($callee ?? ''), ['in_array', 'array_search', 'array_key_exists'], true)) {
+                    return false;
+                }
+
+                return $this->priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+                    $callIndex,
+                    $j,
+                    $cfgChildren
+                );
+            }
+            if ($next instanceof Op\Expr\Array_
+                || $next instanceof Op\Expr\ConstFetch
+                || $next instanceof Op\Expr\ClassConstFetch
+                || $this->isUnaryInlineSiblingCallArgExpr($next)
+            ) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg `f(g(), h())` — map arg N to the Nth sibling hoisted FuncCall producer (#9463, #10917).
      */
     private function resolveSiblingInlineCallArgProducerSlot(
@@ -26483,6 +26578,12 @@ class Compiler {
         ?Op $cfgCallOp = null
     ): OpCode {
         $line = $startLine > 0 ? $startLine : null;
+        if ($this->stmtLevelVoidCallBeforeHoistedArrayConsumerPrelude($cfgCallOp, $block)) {
+            return new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+                $line
+            );
+        }
         if (
             $this->forceDeferredSiblingCallReturnSlot
             || $this->callNeedsReturnSlot($result, $block, $cfgCallOp)

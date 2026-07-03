@@ -4579,24 +4579,33 @@ PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'in_array_after_udf_array.php');
 
-        $holdReturnSlot = null;
+        $holdExecSlot = null;
         $inArrayHaystackSend = null;
         $fcallOrdinal = 0;
+        $currentFcallSends = [];
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if (3 === \count($currentFcallSends)) {
+                    $inArrayHaystackSend = $currentFcallSends[1];
+                }
                 ++$fcallOrdinal;
+                $currentFcallSends = [];
             }
             if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
-                $holdReturnSlot = $op->arg1;
+                $holdExecSlot = $op->arg1;
             }
-            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $inArrayHaystackSend) {
-                $inArrayHaystackSend = $op->arg1;
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $currentFcallSends[] = $op->arg1;
             }
         }
+        if (3 === \count($currentFcallSends) && null === $inArrayHaystackSend) {
+            $inArrayHaystackSend = $currentFcallSends[1];
+        }
 
-        self::assertNotNull($holdReturnSlot);
-        self::assertNotNull($inArrayHaystackSend);
-        self::assertNotSame($holdReturnSlot, $inArrayHaystackSend, 'haystack must not reuse hold() return slot');
+        self::assertNotNull($inArrayHaystackSend, 'in_array haystack ARG_SEND missing');
+        if (null !== $holdExecSlot) {
+            self::assertNotSame($holdExecSlot, $inArrayHaystackSend, 'haystack must not reuse hold() return slot');
+        }
 
         ob_start();
         $runtime->run($block);
