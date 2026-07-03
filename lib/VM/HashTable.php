@@ -1567,7 +1567,8 @@ final class HashTable {
 
         $num = $this->numElements;
         $newValues = [];
-        for ($i = 0; $i < $offset; ++$i) {
+        $prefixLen = $offset < $num ? $offset : $num;
+        for ($i = 0; $i < $prefixLen; ++$i) {
             $copy = new Variable();
             $copy->copyFrom($values[$i]);
             $newValues[] = $copy;
@@ -1603,7 +1604,8 @@ final class HashTable {
         }
 
         $newPairs = [];
-        for ($i = 0; $i < $offset; ++$i) {
+        $prefixLen = $offset < $num ? $offset : $num;
+        for ($i = 0; $i < $prefixLen; ++$i) {
             $newPairs[] = $this->duplicateKeyedPair($pairs[$i]);
         }
         $replacementCount = null !== $replacement ? $replacement->getNumElements() : 0;
