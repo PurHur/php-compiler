@@ -25,6 +25,8 @@ class Module extends ModuleAbstract
             'SODIUM_CRYPTO_SECRETBOX_KEYBYTES' => VmSodium::CRYPTO_SECRETBOX_KEYBYTES,
             'SODIUM_CRYPTO_SECRETBOX_NONCEBYTES' => VmSodium::CRYPTO_SECRETBOX_NONCEBYTES,
             'SODIUM_CRYPTO_SECRETBOX_MACBYTES' => VmSodium::CRYPTO_SECRETBOX_MACBYTES,
+            'SODIUM_CRYPTO_AUTH_KEYBYTES' => VmSodium::CRYPTO_AUTH_KEYBYTES,
+            'SODIUM_CRYPTO_AUTH_BYTES' => VmSodium::CRYPTO_AUTH_BYTES,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -41,6 +43,8 @@ class Module extends ModuleAbstract
         return [
             new sodium_crypto_secretbox(),
             new sodium_crypto_secretbox_open(),
+            new sodium_crypto_auth(),
+            new sodium_crypto_auth_verify(),
         ];
     }
 }
