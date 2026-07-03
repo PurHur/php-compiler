@@ -212,6 +212,29 @@ echo $hit, "\n";
         );
     }
 
+    /** Issue #15315: throw expr as ?? LHS — php-cfg emits Coalesce then Throw; must not double-lower. */
+    public function testThrowExpressionNullCoalesceLeftOperand(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+class Ex extends Exception {}
+try {
+    $x = throw new Ex("coalesce") ?? 1;
+    echo "fail\n";
+} catch (Ex $e) {
+    echo "ok\n";
+}
+try {
+    $y = (throw new Ex("nested") ?? 2) ?? 3;
+    echo "fail\n";
+} catch (Ex $e) {
+    echo "ok\n";
+}
+',
+            "ok\nok\n"
+        );
+    }
+
     /** Issue #9479: null container dim ?? default in func-call arg must not leave dead temp (#10390 audit). */
     public function testNullCoalesceNullOffsetFuncCallArg(): void
     {
