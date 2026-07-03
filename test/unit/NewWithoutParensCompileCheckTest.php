@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Runtime;
 use PHPUnit\Framework\TestCase;
 
@@ -13,6 +14,9 @@ final class NewWithoutParensCompileCheckTest extends TestCase
 {
     public function testClassConstNewWithoutParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions enabled on 8.3+ forward profile');
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -85,6 +89,9 @@ PHP, 'promoted_new_with_parens.php');
 
     public function testClassConstNewWithParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions enabled on 8.3+ forward profile');
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -98,6 +105,9 @@ PHP);
 
     public function testClassConstNewEmptyArgsWithParensCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions enabled on 8.3+ forward profile');
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {
@@ -108,6 +118,9 @@ PHP);
 
     public function testClassConstArrayWithNewCompileErrors(): void
     {
+        if (CompilerVersion::supportsClassConstObjectExpressions()) {
+            $this->markTestSkipped('class const object expressions enabled on 8.3+ forward profile');
+        }
         $this->expectCompileError(<<<'PHP'
 <?php
 class C {

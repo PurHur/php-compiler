@@ -471,9 +471,10 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'typed_class_const_reference_profile'))) {
                 continue;
             }
-            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123).
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123, #15693).
             if (CompilerVersion::supportsClassConstObjectExpressions()) {
                 if (str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_reject')
                     || str_contains($name, 'class_const_new_expr')
                     || str_contains($name, 'class_const_new_reference_profile')
                     || str_contains($name, 'new_in_class_constant_reject')
