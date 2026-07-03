@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\ext\standard\VmDateInterval;
 use PHPCompiler\Runtime;
+use PHPCompiler\VM\NativeDateMalformedIntervalException;
 use PHPUnit\Framework\TestCase;
 
 /** @covers issue #7278 */
@@ -56,8 +58,32 @@ PHP;
 
     public function testMalformedSpecThrowsException(): void
     {
-        $this->expectException(\Exception::class);
+        if (CompilerVersion::advertisesDateExceptionHierarchy()) {
+            $this->expectException(NativeDateMalformedIntervalException::class);
+        } else {
+            $this->expectException(\Exception::class);
+        }
         $this->expectExceptionMessage('Unknown or bad format (bad)');
         VmDateInterval::parseSpec('bad');
+    }
+
+    public function testVmDateIntervalMalformedSpecThrowsTypedException(): void
+    {
+        if (!CompilerVersion::advertisesDateExceptionHierarchy()) {
+            $this->markTestSkipped('DateMalformedIntervalException requires PHP 8.3+ date hierarchy');
+        }
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+try {
+    new DateInterval('bad');
+    echo "no throw\n";
+} catch (DateMalformedIntervalException $e) {
+    echo $e->getMessage(), "\n";
+}
+PHP;
+        ob_start();
+        $runtime->run($runtime->parseAndCompile($code, 'date_interval_malformed.php'));
+        $this->assertSame("Unknown or bad format (bad)\n", ob_get_clean());
     }
 }
