@@ -857,7 +857,7 @@ class Context {
     }
 
     /** User examples or bootstrap-aot-link: thin standalone main without session/header reset LLVM (#13571, #14459). */
-    private function isThinStandaloneAotMain(): bool
+    public function isThinStandaloneAotMain(): bool
     {
         return $this->isUserScriptAot() || $this->shouldUseBootstrapAotStandaloneBodies();
     }
@@ -888,6 +888,7 @@ class Context {
     {
         Builtin\StringJsonDecode::ensureDeferredStubsForInventoryEmit($this);
         Builtin\StringJsonEncode::ensureDeferredStubsForInventoryEmit($this);
+        Builtin\StringHtmlspecialchars::ensureStandaloneBodies($this);
         ExceptionBridge::ensureStandaloneBodies($this);
         ErrorBridge::ensureStandaloneBodies($this);
         Builtin\StreamLifecycleRuntime::ensureDeferredStubsForInventoryEmit($this);
@@ -1015,7 +1016,7 @@ class Context {
 
         if (Builtin::LOAD_TYPE_STANDALONE === $this->loadType && $this->isThinStandaloneAotMain()) {
             Builtin\CliArgvRuntime::ensureUserScriptMainStubs($this);
-            Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefresh($this);
+            Builtin\SuperglobalRefreshRuntime::ensureUserScriptRefreshEmit($this);
         }
 
         // add main function

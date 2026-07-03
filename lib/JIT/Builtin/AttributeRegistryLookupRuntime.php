@@ -57,6 +57,16 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+            && '{}' === $classNamesJson
+            && '{}' === $methodNamesJson
+            && !self::classEntriesNeedArgsBridge($classEntriesJson)) {
+            self::implementEmptyLookupStubs($context);
+            $context->builder->clearInsertionPosition();
+
+            return;
+        }
+
         self::ensureJitHelperCompiled($context);
         self::implementClassCountBridge($context, $classNamesJson);
         self::implementClassNameAtBridge($context, $classNamesJson);
@@ -64,6 +74,43 @@ final class AttributeRegistryLookupRuntime
         self::implementMethodNameAtBridge($context, $methodNamesJson);
         self::implementClassArgsHashtableBridge($context, $classEntriesJson);
         $context->builder->clearInsertionPosition();
+    }
+
+    /** User-script AOT without compile-time attributes: avoid nested AttributeRegistryJitHelper JIT (#15417). */
+    private static function implementEmptyLookupStubs(Context $context): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $i8p = $context->getTypeFromString('int8*');
+        $zero = $sizeT->constInt(0, false);
+        $nullCstr = $i8p->constNull();
+
+        foreach (
+            [
+                ['__compiler_attr_class_count', $context->context->functionType($sizeT, false, $i8p), $zero],
+                ['__compiler_attr_method_count', $context->context->functionType($sizeT, false, $i8p, $i8p), $zero],
+            ] as [$abiName, $ft, $ret]
+        ) {
+            $fn = $context->module->addFunction($abiName, $ft);
+            $entry = $fn->appendBasicBlock('attr_empty_count');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($ret);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        foreach (
+            [
+                ['__compiler_attr_class_name_at', $context->context->functionType($i8p, false, $i8p, $sizeT)],
+                ['__compiler_attr_method_name_at', $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)],
+            ] as [$abiName, $ft]
+        ) {
+            $fn = $context->module->addFunction($abiName, $ft);
+            $entry = $fn->appendBasicBlock('attr_empty_name_at');
+            $context->builder->positionAtEnd($entry);
+            $context->builder->returnValue($nullCstr);
+            $context->registerFunction($abiName, $fn);
+        }
+
+        self::implementClassArgsHashtableNullBridge($context);
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void

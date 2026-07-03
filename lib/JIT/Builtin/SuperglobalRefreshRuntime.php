@@ -66,14 +66,28 @@ final class SuperglobalRefreshRuntime
         self::implement($context);
     }
 
-    /** User-script standalone: native LLVM refresh without nested JIT during init (#13571, #13717). */
     public static function ensureUserScriptRefresh(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
             return;
         }
-        StringHtmlspecialchars::ensureStandaloneBodies($context);
         SuperglobalRefreshUserScriptLlvm::implement($context);
+    }
+
+    public static function ensureUserScriptRefreshPrerequisites(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        SuperglobalRefreshUserScriptLlvm::ensurePrerequisites($context);
+    }
+
+    public static function ensureUserScriptRefreshEmit(Context $context): void
+    {
+        if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {
+            return;
+        }
+        SuperglobalRefreshUserScriptLlvm::emitRefresh($context);
     }
 
     public static function implement(Context $context): void

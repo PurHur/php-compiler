@@ -31,6 +31,23 @@ final class SuperglobalRefreshUserScriptLlvm
 
     public static function implement(Context $context): void
     {
+        self::ensurePrerequisites($context);
+        self::emitRefresh($context);
+    }
+
+    /** ParseStr/environ/globals before user main LLVM — nested JIT must not run after user lowering (#15417). */
+    public static function ensurePrerequisites(Context $context): void
+    {
+        LibcExtern::register($context);
+        ParseStrRuntime::ensureLinked($context);
+        EnvironMirrorUserScriptLlvm::ensureLinked($context);
+        self::ensureGlobals($context);
+        self::ensureHeaderQueueExternal($context);
+    }
+
+    /** Emit __superglobals__refresh native LLVM once prerequisites are linked (#15417). */
+    public static function emitRefresh(Context $context): void
+    {
         $probe = $context->module->getNamedFunction('__superglobals__refresh');
         if (null !== $probe && $probe->countBasicBlocks() > 0) {
             $context->registerFunction('__superglobals__refresh', $probe);
@@ -39,16 +56,11 @@ final class SuperglobalRefreshUserScriptLlvm
         }
 
         $restore = self::captureInsertBlock($context);
-        LibcExtern::register($context);
-        ParseStrRuntime::ensureLinked($context);
-        EnvironMirrorUserScriptLlvm::ensureLinked($context);
-        self::ensureGlobals($context);
-        self::ensureHeaderQueueExternal($context);
-
+        unset($restore);
         $fn = self::declareRefresh($context);
+        $context->builder->clearInsertionPosition();
         self::emitRefreshMain($context, $fn);
 
-        self::restoreInsertBlock($context, $restore);
         $context->registerFunction('__superglobals__refresh', $fn);
         $context->builder->clearInsertionPosition();
     }
