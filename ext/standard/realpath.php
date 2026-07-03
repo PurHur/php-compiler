@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** realpath() — canonical path when the target exists (VM: VmString; JIT: libc via JitRealpath). */
+/** realpath() — canonical path when the target exists (VM + JIT: VmString via RealpathJitHelper #15323). */
 final class realpath extends Internal
 {
     public function execute(Frame $frame): void
