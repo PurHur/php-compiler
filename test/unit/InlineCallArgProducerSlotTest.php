@@ -2452,6 +2452,20 @@ PHP;
         self::assertStringContainsString("'b' => 20", $out);
     }
 
+    /** Issue #15558 — maintainer_gap repro: assignment form matches var_export probe (#13776). */
+    public function testArrayCombineInlineArrayKeysMaintainerGapRepro(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_combine_inline_array_keys.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_combine_inline_array_keys.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #10214 — array_combine([1, 2], [3]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayCombineSiblingInlineLiteralLengthMismatchRuntime(): void
     {
