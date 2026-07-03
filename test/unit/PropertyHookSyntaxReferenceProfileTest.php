@@ -17,9 +17,9 @@ final class PropertyHookSyntaxReferenceProfileTest extends TestCase
         }
     }
 
-    public function testSupportsPropertyHooksFalseOnReferenceProfile(): void
+    public function testSupportsPropertyHooksTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsPropertyHooks());
+        $this->assertTrue(CompilerVersion::supportsPropertyHooks());
     }
 
     public function testRejectorThrowsOnDefaultInitializerHook(): void
