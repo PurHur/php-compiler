@@ -223,6 +223,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_constant_reference_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionPropertyAccessProbes()
+                && str_contains($name, 'reflection_property_isreadable_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionPropertyAccessProbes()
+                && str_contains($name, 'reflection_property_isreadable_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
