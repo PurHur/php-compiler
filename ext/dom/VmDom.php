@@ -908,11 +908,11 @@ final class VmDom
         $trimmed = trim($xml);
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
-        $elementXml = self::stripDoctype($trimmed);
+        [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
         if (!VmXml::validateAndReport($ctx, $elementXml, $frame)) {
             return false;
         }
-        $root = self::parseElementTree($ctx, $elementXml);
+        $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset);
         if (null === $root) {
             return false;
         }
@@ -1212,11 +1212,41 @@ final class VmDom
 
     private static function stripDoctype(string $xml): string
     {
-        $stripped = preg_replace('/^\s*<\?xml[^?]*\?>\s*/s', '', $xml) ?? $xml;
-        $stripped = preg_replace('/^\s*<!DOCTYPE\s+\S+\s*\[[^\]]*\]\s*>\s*/s', '', $stripped) ?? $stripped;
-        $stripped = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/s', '', $stripped) ?? $stripped;
+        return self::stripDoctypeWithOffset($xml)[0];
+    }
 
-        return trim($stripped);
+    /**
+     * @return array{0: string, 1: int} element XML and byte offset in $xml for line numbers (#15290)
+     */
+    private static function stripDoctypeWithOffset(string $xml): array
+    {
+        $offset = 0;
+        if (preg_match('/^\s*<\?xml[^?]*\?>\s*/s', $xml, $match)) {
+            $offset += \strlen($match[0]);
+            $xml = substr($xml, \strlen($match[0]));
+        }
+        if (preg_match('/^\s*<!DOCTYPE\s+\S+\s*\[[^\]]*\]\s*>\s*/s', $xml, $match)) {
+            $offset += \strlen($match[0]);
+            $xml = substr($xml, \strlen($match[0]));
+        }
+        if (preg_match('/^\s*<!DOCTYPE[^>]*>\s*/s', $xml, $match)) {
+            $offset += \strlen($match[0]);
+            $xml = substr($xml, \strlen($match[0]));
+        }
+        $leading = \strlen($xml) - \strlen(ltrim($xml));
+        $offset += $leading;
+        $xml = ltrim($xml);
+
+        return [rtrim($xml), $offset];
+    }
+
+    private static function lineNoAtOffset(string $sourceXml, int $offset): int
+    {
+        if ($offset <= 0) {
+            return 1;
+        }
+
+        return substr_count(substr($sourceXml, 0, $offset), "\n") + 1;
     }
 
     /**
@@ -1861,12 +1891,17 @@ final class VmDom
         return $var;
     }
 
-    private static function parseElementTree(Context $ctx, string $elementXml): ?ObjectEntry
-    {
+    private static function parseElementTree(
+        Context $ctx,
+        string $elementXml,
+        string $sourceXml,
+        int $baseOffset
+    ): ?ObjectEntry {
         $trimmed = trim($elementXml);
         if (preg_match('/^<([A-Za-z_][\w:.-]*)(\s[^>]*)?\/>$/s', $trimmed, $selfClose)) {
             $entry = self::createElement($ctx, $selfClose[1])->toObject();
             $state = DomRegistry::state($entry);
+            $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
             $state->attributes = self::parseAttributes($selfClose[2] ?? '');
             self::applyQualifiedElementNames($state, $selfClose[1]);
             $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
@@ -1879,9 +1914,12 @@ final class VmDom
 
         $entry = self::createElement($ctx, $matches[1])->toObject();
         $state = DomRegistry::state($entry);
+        $state->lineNo = self::lineNoAtOffset($sourceXml, $baseOffset);
         $state->attributes = self::parseAttributes($matches[2] ?? '');
         self::applyQualifiedElementNames($state, $matches[1]);
         $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
+        $openTag = '<'.$matches[1].($matches[2] ?? '').'>';
+        $innerBase = $baseOffset + \strlen($openTag);
         $pos = 0;
         $inner = $matches[3];
         $len = \strlen($inner);
@@ -1905,7 +1943,7 @@ final class VmDom
                 return null;
             }
             $childXml = substr($inner, $pos, $end - $pos);
-            $child = self::parseElementTree($ctx, $childXml);
+            $child = self::parseElementTree($ctx, $childXml, $sourceXml, $innerBase + $pos);
             if (null === $child) {
                 return null;
             }
