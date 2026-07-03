@@ -1,5 +1,5 @@
 --TEST--
-JIT: link() via libc linkat(2) (issue #3589)
+JIT: link() via LinkJitHelper PHP (#15544)
 --SKIPIF--
 <?php if (!function_exists('link')) { die('skip hard links unavailable'); } ?>
 --FILE--

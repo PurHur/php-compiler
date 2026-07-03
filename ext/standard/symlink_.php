@@ -12,7 +12,7 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\InternalStrictArg;
 use PHPLLVM\Value;
 
-/** symlink() — VM via VmFs; JIT/AOT via libc symlinkat(2) (issue #3227). */
+/** symlink() — VM via VmFs; JIT/AOT via SymlinkJitHelper PHP (#15544). */
 final class symlink_ extends Internal
 {
     public function __construct()
