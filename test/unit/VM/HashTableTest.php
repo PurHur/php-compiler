@@ -236,6 +236,25 @@ class HashTableTest extends TestCase
         $this->assertSame('x', $key->toString());
     }
 
+    /** Issue #9534 — PHP_INT_MAX index must not overflow nextFreeElement (php-src zend_ulong). */
+    public function testAddIndexAtPhpIntMaxDoesNotOverflowNextFreeElement(): void
+    {
+        $ht = new HashTable();
+        $value = $this->int(1);
+        $ht->addIndex(\PHP_INT_MAX, $value);
+
+        $found = $ht->findIndex(\PHP_INT_MAX);
+        $this->assertNotNull($found);
+        $this->assertTrue($found->identicalTo($value));
+
+        $appended = new Variable();
+        $appended->string('tail');
+        $ht->append($appended);
+        $atZero = $ht->findIndex(0);
+        $this->assertNotNull($atZero);
+        $this->assertSame('tail', $atZero->toString());
+    }
+
     private function int(int $value): Variable
     {
         $var = new Variable();
