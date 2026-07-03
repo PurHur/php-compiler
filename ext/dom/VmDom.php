@@ -1680,12 +1680,14 @@ final class VmDom
             throw new \LogicException('DOMDocument::saveXML() called on non-document node in this compiler build');
         }
 
+        $formatOutput = self::documentFormatOutput($document);
+
         if (null !== $node) {
             if (!self::isDomNode($node)) {
                 throw new \TypeError('DOMDocument::saveXML(): Argument #1 ($node) must be of type DOMNode');
             }
 
-            return self::serializeNode($node);
+            return self::serializeNode($node, 0, $formatOutput);
         }
 
         $lines = [self::serializeXmlDeclaration($state)];
@@ -1700,12 +1702,17 @@ final class VmDom
 
         $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
         if (Variable::TYPE_OBJECT === $rootVar->type) {
-            $lines[] = self::serializeElement($rootVar->toObject());
+            $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput);
         } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
             $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
         }
 
         return implode("\n", $lines)."\n";
+    }
+
+    private static function documentFormatOutput(ObjectEntry $document): bool
+    {
+        return $document->getProperty(self::PROP_FORMAT_OUTPUT)->resolveIndirect()->toBool();
     }
 
     public static function loadHTML(Context $ctx, ObjectEntry $document, string $html, int $options = 0): bool
@@ -2075,35 +2082,56 @@ final class VmDom
         return null;
     }
 
-    private static function serializeNode(ObjectEntry $entry): string
+    private static function serializeNode(ObjectEntry $entry, int $depth = 0, bool $format = false): string
     {
         if (self::isElement($entry)) {
-            return self::serializeElement($entry);
+            return self::serializeElement($entry, $depth, $format);
         }
         if (self::isTextNode($entry)) {
-            return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+            $text = self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+            if (!$format || '' === $text) {
+                return $text;
+            }
+
+            return str_repeat('  ', $depth).$text;
         }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
 
-    private static function serializeElement(ObjectEntry $entry): string
+    private static function serializeElement(ObjectEntry $entry, int $depth = 0, bool $format = false): string
     {
         $state = DomRegistry::state($entry);
         $name = self::escapeName($state->nodeName);
         $attrPart = self::serializeAttributes($state);
         if ([] === $state->childIds) {
-            return '<'.$name.$attrPart.'/>';
+            $tag = '<'.$name.$attrPart.'/>';
+
+            return $format ? str_repeat('  ', $depth).$tag : $tag;
         }
-        $parts = [];
+        if (!$format) {
+            $parts = [];
+            foreach ($state->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    $parts[] = self::serializeNode($child);
+                }
+            }
+
+            return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+        }
+
+        $indent = str_repeat('  ', $depth);
+        $lines = [$indent.'<'.$name.$attrPart.'>'];
         foreach ($state->childIds as $childId) {
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
-                $parts[] = self::serializeNode($child);
+                $lines[] = self::serializeNode($child, $depth + 1, true);
             }
         }
+        $lines[] = $indent.'</'.$name.'>';
 
-        return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+        return implode("\n", $lines);
     }
 
     /** @return non-empty-string */
