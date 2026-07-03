@@ -1,5 +1,5 @@
 --TEST--
-stdlib DOMNode::before()/after()/replaceWith()/remove() (#15345, ext/dom/php_dom.c)
+stdlib DOMNode::before()/after()/replaceWith()/remove() (#15345, #15397, #15398, ext/dom/php_dom.c)
 --FILE--
 <?php
 $doc = new DOMDocument();
@@ -20,9 +20,28 @@ $b->replaceWith($repl);
 echo $doc->saveXML($root), "\n";
 $repl->remove();
 echo $doc->saveXML($root), "\n";
+
+$p = $doc->createElement('p');
+$doc2 = new DOMDocument();
+$doc2->appendChild($p);
+$span = $doc2->createElement('span');
+$p->after($span);
+echo preg_replace('/\s+/', '', $doc2->saveXML()), "\n";
+$frag = $doc2->createDocumentFragment();
+$frag->appendChild($doc2->createElement('a'));
+$p->after($frag);
+echo preg_replace('/\s+/', '', $doc2->saveXML()), "\n";
+$names = [];
+foreach ($doc2->childNodes as $n) {
+    $names[] = $n->nodeName;
+}
+echo implode(',', $names), "\n";
 ?>
 --EXPECT--
 <root><a/><before/><b/></root>
 <root><a/><before/><b/><after/></root>
 <root><a/><before/><replace/><after/></root>
 <root><a/><before/><after/></root>
+<?xmlversion="1.0"?><p/><span/>
+<?xmlversion="1.0"?><p/><a/><span/>
+p,a,span
