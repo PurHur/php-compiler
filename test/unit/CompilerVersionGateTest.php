@@ -411,6 +411,42 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($ctx->functions['stream_context_get_options']));
     }
 
+    public function testSupportsStreamContextSetOptionsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsStreamContextSetOptions());
+    }
+
+    public function testSupportsStreamContextSetOptionsTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamContextSetOptions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersStreamContextSetOptionsOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['stream_context_set_options']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterClassConstantsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
