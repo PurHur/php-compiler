@@ -36,6 +36,14 @@ class Module extends ModuleAbstract
             'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NPUBBYTES,
             'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NSECRETBYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_NSECRETBYTES,
             'SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES' => VmSodium::CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES,
+            'SODIUM_CRYPTO_GENERICHASH_BYTES' => VmSodium::CRYPTO_GENERICHASH_BYTES,
+            'SODIUM_CRYPTO_GENERICHASH_BYTES_MIN' => VmSodium::CRYPTO_GENERICHASH_BYTES_MIN,
+            'SODIUM_CRYPTO_GENERICHASH_BYTES_MAX' => VmSodium::CRYPTO_GENERICHASH_BYTES_MAX,
+            'SODIUM_CRYPTO_GENERICHASH_KEYBYTES' => VmSodium::CRYPTO_GENERICHASH_KEYBYTES,
+            'SODIUM_CRYPTO_GENERICHASH_KEYBYTES_MIN' => VmSodium::CRYPTO_GENERICHASH_KEYBYTES_MIN,
+            'SODIUM_CRYPTO_GENERICHASH_KEYBYTES_MAX' => VmSodium::CRYPTO_GENERICHASH_KEYBYTES_MAX,
+            'SODIUM_CRYPTO_SCALARMULT_BYTES' => VmSodium::CRYPTO_SCALARMULT_BYTES,
+            'SODIUM_CRYPTO_SCALARMULT_SCALARBYTES' => VmSodium::CRYPTO_SCALARMULT_SCALARBYTES,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -64,6 +72,11 @@ class Module extends ModuleAbstract
             new sodium_crypto_stream_xchacha20_keygen(),
             new sodium_crypto_aead_xchacha20poly1305_ietf_encrypt(),
             new sodium_crypto_aead_xchacha20poly1305_ietf_decrypt(),
+            new sodium_pad(),
+            new sodium_unpad(),
+            new sodium_crypto_generichash(),
+            new sodium_crypto_scalarmult(),
+            new sodium_crypto_scalarmult_base(),
         ];
     }
 }

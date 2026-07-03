@@ -37,6 +37,22 @@ final class VmSodium
 
     public const CRYPTO_AEAD_XCHACHA20POLY1305_IETF_ABYTES = 16;
 
+    public const CRYPTO_GENERICHASH_BYTES = 32;
+
+    public const CRYPTO_GENERICHASH_BYTES_MIN = 16;
+
+    public const CRYPTO_GENERICHASH_BYTES_MAX = 64;
+
+    public const CRYPTO_GENERICHASH_KEYBYTES = 32;
+
+    public const CRYPTO_GENERICHASH_KEYBYTES_MIN = 16;
+
+    public const CRYPTO_GENERICHASH_KEYBYTES_MAX = 32;
+
+    public const CRYPTO_SCALARMULT_BYTES = 32;
+
+    public const CRYPTO_SCALARMULT_SCALARBYTES = 32;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -47,7 +63,94 @@ final class VmSodium
             || \function_exists('sodium_crypto_auth')
             || \function_exists('sodium_crypto_stream')
             || \function_exists('sodium_crypto_aead_xchacha20poly1305_ietf_encrypt')
+            || \function_exists('sodium_pad')
+            || \function_exists('sodium_crypto_generichash')
+            || \function_exists('sodium_crypto_scalarmult')
             || null !== self::ffi();
+    }
+
+    public static function pad(string $string, int $blockSize): string
+    {
+        if ($blockSize <= 0) {
+            self::throwSodium(\sprintf(
+                'sodium_pad(): Argument #2 ($block_size) must be greater than 0'
+            ));
+        }
+        if (\function_exists('sodium_pad')) {
+            return \sodium_pad($string, $blockSize);
+        }
+
+        return self::ffiPad($string, $blockSize);
+    }
+
+    public static function unpad(string $string, int $blockSize): string
+    {
+        if ($blockSize <= 0) {
+            self::throwSodium(\sprintf(
+                'sodium_unpad(): Argument #2 ($block_size) must be greater than 0'
+            ));
+        }
+        if (\strlen($string) < $blockSize) {
+            self::throwSodium(
+                'sodium_unpad(): Argument #1 ($string) must be at least as long as the block size'
+            );
+        }
+        if (\function_exists('sodium_unpad')) {
+            return \sodium_unpad($string, $blockSize);
+        }
+
+        return self::ffiUnpad($string, $blockSize);
+    }
+
+    public static function generichash(string $message, string $key = '', int $length = self::CRYPTO_GENERICHASH_BYTES): string
+    {
+        if ($length < self::CRYPTO_GENERICHASH_BYTES_MIN || $length > self::CRYPTO_GENERICHASH_BYTES_MAX) {
+            self::throwSodium('unsupported output length');
+        }
+        $keyLen = \strlen($key);
+        if (0 !== $keyLen
+            && ($keyLen < self::CRYPTO_GENERICHASH_KEYBYTES_MIN || $keyLen > self::CRYPTO_GENERICHASH_KEYBYTES_MAX)
+        ) {
+            self::throwSodium('unsupported key length');
+        }
+        if (\function_exists('sodium_crypto_generichash')) {
+            return \sodium_crypto_generichash($message, $key, $length);
+        }
+
+        return self::ffiGenerichash($message, $key, $length);
+    }
+
+    public static function scalarmult(string $n, string $p): string
+    {
+        if (\strlen($n) !== self::CRYPTO_SCALARMULT_SCALARBYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult(): Argument #1 ($n) must be SODIUM_CRYPTO_SCALARMULT_SCALARBYTES bytes long'
+            );
+        }
+        if (\strlen($p) !== self::CRYPTO_SCALARMULT_BYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult(): Argument #2 ($p) must be SODIUM_CRYPTO_SCALARMULT_BYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_scalarmult')) {
+            return \sodium_crypto_scalarmult($n, $p);
+        }
+
+        return self::ffiScalarmult($n, $p);
+    }
+
+    public static function scalarmultBase(string $n): string
+    {
+        if (\strlen($n) !== self::CRYPTO_SCALARMULT_SCALARBYTES) {
+            self::throwSodium(
+                'sodium_crypto_scalarmult_base(): Argument #1 ($secret_key) must be SODIUM_CRYPTO_SCALARMULT_SCALARBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_scalarmult_base')) {
+            return \sodium_crypto_scalarmult_base($n);
+        }
+
+        return self::ffiScalarmultBase($n);
     }
 
     public static function stream(int $length, string $nonce, string $key): string
@@ -288,6 +391,82 @@ final class VmSodium
         $s2 = self::stringToUnsignedCharArray($ffi, $string2);
 
         return $ffi->sodium_memcmp($s1, $s2, $len);
+    }
+
+    private static function ffiPad(string $string, int $blockSize): string
+    {
+        $ffi = self::requireFfi();
+        $unpaddedLen = \strlen($string);
+        $bufLen = $unpaddedLen + $blockSize;
+        $buf = $ffi->new('unsigned char['.$bufLen.']');
+        for ($i = 0; $i < $unpaddedLen; ++$i) {
+            $buf[$i] = \ord($string[$i]);
+        }
+        $paddedLenOut = $ffi->new('size_t');
+        $paddedLenOut->cdata = $unpaddedLen;
+        $rc = $ffi->sodium_pad($paddedLenOut, $buf, $unpaddedLen, $blockSize);
+        if (0 !== $rc) {
+            self::throwSodium('input is too large');
+        }
+
+        return self::unsignedCharArrayToString($buf, (int) $paddedLenOut->cdata);
+    }
+
+    private static function ffiUnpad(string $string, int $blockSize): string
+    {
+        $ffi = self::requireFfi();
+        $paddedLen = \strlen($string);
+        $buf = self::stringToUnsignedCharArray($ffi, $string);
+        $unpaddedLenOut = $ffi->new('size_t');
+        $rc = $ffi->sodium_unpad($unpaddedLenOut, $buf, $paddedLen, $blockSize);
+        if (0 !== $rc) {
+            self::throwSodium('sodium_unpad(): padding is invalid');
+        }
+
+        return self::unsignedCharArrayToString($buf, (int) $unpaddedLenOut->cdata);
+    }
+
+    private static function ffiGenerichash(string $message, string $key, int $length): string
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $keyLen = \strlen($key);
+        $outBuf = $ffi->new('unsigned char['.$length.']');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $kBuf = 0 === $keyLen ? $ffi->new('unsigned char[1]') : self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_generichash($outBuf, $length, $mBuf, $mlen, $kBuf, $keyLen);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($outBuf, $length);
+    }
+
+    private static function ffiScalarmult(string $n, string $p): string
+    {
+        $ffi = self::requireFfi();
+        $qBuf = $ffi->new('unsigned char['.self::CRYPTO_SCALARMULT_BYTES.']');
+        $nBuf = self::stringToUnsignedCharArray($ffi, $n);
+        $pBuf = self::stringToUnsignedCharArray($ffi, $p);
+        $rc = $ffi->crypto_scalarmult($qBuf, $nBuf, $pBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($qBuf, self::CRYPTO_SCALARMULT_BYTES);
+    }
+
+    private static function ffiScalarmultBase(string $n): string
+    {
+        $ffi = self::requireFfi();
+        $qBuf = $ffi->new('unsigned char['.self::CRYPTO_SCALARMULT_BYTES.']');
+        $nBuf = self::stringToUnsignedCharArray($ffi, $n);
+        $rc = $ffi->crypto_scalarmult_base($qBuf, $nBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($qBuf, self::CRYPTO_SCALARMULT_BYTES);
     }
 
     private static function ffiStream(int $length, string $nonce, string $key): string
@@ -601,7 +780,12 @@ final class VmSodium
                     int crypto_stream_xchacha20_xor_ic(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *n, const unsigned char k[32], unsigned long long ic);
                     int crypto_aead_xchacha20poly1305_ietf_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
                     int crypto_aead_xchacha20poly1305_ietf_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
-                    int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);',
+                    int sodium_memcmp(const unsigned char *s1, const unsigned char *s2, size_t len);
+                    int sodium_pad(size_t *unpadded_buf_len_p, unsigned char *buf, size_t unpadded_buf_len, size_t blocksize);
+                    int sodium_unpad(size_t *unpadded_buf_len_p, const unsigned char *buf, size_t padded_buf_len, size_t blocksize);
+                    int crypto_generichash(unsigned char *out, size_t outlen, const unsigned char *in, unsigned long long inlen, const unsigned char *key, size_t keylen);
+                    int crypto_scalarmult(unsigned char *q, const unsigned char *n, const unsigned char *p);
+                    int crypto_scalarmult_base(unsigned char *q, const unsigned char *n);',
                     $lib
                 );
                 $ffi->sodium_init();
