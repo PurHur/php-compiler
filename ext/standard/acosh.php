@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAcosh;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class acosh extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\acosh($num));
+        $frame->returnVar->float(VmMath::acosh($num));
     }
 
     public Context $context;
@@ -48,8 +49,7 @@ final class acosh extends Internal
             throw new \LogicException('acosh() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'acosh', 'float');
-        $fn = $context->lookupFunction('acosh');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathAcosh::invoke($context, $asFloat);
     }
 }

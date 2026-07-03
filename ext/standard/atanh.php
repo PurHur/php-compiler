@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Builtin\MathAtanh;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
@@ -36,7 +37,7 @@ final class atanh extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->float(\atanh($num));
+        $frame->returnVar->float(VmMath::atanh($num));
     }
 
     public Context $context;
@@ -48,8 +49,7 @@ final class atanh extends Internal
             throw new \LogicException('atanh() requires exactly one argument');
         }
         $asFloat = JitFdiv::lowerSingleOperand($context, $args[0], 1, 'num', 'atanh', 'float');
-        $fn = $context->lookupFunction('atanh');
 
-        return $context->builder->call($fn, $asFloat);
+        return MathAtanh::invoke($context, $asFloat);
     }
 }
