@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -158,6 +159,7 @@ final class JitClassUses
         }
 
         $i32 = $context->getTypeFromString('int32');
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $strcasecmpFn = $context->lookupFunction('strcasecmp');
         $nameData = JitClassExists::stringDataPtr($context, $nameStr);
 

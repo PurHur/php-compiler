@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\Type\Object_ as ObjectBuiltin;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -213,6 +214,7 @@ final class JitGetClassMethods
         /** @var list<array{0: \PHPLLVM\BasicBlock, 1: Value}> $incoming */
         $incoming = [];
 
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $nameData = JitClassExists::stringDataPtr($context, $nameStr);
         $strcasecmpFn = $context->lookupFunction('strcasecmp');
         $i32 = $context->getTypeFromString('int32');

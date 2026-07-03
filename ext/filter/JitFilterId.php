@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\filter;
 
 use PHPCompiler\ext\standard\JitClassExists;
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\JitStringBuiltinArg;
@@ -51,6 +52,7 @@ final class JitFilterId
 
     private static function lookupRuntime(Context $context, Value $nameData): Value
     {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
         $strcasecmpFn = $context->lookupFunction('strcasecmp');

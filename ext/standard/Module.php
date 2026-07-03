@@ -13,6 +13,7 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\StringStrpbrk;
 use PHPCompiler\ModuleAbstract;
 use PHPCompiler\Runtime;
@@ -1002,25 +1003,8 @@ class Module extends ModuleAbstract
             $fn = $context->module->addFunction('strncmp', $ft);
             $context->registerFunction('strncmp', $fn);
         }
-        try {
-            $context->lookupFunction('strcasecmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcasecmp', $ft);
-            $context->registerFunction('strcasecmp', $fn);
-        }
-        try {
-            $context->lookupFunction('strncasecmp');
-        } catch (\Throwable $e) {
-            $i8p = $context->getTypeFromString('int8*');
-            $sizeT = $context->getTypeFromString('size_t');
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p, $sizeT);
-            $fn = $context->module->addFunction('strncasecmp', $ft);
-            $context->registerFunction('strncasecmp', $fn);
-        }
+        StringCaseCompare::ensureStrcasecmpLinked($context);
+        StringCaseCompare::ensureStrncasecmpLinked($context);
         try {
             $context->lookupFunction('substr_compare');
         } catch (\Throwable $e) {

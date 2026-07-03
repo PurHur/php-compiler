@@ -24,5 +24,12 @@ final class ClassConstFetchRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('ensureStrCaseCmp', $source);
         $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
     }
+
+    public function testClassConstFetchHelperRoutesStrcasecmpThroughCaseCompare(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/ClassConstFetchHelper.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
+        $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
+    }
 }
 

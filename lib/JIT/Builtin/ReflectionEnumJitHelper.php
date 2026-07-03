@@ -238,6 +238,7 @@ final class ReflectionEnumJitHelper
             return;
         }
 
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $nameData = self::stringDataPtr($context, $enumNameStr);
         $strcasecmpFn = $context->lookupFunction('strcasecmp');
         $i32 = $context->getTypeFromString('int32');

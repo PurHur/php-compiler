@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\HashTableHelper;
@@ -176,6 +177,7 @@ final class JitIniGetAll
 
     private static function emitStringEqualsCi(Context $context, Value $str, string $literal): Value
     {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $strMap = $context->structFieldMap['__string__'];
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

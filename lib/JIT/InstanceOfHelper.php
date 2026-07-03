@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\JIT;
 
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\VM\InstanceOfClassName;
 use PHPCompiler\VM\InstanceOfJitHelper;
 use PHPCfg\Operand;
@@ -157,7 +158,7 @@ final class InstanceOfHelper
 
     private static function emitWithClassNameString(Context $context, Variable $expr, Value $classNameStr): Variable
     {
-        self::ensureStrcasecmp($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $objectType = $context->type->object;
         $i1 = $context->getTypeFromString('int1');
         $acc = $i1->constInt(0, false);
@@ -207,19 +208,6 @@ final class InstanceOfHelper
         ErrorRaise::ensureLinked($context);
         ErrorRaise::emitRaise($context, self::ERROR_MESSAGE);
         $context->builder->call($context->lookupFunction('abort'));
-    }
-
-    private static function ensureStrcasecmp(Context $context): void
-    {
-        try {
-            $context->lookupFunction('strcasecmp');
-        } catch (\Throwable) {
-            $i32 = $context->getTypeFromString('int32');
-            $i8p = $context->getTypeFromString('int8')->pointer();
-            $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-            $fn = $context->module->addFunction('strcasecmp', $ft);
-            $context->registerFunction('strcasecmp', $fn);
-        }
     }
 
     private static function ensureValueBoxBridgeLinked(Context $context): void

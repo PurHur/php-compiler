@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\BasicBlockHelper;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
@@ -224,6 +225,7 @@ final class JitMethodExists
         int $classId,
         Value $methodStr
     ): Value {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $exists = $i1->constInt(0, false);
         $object = $context->type->object;
@@ -248,6 +250,7 @@ final class JitMethodExists
         Value $methodStr,
         bool $walkInheritance
     ): Value {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $exists = $i1->constInt(0, false);
         $object = $context->type->object;

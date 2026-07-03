@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\ReflectionBuiltinHelper;
@@ -23,6 +24,7 @@ final class JitTraitExists
         }
 
         $nameStr = JitStringArg::lower($context, $nameArg, 'trait_exists() trait name');
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $i32 = $context->getTypeFromString('int32');
         $exists = $i1->constInt(0, false);
