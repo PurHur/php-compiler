@@ -106,6 +106,7 @@ bootstrap_gen0_sidecar_blob_for_entry() {
     */test/selfhost/compiler_helloworld_smoke/compile_driver.php) rel='build/.m3_compile_driver_aot_blob' ;;
     */test/selfhost/compiler_helloworld_smoke/main.php) rel='build/.m3_helloworld_smoke_main_aot_blob' ;;
     */test/selfhost/bootstrap_loop_smoke/main.php) rel='build/.m3_bootstrap_loop_smoke_main_aot_blob' ;;
+    */test/selfhost/changed_sources_smoke/main.php) rel='build/.m3_changed_sources_smoke_aot_blob' ;;
     */bin/compile.php) rel='build/.m3_bin_compile_aot_blob' ;;
     *) return 1 ;;
   esac

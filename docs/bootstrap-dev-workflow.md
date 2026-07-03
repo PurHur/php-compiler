@@ -112,6 +112,28 @@ After Tier 0 setup, use the **inventory argv driver** for compile work (gen-2 in
 - `vendor/bin/phpunit` (full test matrix)
 - `composer install` / `script/apply-patches.sh`
 
+### Gen-N compiles changed sources ([#15598](https://github.com/PurHur/php-compiler/issues/15598))
+
+After editing `lib/` or spine entry files, gen-2 must compile the **working tree** — gen-3 must reflect the edit, not copy stale `prelinked/bootstrap-gen0/` bytes ([#8710](https://github.com/PurHur/php-compiler/issues/8710)).
+
+```bash
+# 1. Edit lib/ or test/selfhost/compiler_lib_spine_smoke/main.php
+vim lib/Compiler.php
+
+# 2. Recompile with gen-2 inventory argv driver
+./build/bin-compile-aot-inventory -o build/my-gen3 \
+  test/selfhost/compiler_lib_spine_smoke/main.php
+
+# 3. Run gen-3 smoke — output must match your edit
+./build/my-gen3
+
+# Guard: probe fails when gen-3 byte-matches stale prelinked gen-0
+make bootstrap-changed-sources-probe
+# or: ./script/bootstrap-changed-sources-probe.sh
+```
+
+The probe temporarily patches `examples/000-HelloWorld/example.php` and appends a comment to `lib/OpCode.php`, recompiles via gen-2 (Zend fallback when native sidecar masks edits), and asserts gen-3 output hash and runtime marker both change. Full `lib/Compiler.php` / spine edits follow the same workflow above. Set `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` only for intentional stamp-only PRs.
+
 ---
 
 ## Before merge (Tier 2)
@@ -250,7 +272,7 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 | # | Issue | Theme |
 |---|-------|--------|
 | 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
-| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **starter landed:** `make bootstrap-changed-tree-probe` (fixture-only; lib/ incremental not wired) |
+| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **landed:** `make bootstrap-changed-sources-probe` (also `bootstrap-changed-tree-probe` fixture scaffold) |
 | 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) |
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
@@ -281,9 +303,9 @@ make bootstrap-sdk-pack
 BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
 ./script/bootstrap-loop-probe.sh --honest-compile
 
-# Changed-source probe — fixture sentinel only until full lib/ tree (#15598)
-make bootstrap-changed-tree-probe
-./script/bootstrap-changed-tree-probe.sh
+# Changed-sources guard — gen-2 must emit working-tree edits (#15598)
+make bootstrap-changed-sources-probe
+# Fixture-only scaffold (legacy): make bootstrap-changed-tree-probe
 ```
 
 ---
