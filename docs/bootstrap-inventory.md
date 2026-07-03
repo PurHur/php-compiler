@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3865 |
-| Phase A inventory files (M2 ratio SSOT) | 3865 |
+| PHP files on vm.php path | 3882 |
+| Phase A inventory files (M2 ratio SSOT) | 3882 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10402 |
+| Source constructs flagged (warnings) | 10447 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -431,17 +431,32 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/sockets/socket_atmark.php` | 0 | 3 |
 | `ext/sockets/socket_import_stream.php` | 0 | 3 |
 | `ext/sodium/JitSodium.php` | 0 | 1 |
-| `ext/sodium/Module.php` | 0 | 6 |
+| `ext/sodium/Module.php` | 0 | 15 |
+| `ext/sodium/SodiumAeadDecryptFunction.php` | 0 | 3 |
+| `ext/sodium/SodiumAeadEncryptFunction.php` | 0 | 3 |
 | `ext/sodium/SodiumAuthFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumAuthVerifyFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumExtensionPolicy.php` | 0 | 1 |
 | `ext/sodium/SodiumFunction.php` | 0 | 4 |
 | `ext/sodium/SodiumJitHelper.php` | 0 | 1 |
-| `ext/sodium/VmSodium.php` | 0 | 9 |
+| `ext/sodium/SodiumKeygenFunction.php` | 0 | 3 |
+| `ext/sodium/SodiumStreamLengthFunction.php` | 0 | 3 |
+| `ext/sodium/SodiumStreamXorFunction.php` | 0 | 4 |
+| `ext/sodium/SodiumStreamXorIcFunction.php` | 0 | 3 |
+| `ext/sodium/VmSodium.php` | 0 | 15 |
+| `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_auth.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_auth_verify.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox.php` | 0 | 1 |
 | `ext/sodium/sodium_crypto_secretbox_open.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_keygen.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_xchacha20.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_xchacha20_keygen.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_xchacha20_xor.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php` | 0 | 1 |
+| `ext/sodium/sodium_crypto_stream_xor.php` | 0 | 1 |
 | `ext/spl/AppendIteratorBuiltin.php` | 0 | 4 |
 | `ext/spl/ArrayIteratorBuiltin.php` | 0 | 26 |
 | `ext/spl/ArrayObjectBuiltin.php` | 0 | 25 |
@@ -1174,6 +1189,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ReadlinkJitHelper.php` | 0 | 1 |
 | `ext/standard/ReadonlyRaiseJitHelper.php` | 0 | 1 |
 | `ext/standard/RealpathJitHelper.php` | 0 | 1 |
+| `ext/standard/RenameJitHelper.php` | 0 | 1 |
 | `ext/standard/RequestMethodEnumData.php` | 0 | 1 |
 | `ext/standard/ResolveSidecarJitHelper.php` | 0 | 1 |
 | `ext/standard/ReturnPendingJitHelper.php` | 0 | 1 |
@@ -2962,6 +2978,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringReadfile.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringReadlink.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRealpath.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringRename.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringRmdir.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSerialize.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringSimilarText.php` | 0 | 2 |
@@ -6598,17 +6615,40 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/JitSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- 3 class method(s)
+- 4 class method(s)
 
 ### `ext/sodium/Module.php`
 
 **Warnings** (review for bootstrap subset):
-- new VM\Variable (line 31)
-- new sodium_crypto_secretbox (line 44)
-- new sodium_crypto_secretbox_open (line 45)
-- new sodium_crypto_auth (line 46)
-- new sodium_crypto_auth_verify (line 47)
+- new VM\Variable (line 39)
+- new sodium_crypto_secretbox (line 52)
+- new sodium_crypto_secretbox_open (line 53)
+- new sodium_crypto_auth (line 54)
+- new sodium_crypto_auth_verify (line 55)
+- new sodium_crypto_stream (line 56)
+- new sodium_crypto_stream_xor (line 57)
+- new sodium_crypto_stream_keygen (line 58)
+- new sodium_crypto_stream_xchacha20 (line 59)
+- new sodium_crypto_stream_xchacha20_xor (line 60)
+- new sodium_crypto_stream_xchacha20_xor_ic (line 61)
+- new sodium_crypto_stream_xchacha20_keygen (line 62)
+- new sodium_crypto_aead_xchacha20poly1305_ietf_encrypt (line 63)
+- new sodium_crypto_aead_xchacha20poly1305_ietf_decrypt (line 64)
 - 2 class method(s)
+
+### `ext/sodium/SodiumAeadDecryptFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 29)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumAeadEncryptFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 26)
+- 3 class method(s)
+- 1 closure(s)
 
 ### `ext/sodium/SodiumAuthFunction.php`
 
@@ -6642,20 +6682,65 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/sodium/SodiumJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 6 class method(s)
+
+### `ext/sodium/SodiumKeygenFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 25)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumStreamLengthFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 28)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumStreamXorFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- new ArgumentCountError (line 45)
+- 3 class method(s)
+- 1 closure(s)
+
+### `ext/sodium/SodiumStreamXorIcFunction.php`
+
+**Warnings** (review for bootstrap subset):
+- new ArgumentCountError (line 27)
+- 3 class method(s)
+- 1 closure(s)
 
 ### `ext/sodium/VmSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new Exception (line 83)
-- new Exception (line 95)
-- new Exception (line 104)
-- new Exception (line 120)
-- new Exception (line 146)
-- new Exception (line 149)
-- new SodiumException (line 167)
-- new Exception (line 169)
-- 16 class method(s)
+- new Exception (line 209)
+- new Exception (line 221)
+- new Exception (line 230)
+- new Exception (line 246)
+- new Exception (line 278)
+- new Exception (line 295)
+- new Exception (line 310)
+- new Exception (line 327)
+- new Exception (line 344)
+- new Exception (line 380)
+- new Exception (line 516)
+- new Exception (line 519)
+- new SodiumException (line 537)
+- new Exception (line 539)
+- 37 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
 
 ### `ext/sodium/sodium_crypto_auth.php`
 
@@ -6673,6 +6758,41 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/sodium/sodium_crypto_secretbox_open.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_xchacha20.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_xchacha20_keygen.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_xchacha20_xor.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/sodium/sodium_crypto_stream_xor.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -11747,6 +11867,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 5 class method(s)
 
 ### `ext/standard/RealpathJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/RenameJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -23221,6 +23346,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
 
+### `lib/JIT/Builtin/StringRename.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringRmdir.php`
 
 **Warnings** (review for bootstrap subset):
@@ -23257,7 +23387,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/Builtin/StringSodium.php`
 
 **Warnings** (review for bootstrap subset):
-- new JIT (line 175)
+- new JIT (line 183)
 - 6 class method(s)
 - 1 closure(s)
 
@@ -25650,124 +25780,124 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ClosureState (line 5121)
 - new Variable (line 5144)
 - new Func\PHP (line 5182)
-- new Variable (line 5322)
-- new Variable (line 5331)
-- new GeneratorState (line 5396)
-- new Variable (line 5699)
-- new VM\ClassEntry (line 5811)
-- new ClassEntry (line 5837)
-- new Variable (line 5851)
-- new Variable (line 5854)
-- new ClassEntry (line 5878)
-- new ClassEntry (line 5904)
-- new ObjectEntry (line 6037)
-- new Variable (line 6224)
-- new Variable (line 6243)
-- new Variable (line 6280)
-- new Variable (line 6332)
-- new Variable (line 6598)
-- new WeakMapIterator (line 6956)
-- new ObjectPropertyIterator (line 6961)
-- new Variable (line 7168)
-- new Variable (line 7595)
-- new Variable (line 7607)
-- new Variable (line 7713)
-- new Variable (line 7851)
-- new Variable (line 7910)
-- new Variable (line 7934)
-- new Variable (line 8216)
-- new Variable (line 8223)
-- new Variable (line 8240)
-- new Variable (line 8247)
-- new Variable (line 8264)
-- new VM\NativeFiberStackOverflow (line 8837)
-- new VM\BuiltinCallbackCatchRedirect (line 8888)
-- new VM\BuiltinCallbackCatchRedirect (line 8906)
-- new Variable (line 9009)
-- new Variable (line 9117)
-- new Variable (line 9250)
-- new ScriptExit (line 9364)
-- new Exception (line 9377)
-- new ScriptExit (line 9385)
-- new Error (line 9641)
-- new VM\PropertyHookRefWriteSignal (line 9689)
-- new Variable (line 9713)
-- new VM\PropertyHookRefWriteSignal (line 9718)
-- new VM\PropertyHookFiberSuspendSignal (line 9721)
-- new VM\PropertyHookRefWriteSignal (line 9837)
-- new Variable (line 9854)
-- new VM\PropertyHookRefWriteSignal (line 9868)
-- new VM\PropertyHookRefWriteSignal (line 9880)
-- new Variable (line 10111)
-- new Variable (line 10134)
-- new Variable (line 10144)
-- new Variable (line 10154)
-- new VM\PropertyHookRefWriteSignal (line 10160)
-- new VM\PropertyHookRefWriteSignal (line 10168)
-- new VM\PropertyHookRefWriteSignal (line 10171)
-- new Variable (line 10186)
-- new VM\PropertyHookRefWriteSignal (line 10192)
-- new Variable (line 10220)
-- new VM\PropertyHookRefWriteSignal (line 10225)
-- new VM\PropertyHookFiberSuspendSignal (line 10228)
-- new ClassEntry (line 11434)
-- new Variable (line 11435)
-- new VM\ClassProperty (line 11436)
-- new ObjectEntry (line 11439)
-- new Variable (line 11442)
-- new Variable (line 11523)
-- new Error (line 11609)
-- new Variable (line 11688)
-- new VM\GeneratorUncaughtThrow (line 11690)
-- new Variable (line 11715)
-- new VM\GeneratorUncaughtThrow (line 11729)
-- new Variable (line 11800)
-- new VM\GeneratorUncaughtThrow (line 11820)
-- new Variable (line 11857)
-- new Variable (line 11859)
-- new Variable (line 11863)
-- new Variable (line 11978)
-- new Variable (line 11997)
-- new Variable (line 12167)
-- new Variable (line 12183)
-- new Variable (line 12314)
-- new Variable (line 12380)
-- new Variable (line 12526)
-- new VM\PropertyIsInitializedHandler (line 12535)
-- new Error (line 12596)
-- new VM\EnumFromHandler (line 12621)
-- new CompileError (line 13343)
-- new VM\ClassProperty (line 13454)
-- new Variable (line 13744)
-- new Variable (line 13926)
-- new Variable (line 13928)
-- new VM\ClassProperty (line 14053)
-- new Func\PHP (line 14176)
-- new Variable (line 14252)
-- new Variable (line 14259)
+- new Variable (line 5335)
+- new Variable (line 5344)
+- new GeneratorState (line 5409)
+- new Variable (line 5712)
+- new VM\ClassEntry (line 5824)
+- new ClassEntry (line 5850)
+- new Variable (line 5864)
+- new Variable (line 5867)
+- new ClassEntry (line 5891)
+- new ClassEntry (line 5917)
+- new ObjectEntry (line 6050)
+- new Variable (line 6237)
+- new Variable (line 6256)
+- new Variable (line 6293)
+- new Variable (line 6345)
+- new Variable (line 6611)
+- new WeakMapIterator (line 6969)
+- new ObjectPropertyIterator (line 6974)
+- new Variable (line 7181)
+- new Variable (line 7608)
+- new Variable (line 7620)
+- new Variable (line 7726)
+- new Variable (line 7864)
+- new Variable (line 7923)
+- new Variable (line 7947)
+- new Variable (line 8229)
+- new Variable (line 8236)
+- new Variable (line 8253)
+- new Variable (line 8260)
+- new Variable (line 8277)
+- new VM\NativeFiberStackOverflow (line 8850)
+- new VM\BuiltinCallbackCatchRedirect (line 8901)
+- new VM\BuiltinCallbackCatchRedirect (line 8919)
+- new Variable (line 9022)
+- new Variable (line 9130)
+- new Variable (line 9263)
+- new ScriptExit (line 9377)
+- new Exception (line 9390)
+- new ScriptExit (line 9398)
+- new Error (line 9654)
+- new VM\PropertyHookRefWriteSignal (line 9702)
+- new Variable (line 9726)
+- new VM\PropertyHookRefWriteSignal (line 9731)
+- new VM\PropertyHookFiberSuspendSignal (line 9734)
+- new VM\PropertyHookRefWriteSignal (line 9850)
+- new Variable (line 9867)
+- new VM\PropertyHookRefWriteSignal (line 9881)
+- new VM\PropertyHookRefWriteSignal (line 9893)
+- new Variable (line 10124)
+- new Variable (line 10147)
+- new Variable (line 10157)
+- new Variable (line 10167)
+- new VM\PropertyHookRefWriteSignal (line 10173)
+- new VM\PropertyHookRefWriteSignal (line 10181)
+- new VM\PropertyHookRefWriteSignal (line 10184)
+- new Variable (line 10199)
+- new VM\PropertyHookRefWriteSignal (line 10205)
+- new Variable (line 10233)
+- new VM\PropertyHookRefWriteSignal (line 10238)
+- new VM\PropertyHookFiberSuspendSignal (line 10241)
+- new ClassEntry (line 11447)
+- new Variable (line 11448)
+- new VM\ClassProperty (line 11449)
+- new ObjectEntry (line 11452)
+- new Variable (line 11455)
+- new Variable (line 11536)
+- new Error (line 11622)
+- new Variable (line 11701)
+- new VM\GeneratorUncaughtThrow (line 11703)
+- new Variable (line 11728)
+- new VM\GeneratorUncaughtThrow (line 11742)
+- new Variable (line 11813)
+- new VM\GeneratorUncaughtThrow (line 11833)
+- new Variable (line 11870)
+- new Variable (line 11872)
+- new Variable (line 11876)
+- new Variable (line 11991)
+- new Variable (line 12010)
+- new Variable (line 12180)
+- new Variable (line 12196)
+- new Variable (line 12327)
+- new Variable (line 12393)
+- new Variable (line 12539)
+- new VM\PropertyIsInitializedHandler (line 12548)
+- new Error (line 12609)
+- new VM\EnumFromHandler (line 12634)
+- new CompileError (line 13356)
+- new VM\ClassProperty (line 13467)
+- new Variable (line 13757)
+- new Variable (line 13939)
+- new Variable (line 13941)
+- new VM\ClassProperty (line 14066)
+- new Func\PHP (line 14189)
 - new Variable (line 14265)
-- new Variable (line 14302)
-- new Variable (line 14331)
-- new Variable (line 14515)
-- new Variable (line 14561)
-- new VM\ClassProperty (line 14623)
-- new Error (line 14660)
-- new Error (line 14692)
-- new Error (line 14695)
-- new Error (line 14698)
-- new Error (line 14717)
-- new ObjectEntry (line 14721)
-- new Variable (line 14723)
-- new Variable (line 14737)
-- new Error (line 14862)
-- new Error (line 14867)
-- new VM\ObjectEntry (line 14871)
-- new Variable (line 15011)
-- new Variable (line 15029)
-- new NoDiscardMetadata (line 15150)
-- new Variable (line 15307)
-- new Variable (line 15309)
-- new Variable (line 15401)
+- new Variable (line 14272)
+- new Variable (line 14278)
+- new Variable (line 14315)
+- new Variable (line 14344)
+- new Variable (line 14528)
+- new Variable (line 14574)
+- new VM\ClassProperty (line 14636)
+- new Error (line 14673)
+- new Error (line 14705)
+- new Error (line 14708)
+- new Error (line 14711)
+- new Error (line 14730)
+- new ObjectEntry (line 14734)
+- new Variable (line 14736)
+- new Variable (line 14750)
+- new Error (line 14875)
+- new Error (line 14880)
+- new VM\ObjectEntry (line 14884)
+- new Variable (line 15024)
+- new Variable (line 15042)
+- new NoDiscardMetadata (line 15163)
+- new Variable (line 15320)
+- new Variable (line 15322)
+- new Variable (line 15414)
 - 443 class method(s)
 - 15 closure(s)
 
