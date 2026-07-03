@@ -44,9 +44,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNextafter());
+    }
+
     public function testSupportsNextafterTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsNextafter());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsNextafter());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
@@ -302,10 +317,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
     }
 
-    public function testVmRegistersNextafterOnForwardProfile(): void
+    public function testVmDoesNotRegisterNextafterOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
+    }
+
+    public function testVmRegistersNextafterOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterFpowOnReferenceProfile(): void

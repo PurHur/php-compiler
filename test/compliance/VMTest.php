@@ -38,7 +38,12 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsNextafter()
                 && str_contains($name, 'nextafter')
-                && !str_contains($name, 'php84_math_string_builtins_phantom')) {
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'nextafter_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsRoundingModeEnum()
