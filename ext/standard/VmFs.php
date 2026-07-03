@@ -818,6 +818,7 @@ final class VmFs
     private static function finalizeStreamOpen(int|false $handle, string $userMode): int|false
     {
         if (false !== $handle) {
+            VmStreamContext::ensureDefaultForStreamOpen();
             self::registerStreamMode($handle, $userMode);
         }
 
@@ -2276,6 +2277,14 @@ final class VmFs
             $value->streamHandle($id, $ctx);
             $ht->addIndex($index, $value);
             ++$index;
+        }
+        if (null === $type) {
+            foreach (VmStreamContext::activeContextVariables() as $contextVar) {
+                $value = new Variable();
+                $value->copyFrom($contextVar);
+                $ht->addIndex($index, $value);
+                ++$index;
+            }
         }
 
         return $ht;
