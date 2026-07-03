@@ -21,9 +21,12 @@ final class ReservedBuiltinClass
         'directory' => 'Cannot directly construct Directory, use dir() instead',
     ];
 
-    /** @var array<string, string> lc => display name — compile-time implements guard (#13327) */
+    /** @var array<string, string> lc => display name — compile-time implements guard (#13327, #15445) */
     private const COMPILE_TIME_NON_INTERFACES = [
+        'closure' => 'Closure',
+        'generator' => 'Generator',
         'internaliterator' => 'InternalIterator',
+        'stdclass' => 'stdClass',
     ];
 
     public static function userInstantiationErrorMessage(string $classLc): ?string

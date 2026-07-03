@@ -230,4 +230,47 @@ PHP;
         $runtime->run($block);
         $this->assertSame("ok\n", ob_get_clean());
     }
+
+    /** @covers issue #15445 */
+    public function testClassImplementsClosureFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class C implements Closure {
+    public function __invoke(): void {}
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('C cannot implement Closure - it is not an interface');
+        $runtime->parseAndCompile($code, 'implements_closure.php');
+    }
+
+    /** @covers issue #15445 */
+    public function testClassImplementsGeneratorFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class G implements Generator {}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('G cannot implement Generator - it is not an interface');
+        $runtime->parseAndCompile($code, 'implements_generator.php');
+    }
+
+    /** @covers issue #15445 */
+    public function testClassImplementsStdClassFailsAtCompileTime(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+class S implements stdClass {
+    public int $x = 1;
+}
+PHP;
+        $this->expectException(\CompileError::class);
+        $this->expectExceptionMessage('S cannot implement stdClass - it is not an interface');
+        $runtime->parseAndCompile($code, 'implements_stdclass.php');
+    }
 }
