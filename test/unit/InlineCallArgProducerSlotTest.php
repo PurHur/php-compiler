@@ -512,6 +512,59 @@ PHP;
         self::assertSame('0', ob_get_clean());
     }
 
+    /** Issue #15476 — similar_text(str_repeat(), str_repeat(), $p) preserves by-ref percent with distinct producer slots. */
+    public function testSimilarTextDualStrRepeatWithByRefPercentRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$p = 0.0;
+$c = similar_text(str_repeat('a', 5), str_repeat('a', 4), $p);
+echo $c, ':', $p, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'similar_text_dual_str_repeat_byref.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("4:88.888888888889\n", ob_get_clean());
+    }
+
+    /** Issue #15476 — sibling str_repeat producers each FUNCCALL_EXEC_RETURN before similar_text sends. */
+    public function testSimilarTextDualStrRepeatWithByRefPercentUsesDistinctProducerSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$p = 0.0;
+similar_text(str_repeat('a', 5), str_repeat('a', 4), $p);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'similar_text_dual_str_repeat_byref_slots.php');
+
+        $returnSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $sendSlots);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertContains($sendSlots[0], $returnSlots);
+        self::assertContains($sendSlots[1], $returnSlots);
+    }
+
     /** Issue #9351 — sibling MethodCall producers map to distinct var_dump arg slots. */
     public function testVarDumpReceivesDistinctMethodCallProducerSlots(): void
     {
