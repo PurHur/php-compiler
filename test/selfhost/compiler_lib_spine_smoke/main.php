@@ -392,6 +392,8 @@ require_once __DIR__.'/../../../ext/openssl/openssl_free_key.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_cipher_methods.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_get_md_methods.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_pkey_new.php';
+require_once __DIR__.'/../../../ext/openssl/openssl_pkey_derive.php';
+require_once __DIR__.'/../../../ext/openssl/VmOpensslPkeyDeriveNative.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_sign.php';
 require_once __DIR__.'/../../../ext/openssl/openssl_verify.php';
 require_once __DIR__.'/../../../ext/openssl/VmOpensslSignNative.php';
