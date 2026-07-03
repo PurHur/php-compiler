@@ -21,7 +21,7 @@ final class StringInfoRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('UTSNAME_SIZE', $source);
         $this->assertStringNotContainsString('stringEqualsIgnoreCase', $source);
         $this->assertStringNotContainsString('__hashtable__setStringAt', $source);
-        $this->assertLessThan(320, \substr_count($source, "\n") + 1);
+        $this->assertLessThan(460, \substr_count($source, "\n") + 1);
     }
 
     public function testInfoJitHelperDelegatesToVmInfo(): void

@@ -6,7 +6,6 @@ namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\HashTable;
-use PHPCompiler\VM\Variable;
 
 /**
  * phpversion/php_uname/extension introspection for compiled JIT/AOT modules (#9148, #13803, php-in-PHP).
@@ -93,19 +92,25 @@ final class InfoJitHelper
         return false === $result ? null : $result;
     }
 
-    public static function posixUnameArgv(): ?HashTable
+    /** Scalar JIT helpers for posix_uname() bridge — HashTable foreach over utsname() SIGSEGV in AOT (#15633). */
+    public static function posixUnameAvailable(): int
     {
-        if (!VmUnamePure::available()) {
-            return null;
-        }
-        $ht = new HashTable();
-        foreach (VmUnamePure::utsname() as $key => $value) {
-            $slot = new Variable();
-            $slot->string((string) $value);
-            $ht->add((string) $key, $slot);
-        }
+        return VmUnamePure::available() ? 1 : 0;
+    }
 
-        return $ht;
+    public static function posixUnameField(int $index): string
+    {
+        $uts = VmUnamePure::utsname();
+
+        return match ($index) {
+            0 => $uts['sysname'],
+            1 => $uts['nodename'],
+            2 => $uts['release'],
+            3 => $uts['version'],
+            4 => $uts['machine'],
+            5 => $uts['domainname'],
+            default => '',
+        };
     }
 
     /** @deprecated LLVM loop helper — use {@see getLoadedExtensionsArgv()} (#13803) */

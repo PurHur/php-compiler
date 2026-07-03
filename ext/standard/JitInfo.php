@@ -39,7 +39,7 @@ final class JitInfo
 
     public static function php_sapi_name(Context $context): Value
     {
-        StringInfo::ensureLinked($context);
+        StringInfo::ensurePhpSapiNameLinked($context);
         $raw = $context->builder->call($context->lookupFunction('__compiler_php_sapi_name'));
         $slot = JitValueBox::alloc($context);
         $ptr = JitValueBox::pointer($context, $slot);
