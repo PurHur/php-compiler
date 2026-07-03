@@ -594,7 +594,7 @@ final class VmDom
             if ($local !== $localName) {
                 continue;
             }
-            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
             if ($attrNs === $wantNs) {
                 return $value;
             }
@@ -620,7 +620,7 @@ final class VmDom
             if ($local !== $localName) {
                 continue;
             }
-            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
 
             return $attrNs === $wantNs;
         }
@@ -639,6 +639,7 @@ final class VmDom
         }
         $state = DomRegistry::state($element);
         $state->attributes[$qualifiedName] = $value;
+        $state->attributeNamespaces[$qualifiedName] = $namespace ?? '';
         if (self::isXmlnsAttributeName($qualifiedName)) {
             $state->namespaceDeclarations = self::extractNamespaceDeclarations($state->attributes);
         }
@@ -663,7 +664,7 @@ final class VmDom
             if ($local !== $localName) {
                 continue;
             }
-            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
             if ($attrNs === $wantNs) {
                 $removedQName = $qName;
                 break;
@@ -672,7 +673,7 @@ final class VmDom
         if (null === $removedQName) {
             return false;
         }
-        unset($state->attributes[$removedQName]);
+        unset($state->attributes[$removedQName], $state->attributeNamespaces[$removedQName]);
         if (null !== $state->idAttributeName && $removedQName === $state->idAttributeName) {
             $document = self::ownerDocumentEntry($element);
             if (null !== $document) {
@@ -745,13 +746,29 @@ final class VmDom
             if ($local !== $localName) {
                 continue;
             }
-            $attrNs = '' !== $prefix ? (self::lookupNamespaceURI($element, $prefix) ?? '') : '';
+            $attrNs = self::resolveAttributeNamespaceUri($element, $qName, $prefix);
             if ($attrNs === $wantNs) {
                 return $qName;
             }
         }
 
         return null;
+    }
+
+    private static function resolveAttributeNamespaceUri(
+        ObjectEntry $element,
+        string $qName,
+        string $prefix
+    ): string {
+        $state = DomRegistry::state($element);
+        if (\array_key_exists($qName, $state->attributeNamespaces)) {
+            return $state->attributeNamespaces[$qName];
+        }
+        if ('' === $prefix) {
+            return '';
+        }
+
+        return self::lookupNamespaceURI($element, $prefix) ?? '';
     }
 
     private static function registerElementId(ObjectEntry $document, ObjectEntry $element): void
@@ -3297,6 +3314,7 @@ final class VmDom
         $clonedState->documentId = $sourceState->documentId;
         if (self::isElement($source)) {
             $clonedState->attributes = $sourceState->attributes;
+            $clonedState->attributeNamespaces = $sourceState->attributeNamespaces;
             $clonedState->namespaceDeclarations = $sourceState->namespaceDeclarations;
             $clonedState->localName = $sourceState->localName;
             $clonedState->prefix = $sourceState->prefix;
