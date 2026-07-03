@@ -1381,10 +1381,9 @@ final class ReflectionSupport
         if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
         }
-        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
-        $declEntry = $ctx->classes[$declLc] ?? $entry;
-
-        return [$declEntry, $methodName];
+        // php-src ext/reflection/php_reflection.c — store the requested class (composing
+        // class for trait imports/aliases), matching ReflectionClass::getMethod().
+        return [$entry, $methodName];
     }
 
     /**
