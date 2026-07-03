@@ -15,7 +15,7 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('HtmlspecialcharsJitHelper', $source);
         $this->assertStringNotContainsString('htmlspecialchars_count_head', $source);
         $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm', $source);
-        $this->assertFileDoesNotExist(__DIR__.'/../../lib/JIT/Builtin/StringHtmlspecialcharsStandaloneLlvm.php');
+        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm', $source);
     }
 
     public function testHtmlspecialcharsJitHelperIsSelfContained(): void
@@ -44,6 +44,7 @@ final class HtmlspecialcharsRuntimeShrinkTest extends TestCase
     {
         $spine = (string) file_get_contents(__DIR__.'/../../test/selfhost/compiler_lib_spine_smoke/main.php');
         $this->assertStringContainsString('HtmlspecialcharsJitHelper.php', $spine);
-        $this->assertStringNotContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
+        $this->assertStringContainsString('StringHtmlspecialcharsStandaloneLlvm.php', $spine);
+        $this->assertStringContainsString('StringHtmlspecialcharsUserScriptLlvm.php', $spine);
     }
 }
