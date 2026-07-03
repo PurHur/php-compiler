@@ -6,15 +6,15 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** stripos() CI JIT uses LLVM memcasecmp, not libc strncasecmp (#14000 follow-up, #4146). */
+/** stripos() CI JIT uses FindSubstrJitHelper PHP, not inline LLVM memcasecmp loops (#15287). */
 final class JitStringSearchRuntimeShrinkTest extends TestCase
 {
-    public function testJitStringSearchCiPathUsesLlvmMemcasecmpNotLibc(): void
+    public function testJitStringSearchCiPathUsesPhpBridgeNotInlineLlvm(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../ext/standard/JitStringSearch.php');
-        $this->assertStringContainsString('__phpc_string_memcasecmp', $source);
-        $this->assertStringContainsString('emitMemcasecmpCi', $source);
-        $this->assertStringNotContainsString("self::emitFindSubstrLoop(\$context, \$fn, 'strncasecmp')", $source);
+        $this->assertStringContainsString('StringFindSubstr::invokeFindOffsetI32', $source);
+        $this->assertStringNotContainsString('emitMemcasecmpCi', $source);
+        $this->assertStringNotContainsString('__phpc_string_memcasecmp', $source);
     }
 
     public function testStrposJitRoutesThroughStrposJitHelperNotJitStrpos(): void
