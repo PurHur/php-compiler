@@ -33,6 +33,8 @@ final class BootstrapVmDriverExecuteProbeTest extends TestCase
         $this->assertStringContainsString('.m3_compiler_lib_sidecar.sha', $script);
         $this->assertStringContainsString('BOOTSTRAP_VM_DRIVER_EXECUTE_PROBE_FULL_LINK', $script);
         $this->assertStringContainsString('bootstrap_copy_prelinked_compiler_lib_spine_blob', $script);
+        $this->assertStringContainsString('fast path probe failed', $script);
+        $this->assertStringContainsString('fast_probe_failed', $script);
         $this->assertStringContainsString('bootstrap_vm_driver_execute_probe_llvm_env', $script);
     }
 
