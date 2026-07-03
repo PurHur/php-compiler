@@ -322,6 +322,9 @@ final class VmDom
         $document->methodNames['savehtmlfile'] = 'saveHTMLFile';
         $document->methods['getelementsbytagname'] = new DocumentGetElementsByTagName();
         $document->methodVisibility['getelementsbytagname'] = $pub;
+        $document->methods['getelementsbytagnamens'] = new DocumentGetElementsByTagNameNS();
+        $document->methodVisibility['getelementsbytagnamens'] = $pub;
+        $document->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
         $document->methods['getelementbyid'] = new DocumentGetElementById();
         $document->methodVisibility['getelementbyid'] = $pub;
         $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
@@ -359,6 +362,9 @@ final class VmDom
         $element->methodNames['setidattributens'] = 'setIdAttributeNS';
         $element->methods['getelementsbytagname'] = new ElementGetElementsByTagName();
         $element->methodVisibility['getelementsbytagname'] = $pub;
+        $element->methods['getelementsbytagnamens'] = new ElementGetElementsByTagNameNS();
+        $element->methodVisibility['getelementsbytagnamens'] = $pub;
+        $element->methodNames['getelementsbytagnamens'] = 'getElementsByTagNameNS';
         $ctx->classes[self::CLASS_ELEMENT] = $element;
 
         $fragment = new ClassEntry('DOMDocumentFragment');
@@ -2976,6 +2982,48 @@ final class VmDom
         return self::createNodeList($ctx, self::collectElementsByTagName($node, $tagName));
     }
 
+    /**
+     * @return list<int> matching element object ids in document order (php-src dom_document_get_elements_by_tag_name_ns)
+     */
+    public static function collectElementsByTagNameNS(
+        ObjectEntry $node,
+        string $namespaceUri,
+        string $localName
+    ): array {
+        $matches = [];
+        self::collectElementsByTagNameNSRecursive($node, $namespaceUri, $localName, $matches);
+
+        return $matches;
+    }
+
+    public static function getElementsByTagNameNS(
+        Context $ctx,
+        ObjectEntry $document,
+        string $namespaceUri,
+        string $localName
+    ): Variable {
+        self::ensureDocument($document);
+        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $rootVar->type) {
+            return self::createNodeList($ctx, []);
+        }
+
+        return self::getElementsByTagNameNSFromNode($ctx, $rootVar->toObject(), $namespaceUri, $localName);
+    }
+
+    public static function getElementsByTagNameNSFromNode(
+        Context $ctx,
+        ObjectEntry $node,
+        string $namespaceUri,
+        string $localName
+    ): Variable {
+        if (!self::isElement($node)) {
+            throw new \DOMException('Not an element node');
+        }
+
+        return self::createNodeList($ctx, self::collectElementsByTagNameNS($node, $namespaceUri, $localName));
+    }
+
     public static function nodeListItem(ObjectEntry $nodeList, int $index): ?ObjectEntry
     {
         if (!self::isNodeList($nodeList)) {
@@ -3362,6 +3410,35 @@ final class VmDom
             $child = DomRegistry::entry($childId);
             if (null !== $child) {
                 self::collectElementsByTagNameRecursive($child, $want, $matches);
+            }
+        }
+    }
+
+    /**
+     * @param list<int> $matches
+     */
+    private static function collectElementsByTagNameNSRecursive(
+        ObjectEntry $node,
+        string $namespaceUri,
+        string $localName,
+        array &$matches
+    ): void {
+        if (self::isElement($node)) {
+            $ns = self::readNamespaceUri($node) ?? '';
+            $name = self::readLocalName($node);
+            $nsMatch = '*' === $namespaceUri || $ns === $namespaceUri;
+            $nameMatch = '*' === $localName || $name === $localName;
+            if ($nsMatch && $nameMatch) {
+                $matches[] = $node->id;
+            }
+        }
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        foreach (DomRegistry::state($node)->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::collectElementsByTagNameNSRecursive($child, $namespaceUri, $localName, $matches);
             }
         }
     }
