@@ -230,7 +230,7 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
+        foreach (['array_find', 'array_find_key', 'array_any', 'array_any_key', 'array_all', 'array_all_key', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
             $this->assertTrue(isset($ctx->functions[$fn]), $fn);
         }
     }
