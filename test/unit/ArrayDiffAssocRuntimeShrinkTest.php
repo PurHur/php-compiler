@@ -21,7 +21,13 @@ final class ArrayDiffAssocRuntimeShrinkTest extends TestCase
 
         $builtin = (string) file_get_contents(__DIR__.'/../../ext/standard/array_diff_assoc.php');
         $this->assertStringContainsString('ArrayDiffAssocRuntime::diffAssoc', $builtin);
+        $this->assertStringContainsString("require_once __DIR__.'/VmArrayAssocSetOps.php'", $builtin);
         $this->assertStringNotContainsString('ArrayBuiltinHelper::arrayDiffAssoc', $builtin);
+    }
+
+    public function testArrayDiffAssocAutoloadsTraitBeforeClass(): void
+    {
+        $this->assertTrue(class_exists(\PHPCompiler\ext\standard\array_diff_assoc::class));
     }
 
     public function testArrayDiffAssocJitHelperRemovesMatchingPairs(): void
