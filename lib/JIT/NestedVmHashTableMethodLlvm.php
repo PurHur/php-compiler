@@ -24,6 +24,10 @@ final class NestedVmHashTableMethodLlvm
 
     public static function ensureMethod(Context $context, string $methodLc): bool
     {
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
+            && ('keyscopy' === $methodLc || 'valuescopy' === $methodLc)) {
+            return false;
+        }
         $handler = self::METHOD_HANDLERS[$methodLc] ?? null;
         if (null === $handler) {
             return false;
