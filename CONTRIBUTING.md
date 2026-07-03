@@ -30,6 +30,14 @@ All submissions, including by project members, require review via GitHub pull re
 
 Also run `php script/bootstrap-inventory.php --check` before push when bootstrap paths change.
 
+**Mandatory before every merge — including docs-only and gate-only PRs** ([#15621](https://github.com/PurHur/php-compiler/issues/15621)):
+
+```bash
+./script/check-generated-docs.sh   # < 30 s; bundles all drift checks incl. composer.lock hash
+```
+
+Generated-doc drift that lands on `master` turns the fast gate red for every downstream clone (see #15619, #15620) — this one-liner is cheap enough that no PR class is exempt.
+
 ### Verifying your change
 
 Merge gates are **local/Docker only** — GitHub Actions and CircleCI are disabled ([#394](https://github.com/PurHur/php-compiler/issues/394)); optional mirrors live under [`.github/workflows-disabled/`](.github/workflows-disabled/). See the full matrix in [docs/local-ci-matrix.md](docs/local-ci-matrix.md).

@@ -28,7 +28,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 
 | Tier | When | Tools |
 |------|------|-------|
-| **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/ci-fast.sh` |
+| **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/check-generated-docs.sh` (< 30 s, mandatory pre-merge; [#15621](https://github.com/PurHur/php-compiler/issues/15621)), `./script/ci-fast.sh` |
 | **1** | Compiling fixtures, examples, local AOT during feature work | `./build/bin-compile-aot-inventory -o OUT SOURCE.php` |
 | **2** | Before merge; after spine or gen-0 edits | `make north-star5-verify-fast`, `make bootstrap-loop-probe` |
 
