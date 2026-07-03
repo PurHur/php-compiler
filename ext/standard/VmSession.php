@@ -217,9 +217,12 @@ final class VmSession
 
     /**
      * @return string|false
-     * previous id, or false when $id is empty
+     * previous id, or false when $id is invalid (non-empty but sanitizes to empty)
      */
     public static function setId(string $id) {
+        if ('' === $id) {
+            return self::$id;
+        }
         $sanitized = self::sanitizeId($id);
         if ('' === $sanitized) {
             return false;

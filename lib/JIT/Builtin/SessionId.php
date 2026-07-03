@@ -182,9 +182,18 @@ final class SessionId
         $newLen = $context->builder->load(
             $context->builder->structGep($newStr, $strMap['length'])
         );
-        $tooLong = $context->builder->icmp(Builder::INT_UGT, $newLen, $maxLen);
         $fn = $context->builder->getInsertBlock()->getParent();
         assert($fn instanceof Value\Function_);
+        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $newLen, $zero);
+        $bbEmptyNoop = $fn->appendBasicBlock('sid_empty_noop');
+        $bbLenCheck = $fn->appendBasicBlock('sid_len_check');
+        $context->builder->branchIf($isEmpty, $bbEmptyNoop, $bbLenCheck);
+
+        $context->builder->positionAtEnd($bbEmptyNoop);
+        $context->builder->returnVoid();
+
+        $context->builder->positionAtEnd($bbLenCheck);
+        $tooLong = $context->builder->icmp(Builder::INT_UGT, $newLen, $maxLen);
         $bbClamp = $fn->appendBasicBlock('sid_clamp_len');
         $bbCopy = $fn->appendBasicBlock('sid_copy');
         $context->builder->branchIf($tooLong, $bbClamp, $bbCopy);
