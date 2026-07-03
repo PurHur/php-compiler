@@ -3710,6 +3710,8 @@ require_once __DIR__.'/../../../lib/VM/MagicMethodJitHelper.php';
 require_once __DIR__.'/../../../lib/VM/MemoryAccounting.php';
 require_once __DIR__.'/../../../lib/VM/NamedArgs.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateInvalidTimeZoneException.php';
+require_once __DIR__.'/../../../lib/VM/NativeDateMalformedIntervalException.php';
+require_once __DIR__.'/../../../lib/VM/NativeDateMalformedPeriodException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateMalformedStringException.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateObjectError.php';
 require_once __DIR__.'/../../../lib/VM/NativeDateRangeError.php';
