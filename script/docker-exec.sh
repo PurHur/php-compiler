@@ -174,8 +174,18 @@ if [[ "${#SYNC_BACK_PATHS[@]}" -gt 0 ]]; then
   docker logs "${container_id}" 1>&2
   set -e
   for p in "${SYNC_BACK_PATHS[@]}"; do
-    mkdir -p "$(dirname "${p}")"
-    docker cp "${container_id}:/compiler/${p}" "${p}" >/dev/null 2>&1 || true
+    case "${p}" in
+      prelinked/bootstrap-gen0|prelinked/bootstrap-vendor)
+        mkdir -p "${p}"
+        # Trailing /. merges into existing host dir; bare path nests dir/dir (#15213).
+        # docker exec fails after docker wait (exited container), so classify paths explicitly.
+        docker cp "${container_id}:/compiler/${p}/." "${p}/" >/dev/null 2>&1 || true
+        ;;
+      *)
+        mkdir -p "$(dirname "${p}")"
+        docker cp "${container_id}:/compiler/${p}" "${p}" >/dev/null 2>&1 || true
+        ;;
+    esac
   done
   _tar_fallback_cleanup
   trap - EXIT INT TERM
