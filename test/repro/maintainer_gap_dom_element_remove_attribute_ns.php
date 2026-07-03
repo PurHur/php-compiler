@@ -13,8 +13,9 @@ if (!$el->hasAttributeNS('http://example.com', 'foo')) {
     fwrite(STDERR, "fail: setup missing ex:foo\n");
     exit(1);
 }
-if (!$el->removeAttributeNS('http://example.com', 'foo')) {
-    fwrite(STDERR, "fail: removeAttributeNS did not remove ex:foo\n");
+$removed = $el->removeAttributeNS('http://example.com', 'foo');
+if (null !== $removed) {
+    fwrite(STDERR, 'fail: removeAttributeNS success should return null, got '.var_export($removed, true)."\n");
     exit(1);
 }
 if ($el->hasAttributeNS('http://example.com', 'foo')) {
@@ -25,8 +26,9 @@ if (!$el->hasAttributeNS('http://example.com', 'bar')) {
     fwrite(STDERR, "fail: ex:bar removed unexpectedly\n");
     exit(1);
 }
-if ($el->removeAttributeNS('http://example.com', 'missing')) {
-    fwrite(STDERR, "fail: removeAttributeNS should return false for missing attr\n");
+$missing = $el->removeAttributeNS('http://example.com', 'missing');
+if (null !== $missing) {
+    fwrite(STDERR, 'fail: removeAttributeNS missing attr should return null, got '.var_export($missing, true)."\n");
     exit(1);
 }
 

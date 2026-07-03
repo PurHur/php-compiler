@@ -31,7 +31,9 @@ final class DomNodePropertySupport
             || strtolower(VmDom::PROP_BASE_URI) === $lc
             || strtolower(VmDom::PROP_NAMESPACE_URI) === $lc
             || strtolower(VmDom::PROP_LOCAL_NAME) === $lc
-            || strtolower(VmDom::PROP_PREFIX) === $lc;
+            || strtolower(VmDom::PROP_PREFIX) === $lc
+            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc)
+            || (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc);
     }
 
     public static function getProperty(ObjectEntry $object, string $name, ?Context $ctx = null): Variable
@@ -103,6 +105,16 @@ final class DomNodePropertySupport
 
             return $var;
         }
+        if (VmDom::isAttr($object) && strtolower(VmDom::PROP_VALUE) === $lc) {
+            $var->string(VmDom::readNodeValue($object) ?? '');
+
+            return $var;
+        }
+        if (VmDom::isAttr($object) && strtolower(VmDom::PROP_OWNER_ELEMENT) === $lc) {
+            $var->null();
+
+            return $var;
+        }
 
         throw new \LogicException('DomNodePropertySupport::getProperty() called with unmanaged name');
     }
@@ -117,7 +129,10 @@ final class DomNodePropertySupport
         Context $ctx
     ): bool {
         $lc = strtolower($propName);
-        if (strtolower(VmDom::PROP_NODE_VALUE) !== $lc && strtolower(VmDom::PROP_TEXT_CONTENT) !== $lc) {
+        if (strtolower(VmDom::PROP_NODE_VALUE) !== $lc
+            && strtolower(VmDom::PROP_TEXT_CONTENT) !== $lc
+            && strtolower(VmDom::PROP_VALUE) !== $lc
+        ) {
             return false;
         }
         if (!DomRegistry::has($owner)) {

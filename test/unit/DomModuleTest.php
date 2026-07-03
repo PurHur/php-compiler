@@ -24,6 +24,7 @@ final class DomModuleTest extends TestCase
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocument'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMDocumentType'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMElement'));
+        self::assertTrue(VmReflection::classExists($ctx, 'DOMAttr'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNode'));
         self::assertTrue(VmReflection::classExists($ctx, 'DOMNodeList'));
         self::assertTrue(ModuleRegistry::extensionLoaded('dom'));
@@ -304,6 +305,42 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("10\n20\n4\n1\n", ob_get_clean());
+    }
+
+    public function test_dom_node_is_equal_node(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root><a id="1"/></root>');
+$a = $doc->documentElement->firstChild;
+$b = $a->cloneNode(true);
+echo (int) $a->isEqualNode($b), "\n";
+echo (int) $a->isSameNode($b), "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_is_equal_node.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n0\n", ob_get_clean());
+    }
+
+    public function test_dom_create_attribute_ns(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$attr = $doc->createAttributeNS('http://example.com', 'ex:foo');
+echo get_class($attr), "\n";
+echo $attr->localName, "\n";
+$attr->value = 'x';
+echo $attr->value, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_create_attribute_ns.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("DOMAttr\nfoo\nx\n", ob_get_clean());
     }
 
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
