@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 3842 |
-| Phase A inventory files (M2 ratio SSOT) | 3842 |
+| PHP files on vm.php path | 3843 |
+| Phase A inventory files (M2 ratio SSOT) | 3843 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10333 |
+| Source constructs flagged (warnings) | 10335 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -299,7 +299,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/MbStrwidthJitHelper.php` | 0 | 1 |
 | `ext/mbstring/MbstringEncodingRegistry.php` | 0 | 1 |
 | `ext/mbstring/MbstringState.php` | 0 | 3 |
-| `ext/mbstring/Module.php` | 0 | 34 |
+| `ext/mbstring/Module.php` | 0 | 35 |
 | `ext/mbstring/Utf8CaseMap.php` | 0 | 1 |
 | `ext/mbstring/VmMbstring.php` | 0 | 3 |
 | `ext/mbstring/mb_check_encoding.php` | 0 | 2 |
@@ -314,6 +314,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/mbstring/mb_encoding_aliases.php` | 0 | 2 |
 | `ext/mbstring/mb_http_output.php` | 0 | 2 |
 | `ext/mbstring/mb_internal_encoding.php` | 0 | 2 |
+| `ext/mbstring/mb_list_encodings.php` | 0 | 1 |
 | `ext/mbstring/mb_ltrim.php` | 0 | 1 |
 | `ext/mbstring/mb_preferred_mime_name.php` | 0 | 2 |
 | `ext/mbstring/mb_rtrim.php` | 0 | 1 |
@@ -5632,7 +5633,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/mbstring/MbstringEncodingRegistry.php`
 
 **Warnings** (review for bootstrap subset):
-- 7 class method(s)
+- 8 class method(s)
 
 ### `ext/mbstring/MbstringState.php`
 
@@ -5646,37 +5647,38 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - new VM\Variable (line 25)
 - new mb_check_encoding (line 34)
-- new mb_strlen (line 35)
-- new mb_strwidth (line 36)
-- new mb_strimwidth (line 37)
-- new mb_str_pad (line 38)
-- new mb_substr (line 39)
-- new mb_strcut (line 40)
-- new mb_substr_count (line 41)
-- new mb_strpos (line 42)
-- new mb_strtolower (line 43)
-- new mb_strtoupper (line 44)
-- new mb_convert_case (line 45)
-- new mb_convert_encoding (line 46)
-- new mb_stripos (line 47)
-- new mb_strrpos (line 48)
-- new mb_strrichr (line 49)
-- new mb_trim (line 51)
-- new mb_ltrim (line 52)
-- new mb_rtrim (line 53)
-- new mb_scrub (line 55)
-- new mb_encode_numericentity (line 56)
-- new mb_decode_numericentity (line 57)
-- new mb_encode_mimeheader (line 58)
-- new mb_decode_mimeheader (line 59)
-- new mb_http_output (line 60)
-- new mb_internal_encoding (line 61)
-- new mb_detect_order (line 62)
-- new mb_substitute_character (line 63)
-- new mb_preferred_mime_name (line 64)
-- new mb_encoding_aliases (line 65)
-- new mb_convert_kana (line 66)
-- new mb_split (line 67)
+- new mb_list_encodings (line 35)
+- new mb_strlen (line 36)
+- new mb_strwidth (line 37)
+- new mb_strimwidth (line 38)
+- new mb_str_pad (line 39)
+- new mb_substr (line 40)
+- new mb_strcut (line 41)
+- new mb_substr_count (line 42)
+- new mb_strpos (line 43)
+- new mb_strtolower (line 44)
+- new mb_strtoupper (line 45)
+- new mb_convert_case (line 46)
+- new mb_convert_encoding (line 47)
+- new mb_stripos (line 48)
+- new mb_strrpos (line 49)
+- new mb_strrichr (line 50)
+- new mb_trim (line 52)
+- new mb_ltrim (line 53)
+- new mb_rtrim (line 54)
+- new mb_scrub (line 56)
+- new mb_encode_numericentity (line 57)
+- new mb_decode_numericentity (line 58)
+- new mb_encode_mimeheader (line 59)
+- new mb_decode_mimeheader (line 60)
+- new mb_http_output (line 61)
+- new mb_internal_encoding (line 62)
+- new mb_detect_order (line 63)
+- new mb_substitute_character (line 64)
+- new mb_preferred_mime_name (line 65)
+- new mb_encoding_aliases (line 66)
+- new mb_convert_kana (line 67)
+- new mb_split (line 68)
 - 2 class method(s)
 
 ### `ext/mbstring/Utf8CaseMap.php`
@@ -5763,6 +5765,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - new ArgumentCountError (line 25)
+- 2 class method(s)
+
+### `ext/mbstring/mb_list_encodings.php`
+
+**Warnings** (review for bootstrap subset):
 - 2 class method(s)
 
 ### `ext/mbstring/mb_ltrim.php`
