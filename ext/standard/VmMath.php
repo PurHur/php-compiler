@@ -919,9 +919,6 @@ final class VmMath
      */
     public static function nextafter(float $num, float $next): float
     {
-        if (\function_exists('nextafter')) {
-            return \nextafter($num, $next);
-        }
         if (\is_nan($num)) {
             return $num;
         }

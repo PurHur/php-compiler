@@ -44,9 +44,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
-    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    public function testSupportsNextafterTrueOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsNextafter());
+        $this->assertTrue(CompilerVersion::supportsNextafter());
     }
 
     public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
@@ -235,6 +235,12 @@ final class CompilerVersionGateTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
+    }
+
+    public function testVmRegistersNextafterOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
     }
 
     public function testVmDoesNotRegisterFpowOnReferenceProfile(): void

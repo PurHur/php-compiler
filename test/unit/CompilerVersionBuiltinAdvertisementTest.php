@@ -69,9 +69,15 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
-    public function testNextafterWithheldOnReferenceProfileUntilStable84(): void
+    public function testNextafterAdvertisedOnForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsNextafter());
+        $this->assertTrue(CompilerVersion::supportsNextafter());
+    }
+
+    public function testVmRegistersNextafterOnForwardProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
     }
 
     public function testRoundingModeEnumWithheldOnReferenceProfileUntilStable84(): void

@@ -43,6 +43,12 @@ final class VmVarExportFloat
             return $m[1].'.0E'.$m[2];
         }
 
+        // php-src zend_print_flat_zval: prefer host var_export when dtoa picks a different round-trip (#15584).
+        $zend = \var_export($f, true);
+        if ($f === (float) $zend && $zend !== $s) {
+            return $zend;
+        }
+
         return $s;
     }
 }
