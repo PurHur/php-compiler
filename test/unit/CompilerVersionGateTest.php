@@ -289,9 +289,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
     }
 
-    public function testSupportsBareRethrowOnForwardProfile(): void
+    public function testSupportsBareRethrowFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsBareRethrow());
+        $this->assertFalse(CompilerVersion::supportsBareRethrow());
     }
 
     public function testVmRegistersClosureGetCurrentOnForwardProfile(): void

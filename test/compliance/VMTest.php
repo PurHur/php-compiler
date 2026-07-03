@@ -522,7 +522,7 @@ class VMTest extends BaseTest {
                 continue;
             }
             if (!CompilerVersion::supportsBareRethrow()
-                && str_contains($name, 'throw_rethrow')
+                && (str_contains($name, 'bare_throw') || str_contains($name, 'throw_rethrow'))
                 && !str_contains($name, 'bare_throw_reference_profile')) {
                 continue;
             }
