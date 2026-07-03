@@ -44,6 +44,11 @@ class Module extends ModuleAbstract
             'SODIUM_CRYPTO_GENERICHASH_KEYBYTES_MAX' => VmSodium::CRYPTO_GENERICHASH_KEYBYTES_MAX,
             'SODIUM_CRYPTO_SCALARMULT_BYTES' => VmSodium::CRYPTO_SCALARMULT_BYTES,
             'SODIUM_CRYPTO_SCALARMULT_SCALARBYTES' => VmSodium::CRYPTO_SCALARMULT_SCALARBYTES,
+            'SODIUM_CRYPTO_BOX_SECRETKEYBYTES' => VmSodium::CRYPTO_BOX_SECRETKEYBYTES,
+            'SODIUM_CRYPTO_BOX_PUBLICKEYBYTES' => VmSodium::CRYPTO_BOX_PUBLICKEYBYTES,
+            'SODIUM_CRYPTO_BOX_KEYPAIRBYTES' => VmSodium::CRYPTO_BOX_KEYPAIRBYTES,
+            'SODIUM_CRYPTO_BOX_MACBYTES' => VmSodium::CRYPTO_BOX_MACBYTES,
+            'SODIUM_CRYPTO_BOX_SEALBYTES' => VmSodium::CRYPTO_BOX_SEALBYTES,
         ] as $name => $value) {
             $var = new VM\Variable();
             $var->int($value);
@@ -77,6 +82,11 @@ class Module extends ModuleAbstract
             new sodium_crypto_generichash(),
             new sodium_crypto_scalarmult(),
             new sodium_crypto_scalarmult_base(),
+            new sodium_crypto_box_keypair(),
+            new sodium_crypto_box_publickey(),
+            new sodium_crypto_box_secretkey(),
+            new sodium_crypto_box_seal(),
+            new sodium_crypto_box_seal_open(),
         ];
     }
 }
