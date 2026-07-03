@@ -86,8 +86,11 @@ final class ReflectionBuiltinHelper
     public static function enumExistsLiteral(Context $context, string $enumName): Value
     {
         $lc = strtolower($enumName);
-        $exists = self::objectBuiltin($context)->hasUserDeclaredEnum($enumName)
-            || (null !== $context->runtime->vmContext && isset($context->runtime->vmContext->enums[$lc]));
+        $exists = self::objectBuiltin($context)->hasUserDeclaredEnum($enumName);
+        if (!$exists && null !== $context->runtime->vmContext) {
+            $entry = $context->runtime->vmContext->classes[$lc] ?? null;
+            $exists = null !== $entry && $entry->isEnum;
+        }
         $i1 = $context->getTypeFromString('int1');
 
         return $i1->constInt($exists ? 1 : 0, false);
