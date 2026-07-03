@@ -17765,6 +17765,9 @@ class Compiler {
             ) {
                 return false;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
 
             return false;
         }
@@ -18620,6 +18623,17 @@ class Compiler {
             )
         ) {
             // json_decode(g(), true, 512, JSON_THROW_ON_ERROR) — arg0 producer, not a stmt-level callee (#12009, #15441).
+            return false;
+        }
+        if ($onlySkippablePreludes) {
+            for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                $mid = $cfgChildren[$j] ?? null;
+                if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                    return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
+                }
+            }
+
+            // date_sun_info(strtotime(...), lat, -lon) — lone hoisted FuncCall + UnaryMinus prelude (#11336).
             return false;
         }
 
@@ -26262,6 +26276,9 @@ class Compiler {
             ) {
                 continue;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($consumer)) {
+                continue;
+            }
             if (!$this->isInlineExprCallArgConsumer($consumer)) {
                 return false;
             }
@@ -26407,6 +26424,9 @@ class Compiler {
                 || $child instanceof Op\Expr\ClassConstFetch
                 || $child instanceof Op\Expr\Array_
             ) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
                 continue;
             }
             if (!$this->isInlineExprCallArgConsumer($child)) {
