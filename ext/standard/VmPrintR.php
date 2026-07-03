@@ -7,6 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\VM;
 use PHPCompiler\VM\ClassEntry;
+use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\TypedPropertyCheck;
 use PHPCompiler\VM\Variable;
 
@@ -64,10 +65,19 @@ final class VmPrintR
             return self::formatArray($vm, $var->toArray(), $level, $frame, $visited);
         }
         if (Variable::TYPE_OBJECT === $var->type) {
+            if (EnumCaseSupport::isEnumCase($var->toObject())) {
+                $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+                if (null !== $entry) {
+                    return self::formatEnumCase($vm, $entry, $level, $frame, $visited);
+                }
+            }
+
             return self::formatObject($vm, $var->toObject(), $level, $frame, $visited);
         }
         if (Variable::TYPE_ENUM_CASE === $var->type) {
-            return self::formatEnumCase($vm, $var->toEnumCase(), $level, $frame, $visited);
+            $entry = EnumCaseSupport::enumCaseEntryForVariable($var);
+
+            return self::formatEnumCase($vm, $entry ?? $var->toEnumCase(), $level, $frame, $visited);
         }
 
         return '';
