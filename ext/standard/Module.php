@@ -1173,14 +1173,6 @@ class Module extends ModuleAbstract
             $context->registerFunction('chmod', $fn);
         }
         try {
-            $context->lookupFunction('umask');
-        } catch (\Throwable $e) {
-            $i32 = $context->getTypeFromString('int32');
-            $ft = $context->context->functionType($i32, false, $i32);
-            $fn = $context->module->addFunction('umask', $ft);
-            $context->registerFunction('umask', $fn);
-        }
-        try {
             $context->lookupFunction('nice');
         } catch (\Throwable $e) {
             $i32 = $context->getTypeFromString('int32');

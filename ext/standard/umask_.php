@@ -10,7 +10,7 @@ use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** umask() — process file-creation mask (VM host; JIT/AOT via libc umask(2), #3226). */
+/** umask() — process file-creation mask (VM host; JIT/AOT via UmaskJitHelper PHP, #3226, #15497). */
 final class umask_ extends Internal
 {
     public function __construct()
