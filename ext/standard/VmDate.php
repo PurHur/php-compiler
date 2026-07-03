@@ -6,7 +6,7 @@ declare(strict_types=1);
  * VM date/time helpers via VmDatePure host builtins (#13765, #5045).
  *
  * php-src: ext/date/php_date.c — time, date, gmdate, microtime, getdate.
- * JIT/AOT: JitDate.php, MicrotimeJitHelper/GettimeofdayJitHelper PHP, StringDateTime (__compiler_format_datetime).
+ * JIT/AOT: JitDate.php, FormatDatetimeJitHelper/MicrotimeJitHelper/GettimeofdayJitHelper PHP.
  */
 namespace PHPCompiler\ext\standard;
 

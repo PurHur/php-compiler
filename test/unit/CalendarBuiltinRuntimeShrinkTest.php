@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Test\Unit;
 
+use PHPCompiler\ext\standard\FormatDatetimeJitHelper;
 use PHPCompiler\ext\standard\GmmktimeJitHelper;
 use PHPCompiler\ext\standard\MktimeJitHelper;
 use PHPCompiler\ext\standard\StrftimeJitHelper;
@@ -30,6 +31,16 @@ final class CalendarBuiltinRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('TM_SEC', $source);
         $this->assertStringNotContainsString("lookupFunction('timegm')", $source);
         $this->assertLessThan(210, \substr_count($source, "\n") + 1);
+    }
+
+    public function testStringDateTimeRoutesThroughFormatDatetimeJitHelper(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/StringDateTime.php');
+        $this->assertStringContainsString('FormatDatetimeJitHelper', $source);
+        $this->assertStringNotContainsString('TM_SEC', $source);
+        $this->assertStringNotContainsString("lookupFunction('localtime')", $source);
+        $this->assertStringNotContainsString("lookupFunction('gmtime')", $source);
+        $this->assertLessThan(150, \substr_count($source, "\n") + 1);
     }
 
     public function testStringStrftimeRoutesThroughStrftimeJitHelper(): void
@@ -71,6 +82,18 @@ final class CalendarBuiltinRuntimeShrinkTest extends TestCase
         $this->assertSame(
             VmDate::gmmktime(0, 0, 0, 1, 1, 2000),
             GmmktimeJitHelper::lastTimestamp()
+        );
+    }
+
+    public function testFormatDatetimeJitHelperSemanticsMatchVmDate(): void
+    {
+        $this->assertSame(
+            VmDate::date('Y-m-d', 0),
+            FormatDatetimeJitHelper::formatDatetimeArgv('Y-m-d', 0, 0)
+        );
+        $this->assertSame(
+            VmDate::gmdate('Y-m-d', 0),
+            FormatDatetimeJitHelper::formatDatetimeArgv('Y-m-d', 0, 1)
         );
     }
 
