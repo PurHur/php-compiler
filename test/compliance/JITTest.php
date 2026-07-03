@@ -437,7 +437,8 @@ class JITTest extends BaseTest {
             }
             // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables typed class constants (#12798).
             if (CompilerVersion::supportsTypedClassConstants()
-                && str_contains($name, 'typed_class_const_reject')) {
+                && (str_contains($name, 'typed_class_const_reject')
+                    || str_contains($name, 'typed_class_const_reference_profile'))) {
                 continue;
             }
             // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123).
@@ -465,7 +466,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'enum_typed_class_const')
                     || str_contains($name, 'match_typed_class_const')
                     || str_contains($name, 'reflection_class_constant_get_type'))
-                && !str_contains($name, 'typed_class_const_reject')) {
+                && !str_contains($name, 'typed_class_const_reject')
+                && !str_contains($name, 'typed_class_const_reference_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).

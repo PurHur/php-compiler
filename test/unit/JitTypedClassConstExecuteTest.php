@@ -36,7 +36,10 @@ final class JitTypedClassConstExecuteTest extends TestCase
     public function testTypedClassConstMatchesVm(string $fixture): void
     {
         if (!CompilerVersion::supportsTypedClassConstants()) {
-            $this->markTestSkipped('typed class constants require CompilerVersion 8.4.0+');
+            putenv('PHP_COMPILER_PROFILE=8.3');
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require forward profile 8.3+');
+            }
         }
         $jit = realpath($this->repoRoot.'/bin/jit.php');
         $this->assertNotFalse($jit);
@@ -44,6 +47,9 @@ final class JitTypedClassConstExecuteTest extends TestCase
         $this->assertNotFalse($vm);
         $code = $this->phptFixtureCode($fixture);
         $env = $this->llvmProcessEnv();
+        if (!CompilerVersion::supportsTypedClassConstants()) {
+            $env['PHP_COMPILER_PROFILE'] = '8.3';
+        }
         $vmOut = $this->runScript([PHP_BINARY, $vm], $env, $code);
         $this->assertSame(0, $vmOut['exit'], 'VM: '.$vmOut['combined']);
         $jitOut = $this->runScript(

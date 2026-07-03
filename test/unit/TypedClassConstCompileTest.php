@@ -29,10 +29,13 @@ PHP;
 
     public function testTypedClassConstantCompilesOnForwardProfile(): void
     {
-        if (!CompilerVersion::supportsTypedClassConstants()) {
-            $this->markTestSkipped('typed class constants require forward profile 8.3+ (#12994)');
-        }
-        $code = <<<'PHP'
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            if (!CompilerVersion::supportsTypedClassConstants()) {
+                $this->markTestSkipped('typed class constants require forward profile 8.3+ (#12994)');
+            }
+            $code = <<<'PHP'
 <?php
 class C {
     public const string K = 'v';
@@ -40,12 +43,19 @@ class C {
 }
 echo C::K, C::X[0];
 PHP;
-        $runtime = new Runtime();
-        $block = $runtime->parseAndCompile($code, 'typed_class_const_forward.php');
-        $this->assertNotNull($block);
-        ob_start();
-        $runtime->run($block);
-        $this->assertSame('v1', ob_get_clean());
+            $runtime = new Runtime();
+            $block = $runtime->parseAndCompile($code, 'typed_class_const_forward.php');
+            $this->assertNotNull($block);
+            ob_start();
+            $runtime->run($block);
+            $this->assertSame('v1', ob_get_clean());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testUntypedClassConstantStillCompilesOnReferenceProfile(): void
