@@ -6,10 +6,10 @@ namespace PHPCompiler\Test\Unit;
 
 use PHPUnit\Framework\TestCase;
 
-/** Bootstrap M3 emit selfhost path probe uses JitStringSearch, not libc strstr (#14080). */
+/** Bootstrap M3 emit uses JitStringSearch::findOffsetI32 backed by FindSubstrJitHelper PHP (#15287). */
 final class BootstrapCompileSmokeM3EmitShrinkTest extends TestCase
 {
-    public function testEmitPutenvProbeUsesJitStringSearchNotLibcStrstr(): void
+    public function testBootstrapEmitUsesFindSubstrPhpBridge(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/BootstrapCompileSmokeM3Emit.php');
         $this->assertStringContainsString('JitStringSearch::findOffsetI32', $source);
