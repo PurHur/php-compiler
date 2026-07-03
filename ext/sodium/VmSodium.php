@@ -63,6 +63,40 @@ final class VmSodium
 
     public const CRYPTO_BOX_SEALBYTES = 48;
 
+    public const CRYPTO_AEAD_AES256GCM_KEYBYTES = 32;
+
+    public const CRYPTO_AEAD_AES256GCM_NPUBBYTES = 12;
+
+    public const CRYPTO_AEAD_AES256GCM_NSECRETBYTES = 0;
+
+    public const CRYPTO_AEAD_AES256GCM_ABYTES = 16;
+
+    public const CRYPTO_SIGN_PUBLICKEYBYTES = 32;
+
+    public const CRYPTO_SIGN_SECRETKEYBYTES = 64;
+
+    public const CRYPTO_SIGN_KEYPAIRBYTES = 96;
+
+    public const CRYPTO_SIGN_BYTES = 64;
+
+    public const CRYPTO_SIGN_SEEDBYTES = 32;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES = 32;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_HEADERBYTES = 24;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES = 17;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES = 52;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE = 0;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_PUSH = 1;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_REKEY = 2;
+
+    public const CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_FINAL = 3;
+
     private static ?\FFI $ffi = null;
 
     private static bool $ffiUnavailable = false;
@@ -77,7 +111,23 @@ final class VmSodium
             || \function_exists('sodium_crypto_generichash')
             || \function_exists('sodium_crypto_scalarmult')
             || \function_exists('sodium_crypto_box_seal')
+            || \function_exists('sodium_crypto_aead_aes256gcm_encrypt')
+            || \function_exists('sodium_crypto_sign_keypair')
+            || \function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')
             || null !== self::ffi();
+    }
+
+    public static function aeadAes256gcmIsAvailable(): bool
+    {
+        if (\function_exists('sodium_crypto_aead_aes256gcm_is_available')) {
+            return \sodium_crypto_aead_aes256gcm_is_available();
+        }
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return false;
+        }
+
+        return 1 === (int) $ffi->crypto_aead_aes256gcm_is_available();
     }
 
     public static function pad(string $string, int $blockSize): string
@@ -326,6 +376,218 @@ final class VmSodium
         }
 
         return self::ffiAeadXchacha20poly1305IetfDecrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    public static function aeadAes256gcmEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        if (!self::aeadAes256gcmIsAvailable()) {
+            self::throwSodium('AES-256-GCM is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aes256gcm_encrypt')) {
+            self::validateAeadAes256gcmKeyNonce($key, $nonce, 'sodium_crypto_aead_aes256gcm_encrypt', 3, 4);
+
+            return \sodium_crypto_aead_aes256gcm_encrypt($message, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAes256gcmEncrypt($message, $additionalData, $nonce, $key);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function aeadAes256gcmDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        if (!self::aeadAes256gcmIsAvailable()) {
+            self::throwSodium('AES-256-GCM is not available');
+        }
+        if (\function_exists('sodium_crypto_aead_aes256gcm_decrypt')) {
+            self::validateAeadAes256gcmKeyNonce($key, $nonce, 'sodium_crypto_aead_aes256gcm_decrypt', 3, 4);
+
+            return \sodium_crypto_aead_aes256gcm_decrypt($ciphertext, $additionalData, $nonce, $key);
+        }
+
+        return self::ffiAeadAes256gcmDecrypt($ciphertext, $additionalData, $nonce, $key);
+    }
+
+    public static function signKeypair(): string
+    {
+        if (\function_exists('sodium_crypto_sign_keypair')) {
+            return \sodium_crypto_sign_keypair();
+        }
+
+        return self::ffiSignKeypair();
+    }
+
+    public static function signPublickey(string $keypair): string
+    {
+        self::validateSignKeypair($keypair, 'sodium_crypto_sign_publickey');
+        if (\function_exists('sodium_crypto_sign_publickey')) {
+            return \sodium_crypto_sign_publickey($keypair);
+        }
+
+        return \substr($keypair, self::CRYPTO_SIGN_SECRETKEYBYTES, self::CRYPTO_SIGN_PUBLICKEYBYTES);
+    }
+
+    public static function signSecretkey(string $keypair): string
+    {
+        self::validateSignKeypair($keypair, 'sodium_crypto_sign_secretkey');
+        if (\function_exists('sodium_crypto_sign_secretkey')) {
+            return \sodium_crypto_sign_secretkey($keypair);
+        }
+
+        return \substr($keypair, 0, self::CRYPTO_SIGN_SECRETKEYBYTES);
+    }
+
+    public static function signPublickeyFromSecretkey(string $secretkey): string
+    {
+        self::validateSignSecretkey($secretkey, 'sodium_crypto_sign_publickey_from_secretkey');
+        if (\function_exists('sodium_crypto_sign_publickey_from_secretkey')) {
+            return \sodium_crypto_sign_publickey_from_secretkey($secretkey);
+        }
+
+        return self::ffiSignPublickeyFromSecretkey($secretkey);
+    }
+
+    public static function sign(string $message, string $secretkey): string
+    {
+        self::validateSignSecretkey($secretkey, 'sodium_crypto_sign', 2);
+        if (\function_exists('sodium_crypto_sign')) {
+            return \sodium_crypto_sign($message, $secretkey);
+        }
+
+        return self::ffiSign($message, $secretkey);
+    }
+
+    /**
+     * @return string|false
+     */
+    public static function signOpen(string $signedMessage, string $publickey): string|false
+    {
+        if (\strlen($publickey) !== self::CRYPTO_SIGN_PUBLICKEYBYTES) {
+            self::throwSodium(
+                'sodium_crypto_sign_open(): Argument #2 ($public_key) must be SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_sign_open')) {
+            return \sodium_crypto_sign_open($signedMessage, $publickey);
+        }
+
+        return self::ffiSignOpen($signedMessage, $publickey);
+    }
+
+    public static function signDetached(string $message, string $secretkey): string
+    {
+        self::validateSignSecretkey($secretkey, 'sodium_crypto_sign_detached', 2);
+        if (\function_exists('sodium_crypto_sign_detached')) {
+            return \sodium_crypto_sign_detached($message, $secretkey);
+        }
+
+        return self::ffiSignDetached($message, $secretkey);
+    }
+
+    public static function signVerifyDetached(string $signature, string $message, string $publickey): bool
+    {
+        if (\strlen($signature) !== self::CRYPTO_SIGN_BYTES) {
+            self::throwSodium(
+                'sodium_crypto_sign_verify_detached(): Argument #1 ($signature) must be SODIUM_CRYPTO_SIGN_BYTES bytes long'
+            );
+        }
+        if (\strlen($publickey) !== self::CRYPTO_SIGN_PUBLICKEYBYTES) {
+            self::throwSodium(
+                'sodium_crypto_sign_verify_detached(): Argument #3 ($public_key) must be SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_sign_verify_detached')) {
+            return \sodium_crypto_sign_verify_detached($signature, $message, $publickey);
+        }
+
+        return self::ffiSignVerifyDetached($signature, $message, $publickey);
+    }
+
+    public static function secretstreamKeygen(): string
+    {
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_keygen')) {
+            return \sodium_crypto_secretstream_xchacha20poly1305_keygen();
+        }
+
+        return self::ffiSecretstreamKeygen();
+    }
+
+    /**
+     * @return array{0: string, 1: string} state and header
+     */
+    public static function secretstreamInitPush(string $key): array
+    {
+        self::validateSecretstreamKey($key, 'sodium_crypto_secretstream_xchacha20poly1305_init_push');
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_init_push')) {
+            return \sodium_crypto_secretstream_xchacha20poly1305_init_push($key);
+        }
+
+        return self::ffiSecretstreamInitPush($key);
+    }
+
+    public static function secretstreamInitPull(string $header, string $key): string
+    {
+        self::validateSecretstreamKey($key, 'sodium_crypto_secretstream_xchacha20poly1305_init_pull', 2);
+        if (\strlen($header) !== self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_HEADERBYTES) {
+            self::throwSodium(
+                'sodium_crypto_secretstream_xchacha20poly1305_init_pull(): Argument #1 ($header) must be SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_HEADERBYTES bytes long'
+            );
+        }
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_init_pull')) {
+            return \sodium_crypto_secretstream_xchacha20poly1305_init_pull($header, $key);
+        }
+
+        return self::ffiSecretstreamInitPull($header, $key);
+    }
+
+    public static function secretstreamPush(
+        string &$state,
+        string $message,
+        string $additionalData = '',
+        int $tag = self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_TAG_MESSAGE
+    ): string {
+        self::validateSecretstreamState($state, 'sodium_crypto_secretstream_xchacha20poly1305_push');
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_push')) {
+            return \sodium_crypto_secretstream_xchacha20poly1305_push($state, $message, $additionalData, $tag);
+        }
+
+        return self::ffiSecretstreamPush($state, $message, $additionalData, $tag);
+    }
+
+    /**
+     * @return array{0: string, 1: int}|false
+     */
+    public static function secretstreamPull(
+        string &$state,
+        string $ciphertext,
+        string $additionalData = ''
+    ): array|false {
+        self::validateSecretstreamState($state, 'sodium_crypto_secretstream_xchacha20poly1305_pull');
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_pull')) {
+            return \sodium_crypto_secretstream_xchacha20poly1305_pull($state, $ciphertext, $additionalData);
+        }
+
+        return self::ffiSecretstreamPull($state, $ciphertext, $additionalData);
+    }
+
+    public static function secretstreamRekey(string &$state): void
+    {
+        self::validateSecretstreamState($state, 'sodium_crypto_secretstream_xchacha20poly1305_rekey');
+        if (\function_exists('sodium_crypto_secretstream_xchacha20poly1305_rekey')) {
+            \sodium_crypto_secretstream_xchacha20poly1305_rekey($state);
+
+            return;
+        }
+        self::ffiSecretstreamRekey($state);
     }
 
     public static function auth(string $message, string $key): string
@@ -751,6 +1013,308 @@ final class VmSodium
         return self::unsignedCharArrayToString($mBuf, $mlen);
     }
 
+    private static function ffiAeadAes256gcmEncrypt(
+        string $message,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string {
+        $ffi = self::requireFfi();
+        self::validateAeadAes256gcmKeyNonce($key, $nonce, 'sodium_crypto_aead_aes256gcm_encrypt', 3, 4);
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_AEAD_AES256GCM_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aes256gcm_encrypt(
+            $cBuf,
+            $clenOut,
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            $nsecBuf,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            throw new \Exception('sodium_crypto_aead_aes256gcm_encrypt(): internal error');
+        }
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiAeadAes256gcmDecrypt(
+        string $ciphertext,
+        string $additionalData,
+        string $nonce,
+        string $key
+    ): string|false {
+        $ffi = self::requireFfi();
+        self::validateAeadAes256gcmKeyNonce($key, $nonce, 'sodium_crypto_aead_aes256gcm_decrypt', 3, 4);
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_AEAD_AES256GCM_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_AEAD_AES256GCM_ABYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $mlenOut = $ffi->new('unsigned long long');
+        $nsecBuf = $ffi->new('unsigned char[0]');
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $adlen = \strlen($additionalData);
+        $npubBuf = self::stringToUnsignedCharArray($ffi, $nonce);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_aead_aes256gcm_decrypt(
+            $mBuf,
+            $mlenOut,
+            $nsecBuf,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen,
+            $npubBuf,
+            $kBuf
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return self::unsignedCharArrayToString($mBuf, $mlen);
+    }
+
+    private static function ffiSignKeypair(): string
+    {
+        $ffi = self::requireFfi();
+        $pkBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_PUBLICKEYBYTES.']');
+        $skBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_SECRETKEYBYTES.']');
+        $rc = $ffi->crypto_sign_keypair($pkBuf, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($skBuf, self::CRYPTO_SIGN_SECRETKEYBYTES)
+            .self::unsignedCharArrayToString($pkBuf, self::CRYPTO_SIGN_PUBLICKEYBYTES);
+    }
+
+    private static function ffiSignPublickeyFromSecretkey(string $secretkey): string
+    {
+        $ffi = self::requireFfi();
+        $pkBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_PUBLICKEYBYTES.']');
+        $skBuf = self::stringToUnsignedCharArray($ffi, $secretkey);
+        $rc = $ffi->crypto_sign_ed25519_sk_to_pk($pkBuf, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($pkBuf, self::CRYPTO_SIGN_PUBLICKEYBYTES);
+    }
+
+    private static function ffiSign(string $message, string $secretkey): string
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $smlen = $mlen + self::CRYPTO_SIGN_BYTES;
+        $smBuf = $ffi->new('unsigned char['.$smlen.']');
+        $smlenOut = $ffi->new('unsigned long long');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $skBuf = self::stringToUnsignedCharArray($ffi, $secretkey);
+        $rc = $ffi->crypto_sign($smBuf, $smlenOut, $mBuf, $mlen, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($smBuf, $smlen);
+    }
+
+    /**
+     * @return string|false
+     */
+    private static function ffiSignOpen(string $signedMessage, string $publickey): string|false
+    {
+        $ffi = self::requireFfi();
+        $smlen = \strlen($signedMessage);
+        if ($smlen < self::CRYPTO_SIGN_BYTES) {
+            return false;
+        }
+        $mlen = $smlen - self::CRYPTO_SIGN_BYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $mlenOut = $ffi->new('unsigned long long');
+        $smBuf = self::stringToUnsignedCharArray($ffi, $signedMessage);
+        $pkBuf = self::stringToUnsignedCharArray($ffi, $publickey);
+        $rc = $ffi->crypto_sign_open($mBuf, $mlenOut, $smBuf, $smlen, $pkBuf);
+        if (0 !== $rc) {
+            return false;
+        }
+
+        return self::unsignedCharArrayToString($mBuf, $mlen);
+    }
+
+    private static function ffiSignDetached(string $message, string $secretkey): string
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $sigBuf = $ffi->new('unsigned char['.self::CRYPTO_SIGN_BYTES.']');
+        $siglenOut = $ffi->new('unsigned long long');
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $skBuf = self::stringToUnsignedCharArray($ffi, $secretkey);
+        $rc = $ffi->crypto_sign_detached($sigBuf, $siglenOut, $mBuf, $mlen, $skBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($sigBuf, self::CRYPTO_SIGN_BYTES);
+    }
+
+    private static function ffiSignVerifyDetached(string $signature, string $message, string $publickey): bool
+    {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $sigBuf = self::stringToUnsignedCharArray($ffi, $signature);
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $pkBuf = self::stringToUnsignedCharArray($ffi, $publickey);
+        $rc = $ffi->crypto_sign_verify_detached($sigBuf, $mBuf, $mlen, $pkBuf);
+
+        return 0 === $rc;
+    }
+
+    private static function ffiSecretstreamKeygen(): string
+    {
+        $ffi = self::requireFfi();
+        $kBuf = $ffi->new('unsigned char['.self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES.']');
+        $ffi->crypto_secretstream_xchacha20poly1305_keygen($kBuf);
+
+        return self::unsignedCharArrayToString($kBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES);
+    }
+
+    /**
+     * @return array{0: string, 1: string}
+     */
+    private static function ffiSecretstreamInitPush(string $key): array
+    {
+        $ffi = self::requireFfi();
+        $stateBuf = $ffi->new('unsigned char['.self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES.']');
+        $headerBuf = $ffi->new('unsigned char['.self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_HEADERBYTES.']');
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_secretstream_xchacha20poly1305_init_push($stateBuf, $headerBuf, $kBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return [
+            self::unsignedCharArrayToString($stateBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES),
+            self::unsignedCharArrayToString($headerBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_HEADERBYTES),
+        ];
+    }
+
+    private static function ffiSecretstreamInitPull(string $header, string $key): string
+    {
+        $ffi = self::requireFfi();
+        $stateBuf = $ffi->new('unsigned char['.self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES.']');
+        $headerBuf = self::stringToUnsignedCharArray($ffi, $header);
+        $kBuf = self::stringToUnsignedCharArray($ffi, $key);
+        $rc = $ffi->crypto_secretstream_xchacha20poly1305_init_pull($stateBuf, $headerBuf, $kBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+
+        return self::unsignedCharArrayToString($stateBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES);
+    }
+
+    private static function ffiSecretstreamPush(
+        string &$state,
+        string $message,
+        string $additionalData,
+        int $tag
+    ): string {
+        $ffi = self::requireFfi();
+        $mlen = \strlen($message);
+        $adlen = \strlen($additionalData);
+        $clen = $mlen + self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES;
+        $cBuf = $ffi->new('unsigned char['.$clen.']');
+        $clenOut = $ffi->new('unsigned long long');
+        $stateBuf = self::stringToUnsignedCharArray($ffi, $state);
+        $mBuf = self::stringToUnsignedCharArray($ffi, $message);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $rc = $ffi->crypto_secretstream_xchacha20poly1305_push(
+            $cBuf,
+            $clenOut,
+            $stateBuf,
+            $mBuf,
+            $mlen,
+            $adBuf,
+            $adlen,
+            $tag
+        );
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $state = self::unsignedCharArrayToString($stateBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES);
+
+        return self::unsignedCharArrayToString($cBuf, $clen);
+    }
+
+    /**
+     * @return array{0: string, 1: int}|false
+     */
+    private static function ffiSecretstreamPull(
+        string &$state,
+        string $ciphertext,
+        string $additionalData
+    ): array|false {
+        $ffi = self::requireFfi();
+        $clen = \strlen($ciphertext);
+        if ($clen < self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES) {
+            return false;
+        }
+        $mlen = $clen - self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_ABYTES;
+        $mBuf = $ffi->new('unsigned char['.$mlen.']');
+        $mlenOut = $ffi->new('unsigned long long');
+        $tagOut = $ffi->new('unsigned char');
+        $stateBuf = self::stringToUnsignedCharArray($ffi, $state);
+        $cBuf = self::stringToUnsignedCharArray($ffi, $ciphertext);
+        $adBuf = self::stringToUnsignedCharArray($ffi, $additionalData);
+        $adlen = \strlen($additionalData);
+        $rc = $ffi->crypto_secretstream_xchacha20poly1305_pull(
+            $mBuf,
+            $mlenOut,
+            $tagOut,
+            $stateBuf,
+            $cBuf,
+            $clen,
+            $adBuf,
+            $adlen
+        );
+        if (0 !== $rc) {
+            return false;
+        }
+        $state = self::unsignedCharArrayToString($stateBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES);
+
+        return [
+            self::unsignedCharArrayToString($mBuf, $mlen),
+            (int) $tagOut[0],
+        ];
+    }
+
+    private static function ffiSecretstreamRekey(string &$state): void
+    {
+        $ffi = self::requireFfi();
+        $stateBuf = self::stringToUnsignedCharArray($ffi, $state);
+        $rc = $ffi->crypto_secretstream_xchacha20poly1305_rekey($stateBuf);
+        if (0 !== $rc) {
+            self::throwSodium('internal error');
+        }
+        $state = self::unsignedCharArrayToString($stateBuf, self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES);
+    }
+
     private static function validateStreamLength(int $length, string $fn): void
     {
         if ($length <= 0) {
@@ -823,6 +1387,72 @@ final class VmSodium
                 '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_XCHACHA20POLY1305_IETF_KEYBYTES bytes long',
                 $fn,
                 $keyArg
+            ));
+        }
+    }
+
+    private static function validateAeadAes256gcmKeyNonce(
+        string $key,
+        string $nonce,
+        string $fn,
+        int $nonceArg,
+        int $keyArg
+    ): void {
+        if (\strlen($nonce) !== self::CRYPTO_AEAD_AES256GCM_NPUBBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($nonce) must be SODIUM_CRYPTO_AEAD_AES256GCM_NPUBBYTES bytes long',
+                $fn,
+                $nonceArg
+            ));
+        }
+        if (\strlen($key) !== self::CRYPTO_AEAD_AES256GCM_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_AEAD_AES256GCM_KEYBYTES bytes long',
+                $fn,
+                $keyArg
+            ));
+        }
+    }
+
+    private static function validateSignKeypair(string $keypair, string $fn, int $argNum = 1): void
+    {
+        if (\strlen($keypair) !== self::CRYPTO_SIGN_KEYPAIRBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($keypair) must be SODIUM_CRYPTO_SIGN_KEYPAIRBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
+    private static function validateSignSecretkey(string $secretkey, string $fn, int $argNum = 1): void
+    {
+        if (\strlen($secretkey) !== self::CRYPTO_SIGN_SECRETKEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($secret_key) must be SODIUM_CRYPTO_SIGN_SECRETKEYBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
+    private static function validateSecretstreamKey(string $key, string $fn, int $argNum = 1): void
+    {
+        if (\strlen($key) !== self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #%d ($key) must be SODIUM_CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_KEYBYTES bytes long',
+                $fn,
+                $argNum
+            ));
+        }
+    }
+
+    private static function validateSecretstreamState(string $state, string $fn): void
+    {
+        if (\strlen($state) !== self::CRYPTO_SECRETSTREAM_XCHACHA20POLY1305_STATEBYTES) {
+            self::throwSodium(\sprintf(
+                '%s(): Argument #1 ($state) must be a reference to a state',
+                $fn
             ));
         }
     }
@@ -922,7 +1552,22 @@ final class VmSodium
                     int crypto_scalarmult_base(unsigned char *q, const unsigned char *n);
                     int crypto_box_keypair(unsigned char *pk, unsigned char *sk);
                     int crypto_box_seal(unsigned char *c, const unsigned char *m, unsigned long long mlen, const unsigned char *pk);
-                    int crypto_box_seal_open(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *pk, const unsigned char *sk);',
+                    int crypto_box_seal_open(unsigned char *m, const unsigned char *c, unsigned long long clen, const unsigned char *pk, const unsigned char *sk);
+                    int crypto_aead_aes256gcm_is_available(void);
+                    int crypto_aead_aes256gcm_encrypt(unsigned char *c, unsigned long long *clen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, const unsigned char *nsec, const unsigned char *npub, const unsigned char *k);
+                    int crypto_aead_aes256gcm_decrypt(unsigned char *m, unsigned long long *mlen_p, unsigned char *nsec, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen, const unsigned char *npub, const unsigned char *k);
+                    int crypto_sign_keypair(unsigned char *pk, unsigned char *sk);
+                    int crypto_sign_ed25519_sk_to_pk(unsigned char *pk, const unsigned char *sk);
+                    int crypto_sign(unsigned char *sm, unsigned long long *smlen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *sk);
+                    int crypto_sign_open(unsigned char *m, unsigned long long *mlen_p, const unsigned char *sm, unsigned long long smlen, const unsigned char *pk);
+                    int crypto_sign_detached(unsigned char *sig, unsigned long long *siglen_p, const unsigned char *m, unsigned long long mlen, const unsigned char *sk);
+                    int crypto_sign_verify_detached(const unsigned char *sig, const unsigned char *m, unsigned long long mlen, const unsigned char *pk);
+                    void crypto_secretstream_xchacha20poly1305_keygen(unsigned char k[32]);
+                    int crypto_secretstream_xchacha20poly1305_init_push(unsigned char *state, unsigned char *header, const unsigned char k[32]);
+                    int crypto_secretstream_xchacha20poly1305_init_pull(unsigned char *state, const unsigned char *header, const unsigned char k[32]);
+                    int crypto_secretstream_xchacha20poly1305_push(unsigned char *c, unsigned long long *clen_p, unsigned char *state, const unsigned char *m, unsigned long long mlen, const unsigned char *ad, unsigned long long adlen, unsigned char tag);
+                    int crypto_secretstream_xchacha20poly1305_pull(unsigned char *m, unsigned long long *mlen_p, unsigned char *tag, unsigned char *state, const unsigned char *c, unsigned long long clen, const unsigned char *ad, unsigned long long adlen);
+                    int crypto_secretstream_xchacha20poly1305_rekey(unsigned char *state);',
                     $lib
                 );
                 $ffi->sodium_init();
