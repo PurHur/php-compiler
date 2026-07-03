@@ -1,5 +1,5 @@
 --TEST--
-Language: public private(set) — compile fatal (#15184, Zend/zend_compile.c)
+Language: public private(set) — read OK, write Error (#15368, Zend/zend_execute.c)
 --FILE--
 <?php
 class B {
@@ -7,5 +7,11 @@ class B {
 }
 $b = new B();
 echo $b->label, "\n";
---EXPECT_EXIT--
-255
+try {
+    $b->label = 'no';
+} catch (Error $e) {
+    echo get_class($e), ': ', $e->getMessage(), "\n";
+}
+--EXPECT--
+hi
+Error: Cannot modify private(set) property B::$label from global scope

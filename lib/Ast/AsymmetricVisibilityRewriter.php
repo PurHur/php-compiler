@@ -274,9 +274,9 @@ final class AsymmetricVisibilityRewriter
 
     private static function lineViolatesMultipleSetModifierRules(string $line): bool
     {
-        // php-src: zend_add_member_modifier() — explicit read plus set is a compile fatal (#15184).
-        return self::lineViolatesDuplicateSetModifierRules($line)
-            || self::lineHasExplicitReadPlusSetModifier($line);
+        // php-src 8.4: duplicate PPP / PPP_SET only; explicit read + different set is valid asymmetric visibility (#15368).
+        // Weaker-than-set pairs are rejected later by AsymmetricVisibilityCompileCheck.
+        return self::lineViolatesDuplicateSetModifierRules($line);
     }
 
     /**
