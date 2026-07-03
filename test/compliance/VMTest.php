@@ -445,6 +445,7 @@ class VMTest extends BaseTest {
                 if (str_contains($name, 'class_const_new_rejected')
                     || str_contains($name, 'class_const_new_expr')
                     || str_contains($name, 'class_const_new_reference_profile')
+                    || str_contains($name, 'new_in_class_constant_reject')
                     || (str_contains($name, 'class_const_new_expression') && !str_contains($name, '_run'))
                     || (str_contains($name, 'class_const_new_object') && !str_contains($name, '_run'))
                     || (str_contains($name, 'class_const_object') && !str_contains($name, '_run'))
