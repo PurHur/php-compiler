@@ -279,11 +279,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
-    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
+    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
-        $this->assertFalse(isset($closure->methods['getcurrent']));
+        $this->assertTrue(isset($closure->methods['getcurrent']));
     }
 }
