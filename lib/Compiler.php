@@ -14304,6 +14304,12 @@ class Compiler {
                 return $mergeMapped;
             }
         }
+        if ('preg_replace' === $inlineFuncName) {
+            $pregReplaceMapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $pregReplaceMapped) {
+                return $pregReplaceMapped;
+            }
+        }
         $trailingComparator = $this->matchTrailingComparatorInlineCallArgProducer(
             $producers,
             $callArgs,
@@ -15531,21 +15537,16 @@ class Compiler {
         }
         // array_map(callback, [...], [...]) — map hoisted Array_ producers to array args by order (#10094, #13812).
         if ('array_map' === $inlineFuncName && $argIndex >= 1) {
-            $arrayProducers = array_values(array_filter(
-                $producers,
-                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
-            ));
-            if ([] !== $arrayProducers) {
-                $arrayArgIndices = [];
-                foreach ($callArgs as $i => $arg) {
-                    if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
-                        $arrayArgIndices[] = $i;
-                    }
-                }
-                $position = array_search($argIndex, $arrayArgIndices, true);
-                if (false !== $position && isset($arrayProducers[$position])) {
-                    return $arrayProducers[$position];
-                }
+            $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
+            }
+        }
+        // preg_replace(['/a/'], ['A'], 'subj') — sibling Array_ pattern/replacement + embedded subject (#10808).
+        if ('preg_replace' === $inlineFuncName) {
+            $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
             }
         }
         // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
@@ -19584,6 +19585,38 @@ class Compiler {
         }
 
         return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+    }
+
+    /**
+     * Map consecutive hoisted Array_ producers to array-shaped call args by order (#10094, #10808).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchInlineArrayProducersToArrayCallArgs(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if ([] === $arrayProducers) {
+            return null;
+        }
+        $arrayArgIndices = [];
+        foreach ($callArgs as $i => $arg) {
+            if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
+                $arrayArgIndices[] = $i;
+            }
+        }
+        $position = array_search($argIndex, $arrayArgIndices, true);
+        if (false === $position || !isset($arrayProducers[$position])) {
+            return null;
+        }
+
+        return $arrayProducers[$position];
     }
 
     /**
@@ -24796,7 +24829,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
-                && 1 === $this->countDeadArrayInlineCallArgs($cfgCallOp)
+                && $this->countDeadArrayInlineCallArgs($cfgCallOp) >= 1
                 && null !== $block->orig
                 && !$this->precedingInlineCallArgHasPlusOrConcatProducer($block->orig->children, $cfgCallOp)
                 && null === $this->nestedInlineFuncCallProducerForCallArg($block, $cfgCallOp, (int) $argIndex)
@@ -24807,32 +24840,53 @@ class Compiler {
                         $cfgCallOp
                     )
                     : [];
-                $lastProducer = $producers[\count($producers) - 1] ?? null;
-                $hasArrayUnionPlus = false;
-                foreach ($producers as $producer) {
-                    if ($producer instanceof Op\Expr\BinaryOp\Plus) {
-                        $hasArrayUnionPlus = true;
-                        break;
-                    }
-                }
-                // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
-                if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
-                    $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
-                    if ($immediateArray instanceof Op\Expr\Array_) {
-                        $immediateSlot = $block->slotForOperand($immediateArray->result);
-                        if (null === $immediateSlot) {
-                            foreach ($this->compileExpr($immediateArray, $block) as $op) {
+                $deadArrayArgCount = $this->countDeadArrayInlineCallArgs($cfgCallOp);
+                if ($deadArrayArgCount >= 2) {
+                    $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                        $producers,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    );
+                    if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
+                        if (null === $block->slotForOperand($matched->result)) {
+                            foreach ($this->compileExpr($matched, $block) as $op) {
                                 $sends[] = $op;
                             }
+                        }
+                        $matchedSlot = $block->slotForOperand($matched->result);
+                        if (null !== $matchedSlot) {
+                            $valueSlot = (string) $matchedSlot;
+                        }
+                    }
+                } else {
+                    $lastProducer = $producers[\count($producers) - 1] ?? null;
+                    $hasArrayUnionPlus = false;
+                    foreach ($producers as $producer) {
+                        if ($producer instanceof Op\Expr\BinaryOp\Plus) {
+                            $hasArrayUnionPlus = true;
+                            break;
+                        }
+                    }
+                    // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
+                    if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
+                        $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
+                        if ($immediateArray instanceof Op\Expr\Array_) {
                             $immediateSlot = $block->slotForOperand($immediateArray->result);
-                        }
-                        if (null !== $immediateSlot) {
-                            $valueSlot = (string) $immediateSlot;
-                        }
-                    } else {
-                        $resolvedSlot = $this->slotForDeadInlineArrayOrCallResultCallArg($block, $cfgCallOp, (int) $argIndex);
-                        if (null !== $resolvedSlot) {
-                            $valueSlot = $resolvedSlot;
+                            if (null === $immediateSlot) {
+                                foreach ($this->compileExpr($immediateArray, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $immediateSlot = $block->slotForOperand($immediateArray->result);
+                            }
+                            if (null !== $immediateSlot) {
+                                $valueSlot = (string) $immediateSlot;
+                            }
+                        } else {
+                            $resolvedSlot = $this->slotForDeadInlineArrayOrCallResultCallArg($block, $cfgCallOp, (int) $argIndex);
+                            if (null !== $resolvedSlot) {
+                                $valueSlot = $resolvedSlot;
+                            }
                         }
                     }
                 }
