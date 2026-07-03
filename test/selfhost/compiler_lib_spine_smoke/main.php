@@ -342,6 +342,7 @@ require_once __DIR__.'/../../../ext/mbstring/mb_preferred_mime_name.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_rtrim.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_scrub.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_split.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_str_split.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_str_pad.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strcut.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strimwidth.php';
