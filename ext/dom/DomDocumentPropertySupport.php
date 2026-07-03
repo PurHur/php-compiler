@@ -23,7 +23,8 @@ final class DomDocumentPropertySupport
         return strtolower(VmDom::PROP_ENCODING) === $lc
             || strtolower(VmDom::PROP_XML_VERSION) === $lc
             || strtolower(VmDom::PROP_XML_STANDALONE) === $lc
-            || strtolower(VmDom::PROP_DOCUMENT_URI) === $lc;
+            || strtolower(VmDom::PROP_DOCUMENT_URI) === $lc
+            || strtolower(VmDom::PROP_IMPLEMENTATION) === $lc;
     }
 
     public static function getProperty(ObjectEntry $object, string $name): Variable
@@ -59,6 +60,11 @@ final class DomDocumentPropertySupport
             } else {
                 $var->string($state->documentUri);
             }
+
+            return $var;
+        }
+        if (strtolower(VmDom::PROP_IMPLEMENTATION) === $lc) {
+            $var->object(VmDom::implementationSingleton());
 
             return $var;
         }

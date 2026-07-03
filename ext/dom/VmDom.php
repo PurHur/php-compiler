@@ -23,6 +23,10 @@ use PHPCompiler\VM\Variable;
  */
 final class VmDom
 {
+    private static ?ClassEntry $implementationClassEntry = null;
+
+    /** @var array<int, ObjectEntry> */
+    private static array $implementationSingletons = [];
     public const CLASS_IMPLEMENTATION = 'domimplementation';
 
     public const CLASS_DOCUMENT = 'domdocument';
@@ -40,6 +44,8 @@ final class VmDom
     public const CLASS_NODE_LIST = 'domnodelist';
 
     public const PROP_FORMAT_OUTPUT = 'formatOutput';
+
+    public const PROP_IMPLEMENTATION = 'implementation';
 
     public const PROP_VALIDATE_ON_PARSE = 'validateOnParse';
 
@@ -195,6 +201,7 @@ final class VmDom
         $impl->methodVisibility['getfeature'] = $pub;
         $impl->methods['hasfeature'] = new ImplementationHasFeature();
         $impl->methodVisibility['hasfeature'] = $pub;
+        self::$implementationClassEntry = $impl;
         $ctx->classes[self::CLASS_IMPLEMENTATION] = $impl;
 
         $doctype = new ClassEntry('DOMDocumentType');
@@ -370,6 +377,21 @@ final class VmDom
         }
 
         return false;
+    }
+
+    public static function implementationSingleton(): ObjectEntry
+    {
+        if (null === self::$implementationClassEntry) {
+            throw new \LogicException('DOMImplementation is not registered in this compiler build');
+        }
+        $key = spl_object_id(self::$implementationClassEntry);
+        if (!isset(self::$implementationSingletons[$key])) {
+            $entry = new ObjectEntry(self::$implementationClassEntry);
+            $entry->constructed = true;
+            self::$implementationSingletons[$key] = $entry;
+        }
+
+        return self::$implementationSingletons[$key];
     }
 
     public static function isDefaultNamespace(ObjectEntry $node, string $namespaceUri): bool
