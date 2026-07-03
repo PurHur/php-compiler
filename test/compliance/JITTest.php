@@ -797,6 +797,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'reflection_property_isreadable')) {
                 continue;
             }
+            // ReflectionProperty::isDynamic profile gates: VM-only (#15676).
+            if (str_contains($name, 'reflection_property_isdynamic')) {
+                continue;
+            }
             // Reflection docblock/source getters are VM-only (#7358).
             if (str_contains($name, 'reflection_docblock_source')) {
                 continue;

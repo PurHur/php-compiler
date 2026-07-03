@@ -99,6 +99,26 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsReflectionPropertyIsDynamicFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyIsDynamic());
+    }
+
+    public function testSupportsReflectionPropertyIsDynamicTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyIsDynamic());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsHrtimeAsNumberFloatFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsHrtimeAsNumberFloat());
