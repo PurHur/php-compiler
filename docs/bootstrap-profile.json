@@ -3710,6 +3710,8 @@
         "lib/VM/MemoryAccounting.php",
         "lib/VM/NamedArgs.php",
         "lib/VM/NativeDateInvalidTimeZoneException.php",
+        "lib/VM/NativeDateMalformedIntervalException.php",
+        "lib/VM/NativeDateMalformedPeriodException.php",
         "lib/VM/NativeDateMalformedStringException.php",
         "lib/VM/NativeDateObjectError.php",
         "lib/VM/NativeDateRangeError.php",
@@ -4059,9 +4061,9 @@
         "test/bootstrap-aot/lib_opcode/main.php"
     ],
     "totals": {
-        "inventory_files": 3829,
+        "inventory_files": 3831,
         "excluded": 0,
-        "eligible": 3829,
+        "eligible": 3831,
         "aot_lint_targets": 111,
         "aot_link_targets": 98,
         "aot_link_lib_targets": 1

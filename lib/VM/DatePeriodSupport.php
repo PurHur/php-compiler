@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCompiler\Frame;
+
 /**
  * Shared helpers for DatePeriod VM builtins (issue #14144, php-src ext/date/php_date.c).
  */
@@ -11,12 +13,61 @@ final class DatePeriodSupport
 {
     public const CLASS_DATEPERIOD = 'dateperiod';
 
+    /** php-src date_period_construct — accepted overload list (#15431). */
+    public const CONSTRUCTOR_SIGNATURE_TYPE_ERROR =
+        'DatePeriod::__construct() accepts (DateTimeInterface, DateInterval, int [, int]), '
+        .'or (DateTimeInterface, DateInterval, DateTime [, int]), or (string [, int]) as arguments';
+
     /** php-src PHP_DATE_PERIOD_INCLUDE_END_DATE — end-date ctor overload sentinel. */
     public const RECURRENCES_END_DATE = 2147483648;
 
     public const OPTION_EXCLUDE_START_DATE = 1;
 
     public const OPTION_INCLUDE_END_DATE = 2;
+
+    /**
+     * php-src date_period_construct — reject unknown overload shapes before mutating state (#15431).
+     */
+    public static function assertConstructorOverload(Frame $frame, int $argc, Context $ctx): void
+    {
+        $userArgs = $argc - 1;
+        if ($userArgs < 1 || $userArgs > 4) {
+            return;
+        }
+        $arg1 = $frame->calledArgs[1]->resolveIndirect();
+        if ($userArgs <= 2) {
+            if (Variable::TYPE_STRING !== $arg1->type) {
+                throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+            }
+
+            return;
+        }
+        if (Variable::TYPE_OBJECT !== $arg1->type) {
+            throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+        }
+        $start = $arg1->toObject();
+        if (!InterfaceCheck::entryIsInstanceOf($start->class, DateTimeSupport::CLASS_DATETIMEINTERFACE, $ctx)) {
+            throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+        }
+        $arg2 = $frame->calledArgs[2]->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $arg2->type) {
+            throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+        }
+        if (DateIntervalSupport::CLASS_DATEINTERVAL !== strtolower($arg2->toObject()->class->name)) {
+            throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+        }
+        $arg3 = $frame->calledArgs[3]->resolveIndirect();
+        if (Variable::TYPE_INTEGER === $arg3->type) {
+            return;
+        }
+        if (Variable::TYPE_OBJECT === $arg3->type) {
+            $end = $arg3->toObject();
+            if (InterfaceCheck::entryIsInstanceOf($end->class, DateTimeSupport::CLASS_DATETIMEINTERFACE, $ctx)) {
+                return;
+            }
+        }
+        throw new \TypeError(self::CONSTRUCTOR_SIGNATURE_TYPE_ERROR);
+    }
 
     public static function requireDatePeriod(
         Variable $var,

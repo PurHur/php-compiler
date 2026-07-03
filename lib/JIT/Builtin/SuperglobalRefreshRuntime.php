@@ -66,6 +66,7 @@ final class SuperglobalRefreshRuntime
         self::implement($context);
     }
 
+    /** User-script standalone: native LLVM refresh without nested JIT during init (#13571, #13717, #15417). */
     public static function ensureUserScriptRefresh(Context $context): void
     {
         if (Builtin::LOAD_TYPE_STANDALONE !== $context->loadType) {

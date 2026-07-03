@@ -57,12 +57,8 @@ final class AttributeRegistryLookupRuntime
             return;
         }
 
-        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)
-            && '{}' === $classNamesJson
-            && '{}' === $methodNamesJson
-            && !self::classEntriesNeedArgsBridge($classEntriesJson)) {
-            self::implementEmptyLookupStubs($context);
-            $context->builder->clearInsertionPosition();
+        if (StreamIoRuntime::shouldDeferHeavyStreamIoEmitters($context)) {
+            self::implementDeferredUserScriptStubs($context);
 
             return;
         }
@@ -76,41 +72,75 @@ final class AttributeRegistryLookupRuntime
         $context->builder->clearInsertionPosition();
     }
 
-    /** User-script AOT without compile-time attributes: avoid nested AttributeRegistryJitHelper JIT (#15417). */
-    private static function implementEmptyLookupStubs(Context $context): void
+    /** User-script AOT: linkable attr ABI without nested AttributeRegistryJitHelper JIT (#15417). */
+    private static function implementDeferredUserScriptStubs(Context $context): void
     {
         $sizeT = $context->getTypeFromString('size_t');
         $i8p = $context->getTypeFromString('int8*');
-        $zero = $sizeT->constInt(0, false);
-        $nullCstr = $i8p->constNull();
+        $htPtr = $context->getTypeFromString('__hashtable__*');
+        $voidp = $context->getTypeFromString('void*');
 
-        foreach (
-            [
-                ['__compiler_attr_class_count', $context->context->functionType($sizeT, false, $i8p), $zero],
-                ['__compiler_attr_method_count', $context->context->functionType($sizeT, false, $i8p, $i8p), $zero],
-            ] as [$abiName, $ft, $ret]
-        ) {
-            $fn = $context->module->addFunction($abiName, $ft);
-            $entry = $fn->appendBasicBlock('attr_empty_count');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($ret);
-            $context->registerFunction($abiName, $fn);
-        }
+        self::implementDeferredSizeTUnaryStub(
+            $context,
+            '__compiler_attr_class_count',
+            $context->context->functionType($sizeT, false, $i8p)
+        );
+        self::implementDeferredCstrTernaryStub(
+            $context,
+            '__compiler_attr_class_name_at',
+            $context->context->functionType($i8p, false, $i8p, $sizeT)
+        );
+        self::implementDeferredSizeTBinaryStub(
+            $context,
+            '__compiler_attr_method_count',
+            $context->context->functionType($sizeT, false, $i8p, $i8p)
+        );
+        self::implementDeferredCstrQuaternaryStub(
+            $context,
+            '__compiler_attr_method_name_at',
+            $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)
+        );
 
-        foreach (
-            [
-                ['__compiler_attr_class_name_at', $context->context->functionType($i8p, false, $i8p, $sizeT)],
-                ['__compiler_attr_method_name_at', $context->context->functionType($i8p, false, $i8p, $i8p, $sizeT)],
-            ] as [$abiName, $ft]
-        ) {
-            $fn = $context->module->addFunction($abiName, $ft);
-            $entry = $fn->appendBasicBlock('attr_empty_name_at');
-            $context->builder->positionAtEnd($entry);
-            $context->builder->returnValue($nullCstr);
-            $context->registerFunction($abiName, $fn);
-        }
+        $abiName = '__compiler_attr_class_args_hashtable';
+        $ft = $context->context->functionType($htPtr, false, $i8p, $sizeT);
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock('attr_class_args_ht_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue(
+            $context->builder->pointerCast($voidp->constNull(), $htPtr)
+        );
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
 
-        self::implementClassArgsHashtableNullBridge($context);
+    private static function implementDeferredSizeTUnaryStub(Context $context, string $abiName, $ft): void
+    {
+        $sizeT = $context->getTypeFromString('size_t');
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($sizeT->constInt(0, false));
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementDeferredSizeTBinaryStub(Context $context, string $abiName, $ft): void
+    {
+        self::implementDeferredSizeTUnaryStub($context, $abiName, $ft);
+    }
+
+    private static function implementDeferredCstrTernaryStub(Context $context, string $abiName, $ft): void
+    {
+        $i8p = $context->getTypeFromString('int8*');
+        $fn = $context->module->addFunction($abiName, $ft);
+        $entry = $fn->appendBasicBlock($abiName.'_user_stub');
+        $context->builder->positionAtEnd($entry);
+        $context->builder->returnValue($i8p->constNull());
+        $context->registerFunction($abiName, $fn);
+    }
+
+    private static function implementDeferredCstrQuaternaryStub(Context $context, string $abiName, $ft): void
+    {
+        self::implementDeferredCstrTernaryStub($context, $abiName, $ft);
     }
 
     private static function implementClassCountBridge(Context $context, string $classNamesJson): void

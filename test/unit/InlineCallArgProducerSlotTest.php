@@ -2374,6 +2374,46 @@ PHP;
         self::assertStringContainsString('1', $out);
     }
 
+    /** Issue #15421 — array_pad negative literal after UDF array param must not mis-bind length to haystack. */
+    public function testArrayPadNegativeLiteralAfterUdfArrayParamUsesDistinctArgSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+function hold(array $v): void
+{
+}
+hold([]);
+$r = array_pad([1, 2], -4, 0);
+var_export($r);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_after_udf_array.php');
+
+        $padSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $padSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $padSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $padSends);
+        self::assertNotSame($padSends[0], $padSends[1], 'arg sends='.json_encode($padSends));
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('0', $out);
+        self::assertStringContainsString('1', $out);
+        self::assertStringContainsString('2', $out);
+    }
+
     /** Issue #10495 — var_export(get_debug_type(null), true) wires nested scalar-return FuncCall producer. */
     public function testVarExportNestedScalarBuiltinUsesFuncCallProducerSlot(): void
     {
@@ -4117,5 +4157,69 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("2\n", ob_get_clean());
+    }
+
+    /** Issue #15422 — in_array/array_search/array_key_exists after UDF with array param. */
+    public function testInArrayFamilyAfterUdfArrayParamRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_in_array_after_udf_array.php');
+        self::assertNotFalse($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_after_udf_array.php');
+
+        $holdReturnSlot = null;
+        $inArrayHaystackSend = null;
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $holdReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $inArrayHaystackSend) {
+                $inArrayHaystackSend = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($holdReturnSlot);
+        self::assertNotNull($inArrayHaystackSend);
+        self::assertNotSame($holdReturnSlot, $inArrayHaystackSend, 'haystack must not reuse hold() return slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
+    /** Issue #15421 — array_pad negative length after UDF with array param. */
+    public function testArrayPadNegativeLengthAfterUdfArrayParamRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_pad_neg_after_udf_array.php');
+        self::assertNotFalse($code);
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_pad_neg_after_udf_array.php');
+
+        $padArgSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $padArgSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $padArgSends[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(3, $padArgSends);
+        self::assertNotSame($padArgSends[0], $padArgSends[1], 'array and length must use distinct slots');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
     }
 }
