@@ -5,10 +5,11 @@ declare(strict_types=1);
 namespace PHPCompiler\VM;
 
 /**
- * PHP 8.3+ clone-with readonly property reinit window (#7250).
+ * PHP 8.3+ readonly property reinit during clone-with and __clone (#7250, #15365).
  *
  * php-src unlocks IS_PROP_REINITABLE in zend_objects_clone_obj_with() before applying
  * the with property list, then clears after the block (Zend/zend_objects.c).
+ * Readonly amendments allow one reinit per readonly property during __clone (zend_readonly.c).
  */
 final class CloneWithSupport
 {
@@ -21,11 +22,28 @@ final class CloneWithSupport
             }
             $object->reinitableProperties[$name] = true;
         }
+        \PHPCompiler\ext\standard\CloneWithJitHelper::registerVmCloneReinit($object->id);
     }
 
     public static function endReinit(ObjectEntry $object): void
     {
         $object->reinitableProperties = [];
+        \PHPCompiler\ext\standard\CloneWithJitHelper::unregisterVmCloneReinit($object->id);
+    }
+
+    /**
+     * @param callable(ObjectEntry, string): ?string $isReadonlyProperty
+     *     returns declaring class name when $propName is readonly, else null
+     */
+    public static function beginCloneMagicReinit(ObjectEntry $object, callable $isReadonlyProperty): void
+    {
+        $names = [];
+        foreach (array_keys($object->propertiesWithNames()) as $propName) {
+            if (null !== $isReadonlyProperty($object, $propName)) {
+                $names[] = $propName;
+            }
+        }
+        self::beginReinit($object, $names);
     }
 
     public static function consumeReinit(ObjectEntry $object, string $prop): bool
