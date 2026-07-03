@@ -190,18 +190,20 @@ final class VmDom
         $node->methodVisibility['isdefaultnamespace'] = $pub;
         $node->methods['issupported'] = new NodeIsSupported();
         $node->methodVisibility['issupported'] = $pub;
-        $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
-        $node->methodVisibility['comparedocumentposition'] = $pub;
+        if (CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
+            $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
+            $node->methodVisibility['comparedocumentposition'] = $pub;
+            DomClassConstants::registerIntConstants($node, [
+                'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
+                'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
+                'DOCUMENT_POSITION_FOLLOWING' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
+                'DOCUMENT_POSITION_CONTAINS' => DomConstants::DOCUMENT_POSITION_CONTAINS,
+                'DOCUMENT_POSITION_CONTAINED_BY' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
+                'DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
+            ]);
+        }
         $node->methods['normalize'] = new NodeNormalize();
         $node->methodVisibility['normalize'] = $pub;
-        DomClassConstants::registerIntConstants($node, [
-            'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
-            'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
-            'DOCUMENT_POSITION_FOLLOWING' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
-            'DOCUMENT_POSITION_CONTAINS' => DomConstants::DOCUMENT_POSITION_CONTAINS,
-            'DOCUMENT_POSITION_CONTAINED_BY' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
-            'DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
-        ]);
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
