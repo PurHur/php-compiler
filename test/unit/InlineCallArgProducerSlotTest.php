@@ -446,6 +446,48 @@ PHP;
         self::assertStringContainsString('ok', $out);
     }
 
+    /** Issue #15490 — array_filter(str_split(...), is_numeric(...)) wires haystack + FCC callback slots. */
+    public function testArrayFilterFccInlineNestedHaystackRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_array_filter_fcc_inline_nested.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_array_filter_fcc_inline_nested.php');
+
+        $fccSlot = null;
+        $splitReturnSlot = null;
+        $filterSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FROM_CALLABLE === $op->type && 2 === $fcallOrdinal) {
+                $fccSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (3 === $fcallOrdinal) {
+                    $filterSends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $splitReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $filterSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($fccSlot);
+        self::assertNotNull($splitReturnSlot);
+        self::assertCount(2, $filterSends, 'filter sends='.json_encode($filterSends));
+        self::assertSame($splitReturnSlot, $filterSends[0], 'haystack slot');
+        self::assertSame($fccSlot, $filterSends[1], 'callback slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out);
+    }
+
     /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
     public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
     {
