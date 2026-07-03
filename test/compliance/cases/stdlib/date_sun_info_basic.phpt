@@ -13,8 +13,8 @@ echo $info['nautical_twilight_end'], "\n";
 echo $info['astronomical_twilight_begin'], "\n";
 echo $info['astronomical_twilight_end'], "\n";
 --EXPECT--
-1718077608
-1718135636
+1718077492
+1718135752
 1718106622
 1718075077
 1718138166
