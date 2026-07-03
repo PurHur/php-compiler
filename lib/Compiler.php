@@ -3432,6 +3432,52 @@ class Compiler {
         return false;
     }
 
+    /**
+     * php-cfg isset()/empty() prelude stmts between hoisted sibling call-arg producers (#15646).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isIssetOrEmptyInlineCallArgPreludeStmt(?Op $stmt, int $index, array $cfgChildren): bool
+    {
+        if (!$stmt instanceof Op\Expr) {
+            return false;
+        }
+        $next = $cfgChildren[$index + 1] ?? null;
+
+        return ($stmt instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\StaticPropertyFetch && $this->isStaticPropertyFetchOnlyIssetVar($stmt, $next));
+    }
+
+    /**
+     * 0-based ordinal among hoisted sibling call-arg producers, skipping isset/empty preludes (#15646).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hoistedSiblingCallArgProducerOrdinal(
+        int $producerIndex,
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): int {
+        $ordinal = 0;
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            if ($j === $producerIndex) {
+                return $ordinal;
+            }
+            $stmt = $cfgChildren[$j] ?? null;
+            if (!$stmt instanceof Op\Expr || !$this->isInlineExprCallArgProducer($stmt)) {
+                continue;
+            }
+            if ($this->isIssetOrEmptyInlineCallArgPreludeStmt($stmt, $j, $cfgChildren)) {
+                continue;
+            }
+            ++$ordinal;
+        }
+
+        return $ordinal;
+    }
+
     private function isPropertyFetchOnlyEmptyVar(
         Op\Expr\PropertyFetch $fetch,
         Op $next,
@@ -17379,6 +17425,26 @@ class Compiler {
                 }
                 break;
             }
+            // php-cfg PropertyFetch/ArrayDimFetch prelude before Isset_ — not a sibling call-arg producer (#15646).
+            $next = $cfgChildren[$i + 1] ?? null;
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
             array_unshift($producers, $child);
         }
 
@@ -18394,9 +18460,23 @@ class Compiler {
                     return false;
                 }
             } else {
-                $distance = $consumerIndex - $producerIndex;
-                if ($distance < 1 || $distance > $argCount) {
-                    return false;
+                $firstSiblingForDistance = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+                if (null !== $firstSiblingForDistance) {
+                    $producerOrdinal = $this->hoistedSiblingCallArgProducerOrdinal(
+                        $producerIndex,
+                        $firstSiblingForDistance,
+                        $consumerIndex,
+                        $cfgChildren
+                    );
+                    $effectiveDistance = $producerOrdinal + 1;
+                    if ($effectiveDistance < 1 || $effectiveDistance > $argCount) {
+                        return false;
+                    }
+                } else {
+                    $distance = $consumerIndex - $producerIndex;
+                    if ($distance < 1 || $distance > $argCount) {
+                        return false;
+                    }
                 }
             }
         }
@@ -18463,6 +18543,27 @@ class Compiler {
             }
             // is_countable(new ArrayObject()) — New_ prelude between hoisted sibling producers (#14958).
             if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\Isset_ || $mid instanceof Op\Expr\Empty_) {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($mid)) {
@@ -18543,6 +18644,27 @@ class Compiler {
                 continue;
             }
             if ($sib instanceof Op\Expr\New_ || $sib instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if ($sib instanceof Op\Expr\Isset_ || $sib instanceof Op\Expr\Empty_) {
                 continue;
             }
             if (!$this->isSiblingInlineCallProducerExpr($sib)) {
@@ -19028,6 +19150,31 @@ class Compiler {
                 --$i;
                 continue;
             }
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
             if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
                 // $c = get_defined_constants(true); in_array(..., get_declared_traits(), …) — stmt assign
                 // is not part of the hoisted sibling chain (#15611, re-#14237).
@@ -19085,6 +19232,31 @@ class Compiler {
                 continue;
             }
             if ($skip instanceof Op\Expr\New_ || $skip instanceof Op\Expr\Clone_) {
+                ++$first;
+                continue;
+            }
+            if ($skip instanceof Op\Expr\Isset_ || $skip instanceof Op\Expr\Empty_) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
                 ++$first;
                 continue;
             }
