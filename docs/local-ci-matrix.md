@@ -35,6 +35,8 @@ Repository defaults live in [`script/ci-defaults.env`](../script/ci-defaults.env
 | Single PHPUnit filter | Append args: `./script/ci-fast.sh --filter VMTest` | Same inside Docker wrappers |
 | User release readiness (quick) | `./script/release-readiness.sh --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --json'` |
 | User release readiness (full) | `./script/release-readiness.sh --full --json` | `./script/docker-exec.sh -- bash -lc './script/release-readiness.sh --full --json'` |
+| Bootstrap dev (gen-1+ daily) | See [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md) | `make north-star5-verify-fast`; spine PR: `make bootstrap-gen0-refresh-sidecar` |
+| GHA bootstrap spine gate | — | [`.github/workflows/bootstrap-spine-gate.yml`](../.github/workflows/bootstrap-spine-gate.yml) on spine/gen-0 path changes |
 
 ### Release readiness (`release-readiness.sh`, #8737)
 

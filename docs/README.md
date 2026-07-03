@@ -62,6 +62,7 @@ Generated maps and large tables — **repo only**; exclude from `docs/pages/` co
 
 | Doc | Content |
 |-----|---------|
+| [**bootstrap-dev-workflow.md**](bootstrap-dev-workflow.md) | **Tiered gen-1+ daily path**, spine checklist, sidecar refresh, CI |
 | [bootstrap-selfhost.md](bootstrap-selfhost.md) | Gates, waves, stub policy |
 | [bootstrap-generations.md](bootstrap-generations.md) | Gen-0…gen-3 ladder, artifacts, presenter commands |
 | [bootstrap-inventory.md](bootstrap-inventory.md) | `lib/` inventory (`php script/bootstrap-inventory.php`) |

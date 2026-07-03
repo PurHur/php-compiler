@@ -135,7 +135,9 @@ make north-star5-verify-fast
 ./script/north-star5-verify.sh --strict
 ```
 
-Expect on `--strict`: inventory **2643/2643**, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For LLVM hot loops use `make bootstrap-selfhost-vm-driver-execute-probe` (~**20ms**); see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md).
+Expect on `--strict`: spine **N/N** from `php script/bootstrap-spine-count.php`, spine link + run, vendor prelink **3/3**, cold boot without `vendor/`. For LLVM hot loops use `make bootstrap-selfhost-vm-driver-execute-probe` (~**20ms**); see [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md).
+
+**Day-to-day bootstrap development** (gen-2 compile loop, spine PR checklist, when to use Zend): [bootstrap-dev-workflow.md](bootstrap-dev-workflow.md).
 
 After **spine entry** edits (`test/selfhost/compiler_lib_spine_smoke/main.php`), refresh committed gen-0 sidecars in one step:
 
