@@ -159,6 +159,14 @@ final class VmDom
         $node->methodVisibility['append'] = $pub;
         $node->methods['prepend'] = new NodePrepend();
         $node->methodVisibility['prepend'] = $pub;
+        $node->methods['before'] = new NodeBefore();
+        $node->methodVisibility['before'] = $pub;
+        $node->methods['after'] = new NodeAfter();
+        $node->methodVisibility['after'] = $pub;
+        $node->methods['replacewith'] = new NodeReplaceWith();
+        $node->methodVisibility['replacewith'] = $pub;
+        $node->methods['remove'] = new NodeRemove();
+        $node->methodVisibility['remove'] = $pub;
         $node->methods['lookupprefix'] = new NodeLookupPrefix();
         $node->methodVisibility['lookupprefix'] = $pub;
         $node->methods['lookupnamespaceuri'] = new NodeLookupNamespaceURI();
@@ -1791,6 +1799,138 @@ final class VmDom
             self::prependLiveStandardChild($ctx, $parent, $child);
         }
         self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function beforeLiveStandardNodes(Context $ctx, ObjectEntry $node, array $args): void
+    {
+        $parent = self::parentEntryForSiblingMutation($node);
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::before()');
+            self::insertBeforeSibling($ctx, $parent, $child, $node);
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function afterLiveStandardNodes(Context $ctx, ObjectEntry $node, array $args): void
+    {
+        $parent = self::parentEntryForSiblingMutation($node);
+        $anchor = $node;
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::after()');
+            self::insertAfterSibling($ctx, $parent, $child, $anchor);
+            if (!self::isDocumentFragment($child)) {
+                $anchor = $child;
+            }
+        }
+        self::syncSubtree($ctx, $parent);
+    }
+
+    /**
+     * @param list<\PHPCompiler\VM\Variable> $args
+     */
+    public static function replaceWithLiveStandardNodes(Context $ctx, ObjectEntry $node, array $args): void
+    {
+        $parent = self::parentEntryForSiblingMutation($node);
+        foreach ($args as $arg) {
+            $child = self::resolveLiveStandardAppendArg($ctx, $parent, $arg, 'DOMNode::replaceWith()');
+            self::insertBeforeSibling($ctx, $parent, $child, $node);
+        }
+        self::removeLiveStandard($ctx, $node);
+        self::syncSubtree($ctx, $parent);
+    }
+
+    public static function removeLiveStandard(Context $ctx, ObjectEntry $node): void
+    {
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            throw new \DOMException('Not Found Error');
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent) {
+            throw new \DOMException('Not Found Error');
+        }
+        self::removeChild($ctx, $parent, $node);
+    }
+
+    private static function parentEntryForSiblingMutation(ObjectEntry $node): ObjectEntry
+    {
+        $state = DomRegistry::state($node);
+        if (null === $state->parentId) {
+            throw new \DOMException('Hierarchy request error');
+        }
+        $parent = DomRegistry::entry($state->parentId);
+        if (null === $parent) {
+            throw new \DOMException('Hierarchy request error');
+        }
+
+        return $parent;
+    }
+
+    private static function insertBeforeSibling(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ObjectEntry $refNode
+    ): void {
+        if (self::isDocumentFragment($newChild)) {
+            $fragState = DomRegistry::state($newChild);
+            $childIds = $fragState->childIds;
+            $fragState->childIds = [];
+            foreach ($childIds as $childId) {
+                $fragChild = DomRegistry::entry($childId);
+                if (null === $fragChild) {
+                    continue;
+                }
+                self::linkChildToParent($fragChild, null);
+                self::insertBeforeSibling($ctx, $parent, $fragChild, $refNode);
+            }
+            self::syncSubtree($ctx, $newChild);
+
+            return;
+        }
+        self::insertBeforeLiveStandard($ctx, $parent, $newChild, $refNode);
+    }
+
+    private static function insertAfterSibling(
+        Context $ctx,
+        ObjectEntry $parent,
+        ObjectEntry $newChild,
+        ObjectEntry $refNode
+    ): void {
+        if (self::isDocumentFragment($newChild)) {
+            $fragState = DomRegistry::state($newChild);
+            $childIds = $fragState->childIds;
+            $fragState->childIds = [];
+            $anchor = $refNode;
+            foreach ($childIds as $childId) {
+                $fragChild = DomRegistry::entry($childId);
+                if (null === $fragChild) {
+                    continue;
+                }
+                self::linkChildToParent($fragChild, null);
+                self::insertAfterSibling($ctx, $parent, $fragChild, $anchor);
+                $anchor = $fragChild;
+            }
+            self::syncSubtree($ctx, $newChild);
+
+            return;
+        }
+        $parentState = DomRegistry::state($parent);
+        $index = self::childIndex($parentState->childIds, $refNode->id);
+        if (null === $index) {
+            throw new \DOMException('Not found error');
+        }
+        $nextIndex = $index + 1;
+        $refChild = isset($parentState->childIds[$nextIndex])
+            ? DomRegistry::entry($parentState->childIds[$nextIndex])
+            : null;
+        self::insertBeforeLiveStandard($ctx, $parent, $newChild, $refChild);
     }
 
     public static function appendLiveStandardChild(Context $ctx, ObjectEntry $parent, ObjectEntry $child): void
