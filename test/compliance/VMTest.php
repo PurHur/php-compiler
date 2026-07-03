@@ -153,12 +153,21 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'builtin_stub_enums_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && (str_contains($name, 'array_first_key') || str_contains($name, 'array_last_key'))
+                && !str_contains($name, 'array_first_last_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && str_contains($name, 'array_first_last_key_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp84ArraySearchFunctions()
                 && (str_contains($name, 'array_find')
                     || str_contains($name, 'array_any')
                     || str_contains($name, 'array_all')
                     || (str_contains($name, 'array_first') && !str_contains($name, 'array_first_key'))
-                    || str_contains($name, 'array_last'))
+                    || (str_contains($name, 'array_last') && !str_contains($name, 'array_last_key')))
                 && !str_contains($name, 'php84_array_search_phantom')) {
                 continue;
             }

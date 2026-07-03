@@ -63,6 +63,15 @@ class AotTest extends BaseTest
                 && str_contains($name, 'str_increment_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && str_contains($name, 'array_first_last_key')
+                && !str_contains($name, 'array_first_last_key_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsPhp83ArrayKeyFunctions()
+                && str_contains($name, 'array_first_last_key_phantom')) {
+                continue;
+            }
             if (!CompilerVersion::supportsPhp84ReflectionProbeBuiltins()
                 && (str_contains($name, 'attribute_exists')
                     || str_contains($name, 'class_meth_exists')
