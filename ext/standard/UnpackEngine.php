@@ -109,9 +109,7 @@ final class UnpackEngine
             if (!(self::argIsRepeatCount($code) && $arg > 1)) {
                 $need = self::needBytes($code, $arg);
                 if (null === $need) {
-                    self::fail('unpack(): Type '.$code.': unknown format code');
-
-                    return false;
+                    self::throwInvalidFormatType($code);
                 }
 
                 if ($pos + $need > $len) {
@@ -127,9 +125,7 @@ final class UnpackEngine
             } else {
                 $need = self::needBytes($code, $arg);
                 if (null === $need) {
-                    self::fail('unpack(): Type '.$code.': unknown format code');
-
-                    return false;
+                    self::throwInvalidFormatType($code);
                 }
             }
 
@@ -181,9 +177,7 @@ final class UnpackEngine
             }
 
             if (!self::isSupportedCode($code)) {
-                self::fail(\sprintf('unpack(): Type %s: unknown format code', $code));
-
-                return null;
+                self::throwInvalidFormatType($code);
             }
 
             $specs[] = [
@@ -553,5 +547,11 @@ final class UnpackEngine
     private static function fail(string $message): void
     {
         @\trigger_error($message, \E_USER_WARNING);
+    }
+
+    /** php-src ext/standard/pack.c — php_unpack() invalid format letter (PHP 8+ ValueError). */
+    private static function throwInvalidFormatType(string $code): never
+    {
+        throw new \ValueError(\sprintf('Invalid format type %s', $code));
     }
 }
