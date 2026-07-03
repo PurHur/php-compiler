@@ -13,6 +13,20 @@ use PHPCompiler\VM\Variable;
  */
 final class DomDocumentPropertySupport
 {
+    /** php-src ext/dom/php_dom.c — DOMDocument::$documentElement is read-only (#15550). */
+    public static function rejectReadOnlyPropertyWrite(ObjectEntry $owner, string $name): void
+    {
+        if (VmDom::CLASS_DOCUMENT !== strtolower($owner->class->name)) {
+            return;
+        }
+        if (strtolower(VmDom::PROP_DOCUMENT_ELEMENT) !== strtolower($name)) {
+            return;
+        }
+        throw new \Error(
+            'Cannot write read-only property DOMDocument::$documentElement'
+        );
+    }
+
     public static function isManagedProperty(ObjectEntry $object, string $name): bool
     {
         if (VmDom::CLASS_DOCUMENT !== strtolower($object->class->name)) {
