@@ -18077,6 +18077,16 @@ class Compiler {
             $next = $cfgChildren[$j + 1] ?? null;
             if (
                 $j + 1 < $consumerIndex
+                && ($next instanceof Op\Expr\Assign || $next instanceof Op\Expr\AssignRef)
+                && null !== $child->result
+                && null !== $next->expr
+                && $this->operandsReferToSameVariable($child->result, $next->expr)
+            ) {
+                // $loose = in_array(...); array_search(null, [null]) — stmt-level callee, not outer arg (#11058).
+                continue;
+            }
+            if (
+                $j + 1 < $consumerIndex
                 && ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall)
                 && $this->isAdjacentNestedFuncCallProducer($child, $next, $j, $j + 1)
             ) {
