@@ -14283,6 +14283,14 @@ class Compiler {
                     && null !== $callArg
                     && !$this->callArgOperandExpectsArrayProducer($callArg)
                 ) {
+                    foreach ($producers as $candidate) {
+                        if (
+                            $candidate instanceof Op\Expr\Cast
+                            && $this->operandsReferToSameVariable($candidate->expr, $byIndex->result)
+                        ) {
+                            return $candidate;
+                        }
+                    }
                     $castProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
                     if ($castProducer instanceof Op\Expr\Cast) {
                         return $castProducer;
@@ -22220,6 +22228,24 @@ class Compiler {
                 $producer = $this->matchInlineCallArgProducer($producers, $callOp->args, $argIndex, $callOp, $block);
             }
             if ($producer instanceof Op\Expr\ConstFetch) {
+                if (null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg)) {
+                    foreach ($producers as $candidate) {
+                        if (!$candidate instanceof Op\Expr\Cast) {
+                            continue;
+                        }
+                        if ($this->operandsReferToSameVariable($candidate->expr, $producer->result)) {
+                            $producer = $candidate;
+                            break;
+                        }
+                    }
+                } elseif (null !== $callArg) {
+                    $castProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
+                    if ($castProducer instanceof Op\Expr\Cast) {
+                        $producer = $castProducer;
+                    }
+                }
+            }
+            if ($producer instanceof Op\Expr\ConstFetch) {
                 $vm = $this->tryFoldGlobalConstFetch($producer);
                 if (null !== $vm) {
                     // php-cfg dead call-arg temp vs hoisted ConstFetch.result (#10453, password_hash PASSWORD_BCRYPT + options).
@@ -22268,6 +22294,16 @@ class Compiler {
                 );
                 if (null !== $vm) {
                     return $block->registerConstant($arg, $vm);
+                }
+                $producerSlot = $block->slotForOperand($producer->result);
+                if (null === $producerSlot) {
+                    foreach ($this->compileExpr($producer, $block) as $op) {
+                        $block->addOpCode($op);
+                    }
+                    $producerSlot = $block->slotForOperand($producer->result);
+                }
+                if (null !== $producerSlot) {
+                    return $producerSlot;
                 }
             }
             if ($producer instanceof Op\Expr\ClassConstFetch) {
