@@ -57,21 +57,16 @@ final class CompilerVersion
     /**
      * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367).
      *
-     * Unset {@see languageProfileVersion()} on the 8.4.0-dev line matches Zend 8.2 (reject at compile).
-     * Set `PHP_COMPILER_PROFILE=8.3` or `8.4` to enable forward syntax (#15560).
+     * Enabled on the 8.4.0-dev forward line when {@see languageProfileVersion()} is 8.3+; set
+     * `PHP_COMPILER_PROFILE=8.2` to match Zend 8.2 compile-time rejection (#12798, #15581).
      */
     public static function supportsTypedClassConstants(): bool
     {
-        $profile = self::languageProfileVersion();
-        if (version_compare($profile, '8.3.0', '<')) {
-            return false;
-        }
-        $raw = getenv('PHP_COMPILER_PROFILE');
-        if ((!is_string($raw) || '' === trim($raw)) && version_compare(self::VERSION, '8.4.0', '<')) {
+        if (version_compare(self::VERSION, '8.3', '<')) {
             return false;
         }
 
-        return true;
+        return version_compare(self::languageProfileVersion(), '8.3.0', '>=');
     }
 
     /** PHP 8.3+ typed constants at compile-unit scope (Zend/zend_compile.c, issue #7081). */

@@ -144,17 +144,17 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
-    public function testSupportsTypedClassConstantsFalseOnReferenceProfile(): void
+    public function testSupportsTypedClassConstantsTrueOnDevForwardProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
+        $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
     }
 
-    public function testSupportsTypedClassConstantsTrueWhenProfile84(): void
+    public function testSupportsTypedClassConstantsFalseWhenProfile82(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
-        putenv('PHP_COMPILER_PROFILE=8.4');
+        putenv('PHP_COMPILER_PROFILE=8.2');
         try {
-            $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+            $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
