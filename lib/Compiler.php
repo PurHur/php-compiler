@@ -17698,8 +17698,15 @@ class Compiler {
             return false;
         }
         // Statement-level calls before fscanf($f, '…') are not sibling arg producers (#11093).
-        foreach ($consumer->args as $consumerArg) {
-            if ($consumerArg instanceof Operand && $this->isNamedVariableOperand($consumerArg)) {
+        // Trailing by-ref named locals (similar_text $percent, preg_match $matches) are not producers (#15476).
+        foreach ($consumer->args as $argIndex => $consumerArg) {
+            if (!($consumerArg instanceof Operand)) {
+                continue;
+            }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $argIndex, $consumerArg)) {
+                continue;
+            }
+            if ($this->isNamedVariableOperand($consumerArg)) {
                 return false;
             }
         }
@@ -17829,10 +17836,14 @@ class Compiler {
             return false;
         }
         $hoistedArgs = [];
-        foreach ($consumer->args as $callArg) {
-            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
-                $hoistedArgs[] = $callArg;
+        foreach ($consumer->args as $argIndex => $callArg) {
+            if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
             }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $argIndex, $callArg)) {
+                continue;
+            }
+            $hoistedArgs[] = $callArg;
         }
         if (!$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
@@ -18072,10 +18083,14 @@ class Compiler {
             return false;
         }
         $hoistedArgs = [];
-        foreach ($consumer->args as $callArg) {
-            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
-                $hoistedArgs[] = $callArg;
+        foreach ($consumer->args as $argIndex => $callArg) {
+            if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
             }
+            if ($this->isByRefNamedCallArgExcludedFromSiblingProducerWiring($consumer, (int) $argIndex, $callArg)) {
+                continue;
+            }
+            $hoistedArgs[] = $callArg;
         }
         if (\count($hoistedArgs) < 2 || !$this->callArgsAreDistinctInlineTemporaries($hoistedArgs)) {
             return false;
@@ -24574,6 +24589,28 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * By-ref named locals are real CV operands, not hoisted inline FuncCall producers (#15476, #13714).
+     */
+    private function isByRefNamedCallArgExcludedFromSiblingProducerWiring(
+        Op $consumer,
+        int $argIndex,
+        Operand $arg
+    ): bool {
+        if (!$this->isNamedVariableOperand($arg)) {
+            return false;
+        }
+        if (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $calleeName = $this->funcCallExprCalleeName($consumer);
+        if (null === $calleeName) {
+            return false;
+        }
+
+        return $this->callArgRequiresByRef($calleeName, $argIndex, $arg);
     }
 
     private function callArgRequiresByRef(string $calleeName, int $argIndex, ?Operand $arg = null, ?Block $block = null): bool
