@@ -243,7 +243,7 @@ final class M3EmitTuTrivialEchoAot
             'sentinelLc' => $sentinelLc,
             'objectOnly' => $objectOnlySidecar,
             'sourcePathGlobal' => $sourcePathGlobal,
-            'contentMatchOnly' => self::isCompilerLibSidecarRel($sidecarRel),
+            'contentMatchOnly' => self::isCompilerLibSidecarRel($sidecarRel) && !$objectOnlySidecar,
         ];
 
         if (null === $context->m3EmitTuTrivialEchoSourceGlobal) {

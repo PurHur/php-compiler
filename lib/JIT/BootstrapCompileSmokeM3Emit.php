@@ -357,6 +357,7 @@ final class BootstrapCompileSmokeM3Emit
      */
     private static function emitPutenvM3CompileDriverMainForBootstrapSelfhost(Context $context, Value $sourceFile): void
     {
+        BasicBlockHelper::ensureOpenInsertBlock($context, 'csm3_putenv_m3main_entry');
         $charPtr = $context->getTypeFromString('char*');
         $i32 = $context->getTypeFromString('int32');
         $notFound = $i32->constInt(JitStringSearch::NOT_FOUND, true);

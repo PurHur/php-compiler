@@ -2187,6 +2187,11 @@ class JIT {
                 'standalone',
             ];
             if (in_array($methodLc, $inventoryEmitSpine, true)) {
+                // Real argv parse spine needs ctor/init; standalone stays stubbed (#15597).
+                if ($this->shouldRealLowerInventoryArgvParseSpine() && 'standalone' !== $methodLc) {
+                    return false;
+                }
+
                 return true;
             }
         }
@@ -5255,6 +5260,7 @@ class JIT {
             if ($compilerLibStampOk || ($compilerLibSidecar && $this->m3EmitTuReuseStaleCompilerLibSidecar())) {
                 $aotBytes = file_get_contents($repoSidecar);
                 if (is_string($aotBytes) && '' !== $aotBytes) {
+                    $pathKeyedSidecar = $compilerLibSidecar && !$compilerLibStampOk;
                     \PHPCompiler\JIT\M3EmitTuTrivialEchoAot::registerLinktime(
                         $this->context,
                         $repoRoot,
@@ -5262,7 +5268,7 @@ class JIT {
                         $aotBytes,
                         $sidecarRel,
                         $sentinelLogical,
-                        false,
+                        $pathKeyedSidecar,
                         $this->m3EmitTuSidecarSourcePathNorm($path)
                     );
 
