@@ -79,6 +79,38 @@ PHP;
         self::assertSame($arraySlot, $sendSlots[2] ?? null, 'arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #15151 — inline first array_multisort operand must not share assign-in-call companion slot. */
+    public function testArrayMultisortInlineFirstArrayUsesDistinctSendSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_multisort([3, 1, 2], $labels = ['c', 'a', 'b']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_multisort_inline_companion.php');
+
+        $initArraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+        $companionRhsSlot = $initArraySlots[1] ?? null;
+
+        self::assertCount(2, $sendSlots);
+        self::assertNotNull($companionRhsSlot);
+        self::assertNotSame($sendSlots[0], $sendSlots[1], 'arg sends='.json_encode($sendSlots));
+        self::assertSame($companionRhsSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        ob_end_clean();
+    }
+
     /** Issue #12732 — by-ref sort-family builtins must not defer as sibling inline producers. */
     public function testNatcasesortBeforeArrayValuesImplodeCompilesEagerly(): void
     {

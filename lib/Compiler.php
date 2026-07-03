@@ -20167,10 +20167,25 @@ class Compiler {
         Op $cfgCallOp,
         int $argIndex
     ): ?string {
+        return $this->resolveAssignInCallRhsCallArgSlot($block, $cfgCallOp, $argIndex);
+    }
+
+    /**
+     * Hoisted assign-in-call before a by-ref builtin — wire the RHS value, not the named lvalue (#15151).
+     *
+     * `array_multisort([..], $labels = [..])` is lowered as Array_, Array_, Assign, FuncCall; Zend couples
+     * sort using the literal arrays but does not write sorted order back through assign-in-call operands.
+     */
+    private function resolveAssignInCallRhsCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        ?Operand $arg = null
+    ): ?string {
         if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
             return null;
         }
-        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        $callArg = $cfgCallOp->args[$argIndex] ?? $arg;
         if (!$this->callArgIsDeadInlineTemporary($callArg)) {
             return null;
         }
@@ -20185,18 +20200,58 @@ class Compiler {
             return null;
         }
         $prev = $block->orig->children[$callIndex - 1] ?? null;
-        if (!$prev instanceof Op\Expr\Assign) {
+        if (!$prev instanceof Op\Expr\Assign || null === $prev->result) {
             return null;
         }
-        if (null === $prev->result) {
+        if (
+            0 === $argIndex
+            && !$this->operandsReferToSameVariable($callArg, $prev->result)
+        ) {
             return null;
         }
-        $slot = $block->slotForOperand($prev->result);
+        $slot = $block->slotForOperand($prev->expr);
         if (null === $slot) {
-            $slot = $this->slotForEmittedAssignResultSlot($block, $prev);
+            $slot = $this->slotForEmittedAssignRhsSlot($block, $prev);
+        }
+        if (null === $slot) {
+            return null;
         }
 
-        return null !== $slot ? (string) $slot : null;
+        return (string) $slot;
+    }
+
+    /** TYPE_ASSIGN arg3 for a registered assign.expr temp (#15151). */
+    private function slotForEmittedAssignRhsSlot(Block $block, Op\Expr\Assign $assign): ?int
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $assignOrdinal = 0;
+        $targetOrdinal = null;
+        foreach ($block->orig->children as $child) {
+            if ($child instanceof Op\Expr\Assign) {
+                if ($child === $assign) {
+                    $targetOrdinal = $assignOrdinal;
+                    break;
+                }
+                ++$assignOrdinal;
+            }
+        }
+        if (null === $targetOrdinal) {
+            return null;
+        }
+        $seen = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+            if ($seen === $targetOrdinal) {
+                return (int) $op->arg3;
+            }
+            ++$seen;
+        }
+
+        return null;
     }
 
     private function isAdjacentNestedFuncCallProducer(
@@ -25116,6 +25171,7 @@ class Compiler {
             } elseif (null !== $valueSlot && is_numeric($valueSlot)) {
                 $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, (int) $valueSlot, true);
             }
+            if (null === $namedAssignDest) {
             if (
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
@@ -25182,16 +25238,8 @@ class Compiler {
                     }
                 }
             }
+            }
             if (
-                null !== $cfgCallOp
-                && 0 === $argIndex
-                && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
-            ) {
-                $initArraySlot = $this->slotForRecentInitArrayCallArg($block);
-                if (null !== $initArraySlot) {
-                    $valueSlot = $initArraySlot;
-                }
-            } else            if (
                 null !== $cfgCallOp
                 && 0 === $argIndex
                 && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
@@ -25748,6 +25796,48 @@ class Compiler {
                     ) {
                         $valueSlot = (string) $pendingNested;
                     }
+                }
+            }
+            if (
+                'array_multisort' === strtolower($calleeName ?? '')
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $multisortArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                if (
+                    0 === (int) $argIndex
+                    && $this->callArgIsDeadInlineTemporary($multisortArgProbe)
+                ) {
+                    foreach ($block->orig->children as $child) {
+                        if (!$child instanceof Op\Expr\Array_) {
+                            continue;
+                        }
+                        if (null === $block->slotForOperand($child->result)) {
+                            foreach ($this->compileArrayLiteral($child, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                        }
+                        $leadArraySlot = $block->slotForOperand($child->result);
+                        if (null !== $leadArraySlot) {
+                            $valueSlot = (string) $leadArraySlot;
+                        }
+                        break;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $calleeName
+                && $this->callArgRequiresByRef($calleeName, (int) $argIndex, $arg, $block)
+            ) {
+                $assignInCallRhs = $this->resolveAssignInCallRhsCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $arg
+                );
+                if (null !== $assignInCallRhs) {
+                    $valueSlot = $assignInCallRhs;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
