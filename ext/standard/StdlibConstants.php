@@ -85,6 +85,11 @@ final class StdlibConstants
     public const FILE_APPEND = 8;
     public const FILE_NO_DEFAULT_CONTEXT = 16;
 
+    /** fseek()/gzseek() whence values (ext/standard/file.c, stddef.h SEEK_*). */
+    public const SEEK_SET = 0;
+    public const SEEK_CUR = 1;
+    public const SEEK_END = 2;
+
     /** scandir() sort order (ext/standard/dir.c). */
     public const SCANDIR_SORT_ASCENDING = 0;
     public const SCANDIR_SORT_DESCENDING = 1;
@@ -314,6 +319,9 @@ final class StdlibConstants
         'file_use_include_path' => self::FILE_USE_INCLUDE_PATH,
         'file_append' => self::FILE_APPEND,
         'file_no_default_context' => self::FILE_NO_DEFAULT_CONTEXT,
+        'seek_set' => self::SEEK_SET,
+        'seek_cur' => self::SEEK_CUR,
+        'seek_end' => self::SEEK_END,
         'scandir_sort_ascending' => self::SCANDIR_SORT_ASCENDING,
         'scandir_sort_descending' => self::SCANDIR_SORT_DESCENDING,
         'scandir_sort_none' => self::SCANDIR_SORT_NONE,
@@ -508,6 +516,9 @@ final class StdlibConstants
         'file_use_include_path',
         'file_append',
         'file_no_default_context',
+        'seek_set',
+        'seek_cur',
+        'seek_end',
         'scandir_sort_ascending',
         'scandir_sort_descending',
         'scandir_sort_none',
