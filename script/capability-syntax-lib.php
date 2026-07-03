@@ -1219,6 +1219,164 @@ function builtinCapabilityCurations(): array
  *
  * @return array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}>
  */
+/**
+ * Builtins with PHP implementations gated off the active advertisement profile (#11842, #11904).
+ *
+ * @return list<array{names: list<string>, gate: callable(): bool, since: string, module: string, relPath: string}>
+ */
+function withheldBuiltinGateDefinitions(): array
+{
+    return [
+        [
+            'names' => ['fpow', 'fmin', 'fmax'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsFpow'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/fpow.php',
+        ],
+        [
+            'names' => ['nextafter'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsNextafter'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/nextafter.php',
+        ],
+        [
+            'names' => ['strxfrm'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStrxfrm'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/strxfrm.php',
+        ],
+        [
+            'names' => ['convert_cyr_string'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsConvertCyrString'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/convert_cyr_string.php',
+        ],
+        [
+            'names' => ['class_uses_recursive'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsClassUsesRecursive'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/class_uses_recursive.php',
+        ],
+        [
+            'names' => ['attribute_exists', 'class_meth_exists', 'unitenum_exists'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsPhp84ReflectionProbeBuiltins'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/attribute_exists_.php',
+        ],
+        [
+            'names' => ['readonly'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsReadonlyBuiltin'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/readonly_.php',
+        ],
+        [
+            'names' => ['stream_supports'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsStreamSupports'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/stream_supports.php',
+        ],
+        [
+            'names' => ['zend_thread_id'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsZendThreadId'],
+            'since' => '8.4.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/zend_thread_id.php',
+        ],
+        [
+            'names' => ['getmygrgid'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsGetmygrgid'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/getmygrgid.php',
+        ],
+        [
+            'names' => ['disktotalspace'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsDisktotalspace'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/disktotalspace.php',
+        ],
+        [
+            'names' => ['crc32c'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsCrc32c'],
+            'since' => '8.3.0',
+            'module' => 'standard',
+            'relPath' => 'ext/standard/crc32c.php',
+        ],
+        [
+            'names' => ['mb_str_pad'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbStrPad'],
+            'since' => '8.4.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_str_pad.php',
+        ],
+        [
+            'names' => ['mb_trim', 'mb_ltrim', 'mb_rtrim'],
+            'gate' => [PHPCompiler\CompilerVersion::class, 'supportsMbTrimFunctions'],
+            'since' => '8.4.0',
+            'module' => 'mbstring',
+            'relPath' => 'ext/mbstring/mb_trim.php',
+        ],
+    ];
+}
+
+/**
+ * Align matrix VM column with function_exists() and document withheld builtins (#11904).
+ *
+ * @param array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}> $capabilities
+ *
+ * @return array<string, array{vm: bool, jit: bool, aot: bool|string, notes: list<string>, module: string}>
+ */
+function applyBuiltinAdvertisementParity(array $capabilities, string $root): array
+{
+    $runtime = new PHPCompiler\Runtime();
+    $ctx = $runtime->vmContext;
+    $refProfile = PHPCompiler\CompilerVersion::builtinAdvertisementVersion();
+
+    foreach ($capabilities as $name => &$row) {
+        $registered = isset($ctx->functions[$name]);
+        if ($row['vm'] && !$registered) {
+            $row['vm'] = false;
+            $row['notes'][] = 'gated ('.$refProfile.' ref)';
+        }
+    }
+    unset($row);
+
+    foreach (withheldBuiltinGateDefinitions() as $def) {
+        if (($def['gate'])()) {
+            continue;
+        }
+        if (!is_file($root.'/'.$def['relPath'])) {
+            continue;
+        }
+        $note = 'impl present; gated ('.$refProfile.' ref, since '.$def['since'].')';
+        foreach ($def['names'] as $name) {
+            if (isset($capabilities[$name]) || isset($ctx->functions[$name])) {
+                continue;
+            }
+            $capabilities[$name] = [
+                'vm' => false,
+                'jit' => false,
+                'aot' => false,
+                'notes' => [$note],
+                'module' => $def['module'],
+            ];
+        }
+    }
+
+    ksort($capabilities, SORT_STRING);
+
+    return $capabilities;
+}
+
 function applyBuiltinCapabilityCurations(array $capabilities): array
 {
     foreach (builtinCapabilityCurations() as $name => $patch) {
