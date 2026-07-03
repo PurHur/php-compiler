@@ -337,8 +337,8 @@ function syntaxRowDefinitions(): array
             'opcodes' => ['TYPE_DECLARE_CLASS_CONST', 'TYPE_NEW'],
             'issue' => 15608,
             'notes' => [
-                'php-src rejects all `new` in class constant expressions (#15608, Zend/zend_compile.c)',
-                'NewWithoutParensCompileCheck rejects bare `new`, `new()` with args, and `new` nested in arrays',
+                'PHP 8.3+ class constant `new` initializers (#12940, #15693, Zend/zend_compile.c)',
+                'Enabled on stable 8.4.0+ or PHP_COMPILER_PROFILE=8.3/8.4; property defaults still rejected',
             ],
             'probe' => 'class C { public const X = new stdClass(); } var_export(C::X);',
         ],
