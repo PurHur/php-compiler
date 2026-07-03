@@ -217,11 +217,27 @@ final class VmDom
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
         $nodeList->interfaces[] = 'countable';
+        if (isset($ctx->classes['iterator'])) {
+            $nodeList->interfaces[] = 'iterator';
+        }
+        if (isset($ctx->classes['traversable'])) {
+            $nodeList->interfaces[] = 'traversable';
+        }
         $nodeList->properties[] = new ClassProperty(self::PROP_LENGTH, null, $intProto);
         $nodeList->methods['item'] = new NodeListItem();
         $nodeList->methodVisibility['item'] = $pub;
         $nodeList->methods['count'] = new NodeListCount();
         $nodeList->methodVisibility['count'] = $pub;
+        $nodeList->methods['rewind'] = new NodeListRewind();
+        $nodeList->methodVisibility['rewind'] = $pub;
+        $nodeList->methods['valid'] = new NodeListValid();
+        $nodeList->methodVisibility['valid'] = $pub;
+        $nodeList->methods['current'] = new NodeListCurrent();
+        $nodeList->methodVisibility['current'] = $pub;
+        $nodeList->methods['key'] = new NodeListKey();
+        $nodeList->methodVisibility['key'] = $pub;
+        $nodeList->methods['next'] = new NodeListNext();
+        $nodeList->methodVisibility['next'] = $pub;
         $ctx->classes[self::CLASS_NODE_LIST] = $nodeList;
 
         $impl = new ClassEntry('DOMImplementation');
@@ -2118,11 +2134,20 @@ final class VmDom
             );
         }
 
-        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $rootVar->type) {
-            $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput);
-        } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-            $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+        if ([] !== $state->childIds) {
+            foreach ($state->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    $lines[] = self::serializeNode($child, 0, $formatOutput);
+                }
+            }
+        } else {
+            $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $rootVar->type) {
+                $lines[] = self::serializeElement($rootVar->toObject(), 0, $formatOutput);
+            } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
+                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+            }
         }
 
         return implode("\n", $lines)."\n";
@@ -2693,6 +2718,54 @@ final class VmDom
         return DomRegistry::entry($ids[$index]);
     }
 
+    public static function nodeListRewind(ObjectEntry $nodeList): void
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::rewind() called on non-nodelist in this compiler build');
+        }
+        DomRegistry::state($nodeList)->listIterIndex = 0;
+    }
+
+    public static function nodeListValid(ObjectEntry $nodeList): bool
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::valid() called on non-nodelist in this compiler build');
+        }
+        $state = DomRegistry::state($nodeList);
+
+        return $state->listIterIndex < \count($state->listNodeIds);
+    }
+
+    public static function nodeListCurrent(ObjectEntry $nodeList): ?ObjectEntry
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::current() called on non-nodelist in this compiler build');
+        }
+        $state = DomRegistry::state($nodeList);
+        if ($state->listIterIndex < 0 || $state->listIterIndex >= \count($state->listNodeIds)) {
+            return null;
+        }
+
+        return self::nodeListItem($nodeList, $state->listIterIndex);
+    }
+
+    public static function nodeListKey(ObjectEntry $nodeList): int
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::key() called on non-nodelist in this compiler build');
+        }
+
+        return DomRegistry::state($nodeList)->listIterIndex;
+    }
+
+    public static function nodeListNext(ObjectEntry $nodeList): void
+    {
+        if (!self::isNodeList($nodeList)) {
+            throw new \LogicException('DOMNodeList::next() called on non-nodelist in this compiler build');
+        }
+        ++DomRegistry::state($nodeList)->listIterIndex;
+    }
+
     /**
      * @param list<int> $nodeIds
      */
@@ -2711,6 +2784,7 @@ final class VmDom
         $state->nodeType = DomConstants::XML_NODELIST;
         $state->nodeName = '#nodelist';
         $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
         DomRegistry::attach($entry, $state);
 
         $var = new Variable(Variable::TYPE_OBJECT);
@@ -2992,6 +3066,7 @@ final class VmDom
         }
         $state = DomRegistry::state($nodeList);
         $state->listNodeIds = $nodeIds;
+        $state->listIterIndex = 0;
         $nodeList->getProperty(self::PROP_LENGTH)->int(\count($nodeIds));
     }
 

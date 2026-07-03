@@ -61,6 +61,9 @@ final class DomNodeState
      */
     public array $listNodeIds = [];
 
+    /** Iterator walk position for {@see DomConstants::XML_NODELIST} (php-src ext/dom/nodelist.c). */
+    public int $listIterIndex = 0;
+
     /** Persistent childNodes list object id for element/document nodes. */
     public ?int $childNodesListId = null;
 
