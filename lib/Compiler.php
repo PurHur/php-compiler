@@ -17834,6 +17834,9 @@ class Compiler {
             ) {
                 return false;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
 
             return false;
         }
@@ -18715,25 +18718,16 @@ class Compiler {
             // json_decode(g(), true, 512, JSON_THROW_ON_ERROR) — arg0 producer, not a stmt-level callee (#12009, #15441).
             return false;
         }
-        // substr(sprintf(...), -N) — lone hoisted FuncCall + UnaryMinus offset, not stmt-level (#10673, #13801).
-        if (
-            $onlySkippablePreludes
-            && ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall)
-            && ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
-            && property_exists($consumer, 'args')
-            && \is_array($consumer->args)
-            && \count($consumer->args) >= 2
-        ) {
-            $distance = $consumerIndex - $producerIndex;
-            $mid = $cfgChildren[$producerIndex + 1] ?? null;
-            if (
-                2 === $distance
-                && $this->isUnaryInlineSiblingCallArgExpr($mid)
-                && $this->callArgIsDeadInlineTemporary($consumer->args[0] ?? null)
-                && $this->callArgIsDeadInlineTemporary($consumer->args[1] ?? null)
-            ) {
-                return false;
+        if ($onlySkippablePreludes) {
+            for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+                $mid = $cfgChildren[$j] ?? null;
+                if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                    return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
+                }
             }
+
+            // date_sun_info(strtotime(...), lat, -lon) / substr(sprintf(...), -N) — inline hoisted producers (#11336, #10673, #13801).
+            return false;
         }
 
         return $producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall;
@@ -26440,6 +26434,9 @@ class Compiler {
             ) {
                 continue;
             }
+            if ($this->isUnaryInlineSiblingCallArgExpr($consumer)) {
+                continue;
+            }
             if (!$this->isInlineExprCallArgConsumer($consumer)) {
                 return false;
             }
@@ -26585,6 +26582,9 @@ class Compiler {
                 || $child instanceof Op\Expr\ClassConstFetch
                 || $child instanceof Op\Expr\Array_
             ) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
                 continue;
             }
             if (!$this->isInlineExprCallArgConsumer($child)) {
