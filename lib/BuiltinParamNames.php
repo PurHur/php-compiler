@@ -232,6 +232,8 @@ final class BuiltinParamNames
                 return ['pattern', 'replacement', 'subject', 'limit', 'count'];
             case 'preg_grep':
                 return ['pattern', 'array', 'flags'];
+            case 'preg_quote':
+                return ['str', 'delimiter'];
             case 'file_get_contents':
                 return ['filename', 'use_include_path', 'context', 'offset', 'length'];
             case 'file_put_contents':
