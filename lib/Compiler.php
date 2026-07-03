@@ -48,6 +48,7 @@ use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
+use PHPCompiler\Compiler\NonEnumBuiltinInterfaceCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
 use PHPCompiler\Compiler\AsymmetricVisibilityCompileCheck;
 use PHPCompiler\Compiler\CompileFatal;
@@ -488,6 +489,7 @@ class Compiler {
             $this->appendMcjitDnfPropertyTryEpilogue($main);
         }
 
+        NonEnumBuiltinInterfaceCompileCheck::validate($script);
         InterfaceImplementationCheck::validate($script, $this->propertyHookRegistry);
         TraitCollisionCheck::validate($script);
         FinalClassExtensionCheck::validate($script);
