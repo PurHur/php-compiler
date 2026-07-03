@@ -3460,6 +3460,7 @@ require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneGetName.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneGetOffset.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneGetTransitions.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneListAbbreviations.php';
+require_once __DIR__.'/../../../lib/VM/Builtin/DateTimeZoneListIdentifiers.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/DeprecatedConstruct.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/EnumCases.php';
 require_once __DIR__.'/../../../lib/VM/Builtin/EnumCasesConstruct.php';
