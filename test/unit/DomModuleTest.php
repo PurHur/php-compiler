@@ -364,6 +364,25 @@ PHP;
         self::assertSame("DOMEntityReference\n5\namp\namp\n", ob_get_clean());
     }
 
+    public function test_dom_document_fragment_append_xml(): void
+    {
+        $runtime = new Runtime();
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$frag = $doc->createDocumentFragment();
+$ok = $frag->appendXML('<a/><b/>');
+echo (int) $ok, "\n";
+echo $frag->childNodes->length, "\n";
+echo $frag->firstChild->nodeName, "\n";
+echo $frag->lastChild->nodeName, "\n";
+PHP;
+        $block = $runtime->parseAndCompile($code, 'dom_fragment_append_xml.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("1\n2\na\nb\n", ob_get_clean());
+    }
+
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
     {
         $linker = (string) file_get_contents(__DIR__.'/../../lib/AOT/Linker.php');
