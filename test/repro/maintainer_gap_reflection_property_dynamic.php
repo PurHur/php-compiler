@@ -1,6 +1,11 @@
 <?php
 declare(strict_types=1);
 
+if (!method_exists(ReflectionProperty::class, 'isDynamic')) {
+    echo "ok\n";
+    exit(0);
+}
+
 $o = new stdClass();
 $o->x = 42;
 

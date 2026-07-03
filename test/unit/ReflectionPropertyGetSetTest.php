@@ -52,6 +52,10 @@ PHP;
     /** @covers issue #15540 */
     public function testDynamicStdClassPropertyIntrospection(): void
     {
+        if (!\PHPCompiler\CompilerVersion::supportsReflectionPropertyIsDynamic()) {
+            $this->markTestSkipped('ReflectionProperty::isDynamic() requires PHP 8.4 forward profile');
+        }
+
         $runtime = new Runtime();
         $code = <<<'PHP'
 <?php

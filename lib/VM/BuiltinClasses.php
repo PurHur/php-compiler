@@ -730,7 +730,6 @@ final class BuiltinClasses
                 'isprotected' => new ReflectionPropertyIsProtected(),
                 'isabstract' => new ReflectionPropertyIsAbstract(),
                 'isvirtual' => new ReflectionPropertyIsVirtual(),
-                'isdynamic' => new ReflectionPropertyIsDynamic(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
                 'hashook' => new ReflectionPropertyHasHook(),
                 'gethooks' => new ReflectionPropertyGetHooks(),
@@ -761,6 +760,10 @@ final class BuiltinClasses
             $rp->methodVisibility['isreadable'] = $pub;
             $rp->methods['iswritable'] = ReflectionPropertyAccessProbe::isWritable();
             $rp->methodVisibility['iswritable'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyIsDynamic()) {
+            $rp->methods['isdynamic'] = new ReflectionPropertyIsDynamic();
+            $rp->methodVisibility['isdynamic'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
