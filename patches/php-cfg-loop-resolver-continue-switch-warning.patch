@@ -83,7 +83,7 @@
                  throw new \LogicException('Too high of a count for '.$node->getType());
              }
              $loc = array_slice($stack, -$num, 1);
-@@ -91,6 +110,38 @@
+@@ -91,6 +110,45 @@
          throw new \LogicException('Unimplemented Node Value Type');
      }
  
