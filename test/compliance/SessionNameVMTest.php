@@ -17,6 +17,10 @@ final class SessionNameVMTest extends BaseTest
             __DIR__.'/cases/stdlib/session_name_empty_warning.phpt',
             'session_name_empty_warning.phpt'
         );
+        yield 'session_name_headers_sent.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/session_name_headers_sent.phpt',
+            'session_name_headers_sent.phpt'
+        );
     }
 
     public function setUp(): void

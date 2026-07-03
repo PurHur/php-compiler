@@ -197,6 +197,7 @@ final class SessionName
         $bbCheckReject = $fn->appendBasicBlock('sname_check_reject');
         $bbReject = $fn->appendBasicBlock('sname_reject');
         $bbFail = $fn->appendBasicBlock('sname_set_fail');
+        $bbCheckHeaders = $fn->appendBasicBlock('sname_check_headers');
         $bbCopy = $fn->appendBasicBlock('sname_copy');
         $bbClamp = $fn->appendBasicBlock('sname_clamp_len');
         $bbStore = $fn->appendBasicBlock('sname_store');
@@ -204,7 +205,12 @@ final class SessionName
 
         $active = $context->builder->load(SessionStorageGlobals::$activeGlobal);
         $isActive = $context->builder->icmp(Builder::INT_NE, $active, $i8->constInt(0, false));
-        $context->builder->branchIf($isActive, $bbFail, $bbCheckReject);
+        $context->builder->branchIf($isActive, $bbFail, $bbCheckHeaders);
+
+        $context->builder->positionAtEnd($bbCheckHeaders);
+        $headersSent = $context->builder->call($context->lookupFunction('__phpc_headers_sent'));
+        $headersSentNonZero = $context->builder->icmp(Builder::INT_NE, $headersSent, $i32->constInt(0, false));
+        $context->builder->branchIf($headersSentNonZero, $bbFail, $bbCheckReject);
 
         $context->builder->positionAtEnd($bbCheckReject);
         SessionNameRejectRuntime::ensureLinked($context);
