@@ -42,4 +42,51 @@ final class StrcasecmpRuntimeShrinkTest extends TestCase
         $this->assertStringContainsString('CaseCompareJitHelper.php', $spine);
         $this->assertStringContainsString('StringCaseCompare.php', $spine);
     }
+
+    /** @return list<string> */
+    private function introspectionJitEmitters(): array
+    {
+        return [
+            'ext/standard/JitClassExists.php',
+            'ext/standard/JitEnumExists.php',
+            'ext/standard/JitUnitEnumExists.php',
+            'ext/standard/JitInterfaceExists.php',
+            'ext/standard/JitTraitExists.php',
+            'ext/standard/JitMethodExists.php',
+            'ext/standard/JitPropertyExists.php',
+            'ext/standard/JitGetClassMethods.php',
+            'ext/standard/JitClassUses.php',
+            'ext/standard/JitIniGetAll.php',
+            'ext/filter/JitFilterId.php',
+            'lib/JIT/InstanceOfHelper.php',
+            'lib/JIT/ClassConstFetchHelper.php',
+            'lib/JIT/Builtin/ClassConstFetchRuntime.php',
+            'lib/JIT/Builtin/ReflectionEnumJitHelper.php',
+            'lib/JIT/Builtin/SessionModuleName.php',
+        ];
+    }
+
+    public function testIntrospectionJitEmittersLinkCaseCompareBeforeStrcasecmp(): void
+    {
+        foreach ($this->introspectionJitEmitters() as $relativePath) {
+            $source = (string) file_get_contents(__DIR__.'/../../'.$relativePath);
+            $this->assertStringContainsString(
+                'ensureStrcasecmpLinked',
+                $source,
+                "{$relativePath} must link CaseCompareJitHelper before strcasecmp lookup (#15256)"
+            );
+            $this->assertStringNotContainsString(
+                "addFunction('strcasecmp'",
+                $source,
+                "{$relativePath} must not declare empty strcasecmp LLVM stub (#15256)"
+            );
+        }
+    }
+
+    public function testModulePhpLinksCaseCompareNotEmptyStrcasecmpStub(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/Module.php');
+        $this->assertStringContainsString('StringCaseCompare::ensureStrcasecmpLinked', $source);
+        $this->assertStringNotContainsString("addFunction('strcasecmp'", $source);
+    }
 }

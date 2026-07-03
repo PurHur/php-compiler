@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -14,6 +15,7 @@ final class JitUnitEnumExists
     /** @return Value matches defined() / enum_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, Value $nameStr): Value
     {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i1 = $context->getTypeFromString('int1');
         $i32 = $context->getTypeFromString('int32');
         $exists = $i1->constInt(0, false);

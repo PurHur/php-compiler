@@ -282,6 +282,7 @@ final class SessionModuleName
 
     private static function emitStringEqualsCi(Context $context, Value $str, string $literal): Value
     {
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $strMap = $context->structFieldMap['__string__'];
         $i8p = $context->getTypeFromString('int8*');
         $i32 = $context->getTypeFromString('int32');

@@ -16,6 +16,7 @@ use PHPCompiler\PseudoClassScope;
 use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin\ClassConstFetchRuntime;
 use PHPCompiler\JIT\Builtin\ErrorRaise;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\ReadonlyBridge;
 use PHPCompiler\JIT\Builtin\Type\Object_;
 use PHPCompiler\JIT\Builtin\TypeErrorRaise;
@@ -381,7 +382,7 @@ final class ClassConstFetchHelper
         if (null === $scopeClass) {
             return $nameStr;
         }
-        self::ensureStrCaseCmp($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $result = $nameStr;
 
@@ -428,7 +429,7 @@ final class ClassConstFetchHelper
     private static function emitResolveClassIdFromNameString(Object_ $objectType, Value $resolvedNameStr): Value
     {
         $context = $objectType->jitContext();
-        self::ensureStrCaseCmp($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         ErrorRaise::ensureLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $i64 = $context->getTypeFromString('int64');
@@ -473,7 +474,7 @@ final class ClassConstFetchHelper
     private static function emitCanonicalClassNameFromResolved(Object_ $objectType, Value $resolvedNameStr): Value
     {
         $context = $objectType->jitContext();
-        self::ensureStrCaseCmp($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $i32 = $context->getTypeFromString('int32');
         $strMap = $context->structFieldMap['__string__'];
         $result = $context->builder->load($context->constantStringFromString(''));
@@ -643,19 +644,6 @@ final class ClassConstFetchHelper
         }
 
         return $objectType->classNameForId($classId);
-    }
-
-    private static function ensureStrCaseCmp(Context $context): void
-    {
-        $i8p = $context->getTypeFromString('int8*');
-        $i32 = $context->getTypeFromString('int32');
-        $ft = $context->context->functionType($i32, false, $i8p, $i8p);
-        try {
-            $context->lookupFunction('strcasecmp');
-        } catch (\Throwable $e) {
-            $fn = $context->module->addFunction('strcasecmp', $ft);
-            $context->registerFunction('strcasecmp', $fn);
-        }
     }
 
     private static function stringDataPtr(Context $context, Value $strPtr): Value

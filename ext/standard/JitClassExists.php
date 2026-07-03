@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\ext\standard;
 
 use PHPCompiler\JIT\Builtin\GlobalIntrospectionNameRuntime;
+use PHPCompiler\JIT\Builtin\StringCaseCompare;
 use PHPCompiler\JIT\Context;
 use PHPLLVM\Builder;
 use PHPLLVM\Value;
@@ -15,6 +16,7 @@ final class JitClassExists
     public static function invoke(Context $context, Value $nameStr): Value
     {
         GlobalIntrospectionNameRuntime::ensureLinked($context);
+        StringCaseCompare::ensureStrcasecmpLinked($context);
         $nameStr = GlobalIntrospectionNameRuntime::normalizeString($context, $nameStr);
         $i1 = $context->getTypeFromString('int1');
         $i32 = $context->getTypeFromString('int32');
