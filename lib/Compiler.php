@@ -1950,6 +1950,10 @@ class Compiler {
                         if ($this->isCoalesceChainInnerStmt($child, $ops, $i)) {
                             break;
                         }
+                        // php-cfg emits Coalesce before Throw when source is `throw … ?? …`; lower once inside compileThrowExpression (#15315).
+                        if ($this->isCoalesceLoweredByFollowingThrow($ops, $i)) {
+                            break;
+                        }
                         $resultOverride = null;
                         if (
                             $i + 1 < $opCount
@@ -9047,6 +9051,31 @@ class Compiler {
     }
 
     /**
+     * php-cfg emits `Coalesce` then `Throw_(coalesce.result)` for `throw $lhs ?? $rhs` (#15315).
+     *
+     * @param Op[] $ops
+     */
+    private function isCoalesceLoweredByFollowingThrow(array $ops, int $index): bool
+    {
+        $op = $ops[$index] ?? null;
+        if (!$op instanceof Op\Expr\BinaryOp\Coalesce) {
+            return false;
+        }
+        $count = count($ops);
+        for ($j = $index + 1; $j < $count; ++$j) {
+            $next = $ops[$j];
+            if ($next instanceof Op\Expr\Throw_) {
+                return $this->operandsChainEqual($next->expr, $op->result);
+            }
+            if (!$next instanceof Op\Expr) {
+                return false;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg emits inner expr ops (New_, …) before Throw_; lower them inside compileExpr(Throw_) (#3802).
      *
      * @param Op[] $ops
@@ -9120,6 +9149,7 @@ class Compiler {
         $newOp = $this->findNewExprForThrowOperand($expr, $block, ...$extraSearchBlocks);
         $ops = [];
         $throwSlot = null;
+        $throwEmitBlock = null;
         if (null !== $newOp) {
             foreach ($this->compileNewExprForThrow($newOp, $block) as $innerOpcode) {
                 $ops[] = $innerOpcode;
@@ -9128,20 +9158,32 @@ class Compiler {
         } else {
             $innerOp = $this->findThrowInnerExprOp($expr, $block);
             if (null !== $innerOp) {
-                foreach ($this->compileExpr($innerOp, $block) as $innerOpcode) {
-                    $ops[] = $innerOpcode;
+                if ($innerOp instanceof Op\Expr\BinaryOp\Coalesce) {
+                    // ?? merge must complete before TYPE_THROW; compileExpr(Coalesce) leaves throw on entry block (#15315).
+                    $throwEmitBlock = $this->compileCoalesce($innerOp, $block);
+                } else {
+                    foreach ($this->compileExpr($innerOp, $block) as $innerOpcode) {
+                        $ops[] = $innerOpcode;
+                    }
                 }
             }
         }
+        $slotBlock = $throwEmitBlock ?? $block;
         if (null === $throwSlot) {
-            $throwSlot = $this->compileOperand($expr->expr, $block, true);
+            $throwSlot = $this->compileOperand($expr->expr, $slotBlock, true);
         }
         $line = $expr->getLine();
-        $ops[] = new OpCode(
+        $throwOp = new OpCode(
             OpCode::TYPE_THROW,
             $throwSlot,
             $line > 0 ? $line : null
         );
+        if (null !== $throwEmitBlock) {
+            $throwEmitBlock->addOpCode($throwOp);
+
+            return [];
+        }
+        $ops[] = $throwOp;
 
         return $ops;
     }
