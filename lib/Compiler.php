@@ -11800,7 +11800,10 @@ class Compiler {
                         && (
                             $this->operandsReferToSameVariable($child->result, $callArgProbe)
                             || $this->operandsReferToSameVariable($child->result, $arg)
-                            || $this->callArgIsDeadInlineTemporary($callArgProbe)
+                            || (
+                                $this->callArgIsDeadInlineTemporary($callArgProbe)
+                                && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            )
                         )
                     ) {
                         return $child;
@@ -14226,6 +14229,7 @@ class Compiler {
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseAnd
                         || $byIndex instanceof Op\Expr\BinaryOp\BitwiseXor
                         || $byIndex instanceof Op\Expr\ClassConstFetch
+                        || $byIndex instanceof Op\Expr\Cast
                         || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
                     )
                 ) {
@@ -14358,7 +14362,8 @@ class Compiler {
                         && (($filtered[1] ?? null) instanceof Op\Expr\FuncCall
                             || ($filtered[1] ?? null) instanceof Op\Expr\NsFuncCall
                             || ($filtered[1] ?? null) instanceof Op\Expr\StaticCall
-                            || ($filtered[1] ?? null) instanceof Op\Expr\MethodCall)
+                            || ($filtered[1] ?? null) instanceof Op\Expr\MethodCall
+                            || ($filtered[1] ?? null) instanceof Op\Expr\Cast)
                     ) {
                         return $filtered[1];
                     }
@@ -15499,6 +15504,17 @@ class Compiler {
                     }
                 }
             }
+            // array_merge((object)[...], [...]) — Array_ prelude feeds Cast, not the call (#15207).
+            if ($producer instanceof Op\Expr\Array_) {
+                $next = $producers[$i + 1] ?? null;
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->operandsReferToSameVariable($next->expr, $producer->result)
+                ) {
+                    continue;
+                }
+            }
             $filtered[] = $producer;
         }
 
@@ -15668,6 +15684,10 @@ class Compiler {
                 || $producer instanceof Op\Expr\FuncCall
                 || $producer instanceof Op\Expr\NsFuncCall
             ) {
+                return $producer;
+            }
+            // array_merge((object)[...], [...]) — Cast producer feeds arg #0 (#15207).
+            if ($producer instanceof Op\Expr\Cast) {
                 return $producer;
             }
         }
@@ -16740,6 +16760,14 @@ class Compiler {
             }
             if ($child instanceof Op\Expr\Array_) {
                 $next = $cfgChildren[$i + 1] ?? null;
+                // (object)[...] / (array)[...] — inner Array_ feeds sibling Cast, not the consumer (#15207).
+                if (
+                    $next instanceof Op\Expr\Cast
+                    && property_exists($next, 'expr')
+                    && $this->cfgExprUsesOperand($next, $child->result)
+                ) {
+                    continue;
+                }
                 // php-cfg `var_export(array_keys([...]), true)` — Array_ feeds sibling FuncCall arg (#10373).
                 if (
                     ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall
@@ -22405,7 +22433,6 @@ class Compiler {
                 null !== $inlineArray
                 && null !== $callArgOperand
                 && !$this->callArgOperandExpectsArrayProducer($callArgOperand)
-                && !$this->callArgIsDeadInlineTemporary($callArgOperand)
             ) {
                 $inlineArray = null;
             }
