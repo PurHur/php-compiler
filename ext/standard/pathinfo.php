@@ -12,7 +12,7 @@ use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** pathinfo() for file paths (subset of PHP; JIT/AOT via JitPathinfo). */
+/** pathinfo() for file paths (subset of PHP; JIT/AOT via JitPathinfo + PathinfoJitHelper #15322). */
 final class pathinfo extends Internal
 {
     public function execute(Frame $frame): void
