@@ -1,0 +1,68 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PHPCompiler\ext\standard;
+
+use PHPCompiler\Frame;
+use PHPCompiler\Func\Internal;
+use PHPCompiler\JIT\Context;
+use PHPCompiler\JIT\Variable as JITVariable;
+use PHPLLVM\Value;
+
+/**
+ * session_cache_limiter() — session cache control header mode (php-src ext/session/session.c; #11095).
+ */
+class session_cache_limiter_ extends Internal
+{
+    public function __construct()
+    {
+        parent::__construct('session_cache_limiter');
+    }
+
+    public function execute(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        if ($argc > 1) {
+            throw new \ArgumentCountError(
+                'session_cache_limiter() expects at most 1 argument, '.$argc.' given'
+            );
+        }
+        if (null === $frame->returnVar) {
+            if (1 === $argc) {
+                $newLimiter = VmString::coerceStringBuiltinArg(
+                    $frame->calledArgs[0],
+                    'session_cache_limiter',
+                    1,
+                    'new_cache_limiter'
+                );
+                VmSession::setCacheLimiter($frame, $newLimiter);
+            }
+
+            return;
+        }
+        if (1 === $argc) {
+            $newLimiter = VmString::coerceStringBuiltinArg(
+                $frame->calledArgs[0],
+                'session_cache_limiter',
+                1,
+                'new_cache_limiter'
+            );
+            $previous = VmSession::setCacheLimiter($frame, $newLimiter);
+            if (false === $previous) {
+                $frame->returnVar->bool(false);
+
+                return;
+            }
+            $frame->returnVar->string($previous);
+
+            return;
+        }
+        $frame->returnVar->string(VmSession::getCacheLimiter());
+    }
+
+    public function call(Context $context, JITVariable ...$args): Value
+    {
+        throw new \LogicException('session_cache_limiter() is VM-only in this compiler build');
+    }
+}
