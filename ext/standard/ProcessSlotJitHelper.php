@@ -60,10 +60,9 @@ final class ProcessSlotJitHelper
         self::$slots[$slot] = $entry;
 
         if ($entry['statusKnown']) {
-            $status = $entry['status'];
             unset(self::$slots[$slot]);
 
-            return self::exitCodeFromStatus($status);
+            return -1;
         }
 
         try {
@@ -104,11 +103,17 @@ final class ProcessSlotJitHelper
             $statusVal = $entry['status'];
             $running = false;
         } else {
-            // php-src: proc_get_status() must not reap — waitpid only in proc_close() (#13079).
-            try {
-                $running = 0 === (int) $ffi->kill($entry['pid'], 0);
-            } catch (\Throwable) {
-                return false;
+            self::pollChildExitStatus($ffi, $entry);
+            self::$slots[$slot] = $entry;
+            if ($entry['statusKnown']) {
+                $statusVal = $entry['status'];
+                $running = false;
+            } else {
+                try {
+                    $running = 0 === (int) $ffi->kill($entry['pid'], 0);
+                } catch (\Throwable) {
+                    return false;
+                }
             }
         }
 
@@ -166,6 +171,25 @@ final class ProcessSlotJitHelper
         }
 
         return $lowByte;
+    }
+
+    /**
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool} $entry
+     */
+    private static function pollChildExitStatus(\FFI $ffi, array &$entry): void
+    {
+        if ($entry['statusKnown']) {
+            return;
+        }
+        try {
+            $status = $ffi->new('int');
+            $waitRc = (int) $ffi->waitpid($entry['pid'], \FFI::addr($status), self::WNOHANG);
+            if ($waitRc === $entry['pid']) {
+                $entry['statusKnown'] = true;
+                $entry['status'] = (int) $status->cdata;
+            }
+        } catch (\Throwable) {
+        }
     }
 
     private static function ffi(): ?\FFI

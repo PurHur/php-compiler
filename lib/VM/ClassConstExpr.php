@@ -176,7 +176,7 @@ final class ClassConstExpr
 
         $classEntry = $context->classes[$lcClass];
         if ('class' === $constName) {
-            $frame->scope[$op->arg1]->string($classEntry->name);
+            $frame->scope[$op->arg1]->string($className);
 
             return;
         }

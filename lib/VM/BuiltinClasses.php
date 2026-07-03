@@ -150,6 +150,7 @@ use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetAttributes;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetName;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseGetValue;
 use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsBacked;
+use PHPCompiler\VM\Builtin\ReflectionEnumUnitCaseIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionExtensionConstruct;
 use PHPCompiler\VM\Builtin\ReflectionExtensionGetName;
 use PHPCompiler\VM\Builtin\ReflectionFiberGetExecutingFiber;
@@ -698,6 +699,7 @@ final class BuiltinClasses
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
         \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
@@ -729,7 +731,6 @@ final class BuiltinClasses
                 'isprotected' => new ReflectionPropertyIsProtected(),
                 'isabstract' => new ReflectionPropertyIsAbstract(),
                 'isvirtual' => new ReflectionPropertyIsVirtual(),
-                'isdynamic' => new ReflectionPropertyIsDynamic(),
                 'getmangledname' => new ReflectionPropertyGetMangledName(),
                 'hashook' => new ReflectionPropertyHasHook(),
                 'gethooks' => new ReflectionPropertyGetHooks(),
@@ -760,6 +761,10 @@ final class BuiltinClasses
             $rp->methodVisibility['isreadable'] = $pub;
             $rp->methods['iswritable'] = ReflectionPropertyAccessProbe::isWritable();
             $rp->methodVisibility['iswritable'] = $pub;
+        }
+        if (CompilerVersion::supportsReflectionPropertyIsDynamic()) {
+            $rp->methods['isdynamic'] = new ReflectionPropertyIsDynamic();
+            $rp->methodVisibility['isdynamic'] = $pub;
         }
         $ctx->classes[ReflectionSupport::REFLECTION_PROPERTY] = $rp;
 
@@ -887,6 +892,8 @@ final class BuiltinClasses
         $reuc->methodVisibility['getvalue'] = $pub;
         $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
         $reuc->methodVisibility['isbacked'] = $pub;
+        $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
+        $reuc->methodVisibility['isdeprecated'] = $pub;
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
 
         $rebc = new ClassEntry('ReflectionEnumBackedCase');

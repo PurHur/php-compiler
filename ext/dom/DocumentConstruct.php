@@ -47,5 +47,6 @@ final class DocumentConstruct extends DomClassMethod
         }
         $state->xmlVersion = $version;
         $state->encoding = $encoding;
+        VmDom::initDocumentLibxmlDefaults($receiver);
     }
 }

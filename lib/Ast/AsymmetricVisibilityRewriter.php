@@ -24,7 +24,7 @@ final class AsymmetricVisibilityRewriter
     /** php-src: Zend/zend_compile.c — zend_add_member_modifier() duplicate PPP / PPP_SET (#6774). */
     public const MULTIPLE_MODIFIERS_MESSAGE = 'Multiple access type modifiers are not allowed';
 
-    /** php-src: Zend/zend_language_scanner.l — bare private(set)/protected(set) without read modifier (#15446). */
+    /** php-src: Zend/zend_language_scanner.l — invalid set/read modifier ordering on reference profile (#15446). */
     public const BARE_SET_WITHOUT_READ_MESSAGE = 'syntax error, unexpected token ")", expecting variable';
 
     /**
@@ -195,7 +195,6 @@ final class AsymmetricVisibilityRewriter
         self::rejectExplicitPublicBeforeSetModifier($source);
         self::rejectExplicitPublicAfterSetModifier($source);
         self::rejectPromotedParamMultipleAccessModifiers($source);
-        self::rejectBareSetModifierWithoutRead($source);
         self::rejectAsymmetricSetOnStaticProperty($source);
 
         $source = (string) preg_replace_callback(
@@ -262,14 +261,6 @@ final class AsymmetricVisibilityRewriter
         });
     }
 
-
-    /** Bare private(set)/protected(set) without read modifier is a parse error on php-src 8.4 (#15446). */
-    private static function rejectBareSetModifierWithoutRead(string $source): void
-    {
-        if (self::findBareSetModifierLine($source) > 0) {
-            throw new \CompileError(self::BARE_SET_WITHOUT_READ_MESSAGE);
-        }
-    }
 
     private static function lineIsHookBlockSetModifier(string $line): bool
     {

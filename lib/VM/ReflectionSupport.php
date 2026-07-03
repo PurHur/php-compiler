@@ -76,6 +76,9 @@ final class ReflectionSupport
     /** Declaring class name on ReflectionProperty instances (#9878). */
     public const PROP_DECLARING_CLASS_NAME = 'declaringClass';
 
+    /** Runtime dynamic property introspection (#15540, ext/reflection/php_reflection.c). */
+    public const PROP_IS_DYNAMIC = 'isDynamicFlag';
+
     public const PROP_FUNCTION_NAME = 'function';
 
     public const PROP_CONSTANT_NAME = 'constant';
@@ -824,6 +827,16 @@ final class ReflectionSupport
         return $nameVar->toString();
     }
 
+    public static function isDynamicReflectionProperty(ObjectEntry $reflection): bool
+    {
+        $flag = $reflection->getProperty(self::PROP_IS_DYNAMIC)->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $flag->type) {
+            return false;
+        }
+
+        return $flag->toBool();
+    }
+
     /**
      * Declaring class for a ReflectionProperty — stored at construction or resolved from metadata (#9878).
      */
@@ -841,6 +854,28 @@ final class ReflectionSupport
         }
 
         return VmReflection::declaringClassNameForPropertyLookup($entry, $property, $ctx);
+    }
+
+    /** php-src ext/reflection/php_reflection.c — ReflectionMethod::getDeclaringClass() (#15658). */
+    public static function declaringClassNameFromReflectionMethod(ObjectEntry $reflection, Context $ctx): string
+    {
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            throw new \LogicException('ReflectionMethod refers to unknown class in this compiler build');
+        }
+        $methodLc = strtolower($methodName);
+        // Trait-imported methods (incl. aliases) report the composing class, not the trait (#15658).
+        if (isset($entry->traitMethodSources[$methodLc])) {
+            return $entry->name;
+        }
+        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
+        if (isset($ctx->classes[$declLc])) {
+            return $ctx->classes[$declLc]->name;
+        }
+
+        return $entry->name;
     }
 
     public static function functionNameFromReflection(ObjectEntry $reflection): string
@@ -1381,10 +1416,9 @@ final class ReflectionSupport
         if (!isset($entry->methods[$methodLc]) && !isset($entry->abstractMethods[$methodLc])) {
             self::throwReflectionException(self::methodNotFoundMessage($entry->name, $methodName));
         }
-        $declLc = $entry->methodDeclaringClassLc[$methodLc] ?? strtolower($entry->name);
-        $declEntry = $ctx->classes[$declLc] ?? $entry;
-
-        return [$declEntry, $methodName];
+        // php-src ext/reflection/php_reflection.c — store the requested class (composing
+        // class for trait imports/aliases), matching ReflectionClass::getMethod().
+        return [$entry, $methodName];
     }
 
     /**

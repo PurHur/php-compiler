@@ -99,6 +99,17 @@ final class DomDocumentVMTest extends BaseTest
                 'php84_dom_node_get_root_node_phantom.phpt'
             );
         }
+        if (CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
+            yield 'dom_node_compare_document_position.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/dom_node_compare_document_position.phpt',
+                'dom_node_compare_document_position.phpt'
+            );
+        } else {
+            yield 'php84_dom_node_compare_document_position_phantom.phpt' => self::parsePHPT(
+                __DIR__.'/cases/stdlib/php84_dom_node_compare_document_position_phantom.phpt',
+                'php84_dom_node_compare_document_position_phantom.phpt'
+            );
+        }
         yield 'dom_exception.phpt' => self::parsePHPT(
             __DIR__.'/cases/stdlib/dom_exception.phpt',
             'dom_exception.phpt'

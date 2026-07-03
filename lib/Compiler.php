@@ -1830,13 +1830,11 @@ class Compiler {
 
         // Hoist class-like definitions before functions so JIT/AOT see member
         // constants when compiling FUNCDEF bodies (issue #2215, MiniWebApp Router::CONST).
+        // Enums stay in source order so enum_exists() before declaration matches Zend (#5013).
         foreach ($ops as $child) {
             switch (get_class($child)) {
                 case Op\Stmt\Class_::class:
                     $block->addOpCode($this->compileClassLike($child, $block));
-                    break;
-                case Op\Stmt\Enum_::class:
-                    $block->addOpCode($this->compileEnum($child, $block));
                     break;
                 case Op\Stmt\Interface_::class:
                     $block->addOpCode($this->compileInterface($child, $block));
@@ -1929,10 +1927,12 @@ class Compiler {
             switch (get_class($child)) {
                 case Op\Stmt\Function_::class:
                 case Op\Stmt\Class_::class:
-                case Op\Stmt\Enum_::class:
                 case Op\Terminal\Const_::class:
                 case Op\Stmt\Interface_::class:
                 case Op\Stmt\Trait_::class:
+                    break;
+                case Op\Stmt\Enum_::class:
+                    $block->addOpCode($this->compileEnum($child, $block));
                     break;
                 default:
                     if ($child instanceof Op\Expr\Isset_ && count($child->vars) > 1) {
@@ -3430,6 +3430,52 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * php-cfg isset()/empty() prelude stmts between hoisted sibling call-arg producers (#15646).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function isIssetOrEmptyInlineCallArgPreludeStmt(?Op $stmt, int $index, array $cfgChildren): bool
+    {
+        if (!$stmt instanceof Op\Expr) {
+            return false;
+        }
+        $next = $cfgChildren[$index + 1] ?? null;
+
+        return ($stmt instanceof Op\Expr\PropertyFetch && $this->isPropertyFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\ArrayDimFetch && $this->isArrayDimFetchOnlyIssetVar($stmt, $next))
+            || ($stmt instanceof Op\Expr\StaticPropertyFetch && $this->isStaticPropertyFetchOnlyIssetVar($stmt, $next));
+    }
+
+    /**
+     * 0-based ordinal among hoisted sibling call-arg producers, skipping isset/empty preludes (#15646).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hoistedSiblingCallArgProducerOrdinal(
+        int $producerIndex,
+        int $firstSibling,
+        int $consumerIndex,
+        array $cfgChildren
+    ): int {
+        $ordinal = 0;
+        for ($j = $firstSibling; $j < $consumerIndex; ++$j) {
+            if ($j === $producerIndex) {
+                return $ordinal;
+            }
+            $stmt = $cfgChildren[$j] ?? null;
+            if (!$stmt instanceof Op\Expr || !$this->isInlineExprCallArgProducer($stmt)) {
+                continue;
+            }
+            if ($this->isIssetOrEmptyInlineCallArgPreludeStmt($stmt, $j, $cfgChildren)) {
+                continue;
+            }
+            ++$ordinal;
+        }
+
+        return $ordinal;
     }
 
     private function isPropertyFetchOnlyEmptyVar(
@@ -8546,6 +8592,8 @@ class Compiler {
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block);
                 $this->rejectGlobalConstInWriteContext($expr->var, $block);
+                // Zend zend_compile.c: cannot acquire a reference to $GLOBALS (#15627).
+                $this->rejectGlobalsReferenceAcquisition($expr->expr);
                 // Zend zend_compile.c: ref-binding to const/class-const array element (#5409).
                 $this->rejectGlobalConstInWriteContext($expr->expr, $block);
                 $bindRefFlags = 0;
@@ -14304,6 +14352,12 @@ class Compiler {
                 return $mergeMapped;
             }
         }
+        if ('preg_replace' === $inlineFuncName) {
+            $pregReplaceMapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $pregReplaceMapped) {
+                return $pregReplaceMapped;
+            }
+        }
         $trailingComparator = $this->matchTrailingComparatorInlineCallArgProducer(
             $producers,
             $callArgs,
@@ -15531,21 +15585,16 @@ class Compiler {
         }
         // array_map(callback, [...], [...]) — map hoisted Array_ producers to array args by order (#10094, #13812).
         if ('array_map' === $inlineFuncName && $argIndex >= 1) {
-            $arrayProducers = array_values(array_filter(
-                $producers,
-                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
-            ));
-            if ([] !== $arrayProducers) {
-                $arrayArgIndices = [];
-                foreach ($callArgs as $i => $arg) {
-                    if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
-                        $arrayArgIndices[] = $i;
-                    }
-                }
-                $position = array_search($argIndex, $arrayArgIndices, true);
-                if (false !== $position && isset($arrayProducers[$position])) {
-                    return $arrayProducers[$position];
-                }
+            $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
+            }
+        }
+        // preg_replace(['/a/'], ['A'], 'subj') — sibling Array_ pattern/replacement + embedded subject (#10808).
+        if ('preg_replace' === $inlineFuncName) {
+            $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
             }
         }
         // strtotime('next Monday', strtotime('2024-06-03')) — lone hoisted FuncCall → sole non-embedded arg (#10838).
@@ -17376,6 +17425,26 @@ class Compiler {
                 }
                 break;
             }
+            // php-cfg PropertyFetch/ArrayDimFetch prelude before Isset_ — not a sibling call-arg producer (#15646).
+            $next = $cfgChildren[$i + 1] ?? null;
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $next)
+            ) {
+                continue;
+            }
             array_unshift($producers, $child);
         }
 
@@ -18391,9 +18460,23 @@ class Compiler {
                     return false;
                 }
             } else {
-                $distance = $consumerIndex - $producerIndex;
-                if ($distance < 1 || $distance > $argCount) {
-                    return false;
+                $firstSiblingForDistance = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+                if (null !== $firstSiblingForDistance) {
+                    $producerOrdinal = $this->hoistedSiblingCallArgProducerOrdinal(
+                        $producerIndex,
+                        $firstSiblingForDistance,
+                        $consumerIndex,
+                        $cfgChildren
+                    );
+                    $effectiveDistance = $producerOrdinal + 1;
+                    if ($effectiveDistance < 1 || $effectiveDistance > $argCount) {
+                        return false;
+                    }
+                } else {
+                    $distance = $consumerIndex - $producerIndex;
+                    if ($distance < 1 || $distance > $argCount) {
+                        return false;
+                    }
                 }
             }
         }
@@ -18460,6 +18543,27 @@ class Compiler {
             }
             // is_countable(new ArrayObject()) — New_ prelude between hoisted sibling producers (#14958).
             if ($mid instanceof Op\Expr\New_ || $mid instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $mid instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($mid, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\Isset_ || $mid instanceof Op\Expr\Empty_) {
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($mid)) {
@@ -18540,6 +18644,27 @@ class Compiler {
                 continue;
             }
             if ($sib instanceof Op\Expr\New_ || $sib instanceof Op\Expr\Clone_) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if (
+                $sib instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($sib, $cfgChildren[$j + 1] ?? null)
+            ) {
+                continue;
+            }
+            if ($sib instanceof Op\Expr\Isset_ || $sib instanceof Op\Expr\Empty_) {
                 continue;
             }
             if (!$this->isSiblingInlineCallProducerExpr($sib)) {
@@ -19025,9 +19150,56 @@ class Compiler {
                 --$i;
                 continue;
             }
-            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
                 --$i;
                 continue;
+            }
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+                // $c = get_defined_constants(true); in_array(..., get_declared_traits(), …) — stmt assign
+                // is not part of the hoisted sibling chain (#15611, re-#14237).
+                $assignFeedsCallArg = false;
+                $consumer = $cfgChildren[$consumerIndex] ?? null;
+                if (
+                    $consumer instanceof Op\Expr
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    foreach ($consumer->args as $callArg) {
+                        if (
+                            $this->operandsReferToSameVariable($child->var, $callArg)
+                            || $this->operandsReferToSameVariable($child->result, $callArg)
+                        ) {
+                            $assignFeedsCallArg = true;
+                            break;
+                        }
+                    }
+                }
+                if ($assignFeedsCallArg) {
+                    --$i;
+                    continue;
+                }
+                break;
             }
             break;
         }
@@ -19060,6 +19232,31 @@ class Compiler {
                 continue;
             }
             if ($skip instanceof Op\Expr\New_ || $skip instanceof Op\Expr\Clone_) {
+                ++$first;
+                continue;
+            }
+            if ($skip instanceof Op\Expr\Isset_ || $skip instanceof Op\Expr\Empty_) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
+                ++$first;
+                continue;
+            }
+            if (
+                $skip instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($skip, $cfgChildren[$first + 1] ?? null)
+            ) {
                 ++$first;
                 continue;
             }
@@ -19224,6 +19421,101 @@ class Compiler {
                 $block->addOpCode($op);
             }
         }
+    }
+
+    /**
+     * hold(); in_array(..., ['a','b'], true) — stmt-level UDF then hoisted Array_ prelude only (#15422, #15609).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        $producer = $cfgChildren[$producerIndex] ?? null;
+        if (!$producer instanceof Op\Expr\FuncCall && !$producer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $consumer = $cfgChildren[$consumerIndex] ?? null;
+        if (!$consumer instanceof Op\Expr\FuncCall && !$consumer instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        if ($this->inlineCallArgProducerFeedsConsumer($producer, $consumer)) {
+            return false;
+        }
+        $hasArrayPrelude = false;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\Array_) {
+                $hasArrayPrelude = true;
+                continue;
+            }
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($mid)) {
+                continue;
+            }
+            if ($this->isSiblingInlineCallProducerExpr($mid)) {
+                return false;
+            }
+
+            return false;
+        }
+
+        return $hasArrayPrelude;
+    }
+
+    /** Void stmt-level call before hoisted Array_ consumer args — skip EXEC_RETURN slot (#15609). */
+    private function stmtLevelVoidCallBeforeHoistedArrayConsumerPrelude(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig) {
+            return false;
+        }
+        if (!$cfgCallOp instanceof Op\Expr\FuncCall && !$cfgCallOp instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return false;
+        }
+        $cfgChildren = $block->orig->children;
+        for ($j = $callIndex + 1; $j < \count($cfgChildren); ++$j) {
+            $next = $cfgChildren[$j] ?? null;
+            if ($next instanceof Op\Expr\FuncCall || $next instanceof Op\Expr\NsFuncCall) {
+                $callee = $this->resolveCfgFuncCallName($next);
+                if (!\in_array(strtolower($callee ?? ''), ['in_array', 'array_search', 'array_key_exists'], true)) {
+                    return false;
+                }
+
+                return $this->priorStmtLevelCallSeparatedByHoistedArrayPreludeOnly(
+                    $callIndex,
+                    $j,
+                    $cfgChildren
+                );
+            }
+            if ($next instanceof Op\Expr\Array_
+                || $next instanceof Op\Expr\ConstFetch
+                || $next instanceof Op\Expr\ClassConstFetch
+                || $this->isUnaryInlineSiblingCallArgExpr($next)
+            ) {
+                continue;
+            }
+
+            return false;
+        }
+
+        return false;
     }
 
     /**
@@ -19584,6 +19876,38 @@ class Compiler {
         }
 
         return 0 === $argIndex ? $producers[$funcIdx] : $producers[$arrayIdx];
+    }
+
+    /**
+     * Map consecutive hoisted Array_ producers to array-shaped call args by order (#10094, #10808).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchInlineArrayProducersToArrayCallArgs(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if ([] === $arrayProducers) {
+            return null;
+        }
+        $arrayArgIndices = [];
+        foreach ($callArgs as $i => $arg) {
+            if (null !== $arg && $this->callArgOperandExpectsArrayProducer($arg)) {
+                $arrayArgIndices[] = $i;
+            }
+        }
+        $position = array_search($argIndex, $arrayArgIndices, true);
+        if (false === $position || !isset($arrayProducers[$position])) {
+            return null;
+        }
+
+        return $arrayProducers[$position];
     }
 
     /**
@@ -24796,7 +25120,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
-                && 1 === $this->countDeadArrayInlineCallArgs($cfgCallOp)
+                && $this->countDeadArrayInlineCallArgs($cfgCallOp) >= 1
                 && null !== $block->orig
                 && !$this->precedingInlineCallArgHasPlusOrConcatProducer($block->orig->children, $cfgCallOp)
                 && null === $this->nestedInlineFuncCallProducerForCallArg($block, $cfgCallOp, (int) $argIndex)
@@ -24807,32 +25131,53 @@ class Compiler {
                         $cfgCallOp
                     )
                     : [];
-                $lastProducer = $producers[\count($producers) - 1] ?? null;
-                $hasArrayUnionPlus = false;
-                foreach ($producers as $producer) {
-                    if ($producer instanceof Op\Expr\BinaryOp\Plus) {
-                        $hasArrayUnionPlus = true;
-                        break;
-                    }
-                }
-                // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
-                if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
-                    $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
-                    if ($immediateArray instanceof Op\Expr\Array_) {
-                        $immediateSlot = $block->slotForOperand($immediateArray->result);
-                        if (null === $immediateSlot) {
-                            foreach ($this->compileExpr($immediateArray, $block) as $op) {
+                $deadArrayArgCount = $this->countDeadArrayInlineCallArgs($cfgCallOp);
+                if ($deadArrayArgCount >= 2) {
+                    $matched = $this->findUnassignedInlineArrayProducerForDeadCallArg(
+                        $producers,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $block
+                    );
+                    if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
+                        if (null === $block->slotForOperand($matched->result)) {
+                            foreach ($this->compileExpr($matched, $block) as $op) {
                                 $sends[] = $op;
                             }
+                        }
+                        $matchedSlot = $block->slotForOperand($matched->result);
+                        if (null !== $matchedSlot) {
+                            $valueSlot = (string) $matchedSlot;
+                        }
+                    }
+                } else {
+                    $lastProducer = $producers[\count($producers) - 1] ?? null;
+                    $hasArrayUnionPlus = false;
+                    foreach ($producers as $producer) {
+                        if ($producer instanceof Op\Expr\BinaryOp\Plus) {
+                            $hasArrayUnionPlus = true;
+                            break;
+                        }
+                    }
+                    // Array union arg is Plus.result, not the trailing INIT_ARRAY temp (#10490, #12763).
+                    if (!$hasArrayUnionPlus && !$lastProducer instanceof Op\Expr\BinaryOp\Plus) {
+                        $immediateArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, (int) $argIndex, $block);
+                        if ($immediateArray instanceof Op\Expr\Array_) {
                             $immediateSlot = $block->slotForOperand($immediateArray->result);
-                        }
-                        if (null !== $immediateSlot) {
-                            $valueSlot = (string) $immediateSlot;
-                        }
-                    } else {
-                        $resolvedSlot = $this->slotForDeadInlineArrayOrCallResultCallArg($block, $cfgCallOp, (int) $argIndex);
-                        if (null !== $resolvedSlot) {
-                            $valueSlot = $resolvedSlot;
+                            if (null === $immediateSlot) {
+                                foreach ($this->compileExpr($immediateArray, $block) as $op) {
+                                    $sends[] = $op;
+                                }
+                                $immediateSlot = $block->slotForOperand($immediateArray->result);
+                            }
+                            if (null !== $immediateSlot) {
+                                $valueSlot = (string) $immediateSlot;
+                            }
+                        } else {
+                            $resolvedSlot = $this->slotForDeadInlineArrayOrCallResultCallArg($block, $cfgCallOp, (int) $argIndex);
+                            if (null !== $resolvedSlot) {
+                                $valueSlot = $resolvedSlot;
+                            }
                         }
                     }
                 }
@@ -26233,6 +26578,12 @@ class Compiler {
         ?Op $cfgCallOp = null
     ): OpCode {
         $line = $startLine > 0 ? $startLine : null;
+        if ($this->stmtLevelVoidCallBeforeHoistedArrayConsumerPrelude($cfgCallOp, $block)) {
+            return new OpCode(
+                OpCode::TYPE_FUNCCALL_EXEC_NORETURN,
+                $line
+            );
+        }
         if (
             $this->forceDeferredSiblingCallReturnSlot
             || $this->callNeedsReturnSlot($result, $block, $cfgCallOp)
@@ -27022,6 +27373,21 @@ class Compiler {
         }
         if ('this' === $this->baseVariableName($var)) {
             $this->throwCompileError('Cannot re-assign $this');
+        }
+    }
+
+    /**
+     * Zend zend_compile.c: acquiring a reference to $GLOBALS is a compile-time fatal (#15627).
+     *
+     * @return never
+     */
+    protected function rejectGlobalsReferenceAcquisition(?Operand $expr): void
+    {
+        if (null === $expr) {
+            return;
+        }
+        if ('GLOBALS' === $this->baseVariableName($expr)) {
+            $this->throwCompileError('Cannot acquire reference to $GLOBALS');
         }
     }
 

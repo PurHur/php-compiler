@@ -43,7 +43,12 @@ class JITTest extends BaseTest {
             }
             if (!CompilerVersion::supportsNextafter()
                 && str_contains($name, 'nextafter')
-                && !str_contains($name, 'php84_math_string_builtins_phantom')) {
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'nextafter_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsRoundingModeEnum()
@@ -437,12 +442,14 @@ class JITTest extends BaseTest {
             }
             // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables typed class constants (#12798).
             if (CompilerVersion::supportsTypedClassConstants()
-                && str_contains($name, 'typed_class_const_reject')) {
+                && (str_contains($name, 'typed_class_const_reject')
+                    || str_contains($name, 'typed_class_const_reference_profile'))) {
                 continue;
             }
-            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123).
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123, #15693).
             if (CompilerVersion::supportsClassConstObjectExpressions()) {
                 if (str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_reject')
                     || str_contains($name, 'class_const_new_expr')
                     || str_contains($name, 'class_const_new_reference_profile')
                     || str_contains($name, 'new_in_class_constant_reject')
@@ -465,7 +472,8 @@ class JITTest extends BaseTest {
                     || str_contains($name, 'enum_typed_class_const')
                     || str_contains($name, 'match_typed_class_const')
                     || str_contains($name, 'reflection_class_constant_get_type'))
-                && !str_contains($name, 'typed_class_const_reject')) {
+                && !str_contains($name, 'typed_class_const_reject')
+                && !str_contains($name, 'typed_class_const_reference_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).
@@ -789,6 +797,14 @@ class JITTest extends BaseTest {
             }
             // ReflectionProperty asymmetric probes: VM builtins + asymmetric syntax (#6977).
             if (str_contains($name, 'reflection_property_asymmetric')) {
+                continue;
+            }
+            // ReflectionProperty::{isReadable,isWritable} profile gates: VM-only (#15664).
+            if (str_contains($name, 'reflection_property_isreadable')) {
+                continue;
+            }
+            // ReflectionProperty::isDynamic profile gates: VM-only (#15676).
+            if (str_contains($name, 'reflection_property_isdynamic')) {
                 continue;
             }
             // Reflection docblock/source getters are VM-only (#7358).

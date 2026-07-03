@@ -38,7 +38,12 @@ class VMTest extends BaseTest {
             }
             if (!CompilerVersion::supportsNextafter()
                 && str_contains($name, 'nextafter')
-                && !str_contains($name, 'php84_math_string_builtins_phantom')) {
+                && !str_contains($name, 'php84_math_string_builtins_phantom')
+                && !str_contains($name, 'nextafter_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsNextafter()
+                && str_contains($name, 'nextafter_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsRoundingModeEnum()
@@ -221,6 +226,22 @@ class VMTest extends BaseTest {
             }
             if (CompilerVersion::advertisesReflectionConstantClass()
                 && str_contains($name, 'reflection_constant_reference_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReflectionPropertyAccessProbes()
+                && str_contains($name, 'reflection_property_isreadable_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionPropertyAccessProbes()
+                && str_contains($name, 'reflection_property_isreadable_profile')) {
+                continue;
+            }
+            if (!CompilerVersion::supportsReflectionPropertyIsDynamic()
+                && str_contains($name, 'reflection_property_isdynamic_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionPropertyIsDynamic()
+                && str_contains($name, 'reflection_property_isdynamic_profile')) {
                 continue;
             }
             if (!CompilerVersion::supportsMbTrimFunctions()
@@ -446,12 +467,14 @@ class VMTest extends BaseTest {
             }
             // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables typed class constants (#12798).
             if (CompilerVersion::supportsTypedClassConstants()
-                && str_contains($name, 'typed_class_const_reject')) {
+                && (str_contains($name, 'typed_class_const_reject')
+                    || str_contains($name, 'typed_class_const_reference_profile'))) {
                 continue;
             }
-            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123).
+            // 8.2-target reject gate; skipped when CompilerVersion 8.4.0+ enables class const `new` (#12940, #14123, #15693).
             if (CompilerVersion::supportsClassConstObjectExpressions()) {
                 if (str_contains($name, 'class_const_new_rejected')
+                    || str_contains($name, 'class_const_new_reject')
                     || str_contains($name, 'class_const_new_expr')
                     || str_contains($name, 'class_const_new_reference_profile')
                     || str_contains($name, 'new_in_class_constant_reject')
@@ -474,7 +497,8 @@ class VMTest extends BaseTest {
                     || str_contains($name, 'enum_typed_class_const')
                     || str_contains($name, 'match_typed_class_const')
                     || str_contains($name, 'reflection_class_constant_get_type'))
-                && !str_contains($name, 'typed_class_const_reject')) {
+                && !str_contains($name, 'typed_class_const_reject')
+                && !str_contains($name, 'typed_class_const_reference_profile')) {
                 continue;
             }
             // 8.4-target reject gate; skipped when exit()/die() function form enabled (#12413, #12435).

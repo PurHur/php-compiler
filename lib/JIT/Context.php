@@ -903,6 +903,7 @@ class Context {
         Builtin\LastErrorRuntime::ensureStandaloneBodies($this);
         Builtin\RewriteVarsRuntime::ensureStandaloneBodies($this);
         Builtin\DefineRuntime::ensureStandaloneBodies($this);
+        Builtin\StringStrContains::ensureStandaloneBodies($this);
         Builtin\SuperglobalNameRuntime::ensureLinked($this);
         Builtin\StringHtmlspecialcharsStandaloneLlvm::implement($this);
     }

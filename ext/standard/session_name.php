@@ -57,6 +57,13 @@ class session_name extends Internal
 
             return;
         }
+        if (!VmSession::canChangeName($frame)) {
+            if (null !== $frame->returnVar) {
+                $frame->returnVar->bool(false);
+            }
+
+            return;
+        }
         $result = VmSession::setName($name);
         if (null === $frame->returnVar) {
             return;

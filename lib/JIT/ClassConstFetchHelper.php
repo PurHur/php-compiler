@@ -68,10 +68,10 @@ final class ClassConstFetchHelper
         $literal = JitStringArg::compileTimeLiteral($classVar);
         if (null !== $literal) {
             $resolved = self::resolveJitClassNameString($objectType, $block, $literal);
-            $classId = $objectType->lookup($resolved);
+            $objectType->lookup($resolved);
 
             return $objectType->jitContext()->builder->load(
-                $objectType->jitContext()->constantStringFromString($objectType->classNameForId($classId))
+                $objectType->jitContext()->constantStringFromString($resolved)
             );
         }
 
@@ -79,7 +79,7 @@ final class ClassConstFetchHelper
         $nameStr = JitStringArg::lowerDominating($context, $classVar, '::class class operand');
         $resolvedStr = self::emitScopeResolveClassNameString($objectType, $block, $nameStr);
 
-        return self::emitCanonicalClassNameFromResolved($objectType, $resolvedStr);
+        return self::emitClassPseudoConstFromResolvedName($objectType, $resolvedStr);
     }
 
     public static function fetchLiteralConstWithRuntimeClass(
@@ -177,7 +177,7 @@ final class ClassConstFetchHelper
     ): Variable {
         $classIdVal = self::emitResolveClassId($objectType, $block, $classVar, $classOp);
 
-        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block, null);
+        return self::fetchDynamicByClassIdValue($objectType, $classIdVal, $nameVar, $classOp, $block, null, $classVar);
     }
 
     public static function fetchDynamic(
@@ -191,7 +191,7 @@ final class ClassConstFetchHelper
         $literal = JitStringArg::compileTimeLiteral($nameVar);
         if (null !== $literal) {
             if ('class' === strtolower($literal)) {
-                return self::classPseudoConst($objectType, $classId);
+                return self::classPseudoConst($objectType, $classId, self::displayClassName($objectType, $classId, $classOp));
             }
             if (null !== $block && null !== $jit) {
                 ClassConstVisibilityJitGuard::emitBeforeFetch($objectType, $jit, $block, $classId, $literal);
@@ -268,7 +268,8 @@ final class ClassConstFetchHelper
         Variable $nameVar,
         Operand $classOp,
         ?Block $block = null,
-        ?\PHPCompiler\JIT $jit = null
+        ?\PHPCompiler\JIT $jit = null,
+        ?Variable $classVar = null
     ): Variable {
         return ClassConstFetchRuntime::fetchDynamicByClassIdValue(
             $objectType,
@@ -276,14 +277,15 @@ final class ClassConstFetchHelper
             $nameVar,
             $classOp,
             $block,
-            $jit
+            $jit,
+            $classVar
         );
     }
 
-    private static function classPseudoConst(Object_ $objectType, int $classId): Variable
+    private static function classPseudoConst(Object_ $objectType, int $classId, ?string $displayName = null): Variable
     {
         $context = $objectType->jitContext();
-        $lit = new Operand\Literal($objectType->classNameForId($classId));
+        $lit = new Operand\Literal($displayName ?? $objectType->classNameForId($classId));
         $lit->type = \PHPTypes\Type::string();
 
         return Variable::fromLiteral($context, $lit);
@@ -435,9 +437,13 @@ final class ClassConstFetchHelper
         $i64 = $context->getTypeFromString('int64');
         $sentinel = $i64->constInt(-1, false);
         $result = $sentinel;
-        foreach ($objectType->allClassNamesById() as $id => $canonical) {
+        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
+            $classId = $objectType->classIdForLowerName($declLc);
+            if (null === $classId) {
+                continue;
+            }
             $lcGlobal = $context->builder->load(
-                $context->constantStringFromString(strtolower(ltrim($canonical, '\\')))
+                $context->constantStringFromString($declLc)
             );
             $cmp = $context->builder->call(
                 $context->lookupFunction('strcasecmp'),
@@ -445,7 +451,7 @@ final class ClassConstFetchHelper
                 self::stringDataPtr($context, $lcGlobal)
             );
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $idVal = $context->constantFromInteger($id, 'int64');
+            $idVal = $context->constantFromInteger($classId, 'int64');
             $result = $context->builder->select($isMatch, $idVal, $result);
         }
 
@@ -469,18 +475,23 @@ final class ClassConstFetchHelper
     }
 
     /**
+     * Return the reference name for `::class` after validating it names a declared class (#15645).
+     *
      * @return Value {@see __string__*}
      */
-    private static function emitCanonicalClassNameFromResolved(Object_ $objectType, Value $resolvedNameStr): Value
+    private static function emitClassPseudoConstFromResolvedName(Object_ $objectType, Value $resolvedNameStr): Value
     {
         $context = $objectType->jitContext();
         StringCaseCompare::ensureStrcasecmpLinked($context);
         $i32 = $context->getTypeFromString('int32');
-        $strMap = $context->structFieldMap['__string__'];
-        $result = $context->builder->load($context->constantStringFromString(''));
-        foreach ($objectType->allClassNamesById() as $canonical) {
+        $i64 = $context->getTypeFromString('int64');
+        $known = $i64->constInt(0, false);
+        foreach ($objectType->allDeclaredClassLowerNames() as $declLc) {
+            if (null === $objectType->classIdForLowerName($declLc)) {
+                continue;
+            }
             $lcGlobal = $context->builder->load(
-                $context->constantStringFromString(strtolower(ltrim($canonical, '\\')))
+                $context->constantStringFromString($declLc)
             );
             $cmp = $context->builder->call(
                 $context->lookupFunction('strcasecmp'),
@@ -488,19 +499,20 @@ final class ClassConstFetchHelper
                 self::stringDataPtr($context, $lcGlobal)
             );
             $isMatch = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $cand = $context->builder->load($context->constantStringFromString($canonical));
-            $result = $context->builder->select($isMatch, $cand, $result);
+            $known = $context->builder->select(
+                $isMatch,
+                $i64->constInt(1, false),
+                $known
+            );
         }
 
-        $len = $context->builder->load($context->builder->structGep($result, $strMap['length']));
-        $sizeT = $context->getTypeFromString('size_t');
-        $isEmpty = $context->builder->icmp(Builder::INT_EQ, $len, $sizeT->constInt(0, false));
         $fn = BasicBlockHelper::parentFunction($context);
         $entry = $context->builder->getInsertBlock();
         $ok = $fn->appendBasicBlock('class_pseudo_const_ok');
         $fail = $fn->appendBasicBlock('class_pseudo_const_fail');
         $merge = $fn->appendBasicBlock('class_pseudo_const_merge');
-        $context->builder->branchIf($isEmpty, $fail, $ok);
+        $isUnknown = $context->builder->icmp(Builder::INT_EQ, $known, $i64->constInt(0, false));
+        $context->builder->branchIf($isUnknown, $fail, $ok);
 
         $context->builder->positionAtEnd($fail);
         $message = 'Unknown class for constant fetch';
@@ -515,7 +527,7 @@ final class ClassConstFetchHelper
         $context->builder->branch($merge);
         $context->builder->positionAtEnd($merge);
 
-        return $result;
+        return $resolvedNameStr;
     }
 
     public static function writeEnumCaseConstEntryForRuntime(

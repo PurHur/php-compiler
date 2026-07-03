@@ -317,6 +317,53 @@ PHP;
         self::assertSame("bool(false)\nbool(true)\nbool(true)\n", ob_get_clean());
     }
 
+    /** Issue #15646 — var_dump(property_exists(), isset()) on uninitialized typed property. */
+    public function testVarDumpPropertyExistsIssetUninitTypedProperty(): void
+    {
+        $code = <<<'PHP'
+<?php
+class C {
+    public int $x;
+}
+$o = new C();
+var_dump(property_exists($o, 'x'), isset($o->x));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_dump_property_exists_isset.php');
+
+        $returnSlots = [];
+        $issetSlots = [];
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $returnSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ISSET === $op->type) {
+                $issetSlots[] = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_PROPERTY_FETCH === $op->type) {
+                self::fail('must not emit PROPERTY_FETCH for var_dump isset arg');
+            }
+        }
+        self::assertCount(2, $sendSlots);
+        self::assertContains($sendSlots[0], $returnSlots, 'property_exists return feeds arg 0');
+        self::assertContains($sendSlots[1], $issetSlots, 'isset return feeds arg 1');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("bool(true)\nbool(false)\n", ob_get_clean());
+    }
+
     /** Issue #10917 — sibling str_repeat() producers map to distinct levenshtein() arg slots. */
     public function testLevenshteinDualStrRepeatUsesDistinctProducerSlots(): void
     {
@@ -1142,6 +1189,48 @@ PHP;
         }
 
         self::assertSame("ok\n", $out);
+    }
+
+    /** Issue #10808 — preg_replace() sibling inline Array_ pattern/replacement + embedded subject. */
+    public function testPregReplaceDualInlineArrayLiteralsUseBothArraySlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+preg_replace(['/a/'], ['A'], 'aba');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_replace_inline_literals.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[0], 'pattern array must feed arg #1');
+        self::assertSame($arraySlots[1], $sendSlots[1], 'replacement array must feed arg #2');
+    }
+
+    /** Issue #10808 — preg_replace() inline array pattern/replacement runtime parity with Zend. */
+    public function testPregReplaceInlineArrayPatternReplacementRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo preg_replace(['/a/'], ['A'], 'aba'), "\n";
+echo preg_replace(['/a/', '/b/'], ['A', 'B'], 'aba'), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_replace_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("AbA\nABA\n", ob_get_clean());
     }
 
     /** Issue #10231 — sibling inline Array_ producers map to distinct array_replace arg slots. */
@@ -4490,24 +4579,33 @@ PHP;
         $runtime = new Runtime();
         $block = $runtime->parseAndCompile($code, 'in_array_after_udf_array.php');
 
-        $holdReturnSlot = null;
+        $holdExecSlot = null;
         $inArrayHaystackSend = null;
         $fcallOrdinal = 0;
+        $currentFcallSends = [];
         foreach ($block->opCodes as $op) {
             if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                if (3 === \count($currentFcallSends)) {
+                    $inArrayHaystackSend = $currentFcallSends[1];
+                }
                 ++$fcallOrdinal;
+                $currentFcallSends = [];
             }
             if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
-                $holdReturnSlot = $op->arg1;
+                $holdExecSlot = $op->arg1;
             }
-            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type && null === $inArrayHaystackSend) {
-                $inArrayHaystackSend = $op->arg1;
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $currentFcallSends[] = $op->arg1;
             }
         }
+        if (3 === \count($currentFcallSends) && null === $inArrayHaystackSend) {
+            $inArrayHaystackSend = $currentFcallSends[1];
+        }
 
-        self::assertNotNull($holdReturnSlot);
-        self::assertNotNull($inArrayHaystackSend);
-        self::assertNotSame($holdReturnSlot, $inArrayHaystackSend, 'haystack must not reuse hold() return slot');
+        self::assertNotNull($inArrayHaystackSend, 'in_array haystack ARG_SEND missing');
+        if (null !== $holdExecSlot) {
+            self::assertNotSame($holdExecSlot, $inArrayHaystackSend, 'haystack must not reuse hold() return slot');
+        }
 
         ob_start();
         $runtime->run($block);
@@ -4595,5 +4693,58 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("bool(true)\n", ob_get_clean());
+    }
+
+    /** Issue #15611 — get_defined_constants(true) assign must not steal firstSibling from get_declared_traits haystack. */
+    public function testInArrayNestedGetDeclaredTraitsAfterGetDefinedConstantsRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+
+function probe(string $label, mixed $result): void {
+    echo $label . ': ' . (is_bool($result) ? ($result ? 'true' : 'false') : json_encode($result)) . "\n";
+}
+
+$c = get_defined_constants(true);
+probe('declared_traits_has', in_array('Traversable', get_declared_traits(), true));
+
+class CV { public static int $s = 1; }
+PHP;
+
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_declared_traits_after_defined_constants.php');
+
+        $traitsReturnSlot = null;
+        $inArrayHaystackSend = null;
+        $fcallOrdinal = 0;
+        $inArraySends = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $traitsReturnSlot = null;
+                }
+                if (3 === $fcallOrdinal) {
+                    $inArraySends = [];
+                }
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $traitsReturnSlot = $op->arg1;
+            }
+            if (3 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $inArraySends[] = $op->arg1;
+            }
+        }
+        $inArrayHaystackSend = $inArraySends[1] ?? null;
+
+        self::assertNotNull($traitsReturnSlot, 'get_declared_traits() must EXEC_RETURN before in_array haystack send');
+        self::assertNotNull($inArrayHaystackSend);
+        self::assertSame($traitsReturnSlot, $inArrayHaystackSend, 'in_array haystack must reuse get_declared_traits() slot');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('declared_traits_has: false', $out);
     }
 }

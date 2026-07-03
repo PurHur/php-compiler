@@ -29,7 +29,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 
 | Tier | When | Tools |
 |------|------|-------|
-| **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/ci-fast.sh` |
+| **0** | Once per clone; every PHPUnit / doc-sync PR | `composer install`, `script/apply-patches.sh`, `./script/check-generated-docs.sh` (< 30 s, mandatory pre-merge; [#15621](https://github.com/PurHur/php-compiler/issues/15621)), `./script/ci-fast.sh` |
 | **1** | Compiling fixtures, examples, local AOT during feature work | `./build/bin-compile-aot-inventory -o OUT SOURCE.php` |
 | **1.5** | Curated native smoke without host PHPUnit ([#15599](https://github.com/PurHur/php-compiler/issues/15599)) | `make bootstrap-native-test`, `./script/bootstrap-native-test.sh` |
 | **2** | Before merge; after spine or gen-0 edits | `make north-star5-verify-fast`, `make bootstrap-loop-probe` |
@@ -46,7 +46,7 @@ Tier 2 — Bootstrap verify   north-star5-verify-fast, bootstrap-loop-probe
 | **Host PHP 8.1+** | For Tier 0 only; 8.2 matches locked `composer.json` |
 | **LLVM 9** | Required for Tier 1–2; host: `./script/install-llvm9.sh` → `.llvm/` |
 | **RAM** | 8 GiB CI floor; spine link benefits from 10 GiB Docker (`PHP_COMPILER_DOCKER_MEM`) |
-| **Platform** | Prelinked blobs are **Linux x86_64** today |
+| **Platform** | **Linux x86_64** + LLVM 9 — see [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) ([#15606](https://github.com/PurHur/php-compiler/issues/15606)) |
 
 Harness hosts: use `./script/docker-exec.sh` — never raw `docker run -v "$(pwd):/compiler"` on Runforge ([#245](https://github.com/PurHur/php-compiler/issues/245)).
 
@@ -113,6 +113,28 @@ After Tier 0 setup, use the **inventory argv driver** for compile work (gen-2 in
 - `php bin/compile.php -l …` (fast lint during editing)
 - `vendor/bin/phpunit` (full test matrix)
 - `composer install` / `script/apply-patches.sh`
+
+### Gen-N compiles changed sources ([#15598](https://github.com/PurHur/php-compiler/issues/15598))
+
+After editing `lib/` or spine entry files, gen-2 must compile the **working tree** — gen-3 must reflect the edit, not copy stale `prelinked/bootstrap-gen0/` bytes ([#8710](https://github.com/PurHur/php-compiler/issues/8710)).
+
+```bash
+# 1. Edit lib/ or test/selfhost/compiler_lib_spine_smoke/main.php
+vim lib/Compiler.php
+
+# 2. Recompile with gen-2 inventory argv driver
+./build/bin-compile-aot-inventory -o build/my-gen3 \
+  test/selfhost/compiler_lib_spine_smoke/main.php
+
+# 3. Run gen-3 smoke — output must match your edit
+./build/my-gen3
+
+# Guard: probe fails when gen-3 byte-matches stale prelinked gen-0
+make bootstrap-changed-sources-probe
+# or: ./script/bootstrap-changed-sources-probe.sh
+```
+
+The probe temporarily patches `examples/000-HelloWorld/example.php` and appends a comment to `lib/OpCode.php`, recompiles via gen-2 (Zend fallback when native sidecar masks edits), and asserts gen-3 output hash and runtime marker both change. Full `lib/Compiler.php` / spine edits follow the same workflow above. Set `BOOTSTRAP_ALLOW_STALE_SIDECAR=1` only for intentional stamp-only PRs.
 
 ---
 
@@ -252,7 +274,7 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 | # | Issue | Theme |
 |---|-------|--------|
 | 1 | [#15597](https://github.com/PurHur/php-compiler/issues/15597) | Honest full-spine native compile (no sidecar fallback) |
-| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources |
+| 2 | [#15598](https://github.com/PurHur/php-compiler/issues/15598) | Gen-N compiles **changed** sources — **landed:** `make bootstrap-changed-sources-probe` (also `bootstrap-changed-tree-probe` fixture scaffold) |
 | 3 | [#15599](https://github.com/PurHur/php-compiler/issues/15599) | Native test harness (no Zend PHPUnit) — **starter landed:** `make bootstrap-native-test` (one fixture; full matrix later) |
 | 4 | [#15600](https://github.com/PurHur/php-compiler/issues/15600) | Bootstrap cold path without `composer install` |
 | 5 | [#15601](https://github.com/PurHur/php-compiler/issues/15601) | Native lint via gen-2 driver |
@@ -269,6 +291,16 @@ Track progress toward **gen-1+ only** development ([#1492](https://github.com/Pu
 phpc bootstrap init
 make bootstrap-init
 
+# Native lint via gen-2 driver -l (#15601)
+phpc lint --native test/bootstrap-aot/compiler_smoke.php
+./script/bootstrap-native-lint.sh path/to/file.php
+# Fallback when build/bin-compile-aot-inventory is missing: php bin/compile.php -l
+
+# Bootstrap SDK release tarball (#15602)
+make bootstrap-sdk-pack
+# → build/php-compiler-bootstrap-{spine-sha-prefix}.tar.gz
+# Extract at repo root to seed prelinked/bootstrap-gen0/ + vendor *.o
+
 # Honest compile gate — opt-in; fails until #15597 closes (#15603)
 BOOTSTRAP_HONEST_COMPILE_GATE=1 ./script/bootstrap-loop-probe.sh
 ./script/bootstrap-loop-probe.sh --honest-compile
@@ -280,6 +312,10 @@ make bootstrap-native-test
 # Inventory argv sidecar gap probe — reports sidecar_free=ok|blocked (#15604)
 make bootstrap-inventory-argv-probe
 ./script/bootstrap-inventory-argv-probe.sh --check
+
+# Changed-sources guard — gen-2 must emit working-tree edits (#15598)
+make bootstrap-changed-sources-probe
+# Fixture-only scaffold (legacy): make bootstrap-changed-tree-probe
 ```
 
 ### Known gap: inventory argv still uses emit-helper sidecars (#15604)
@@ -300,6 +336,7 @@ Acceptance for closing #15604: `bootstrap-inventory-argv-probe` reports `sidecar
 
 | Doc | Content |
 |-----|---------|
+| [bootstrap-sdk-platform.md](bootstrap-sdk-platform.md) | Linux x86_64 / LLVM 9 platform contract ([#15606](https://github.com/PurHur/php-compiler/issues/15606)) |
 | [bootstrap-generations.md](bootstrap-generations.md) | Gen-0…gen-3 artifacts |
 | [bootstrap-m5-fast-path.md](bootstrap-m5-fast-path.md) | M3 allowlist, ~20 ms probes |
 | [bootstrap-selfhost.md](bootstrap-selfhost.md) | Full gate table |

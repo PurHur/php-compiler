@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "f45fc2d6f85b6d67d016542e0d8d6e00",
+    "content-hash": "d3975322856d0ce3847f490c1d741ff6",
     "packages": [
         {
             "name": "ircmaxell/php-cfg",

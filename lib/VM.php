@@ -4652,6 +4652,12 @@ restart:
                         $frame = $staticVisFrame;
                         goto restart;
                     }
+                    if ('class' === $constName) {
+                        $frame->scope[$op->arg1]->string(
+                            $this->resolveClassPseudoConstDisplayName($className, $frame)
+                        );
+                        break;
+                    }
                     try {
                         if (!$this->copyClassConstOrStaticPropertyByName(
                             $classEntry,
@@ -8045,6 +8051,38 @@ restart:
             Variable::TYPE_ARRAY => 'array',
             default => 'mixed',
         };
+    }
+
+    /**
+     * Resolve `ClassName::class` reference string (Zend zend_constants.c; #15645).
+     *
+     * Returns the name used to refer to the class — alias when accessed via alias, canonical otherwise.
+     * self/parent/static resolve to the declaring/late-static/parent class canonical name.
+     */
+    protected function resolveClassPseudoConstDisplayName(string $className, Frame $frame): string
+    {
+        $lcClass = strtolower($className);
+        if ('self' === $lcClass) {
+            $declaring = $this->declaringClassLc($frame, 'self');
+
+            return $this->context->classes[$declaring]->name;
+        }
+        if ('static' === $lcClass) {
+            $lateLc = $this->lateStaticClassLc($frame);
+
+            return $this->context->classes[$lateLc]->name;
+        }
+        if ('parent' === $lcClass) {
+            $declaring = $this->declaringClassLc($frame, 'parent');
+            $parentLc = $this->context->classes[$declaring]->parentLc;
+            if (null === $parentLc) {
+                throw new \LogicException('parent:: used when class has no parent');
+            }
+
+            return $this->context->classes[$parentLc]->name;
+        }
+
+        return $className;
     }
 
     /**

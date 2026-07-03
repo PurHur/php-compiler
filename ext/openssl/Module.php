@@ -40,6 +40,7 @@ class Module extends ModuleAbstract
             new openssl_get_cipher_methods(),
             new openssl_get_md_methods(),
             new openssl_pkey_new(),
+            new openssl_pkey_derive(),
             new openssl_cipher_iv_length(),
             new openssl_cipher_key_length(),
             new openssl_digest(),

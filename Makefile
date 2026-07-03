@@ -259,7 +259,7 @@ test-docker-exec:
 .PHONY: test-docker-quick
 test-docker-quick: test-docker-fast
 
-.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-warm-m3-sidecars bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-jit-unit-probe-strict bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-smoke-lint bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-selfhost-driver-host-compile bootstrap-selfhost-driver-smoke bootstrap-selfhost-full-revision-probe bootstrap-native-compile-driver-smoke bootstrap-native-test bootstrap-inventory-argv-probe bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-gen2-recompile-spine bootstrap-loop-gen2-recompile-bin-compile bootstrap-loop-gen2-recompile-minimal bootstrap-loop-probe bootstrap-loop-full-spine-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-wave-check
+.PHONY: bootstrap-inventory bootstrap-spine-phpcfg-parse-check bootstrap-profile bootstrap-aot-lint bootstrap-aot-link bootstrap-aot-link-lib bootstrap-vendor-prelink-bundles bootstrap-vendor-objects bootstrap-warm-m3-sidecars bootstrap-selfhost-probe bootstrap-selfhost-link bootstrap-selfhost-compile-smoke bootstrap-selfhost-compile-smoke-strict bootstrap-selfhost-runtime-compile-smoke bootstrap-selfhost-runtime-compile-smoke-strict bootstrap-m3-emit-tu-execute bootstrap-selfhost-compiler-driver-smoke bootstrap-selfhost-compiler-unit-probe bootstrap-selfhost-compiler-unit-probe-strict bootstrap-selfhost-jit-unit-probe bootstrap-selfhost-jit-unit-probe-strict bootstrap-selfhost-vm-unit-probe bootstrap-selfhost-parser-unit-probe bootstrap-selfhost-types-unit-probe bootstrap-selfhost-lib-spine-smoke bootstrap-selfhost-lib-spine-smoke-lint bootstrap-selfhost-lib-spine-vm-smoke bootstrap-selfhost-vm-driver-execute-probe bootstrap-selfhost-helloworld bootstrap-selfhost-helloworld-compile-bin bootstrap-selfhost-cli-driver-emit bootstrap-selfhost-driver-host-compile bootstrap-selfhost-driver-smoke bootstrap-selfhost-full-revision-probe bootstrap-changed-sources-probe bootstrap-native-compile-driver-smoke bootstrap-native-test bootstrap-inventory-argv-probe bootstrap-sdk-pack bootstrap-loop-gen1-link bootstrap-loop-gen1-full-spine-emit bootstrap-loop-gen2-recompile-spine bootstrap-loop-gen2-recompile-bin-compile bootstrap-loop-gen2-recompile-minimal bootstrap-loop-probe bootstrap-loop-full-spine-probe bootstrap-loop-probe-dry bootstrap-loop-probe-dry-run bootstrap-changed-tree-probe bootstrap-wave-check
 bootstrap-inventory:
 	php script/bootstrap-inventory.php
 .PHONY: bootstrap-inventory-check bootstrap-inventory-regenerate
@@ -349,6 +349,8 @@ bootstrap-gen0-refresh-sidecar:
 	./script/bootstrap-refresh-gen0-sidecar.sh
 bootstrap-init:
 	./script/bootstrap-init.sh
+bootstrap-sdk-pack:
+	./script/bootstrap-sdk-pack.sh
 bootstrap-selfhost-lib-spine-smoke-lint:
 	./script/bootstrap-selfhost-lib-spine-smoke-lint.sh
 bootstrap-selfhost-lib-spine-vm-smoke:
@@ -371,6 +373,8 @@ bootstrap-selfhost-driver-smoke:
 	./script/bootstrap-selfhost-driver-smoke.sh
 bootstrap-selfhost-full-revision-probe:
 	./script/bootstrap-selfhost-full-revision-probe.sh
+bootstrap-changed-sources-probe:
+	./script/bootstrap-changed-sources-probe.sh
 bootstrap-native-compile-driver-smoke:
 	./script/bootstrap-native-compile-driver-smoke.sh
 bootstrap-native-test:
@@ -398,5 +402,7 @@ bootstrap-loop-probe:
 bootstrap-loop-probe-dry:
 	./script/bootstrap-loop-probe.sh --dry-run
 bootstrap-loop-probe-dry-run: bootstrap-loop-probe-dry
+bootstrap-changed-tree-probe:
+	./script/bootstrap-changed-tree-probe.sh
 bootstrap-wave-check:
 	./script/bootstrap-wave-check.sh

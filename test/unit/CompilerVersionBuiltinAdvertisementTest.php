@@ -69,15 +69,126 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testNextafterWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNextafter());
+    }
+
     public function testNextafterAdvertisedOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsNextafter());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsNextafter());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testFpowAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsFpow());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testStreamSupportsAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsStreamSupports());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp84ReflectionProbeBuiltinsAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp84ReflectionProbeBuiltins());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testRoundingModeEnumAdvertisedOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsRoundingModeEnum());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersFpowFamilyOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['fpow', 'fmin', 'fmax', 'stream_supports', 'attribute_exists'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+            $this->assertTrue(isset($ctx->classes['roundingmode']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmDoesNotRegisterNextafterOnReferenceProfile(): void
+    {
+        $runtime = new Runtime();
+        $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
     }
 
     public function testVmRegistersNextafterOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testRoundingModeEnumWithheldOnReferenceProfileUntilStable84(): void
@@ -121,9 +232,46 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsStreamSupports());
     }
 
-    public function testPhp84ArraySearchFunctionsAdvertisedOnForwardProfile(): void
+    public function testPhp83ArrayKeyFunctionsWithheldOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        $this->assertFalse(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+    }
+
+    public function testPhp84ArraySearchFunctionsWithheldOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+    }
+
+    public function testPhp83ArrayKeyFunctionsTrueWhenProfile83(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+            $this->assertFalse(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testPhp84ArraySearchFunctionsTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsPhp83ArrayKeyFunctions());
+            $this->assertTrue(CompilerVersion::supportsPhp84ArraySearchFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testDateTimeMicrosecondWithheldOnReferenceProfile(): void
@@ -226,12 +374,12 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['readonly']));
     }
 
-    public function testVmRegistersArrayFindFamilyOnForwardProfile(): void
+    public function testVmDoesNotRegisterArrayFindFamilyOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $ctx = $runtime->vmContext;
-        foreach (['array_find', 'array_find_key', 'array_any', 'array_all', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
-            $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+        foreach (['array_find', 'array_find_key', 'array_any', 'array_any_key', 'array_all', 'array_all_key', 'array_first', 'array_last', 'array_first_key', 'array_last_key'] as $fn) {
+            $this->assertFalse(isset($ctx->functions[$fn]), $fn);
         }
     }
 
@@ -285,11 +433,11 @@ final class CompilerVersionBuiltinAdvertisementTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
     }
 
-    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
-        $this->assertTrue(isset($closure->methods['getcurrent']));
+        $this->assertFalse(isset($closure->methods['getcurrent']));
     }
 }

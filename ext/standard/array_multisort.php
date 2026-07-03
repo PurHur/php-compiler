@@ -7,9 +7,12 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\ArrayBuiltinHelper;
+use PHPCompiler\JIT\Builtin\MultisortRuntime;
+use PHPCompiler\JIT\Builtin\SortRuntime;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\EnumCaseSupport;
+use PHPCompiler\VM\ReferencableCheck;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
@@ -81,7 +84,15 @@ final class array_multisort extends Internal
 
         $indices = range(0, $length - 1);
         self::sortIndicesByMultisort($indices, $allValues, $entries);
+        $caller = self::callerFrame($frame);
+        $skipCoupledWriteback = self::shouldSkipCoupledMultisortWriteback($entries, $caller);
         foreach ($entries as $entryIdx => $entry) {
+            if ($skipCoupledWriteback) {
+                continue;
+            }
+            if (!ReferencableCheck::isReferenceable($entry['array'], $caller)) {
+                continue;
+            }
             self::writeSortedArray(
                 $entry['array'],
                 $allValues[$entryIdx],
@@ -101,9 +112,9 @@ final class array_multisort extends Internal
         if (1 === \count($entries)) {
             $entry = $entries[0];
             if (StdlibConstants::SORT_DESC === $entry['sortOrder']) {
-                ArrayBuiltinHelper::sortPackedReverse($context, $entry['array']);
+                SortRuntime::sortPackedReverse($context, $entry['array']);
             } else {
-                ArrayBuiltinHelper::sortPacked($context, $entry['array']);
+                SortRuntime::sortPacked($context, $entry['array']);
             }
 
             return $context->getTypeFromString('int1')->constInt(1, false);
@@ -111,7 +122,7 @@ final class array_multisort extends Internal
 
         $arrays = array_column($entries, 'array');
         $descending = StdlibConstants::SORT_DESC === $entries[0]['sortOrder'];
-        ArrayBuiltinHelper::multisortPacked($context, $arrays, $descending);
+        MultisortRuntime::multisortPacked($context, $arrays, $descending);
 
         return $context->getTypeFromString('int1')->constInt(1, false);
     }
@@ -159,6 +170,61 @@ final class array_multisort extends Internal
         if (null !== $frame->returnVar) {
             $frame->returnVar->bool(true);
         }
+    }
+
+    /**
+     * php-src skips coupled companion writeback when the primary array operand is an inline temp (#15151).
+     *
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
+     */
+    private static function callerFrame(Frame $handlerFrame): Frame
+    {
+        return $handlerFrame->parent ?? $handlerFrame;
+    }
+
+    /** True when the primary multisort array operand is an inline literal temp (#15151). */
+    private static function isInlinePrimaryMultisortArray(Variable $arg, Frame $caller): bool
+    {
+        if (ReferencableCheck::isEphemeralArrayArg($arg, $caller)) {
+            return true;
+        }
+        if (!$arg->isIndirect()) {
+            return false;
+        }
+        $target = $arg->byRefTarget();
+        foreach ($caller->scope as $slot => $scoped) {
+            if ($scoped === $arg && $scoped !== $target
+                && null !== $caller->block
+                && $caller->block->isNamedVariableSlot((int) $slot)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * php-src skips coupled writeback when inline primary storage aliases a writable companion (#15151).
+     *
+     * @param list<array{array: Variable, sortOrder: int, sortType: int}> $entries
+     */
+    private static function shouldSkipCoupledMultisortWriteback(array $entries, Frame $caller): bool
+    {
+        if (\count($entries) < 2) {
+            return false;
+        }
+        if (!ReferencableCheck::isReferenceable($entries[1]['array'], $caller)) {
+            return false;
+        }
+        if (!self::isInlinePrimaryMultisortArray($entries[0]['array'], $caller)) {
+            return false;
+        }
+        $primaryInner = $entries[0]['array']->byRefTarget();
+        $companionInner = $entries[1]['array']->byRefTarget();
+        $primaryHt = $primaryInner->resolveIndirect()->toArray();
+        $companionHt = $companionInner->resolveIndirect()->toArray();
+
+        return $primaryInner === $companionInner || $primaryHt === $companionHt;
     }
 
     /**

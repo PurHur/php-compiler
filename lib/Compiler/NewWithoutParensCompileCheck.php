@@ -4,12 +4,12 @@ declare(strict_types=1);
 
 namespace PHPCompiler\Compiler;
 
+use PHPCompiler\CompilerVersion;
 use PHPCfg\Op;
 use PHPCfg\Op\Expr\New_;
 use PHPCfg\Op\Stmt\Property;
 use PHPCfg\Script;
 use PHPCfg\Op\Terminal\Const_ as ConstTerminal;
-use PHPCompiler\CompilerVersion;
 
 /**
  * Reject invalid `new` in class **constant**, **static property**, and **instance property** initializers
@@ -56,14 +56,10 @@ final class NewWithoutParensCompileCheck
 
     private function walkClassConstValue(ConstTerminal $const): void
     {
-        $children = $const->valueBlock->children ?? [];
         if (CompilerVersion::supportsClassConstObjectExpressions()) {
-            // PHP 8.3+ ZEND_CONST_EXPR_NEW — top-level `new Class(...)` only (#12940, zend_compile_const_expr).
-            if (1 === \count($children) && $children[0] instanceof New_) {
-                return;
-            }
+            return;
         }
-        $this->walkOpsRejectAllNew($children);
+        $this->walkOpsRejectAllNew($const->valueBlock->children ?? []);
     }
 
     private function rejectPropertyDefaultNew(Property $prop): void

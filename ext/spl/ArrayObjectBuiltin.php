@@ -81,6 +81,10 @@ final class ArrayObjectBuiltin
         $entry->methodVisibility['append'] = $pub;
         $entry->methods['exchangearray'] = new ArrayObjectExchangeArray();
         $entry->methodVisibility['exchangearray'] = $pub;
+        foreach (['uasort', 'uksort'] as $lc) {
+            $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
+            $entry->methodVisibility[$lc] = $pub;
+        }
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayObject');
 

@@ -35,12 +35,27 @@ final class VmSession
 
     public const ACTIVE_ID_CHANGE_WARNING = 'session_id(): Session ID cannot be changed when a session is active';
 
+    public const ACTIVE_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed when a session is active';
+
+    public const HEADERS_SENT_NAME_CHANGE_WARNING = 'session_name(): Session name cannot be changed after headers have already been sent';
+
     public const DEFAULT_MODULE = 'files';
 
     public const MAX_MODULE_LEN = 32;
 
     /** php-src ext/session/session.c — PS(cache_expire) / session.cache_expire default (minutes). */
     public const DEFAULT_CACHE_EXPIRE = 180;
+
+    /** php-src ext/session/session.c — PS(cache_limiter) / session.cache_limiter default. */
+    public const DEFAULT_CACHE_LIMITER = 'nocache';
+
+    public const ACTIVE_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed when a session is active';
+
+    public const HEADERS_SENT_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed after headers have already been sent';
+
+    public const ACTIVE_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed when a session is active';
+
+    public const HEADERS_SENT_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed after headers have already been sent';
 
     private static bool $active = false;
 
@@ -52,6 +67,20 @@ final class VmSession
 
     private static int $cacheExpire = self::DEFAULT_CACHE_EXPIRE;
 
+    private static string $cacheLimiter = self::DEFAULT_CACHE_LIMITER;
+
+    private static int $cookieLifetime = 0;
+
+    private static string $cookiePath = '/';
+
+    private static string $cookieDomain = '';
+
+    private static bool $cookieSecure = false;
+
+    private static bool $cookieHttponly = false;
+
+    private static string $cookieSamesite = '';
+
     public static function reset(): void
     {
         self::$active = false;
@@ -59,6 +88,107 @@ final class VmSession
         self::$id = '';
         self::$moduleName = self::DEFAULT_MODULE;
         self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+        self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
+        self::resetCookieParams();
+    }
+
+    public static function resetCookieParams(): void
+    {
+        self::$cookieLifetime = 0;
+        self::$cookiePath = '/';
+        self::$cookieDomain = '';
+        self::$cookieSecure = false;
+        self::$cookieHttponly = false;
+        self::$cookieSamesite = '';
+    }
+
+    /**
+     * @return array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * }
+     */
+    public static function getCookieParams(): array
+    {
+        return [
+            'lifetime' => self::$cookieLifetime,
+            'path' => self::$cookiePath,
+            'domain' => self::$cookieDomain,
+            'secure' => self::$cookieSecure,
+            'httponly' => self::$cookieHttponly,
+            'samesite' => self::$cookieSamesite,
+        ];
+    }
+
+    public static function cookieParamsHashTable(): HashTable
+    {
+        $ht = new HashTable();
+        $params = self::getCookieParams();
+        $lifetime = new Variable(Variable::TYPE_INTEGER);
+        $lifetime->int($params['lifetime']);
+        $ht->add('lifetime', $lifetime);
+        $path = new Variable(Variable::TYPE_STRING);
+        $path->string($params['path']);
+        $ht->add('path', $path);
+        $domain = new Variable(Variable::TYPE_STRING);
+        $domain->string($params['domain']);
+        $ht->add('domain', $domain);
+        $secure = new Variable(Variable::TYPE_BOOLEAN);
+        $secure->bool($params['secure']);
+        $ht->add('secure', $secure);
+        $httponly = new Variable(Variable::TYPE_BOOLEAN);
+        $httponly->bool($params['httponly']);
+        $ht->add('httponly', $httponly);
+        $samesite = new Variable(Variable::TYPE_STRING);
+        $samesite->string($params['samesite']);
+        $ht->add('samesite', $samesite);
+
+        return $ht;
+    }
+
+    /**
+     * @param array{
+     *     lifetime: int,
+     *     path: string,
+     *     domain: string,
+     *     secure: bool,
+     *     httponly: bool,
+     *     samesite: string,
+     * } $params
+     */
+    public static function applyCookieParams(?Frame $frame, array $params): bool
+    {
+        if (!self::canChangeCookieParams($frame)) {
+            return false;
+        }
+        self::$cookieLifetime = $params['lifetime'];
+        self::$cookiePath = $params['path'];
+        self::$cookieDomain = $params['domain'];
+        self::$cookieSecure = $params['secure'];
+        self::$cookieHttponly = $params['httponly'];
+        self::$cookieSamesite = $params['samesite'];
+
+        return true;
+    }
+
+    public static function canChangeCookieParams(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_COOKIE_PARAMS_WARNING);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function getCacheExpire(): int
@@ -74,6 +204,41 @@ final class VmSession
             );
         }
         self::$cacheExpire = $minutes;
+    }
+
+    public static function getCacheLimiter(): string
+    {
+        return self::$cacheLimiter;
+    }
+
+    /**
+     * @return string|false previous limiter on success, or false when change is rejected
+     */
+    public static function setCacheLimiter(?Frame $frame, string $newLimiter): string|false
+    {
+        if (!self::canChangeCacheLimiter($frame)) {
+            return false;
+        }
+        $previous = self::$cacheLimiter;
+        self::$cacheLimiter = $newLimiter;
+
+        return $previous;
+    }
+
+    public static function canChangeCacheLimiter(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function isActive(): bool
@@ -132,7 +297,7 @@ final class VmSession
     public static function canChangeSaveHandler(?Frame $frame): bool
     {
         if (self::$active) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed when a session is active'
             );
@@ -140,10 +305,26 @@ final class VmSession
             return false;
         }
         if (SapiOutput::headersSent()) {
-            self::triggerSaveHandlerWarning(
+            self::triggerSessionWarning(
                 $frame,
                 'Session save handler cannot be changed after headers have already been sent'
             );
+
+            return false;
+        }
+
+        return true;
+    }
+
+    public static function canChangeName(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_NAME_CHANGE_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_NAME_CHANGE_WARNING);
 
             return false;
         }
@@ -166,7 +347,7 @@ final class VmSession
         return $previous;
     }
 
-    private static function triggerSaveHandlerWarning(?Frame $frame, string $message): void
+    private static function triggerSessionWarning(?Frame $frame, string $message): void
     {
         if (null === $frame || null === $frame->vmContext) {
             return;
@@ -198,9 +379,6 @@ final class VmSession
      * previous name, or false when session is active
      */
     public static function setName(string $name) {
-        if (self::$active) {
-            return false;
-        }
         if (self::isRejectedSessionName($name)) {
             return self::$name;
         }
@@ -244,7 +422,7 @@ final class VmSession
         } else {
             self::$id = self::generateId();
             ResponseContext::addHeader(
-                SetcookieLine::build(self::$name, self::$id, 0, '/'),
+                self::buildSessionSetCookieLine(self::$id),
                 false
             );
         }
@@ -298,7 +476,7 @@ final class VmSession
         }
         self::$id = self::generateId();
         ResponseContext::addHeader(
-            SetcookieLine::build(self::$name, self::$id, 0, '/'),
+            self::buildSessionSetCookieLine(self::$id),
             false
         );
 
@@ -449,6 +627,25 @@ final class VmSession
         }
 
         return $deleted;
+    }
+
+    private static function buildSessionSetCookieLine(string $sessionId): string
+    {
+        $expires = 0;
+        if (self::$cookieLifetime > 0) {
+            $expires = time() + self::$cookieLifetime;
+        }
+
+        return SetcookieLine::build(
+            self::$name,
+            $sessionId,
+            $expires,
+            self::$cookiePath,
+            self::$cookieDomain,
+            self::$cookieSecure,
+            self::$cookieHttponly,
+            self::$cookieSamesite
+        );
     }
 
     private static function readCookieId(Context $ctx): string

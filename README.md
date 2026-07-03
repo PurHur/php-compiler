@@ -321,6 +321,19 @@ Full list: run `./phpc doctor` or see the [local CI matrix](docs/local-ci-matrix
 
 ---
 
+## User SDK vs Bootstrap SDK
+
+Two release channels — do not conflate them ([#15605](https://github.com/PurHur/php-compiler/issues/15605)):
+
+| Channel | Product | Primary gate | Who |
+|---------|---------|--------------|-----|
+| **User SDK** | `phpc run` / `phpc build` for examples **000–009** | `script/release-readiness.sh` | App authors on the documented PHP subset |
+| **Bootstrap SDK** | `build/bin-compile-aot-inventory` + `prelinked/bootstrap-gen0/` | `make north-star5-verify-fast` + spine sidecar sync | Compiler / self-host contributors |
+
+**Bootstrap contributors:** start with `./phpc bootstrap init` and [docs/bootstrap-dev-workflow.md](docs/bootstrap-dev-workflow.md) (tiered gen-1+ path). **App authors:** `composer install` and [docs/GETTING-STARTED.md](docs/GETTING-STARTED.md) § demo script. Platform contract: [docs/bootstrap-sdk-platform.md](docs/bootstrap-sdk-platform.md).
+
+---
+
 ## Development & quality gates
 
 Merge quality is enforced **locally or in Docker** (GitHub Actions / CircleCI are disabled on this fork).

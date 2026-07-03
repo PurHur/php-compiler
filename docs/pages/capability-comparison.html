@@ -64,8 +64,8 @@
         </article>
         <article>
           <div>Stdlib builtins</div>
-          <strong>832</strong> / 842 full (VM+JIT+AOT)
-          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">10 partial · 0 gaps</p>
+          <strong>862</strong> / 892 full (VM+JIT+AOT)
+          <p style="margin:0.35rem 0 0;font-size:0.88rem;color:var(--text-muted)">11 partial · 19 gaps</p>
         </article>
         <article>
           <div>Legend</div>
@@ -210,6 +210,7 @@
 <tr data-support="full"><td><code>`array_find`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_find_key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_first`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`array_first_key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_flip`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_intersect`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_intersect_assoc`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -222,6 +223,7 @@
 <tr data-support="full"><td><code>`array_key_last`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_keys`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_last`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`array_last_key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_map`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_merge`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`array_merge_recursive`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -262,6 +264,7 @@
 <tr data-support="full"><td><code>`atan`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`atan2`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`atanh`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`attribute_exists`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`base64_decode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`base64_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`base_convert`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -288,8 +291,10 @@
 <tr data-support="full"><td><code>`class_has_method`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`class_has_property`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`class_implements`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`class_meth_exists`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`class_parents`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`class_uses`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`class_uses_recursive`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`clearstatcache`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`cli_get_process_title`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`cli_set_process_title`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -300,6 +305,7 @@
 <tr data-support="full"><td><code>`connection_aborted`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`connection_status`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`constant`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`convert_cyr_string`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`convert_uudecode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`convert_uuencode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`copy`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -308,6 +314,7 @@
 <tr data-support="full"><td><code>`count`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`count_chars`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`crc32`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`crc32c`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`crypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ctype_alnum`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`ctype_alpha`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -356,6 +363,7 @@
 <tr data-support="full"><td><code>`disk_free_space`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`disk_total_space`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`diskfreespace`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`disktotalspace`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`dl`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`dns_check_record`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`dns_get_mx`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -407,12 +415,15 @@
 <tr data-support="full"><td><code>`flock`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`floor`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`flush`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`fmax`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`fmin`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fmod`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fnmatch`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fopen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`forward_static_call`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`forward_static_call_array`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fpassthru`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`fpow`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fprintf`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fputcsv`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`fputs`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -483,6 +494,7 @@
 <tr data-support="full"><td><code>`getlastmod`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmxrr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmygid`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`getmygrgid`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmyinode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmypid`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`getmyuid`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -634,9 +646,12 @@
 <tr data-support="full"><td><code>`mb_http_output`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_internal_encoding`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_list_encodings`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`mb_ltrim`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_preferred_mime_name`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`mb_rtrim`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_scrub`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_split`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`mb_str_pad`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_str_split`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strcut`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_strimwidth`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -651,6 +666,7 @@
 <tr data-support="full"><td><code>`mb_substitute_character`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_substr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`mb_substr_count`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`mb_trim`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`md5`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`md5_file`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`memcmp`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -671,6 +687,7 @@
 <tr data-support="full"><td><code>`natsort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`net_get_interfaces`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`next`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`nextafter`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`nl2br`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`nl_langinfo`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`number_format`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -699,6 +716,7 @@
 <tr data-support="partial"><td><code>`openssl_free_key`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_get_cipher_methods`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_get_md_methods`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
+<tr data-support="partial"><td><code>`openssl_pkey_derive`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_pkey_new`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`openssl_random_pseudo_bytes`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="partial"><td><code>`openssl_sign`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
@@ -795,6 +813,7 @@
 <tr data-support="full"><td><code>`readline_redisplay`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`readline_write_history`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`readlink`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`readonly`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`realpath`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`realpath_cache_get`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`realpath_cache_size`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -849,12 +868,37 @@
 <tr data-support="full"><td><code>`sleep`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_atmark`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`socket_import_stream`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_aead_aes256gcm_is_available`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_xchacha20poly1305_ietf_decrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_aead_xchacha20poly1305_ietf_encrypt`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_auth`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_auth_verify`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_keypair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_publickey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_seal`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_seal_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_box_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_generichash`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_scalarmult`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_scalarmult_base`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_secretbox`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_secretbox_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_init_pull`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_init_push`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_pull`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_push`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_secretstream_xchacha20poly1305_rekey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_detached`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_keypair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_open`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_publickey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_publickey_from_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_secretkey`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_crypto_sign_verify_detached`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream_keygen`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream_xchacha20`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -863,6 +907,8 @@
 <tr data-support="full"><td><code>`sodium_crypto_stream_xchacha20_xor_ic`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_crypto_stream_xor`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sodium_memcmp`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_pad`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="full"><td><code>`sodium_unpad`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`sort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`soundex`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`spl_autoload`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -935,6 +981,7 @@
 <tr data-support="full"><td><code>`stream_socket_get_name`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_socket_pair`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_socket_server`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`stream_supports`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_supports_lock`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_wrapper_register`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`stream_wrapper_restore`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -965,6 +1012,7 @@
 <tr data-support="full"><td><code>`strtoupper`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strtr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`strval`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`strxfrm`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr_compare`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`substr_count`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1002,6 +1050,7 @@
 <tr data-support="full"><td><code>`uksort`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`umask`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`uniqid`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`unitenum_exists`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`unlink`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`unpack`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`unserialize`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
@@ -1023,6 +1072,7 @@
 <tr data-support="full"><td><code>`web_int`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`web_string`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`wordwrap`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
+<tr data-support="gap"><td><code>`zend_thread_id`</code></td><td class="status-yes">yes</td><td class="status-no">no</td><td class="status-no">no</td><td class="status-no">no</td><td>—</td></tr>
 <tr data-support="full"><td><code>`zend_version`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`zlib_decode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>
 <tr data-support="full"><td><code>`zlib_encode`</code></td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td class="status-yes">yes</td><td>—</td></tr>

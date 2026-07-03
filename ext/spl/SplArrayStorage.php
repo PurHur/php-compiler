@@ -4,11 +4,17 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\spl;
 
+use PHPCompiler\ext\standard\array_map;
 use PHPCompiler\ext\standard\KeySortJitHelper;
 use PHPCompiler\ext\standard\NaturalSortJitHelper;
 use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\ValueSortJitHelper;
+use PHPCompiler\ext\standard\VmArraySortCallback;
+use PHPCompiler\ext\standard\VmClosureCall;
+use PHPCompiler\ext\standard\VmInternalCompare;
 use PHPCompiler\ext\standard\VmJson;
+use PHPCompiler\Frame;
+use PHPCompiler\JIT\UsortCallbackPolicy;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\HashTable;
 use PHPCompiler\VM\ObjectEntry;
@@ -322,6 +328,110 @@ final class SplArrayStorage
             default => throw new \LogicException('Unsupported SPL array sort: '.$kind),
         };
         self::rewindIterator($object);
+    }
+
+    /** php-src spl_array_object_uasort — in-place user value sort (#9356). */
+    public static function uasortBacking(
+        ObjectEntry $object,
+        Frame $frame,
+        Variable $callbackArg,
+        string $function = 'uasort'
+    ): bool {
+        $table = self::state($object)['table'];
+        $callback = $callbackArg->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, $function);
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, $function);
+        if ($table->getNumElements() < 2) {
+            return true;
+        }
+        $pairs = [];
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->duplicateFrom($key);
+            $valCopy = new Variable();
+            $valCopy->duplicateFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException($function.'() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortKeyedPairsByValue(
+                $frame->vmContext,
+                $pairs,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortKeyedPairsByValue($pairs, $compare);
+        }
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            array_map::appendKeyedCopy($sorted, $key, $value);
+        }
+        self::$store[$object->id]['table'] = $sorted;
+        self::rewindIterator($object);
+
+        return true;
+    }
+
+    /** php-src spl_array_object_uksort — in-place user key sort (#9356). */
+    public static function uksortBacking(
+        ObjectEntry $object,
+        Frame $frame,
+        Variable $callbackArg,
+        string $function = 'uksort'
+    ): bool {
+        $table = self::state($object)['table'];
+        $callback = $callbackArg->resolveIndirect();
+        VmArraySortCallback::requireCallback($callback, $function);
+        VmArraySortCallback::rejectInvalidStringCallback($frame, $callback, $function);
+        if ($table->getNumElements() < 2) {
+            return true;
+        }
+        $pairs = [];
+        foreach ($table->iterateKeyed(true) as [$key, $value]) {
+            $keyCopy = new Variable();
+            $keyCopy->duplicateFrom($key);
+            $valCopy = new Variable();
+            $valCopy->duplicateFrom($value);
+            $pairs[] = [$keyCopy, $valCopy];
+        }
+        if (VmClosureCall::isClosure($callback)) {
+            if (null === $frame->vmContext) {
+                throw new \LogicException($function.'() requires VM context in this compiler build');
+            }
+            VmClosureCall::sortKeyedPairsByKey(
+                $frame->vmContext,
+                $pairs,
+                VmClosureCall::resolve($callback)
+            );
+        } else {
+            if (!UsortCallbackPolicy::isVmSupportedType($callback->type)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $name = $callback->toString();
+            if (!UsortCallbackPolicy::isVmSupportedName($name)) {
+                throw new \LogicException(UsortCallbackPolicy::vmRejectionMessage());
+            }
+            $compare = VmInternalCompare::resolveStringCallback($name);
+            VmInternalCompare::sortKeyedPairsByKeyWithCompare($pairs, $compare);
+        }
+        $sorted = new HashTable();
+        foreach ($pairs as [$key, $value]) {
+            array_map::appendKeyedCopy($sorted, $key, $value);
+        }
+        self::$store[$object->id]['table'] = $sorted;
+        self::rewindIterator($object);
+
+        return true;
     }
 
     public static function append(ObjectEntry $object, Variable $value): void

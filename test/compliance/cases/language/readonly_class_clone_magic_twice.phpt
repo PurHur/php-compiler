@@ -1,5 +1,5 @@
 --TEST--
-language: readonly class __clone rejects second readonly reinit (issue #15365, zend_readonly.c)
+language: readonly class __clone rejects second readonly reinit (issue #15409, zend_readonly.c)
 --FILE--
 <?php
 readonly class R {

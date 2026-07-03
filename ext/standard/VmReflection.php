@@ -149,12 +149,12 @@ final class VmReflection
 
     public static function enumExists(Context $ctx, string $enumName, bool $autoload = true): bool
     {
-        $lc = strtolower(self::normalizeGlobalIntrospectionName($enumName));
-        if ($autoload && !isset($ctx->enums[$lc]) && null === self::resolveClassEntry($ctx, $enumName)) {
+        if ($autoload && null === self::resolveClassEntry($ctx, $enumName)) {
             $ctx->autoloadClass($enumName);
         }
+        $entry = self::resolveClassEntry($ctx, $enumName);
 
-        return isset($ctx->enums[$lc]);
+        return null !== $entry && $entry->isEnum;
     }
 
     /**
@@ -773,6 +773,27 @@ final class VmReflection
     }
 
     /**
+     * Runtime dynamic instance property on $object — not declared on CE (#15540, zend_property_exists).
+     */
+    public static function isRuntimeDynamicProperty(
+        Variable $objectArg,
+        string $property,
+        ClassEntry $entry,
+        Context $ctx
+    ): bool {
+        $objectArg = $objectArg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $objectArg->type) {
+            return false;
+        }
+        $object = $objectArg->toObject();
+        if (self::propertyExistsOnClass($entry, $property, $ctx)) {
+            return false;
+        }
+
+        return $object->hasProperty($property);
+    }
+
+    /**
      * Enum pseudo-properties name/value via ReflectionProperty (php_reflection.c, #5680).
      */
     public static function isEnumReflectionPseudoProperty(ClassEntry $entry, string $property): bool
@@ -869,6 +890,7 @@ final class VmReflection
         $obj->getProperty(ReflectionSupport::PROP_CLASS_NAME)->string($reflectedClassName);
         $obj->getProperty(ReflectionSupport::PROP_PROPERTY_NAME)->string($propertyName);
         $obj->getProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME)->string($declaringClassName);
+        $obj->getProperty(ReflectionSupport::PROP_IS_DYNAMIC)->bool(false);
     }
 
     /** Static property storage key on $class or an ancestor, or null. */

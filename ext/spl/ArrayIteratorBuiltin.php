@@ -86,6 +86,10 @@ final class ArrayIteratorBuiltin
             $entry->methods[$lc] = new ArrayIteratorSortMethod($lc, $acceptsFlags);
             $entry->methodVisibility[$lc] = $pub;
         }
+        foreach (['uasort', 'uksort'] as $lc) {
+            $entry->methods[$lc] = new SplArrayUserSortMethod(self::CLASS_LC, $lc);
+            $entry->methodVisibility[$lc] = $pub;
+        }
 
         SplLegacySerializableMethods::register($entry, self::CLASS_LC, 'ArrayIterator');
 

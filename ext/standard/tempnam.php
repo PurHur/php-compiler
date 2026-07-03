@@ -11,7 +11,7 @@ use PHPCompiler\JIT\JitStringArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
-/** tempnam() — VM via VmFs; JIT/AOT via libc tempnam(3) (issue #1201). */
+/** tempnam() — VM via VmFs; JIT/AOT via TempnamJitHelper PHP (#15685). */
 final class tempnam extends Internal
 {
     public function __construct()

@@ -44,9 +44,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsFpow());
     }
 
+    public function testSupportsNextafterFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsNextafter());
+    }
+
     public function testSupportsNextafterTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsNextafter());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsNextafter());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsRoundingModeEnumFalseOnReferenceProfile(): void
@@ -79,9 +94,44 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGcStatusPhp84Schema());
     }
 
-    public function testSupportsReflectionPropertyAccessProbesTrueOn84DevForwardProfile(): void
+    public function testSupportsReflectionPropertyAccessProbesFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsReflectionPropertyAccessProbes());
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyAccessProbes());
+    }
+
+    public function testSupportsReflectionPropertyAccessProbesTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyAccessProbes());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsReflectionPropertyIsDynamicFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsReflectionPropertyIsDynamic());
+    }
+
+    public function testSupportsReflectionPropertyIsDynamicTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsReflectionPropertyIsDynamic());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsHrtimeAsNumberFloatFalseOnReferenceProfile(): void
@@ -119,9 +169,24 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsCloneWithSyntax());
     }
 
-    public function testSupportsAsymmetricVisibilityTrueOnForwardProfile(): void
+    public function testSupportsAsymmetricVisibilityFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        $this->assertFalse(CompilerVersion::supportsAsymmetricVisibility());
+    }
+
+    public function testSupportsAsymmetricVisibilityTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsAsymmetricVisibility());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsPropertyHooksTrueOnForwardProfile(): void
@@ -144,9 +209,9 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(CompilerVersion::supportsTypedTraitConstants());
     }
 
-    public function testSupportsTypedClassConstantsTrueOnDevForwardProfile(): void
+    public function testSupportsTypedClassConstantsFalseOnReferenceProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+        $this->assertFalse(CompilerVersion::supportsTypedClassConstants());
     }
 
     public function testSupportsTypedClassConstantsFalseWhenProfile82(): void
@@ -164,10 +229,34 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testSupportsClassConstObjectExpressionsTrueOnDevForwardProfile(): void
+    public function testSupportsTypedClassConstantsTrueWhenProfile83(): void
     {
-        // 8.4.0-dev forward line enables ZEND_CONST_EXPR_NEW (#15583).
-        $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.3');
+        try {
+            $this->assertTrue(CompilerVersion::supportsTypedClassConstants());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClassConstObjectExpressionsFalseOnReferenceProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsClassConstObjectExpressionsFalseWhenProfile82(): void
@@ -176,6 +265,21 @@ final class CompilerVersionGateTest extends TestCase
         putenv('PHP_COMPILER_PROFILE=8.2');
         try {
             $this->assertFalse(CompilerVersion::supportsClassConstObjectExpressions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsClassConstObjectExpressionsTrueWhenProfile84(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClassConstObjectExpressions());
         } finally {
             if (false === $prev) {
                 putenv('PHP_COMPILER_PROFILE');
@@ -237,10 +341,26 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(isset($runtime->vmContext->classes['roundingmode']));
     }
 
-    public function testVmRegistersNextafterOnForwardProfile(): void
+    public function testVmDoesNotRegisterNextafterOnReferenceProfile(): void
     {
         $runtime = new Runtime();
-        $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        $this->assertFalse(isset($runtime->vmContext->functions['nextafter']));
+    }
+
+    public function testVmRegistersNextafterOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['nextafter']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterFpowOnReferenceProfile(): void
@@ -321,14 +441,54 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertTrue(isset($runtime->vmContext->functions['array_replace']));
     }
 
+    public function testSupportsClosureGetCurrentFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsClosureGetCurrent());
+    }
+
     public function testSupportsClosureGetCurrentTrueOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsClosureGetCurrent());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsBareRethrowFalseOnReferenceProfile(): void
     {
-        $this->assertFalse(CompilerVersion::supportsBareRethrow());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.2');
+        try {
+            $this->assertFalse(CompilerVersion::supportsBareRethrow());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsBareRethrowTrueOnForwardDevProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE');
+        try {
+            $this->assertTrue(CompilerVersion::supportsBareRethrow());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsBareRethrowTrueWhenProfile84(): void
@@ -346,37 +506,125 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
-    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    public function testVmDoesNotRegisterClosureGetCurrentOnReferenceProfile(): void
     {
         $runtime = new Runtime();
         $closure = $runtime->vmContext->classes['closure'] ?? null;
         $this->assertNotNull($closure);
-        $this->assertTrue(isset($closure->methods['getcurrent']));
+        $this->assertFalse(isset($closure->methods['getcurrent']));
+    }
+
+    public function testVmRegistersClosureGetCurrentOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $closure = $runtime->vmContext->classes['closure'] ?? null;
+            $this->assertNotNull($closure);
+            $this->assertTrue(isset($closure->methods['getcurrent']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testSupportsDomNodeContainsOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeContains());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomNodeContains());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeContainsFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomNodeContains());
     }
 
     public function testVmRegistersDomNodeContainsOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $node = $runtime->vmContext->classes['domnode'] ?? null;
-        $this->assertNotNull($node);
-        $this->assertTrue(isset($node->methods['contains']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $node = $runtime->vmContext->classes['domnode'] ?? null;
+            $this->assertNotNull($node);
+            $this->assertTrue(isset($node->methods['contains']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeCompareDocumentPositionOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomNodeCompareDocumentPosition());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeCompareDocumentPositionFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomNodeCompareDocumentPosition());
     }
 
     public function testSupportsDomNodeGetRootNodeOnForwardProfile(): void
     {
-        $this->assertTrue(CompilerVersion::supportsDomNodeGetRootNode());
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsDomNodeGetRootNode());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testSupportsDomNodeGetRootNodeFalseOnReferenceProfile(): void
+    {
+        $this->assertFalse(CompilerVersion::supportsDomNodeGetRootNode());
     }
 
     public function testVmRegistersDomNodeGetRootNodeOnForwardProfile(): void
     {
-        $runtime = new Runtime();
-        $node = $runtime->vmContext->classes['domnode'] ?? null;
-        $this->assertNotNull($node);
-        $this->assertTrue(isset($node->methods['getrootnode']));
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $node = $runtime->vmContext->classes['domnode'] ?? null;
+            $this->assertNotNull($node);
+            $this->assertTrue(isset($node->methods['getrootnode']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 }

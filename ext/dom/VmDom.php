@@ -6,9 +6,11 @@ namespace PHPCompiler\ext\dom;
 
 use PHPCfg\Func as CfgFunc;
 use PHPCompiler\CompilerVersion;
+use PHPCompiler\ErrorReporter;
 use PHPCompiler\ext\libxml\LibxmlConstants;
 use PHPCompiler\ext\libxml\VmLibxml;
 use PHPCompiler\ext\xml\VmXml;
+use PHPCompiler\Frame;
 use PHPCompiler\VM\ClassEntry;
 use PHPCompiler\VM\ClassProperty;
 use PHPCompiler\VM\Context;
@@ -55,6 +57,16 @@ final class VmDom
     public const PROP_IMPLEMENTATION = 'implementation';
 
     public const PROP_VALIDATE_ON_PARSE = 'validateOnParse';
+
+    public const PROP_RESOLVE_EXTERNALS = 'resolveExternals';
+
+    public const PROP_SUBSTITUTE_ENTITIES = 'substituteEntities';
+
+    public const PROP_PRESERVE_WHITE_SPACE = 'preserveWhiteSpace';
+
+    public const PROP_RECOVER = 'recover';
+
+    public const PROP_STRICT_ERROR_CHECKING = 'strictErrorChecking';
 
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
 
@@ -190,18 +202,26 @@ final class VmDom
         $node->methodVisibility['isdefaultnamespace'] = $pub;
         $node->methods['issupported'] = new NodeIsSupported();
         $node->methodVisibility['issupported'] = $pub;
-        $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
-        $node->methodVisibility['comparedocumentposition'] = $pub;
+        if (CompilerVersion::supportsDomNodeCompareDocumentPosition()) {
+            $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
+            $node->methodVisibility['comparedocumentposition'] = $pub;
+            DomClassConstants::registerIntConstants($node, [
+                'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
+                'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
+                'DOCUMENT_POSITION_FOLLOWING' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
+                'DOCUMENT_POSITION_CONTAINS' => DomConstants::DOCUMENT_POSITION_CONTAINS,
+                'DOCUMENT_POSITION_CONTAINED_BY' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
+                'DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
+            ]);
+        }
         $node->methods['normalize'] = new NodeNormalize();
         $node->methodVisibility['normalize'] = $pub;
-        DomClassConstants::registerIntConstants($node, [
-            'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
-            'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
-            'DOCUMENT_POSITION_FOLLOWING' => DomConstants::DOCUMENT_POSITION_FOLLOWING,
-            'DOCUMENT_POSITION_CONTAINS' => DomConstants::DOCUMENT_POSITION_CONTAINS,
-            'DOCUMENT_POSITION_CONTAINED_BY' => DomConstants::DOCUMENT_POSITION_CONTAINED_BY,
-            'DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC' => DomConstants::DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC,
-        ]);
+        $node->methods['c14n'] = new NodeC14N();
+        $node->methodVisibility['c14n'] = $pub;
+        $node->methodNames['c14n'] = 'C14N';
+        $node->methods['c14nfile'] = new NodeC14NFile();
+        $node->methodVisibility['c14nfile'] = $pub;
+        $node->methodNames['c14nfile'] = 'C14NFile';
         $ctx->classes[self::CLASS_NODE] = $node;
 
         $text = new ClassEntry('DOMText');
@@ -291,6 +311,14 @@ final class VmDom
         $document->methodVisibility['__construct'] = $pub;
         $document->properties[] = new ClassProperty(self::PROP_FORMAT_OUTPUT, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_VALIDATE_ON_PARSE, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_RESOLVE_EXTERNALS, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_SUBSTITUTE_ENTITIES, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_PRESERVE_WHITE_SPACE, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_RECOVER, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_STRICT_ERROR_CHECKING, null, $boolProto);
+        $document->properties[] = new ClassProperty(self::PROP_ENCODING, $nullProto, $strProto);
+        $document->properties[] = new ClassProperty(self::PROP_XML_VERSION, null, $strProto);
+        $document->properties[] = new ClassProperty(self::PROP_XML_STANDALONE, null, $boolProto);
         $document->properties[] = new ClassProperty(self::PROP_DOCUMENT_ELEMENT, $nullProto, $objProto);
         $document->methods['loadxml'] = new DocumentLoadXML();
         $document->methodVisibility['loadxml'] = $pub;
@@ -334,6 +362,17 @@ final class VmDom
         $document->methods['registernodeclass'] = new DocumentRegisterNodeClass();
         $document->methodVisibility['registernodeclass'] = $pub;
         $document->methodNames['registernodeclass'] = 'registerNodeClass';
+        $document->methods['normalizedocument'] = new DocumentNormalizeDocument();
+        $document->methodVisibility['normalizedocument'] = $pub;
+        $document->methodNames['normalizedocument'] = 'normalizeDocument';
+        $document->methods['xinclude'] = new DocumentXInclude();
+        $document->methodVisibility['xinclude'] = $pub;
+        $document->methods['schemavalidate'] = new DocumentSchemaValidate();
+        $document->methodVisibility['schemavalidate'] = $pub;
+        $document->methodNames['schemavalidate'] = 'schemaValidate';
+        $document->methods['relaxngvalidate'] = new DocumentRelaxNGValidate();
+        $document->methodVisibility['relaxngvalidate'] = $pub;
+        $document->methodNames['relaxngvalidate'] = 'relaxNGValidate';
         $ctx->classes[self::CLASS_DOCUMENT] = $document;
 
         $element = new ClassEntry('DOMElement');
@@ -513,11 +552,40 @@ final class VmDom
             $state->nodeType = DomConstants::XML_DOCUMENT_NODE;
             $state->nodeName = '#document';
             DomRegistry::attach($document, $state);
-            self::ensureDomDocumentBoolProperty($document, self::PROP_FORMAT_OUTPUT, false);
+            self::initDocumentLibxmlDefaults($document);
             self::initNodePropertySlots($document);
         }
 
         return DomRegistry::state($document);
+    }
+
+    /** Zend default libxml parser/writer options on fresh DOMDocument (php-src ext/dom/document.c; #14368). */
+    public static function initDocumentLibxmlDefaults(ObjectEntry $document): void
+    {
+        self::setDocumentBoolSlot($document, self::PROP_FORMAT_OUTPUT, false);
+        self::setDocumentBoolSlot($document, self::PROP_VALIDATE_ON_PARSE, false);
+        self::setDocumentBoolSlot($document, self::PROP_RESOLVE_EXTERNALS, false);
+        self::setDocumentBoolSlot($document, self::PROP_SUBSTITUTE_ENTITIES, false);
+        self::setDocumentBoolSlot($document, self::PROP_PRESERVE_WHITE_SPACE, true);
+        self::setDocumentBoolSlot($document, self::PROP_RECOVER, false);
+        self::setDocumentBoolSlot($document, self::PROP_STRICT_ERROR_CHECKING, true);
+        if ($document->hasProperty(self::PROP_XML_VERSION)) {
+            $document->getProperty(self::PROP_XML_VERSION)->string('1.0');
+        }
+        if ($document->hasProperty(self::PROP_ENCODING)) {
+            $document->getProperty(self::PROP_ENCODING)->null();
+        }
+        if ($document->hasProperty(self::PROP_XML_STANDALONE)) {
+            self::setDocumentBoolSlot($document, self::PROP_XML_STANDALONE, false);
+        }
+    }
+
+    private static function setDocumentBoolSlot(ObjectEntry $document, string $propName, bool $value): void
+    {
+        if (!$document->hasProperty($propName)) {
+            return;
+        }
+        $document->getProperty($propName)->bool($value);
     }
 
     public static function ensureDocumentFragment(ObjectEntry $fragment): DomNodeState
@@ -4353,5 +4421,243 @@ final class VmDom
             self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
             default => $lc,
         };
+    }
+
+    /** DOMDocument::normalizeDocument() — normalize entire tree (php-src ext/dom/document.c; #14370). */
+    public static function normalizeDocument(Context $ctx, ObjectEntry $document): void
+    {
+        self::ensureDocument($document);
+        self::normalizeLiveStandard($ctx, $document);
+    }
+
+    /**
+     * DOMDocument::xinclude() — no xi:include nodes in PHP-in-PHP DOM yet (php-src ext/dom/document.c; #14370).
+     *
+     * @return int|false substitution count, or false when libxml xinclude fails
+     */
+    public static function xinclude(Context $ctx, ObjectEntry $document, int $options, ?Frame $frame = null): int|false
+    {
+        self::ensureDocument($document);
+        unset($ctx, $options, $frame);
+
+        return false;
+    }
+
+    /** DOMDocument::schemaValidate() — XSD validation stub (php-src ext/dom/document.c; #14370). */
+    public static function schemaValidate(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        int $flags,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        unset($ctx, $flags);
+        if ('' === $filename || !is_file($filename)) {
+            self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): Invalid Schema');
+
+            return false;
+        }
+        self::triggerDomWarning($frame, 'DOMDocument::schemaValidate(): not implemented in this compiler build');
+
+        return false;
+    }
+
+    /** DOMDocument::relaxNGValidate() — RelaxNG validation stub (php-src ext/dom/document.c; #14370). */
+    public static function relaxNGValidate(
+        Context $ctx,
+        ObjectEntry $document,
+        string $filename,
+        ?Frame $frame = null
+    ): bool {
+        self::ensureDocument($document);
+        unset($ctx);
+        if ('' === $filename || !is_file($filename)) {
+            self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): Invalid RelaxNG');
+
+            return false;
+        }
+        self::triggerDomWarning($frame, 'DOMDocument::relaxNGValidate(): not implemented in this compiler build');
+
+        return false;
+    }
+
+    /**
+     * DOMNode::C14N() — inclusive canonical XML (php-src ext/dom/node.c; #14409).
+     *
+     * @param ?array<mixed> $xpath
+     * @param ?array<mixed> $nsPrefixes
+     */
+    public static function c14n(
+        Context $ctx,
+        ObjectEntry $node,
+        bool $exclusive,
+        bool $withComments,
+        ?array $xpath,
+        ?array $nsPrefixes
+    ): string|false {
+        unset($ctx);
+        if ($exclusive || $withComments || null !== $xpath || null !== $nsPrefixes) {
+            return false;
+        }
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        $state = DomRegistry::state($node);
+        if (DomConstants::XML_DOCUMENT_NODE === $state->nodeType) {
+            $rootVar = $node->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT !== $rootVar->type) {
+                return '';
+            }
+
+            return self::c14nSerializeNode($rootVar->toObject());
+        }
+
+        return self::c14nSerializeNode($node);
+    }
+
+    /**
+     * DOMNode::C14NFile() — write canonical XML bytes (php-src ext/dom/node.c; #14409).
+     *
+     * @param ?array<mixed> $xpath
+     * @param ?array<mixed> $nsPrefixes
+     */
+    public static function c14nFile(
+        Context $ctx,
+        ObjectEntry $node,
+        string $uri,
+        bool $exclusive,
+        bool $withComments,
+        ?array $xpath,
+        ?array $nsPrefixes,
+        ?Frame $frame = null
+    ): int|false {
+        unset($frame);
+        $payload = self::c14n($ctx, $node, $exclusive, $withComments, $xpath, $nsPrefixes);
+        if (false === $payload) {
+            return false;
+        }
+        $written = @file_put_contents($uri, $payload);
+        if (false === $written) {
+            return false;
+        }
+
+        return $written;
+    }
+
+    private static function c14nSerializeNode(ObjectEntry $entry): string|false
+    {
+        if (!DomRegistry::has($entry)) {
+            return false;
+        }
+        if (self::isElement($entry)) {
+            return self::c14nSerializeElement($entry);
+        }
+        if (self::isTextNode($entry)) {
+            return self::escapeText(DomRegistry::state($entry)->textContent ?? '');
+        }
+        if (self::isEntityReference($entry)) {
+            return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
+        }
+
+        return false;
+    }
+
+    private static function c14nSerializeElement(ObjectEntry $entry): string
+    {
+        $state = DomRegistry::state($entry);
+        $name = self::escapeName($state->nodeName);
+        $attrPart = self::c14nSerializeAttributes($state);
+        if ([] === $state->childIds) {
+            return '<'.$name.$attrPart.'></'.$name.'>';
+        }
+        $parts = [];
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            $chunk = self::c14nSerializeNode($child);
+            if (false === $chunk) {
+                continue;
+            }
+            $parts[] = $chunk;
+        }
+
+        return '<'.$name.$attrPart.'>'.implode('', $parts).'</'.$name.'>';
+    }
+
+    /** @return non-empty-string */
+    private static function c14nSerializeAttributes(DomNodeState $state): string
+    {
+        if ([] === $state->attributes) {
+            return '';
+        }
+        $entries = [];
+        foreach ($state->attributes as $aname => $avalue) {
+            $entries[] = [
+                'name' => $aname,
+                'value' => $avalue,
+                'ns' => $state->attributeNamespaces[$aname] ?? null,
+            ];
+        }
+        usort(
+            $entries,
+            static function (array $a, array $b): int {
+                $aNsDecl = self::isNamespaceDeclarationAttribute($a['name']);
+                $bNsDecl = self::isNamespaceDeclarationAttribute($b['name']);
+                if ($aNsDecl && !$bNsDecl) {
+                    return -1;
+                }
+                if (!$aNsDecl && $bNsDecl) {
+                    return 1;
+                }
+                if ($aNsDecl && $bNsDecl) {
+                    if ('xmlns' === $a['name']) {
+                        return 'xmlns' === $b['name'] ? 0 : -1;
+                    }
+                    if ('xmlns' === $b['name']) {
+                        return 1;
+                    }
+
+                    return strcmp($a['name'], $b['name']);
+                }
+                $aNs = $a['ns'] ?? '';
+                $bNs = $b['ns'] ?? '';
+                $cmp = strcmp($aNs, $bNs);
+                if (0 !== $cmp) {
+                    return $cmp;
+                }
+
+                return strcmp(self::attributeLocalName($a['name']), self::attributeLocalName($b['name']));
+            }
+        );
+        $parts = [];
+        foreach ($entries as $entry) {
+            $parts[] = self::escapeName($entry['name']).'="'.self::escapeAttr($entry['value']).'"';
+        }
+
+        return ' '.implode(' ', $parts);
+    }
+
+    private static function attributeLocalName(string $qName): string
+    {
+        $colon = strpos($qName, ':');
+
+        return false === $colon ? $qName : substr($qName, $colon + 1);
+    }
+
+    private static function triggerDomWarning(?Frame $frame, string $message): void
+    {
+        if (null === $frame || null === $frame->vmContext) {
+            return;
+        }
+        $frame->vmContext->errors->triggerError(
+            $message,
+            ErrorReporter::E_WARNING,
+            '' !== $frame->scriptPath ? $frame->scriptPath : null,
+            $frame->vmContext,
+            $frame
+        );
     }
 }
