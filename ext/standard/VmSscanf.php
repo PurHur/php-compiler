@@ -654,7 +654,7 @@ final class VmSscanf
         ) {
             $pos += 2;
         }
-        $value = 0;
+        $digits = '';
         $any = false;
         $digitsRead = 0;
         while ($pos < $len) {
@@ -662,27 +662,48 @@ final class VmSscanf
                 break;
             }
             $ch = $input[$pos];
-            $digit = null;
-            if ($ch >= '0' && $ch <= '9') {
-                $digit = ord($ch) - 48;
-            } elseif ($ch >= 'a' && $ch <= 'f') {
-                $digit = ord($ch) - 87;
-            } elseif ($ch >= 'A' && $ch <= 'F') {
-                $digit = ord($ch) - 55;
+            if (
+                ($ch >= '0' && $ch <= '9')
+                || ($ch >= 'a' && $ch <= 'f')
+                || ($ch >= 'A' && $ch <= 'F')
+            ) {
+                $any = true;
+                $digits .= $ch;
+                ++$pos;
+                ++$digitsRead;
+                continue;
             }
-            if (null === $digit) {
-                break;
-            }
-            $any = true;
-            $value = ($value << 4) + $digit;
-            ++$pos;
-            ++$digitsRead;
+            break;
         }
         if (!$any) {
             return [null, 0];
         }
 
-        return [$value, $pos - $orig];
+        return [self::saturateHexInt($digits), $pos - $orig];
+    }
+
+    /**
+     * Clamp scanned hex digits to PHP_INT_MAX (php-src formatted_io.c overflow, #15327).
+     */
+    private static function saturateHexInt(string $digits): int
+    {
+        $digits = strtolower($digits);
+        $limit = dechex(\PHP_INT_MAX);
+        $len = \strlen($digits);
+        $limitLen = \strlen($limit);
+        if ($len > $limitLen || ($len === $limitLen && $digits > $limit)) {
+            return \PHP_INT_MAX;
+        }
+        $value = 0;
+        for ($i = 0; $i < $len; ++$i) {
+            $ch = $digits[$i];
+            $digit = $ch >= '0' && $ch <= '9'
+                ? \ord($ch) - 48
+                : \ord($ch) - 87;
+            $value = ($value << 4) + $digit;
+        }
+
+        return $value;
     }
 
     /**
