@@ -14283,6 +14283,11 @@ class Compiler {
                     && null !== $callArg
                     && !$this->callArgOperandExpectsArrayProducer($callArg)
                 ) {
+                    $castProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
+                    if ($castProducer instanceof Op\Expr\Cast) {
+                        return $castProducer;
+                    }
+
                     return $byIndex;
                 }
             }
