@@ -384,11 +384,18 @@ final class VmProcessProcOpenNative
             $statusVal = $slot['status'];
             $running = false;
         } else {
-            // php-src: proc_get_status() must not reap — waitpid only in proc_close() (#13079).
-            try {
-                $running = 0 === (int) $ffi->kill($slot['pid'], 0);
-            } catch (\Throwable) {
-                return false;
+            self::pollChildExitStatus($ffi, $slot);
+            self::$slots[$handle] = $slot;
+            if ($slot['statusKnown']) {
+                $statusVal = $slot['status'];
+                $running = false;
+            } else {
+                // php-src: waitpid(WNOHANG) in proc_get_status; reap only when child already exited (#13079, #15647).
+                try {
+                    $running = 0 === (int) $ffi->kill($slot['pid'], 0);
+                } catch (\Throwable) {
+                    return false;
+                }
             }
         }
 
@@ -568,6 +575,33 @@ final class VmProcessProcOpenNative
         $ffi->waitpid($pid, \FFI::addr($status), 0);
     }
 
+    /** Last proc pipe closed — resume paused child so short-lived commands can exit (#15647). */
+    public static function onPipeHandleClosed(int $pipeHandle): void
+    {
+        $ffi = self::ffi();
+        if (null === $ffi) {
+            return;
+        }
+        foreach (self::$slots as $handle => &$slot) {
+            if (!$slot['active']) {
+                continue;
+            }
+            $pipes = $slot['pipeHandles'] ?? [];
+            $idx = array_search($pipeHandle, $pipes, true);
+            if (false === $idx) {
+                continue;
+            }
+            unset($pipes[$idx]);
+            $slot['pipeHandles'] = array_values($pipes);
+            if ([] === $slot['pipeHandles']) {
+                self::resumeChildIfPaused($ffi, $slot);
+            }
+            self::$slots[$handle] = $slot;
+
+            return;
+        }
+    }
+
     /** Resume paused child when parent performs blocking I/O on a proc pipe (#14685, #15084). */
     public static function resumeChildForPipeHandle(int $pipeHandle): void
     {
@@ -585,6 +619,27 @@ final class VmProcessProcOpenNative
             self::resumeChildIfPaused($ffi, $slot);
 
             return;
+        }
+    }
+
+    /**
+     * Non-blocking waitpid — reap exited child and cache status for proc_close() (#15647).
+     *
+     * @param array{pid: int, command: string, statusKnown: bool, status: int, active: bool, pipeHandles?: list<int>, childPaused?: bool} $slot
+     */
+    private static function pollChildExitStatus(\FFI $ffi, array &$slot): void
+    {
+        if ($slot['statusKnown']) {
+            return;
+        }
+        try {
+            $status = $ffi->new('int');
+            $waitRc = (int) $ffi->waitpid($slot['pid'], \FFI::addr($status), self::WNOHANG);
+            if ($waitRc === $slot['pid']) {
+                $slot['statusKnown'] = true;
+                $slot['status'] = (int) $status->cdata;
+            }
+        } catch (\Throwable) {
         }
     }
 

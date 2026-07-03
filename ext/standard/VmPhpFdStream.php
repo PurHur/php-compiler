@@ -401,6 +401,7 @@ final class VmPhpFdStream
         }
         unset(self::$streams[$handle]);
         self::closeFd($state->fd);
+        VmProcessProcOpenNative::onPipeHandleClosed($handle);
 
         return true;
     }
