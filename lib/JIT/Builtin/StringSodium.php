@@ -22,16 +22,24 @@ final class StringSodium
 
     private const SECRETBOX_OPEN_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::secretboxOpen';
 
+    private const AUTH_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::auth';
+
+    private const AUTH_VERIFY_HELPER = 'PHPCompiler\\ext\\sodium\\SodiumJitHelper::authVerify';
+
     /** @var list<string> */
     private const COMPILED_HELPERS = [
         self::SECRETBOX_HELPER,
         self::SECRETBOX_OPEN_HELPER,
+        self::AUTH_HELPER,
+        self::AUTH_VERIFY_HELPER,
     ];
 
     public static function ensureLinked(Context $context): void
     {
         self::implementBridge($context, '__compiler_sodium_secretbox', self::SECRETBOX_HELPER);
         self::implementBridge($context, '__compiler_sodium_secretbox_open', self::SECRETBOX_OPEN_HELPER);
+        self::implementAuthBridge($context);
+        self::implementAuthVerifyBridge($context);
     }
 
     private static function implementBridge(Context $context, string $abiName, string $helper): void
@@ -62,6 +70,72 @@ final class StringSodium
             $fn->getParam(2)
         );
         $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementAuthBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_auth';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($strPtr, false, $strPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_auth_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::AUTH_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1)
+        );
+        $context->builder->returnValue($result);
+        $context->registerFunction($abiName, $fn);
+        $context->builder->clearInsertionPosition();
+    }
+
+    private static function implementAuthVerifyBridge(Context $context): void
+    {
+        $abiName = '__compiler_sodium_auth_verify';
+        $probe = $context->module->getNamedFunction($abiName);
+        if (null !== $probe && $probe->countBasicBlocks() > 0) {
+            $context->registerFunction($abiName, $probe);
+
+            return;
+        }
+
+        self::ensureJitHelperCompiled($context);
+
+        $strPtr = $context->getTypeFromString('__string__*');
+        $i32 = $context->getTypeFromString('int32');
+        $fn = null !== $probe
+            ? $probe
+            : $context->module->addFunction(
+                $abiName,
+                $context->context->functionType($i32, false, $strPtr, $strPtr, $strPtr)
+            );
+
+        $entry = $fn->appendBasicBlock('sodium_auth_verify_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, self::AUTH_VERIFY_HELPER),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2)
+        );
+        $context->builder->returnValue($context->builder->zext($result, $i32));
         $context->registerFunction($abiName, $fn);
         $context->builder->clearInsertionPosition();
     }

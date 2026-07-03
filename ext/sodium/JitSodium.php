@@ -6,6 +6,7 @@ namespace PHPCompiler\ext\sodium;
 
 use PHPCompiler\JIT\Builtin\StringSodium;
 use PHPCompiler\JIT\Context;
+use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
 /** LLVM lowering for sodium builtins via __compiler_sodium_* runtime (#13078). */
@@ -28,6 +29,39 @@ final class JitSodium
             $message,
             $nonce,
             $key
+        );
+    }
+
+    public static function invokeAuth(Context $context, Value $message, Value $key): Value
+    {
+        StringSodium::ensureLinked($context);
+
+        return $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_auth'),
+            $message,
+            $key
+        );
+    }
+
+    public static function invokeAuthVerify(
+        Context $context,
+        Value $mac,
+        Value $message,
+        Value $key
+    ): Value {
+        StringSodium::ensureLinked($context);
+        $i32 = $context->getTypeFromString('int32');
+        $result = $context->builder->call(
+            $context->lookupFunction('__compiler_sodium_auth_verify'),
+            $mac,
+            $message,
+            $key
+        );
+
+        return $context->builder->icmp(
+            Builder::INT_NE,
+            $result,
+            $i32->constInt(0, false)
         );
     }
 }

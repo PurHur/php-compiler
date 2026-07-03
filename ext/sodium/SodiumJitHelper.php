@@ -21,4 +21,15 @@ final class SodiumJitHelper
     {
         return VmSodium::secretboxOpen($ciphertext, $nonce, $key);
     }
+
+    public static function auth(string $message, string $key): string
+    {
+        return VmSodium::auth($message, $key);
+    }
+
+    /** @return bool LLVM i1 ABI; bridge zext to i32 for __compiler_sodium_auth_verify */
+    public static function authVerify(string $mac, string $message, string $key): bool
+    {
+        return VmSodium::authVerify($mac, $message, $key);
+    }
 }
