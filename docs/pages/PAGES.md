@@ -39,9 +39,9 @@ Trackers: [#78](https://github.com/PurHur/php-compiler/issues/78), [#1492](https
 
 ## Publish
 
-Settings → Pages → branch **`master`**, folder **`/docs/pages`**.
+GitHub Pages uses **legacy Jekyll** from the **repo root** (`Settings → Pages → branch `master`, folder `/`). The repo-root [`_config.yml`](../../_config.yml) scopes the build to `docs/pages/` only (excluding `build/`, `prelinked/`, contributor docs, etc.). Without it, Jekyll publishes the whole tree and deploy fails.
 
-## Local preview
+Local preview (static, no Jekyll):
 
 ```bash
 cd docs/pages && python3 -m http.server 8765

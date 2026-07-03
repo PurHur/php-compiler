@@ -376,6 +376,14 @@ ci_run_docs_harness_hygiene_check() {
   "$PHP_BIN" "${PHP_OPTS[@]}" script/check-docs-harness-hygiene.php
 }
 
+ci_run_github_pages_config_check() {
+  if [[ "${GITHUB_PAGES_CONFIG_GATE:-1}" != "1" ]]; then
+    return 0
+  fi
+  echo "GitHub Pages config (GITHUB_PAGES_CONFIG_GATE=1)..."
+  "$PHP_BIN" "${PHP_OPTS[@]}" script/check-github-pages-config.php
+}
+
 ci_run_selfhost_m4_gen2_sync_check() {
   if [[ "${SELFHOST_M4_GEN2_SYNC_GATE:-1}" != "1" ]]; then
     echo "Self-host M4 gen-2 doc sync: skipped (SELFHOST_M4_GEN2_SYNC_GATE=0 opt-out)"
@@ -555,6 +563,7 @@ ci_run_inventory_checks() {
   ci_run_stdlib_jit_deferred_sync_check
   ci_run_doctor_gates_matrix_sync_check
   ci_run_docs_harness_hygiene_check
+  ci_run_github_pages_config_check
 }
 
 ci_llvm_dir() {

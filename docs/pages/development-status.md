@@ -19,7 +19,7 @@ permalink: /development-status.html
 | **Builtin matrix** | **852** functions ([`docs/capabilities.md`](https://github.com/PurHur/php-compiler/blob/master/docs/capabilities.md)) |
 | **Try it** | [`docs/GETTING-STARTED.md`](https://github.com/PurHur/php-compiler/blob/master/docs/GETTING-STARTED.md) |
 
-[← Overview](index.html) · [**Missing implementation**](missing-implementation.html) · [**PHP capability comparison**](capability-comparison.html) · [GitHub](https://github.com/PurHur/php-compiler)
+[← Overview](docs/pages/index.html) · [**Missing implementation**](docs/pages/missing-implementation.html) · [**PHP capability comparison**](docs/pages/capability-comparison.html) · [GitHub](https://github.com/PurHur/php-compiler)
 
 ---
 
@@ -105,9 +105,9 @@ Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-c
 
 ## What is still missing
 
-**[missing-implementation.html](missing-implementation.html)** — emit spine, LLVM deny list, language subset gaps.
+**[missing-implementation.html](docs/pages/missing-implementation.html)** — emit spine, LLVM deny list, language subset gaps.
 
-**[capability-comparison.html](capability-comparison.html)** — PHP language/stdlib vs VM / JIT / AOT (from capability matrices).
+**[capability-comparison.html](docs/pages/capability-comparison.html)** — PHP language/stdlib vs VM / JIT / AOT (from capability matrices).
 
 ---
 
@@ -117,4 +117,4 @@ Contributor detail: [`docs/self-host-target.md`](https://github.com/PurHur/php-c
 
 When a user-visible gap closes, update **`development-status.md`**, **`index.html`**, and **`missing-implementation.html`**.
 
-[← Back to overview](index.html)
+[← Back to overview](docs/pages/index.html)
