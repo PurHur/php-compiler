@@ -24161,9 +24161,12 @@ class Compiler {
                         static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ConstFetch
                             || $producer instanceof Op\Expr\ClassConstFetch
                     ));
-                    $target = 1 === (int) $argIndex
-                        ? ($constProducers[0] ?? null)
-                        : ($constProducers[\count($constProducers) - 1] ?? null);
+                    $target = match (true) {
+                        1 === (int) $argIndex => $constProducers[0] ?? null,
+                        // Lone hoisted ConstFetch is $assoc (arg 1); flags stays embedded (#15486).
+                        3 === (int) $argIndex && \count($constProducers) >= 2 => $constProducers[\count($constProducers) - 1],
+                        default => null,
+                    };
                     if ($target instanceof Op\Expr) {
                         $folded = $target instanceof Op\Expr\ConstFetch
                             ? $this->tryFoldGlobalConstFetch($target)

@@ -3826,6 +3826,18 @@ PHP;
         self::assertSame("ok\n", ob_get_clean());
     }
 
+    /** Issue #15486 — lone hoisted $assoc ConstFetch must not bind $flags embedded literal. */
+    public function testJsonDecodeStrictFlagsTypeErrorNamesStringOperand(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_json_decode_strict_flags_message.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'json_decode_strict_flags_message.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
     /** Issue #13423 — preg_split(..., -1, PREG_SPLIT_*) nested in check() wires limit/flags slots. */
     public function testPregSplitNegativeLimitWithFlagsNestedCallArg(): void
     {
