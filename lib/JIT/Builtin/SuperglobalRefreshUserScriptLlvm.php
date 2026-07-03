@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\JIT\BasicBlockHelper;
 use PHPCompiler\JIT\Builtin;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\LibcExtern;
@@ -40,7 +41,6 @@ final class SuperglobalRefreshUserScriptLlvm
         $restore = self::captureInsertBlock($context);
         LibcExtern::register($context);
         ParseStrRuntime::ensureLinked($context);
-        StringGetenvAll::ensureLinked($context);
         self::ensureGlobals($context);
         self::ensureHeaderQueueExternal($context);
 
@@ -352,15 +352,124 @@ final class SuperglobalRefreshUserScriptLlvm
         $context->builder->positionAtEnd($nextBb);
     }
 
+    /**
+     * Mirror process environ into $_SERVER without nested GetenvJitHelper JIT (#14209, #15417).
+     *
+     * SSOT: {@see \PHPCompiler\ext\standard\VmEnvEnvironNative::enumerate()} / libc environ walk.
+     */
     private static function fillServerFromProcessEnviron(Context $context, LlvmFunction $fn, Value $serverHt): void
     {
-        $logical = 'PHPCompiler\\ext\\standard\\GetenvJitHelper::fillAllEnvironmentHashtable';
-        $lc = \strtolower($logical);
-        $fillFn = $context->functions[$lc] ?? null;
-        if (null === $fillFn) {
-            throw new \LogicException($logical.' missing after StringGetenvAll compile (#14209)');
+        self::ensureEnvironGlobal($context);
+        self::emitEnvironWalkIntoHashtable($context, $fn, $serverHt);
+    }
+
+    private static function ensureEnvironGlobal(Context $context): void
+    {
+        if (null === $context->module->getNamedGlobal('environ')) {
+            $context->module->addGlobal($context->getTypeFromString('int8**'), 'environ');
         }
-        $context->builder->call($fillFn, $serverHt);
+    }
+
+    private static function emitEnvironWalkIntoHashtable(Context $context, LlvmFunction $fn, Value $ht): void
+    {
+        $i8 = $context->getTypeFromString('int8');
+        $i32 = $context->getTypeFromString('int32');
+        $i64 = $context->getTypeFromString('int64');
+        $i8p = $context->getTypeFromString('int8*');
+        $i8pp = $context->getTypeFromString('int8**');
+        $environGlobal = $context->module->getNamedGlobal('environ');
+        if (null === $environGlobal) {
+            return;
+        }
+
+        $envPtr = $context->builder->load(
+            $context->builder->pointerCast($environGlobal, $i8pp->pointerType(0))
+        );
+        $envSlot = BasicBlockHelper::entryAlloca($context, $i8pp);
+        $context->builder->store($envPtr, $envSlot);
+
+        $loopHead = $fn->appendBasicBlock('sg_user_refresh_env_head');
+        $loopBody = $fn->appendBasicBlock('sg_user_refresh_env_body');
+        $doneBb = $fn->appendBasicBlock('sg_user_refresh_env_done');
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($loopHead);
+        $env = $context->builder->load($envSlot);
+        $envNull = $context->builder->icmp(Builder::INT_EQ, $env, $i8pp->constNull());
+        $entryNull = $context->builder->icmp(
+            Builder::INT_EQ,
+            $context->builder->load($env),
+            $i8p->constNull()
+        );
+        $stop = $context->builder->or($envNull, $entryNull);
+        $context->builder->branchIf($stop, $doneBb, $loopBody);
+
+        $context->builder->positionAtEnd($loopBody);
+        $line = $context->builder->load($env);
+        $eq = $context->builder->call(
+            $context->lookupFunction('strchr'),
+            $line,
+            $i32->constInt(61, false)
+        );
+        $noEqBb = $fn->appendBasicBlock('sg_user_refresh_env_no_eq');
+        $haveEqBb = $fn->appendBasicBlock('sg_user_refresh_env_have_eq');
+        $eqNull = $context->builder->icmp(Builder::INT_EQ, $eq, $i8p->constNull());
+        $context->builder->branchIf($eqNull, $noEqBb, $haveEqBb);
+
+        $context->builder->positionAtEnd($haveEqBb);
+        $keyLen = $context->builder->sub(
+            $context->builder->ptrToInt($eq, $i64),
+            $context->builder->ptrToInt($line, $i64)
+        );
+        $emptyKeyBb = $fn->appendBasicBlock('sg_user_refresh_env_empty_key');
+        $setBb = $fn->appendBasicBlock('sg_user_refresh_env_set');
+        $keyEmpty = $context->builder->icmp(Builder::INT_EQ, $keyLen, $i64->constInt(0, false));
+        $context->builder->branchIf($keyEmpty, $emptyKeyBb, $setBb);
+
+        $context->builder->positionAtEnd($setBb);
+        $value = $context->builder->inBoundsGEP($eq, $i64->constInt(1, false));
+        self::setBoundedKeyCstrPairIntoHashtable($context, $ht, $line, $keyLen, $value);
+        $context->builder->branch($noEqBb);
+
+        $context->builder->positionAtEnd($emptyKeyBb);
+        $context->builder->branch($noEqBb);
+
+        $context->builder->positionAtEnd($noEqBb);
+        $context->builder->store(
+            $context->builder->inBoundsGEP($env, $i64->constInt(1, false)),
+            $envSlot
+        );
+        $context->builder->branch($loopHead);
+
+        $context->builder->positionAtEnd($doneBb);
+    }
+
+    private static function setBoundedKeyCstrPairIntoHashtable(
+        Context $context,
+        Value $ht,
+        Value $keyCstr,
+        Value $keyLen,
+        Value $valueCstr
+    ): void {
+        $i64 = $context->getTypeFromString('int64');
+        $charPtr = $context->getTypeFromString('char*');
+        $keyStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $keyLen,
+            $context->builder->pointerCast($keyCstr, $charPtr)
+        );
+        $len = $context->builder->call($context->lookupFunction('strlen'), $valueCstr);
+        $valStr = $context->builder->call(
+            $context->lookupFunction('__string__init'),
+            $context->builder->zExt($len, $i64),
+            $context->builder->pointerCast($valueCstr, $charPtr)
+        );
+        $context->builder->call(
+            $context->lookupFunction('__hashtable__setStringKeyString'),
+            $ht,
+            $keyStr,
+            $valStr
+        );
     }
 
     private static function setServerKeyFromCstr(Context $context, Value $ht, string $key, Value $valCstrSlot): void
