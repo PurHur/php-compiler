@@ -8546,6 +8546,8 @@ class Compiler {
                 $this->rejectNullsafeInWriteContext($expr->var, $block);
                 $this->rejectNewExprInWriteContext($expr->var, $block);
                 $this->rejectGlobalConstInWriteContext($expr->var, $block);
+                // Zend zend_compile.c: cannot acquire a reference to $GLOBALS (#15627).
+                $this->rejectGlobalsReferenceAcquisition($expr->expr);
                 // Zend zend_compile.c: ref-binding to const/class-const array element (#5409).
                 $this->rejectGlobalConstInWriteContext($expr->expr, $block);
                 $bindRefFlags = 0;
@@ -27076,6 +27078,21 @@ class Compiler {
         }
         if ('this' === $this->baseVariableName($var)) {
             $this->throwCompileError('Cannot re-assign $this');
+        }
+    }
+
+    /**
+     * Zend zend_compile.c: acquiring a reference to $GLOBALS is a compile-time fatal (#15627).
+     *
+     * @return never
+     */
+    protected function rejectGlobalsReferenceAcquisition(?Operand $expr): void
+    {
+        if (null === $expr) {
+            return;
+        }
+        if ('GLOBALS' === $this->baseVariableName($expr)) {
+            $this->throwCompileError('Cannot acquire reference to $GLOBALS');
         }
     }
 
