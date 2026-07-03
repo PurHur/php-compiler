@@ -13,20 +13,20 @@ if (!$el->hasAttributeNS('http://example.com', 'foo')) {
     fwrite(STDERR, "fail: setup missing ex:foo\n");
     exit(1);
 }
-if (!$el->removeAttributeNS('http://example.com', 'foo')) {
-    fwrite(STDERR, "fail: removeAttributeNS did not remove ex:foo\n");
+if (null !== $el->removeAttributeNS('http://example.com', 'foo')) {
+    fwrite(STDERR, "fail: removeAttributeNS should return null on success\n");
     exit(1);
 }
-if ($el->hasAttributeNS('http://example.com', 'foo')) {
-    fwrite(STDERR, "fail: ex:foo still present\n");
+if (false !== $el->hasAttributeNS('http://example.com', 'foo')) {
+    fwrite(STDERR, "fail: ex:foo still present after removeAttributeNS\n");
     exit(1);
 }
 if (!$el->hasAttributeNS('http://example.com', 'bar')) {
     fwrite(STDERR, "fail: ex:bar removed unexpectedly\n");
     exit(1);
 }
-if ($el->removeAttributeNS('http://example.com', 'missing')) {
-    fwrite(STDERR, "fail: removeAttributeNS should return false for missing attr\n");
+if (null !== $el->removeAttributeNS('http://example.com', 'missing')) {
+    fwrite(STDERR, "fail: removeAttributeNS should return null for missing attr\n");
     exit(1);
 }
 

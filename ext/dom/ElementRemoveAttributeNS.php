@@ -25,6 +25,7 @@ final class ElementRemoveAttributeNS extends DomClassMethod
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->bool(VmDom::removeAttributeNS($element, $namespace, $localName));
+        VmDom::removeAttributeNS($element, $namespace, $localName);
+        $frame->returnVar->null();
     }
 }

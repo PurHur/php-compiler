@@ -11,6 +11,6 @@ echo (int) $el->hasAttributeNS('http://example.com', 'foo'), "\n";
 echo (int) $el->removeAttributeNS('http://example.com', 'missing'), "\n";
 --EXPECT--
 1
-1
+0
 0
 0
