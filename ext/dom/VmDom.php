@@ -192,6 +192,8 @@ final class VmDom
         $node->methodVisibility['issupported'] = $pub;
         $node->methods['comparedocumentposition'] = new NodeCompareDocumentPosition();
         $node->methodVisibility['comparedocumentposition'] = $pub;
+        $node->methods['normalize'] = new NodeNormalize();
+        $node->methodVisibility['normalize'] = $pub;
         DomClassConstants::registerIntConstants($node, [
             'DOCUMENT_POSITION_DISCONNECTED' => DomConstants::DOCUMENT_POSITION_DISCONNECTED,
             'DOCUMENT_POSITION_PRECEDING' => DomConstants::DOCUMENT_POSITION_PRECEDING,
@@ -1979,6 +1981,86 @@ final class VmDom
             throw new \DOMException('Not Found Error');
         }
         self::removeChild($ctx, $parent, $node);
+    }
+
+    /**
+     * DOMNode::normalize() — merge adjacent text nodes, drop empty text (php-src ext/dom/node.c; #14395).
+     */
+    public static function normalizeLiveStandard(Context $ctx, ObjectEntry $node): void
+    {
+        if (!DomRegistry::has($node)) {
+            return;
+        }
+        $state = DomRegistry::state($node);
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null !== $child) {
+                self::normalizeLiveStandard($ctx, $child);
+            }
+        }
+        if (!self::nodeSupportsChildList($node)) {
+            return;
+        }
+        $mergedChildIds = [];
+        $carryTextId = null;
+        foreach ($state->childIds as $childId) {
+            $child = DomRegistry::entry($childId);
+            if (null === $child) {
+                continue;
+            }
+            if (!self::isTextNode($child)) {
+                $carryTextId = null;
+                $mergedChildIds[] = $childId;
+
+                continue;
+            }
+            $textState = DomRegistry::state($child);
+            $text = $textState->textContent ?? '';
+            if ('' === $text) {
+                self::linkChildToParent($child, null);
+
+                continue;
+            }
+            if (null !== $carryTextId) {
+                $carry = DomRegistry::entry($carryTextId);
+                if (null !== $carry) {
+                    $carryState = DomRegistry::state($carry);
+                    $combined = ($carryState->textContent ?? '').$text;
+                    self::setTextNodeData($carry, $combined);
+                    self::linkChildToParent($child, null);
+                }
+
+                continue;
+            }
+            $carryTextId = $childId;
+            $mergedChildIds[] = $childId;
+        }
+        $state->childIds = $mergedChildIds;
+        self::syncSubtree($ctx, $node);
+    }
+
+    private static function nodeSupportsChildList(ObjectEntry $node): bool
+    {
+        if (!DomRegistry::has($node)) {
+            return false;
+        }
+        $type = DomRegistry::state($node)->nodeType;
+
+        return DomConstants::XML_ELEMENT_NODE === $type
+            || DomConstants::XML_DOCUMENT_NODE === $type
+            || DomConstants::XML_DOCUMENT_FRAG_NODE === $type;
+    }
+
+    private static function setTextNodeData(ObjectEntry $textNode, string $data): void
+    {
+        $state = DomRegistry::state($textNode);
+        $state->textContent = $data;
+        if ($textNode->hasProperty(self::PROP_NODE_VALUE)) {
+            $textNode->getProperty(self::PROP_NODE_VALUE)->string($data);
+        }
+        if ($textNode->hasProperty(self::PROP_TEXT_CONTENT)) {
+            $textNode->getProperty(self::PROP_TEXT_CONTENT)->string($data);
+        }
     }
 
     private static function parentEntryForSiblingMutation(ObjectEntry $node): ObjectEntry
