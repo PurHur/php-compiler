@@ -340,10 +340,10 @@ final class VmProcessProcOpenNative
         self::$slots[$handle] = $slot;
 
         if ($slot['statusKnown']) {
-            $status = $slot['status'];
+            // php-src: proc_get_status() may reap via WNOHANG; blocking waitpid in proc_close then fails (#15661).
             self::releaseSlot($handle);
 
-            return self::exitCodeFromStatus($status);
+            return -1;
         }
 
         try {
