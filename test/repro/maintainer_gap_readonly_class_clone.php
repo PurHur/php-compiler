@@ -1,5 +1,5 @@
 <?php
-// Issue #15365: readonly class clone + __clone reinit (zend_readonly.c, PHP 8.3+ amendments)
+// Issue #15365 / #15409: readonly class clone + __clone (zend_readonly.c)
 readonly class R {
     public function __construct(public int $x) {}
     public function __clone(): void {

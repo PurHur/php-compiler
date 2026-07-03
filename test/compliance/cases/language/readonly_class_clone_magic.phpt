@@ -1,5 +1,5 @@
 --TEST--
-language: readonly class __clone may reinit readonly property once (issue #15365, zend_readonly.c)
+language: readonly class __clone rejects readonly property writes (issue #15409, zend_readonly.c)
 --FILE--
 <?php
 readonly class R {
@@ -9,7 +9,6 @@ readonly class R {
     }
 }
 $r = new R(1);
-$c = clone $r;
-echo $c->x, "\n";
---EXPECT--
-5
+clone $r;
+--EXPECT_EXIT--
+255
