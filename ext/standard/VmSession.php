@@ -46,6 +46,13 @@ final class VmSession
     /** php-src ext/session/session.c — PS(cache_expire) / session.cache_expire default (minutes). */
     public const DEFAULT_CACHE_EXPIRE = 180;
 
+    /** php-src ext/session/session.c — PS(cache_limiter) / session.cache_limiter default. */
+    public const DEFAULT_CACHE_LIMITER = 'nocache';
+
+    public const ACTIVE_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed when a session is active';
+
+    public const HEADERS_SENT_CACHE_LIMITER_WARNING = 'Session cache limiter cannot be changed after headers have already been sent';
+
     public const ACTIVE_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed when a session is active';
 
     public const HEADERS_SENT_COOKIE_PARAMS_WARNING = 'Session cookie parameters cannot be changed after headers have already been sent';
@@ -59,6 +66,8 @@ final class VmSession
     private static string $moduleName = self::DEFAULT_MODULE;
 
     private static int $cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+
+    private static string $cacheLimiter = self::DEFAULT_CACHE_LIMITER;
 
     private static int $cookieLifetime = 0;
 
@@ -79,6 +88,7 @@ final class VmSession
         self::$id = '';
         self::$moduleName = self::DEFAULT_MODULE;
         self::$cacheExpire = self::DEFAULT_CACHE_EXPIRE;
+        self::$cacheLimiter = self::DEFAULT_CACHE_LIMITER;
         self::resetCookieParams();
     }
 
@@ -194,6 +204,41 @@ final class VmSession
             );
         }
         self::$cacheExpire = $minutes;
+    }
+
+    public static function getCacheLimiter(): string
+    {
+        return self::$cacheLimiter;
+    }
+
+    /**
+     * @return string|false previous limiter on success, or false when change is rejected
+     */
+    public static function setCacheLimiter(?Frame $frame, string $newLimiter): string|false
+    {
+        if (!self::canChangeCacheLimiter($frame)) {
+            return false;
+        }
+        $previous = self::$cacheLimiter;
+        self::$cacheLimiter = $newLimiter;
+
+        return $previous;
+    }
+
+    public static function canChangeCacheLimiter(?Frame $frame): bool
+    {
+        if (self::$active) {
+            self::triggerSessionWarning($frame, self::ACTIVE_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+        if (SapiOutput::headersSent()) {
+            self::triggerSessionWarning($frame, self::HEADERS_SENT_CACHE_LIMITER_WARNING);
+
+            return false;
+        }
+
+        return true;
     }
 
     public static function isActive(): bool
