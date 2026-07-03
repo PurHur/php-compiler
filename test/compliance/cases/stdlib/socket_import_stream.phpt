@@ -24,4 +24,4 @@ fclose($b);
 ?>
 --EXPECT--
 1
-pair_skip
+true

@@ -54,6 +54,11 @@ final class socket_import_stream extends Internal
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        throw new \Error('socket_import_stream() is not implemented for JIT in this compiler build (issue #6203)');
+        $argc = \count($args);
+        if (1 !== $argc) {
+            return JitSocketImportStream::emitArgumentCountError($context, $argc);
+        }
+
+        return JitSocketImportStream::invoke($context, $args[0]);
     }
 }
