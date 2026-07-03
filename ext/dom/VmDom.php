@@ -1437,7 +1437,9 @@ final class VmDom
         }
 
         $declaredElements = self::parseDoctypeElementDeclarations($xml);
-        foreach (self::collectElementNames($root) as $elementName) {
+        $elementNames = self::collectElementNames($root);
+        sort($elementNames, SORT_STRING);
+        foreach ($elementNames as $elementName) {
             if (!isset($declaredElements[$elementName])) {
                 self::reportDomLibxmlError(
                     $ctx,
