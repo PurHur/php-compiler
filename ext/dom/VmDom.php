@@ -2445,10 +2445,10 @@ final class VmDom
             return self::disconnectedDocumentPosition($node, $other);
         }
         if ($orderNode < $orderOther) {
-            return DomConstants::DOCUMENT_POSITION_PRECEDING;
+            return DomConstants::DOCUMENT_POSITION_FOLLOWING;
         }
 
-        return DomConstants::DOCUMENT_POSITION_FOLLOWING;
+        return DomConstants::DOCUMENT_POSITION_PRECEDING;
     }
 
     private static function disconnectedDocumentPosition(ObjectEntry $node, ObjectEntry $other): int

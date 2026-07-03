@@ -303,7 +303,7 @@ PHP;
         $block = $runtime->parseAndCompile($code, 'dom_compare_document_position.php');
         ob_start();
         $runtime->run($block);
-        self::assertSame("10\n20\n2\n1\n", ob_get_clean());
+        self::assertSame("10\n20\n4\n1\n", ob_get_clean());
     }
 
     public function test_runtime_shrink_has_no_dom_c_runtime(): void
