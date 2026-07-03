@@ -55,14 +55,14 @@ final class CompilerVersion
     }
 
     /**
-     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15099).
+     * PHP 8.3+ typed class constants on classes/enums (Zend/zend_compile.c, #3592, #12798, #12994, #15367).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects typed const syntax like Zend 8.2.
+     * Forward profile on 8.4.0-dev — same 8.3+ gate as trait/interface typed constants (#5993, #5980).
      * Reference-profile rejection tests skip when this returns true (#12798).
      */
     public static function supportsTypedClassConstants(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::VERSION, '8.3', '>=');
     }
 
     /** PHP 8.3+ typed constants at compile-unit scope (Zend/zend_compile.c, issue #7081). */
