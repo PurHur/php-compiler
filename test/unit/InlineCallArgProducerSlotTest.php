@@ -4527,4 +4527,22 @@ PHP;
             ob_get_clean()
         );
     }
+
+    /** Issue #9292 — && merge phi must not clobber nested stream_set_blocking var_dump arg. */
+    public function testStreamSetBlockingAfterLogicalAndUsesNestedCallSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$f = tmpfile();
+$meta = stream_get_meta_data($f);
+$x = isset($meta['wrapper_type']) && isset($meta['stream_type']);
+var_dump(stream_set_blocking($f, true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'stream_set_blocking_after_and.php');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("bool(true)\n", ob_get_clean());
+    }
 }
