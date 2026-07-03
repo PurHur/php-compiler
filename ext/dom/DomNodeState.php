@@ -41,6 +41,9 @@ final class DomNodeState
 
     public ?string $doctypeSystemId = null;
 
+    /** Live DOMDocumentType child object id (php-src ext/dom/document.c; #15292). */
+    public ?int $doctypeId = null;
+
     /** Child element object ids in document order (php-src dom_child_nodes). */
     /** @var list<int> */
     public array $childIds = [];

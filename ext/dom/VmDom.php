@@ -34,6 +34,8 @@ final class VmDom
 
     public const CLASS_DOCUMENT_TYPE = 'domdocumenttype';
 
+    public const CLASS_PROCESSING_INSTRUCTION = 'domprocessinginstruction';
+
     public const CLASS_ELEMENT = 'domelement';
 
     public const CLASS_TEXT = 'domtext';
@@ -55,6 +57,8 @@ final class VmDom
     public const PROP_VALIDATE_ON_PARSE = 'validateOnParse';
 
     public const PROP_DOCUMENT_ELEMENT = 'documentElement';
+
+    public const PROP_DOCTYPE = 'doctype';
 
     public const PROP_ENCODING = 'encoding';
 
@@ -107,6 +111,10 @@ final class VmDom
     public const PROP_PUBLIC_ID = 'publicId';
 
     public const PROP_SYSTEM_ID = 'systemId';
+
+    public const PROP_TARGET = 'target';
+
+    public const PROP_DATA = 'data';
 
     public static function registerClasses(Context $ctx): void
     {
@@ -262,6 +270,15 @@ final class VmDom
         $doctype->properties[] = new ClassProperty(self::PROP_PUBLIC_ID, null, $strProto);
         $doctype->properties[] = new ClassProperty(self::PROP_SYSTEM_ID, null, $strProto);
         $ctx->classes[self::CLASS_DOCUMENT_TYPE] = $doctype;
+
+        $processingInstruction = new ClassEntry('DOMProcessingInstruction');
+        $processingInstruction->isInternal = true;
+        $processingInstruction->parentLc = self::CLASS_NODE;
+        $processingInstruction->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $processingInstruction->properties[] = new ClassProperty(self::PROP_NODE_VALUE, $nullProto, $strProto);
+        $processingInstruction->properties[] = new ClassProperty(self::PROP_TARGET, null, $strProto);
+        $processingInstruction->properties[] = new ClassProperty(self::PROP_DATA, null, $strProto);
+        $ctx->classes[self::CLASS_PROCESSING_INSTRUCTION] = $processingInstruction;
 
         $document = new ClassEntry('DOMDocument');
         $document->isInternal = true;
@@ -1228,7 +1245,19 @@ final class VmDom
         }
 
         $state = DomRegistry::state($document);
-        $state->childIds = [$root->id];
+        $childIds = [];
+        $doctypeDecl = self::parseDoctypeDeclaration($trimmed);
+        if (null !== $doctypeDecl) {
+            $childIds[] = self::attachDoctypeChild(
+                $ctx,
+                $document,
+                $doctypeDecl['name'],
+                $doctypeDecl['publicId'],
+                $doctypeDecl['systemId']
+            )->id;
+        }
+        $childIds[] = $root->id;
+        $state->childIds = $childIds;
         $state->idAttrByElement = $idAttrByElement;
         $state->elementIds = [];
         $state->xmlVersion = $decl['version'];
@@ -1476,6 +1505,92 @@ final class VmDom
         }
 
         return $match[1];
+    }
+
+    /**
+     * @return array{name: string, publicId: string, systemId: string}|null
+     */
+    private static function parseDoctypeDeclaration(string $xml): ?array
+    {
+        $trimmed = ltrim($xml);
+        if (!preg_match('/^<!DOCTYPE\s+/i', $trimmed)) {
+            return null;
+        }
+        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+PUBLIC\s+"([^"]*)"\s+"([^"]*)"\s*>/is', $trimmed, $match)) {
+            return [
+                'name' => $match[1],
+                'publicId' => $match[2],
+                'systemId' => $match[3],
+            ];
+        }
+        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s+SYSTEM\s+"([^"]*)"\s*>/is', $trimmed, $match)) {
+            return [
+                'name' => $match[1],
+                'publicId' => '',
+                'systemId' => $match[2],
+            ];
+        }
+        if (preg_match('/^<!DOCTYPE\s+([A-Za-z_][\w:.-]*)\s*>/is', $trimmed, $match)) {
+            return [
+                'name' => $match[1],
+                'publicId' => '',
+                'systemId' => '',
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array{name: string, publicId: string, systemId: string}|null
+     */
+    private static function parseHtmlDoctypeDeclaration(string $html): ?array
+    {
+        return self::parseDoctypeDeclaration($html);
+    }
+
+    private static function attachDoctypeChild(
+        Context $ctx,
+        ObjectEntry $document,
+        string $name,
+        string $publicId,
+        string $systemId
+    ): ObjectEntry {
+        $doctypeVar = self::createDocumentType($ctx, $name, $publicId, $systemId);
+        $doctype = $doctypeVar->toObject();
+        $state = DomRegistry::state($document);
+        $state->doctypeName = $name;
+        $state->doctypePublicId = $publicId;
+        $state->doctypeSystemId = $systemId;
+        $state->doctypeId = $doctype->id;
+        self::linkChildToParent($doctype, $document);
+        self::propagateDocumentId($doctype, $document->id);
+
+        return $doctype;
+    }
+
+    public static function createProcessingInstruction(
+        Context $ctx,
+        string $target,
+        string $data,
+        ObjectEntry $ownerDocument
+    ): ObjectEntry {
+        $class = self::resolveNodeClass($ctx, $ownerDocument, self::CLASS_PROCESSING_INSTRUCTION);
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_PROCESSING_INSTRUCTION_NODE;
+        $state->nodeName = $target;
+        $state->textContent = $data;
+        $state->documentId = $ownerDocument->id;
+        DomRegistry::attach($entry, $state);
+        $entry->getProperty(self::PROP_NODE_NAME)->string($target);
+        $entry->getProperty(self::PROP_NODE_VALUE)->string($data);
+        $entry->getProperty(self::PROP_TARGET)->string($target);
+        $entry->getProperty(self::PROP_DATA)->string($data);
+        self::initNodePropertySlots($entry);
+
+        return $entry;
     }
 
     /**
@@ -2178,6 +2293,22 @@ final class VmDom
     {
         self::ensureDocument($document);
 
+        $trimmed = trim($html);
+        $childIds = [];
+        $doctypeDecl = self::parseHtmlDoctypeDeclaration($trimmed);
+        $afterDoctype = $trimmed;
+        if (null !== $doctypeDecl) {
+            $afterDoctype = preg_replace('/^\s*<!DOCTYPE[^>]*>\s*/is', '', $trimmed) ?? $trimmed;
+        }
+        $afterPreamble = $afterDoctype;
+        while (preg_match('/^\s*<\?([^\s?]+)\s+(.*?)\?>\s*/s', $afterPreamble, $piMatch)) {
+            $pi = self::createProcessingInstruction($ctx, $piMatch[1], $piMatch[2], $document);
+            $childIds[] = $pi->id;
+            self::linkChildToParent($pi, $document);
+            self::propagateDocumentId($pi, $document->id);
+            $afterPreamble = substr($afterPreamble, \strlen($piMatch[0]));
+        }
+
         $source = self::normalizeHtmlLoadSource($html, $options);
         $root = self::parseHtmlElementTree($ctx, $source, $document);
         if (null === $root) {
@@ -2186,15 +2317,36 @@ final class VmDom
 
         $state = DomRegistry::state($document);
         $state->isHtmlDocument = true;
-        $state->childIds = [$root->id];
+        if (null !== $doctypeDecl) {
+            $childIds = array_merge(
+                [self::attachDoctypeChild(
+                    $ctx,
+                    $document,
+                    $doctypeDecl['name'],
+                    $doctypeDecl['publicId'],
+                    $doctypeDecl['systemId']
+                )->id],
+                $childIds
+            );
+        } else {
+            $childIds = array_merge(
+                [self::attachDoctypeChild(
+                    $ctx,
+                    $document,
+                    'html',
+                    '-//W3C//DTD HTML 4.0 Transitional//EN',
+                    'http://www.w3.org/TR/REC-html40/loose.dtd'
+                )->id],
+                $childIds
+            );
+        }
+        $childIds[] = $root->id;
+        $state->childIds = $childIds;
         $state->idAttrByElement = [];
         $state->elementIds = [];
         $state->xmlVersion = '1.0';
         $state->encoding = null;
         $state->xmlStandalone = false;
-        $state->doctypeName = 'html';
-        $state->doctypePublicId = '-//W3C//DTD HTML 4.0 Transitional//EN';
-        $state->doctypeSystemId = 'http://www.w3.org/TR/REC-html40/loose.dtd';
         $state->documentElementName = DomRegistry::state($root)->nodeName;
         $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->copyFrom(self::elementVariable($root));
         self::linkChildToParent($root, $document);
@@ -2221,13 +2373,22 @@ final class VmDom
             return self::serializeHtmlNode($node);
         }
 
-        $lines = [self::serializeHtmlDoctype()];
-
-        $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
-        if (Variable::TYPE_OBJECT === $rootVar->type) {
-            $lines[] = self::serializeHtmlNode($rootVar->toObject());
-        } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
-            $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+        $lines = [];
+        if ([] !== $state->childIds) {
+            foreach ($state->childIds as $childId) {
+                $child = DomRegistry::entry($childId);
+                if (null !== $child) {
+                    $lines[] = self::serializeHtmlNode($child);
+                }
+            }
+        } else {
+            $lines[] = self::serializeHtmlDoctypeFromDocumentState($state);
+            $rootVar = $document->getProperty(self::PROP_DOCUMENT_ELEMENT)->resolveIndirect();
+            if (Variable::TYPE_OBJECT === $rootVar->type) {
+                $lines[] = self::serializeHtmlNode($rootVar->toObject());
+            } elseif (null !== $state->documentElementName && '' !== $state->documentElementName) {
+                $lines[] = '<'.self::escapeName($state->documentElementName).'/>';
+            }
         }
 
         return implode('', $lines)."\n";
@@ -2386,13 +2547,45 @@ final class VmDom
         return null;
     }
 
-    private static function serializeHtmlDoctype(): string
+    private static function serializeHtmlDoctypeFromDocumentState(DomNodeState $state): string
     {
-        return '<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.0 Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">'."\n";
+        if (null === $state->doctypeName) {
+            return '';
+        }
+
+        return self::formatHtmlDoctype(
+            $state->doctypeName,
+            $state->doctypePublicId ?? '',
+            $state->doctypeSystemId ?? ''
+        );
+    }
+
+    private static function formatHtmlDoctype(string $name, string $publicId, string $systemId): string
+    {
+        if ('' === $publicId && '' === $systemId) {
+            return '<!DOCTYPE '.self::escapeName($name).'>'."\n";
+        }
+
+        return '<!DOCTYPE '.self::escapeName($name)
+            .' PUBLIC "'.self::escapeAttr($publicId).'" "'.self::escapeAttr($systemId).'">'."\n";
     }
 
     private static function serializeHtmlNode(ObjectEntry $entry): string
     {
+        if (self::isDocumentType($entry)) {
+            $dt = DomRegistry::state($entry);
+
+            return self::formatHtmlDoctype(
+                $dt->nodeName,
+                $dt->publicId ?? '',
+                $dt->systemId ?? ''
+            );
+        }
+        if (self::isProcessingInstruction($entry)) {
+            $pi = DomRegistry::state($entry);
+
+            return '<?'.$pi->nodeName.' '.($pi->textContent ?? '').'?>';
+        }
         if (self::isElement($entry)) {
             return self::serializeHtmlElement($entry);
         }
@@ -3689,6 +3882,12 @@ final class VmDom
             && DomConstants::XML_DOCUMENT_TYPE_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function isProcessingInstruction(ObjectEntry $entry): bool
+    {
+        return DomRegistry::has($entry)
+            && DomConstants::XML_PROCESSING_INSTRUCTION_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
     public static function typeLabel(Variable $var): string
     {
         if (EnumCaseSupport::isEnumCaseVariable($var)) {
@@ -3713,6 +3912,7 @@ final class VmDom
             self::CLASS_IMPLEMENTATION => 'DOMImplementation',
             self::CLASS_DOCUMENT => 'DOMDocument',
             self::CLASS_DOCUMENT_TYPE => 'DOMDocumentType',
+            self::CLASS_PROCESSING_INSTRUCTION => 'DOMProcessingInstruction',
             self::CLASS_ELEMENT => 'DOMElement',
             self::CLASS_DOCUMENT_FRAGMENT => 'DOMDocumentFragment',
             default => $lc,
