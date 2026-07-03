@@ -438,6 +438,40 @@ final class CompilerVersionGateTest extends TestCase
         }
     }
 
+    public function testSupportsMbTrimFunctionsTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbTrimFunctions());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
+    public function testVmRegistersMbTrimOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $ctx = $runtime->vmContext;
+            foreach (['mb_trim', 'mb_ltrim', 'mb_rtrim'] as $fn) {
+                $this->assertTrue(isset($ctx->functions[$fn]), $fn);
+            }
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testVmDoesNotRegisterStreamContextSetOptionsOnReferenceProfile(): void
     {
         $runtime = new Runtime();
