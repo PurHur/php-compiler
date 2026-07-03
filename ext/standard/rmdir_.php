@@ -13,7 +13,7 @@ use PHPCompiler\VM\InternalStrictArg;
 use PHPCompiler\VM\Variable;
 use PHPLLVM\Value;
 
-/** rmdir() — VM via VmFs; JIT/AOT via libc rmdir(2). */
+/** rmdir() — VM via VmFs; JIT/AOT via RmdirJitHelper PHP (#15481). */
 final class rmdir_ extends Internal
 {
     public function __construct()
