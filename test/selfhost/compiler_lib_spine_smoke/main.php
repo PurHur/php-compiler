@@ -22,6 +22,7 @@ if (!defined('PHP_COMPILER_LIB_SPINE_SMOKE')) {
 
 
 
+
 require_once __DIR__.'/../../../lib/OpCode.php';
 require_once __DIR__.'/../../../lib/Block.php';
 require_once __DIR__.'/../../../lib/Frame.php';
@@ -360,7 +361,6 @@ require_once __DIR__.'/../../../ext/mbstring/mb_strlen.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strpos.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrichr.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrpos.php';
-require_once __DIR__.'/../../../ext/mbstring/mb_str_split.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strtolower.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strtoupper.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strwidth.php';
@@ -3891,6 +3891,21 @@ require_once __DIR__.'/../../../ext/hash/mhash_count.php';
 require_once __DIR__.'/../../../ext/hash/mhash_get_block_size.php';
 require_once __DIR__.'/../../../ext/hash/mhash_get_hash_name.php';
 require_once __DIR__.'/../../../ext/hash/mhash_keygen_s2k.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumAeadDecryptFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumAeadEncryptFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumKeygenFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumStreamLengthFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumStreamXorFunction.php';
+require_once __DIR__.'/../../../ext/sodium/SodiumStreamXorIcFunction.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_decrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_aead_xchacha20poly1305_ietf_encrypt.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_keygen.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_keygen.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xchacha20_xor_ic.php';
+require_once __DIR__.'/../../../ext/sodium/sodium_crypto_stream_xor.php';
 // VM -r smoke: bootstrap-selfhost-lib-spine-vm-smoke.sh (#1846).
 // VM driver execute: bootstrap-selfhost-vm-driver-execute-probe.sh (#2201).
 
