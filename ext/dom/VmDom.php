@@ -39,6 +39,8 @@ final class VmDom
 
     public const CLASS_ATTR = 'domattr';
 
+    public const CLASS_ENTITY_REFERENCE = 'domentityreference';
+
     public const CLASS_DOCUMENT_FRAGMENT = 'domdocumentfragment';
 
     public const CLASS_NODE = 'domnode';
@@ -198,6 +200,12 @@ final class VmDom
         $attr->properties[] = new ClassProperty(self::PROP_OWNER_ELEMENT, $nullProto, $objProto);
         $ctx->classes[self::CLASS_ATTR] = $attr;
 
+        $entityRef = new ClassEntry('DOMEntityReference');
+        $entityRef->isInternal = true;
+        $entityRef->parentLc = self::CLASS_NODE;
+        $entityRef->properties[] = new ClassProperty(self::PROP_NODE_NAME, null, $strProto);
+        $ctx->classes[self::CLASS_ENTITY_REFERENCE] = $entityRef;
+
         $nodeList = new ClassEntry('DOMNodeList');
         $nodeList->isInternal = true;
         $nodeList->interfaces[] = 'countable';
@@ -249,6 +257,9 @@ final class VmDom
         $document->methodVisibility['createattributens'] = $pub;
         $document->methods['createdocumentfragment'] = new DocumentCreateDocumentFragment();
         $document->methodVisibility['createdocumentfragment'] = $pub;
+        $document->methods['createentityreference'] = new DocumentCreateEntityReference();
+        $document->methodVisibility['createentityreference'] = $pub;
+        $document->methodNames['createentityreference'] = 'createEntityReference';
         $document->methods['appendchild'] = new DocumentAppendChild();
         $document->methodVisibility['appendchild'] = $pub;
         $document->methods['savexml'] = new DocumentSaveXML();
@@ -1073,6 +1084,38 @@ final class VmDom
         DomRegistry::attach($entry, $state);
 
         return $entry;
+    }
+
+    public static function createEntityReference(
+        Context $ctx,
+        string $name,
+        ?ObjectEntry $ownerDocument = null
+    ): Variable {
+        self::assertValidEntityReferenceName($name);
+
+        $class = $ctx->classes[self::CLASS_ENTITY_REFERENCE] ?? null;
+        if (null === $class) {
+            throw new \LogicException('DOMEntityReference is not registered in this compiler build');
+        }
+
+        $entry = new ObjectEntry($class);
+        $entry->constructed = true;
+        $entry->getProperty(self::PROP_NODE_NAME)->string($name);
+        self::initNodePropertySlots($entry);
+
+        $state = new DomNodeState();
+        $state->nodeType = DomConstants::XML_ENTITY_REF_NODE;
+        $state->nodeName = $name;
+        if (null !== $ownerDocument) {
+            self::ensureDocument($ownerDocument);
+            $state->documentId = $ownerDocument->id;
+        }
+        DomRegistry::attach($entry, $state);
+
+        $var = new Variable(Variable::TYPE_OBJECT);
+        $var->object($entry);
+
+        return $var;
     }
 
     public static function createDocumentFragment(Context $ctx): Variable
@@ -2277,6 +2320,9 @@ final class VmDom
 
             return str_repeat('  ', $depth).$text;
         }
+        if (self::isEntityReference($entry)) {
+            return '&'.self::escapeName(DomRegistry::state($entry)->nodeName).';';
+        }
 
         throw new \DOMException('Cannot serialize node type in this compiler build');
     }
@@ -3064,6 +3110,13 @@ final class VmDom
             && DomConstants::XML_TEXT_NODE === DomRegistry::state($entry)->nodeType;
     }
 
+    public static function isEntityReference(ObjectEntry $entry): bool
+    {
+        return self::CLASS_ENTITY_REFERENCE === strtolower($entry->class->name)
+            && DomRegistry::has($entry)
+            && DomConstants::XML_ENTITY_REF_NODE === DomRegistry::state($entry)->nodeType;
+    }
+
     public static function isAttr(ObjectEntry $entry): bool
     {
         return self::CLASS_ATTR === strtolower($entry->class->name)
@@ -3175,6 +3228,14 @@ final class VmDom
     private static function escapeName(string $name): string
     {
         return $name;
+    }
+
+    /** @throws \DOMException when $name is not a valid XML entity reference name (php-src document.c). */
+    private static function assertValidEntityReferenceName(string $name): void
+    {
+        if ('' === $name || !preg_match('/^[A-Za-z_][\w.-]*$/', $name)) {
+            throw new \DOMException('Invalid Character Error');
+        }
     }
 
     public static function requireReceiver(Variable $var, string $classLc, string $label): ObjectEntry
