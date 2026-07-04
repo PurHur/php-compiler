@@ -40,7 +40,11 @@ final class WeakReferenceCreate extends VmClassMethod
         $ref->object($entry);
         $targetSlot = WeakRefSupport::targetSlot($entry);
         $targetSlot->weakObject($target);
-        WeakRefRegistry::registerWeakRef($target->id, $targetSlot, $entry);
+        WeakRefRegistry::registerWeakRef(
+            WeakRefSupport::targetObjectId($frame->calledArgs[0]),
+            $targetSlot,
+            $entry
+        );
         if (null !== $frame->returnVar) {
             $frame->returnVar->copyFrom($ref);
         }
