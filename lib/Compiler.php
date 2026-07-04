@@ -9602,10 +9602,17 @@ class Compiler {
 
             return [$after, $this->compileCoalesceRhsResultSlot($exprOp, $after)];
         }
-        // Pre-bind the producer slot so compileExpr cannot collide with the outer ?? result (#11801).
-        $resultSlot = $this->compileCoalesceRhsResultSlot($exprOp, $targetBlock);
-        foreach ($this->compileExpr($exprOp, $targetBlock) as $op) {
+        // Lower expr on the ?? branch; read the producer dest from emitted opcodes (#11801, #16206).
+        $ops = $this->compileExpr($exprOp, $targetBlock);
+        $resultSlot = null;
+        foreach ($ops as $op) {
             $targetBlock->addOpCode($op);
+            if (null !== $op->arg1) {
+                $resultSlot = $op->arg1;
+            }
+        }
+        if (null === $resultSlot) {
+            $resultSlot = $this->compileCoalesceRhsResultSlot($exprOp, $targetBlock);
         }
 
         return [$targetBlock, $resultSlot];
