@@ -13481,9 +13481,14 @@ class Compiler {
                             $block->addOpCode($op);
                         }
                     }
-                    $slot = $block->slotForOperand($matched->result);
+                    $slot = $this->slotForInlineCallArgProducerResult(
+                        $block,
+                        $matched,
+                        $callOp,
+                        $block->orig->children
+                    );
                     if (null !== $slot) {
-                        return (string) $slot;
+                        return $slot;
                     }
                 }
             }
@@ -22089,12 +22094,23 @@ class Compiler {
             }
         }
 
-        // Precompiled hoisted producers + trailing by-ref out-param: operand→slot map may
-        // drift after #15848 rematerialize paths — use emitted FUNCCALL EXEC_RETURN (#15476).
-        if ($this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)) {
-            $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $argIndex);
+        // Precompiled hoisted producers: operand→slot map may drift after #15848 rematerialize
+        // paths — use emitted FUNCCALL EXEC_RETURN ordinal (#15476, #10981, #16029).
+        if ([] === $emitOps && null !== $block->orig) {
+            $execReturnSlot = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+                $block,
+                $producer,
+                $cfgCallOp,
+                $block->orig->children
+            );
             if (null !== $execReturnSlot) {
-                return $execReturnSlot;
+                return (string) $execReturnSlot;
+            }
+            if ($this->siblingConsumerHasTrailingByRefNamedLocal($cfgCallOp)) {
+                $execReturnSlot = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $argIndex);
+                if (null !== $execReturnSlot) {
+                    return (string) $execReturnSlot;
+                }
             }
         }
 
@@ -22152,6 +22168,135 @@ class Compiler {
         }
 
         return $execReturnSlots[$producerOrdinal];
+    }
+
+    /**
+     * Result slot for a hoisted sibling FuncCall producer — prefer FUNCCALL_EXEC_RETURN (#16029).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function slotForSiblingInlineCallProducerExecReturnByExpr(
+        Block $block,
+        Op\Expr $producer,
+        Op $consumer,
+        array $cfgChildren
+    ): ?int {
+        $producerIndex = array_search($producer, $cfgChildren, true);
+        $consumerIndex = array_search($consumer, $cfgChildren, true);
+        if (!is_int($producerIndex) || !is_int($consumerIndex)) {
+            return null;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+        if (null === $firstSibling || $producerIndex < $firstSibling || $producerIndex >= $consumerIndex) {
+            return null;
+        }
+        if (!$this->isSiblingInlineCallProducerExpr($producer)) {
+            return null;
+        }
+        $producerOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+            $producerIndex,
+            $firstSibling,
+            $cfgChildren
+        );
+
+        return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $producerOrdinal);
+    }
+
+    /**
+     * Inline call-arg producer result — EXEC_RETURN when hoisted siblings drifted operand slots (#16029).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function slotForInlineCallArgProducerResult(
+        Block $block,
+        Op\Expr $producer,
+        ?Op $consumer = null,
+        ?array $cfgChildren = null
+    ): ?string {
+        if (null !== $consumer && null !== $cfgChildren) {
+            $execReturn = $this->slotForSiblingInlineCallProducerExecReturnByExpr(
+                $block,
+                $producer,
+                $consumer,
+                $cfgChildren
+            );
+            if (null !== $execReturn) {
+                return (string) $execReturn;
+            }
+        }
+        $operandSlot = $block->slotForOperand($producer->result);
+
+        return null !== $operandSlot ? (string) $operandSlot : null;
+    }
+
+    /**
+     * var_dump($g(), $g()) — ARG_SEND must use FUNCCALL_EXEC_RETURN slots, not drifted operand temps (#16029).
+     */
+    private function finalSiblingInlineCallArgSendSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): ?string {
+        if (null === $block->orig || !\is_array($cfgCallOp->args ?? null) || \count($cfgCallOp->args) < 2) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        $callIndex = array_search($cfgCallOp, $block->orig->children, true);
+        if (!\is_int($callIndex)) {
+            return null;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $block->orig->children);
+        if (null === $firstSibling) {
+            return null;
+        }
+        $siblingFuncCount = $this->countSiblingInlineFuncCallProducers(
+            $firstSibling,
+            $callIndex,
+            $block->orig->children
+        );
+        if ($siblingFuncCount < 2) {
+            return null;
+        }
+        if ($this->callIncludesNamedParameter($cfgCallOp)) {
+            return null;
+        }
+        for ($j = $firstSibling; $j < $callIndex; ++$j) {
+            $between = $block->orig->children[$j] ?? null;
+            if ($between instanceof Op\Expr\Array_) {
+                return null;
+            }
+        }
+        $leadingEmbedded = 0;
+        foreach ($cfgCallOp->args as $embeddedArg) {
+            if ($this->isEmbeddedCallLiteralArg($embeddedArg)) {
+                ++$leadingEmbedded;
+                continue;
+            }
+            break;
+        }
+        $producerOrdinal = $argIndex - $leadingEmbedded;
+        if ($producerOrdinal < 0 || $producerOrdinal >= $siblingFuncCount) {
+            return null;
+        }
+        $producerIndex = $this->siblingInlineFuncCallProducerIndexAtOrdinal(
+            $producerOrdinal,
+            $firstSibling,
+            $callIndex,
+            $block->orig->children
+        );
+        if (null === $producerIndex) {
+            return null;
+        }
+        $producer = $block->orig->children[$producerIndex] ?? null;
+        if (!$producer instanceof Op\Expr || !$this->isSiblingInlineCallProducerExpr($producer)) {
+            return null;
+        }
+        $execReturn = $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $producerOrdinal);
+
+        return null !== $execReturn ? (string) $execReturn : null;
     }
 
     /**
@@ -28151,12 +28296,27 @@ class Compiler {
                                     }
                                     $matchedSlot = $matched instanceof Op\Expr\New_
                                         ? $this->slotForInlineNewProducer($block, $matched, $sends)
-                                        : $block->slotForOperand($matched->result);
+                                        : $this->slotForInlineCallArgProducerResult(
+                                            $block,
+                                            $matched,
+                                            $cfgCallOp,
+                                            null !== $block->orig ? $block->orig->children : null
+                                        );
                                 } else {
                                     $matchedSlot = $matched instanceof Op\Expr\New_
                                         ? ($this->slotForInlineNewProducer($block, $matched, $sends)
-                                            ?? $block->slotForOperand($matched->result))
-                                        : $block->slotForOperand($matched->result);
+                                            ?? $this->slotForInlineCallArgProducerResult(
+                                                $block,
+                                                $matched,
+                                                $cfgCallOp,
+                                                null !== $block->orig ? $block->orig->children : null
+                                            ))
+                                        : $this->slotForInlineCallArgProducerResult(
+                                            $block,
+                                            $matched,
+                                            $cfgCallOp,
+                                            null !== $block->orig ? $block->orig->children : null
+                                        );
                                 }
                                 if (null !== $matchedSlot) {
                                     $valueSlot = $matchedSlot;
@@ -28343,8 +28503,18 @@ class Compiler {
                             }
                             $matchedSlot = $matched instanceof Op\Expr\New_
                                 ? ($this->slotForInlineNewProducer($block, $matched)
-                                    ?? $block->slotForOperand($matched->result))
-                                : $block->slotForOperand($matched->result);
+                                    ?? $this->slotForInlineCallArgProducerResult(
+                                        $block,
+                                        $matched,
+                                        $cfgCallOp,
+                                        $block->orig->children
+                                    ))
+                                : $this->slotForInlineCallArgProducerResult(
+                                    $block,
+                                    $matched,
+                                    $cfgCallOp,
+                                    $block->orig->children
+                                );
                             if (null !== $matchedSlot) {
                                 $valueSlot = $matchedSlot;
                             }
@@ -28550,12 +28720,22 @@ class Compiler {
                             $calleeName
                         );
                         if ($this->inlineCallArgProducerUsesExprResultSlot($matched)) {
-                            $matchedSlot = $block->slotForOperand($matched->result);
+                            $matchedSlot = $this->slotForInlineCallArgProducerResult(
+                                $block,
+                                $matched,
+                                $cfgCallOp,
+                                null !== $block->orig ? $block->orig->children : null
+                            );
                             if (null === $matchedSlot) {
                                 foreach ($this->compileExpr($matched, $block) as $op) {
                                     $block->addOpCode($op);
                                 }
-                                $matchedSlot = $block->slotForOperand($matched->result);
+                                $matchedSlot = $this->slotForInlineCallArgProducerResult(
+                                    $block,
+                                    $matched,
+                                    $cfgCallOp,
+                                    null !== $block->orig ? $block->orig->children : null
+                                );
                             }
                             if (null !== $matchedSlot) {
                                 $valueSlot = $matchedSlot;
@@ -28650,7 +28830,12 @@ class Compiler {
                             ?? (
                                 $matched instanceof Op\Expr\New_
                                     ? $this->slotForInlineNewProducer($block, $matched, $sends)
-                                    : $block->slotForOperand($matched->result)
+                                    : $this->slotForInlineCallArgProducerResult(
+                                        $block,
+                                        $matched,
+                                        $cfgCallOp,
+                                        $block->orig->children
+                                    )
                             );
                         if (null !== $matchedSlot && null === $valueSlot) {
                             $valueSlot = $matchedSlot;
@@ -30311,6 +30496,12 @@ class Compiler {
                 );
                 if (null !== $nestedCallArgSlot) {
                     $valueSlot = $nestedCallArgSlot;
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $siblingSendSlot) {
+                    $valueSlot = $siblingSendSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
