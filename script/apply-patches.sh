@@ -108,6 +108,9 @@ patch_already_applied() {
     php-types-str-bool-fns.patch)
       grep -q "'str_contains' => \['bool'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
+    php-types-explode-array-return.patch)
+      grep -q "'explode' => \['array'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
+      ;;
     php-types-readfile-int-false.patch)
       grep -q "'readfile' => \['int|false'" "$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/InternalArgInfo.php" 2>/dev/null
       ;;
@@ -6050,6 +6053,7 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-types" ]]; then
   apply_php_types_hex2bin_strict_overlay
   apply_patch "$PATCH_DIR/php-types-str-bool-fns.patch"
   apply_patch "$PATCH_DIR/php-types-str-incdec.patch"
+  apply_patch "$PATCH_DIR/php-types-explode-array-return.patch"
   apply_patch "$PATCH_DIR/php-types-readfile-int-false.patch"
   apply_patch "$PATCH_DIR/php-types-get-meta-tags-array-false.patch"
   apply_patch "$PATCH_DIR/php-types-array-combine-array-false.patch"
