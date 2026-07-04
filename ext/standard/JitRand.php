@@ -16,11 +16,11 @@ final class JitRand
     /**
      * @param bool $mtRand when true, max<min is ValueError; rand() swaps bounds
      */
-    public static function call(Context $context, bool $mtRand, JITVariable ...$args): Value
+    public static function call(Context $context, bool $mtRand, string $fn = 'rand', JITVariable ...$args): Value
     {
         $argc = \count($args);
         if ($argc < 0 || $argc > 2 || 1 === $argc) {
-            throw new \LogicException('rand() expects 0 or 2 arguments');
+            throw new \LogicException(\sprintf('%s() expects 0 or 2 arguments', $fn));
         }
         RandBuiltin::ensureLinked($context);
         if (0 === $argc) {
