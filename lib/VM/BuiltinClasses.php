@@ -920,8 +920,10 @@ final class BuiltinClasses
         $reuc->methodVisibility['getvalue'] = $pub;
         $reuc->methods['isbacked'] = new ReflectionEnumUnitCaseIsBacked();
         $reuc->methodVisibility['isbacked'] = $pub;
-        $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
-        $reuc->methodVisibility['isdeprecated'] = $pub;
+        if (CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()) {
+            $reuc->methods['isdeprecated'] = new ReflectionEnumUnitCaseIsDeprecated();
+            $reuc->methodVisibility['isdeprecated'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_ENUM_UNIT_CASE] = $reuc;
 
         $rebc = new ClassEntry('ReflectionEnumBackedCase');

@@ -244,6 +244,14 @@ class VMTest extends BaseTest {
                 && str_contains($name, 'reflection_property_isdynamic_profile')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()
+                && str_contains($name, 'reflection_enum_unit_case_is_deprecated_forward_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionEnumUnitCaseIsDeprecated()
+                && str_contains($name, 'reflection_enum_unit_case_is_deprecated_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsMbTrimFunctions()
                 && str_contains($name, 'mb_trim')
                 && !str_contains($name, 'mb_trim_phantom')) {
