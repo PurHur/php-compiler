@@ -16139,13 +16139,16 @@ class Compiler {
                         }
                     }
                     if (1 === $hoistedInNext) {
-                        $discardProducer = true;
+                        // Only discard when $producer is the inner g() feeding f(g()) — not adjacent sibling
+                        // producers (array_diff_assoc(array_keys(...), array_keys(...)), #15571, #13779).
+                        $discardProducer = false;
                         if (null !== $producer->result) {
                             foreach ($next->args as $nextArg) {
                                 if (
                                     null !== $nextArg
                                     && $this->operandsReferToSameVariable($producer->result, $nextArg)
                                 ) {
+                                    $discardProducer = true;
                                     // array_combine(array_keys(...), [...]) / array_merge(array_keys(...), …) —
                                     // keep nested FuncCall producer for inline-call arg wiring (#15553, #15551, #13776, #12450).
                                     $nextCallee = $this->resolveCfgFuncCallName($next);
