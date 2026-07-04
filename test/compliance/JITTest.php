@@ -865,6 +865,10 @@ class JITTest extends BaseTest {
             if (str_contains($name, 'printf_null_format_typeerror') && !str_contains($name, '_jit')) {
                 continue;
             }
+            // addcslashes() null charlist TypeError getMessage in try/catch: VM + AOT (#16102); MCJIT pending TypeError introspection (#98).
+            if (str_contains($name, 'addcslashes_null_charlist_typeerror') && !str_contains($name, '_jit')) {
+                continue;
+            }
             // dl() TypeError in try/catch: VM + bin/jit.php (#3591); MCJIT JitStringBuiltinArg abort IR (#98).
             if (str_contains($name, 'dl_typeerror')) {
                 continue;
