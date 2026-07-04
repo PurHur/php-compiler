@@ -14627,6 +14627,27 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
+        if (
+            0 === $argIndex
+            && null !== $cfgCallOp
+            && null !== $block
+            && null !== $block->orig
+            && $this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)
+        ) {
+            $callIndex = null;
+            foreach ($block->orig->children as $i => $child) {
+                if ($child === $cfgCallOp) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+            if (null !== $callIndex && $callIndex > 0) {
+                $immediate = $block->orig->children[$callIndex - 1] ?? null;
+                if ($immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus) {
+                    return $immediate;
+                }
+            }
+        }
         $producerCount = count($producers);
         $argCount = count($callArgs);
         // tempnam(sys_get_temp_dir(), E::CASE) — nested FuncCall + trailing enum ClassConstFetch (#10303).
@@ -17630,6 +17651,42 @@ class Compiler {
         }
 
         return [$const, $func];
+    }
+
+    /**
+     * round(...); fmod(-1.5, …) — immediate UnaryMinus/Plus feeds arg #0 (#13508, #15736).
+     */
+    private function consumerImmediateUnaryHoistedDeadTempArgZero(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig || !\is_array($cfgCallOp->args ?? null)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $deadHoisted = 0;
+        foreach ($cfgCallOp->args as $hoistedArg) {
+            if ($this->callArgIsDeadInlineTemporary($hoistedArg)) {
+                ++$deadHoisted;
+            }
+        }
+        if (1 !== $deadHoisted) {
+            return false;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex || $callIndex < 1) {
+            return false;
+        }
+        $immediate = $block->orig->children[$callIndex - 1] ?? null;
+
+        return $immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus;
     }
 
     /**
@@ -21699,10 +21756,7 @@ class Compiler {
             && $this->callArgIsDeadInlineTemporary($callArg)
         ) {
             $immediate = $cfgChildren[$callIndex - 1] ?? null;
-            if (
-                ($immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus)
-                && \in_array($immediate, $producers, true)
-            ) {
+            if ($immediate instanceof Op\Expr\UnaryMinus || $immediate instanceof Op\Expr\UnaryPlus) {
                 $deadHoisted = 0;
                 foreach ($callArgs as $hoistedArg) {
                     if ($this->callArgIsDeadInlineTemporary($hoistedArg)) {
@@ -27475,6 +27529,7 @@ class Compiler {
                     isset($cfgCallOp->args[0])
                     && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
                 )
+                && !$this->consumerImmediateUnaryHoistedDeadTempArgZero($cfgCallOp, $block)
             ) {
                 $constFuncPrelude = $this->leadingConstFetchFuncCallPreludeBeforeCfgCall($cfgCallOp, $block)
                     ?? $this->splitLeadingConstFetchWithFuncCallCallArg(
@@ -27494,7 +27549,7 @@ class Compiler {
                             }
                         }
                         $splitSlot = $block->slotForOperand($target->result);
-                        if (null !== $splitSlot) {
+                        if (null !== $splitSlot && null === $valueSlot) {
                             $valueSlot = (string) $splitSlot;
                         }
                     }
