@@ -4137,6 +4137,48 @@ PHP;
         self::assertSame("array (\n  0 => array (\n    0 => 1,\n    1 => 3,\n  ),\n  1 => array (\n    0 => 2,\n    1 => 4,\n  ),\n)\n", ob_get_clean());
     }
 
+    /** Issue #16085 — array_map('explode', [','], ['a,b']) wires both inline array slots. */
+    public function testArrayMapStringBuiltinMultiInlineArrayLiteralUsesAllSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_map('explode', [','], ['a,b']);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_string_builtin_multi_inline.php');
+
+        $arraySlots = [];
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertCount(2, $arraySlots, 'array inits='.json_encode($arraySlots));
+        self::assertCount(3, $sendSlots, 'arg sends='.json_encode($sendSlots));
+        self::assertSame($arraySlots[0], $sendSlots[1]);
+        self::assertSame($arraySlots[1], $sendSlots[2]);
+    }
+
+    /** Issue #16085 — array_map string builtin multi-array runtime parity. */
+    public function testArrayMapStringBuiltinMultiInlineArrayLiteralRuntime(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map('explode', [','], ['a,b']));
+echo "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_string_builtin_multi_inline_runtime.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => array (\n    0 => 'a',\n    1 => 'b',\n  ),\n)\n", ob_get_clean());
+    }
+
     /** Issue #15976 — array_map(null, [[..]]) wires null ConstFetch + nested inline Array_. */
     public function testArrayMapNullNestedInlineHaystackUsesDistinctSlots(): void
     {
