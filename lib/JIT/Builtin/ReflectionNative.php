@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT\Builtin;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\JIT\Context;
 
 /** Declare LLVM attribute lookup symbols lowered from PHP tables (#1936, #6922). */
@@ -32,6 +33,27 @@ final class ReflectionNative
             $ft = $context->context->functionType($ret, false, ...$params);
             $fn = $context->module->addFunction($name, $ft);
             $context->registerFunction($name, $fn);
+        }
+
+        if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()) {
+            $i1 = $context->getTypeFromString('int1');
+            $i64 = $context->getTypeFromString('int64');
+            foreach (
+                [
+                    ['__compiler_param_func_is_sensitive', $i1, [$i8p, $i64]],
+                    ['__compiler_param_method_is_sensitive', $i1, [$i8p, $i8p, $i64]],
+                ] as [$name, $ret, $params]
+            ) {
+                $existing = $context->module->getNamedFunction($name);
+                if (null !== $existing) {
+                    $context->registerFunction($name, $existing);
+
+                    continue;
+                }
+                $ft = $context->context->functionType($ret, false, ...$params);
+                $fn = $context->module->addFunction($name, $ft);
+                $context->registerFunction($name, $fn);
+            }
         }
     }
 }

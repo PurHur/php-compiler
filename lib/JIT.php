@@ -1408,6 +1408,19 @@ class JIT {
         if (null !== $logicalName && null !== $block->func) {
             JIT\Progress::noteFunction($block->func->getScopedName());
         }
+        if ([] !== $block->paramSensitive) {
+            if (null !== $block->func && null !== $block->func->class) {
+                $classLc = strtolower((string) $block->func->class->value);
+                $methodLc = strtolower($block->func->name);
+                foreach (array_keys($block->paramSensitive) as $position) {
+                    JIT\Builtin\ParamSensitiveLowering::recordMethod($classLc, $methodLc, (int) $position);
+                }
+            } elseif (null !== $funcName && '' !== $funcName) {
+                foreach (array_keys($block->paramSensitive) as $index) {
+                    JIT\Builtin\ParamSensitiveLowering::recordFunction(strtolower($funcName), (int) $index);
+                }
+            }
+        }
         $skipName = $this->jitFunctionSkipName($logicalName, $block);
         if (!is_null($funcName)) {
             $internalName = $this->llvmInternalName($funcName);

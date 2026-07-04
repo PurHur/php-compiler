@@ -223,6 +223,15 @@ class JITTest extends BaseTest {
                 && str_contains($name, 'closure_get_current_phantom')) {
                 continue;
             }
+            if (!CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter')
+                && !str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
+            if (CompilerVersion::supportsReflectionParameterIsSensitiveParameter()
+                && str_contains($name, 'reflection_parameter_is_sensitive_parameter_phantom')) {
+                continue;
+            }
             // JIT: method_exists(Closure::class, …) segfaults; phantom is VM-only (#14504).
             if (str_contains($name, 'closure_get_current_phantom')) {
                 continue;
