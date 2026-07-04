@@ -584,6 +584,14 @@ class Block {
             if ($this->scope->contains($root)) {
                 continue;
             }
+            // Named locals keep their CV slot; sibling &&/|| phi maps must not rebind (#15183, #16040).
+            $name = self::resolveVariableName($root);
+            if (null !== $name && '' !== $name) {
+                continue;
+            }
+            if ($this->namedAssignDestSlots->contains($root)) {
+                continue;
+            }
             $this->scope[$root] = $slot;
             if ($sibling->args->contains($root) || $sibling->isArgSlot($slot)) {
                 $this->args[$root] = $slot;
@@ -633,6 +641,13 @@ class Block {
     /** Ensure a ?: merge phi slot is present in this branch frame (#5506). */
     public function bindScopeSlot(Operand $operand, int $slot): void
     {
+        $name = self::resolveVariableName($operand);
+        if (null !== $name && '' !== $name) {
+            $existing = $this->slotIndexForVariableName($name);
+            if (null !== $existing && $existing !== $slot) {
+                return;
+            }
+        }
         if (!$this->scope->contains($operand)) {
             $this->scope[$operand] = $slot;
         }
