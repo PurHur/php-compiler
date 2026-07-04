@@ -19735,6 +19735,10 @@ class Compiler {
         if (null === $callIndex || $callIndex < 1) {
             return null;
         }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand) {
+            return null;
+        }
         $candidate = null;
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
@@ -19742,6 +19746,18 @@ class Compiler {
                 continue;
             }
             if ($child instanceof Op\Expr\Array_) {
+                // var_export([strlen('x'), …]) — stmt-before Array_ feeds arg #0, not hoisted element call (#15783, #10733).
+                if (
+                    $i === $callIndex - 1
+                    && $this->callArgOperandExpectsArrayProducer($callArg)
+                    && (
+                        (null !== $child->result && $this->operandsReferToSameVariable($child->result, $callArg))
+                        || $this->callArgIsDeadInlineTemporary($callArg)
+                    )
+                ) {
+                    $candidate = $child;
+                    break;
+                }
                 continue;
             }
             if ($this->isSiblingInlineCallProducerExpr($child)) {
@@ -19751,10 +19767,6 @@ class Compiler {
             break;
         }
         if (!$candidate instanceof Op\Expr || null === $candidate->result) {
-            return null;
-        }
-        $callArg = $cfgCallOp->args[$argIndex] ?? null;
-        if (null === $callArg) {
             return null;
         }
         $feedsCallArg = $this->inlineCallArgProducerFeedsCallArgOp($candidate, $cfgCallOp, $callArg)
