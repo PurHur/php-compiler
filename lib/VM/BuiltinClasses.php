@@ -73,6 +73,12 @@ use PHPCompiler\VM\Builtin\FiberStart;
 use PHPCompiler\VM\Builtin\FiberSuspend;
 use PHPCompiler\VM\Builtin\FiberThrow;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetArguments;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionFunctionSetAccessible;
+use PHPCompiler\VM\Builtin\ReflectionMethodIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionMethodSetAccessible;
+use PHPCompiler\VM\Builtin\ReflectionPropertyIsAccessible;
+use PHPCompiler\VM\Builtin\ReflectionPropertySetAccessible;
 use PHPCompiler\VM\Builtin\ReflectionAttributeGetName;
 use PHPCompiler\VM\Builtin\ReflectionAttributeIsRepeated;
 use PHPCompiler\VM\Builtin\ReflectionAttributeNewInstance;
@@ -467,6 +473,8 @@ final class BuiltinClasses
         $strProto = new Variable(Variable::TYPE_STRING);
         $intProto = new Variable(Variable::TYPE_INTEGER);
         $boolProto = new Variable(Variable::TYPE_BOOLEAN);
+        $boolFalseDefault = new Variable(Variable::TYPE_BOOLEAN);
+        $boolFalseDefault->bool(false);
         $arrayProto = new Variable(Variable::TYPE_ARRAY);
         $pub = CfgFunc::FLAG_PUBLIC;
         $pubStatic = $pub | CfgFunc::FLAG_STATIC;
@@ -518,6 +526,7 @@ final class BuiltinClasses
         $rm = new ClassEntry('ReflectionMethod');
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_CLASS_NAME, null, $strProto);
         $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_METHOD_NAME, null, $strProto);
+        $rm->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rm->constructor = new ReflectionMethodConstruct();
         $rm->methods['__construct'] = $rm->constructor;
         $rm->methodVisibility['__construct'] = $pub;
@@ -571,6 +580,10 @@ final class BuiltinClasses
         $rm->methodVisibility['isprotected'] = $pub;
         $rm->methods['isprivate'] = new ReflectionMethodIsPrivate();
         $rm->methodVisibility['isprivate'] = $pub;
+        $rm->methods['setaccessible'] = new ReflectionMethodSetAccessible();
+        $rm->methodVisibility['setaccessible'] = $pub;
+        $rm->methods['isaccessible'] = new ReflectionMethodIsAccessible();
+        $rm->methodVisibility['isaccessible'] = $pub;
         $rm->methods['isfinal'] = new ReflectionMethodIsFinal();
         $rm->methodVisibility['isfinal'] = $pub;
         $rm->methods['getmodifiers'] = new ReflectionMethodGetModifiers();
@@ -704,6 +717,7 @@ final class BuiltinClasses
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_PROPERTY_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_DECLARING_CLASS_NAME, null, $strProto);
         $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_IS_DYNAMIC, null, $boolProto);
+        $rp->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         \PHPCompiler\ext\standard\VmReflection::registerReflectionPropertyClassConstants($rp);
         $rp->constructor = new ReflectionPropertyConstruct();
         $rp->methods['__construct'] = $rp->constructor;
@@ -720,6 +734,10 @@ final class BuiltinClasses
         $rp->methodVisibility['getvalue'] = $pub;
         $rp->methods['setvalue'] = new ReflectionPropertySetValue();
         $rp->methodVisibility['setvalue'] = $pub;
+        $rp->methods['setaccessible'] = new ReflectionPropertySetAccessible();
+        $rp->methodVisibility['setaccessible'] = $pub;
+        $rp->methods['isaccessible'] = new ReflectionPropertyIsAccessible();
+        $rp->methodVisibility['isaccessible'] = $pub;
         $rp->methods['setrawvalue'] = new ReflectionPropertySetRawValue();
         $rp->methodVisibility['setrawvalue'] = $pub;
         $rp->methods['getrawvalue'] = new ReflectionPropertyGetRawValue();
@@ -774,6 +792,7 @@ final class BuiltinClasses
 
         $rf = new ClassEntry('ReflectionFunction');
         $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_FUNC_NAME, null, $strProto);
+        $rf->properties[] = new ClassProperty(ReflectionSupport::PROP_ACCESSIBLE, $boolFalseDefault, $boolProto);
         $rf->constructor = new ReflectionFunctionConstruct();
         $rf->methods['__construct'] = $rf->constructor;
         $rf->methodVisibility['__construct'] = $pub;
@@ -796,6 +815,8 @@ final class BuiltinClasses
                 'getclosureusedvariables' => new ReflectionFunctionGetClosureUsedVariables(),
                 'getstaticvariables' => new ReflectionFunctionGetStaticVariables(),
                 'invoke' => new ReflectionFunctionInvoke(),
+                'setaccessible' => new ReflectionFunctionSetAccessible(),
+                'isaccessible' => new ReflectionFunctionIsAccessible(),
             ] as $name => $method
         ) {
             $rf->methods[$name] = $method;

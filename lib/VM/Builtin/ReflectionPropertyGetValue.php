@@ -25,6 +25,7 @@ final class ReflectionPropertyGetValue extends VmClassMethod
         }
         $receiver = ReflectionSupport::requireReflectionProperty($frame, $frame->calledArgs[0]);
         $ctx = VmReflection::requireContext($frame);
+        ReflectionSupport::assertReflectionPropertyAccessible($ctx, $receiver);
         $className = ReflectionSupport::classNameFromReflection($receiver);
         $entry = VmReflection::resolveClassEntry($ctx, $className);
         if (null === $entry) {

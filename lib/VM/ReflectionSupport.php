@@ -14,6 +14,7 @@ use PHPCompiler\ext\standard\VmClosureCall;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPCompiler\Frame;
 use PHPCompiler\Func;
+use PHPCompiler\MethodVisibility;
 use PHPCompiler\Func\PHP as PhpFunc;
 use PHPCompiler\OpCode;
 use PHPCfg\Op\Type as CfgType;
@@ -78,6 +79,9 @@ final class ReflectionSupport
 
     /** Runtime dynamic property introspection (#15540, ext/reflection/php_reflection.c). */
     public const PROP_IS_DYNAMIC = 'isDynamicFlag';
+
+    /** setAccessible() override — php-src ref->accessible (#9823). */
+    public const PROP_ACCESSIBLE = 'accessible';
 
     public const PROP_FUNCTION_NAME = 'function';
 
@@ -1233,6 +1237,94 @@ final class ReflectionSupport
         return $flags;
     }
 
+    /** php-src reflection_*_set_accessible — stores override on reflection object (#9823). */
+    public static function setReflectionAccessible(ObjectEntry $reflection, bool $accessible): void
+    {
+        $reflection->getProperty(self::PROP_ACCESSIBLE)->bool($accessible);
+    }
+
+    private static function reflectionAccessibleForced(ObjectEntry $reflection): bool
+    {
+        $slot = $reflection->getProperty(self::PROP_ACCESSIBLE);
+        if ($slot->isUndefined()) {
+            return false;
+        }
+        $resolved = $slot->resolveIndirect();
+        if (Variable::TYPE_BOOLEAN !== $resolved->type) {
+            return false;
+        }
+
+        return $resolved->toBool();
+    }
+
+    /** php-src reflection_method_is_accessible (#9823). */
+    public static function isReflectionMethodAccessible(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+        if (MethodVisibility::isPublic($flags)) {
+            return true;
+        }
+
+        return self::reflectionAccessibleForced($reflection);
+    }
+
+    public static function assertReflectionMethodAccessible(Context $ctx, ObjectEntry $reflection): void
+    {
+        if (self::isReflectionMethodAccessible($ctx, $reflection)) {
+            return;
+        }
+        $className = self::classNameFromReflection($reflection);
+        $methodName = self::methodNameFromReflection($reflection);
+        $flags = self::reflectedMethodCfgFlags($ctx, $reflection);
+        $vis = MethodVisibility::isPrivate($flags) ? 'private' : 'protected';
+        self::throwReflectionException(
+            'Trying to invoke '.$vis.' method '.$className.'::'.$methodName.'() from global scope'
+        );
+    }
+
+    /** php-src reflection_property_is_accessible (#9823). */
+    public static function isReflectionPropertyAccessible(Context $ctx, ObjectEntry $reflection): bool
+    {
+        $className = self::classNameFromReflection($reflection);
+        $entry = VmReflection::resolveClassEntry($ctx, $className);
+        if (null === $entry) {
+            return false;
+        }
+        $property = self::propertyNameFromReflection($reflection);
+        if (VmReflection::isEnumReflectionPseudoProperty($entry, $property)
+            || self::isDynamicReflectionProperty($reflection)
+        ) {
+            return true;
+        }
+        $meta = VmReflection::findClassProperty($entry, $property, $ctx);
+        if (null === $meta) {
+            return false;
+        }
+        if (MethodVisibility::isPublic($meta->visibility)) {
+            return true;
+        }
+
+        return self::reflectionAccessibleForced($reflection);
+    }
+
+    public static function assertReflectionPropertyAccessible(Context $ctx, ObjectEntry $reflection): void
+    {
+        if (self::isReflectionPropertyAccessible($ctx, $reflection)) {
+            return;
+        }
+        $className = self::classNameFromReflection($reflection);
+        $property = self::propertyNameFromReflection($reflection);
+        self::throwReflectionException(
+            'Cannot access non-public property '.$className.'::$'.$property
+        );
+    }
+
+    /** php-src reflection_function_is_accessible — global functions always accessible (#9823). */
+    public static function isReflectionFunctionAccessible(): bool
+    {
+        return true;
+    }
+
     /**
      * Whether compile-time metadata includes a user-declared return type (#5141).
      *
@@ -1287,6 +1379,7 @@ final class ReflectionSupport
         array $invokeArgs
     ): Variable {
         $ctx = VmReflection::requireContext($frame);
+        self::assertReflectionMethodAccessible($ctx, $reflection);
         [$declaring, $methodLc, $func] = self::resolveReflectedMethod($ctx, $reflection);
         $methodName = $declaring->methodNames[$methodLc] ?? self::methodNameFromReflection($reflection);
         if (!$func instanceof Func\PHP) {
