@@ -14157,6 +14157,44 @@ class Compiler {
     }
 
     /**
+     * E::A->name / E::A?->name hoisted as PropertyFetch stmt immediately before consumer FuncCall (#10286).
+     */
+    private function slotForImmediatePropertyOrMethodFetchBeforeCfgCall(
+        Block $block,
+        Op $callOp,
+        bool $compileIfMissing = true
+    ): ?string {
+        if (null === $block->orig) {
+            return null;
+        }
+        foreach ($block->orig->children as $i => $child) {
+            if ($child !== $callOp) {
+                continue;
+            }
+            if ($i <= 0) {
+                return null;
+            }
+            $prev = $block->orig->children[$i - 1];
+            if (!$prev instanceof Op\Expr\PropertyFetch
+                && !$prev instanceof Op\Expr\NullsafePropertyFetch
+                && !$prev instanceof Op\Expr\NullsafeMethodCall) {
+                return null;
+            }
+            $propertySlot = $block->slotForOperand($prev->result);
+            if (null === $propertySlot && $compileIfMissing) {
+                foreach ($this->compileExpr($prev, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+                $propertySlot = $block->slotForOperand($prev->result);
+            }
+
+            return null !== $propertySlot ? (string) $propertySlot : null;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg dead call-arg temps for hoisted ClassConstFetch (e.g. UnitEnum::class) must not
      * fall through to match-result slot reuse (#9152, is_subclass_of after is_a).
      */
@@ -14171,6 +14209,10 @@ class Compiler {
         }
         if ($this->callArgOperandIsClosureValue($arg, $block)) {
             return null;
+        }
+        $immediatePropertySlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall($block, $callOp);
+        if (null !== $immediatePropertySlot) {
+            return $immediatePropertySlot;
         }
         if (!property_exists($callOp, 'args') || !is_array($callOp->args)) {
             return null;
@@ -15537,6 +15579,14 @@ class Compiler {
                         || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
                     )
                 ) {
+                    if ($byIndex instanceof Op\Expr\ClassConstFetch && null !== $callArg) {
+                        $enumPropertyProducer = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
+                        if ($enumPropertyProducer instanceof Op\Expr\PropertyFetch
+                            || $enumPropertyProducer instanceof Op\Expr\NullsafePropertyFetch
+                            || $enumPropertyProducer instanceof Op\Expr\NullsafeMethodCall) {
+                            return $enumPropertyProducer;
+                        }
+                    }
                     if (
                         (
                             $byIndex instanceof Op\Expr\FuncCall
@@ -17515,6 +17565,12 @@ class Compiler {
             if ($producer instanceof Op\Expr\Cast) {
                 return $producer;
             }
+            // E::A->name / E::A?->name / M::X?->id() — property/method fetch result is the call arg (#9684, #10286).
+            if ($producer instanceof Op\Expr\PropertyFetch
+                || $producer instanceof Op\Expr\NullsafePropertyFetch
+                || $producer instanceof Op\Expr\NullsafeMethodCall) {
+                return $producer;
+            }
         }
 
         return null;
@@ -17855,6 +17911,14 @@ class Compiler {
                 || $this->operandsReferToSameVariable($expr->expr, $operand);
         }
         if ($expr instanceof Op\Expr\PropertyFetch) {
+            return $expr->var === $operand
+                || $this->operandsReferToSameVariable($expr->var, $operand);
+        }
+        if ($expr instanceof Op\Expr\NullsafePropertyFetch) {
+            return $expr->var === $operand
+                || $this->operandsReferToSameVariable($expr->var, $operand);
+        }
+        if ($expr instanceof Op\Expr\NullsafeMethodCall) {
             return $expr->var === $operand
                 || $this->operandsReferToSameVariable($expr->var, $operand);
         }
@@ -23571,6 +23635,18 @@ class Compiler {
                 }
             }
         }
+        if ($candidate instanceof Op\Expr\ClassConstFetch) {
+            $nearest = $producers[0] ?? null;
+            if (
+                ($nearest instanceof Op\Expr\PropertyFetch
+                    || $nearest instanceof Op\Expr\NullsafePropertyFetch
+                    || $nearest instanceof Op\Expr\NullsafeMethodCall)
+                && null !== $candidate->result
+                && $this->cfgExprUsesOperand($nearest, $candidate->result)
+            ) {
+                return $nearest;
+            }
+        }
 
         return $candidate;
     }
@@ -25537,6 +25613,11 @@ class Compiler {
             }
         }
         $argRoot = $this->unwrapOperandChain($arg);
+        if ($argRoot instanceof Op\Expr\PropertyFetch
+            || $argRoot instanceof Op\Expr\NullsafePropertyFetch
+            || $argRoot instanceof Op\Expr\NullsafeMethodCall) {
+            return false;
+        }
         // Guard ordinal/hoisted binding: don't inject enum const fetch ops for scalar-typed call args.
         // php-cfg may create an unrelated temp (e.g. identical/compare result) that happens to align
         // with a dead enum ClassConstFetch statement (#9030).
@@ -27310,6 +27391,14 @@ class Compiler {
                 }
             }
             if ($producer instanceof Op\Expr\ClassConstFetch) {
+                $immediatePropertySlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall(
+                    $block,
+                    $callOp,
+                    false
+                );
+                if (null !== $immediatePropertySlot) {
+                    return (int) $immediatePropertySlot;
+                }
                 $producerConst = $this->staticNameFromOperand($producer->name);
                 if (null !== $producerConst && 'class' !== strtolower($producerConst)) {
                     foreach ($producers as $later) {
@@ -27897,10 +27986,29 @@ class Compiler {
             $prefetchOps = [];
             $assignedNamedLocal = null;
             $valueSlot = null;
+            $hoistedEnumPropertyCallArgSlotWired = false;
             if (null !== $cfgCallOp && null !== $block->orig) {
                 $dateSunSlot = $this->wireDateSunFuncHoistedCallArgSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $dateSunSlot) {
                     $valueSlot = $dateSunSlot;
+                }
+            }
+            // E::A->name / E::A?->name in call args — wire PropertyFetch slot before enum const fold (#10286, #9684).
+            if (null === $valueSlot && null !== $cfgCallOp) {
+                $immediatePropertySlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall($block, $cfgCallOp);
+                if (null !== $immediatePropertySlot) {
+                    $valueSlot = $immediatePropertySlot;
+                    $hoistedEnumPropertyCallArgSlotWired = true;
+                } else {
+                    $hoistedPropertyOrConstSlot = $this->slotForHoistedClassConstFetchCallArg(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                    if (null !== $hoistedPropertyOrConstSlot) {
+                        $valueSlot = $hoistedPropertyOrConstSlot;
+                    }
                 }
             }
             $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
@@ -28243,7 +28351,26 @@ class Compiler {
                         $cfgCallOp
                     );
                     if ([] !== $prefetchOps && !$this->callArgOperandIsClosureValue($arg, $block)) {
-                        $valueSlot = $prefetchOps[0]->arg1;
+                        $skipEnumPrefetchForPropertyProducer = false;
+                        if (null !== $cfgCallOp && null !== $block->orig) {
+                            $prefetchProducers = $this->filterDeadClassConstFetchInlineProducers(
+                                $this->precedingInlineCallArgProducersBeforeCfgOp(
+                                    $block->orig->children,
+                                    $cfgCallOp
+                                )
+                            );
+                            foreach ($prefetchProducers as $prefetchProducer) {
+                                if ($prefetchProducer instanceof Op\Expr\PropertyFetch
+                                    || $prefetchProducer instanceof Op\Expr\NullsafePropertyFetch
+                                    || $prefetchProducer instanceof Op\Expr\NullsafeMethodCall) {
+                                    $skipEnumPrefetchForPropertyProducer = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!$skipEnumPrefetchForPropertyProducer) {
+                            $valueSlot = $prefetchOps[0]->arg1;
+                        }
                     }
                 }
                 if (null === $valueSlot && null !== $cfgCallOp && null !== $block->orig) {
@@ -28443,6 +28570,7 @@ class Compiler {
                 if (
                     null === $assignedNamedLocal
                     && null !== $valueSlot
+                    && !$hoistedEnumPropertyCallArgSlotWired
                     && !$inlineArrayLiteralArgWired
                     && !$this->isCallArgDirectArrayDimFetch($arg)
                     && null !== $block->orig
@@ -30294,6 +30422,16 @@ class Compiler {
                 );
                 if (null !== $nestedCallArgSlot) {
                     $valueSlot = $nestedCallArgSlot;
+                }
+            }
+            if (null !== $cfgCallOp) {
+                $immediatePropertyOrMethodSlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall(
+                    $block,
+                    $cfgCallOp,
+                    false
+                );
+                if (null !== $immediatePropertyOrMethodSlot) {
+                    $valueSlot = $immediatePropertyOrMethodSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
