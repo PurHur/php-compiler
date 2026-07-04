@@ -128,4 +128,27 @@ final class GcCollectCyclesRegistryJitHelper
         }
         self::$destructInvoked[$index] = true;
     }
+
+    /** @internal LLVM embed bridge — object ptr → destruct-invoked flag (#16234) */
+    public static function destructAlreadyInvokedByObject(int $objPtr): int
+    {
+        if ($objPtr <= 0) {
+            return 0;
+        }
+        $idx = self::indexOf($objPtr);
+
+        return ($idx >= 0 && self::isDestructInvoked($idx)) ? 1 : 0;
+    }
+
+    /** @internal LLVM embed bridge — object ptr → mark destruct invoked (#16234) */
+    public static function markDestructInvokedByObject(int $objPtr): void
+    {
+        if ($objPtr <= 0) {
+            return;
+        }
+        $idx = self::indexOf($objPtr);
+        if ($idx >= 0) {
+            self::markDestructInvoked($idx);
+        }
+    }
 }

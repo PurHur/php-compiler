@@ -15,6 +15,8 @@ final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
         $this->assertStringContainsString('implementGcRegisterPhpBridge', $source);
+        $this->assertStringContainsString('implementDestructAlreadyInvokedPhpBridge', $source);
+        $this->assertStringContainsString('implementDestructMarkInvokedPhpBridge', $source);
         $this->assertStringContainsString('usesPhpRegistry', $source);
         $this->assertStringContainsString('gc_register_php_entry', $source);
         // Standalone AOT keeps LLVM registry until #15889 helper-TU isolation (#16133).
@@ -36,8 +38,12 @@ final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 
         GcCollectCyclesRegistryJitHelper::markDestructInvoked(0);
         $this->assertTrue(GcCollectCyclesRegistryJitHelper::isDestructInvoked(0));
+        $this->assertSame(1, GcCollectCyclesRegistryJitHelper::destructAlreadyInvokedByObject(0x1000));
+        $this->assertSame(0, GcCollectCyclesRegistryJitHelper::destructAlreadyInvokedByObject(0x9999));
 
         GcCollectCyclesRegistryJitHelper::appendObject(0x2000, 1);
+        GcCollectCyclesRegistryJitHelper::markDestructInvokedByObject(0x2000);
+        $this->assertTrue(GcCollectCyclesRegistryJitHelper::isDestructInvoked(1));
         $this->assertSame(2, GcCollectCyclesRegistryJitHelper::count());
         GcCollectCyclesRegistryJitHelper::removeObject(0x1000);
         $this->assertSame(1, GcCollectCyclesRegistryJitHelper::count());
