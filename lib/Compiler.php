@@ -21362,8 +21362,57 @@ class Compiler {
             return 0;
         }
         if ($this->firstSiblingInlineFuncCallProducerIndexActive) {
-            // Do not re-enter firstSiblingInlineFuncCallProducerIndexImpl — unbounded recursion
-            // for hoisted FuncCall + ConstFetch preludes (date_sunrise/json_decode, #16012).
+            // Reentrant siblingMultiArg during firstSibling scan — must not recurse into impl (#16012).
+            $firstSiblingWhileActive = $this->scanFirstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (null !== $firstSiblingWhileActive && $producerIndex >= $firstSiblingWhileActive && $producerIndex < $consumerIndex) {
+                $ordinalWhileActive = $this->siblingFuncCallChainHasArrayPrelude(
+                    $firstSiblingWhileActive,
+                    $consumerIndex,
+                    $cfgChildren
+                )
+                    ? $this->siblingInlineFuncCallProducerOrdinal(
+                        $producerIndex,
+                        $firstSiblingWhileActive,
+                        $cfgChildren
+                    )
+                    : ($producerIndex - $firstSiblingWhileActive);
+                $consumerNameWhileActive = $this->resolveCfgFuncCallName($consumer);
+                if ($this->builtinUsesTrailingComparatorCallback($consumerNameWhileActive)) {
+                    $callbackArgIndex = \count($consumer->args) - 1;
+                    $funcArgIndex = 0;
+                    foreach ($consumer->args as $i => $callArg) {
+                        if ($i >= $callbackArgIndex) {
+                            break;
+                        }
+                        if (
+                            $this->isEmbeddedCallLiteralArg($callArg)
+                            || $this->callArgIsDeadInlineTemporary($callArg)
+                        ) {
+                            if ($funcArgIndex === $ordinalWhileActive) {
+                                return $i;
+                            }
+                            ++$funcArgIndex;
+                        }
+                    }
+                }
+                if (
+                    ($consumer instanceof Op\Expr\FuncCall || $consumer instanceof Op\Expr\NsFuncCall)
+                    && property_exists($consumer, 'args')
+                    && \is_array($consumer->args)
+                ) {
+                    $leadingEmbeddedWhileActive = 0;
+                    foreach ($consumer->args as $arg) {
+                        if ($this->isEmbeddedCallLiteralArg($arg)) {
+                            ++$leadingEmbeddedWhileActive;
+                            continue;
+                        }
+                        break;
+                    }
+
+                    return $leadingEmbeddedWhileActive + $ordinalWhileActive;
+                }
+            }
+
             return $distance - 1;
         }
         $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
@@ -21819,6 +21868,75 @@ class Compiler {
         }
 
         return true;
+    }
+
+    /**
+     * Non-recursive first-sibling scan for reentrant siblingMultiArg wiring (#16012).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function scanFirstSiblingInlineFuncCallProducerIndex(int $consumerIndex, array $cfgChildren): ?int
+    {
+        $i = $consumerIndex - 1;
+        while ($i >= 0) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($this->isSiblingInlineCallProducerExpr($child)) {
+                return $i;
+            }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Array_) {
+                --$i;
+                continue;
+            }
+            if ($this->isUnaryInlineSiblingCallArgExpr($child)) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\ArrowFunction
+                || $child instanceof Op\Expr\Closure
+                || $child instanceof Op\Expr\FirstClassCallable) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_ || $child instanceof Op\Expr\Clone_) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Isset_ || $child instanceof Op\Expr\Empty_) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\PropertyFetch
+                && $this->isPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\ArrayDimFetch
+                && $this->isArrayDimFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\StaticPropertyFetch
+                && $this->isStaticPropertyFetchOnlyIssetVar($child, $cfgChildren[$i + 1] ?? null)
+            ) {
+                --$i;
+                continue;
+            }
+            if ($child instanceof Op\Expr\Assign || $child instanceof Op\Expr\AssignRef) {
+                break;
+            }
+            break;
+        }
+
+        return null;
     }
 
     /**
@@ -22682,6 +22800,44 @@ class Compiler {
     }
 
     /**
+     * FUNCCALL_EXEC_RETURN slots emitted before a hoisted sibling FuncCall chain (e.g. `new` ctor).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+        int $firstSibling,
+        array $cfgChildren
+    ): int {
+        $base = 0;
+        for ($j = 0; $j < $firstSibling; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_) {
+                ++$base;
+                continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                ++$base;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\MethodCall
+                || $child instanceof Op\Expr\NullsafeMethodCall
+                || $child instanceof Op\Expr\StaticCall
+            ) {
+                $method = $this->staticNameFromOperand($child->name);
+                if (null === $method || !$this->methodCallIsKnownVoidReturn($method)) {
+                    ++$base;
+                }
+            }
+        }
+
+        return $base;
+    }
+
+    /**
      * FUNCCALL_EXEC_RETURN slot for a hoisted inline FuncCall by cfg child index (#15488, #15475).
      *
      * @param list<Op> $cfgChildren
@@ -22700,6 +22856,43 @@ class Compiler {
             && !$producer instanceof Op\Expr\NsFuncCall
         ) {
             return null;
+        }
+        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            $consumer = $cfgChildren[$consumerIndex] ?? null;
+            if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
+                continue;
+            }
+            if (!\is_array($consumer->args ?? null) || \count($consumer->args) < 2) {
+                continue;
+            }
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (
+                null === $firstSibling
+                || $producerIndex < $firstSibling
+                || $producerIndex >= $consumerIndex
+            ) {
+                continue;
+            }
+            if (!$this->isSiblingMultiArgFuncCallProducer(
+                $producer,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
+                continue;
+            }
+            $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+                $producerIndex,
+                $firstSibling,
+                $cfgChildren
+            );
+            $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+                $firstSibling,
+                $cfgChildren
+            ) + $siblingOrdinal;
+
+            return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
         }
         $funcCallOrdinal = 0;
         for ($j = 0; $j <= $producerIndex; ++$j) {
@@ -22760,8 +22953,12 @@ class Compiler {
             $firstSibling,
             $cfgChildren
         );
+        $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+            $firstSibling,
+            $cfgChildren
+        ) + $producerOrdinal;
 
-        return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $producerOrdinal);
+        return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
     }
 
     /**
@@ -31451,7 +31648,11 @@ class Compiler {
                     $valueSlot = $nestedCallArgSlot;
                 }
             }
-            if (null !== $cfgCallOp) {
+            if (
+                null !== $cfgCallOp
+                && !($cfgCallOp instanceof Op\Expr\MethodCall)
+                && !($cfgCallOp instanceof Op\Expr\NullsafeMethodCall)
+            ) {
                 $immediatePropertyOrMethodSlot = $this->slotForImmediatePropertyOrMethodFetchBeforeCfgCall(
                     $block,
                     $cfgCallOp,
@@ -31464,6 +31665,11 @@ class Compiler {
                     if (null !== $siblingSendSlot) {
                         $valueSlot = $siblingSendSlot;
                     }
+                }
+            } elseif (null !== $cfgCallOp && null !== $block->orig) {
+                $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
+                if (null !== $siblingSendSlot) {
+                    $valueSlot = $siblingSendSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

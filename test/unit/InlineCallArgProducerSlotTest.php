@@ -4644,6 +4644,18 @@ PHP;
         self::assertSame("string\nhhmm\n", ob_get_clean());
     }
 
+    /** Issue #16012 — date_sunrise(time(), SUNFUNCS_RET_STRING, lat, lon) compiles without OOM and runs. */
+    public function testDateSunriseInlineSunfuncsConstFourArgRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_date_sunrise_inline_constant.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_date_sunrise_inline_constant.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertStringContainsString('ok:', ob_get_clean());
+    }
+
     /** Issue #11336 — date_sun_info(strtotime(...), lat, lon) wires hoisted FuncCall + UnaryMinus slots. */
     public function testDateSunInfoInlineStrtotimeAndUnaryLongitudeUsesProducerSlots(): void
     {
@@ -5223,6 +5235,44 @@ PHP;
         ob_start();
         $runtime->run($block);
         self::assertSame("2\n", ob_get_clean());
+    }
+
+    /** Issue #16057 — DOMNode::C14NFile($tmp) on property-fetch receiver must not reuse receiver slot for uri arg. */
+    public function testDomNodeC14NFilePropertyFetchReceiverVariableArgUsesDistinctSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+$doc = new DOMDocument();
+$doc->loadXML('<root xmlns="http://example.com"><child>text</child></root>');
+$expected = '<root xmlns="http://example.com"><child>text</child></root>';
+$tmp = tempnam(sys_get_temp_dir(), 'domc14n');
+$bytes = $doc->documentElement->C14NFile($tmp);
+echo 'ok bytes=', $bytes, "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'dom_c14nfile_property_fetch_var.php');
+
+        $methodInitReceiver = null;
+        $methodArgSendSlot = null;
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_ARG_SEND === $op->type && null === $methodArgSendSlot) {
+                $methodArgSendSlot = $op->arg1;
+                continue;
+            }
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type && null === $methodInitReceiver) {
+                $methodInitReceiver = $op->arg1;
+                break;
+            }
+        }
+
+        self::assertNotNull($methodInitReceiver, 'missing C14NFile receiver slot');
+        self::assertNotNull($methodArgSendSlot, 'missing C14NFile uri ARG_SEND');
+        self::assertNotSame($methodInitReceiver, $methodArgSendSlot, 'uri arg must not alias property-fetch receiver slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok bytes=59\n", ob_get_clean());
     }
 
     /** Issue #15996 — DateTime literal ctor arg must not alias prior inline NEW slot. */
