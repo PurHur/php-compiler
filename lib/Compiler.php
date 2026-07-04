@@ -14584,6 +14584,14 @@ class Compiler {
         if (null !== $foldedFirstNested) {
             return $foldedFirstNested;
         }
+        $soleNestedHaystack = $this->matchSoleNestedInlineArrayHaystackProducer(
+            $producers,
+            $callArgs,
+            $argIndex
+        );
+        if (null !== $soleNestedHaystack) {
+            return $soleNestedHaystack;
+        }
         if ('array_combine' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
             $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
             if (null !== $arrayCombinePair) {
@@ -14701,10 +14709,13 @@ class Compiler {
                     // array_reverse([...], true) — nested FuncCall feeds the dead temp, not hoisted Array_ (#14042).
                     $directCall = $this->matchDirectResultInlineCallArgProducer($producers, $callArg);
                     if (
-                        $directCall instanceof Op\Expr\FuncCall
-                        || $directCall instanceof Op\Expr\NsFuncCall
-                        || $directCall instanceof Op\Expr\StaticCall
-                        || $directCall instanceof Op\Expr\MethodCall
+                        (
+                            $directCall instanceof Op\Expr\FuncCall
+                            || $directCall instanceof Op\Expr\NsFuncCall
+                            || $directCall instanceof Op\Expr\StaticCall
+                            || $directCall instanceof Op\Expr\MethodCall
+                        )
+                        && !$this->callArgOperandExpectsArrayProducer($callArg)
                     ) {
                         return $directCall;
                     }
@@ -14728,7 +14739,20 @@ class Compiler {
                         || $this->inlineCallArgProducerUsesExprResultSlot($byIndex)
                     )
                 ) {
-                    return $byIndex;
+                    if (
+                        (
+                            $byIndex instanceof Op\Expr\FuncCall
+                            || $byIndex instanceof Op\Expr\NsFuncCall
+                            || $byIndex instanceof Op\Expr\StaticCall
+                            || $byIndex instanceof Op\Expr\MethodCall
+                        )
+                        && null !== $callArg
+                        && $this->callArgOperandExpectsArrayProducer($callArg)
+                    ) {
+                        // array_slice([..], array_search(...)) — nested int builtin is arg #1 (#13684).
+                    } else {
+                        return $byIndex;
+                    }
                 }
                 if (
                     null !== $byIndex
@@ -16382,6 +16406,10 @@ class Compiler {
         ) {
             return null;
         }
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+        if (null !== $soleHoisted && 0 === $soleHoisted && 0 === $argIndex) {
+            return $outer1;
+        }
 
         return 0 === $argIndex ? $outer0 : $outer1;
     }
@@ -16881,6 +16909,36 @@ class Compiler {
         }
 
         return $index;
+    }
+
+    /**
+     * array_column([['n'=>'a'], …], 'n') — nested inline haystack preludes share one hoisted arg (#13703).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchSoleNestedInlineArrayHaystackProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $soleHoisted = $this->soleNonEmbeddedCallArgIndex($callArgs);
+        if (null === $soleHoisted || $argIndex !== $soleHoisted) {
+            return null;
+        }
+        $callArg = $callArgs[$soleHoisted] ?? null;
+        if (!$callArg instanceof Operand || !$this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
+        if (!$this->producersAreNestedArrayLiteralChain($producers) || \count($producers) < 2) {
+            return null;
+        }
+        $last = $producers[\count($producers) - 1] ?? null;
+        if (!$last instanceof Op\Expr\Array_) {
+            return null;
+        }
+
+        return $last;
     }
 
     /**
