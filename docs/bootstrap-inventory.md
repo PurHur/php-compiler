@@ -12,7 +12,7 @@ Regenerate: `php script/bootstrap-inventory.php`
 | Phase A inventory files (M2 ratio SSOT) | 3975 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10732 |
+| Source constructs flagged (warnings) | 10733 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1899,7 +1899,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/forward_static_call.php` | 0 | 2 |
 | `ext/standard/forward_static_call_array.php` | 0 | 1 |
 | `ext/standard/fpassthru.php` | 0 | 1 |
-| `ext/standard/fpow.php` | 0 | 1 |
+| `ext/standard/fpow.php` | 0 | 2 |
 | `ext/standard/fprintf_.php` | 0 | 4 |
 | `ext/standard/fputcsv.php` | 0 | 3 |
 | `ext/standard/fread.php` | 0 | 1 |
@@ -14645,7 +14645,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmRoundMode.php`
 
 **Warnings** (review for bootstrap subset):
-- 4 class method(s)
+- 7 class method(s)
 
 ### `ext/standard/VmSapiHeaderGuard.php`
 
@@ -16639,6 +16639,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/fpow.php`
 
 **Warnings** (review for bootstrap subset):
+- new Variable (line 76)
 - 2 class method(s)
 
 ### `ext/standard/fprintf_.php`
@@ -25603,7 +25604,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/JIT/JitRoundModeArg.php`
 
 **Warnings** (review for bootstrap subset):
-- 2 class method(s)
+- 4 class method(s)
 
 ### `lib/JIT/JitStrictIntArg.php`
 
