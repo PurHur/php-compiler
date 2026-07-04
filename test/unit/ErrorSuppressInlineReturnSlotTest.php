@@ -122,4 +122,62 @@ PHP;
             );
         }
     }
+
+    public function testSuppressInnerCallArgWithTrailingTrueLiteralUsesSuppressReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+echo var_export(@get_cfg_var('display_errors'), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'suppress_get_cfg_var_var_export.php');
+
+        $suppressReturnSlot = null;
+        $varExportFirstSendSlot = null;
+        $varExportSecondSendSlot = null;
+        $walk = static function (Block $b) use (&$walk, &$suppressReturnSlot, &$varExportFirstSendSlot, &$varExportSecondSendSlot): void {
+            $inSuppress = null !== $b->orig && $b->orig instanceof \PHPCfg\ErrorSuppressBlock;
+            $inEnd = null !== $b->orig && 1 === \count($b->orig->parents) && $b->orig->parents[0] instanceof \PHPCfg\ErrorSuppressBlock;
+            $pendingInit = false;
+            $varExportSendIndex = 0;
+            foreach ($b->opCodes as $op) {
+                if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                    $pendingInit = true;
+                    if ($inEnd) {
+                        $varExportSendIndex = 0;
+                    }
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                    if ($inSuppress) {
+                        $suppressReturnSlot = $op->arg1;
+                    }
+                    $pendingInit = false;
+                    continue;
+                }
+                if ($pendingInit && OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type) {
+                    $pendingInit = false;
+                    continue;
+                }
+                if (OpCode::TYPE_ARG_SEND === $op->type && $inEnd) {
+                    if (0 === $varExportSendIndex) {
+                        $varExportFirstSendSlot = $op->arg1;
+                    } elseif (1 === $varExportSendIndex) {
+                        $varExportSecondSendSlot = $op->arg1;
+                    }
+                    ++$varExportSendIndex;
+                }
+                foreach ([$op->block1, $op->block2, $op->block3] as $sub) {
+                    if ($sub instanceof Block) {
+                        $walk($sub);
+                    }
+                }
+            }
+        };
+        $walk($block);
+
+        self::assertNotNull($suppressReturnSlot, 'suppress get_cfg_var return slot');
+        self::assertSame($suppressReturnSlot, $varExportFirstSendSlot, 'var_export arg #0 must read suppress result');
+        self::assertNotSame($varExportFirstSendSlot, $varExportSecondSendSlot, 'var_export arg #1 must not alias arg #0');
+    }
 }
