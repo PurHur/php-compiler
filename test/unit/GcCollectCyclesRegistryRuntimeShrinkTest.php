@@ -10,14 +10,19 @@ use PHPUnit\Framework\TestCase;
 /** GcCollectCycles embed registry routes through GcCollectCyclesRegistryJitHelper PHP (#9541). */
 final class GcCollectCyclesRegistryRuntimeShrinkTest extends TestCase
 {
-    public function testGcCollectCyclesRuntimeUsesRegistryJitHelperForAllLoadTypes(): void
+    public function testGcCollectCyclesRuntimeUsesRegistryJitHelper(): void
     {
         $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
         $this->assertStringContainsString('GcCollectCyclesRegistryJitHelper', $source);
+        $this->assertStringContainsString('usesPhpRegistry', $source);
         $this->assertStringContainsString('implementGcRegisterPhpBridge', $source);
-        $this->assertStringNotContainsString('usesPhpRegistry', $source);
-        $this->assertStringNotContainsString("G_OBJECTS = 'phpc_gc_objects'", $source);
-        $this->assertStringNotContainsString('gc_register_entry', $source);
+    }
+
+    public function testEmbedSkipsLlvmRegistryGlobals(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/GcCollectCyclesRuntime.php');
+        $this->assertStringContainsString('standaloneRegistry', $source);
+        $this->assertStringContainsString('$standaloneRegistry && null === $context->module->getNamedGlobal(self::G_OBJECTS)', $source);
     }
 
     public function testGcCollectCyclesRegistryJitHelperRoundtrip(): void

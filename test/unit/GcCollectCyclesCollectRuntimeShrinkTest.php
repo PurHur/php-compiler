@@ -44,7 +44,6 @@ final class GcCollectCyclesCollectRuntimeShrinkTest extends TestCase
         );
         $this->assertStringNotContainsString('collect_impl_init', $body);
         $this->assertStringNotContainsString('collect_sweep', $body);
-        $this->assertStringNotContainsString('phpc_gc_visit_object', $source);
     }
 
     public function testJitGcCollectCyclesUsesRuntimeNotNative(): void
