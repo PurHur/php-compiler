@@ -60,7 +60,7 @@ final class stream_socket_accept extends Internal
         if ($argc >= 3) {
             $peerOut = new Variable(Variable::TYPE_STRING);
             $peerOut->string($peername);
-            $frame->calledArgs[2]->copyFrom($peerOut);
+            $frame->calledArgs[2]->byRefTarget()->copyFrom($peerOut);
         }
 
         if (false === $result) {
