@@ -12456,6 +12456,13 @@ class Compiler {
                         ) {
                             continue;
                         }
+                        // uksort(); ['a','b'] !== array_keys($haystack) — stmt-before Array_ feeds !==, not keys (#16056).
+                        if (
+                            null !== Block::resolveVariableName($callArgProbe)
+                            && !$this->operandsReferToSameVariable($child->result, $callArgProbe)
+                        ) {
+                            continue;
+                        }
 
                         return $child;
                     }
@@ -12463,6 +12470,14 @@ class Compiler {
                         $this->operandsReferToSameVariable($child->result, $arg)
                         && $this->callArgOperandExpectsArrayProducer($arg)
                     ) {
+                        $callArgProbe = $callOp->args[$argIndex] ?? $arg;
+                        if (
+                            null !== Block::resolveVariableName($callArgProbe)
+                            && !$this->operandsReferToSameVariable($child->result, $callArgProbe)
+                        ) {
+                            continue;
+                        }
+
                         return $child;
                     }
                     continue;
@@ -28825,7 +28840,14 @@ class Compiler {
                 ) {
                     $keysArrayProducer = $immediateKeysArray;
                 }
-                if ($keysArrayProducer instanceof Op\Expr\Array_) {
+                $keysCallArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+                if (
+                    $keysArrayProducer instanceof Op\Expr\Array_
+                    && null !== Block::resolveVariableName($keysCallArgProbe)
+                    && !$this->operandsReferToSameVariable($keysArrayProducer->result, $keysCallArgProbe)
+                ) {
+                    // uksort(); ['a','b'] !== array_keys($haystack) — literal before keys() feeds !== (#16056).
+                } elseif ($keysArrayProducer instanceof Op\Expr\Array_) {
                     $keysArraySlot = $block->slotForOperand($keysArrayProducer->result);
                     if (null === $keysArraySlot) {
                         foreach ($this->compileArrayLiteral($keysArrayProducer, $block) as $op) {
@@ -29110,12 +29132,29 @@ class Compiler {
                             || ($this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
                                 && $this->callArgOperandExpectsArrayProducer($arg))
                         ) {
-                            $inlineArray = $stmtBeforeArray;
+                            // uksort(); ['a','b'] !== array_keys($haystack) — literal before array_keys is for !==, not arg #0 (#16056).
+                            if (
+                                null !== Block::resolveVariableName($callArgProbe)
+                                && !$this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
+                            ) {
+                                // skip mis-wire
+                            } else {
+                                $inlineArray = $stmtBeforeArray;
+                            }
                         }
                     }
                 }
             }
             $callArgOperand = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (
+                null !== $inlineArray
+                && null !== $callArgOperand
+                && null !== Block::resolveVariableName($callArgOperand)
+                && !$this->operandsReferToSameVariable($inlineArray->result, $callArgOperand)
+            ) {
+                // Stmt-level Array_ before array_keys($var) may feed a later !== consumer (#16056).
+                $inlineArray = null;
+            }
             if (null !== $inlineArray && null !== $cfgCallOp && null !== $block->orig) {
                 $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                     $block->orig->children,
@@ -31679,6 +31718,24 @@ class Compiler {
                 $siblingSendSlot = $this->finalSiblingInlineCallArgSendSlot($block, $cfgCallOp, (int) $argIndex);
                 if (null !== $siblingSendSlot) {
                     $valueSlot = $siblingSendSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 'array_keys' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && 0 === (int) $argIndex
+            ) {
+                $keysArg = $cfgCallOp->args[0] ?? $arg;
+                $keysSlot = $block->slotForOperand($keysArg);
+                if (null !== $keysSlot) {
+                    $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, (int) $keysSlot, true);
+                } else {
+                    $namedLocal = $this->slotForNamedLocalFromAssignVarOperand($keysArg, $block);
+                    if (null !== $namedLocal) {
+                        $valueSlot = (string) $this->finalizeOperandSlotForAccess($block, $namedLocal, true);
+                    } else {
+                        $valueSlot = $this->compileOperand($keysArg, $block, true);
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);

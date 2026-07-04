@@ -5601,4 +5601,24 @@ PHP;
         self::assertStringContainsString('flat string', $out);
         self::assertStringNotContainsString('details flag must be a boolean', $out);
     }
+
+    /** Issue #16056 — uksort(); ['a2','a10'] !== array_keys($a) must not wire comparison literal to array_keys arg #0. */
+    public function testUksortArrayKeysStrictCompareRepro(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_uksort_strnatcmp_callback.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_uksort_strnatcmp_callback.php');
+
+        ob_start();
+        try {
+            $runtime->run($block);
+            $out = ob_get_clean();
+        } catch (\PHPCompiler\VM\ScriptExit $e) {
+            ob_end_clean();
+            self::assertSame(0, $e->status);
+            $out = '';
+        }
+        self::assertSame('', $out);
+    }
 }
