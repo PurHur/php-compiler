@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace PHPCompiler\Test\Unit;
 
 use PHPCompiler\ext\standard\SprintfJitHelper;
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmNumberFormat;
 use PHPCompiler\ext\standard\VmSprintf;
 use PHPUnit\Framework\TestCase;
@@ -47,5 +48,19 @@ final class StringFormatRuntimeShrinkTest extends TestCase
             SprintfJitHelper::numberFormat(1234.5, 2, '.', ',')
         );
         $this->assertSame('nan', SprintfJitHelper::numberFormat(NAN, 0, '.', ','));
+        $this->assertSame(
+            '3',
+            SprintfJitHelper::numberFormat(2.5, 0, '.', '', StdlibConstants::PHP_ROUND_HALF_UP)
+        );
+        $this->assertSame(
+            '2',
+            SprintfJitHelper::numberFormat(
+                2.5,
+                0,
+                '.',
+                '',
+                StdlibConstants::PHP_ROUND_TOWARD_ZERO
+            )
+        );
     }
 }
