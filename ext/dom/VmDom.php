@@ -1498,7 +1498,16 @@ final class VmDom
         $decl = self::parseXmlDeclaration($trimmed);
         $idAttrByElement = self::parseDoctypeIdAttributes($trimmed);
         [$elementXml, $elementOffset] = self::stripDoctypeWithOffset($trimmed);
-        if (!VmXml::validateAndReport($ctx, $elementXml, $frame)) {
+        $validationError = VmXml::validationErrorRecord($elementXml);
+        if (null !== $validationError) {
+            self::reportDomLibxmlError(
+                $ctx,
+                $validationError['message'],
+                $validationError['code'],
+                $validationError['column'],
+                $frame
+            );
+
             return false;
         }
         $root = self::parseElementTree($ctx, $elementXml, $trimmed, $elementOffset);
