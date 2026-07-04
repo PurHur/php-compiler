@@ -52,6 +52,12 @@ class AssignOp extends Optimizer
                 ) {
                     // We can safely replace it with an assign op
                     $binaryDest = $prior->arg1;
+                    // ??/?: deferred RHS: assign copies a pre-bound producer slot into merge dest (#11801, #16206).
+                    if (null !== $op->arg3 && (int) $op->arg3 !== (int) $binaryDest) {
+                        $priorPrior = $prior;
+                        $prior = $op;
+                        continue;
+                    }
                     $prior->arg1 = $op->arg2;
                     // Compound assign ($x += 1): arg2 is the in-place lvalue — redirect both (#13083).
                     // Do not clobber additive/concat operands on ??/?: deferred RHS (#11801, #13104, #13105).
