@@ -15692,6 +15692,21 @@ class Compiler {
                 return $arrayMergePair;
             }
         }
+        // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch prelude + sibling FuncCall (#15833).
+        if ('explode' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
+            $constProducer = null;
+            $funcProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\ConstFetch) {
+                    $constProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                }
+            }
+            if (null !== $constProducer && null !== $funcProducer) {
+                return (0 === $argIndex) ? $constProducer : $funcProducer;
+            }
+        }
         // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
         if (
             ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3))
@@ -16208,13 +16223,16 @@ class Compiler {
                         }
                     }
                     if (1 === $hoistedInNext) {
-                        $discardProducer = true;
+                        // Only discard when $producer is the inner g() feeding f(g()) — not adjacent sibling
+                        // producers (array_diff_assoc(array_keys(...), array_keys(...)), #15571, #13779).
+                        $discardProducer = false;
                         if (null !== $producer->result) {
                             foreach ($next->args as $nextArg) {
                                 if (
                                     null !== $nextArg
                                     && $this->operandsReferToSameVariable($producer->result, $nextArg)
                                 ) {
+                                    $discardProducer = true;
                                     // array_combine(array_keys(...), [...]) / array_merge(array_keys(...), …) —
                                     // keep nested FuncCall producer for inline-call arg wiring (#15553, #15551, #13776, #12450).
                                     $nextCallee = $this->resolveCfgFuncCallName($next);
@@ -26485,39 +26503,62 @@ class Compiler {
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
             ) {
-                $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
-                if (null === $arrayProducerSlot) {
-                    $siblingEmit = [];
+                $arrayProducerSlot = null;
+                $siblingEmit = [];
+                $siblingFuncCount = 0;
+                if (null !== $block->orig) {
+                    $callIndex = null;
+                    foreach ($block->orig->children as $i => $child) {
+                        if ($child === $cfgCallOp) {
+                            $callIndex = $i;
+                            break;
+                        }
+                    }
+                    if (null !== $callIndex) {
+                        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex(
+                            $callIndex,
+                            $block->orig->children
+                        );
+                        if (null !== $firstSibling) {
+                            $siblingFuncCount = $this->countSiblingInlineFuncCallProducers(
+                                $firstSibling,
+                                $callIndex,
+                                $block->orig->children
+                            );
+                        }
+                    }
+                }
+                if ($siblingFuncCount >= 2) {
+                    // array_intersect_assoc(array_keys(), array_keys()) — ordinal sibling wiring (#13778, #15570).
                     $arrayProducerSlot = $this->resolveSiblingInlineCallArgProducerSlot(
                         $block,
                         $cfgCallOp,
                         (int) $argIndex,
                         $siblingEmit
                     );
-                    if ([] !== $siblingEmit) {
-                        $sends = array_merge($sends, $siblingEmit);
+                    if (null === $arrayProducerSlot) {
+                        $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                     }
+                } else {
+                    // in_array('x', g(), true) — lone nested producer after stmt calls (#15612, #15829).
+                    $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                    if (null === $arrayProducerSlot) {
+                        $arrayProducerSlot = $this->resolveSiblingInlineCallArgProducerSlot(
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex,
+                            $siblingEmit
+                        );
+                    }
+                }
+                if ([] !== $siblingEmit) {
+                    $sends = array_merge($sends, $siblingEmit);
                 }
                 if (null !== $arrayProducerSlot) {
                     $valueSlot = (string) $arrayProducerSlot;
                 }
             }
-            if (
-                null !== $cfgCallOp
-                && null !== $valueSlot
-                && 0 === (int) $argIndex
-            ) {
-                $cfgArgRoot = $this->unwrapOperandChain($cfgCallOp->args[(int) $argIndex] ?? $arg);
-                if ($cfgArgRoot instanceof Op\Expr\ConstFetch) {
-                    $foldedGlobalConst = $this->tryFoldGlobalConstFetch($cfgArgRoot);
-                    if (null !== $foldedGlobalConst) {
-                        $valueSlot = (string) $block->registerConstant(
-                            $cfgCallOp->args[(int) $argIndex] ?? $arg,
-                            $foldedGlobalConst
-                        );
-                    }
-                }
-            }
+            // explode(PATH_SEPARATOR, …) — wire separator send to in-block CONST_FETCH (#15833).
             if (
                 'explode' === strtolower($calleeName ?? '')
                 && 0 === (int) $argIndex
