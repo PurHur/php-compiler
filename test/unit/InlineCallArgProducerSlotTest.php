@@ -4392,6 +4392,55 @@ PHP;
         self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
     }
 
+    /** Issue #16152 — get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5) ConstFetch + BitwiseOr slots. */
+    public function testGetHtmlTranslationTableConstFetchBitmaskArgSend(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+get_html_translation_table(HTML_ENTITIES, ENT_QUOTES | ENT_HTML5);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'get_html_translation_table_html5.php');
+
+        $htmlEntitiesSlot = null;
+        $bitwiseOrSlot = null;
+        $sendSlots = [];
+        $captureSends = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type) {
+                $name = $block->constants[$op->arg2]->toString();
+                if ('HTML_ENTITIES' === $name) {
+                    $htmlEntitiesSlot = $op->arg1;
+                }
+            }
+            if (OpCode::TYPE_BITWISE_OR === $op->type) {
+                $bitwiseOrSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                $captureSends = true;
+                $sendSlots = [];
+                continue;
+            }
+            if ($captureSends && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+                continue;
+            }
+            if ($captureSends && (OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type || OpCode::TYPE_FUNCCALL_EXEC_NORETURN === $op->type)) {
+                break;
+            }
+        }
+
+        self::assertNotNull($htmlEntitiesSlot, 'expected HTML_ENTITIES CONST_FETCH slot');
+        self::assertNotNull($bitwiseOrSlot, 'expected TYPE_BITWISE_OR slot');
+        self::assertSame($htmlEntitiesSlot, $sendSlots[0] ?? null, 'table arg sends='.json_encode($sendSlots));
+        self::assertSame($bitwiseOrSlot, $sendSlots[1] ?? null, 'flags arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        ob_end_clean();
+    }
+
     /** Issue #11409 — chown($path, getmyuid()) wires nested int into trailing arg slot. */
     public function testChownNamedPathNestedGetmyuidArgSend(): void
     {
