@@ -11,7 +11,7 @@ Always run the **smallest gate that can catch your mistake**, then one ladder st
 |---|------|-----------|----------------------|
 | 1 | `php script/bootstrap-inventory.php --check` | seconds | anything on the `bin/vm.php` dependency path |
 | 2 | `./script/check-generated-docs.sh` | < 30 s | builtin registration, advertisement gates (`lib/CompilerVersion.php`), composer.json, ext/ modules |
-| 3 | `vendor/bin/phpunit --filter <TestClass>` | seconds–min | one subsystem (e.g. `--filter VMTest`, `--filter SodiumTest`) |
+| 3 | `./script/phpunit.sh --filter <TestClass>` | seconds–min | one subsystem (e.g. `--filter VMTest`, `--filter SodiumTest`) |
 | 4 | `./script/ci-fast.sh` or `./phpc test --fast` | ~5–15 min | anything in lib/, ext/, bin/; **mandatory before every PR** |
 | 5 | `make north-star5-verify-fast` (Docker) | ~2–5 min | bootstrap/spine/gen-0/self-host paths |
 | 6 | `./script/ci-local.sh` | longer; downloads LLVM 9 to `.llvm/` on first run | pre-merge for compiler/JIT/AOT changes |

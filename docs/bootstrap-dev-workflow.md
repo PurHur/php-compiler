@@ -237,7 +237,7 @@ GitHub Actions runs the same spine gates on matching paths — see [`.github/wor
 | `parseAndCompile returned null (parser/CFG spine)` | Native full-spine parse not complete; sidecar recovery | Expected today; track honest compile % ([#1492](https://github.com/PurHur/php-compiler/issues/1492)) |
 | `north-star5-verify-fast` step 2 fail | Spine/doc count drift | `check-selfhost-spine-count-sync.php` |
 | `BOOTSTRAP_M5_NO_ZEND=1` hard fail | No prelinked gen-0 or sidecar fallback refused | Seed `prelinked/bootstrap-gen0/`; do not use on partial setups |
-| Docker lock / OOM | Parallel `docker-exec` or low RAM | `rm -f .php-compiler-ci.lock`; set `PHP_COMPILER_DOCKER_MEM=10g` |
+| Docker lock / OOM | Parallel `docker-exec` or low RAM | **Wait** for the active `./script/docker-exec.sh` job — do **not** `rm -f .php-compiler-ci.lock` and run host `vendor/bin/phpunit` (unlimited RAM on harness). Use `./script/phpunit.sh` or retry docker-exec; tune `PHP_COMPILER_DOCKER_MEM=10g` if containers OOM |
 
 ---
 

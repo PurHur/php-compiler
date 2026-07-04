@@ -58,7 +58,9 @@ On hosts **without** system PHP/LLVM, or on Runforge/harness sandboxes where `do
 
 - **Full gate:** `make test-harness` or `./script/docker-ci-local.sh`
 - **Fast iteration inside Docker:** `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && ./script/ci-fast.sh'`
-- **Targeted:** `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit --filter VMTest'`
+- **Targeted:** `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit --filter VMTest'` or `./script/phpunit.sh --filter VMTest`
+
+Do **not** run bare `php vendor/bin/phpunit` on Runforge/harness — host PHP uses unlimited memory and runaway workers can exhaust host RAM. Do **not** remove `.php-compiler-ci.lock` to bypass Docker while another CI job runs.
 
 Do **not** use raw `docker run -v "$(pwd):/compiler"` — use the wrappers above ([#245](https://github.com/PurHur/php-compiler/issues/245), [#2245](https://github.com/PurHur/php-compiler/issues/2245)).
 

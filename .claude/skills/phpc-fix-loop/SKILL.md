@@ -9,7 +9,7 @@ description: The smallest-gate-first edit→verify→PR loop for a php-compiler 
 
 1. **Repro first**: write/locate a minimal repro under `test/repro/` (or a failing `--filter` PHPUnit case). Run it on the VM: `php bin/vm.php test/repro/<x>.php`. Seconds.
 2. **Edit** the narrowest layer: prefer PHP lowering (`lib/`) / module registration (`ext/<mod>/`) over C runtime branches.
-3. **Verify inner loop**: re-run the repro + targeted `vendor/bin/phpunit --filter <Class>`. Iterate here — never iterate on full gates.
+3. **Verify inner loop**: re-run the repro + targeted `./script/phpunit.sh --filter <Class>` (or `./script/docker-exec.sh -- bash -lc 'source script/php-env.sh && vendor/bin/phpunit --filter …'`). **Never** bare `php vendor/bin/phpunit` on Runforge — host PHP has unlimited memory and can OOM the machine. Iterate here — never iterate on full gates.
 4. **Resync generated docs** (see table below) or the fast gate will go red for the *next* agent.
 5. **Ladder up**: `./phpc test --fast`, plus the tier the diff class demands (see phpc-verify skill).
 6. **PR**: branch `fix/<issue>-<slug>`, commit message `<Category>: <what> (#<issue>)`, body = problem → root-cause commit SHA → fix → verification transcript. All merges via PR (CONTRIBUTING), gates are local-only (remote CI disabled, #394).
