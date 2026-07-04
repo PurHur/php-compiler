@@ -181,6 +181,7 @@ use PHPCompiler\VM\Builtin\ReflectionFunctionInvoke;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsAnonymous;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsClosure;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsInternal;
+use PHPCompiler\VM\Builtin\ReflectionFunctionIsDeprecated;
 use PHPCompiler\VM\Builtin\ReflectionFunctionIsUserDefined;
 use PHPCompiler\VM\Builtin\ReflectionMethodConstruct;
 use PHPCompiler\VM\Builtin\ReflectionMethodCreateFromClosure;
@@ -826,6 +827,10 @@ final class BuiltinClasses
         $rf->methodVisibility['createfromcallable'] = $pubStatic;
         $rf->methods['createfromfunction'] = new ReflectionFunctionCreateFromFunction();
         $rf->methodVisibility['createfromfunction'] = $pubStatic;
+        if (CompilerVersion::supportsReflectionFunctionIsDeprecated()) {
+            $rf->methods['isdeprecated'] = new ReflectionFunctionIsDeprecated();
+            $rf->methodVisibility['isdeprecated'] = $pub;
+        }
         $ctx->classes[ReflectionSupport::REFLECTION_FUNCTION] = $rf;
 
         if (CompilerVersion::advertisesReflectionConstantClass()) {
