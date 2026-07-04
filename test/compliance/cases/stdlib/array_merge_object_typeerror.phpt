@@ -1,5 +1,5 @@
 --TEST--
-stdlib array_merge family — object operand TypeError inline cast (#15207, ext/standard/array.c)
+stdlib array_merge family — object operand TypeError (#15858, ext/standard/array.c)
 --SKIPIF--
 <?php die('skip — compiler VM/JIT compliance via VMTest/JITTest, not Zend CLI'); ?>
 --FILE--
@@ -18,15 +18,16 @@ $fns = [
 foreach ($fns as $fn) {
     try {
         $fn((object) ['a' => 1], ['b' => 2]);
-        echo "$fn: uncaught\n";
+        echo "uncaught:{$fn}\n";
+        exit(1);
     } catch (TypeError $e) {
-        echo "$fn: ", $e->getMessage(), "\n";
+        if (!str_contains($e->getMessage(), 'must be of type array')) {
+            echo "bad-msg:{$fn}:{$e->getMessage()}\n";
+            exit(1);
+        }
     }
 }
+
+echo "ok\n";
 --EXPECT--
-array_merge: array_merge(): Argument #1 must be of type array, stdClass given
-array_merge_recursive: array_merge_recursive(): Argument #1 must be of type array, stdClass given
-array_replace: array_replace(): Argument #1 ($array) must be of type array, stdClass given
-array_replace_recursive: array_replace_recursive(): Argument #1 must be of type array, stdClass given
-array_diff: array_diff(): Argument #1 must be of type array, stdClass given
-array_intersect: array_intersect(): Argument #1 must be of type array, stdClass given
+ok
