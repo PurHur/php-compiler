@@ -6,6 +6,7 @@ namespace PHPCompiler;
 
 use PHPCompiler\ext\bcmath\bcadd;
 use PHPCompiler\ext\bcmath\VmBcmath;
+use PHPCompiler\ext\standard\StdlibConstants;
 use PHPCompiler\ext\standard\VmReflection;
 use PHPUnit\Framework\TestCase;
 
@@ -73,6 +74,12 @@ PHP;
         self::assertSame('3.33', VmBcmath::div('10', '3', 2));
         self::assertSame(0, VmBcmath::comp('1.0', '1.00', 2));
         self::assertSame(1, VmBcmath::comp('1.01', '1.00', 2));
+    }
+
+    public function test_vmbcmath_div_rounding_mode_issue_9919(): void
+    {
+        self::assertSame('3', VmBcmath::div('10', '3', null, StdlibConstants::PHP_ROUND_HALF_UP));
+        self::assertSame('24', VmBcmath::powmod('2', '10', '1000', 0, StdlibConstants::PHP_ROUND_HALF_UP));
     }
 
     public function test_bcpowmod_issue_6976(): void
