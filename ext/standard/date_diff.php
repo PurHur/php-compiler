@@ -37,13 +37,15 @@ final class date_diff extends Internal
             $frame->calledArgs[0],
             'date_diff()',
             1,
-            'object'
+            'object',
+            $frame->vmContext
         );
         $target = DateTimeSupport::requireDateTime(
             $frame->calledArgs[1],
             'date_diff()',
             2,
-            'object'
+            'object',
+            $frame->vmContext
         );
         $absolute = false;
         if ($argc >= 3) {

@@ -36,7 +36,8 @@ final class date_timestamp_set extends Internal
             $frame->calledArgs[0],
             'date_timestamp_set(): Argument #1 ($object)',
             1,
-            'object'
+            'object',
+            $frame->vmContext
         );
         $timestamp = VmMath::parseIntBuiltinArg(
             $frame->calledArgs[1],

@@ -20,7 +20,13 @@ final class DateTimeSetTimezone extends VmClassMethod
         if (\count($frame->calledArgs) < 2) {
             throw new \LogicException('DateTime::setTimezone() expects exactly 1 argument');
         }
-        $receiver = DateTimeSupport::requireDateTime($frame->calledArgs[0], 'DateTime::setTimezone()');
+        $receiver = DateTimeSupport::requireDateTime(
+            $frame->calledArgs[0],
+            'DateTime::setTimezone()',
+            null,
+            null,
+            $frame->vmContext
+        );
         $timezone = DateTimeSupport::requireDateTimeZone($frame->calledArgs[1], 'DateTime::setTimezone() timezone');
         DateTimeSupport::setTimezone($receiver, $timezone);
         if (null !== $frame->returnVar) {
