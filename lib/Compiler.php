@@ -47,6 +47,7 @@ use PHPCompiler\Compiler\EnumBackedCaseCheck;
 use PHPCompiler\Compiler\EnumMagicMethodCheck;
 use PHPCompiler\Compiler\EnumParentCompileCheck;
 use PHPCompiler\Compiler\MagicMethodReturnTypeCheck;
+use PHPCompiler\Compiler\FunctionStaticAnonymousClassCompileCheck;
 use PHPCompiler\Compiler\NewWithoutParensCompileCheck;
 use PHPCompiler\Compiler\NonEnumBuiltinInterfaceCompileCheck;
 use PHPCompiler\Compiler\ThrowInClassConstCompileCheck;
@@ -473,6 +474,7 @@ class Compiler {
         // Const-expr context checks before compileCfgBlock / PHPTypes folding (#10106, #6549, #6580).
         ThrowInClassConstCompileCheck::validate($script);
         NewWithoutParensCompileCheck::validate($script, $this->compileSourceCode);
+        FunctionStaticAnonymousClassCompileCheck::validate($script);
 
         /** @var mixed $main */
         $main = $this->compileCfgBlock($script->main->cfg, $script->main->params, $script->main);
