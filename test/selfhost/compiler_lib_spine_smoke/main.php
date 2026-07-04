@@ -358,6 +358,8 @@ require_once __DIR__.'/../../../ext/mbstring/mb_strcut.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strimwidth.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_stripos.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strlen.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_chr.php';
+require_once __DIR__.'/../../../ext/mbstring/mb_ord.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strpos.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrichr.php';
 require_once __DIR__.'/../../../ext/mbstring/mb_strrpos.php';

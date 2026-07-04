@@ -1628,6 +1628,78 @@ final class VmMbstring
             .\chr(0x80 | ($cp & 0x3F));
     }
 
+    /**
+     * mb_chr() — codepoint to character (php-src ext/mbstring/mbstring.c; #4559).
+     */
+    public static function chr(int $codepoint, string $encoding): string|false
+    {
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, 'mb_chr', 1);
+        if ('UTF-8' === $encoding) {
+            if (!self::isValidUnicodeCodepoint($codepoint)) {
+                return false;
+            }
+
+            return self::encodeUtf8Codepoint($codepoint);
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            if ($codepoint < 0 || $codepoint > 255) {
+                return false;
+            }
+
+            return \chr($codepoint);
+        }
+        if (!self::isValidUnicodeCodepoint($codepoint)) {
+            return false;
+        }
+        $utf8 = self::encodeUtf8Codepoint($codepoint);
+        $converted = CharsetEngine::convert('UTF-8', $encoding, $utf8);
+
+        return false === $converted ? false : $converted;
+    }
+
+    /**
+     * mb_ord() — first character codepoint (php-src ext/mbstring/mbstring.c; #4559).
+     */
+    public static function ord(string $string, string $encoding): int|false
+    {
+        if ('' === $string) {
+            throw new \ValueError('mb_ord(): Argument #1 ($string) must not be empty');
+        }
+        $encoding = MbstringEncodingRegistry::assertValid($encoding, 'mb_ord', 1);
+        if ('UTF-8' === $encoding) {
+            if (!VmString::isValidUtf8($string)) {
+                return false;
+            }
+            $charLen = VmString::utf8CharLength($string);
+            if (0 === $charLen) {
+                return false;
+            }
+
+            return self::utf8CharToCodepoint(VmString::utf8CharSubstr($string, 0, 1));
+        }
+        if ('ASCII' === $encoding || '8BIT' === $encoding) {
+            return \ord($string[0]);
+        }
+        $utf8 = CharsetEngine::convert($encoding, 'UTF-8', $string[0]);
+        if (false === $utf8 || !VmString::isValidUtf8($utf8)) {
+            return false;
+        }
+
+        return self::utf8CharToCodepoint($utf8);
+    }
+
+    private static function isValidUnicodeCodepoint(int $cp): bool
+    {
+        if ($cp < 0 || $cp >= 0x110000) {
+            return false;
+        }
+        if ($cp >= 0xD800 && $cp <= 0xDFFF) {
+            return false;
+        }
+
+        return true;
+    }
+
     private static function assertNumericEntityEncoding(string $encoding): void
     {
         if ('UTF-8' !== $encoding && 'ASCII' !== $encoding && '8BIT' !== $encoding) {
