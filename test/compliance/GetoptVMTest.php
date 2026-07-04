@@ -51,4 +51,23 @@ final class GetoptVMTest extends TestCase
         $this->assertIsString($stdout);
         $this->assertStringContainsString("ok\n", $stdout);
     }
+
+    public function testGetoptRestIndexByRefAfterArgvSeparator(): void
+    {
+        $repoRoot = \dirname(__DIR__, 2);
+        $vm = $repoRoot.'/bin/vm.php';
+        $script = $repoRoot.'/test/repro/maintainer_gap_getopt_rest_index_byref_fatal.php';
+        $this->assertFileExists($vm);
+        $this->assertFileExists($script);
+
+        $cmd = \sprintf(
+            '%s %s %s -- -a1 2>&1',
+            \escapeshellarg(\PHP_BINARY),
+            \escapeshellarg($vm),
+            \escapeshellarg($script)
+        );
+        $stdout = shell_exec('cd '.\escapeshellarg($repoRoot).' && '.$cmd);
+        $this->assertIsString($stdout);
+        $this->assertStringContainsString("ok\n", $stdout);
+    }
 }

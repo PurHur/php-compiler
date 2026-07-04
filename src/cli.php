@@ -146,3 +146,22 @@ if (!function_exists('php_compiler_cli_resolve_user_path')) {
         return rtrim($base, '/\\').'/'.$path;
     }
 }
+
+if (!function_exists('php_compiler_cli_user_script_argv_tail')) {
+    /**
+     * Trailing argv slice for user scripts — strips a leading "--" separator (Zend CLI parity, #4139, #15070).
+     *
+     * @param list<string> $argv
+     *
+     * @return list<string>
+     */
+    function php_compiler_cli_user_script_argv_tail(array $argv, int $startIndex): array
+    {
+        $rest = array_slice($argv, $startIndex);
+        if (isset($rest[0]) && '--' === $rest[0]) {
+            $rest = array_slice($rest, 1);
+        }
+
+        return array_values(array_map('strval', $rest));
+    }
+}

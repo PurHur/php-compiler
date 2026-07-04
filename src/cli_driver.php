@@ -234,11 +234,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     ++$i;
                     $execFile = php_compiler_cli_command_line_code_filename();
                     // Zend CLI: $argv[0] is "Command line code" for -r; args after "--" are user args (not "--" itself).
-                    $rest = array_slice($argv, $i);
-                    if (isset($rest[0]) && '--' === $rest[0]) {
-                        $rest = array_slice($rest, 1);
-                    }
-                    $scriptArgv = array_merge([$execFile], $rest);
+                    $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                     // Do not parse trailing args as compiler options; they belong to user code.
                     $i = $argc;
 
@@ -284,7 +280,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                             $execFile = '-';
                             $execCode = stream_get_contents(\STDIN);
                             // Mirror Zend CLI stdin: $argv[0] is "-" and remaining args follow.
-                            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                            $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                             // Do not parse trailing args as compiler options; they belong to user code.
                             $i = $argc;
 
@@ -305,7 +301,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
                     }
                     $execFile = realpath($scriptPath) ?: $scriptPath;
                     // Allow arbitrary user script args after the script path (Zend CLI parity, #4139).
-                    $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+                    $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
                     // Stop parsing: remaining args are for the user script.
                     $i = $argc;
             }
@@ -315,7 +311,7 @@ if (!function_exists('php_compiler_cli_dispatch')) {
         if (empty($execCode)) {
             $execFile = '-';
             $execCode = stream_get_contents(\STDIN);
-            $scriptArgv = array_merge([$execFile], array_slice($argv, $i));
+            $scriptArgv = array_merge([$execFile], php_compiler_cli_user_script_argv_tail($argv, $i));
         }
         if (null === $scriptArgv) {
             // Fallback: ensure user code sees $argv/$argc even if no args were parsed.
