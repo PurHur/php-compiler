@@ -33,6 +33,9 @@ use PHPCompiler\VM\Variable;
  */
 final class VmSerialize
 {
+    private const CLASS_INCOMPLETE = '__php_incomplete_class';
+    private const INCOMPLETE_CLASS_NAME_PROP = '__PHP_Incomplete_Class_Name';
+
     public static function serializeValue(Context $ctx, Variable $value, ?Frame $frame = null): string
     {
         $value = $value->resolveIndirect();
@@ -73,6 +76,9 @@ final class VmSerialize
                     new VmSerializeRefState(),
                     $frame
                 );
+            }
+            if (self::CLASS_INCOMPLETE === $lcClass) {
+                return self::encodeIncompleteObjectWire($ctx, $entry, null, $frame);
             }
             if (self::hasInstanceMethod($entry->class, '__serialize')) {
                 $data = self::invokeSerialize($ctx, $entry);
@@ -503,6 +509,9 @@ final class VmSerialize
         if (SplObjectStorageSerializeSupport::isSplObjectStorageClass($lcClass)) {
             return SplObjectStorageSerializeSupport::encodeZendSerializeWire($ctx, $entry, $state, $frame);
         }
+        if (self::CLASS_INCOMPLETE === $lcClass) {
+            return self::encodeIncompleteObjectWire($ctx, $entry, $state, $frame);
+        }
         if (self::hasInstanceMethod($entry->class, '__serialize')) {
             $magicData = self::invokeSerialize($ctx, $entry);
             if (Variable::TYPE_ARRAY !== $magicData->type) {
@@ -901,6 +910,52 @@ final class VmSerialize
         }
 
         return $names;
+    }
+
+    /**
+     * Zend php_var_serialize() for __PHP_Incomplete_Class — emit original class name (var.c, #10765).
+     */
+    private static function encodeIncompleteObjectWire(
+        Context $ctx,
+        ObjectEntry $entry,
+        ?VmSerializeRefState $state = null,
+        ?Frame $frame = null
+    ): string {
+        if (!$entry->hasProperty(self::INCOMPLETE_CLASS_NAME_PROP)) {
+            throw new \LogicException(
+                '__PHP_Incomplete_Class object missing '.self::INCOMPLETE_CLASS_NAME_PROP.' property'
+            );
+        }
+        $originalClass = $entry->getProperty(self::INCOMPLETE_CLASS_NAME_PROP)->resolveIndirect()->toString();
+
+        $isRoot = null === $state;
+        if ($isRoot) {
+            $state = new VmSerializeRefState();
+            $state->objectIndex[$entry] = 1;
+            $state->nextIndex = 2;
+        } elseif (null === $state->lookupObjectIndex($entry)) {
+            $state->assignObjectIndex($entry);
+        }
+
+        $body = '';
+        $count = 0;
+        foreach ($entry->getRawProperties() as $name => $prop) {
+            if (self::INCOMPLETE_CLASS_NAME_PROP === $name) {
+                continue;
+            }
+            $value = $prop->resolveIndirect();
+            if (TypedPropertyCheck::omitFromSerialize($value)) {
+                continue;
+            }
+            $keyVar = new Variable();
+            $keyVar->string($name);
+            $body .= self::encodeWireKey($keyVar);
+            $body .= self::encodeWireVariable($ctx, $value, $state, $frame);
+            ++$count;
+        }
+        $classLen = \strlen($originalClass);
+
+        return 'O:'.$classLen.':"'.$originalClass.'":'.$count.':{'.$body.'}';
     }
 
     /**
