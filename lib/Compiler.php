@@ -20151,6 +20151,22 @@ class Compiler {
                 }
             }
 
+            // ini_get_all(null, false) after stmt call + array dim access — ConstFetch args only (#15931).
+            if (
+                $consumer instanceof Op\Expr\FuncCall
+                || $consumer instanceof Op\Expr\NsFuncCall
+            ) {
+                if ($this->consumerHoistedArgsFullySatisfiedByConstFetchPreludes(
+                    $producer,
+                    $consumer,
+                    $producerIndex,
+                    $consumerIndex,
+                    $cfgChildren
+                )) {
+                    return true;
+                }
+            }
+
             // date_sun_info(strtotime(...), lat, -lon) / substr(sprintf(...), -N) — inline hoisted producers (#11336, #10673, #13801).
             return false;
         }
@@ -20210,6 +20226,63 @@ class Compiler {
         }
 
         return $literalPreludeCount === max(0, $hoistedArgCount - 1);
+    }
+
+    /**
+     * Stmt FuncCall before consumer whose hoisted args are only ConstFetch preludes — not a sibling producer (#15931).
+     *
+     * php-cfg: `var_dump(array_keys($all['k'] ?? [])); ini_get_all(null, false);`
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function consumerHoistedArgsFullySatisfiedByConstFetchPreludes(
+        Op\Expr $producer,
+        Op $consumer,
+        int $producerIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if ($producerIndex >= $consumerIndex - 1) {
+            return false;
+        }
+        if (!property_exists($consumer, 'args') || !\is_array($consumer->args) || [] === $consumer->args) {
+            return false;
+        }
+        $constPreludeCount = 0;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                ++$constPreludeCount;
+                continue;
+            }
+
+            return false;
+        }
+        if ($constPreludeCount < 1) {
+            return false;
+        }
+        $hoistedArgCount = 0;
+        foreach ($consumer->args as $callArg) {
+            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
+                ++$hoistedArgCount;
+            }
+        }
+        if ($constPreludeCount !== $hoistedArgCount) {
+            return false;
+        }
+        if (null === $producer->result) {
+            return false;
+        }
+        foreach ($consumer->args as $callArg) {
+            if (
+                null !== $callArg
+                && $this->operandsReferToSameVariable($producer->result, $callArg)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**
