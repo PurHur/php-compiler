@@ -219,6 +219,9 @@ class Block {
     /** @var array<int, true> */
     private array $namedAssignDestSlotIndexes = [];
 
+    /** assign.result temp => CV lvalue slot for reads after in-place mutation (#15125). */
+    private array $assignResultToLvalueSlot = [];
+
     public function __construct(?CfgBlock $block) {
         $this->orig = $block;
         $this->scope = new \SplObjectStorage;
@@ -231,6 +234,16 @@ class Block {
     {
         $this->namedAssignDestSlots[$varRoot] = $slot;
         $this->namedAssignDestSlotIndexes[$slot] = true;
+    }
+
+    public function registerAssignResultLvalue(int $resultSlot, int $lvalueSlot): void
+    {
+        $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
+    }
+
+    public function lvalueSlotForAssignResult(int $resultSlot): ?int
+    {
+        return $this->assignResultToLvalueSlot[$resultSlot] ?? null;
     }
 
     public function slotForNamedAssignDest(Operand $operand): ?int
@@ -636,6 +649,11 @@ class Block {
         foreach ($parent->namedAssignDestSlots as $root) {
             if (!$this->namedAssignDestSlots->contains($root)) {
                 $this->namedAssignDestSlots[$root] = $parent->namedAssignDestSlots[$root];
+            }
+        }
+        foreach ($parent->assignResultToLvalueSlot as $resultSlot => $lvalueSlot) {
+            if (!isset($this->assignResultToLvalueSlot[$resultSlot])) {
+                $this->assignResultToLvalueSlot[$resultSlot] = $lvalueSlot;
             }
         }
         // literal/deploy include path tables are per-block; inheriting parent paths breaks
