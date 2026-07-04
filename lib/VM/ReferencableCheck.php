@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace PHPCompiler\VM;
 
+use PHPCfg\Operand;
+use PHPCfg\Operand\Temporary;
+use PHPCfg\Op\Expr\Array_ as ArrayExpr;
+use PHPCfg\Op\Expr\Cast\Object_ as ObjectCastExpr;
 use PHPCompiler\Block;
 use PHPCompiler\BuiltinByRefParams;
 use PHPCompiler\BuiltinParamNames;
@@ -221,7 +225,9 @@ final class ReferencableCheck
                 && !self::isReferenceable($calledArgs[$paramIdx], $caller)
                 && self::isObjectOperand($calledArgs[$paramIdx])
             ) {
-                self::emitNonVariableByRefNotice($caller);
+                if (self::shouldEmitNonVariableObjectByRefNotice($calledArgs[$paramIdx])) {
+                    self::emitNonVariableByRefNotice($caller);
+                }
                 continue;
             }
             $paramName = $paramNames[$paramIdx] ?? 'param'.($paramIdx + 1);
@@ -309,10 +315,60 @@ final class ReferencableCheck
             || 'array_splice' === $lc;
     }
 
-    /** array_walk* accepts object operands — non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
+    /** array_walk* accepts object operands — empty non-lvalue objects get E_NOTICE only (ext/standard/array.c, #13237). */
     public static function allowsNonVariableObjectByRef(string $fn): bool
     {
         return \in_array(strtolower($fn), ['array_walk', 'array_walk_recursive'], true);
+    }
+
+    /** Runtime: notice only for ephemeral empty objects (new stdClass()), not (object) array casts (#15874). */
+    public static function shouldEmitNonVariableObjectByRefNotice(Variable $arg, ?Operand $operand = null): bool
+    {
+        if (self::objectOperandHasDynamicProperties($arg)) {
+            return false;
+        }
+        if (null !== $operand && self::operandIsObjectCastFromNonEmptyArray($operand)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Compile-time: skip notice for inline (object)[...] haystack operands (#15874). */
+    public static function shouldEmitNonVariableObjectByRefNoticeAtCompileTime(?Operand $operand): bool
+    {
+        if (null !== $operand && self::operandIsObjectCastFromNonEmptyArray($operand)) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private static function objectOperandHasDynamicProperties(Variable $arg): bool
+    {
+        $resolved = $arg->resolveIndirect();
+        if (Variable::TYPE_OBJECT !== $resolved->type) {
+            return false;
+        }
+
+        return [] !== $resolved->toObject()->propertiesWithNames();
+    }
+
+    private static function operandIsObjectCastFromNonEmptyArray(Operand $operand): bool
+    {
+        $current = $operand;
+        while ($current instanceof Temporary && null !== $current->original) {
+            $current = $current->original;
+        }
+        foreach ($current->usages as $usage) {
+            if ($usage instanceof ObjectCastExpr && $usage->result === $current) {
+                $inner = $usage->expr ?? null;
+
+                return $inner instanceof ArrayExpr && [] !== ($inner->values ?? []);
+            }
+        }
+
+        return false;
     }
 
     /** Operand is array or object — other types get TypeError in the builtin (#11984). */
