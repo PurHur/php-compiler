@@ -29,9 +29,9 @@ final class WeakRefRegistryRuntime
 
     private const RESET = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::reset';
 
-    private const REGISTER_REF = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::appendRefEntry';
+    private const REGISTER_REF = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::registerRef';
 
-    private const REGISTER_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::appendMapEntry';
+    private const REGISTER_MAP = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::registerMap';
 
     private const FORMAT_KEY = 'PHPCompiler\\ext\\standard\\WeakRefRegistryJitHelper::formatObjectKey';
 
@@ -140,42 +140,12 @@ final class WeakRefRegistryRuntime
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('wr_reg_ref_bridge_entry');
-        $doneBb = $fn->appendBasicBlock('wr_reg_ref_bridge_done');
-        $checkSlotBb = $fn->appendBasicBlock('wr_reg_ref_bridge_check_slot');
-        $checkMaxBb = $fn->appendBasicBlock('wr_reg_ref_bridge_check_max');
-        $workBb = $fn->appendBasicBlock('wr_reg_ref_bridge_work');
         $context->builder->positionAtEnd($entry);
-
-        $target = $context->builder->pointerCast($fn->getParam(0), $i64);
-        $slot = $context->builder->pointerCast($fn->getParam(1), $i64);
-        $zero = $i64->constInt(0, false);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
-            $doneBb,
-            $checkSlotBb
+        $context->builder->call(
+            self::helperFunction($context, self::REGISTER_REF),
+            $context->builder->pointerCast($fn->getParam(0), $i64),
+            $context->builder->pointerCast($fn->getParam(1), $i64)
         );
-
-        $context->builder->positionAtEnd($checkSlotBb);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $slot, $zero),
-            $doneBb,
-            $checkMaxBb
-        );
-
-        $context->builder->positionAtEnd($checkMaxBb);
-        $count = $context->builder->call(self::helperFunction($context, self::REF_COUNT));
-        $maxRefs = $i64->constInt(WeakRefRegistryJitHelper::MAX_REFS, false);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SGE, $count, $maxRefs),
-            $doneBb,
-            $workBb
-        );
-
-        $context->builder->positionAtEnd($workBb);
-        $context->builder->call(self::helperFunction($context, self::REGISTER_REF), $target, $slot);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
@@ -193,58 +163,17 @@ final class WeakRefRegistryRuntime
         $voidTy = $context->getTypeFromString('void');
         $i8p = $context->getTypeFromString('int8*');
         $i64 = $context->getTypeFromString('int64');
-        $strPtr = $context->getTypeFromString('__string__*');
-        $sizeT = $context->getTypeFromString('size_t');
         $ft = $context->context->functionType($voidTy, false, $i8p, $i8p, $i8p);
         $fn = null !== $probe ? $probe : $context->module->addFunction($abiName, $ft);
         $entry = $fn->appendBasicBlock('wr_reg_map_bridge_entry');
-        $doneBb = $fn->appendBasicBlock('wr_reg_map_bridge_done');
-        $checkHtBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_ht');
-        $checkKeyBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_key');
-        $checkMaxBb = $fn->appendBasicBlock('wr_reg_map_bridge_check_max');
-        $workBb = $fn->appendBasicBlock('wr_reg_map_bridge_work');
         $context->builder->positionAtEnd($entry);
-
-        $target = $context->builder->pointerCast($fn->getParam(0), $i64);
-        $ht = $context->builder->pointerCast($fn->getParam(1), $i64);
-        $keyCstr = $fn->getParam(2);
-        $zero = $i64->constInt(0, false);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $target, $zero),
-            $doneBb,
-            $checkHtBb
+        $keyStr = self::cstrToString($context, $fn->getParam(2));
+        $context->builder->call(
+            self::helperFunction($context, self::REGISTER_MAP),
+            $context->builder->pointerCast($fn->getParam(0), $i64),
+            $context->builder->pointerCast($fn->getParam(1), $i64),
+            $keyStr
         );
-
-        $context->builder->positionAtEnd($checkHtBb);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $ht, $zero),
-            $doneBb,
-            $checkKeyBb
-        );
-
-        $context->builder->positionAtEnd($checkKeyBb);
-        $keyLen = $context->builder->call($context->lookupFunction('strlen'), $keyCstr);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_EQ, $keyLen, $sizeT->constInt(0, false)),
-            $doneBb,
-            $checkMaxBb
-        );
-
-        $context->builder->positionAtEnd($checkMaxBb);
-        $count = $context->builder->call(self::helperFunction($context, self::MAP_COUNT));
-        $maxMaps = $i64->constInt(WeakRefRegistryJitHelper::MAX_MAPS, false);
-        $context->builder->branchIf(
-            $context->builder->icmp(Builder::INT_SGE, $count, $maxMaps),
-            $doneBb,
-            $workBb
-        );
-
-        $context->builder->positionAtEnd($workBb);
-        $keyStr = self::cstrToString($context, $keyCstr);
-        $context->builder->call(self::helperFunction($context, self::REGISTER_MAP), $target, $ht, $keyStr);
-        $context->builder->branch($doneBb);
-
-        $context->builder->positionAtEnd($doneBb);
         $context->builder->returnVoid();
         $context->registerFunction($abiName, $fn);
     }
