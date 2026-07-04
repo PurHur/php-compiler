@@ -720,13 +720,21 @@ class Block {
 
     public function slotIndexForVariableName(string $name): ?int
     {
+        $fallback = null;
         foreach ($this->scope as $operand) {
-            if (self::resolveVariableName($operand) === $name) {
-                return $this->scope[$operand];
+            if (self::resolveVariableName($operand) !== $name) {
+                continue;
+            }
+            $slot = $this->scope[$operand];
+            if (isset($this->namedAssignDestSlotIndexes[$slot])) {
+                return $slot;
+            }
+            if (null === $fallback) {
+                $fallback = $slot;
             }
         }
 
-        return null;
+        return $fallback;
     }
 
     /** True when $slot holds a named local ($a), not a compiler temporary (#5340). */

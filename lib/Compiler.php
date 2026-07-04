@@ -1458,12 +1458,15 @@ class Compiler {
         $this->ternaryMergePhiRhsSlots[$mergeCfg] = $slot;
         $root = Block::cfgVarRoot($phiOperand);
         if (null !== $root) {
-            if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
-                $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+            $rootName = Block::resolveVariableName($root);
+            if (null === $rootName || '' === $rootName) {
+                if (!$this->ternaryMergeVarSlots->contains($mergeCfg)) {
+                    $this->ternaryMergeVarSlots[$mergeCfg] = new SplObjectStorage();
+                }
+                /** @var SplObjectStorage<CfgVariable, int> $map */
+                $map = $this->ternaryMergeVarSlots[$mergeCfg];
+                $map[$root] = $slot;
             }
-            /** @var SplObjectStorage<CfgVariable, int> $map */
-            $map = $this->ternaryMergeVarSlots[$mergeCfg];
-            $map[$root] = $slot;
         }
 
         return $slot;
@@ -1633,6 +1636,12 @@ class Compiler {
             /** @var SplObjectStorage<CfgVariable, int> $map */
             $map = $this->ternaryMergeVarSlots[$mergeCfg];
             foreach ($map as $root) {
+                if ($this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                    $rootName = Block::resolveVariableName($root);
+                    if (null !== $rootName && '' !== $rootName) {
+                        continue;
+                    }
+                }
                 $compiled->prebindCfgVarRoot($root, $map[$root]);
             }
         }
