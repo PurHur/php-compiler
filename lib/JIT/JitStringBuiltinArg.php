@@ -732,8 +732,6 @@ final class JitStringBuiltinArg
             return;
         }
 
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
         $map = $context->structFieldMap['__string__'];
         $len = $context->builder->load(
             $context->builder->structGep($loweredStr, $map['length'])
@@ -741,12 +739,11 @@ final class JitStringBuiltinArg
         $i64 = $context->getTypeFromString('int64');
         $zero = $i64->constInt(0, false);
         $empty = $context->builder->icmp(Builder::INT_EQ, $len, $zero);
-        $failBlock = BasicBlockHelper::append($context, 'str_empty_fail');
-        $okBlock = BasicBlockHelper::append($context, 'str_empty_ok');
-        $context->builder->branchIf($empty, $failBlock, $okBlock);
-        $context->builder->positionAtEnd($failBlock);
-        TypeErrorRaise::emitValueError($context, $errorMessage);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->positionAtEnd($okBlock);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->not($empty),
+            'str_empty',
+            $errorMessage
+        );
     }
 }

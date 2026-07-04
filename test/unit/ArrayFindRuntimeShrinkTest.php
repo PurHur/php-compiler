@@ -14,6 +14,8 @@ final class ArrayFindRuntimeShrinkTest extends TestCase
         $helper = (string) file_get_contents(__DIR__.'/../../lib/JIT/ArrayFindHelper.php');
         $this->assertStringNotContainsString('ArrayFindRuntime::walk', $helper);
         $this->assertStringContainsString('resolvePredicateHandler', $helper);
+        $this->assertStringContainsString('TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure', $helper);
+        $this->assertStringNotContainsString('lookupFunction(\'abort\')', $helper);
 
         $runtime = (string) file_get_contents(__DIR__.'/../../lib/JIT/Builtin/ArrayFindRuntime.php');
         $this->assertStringContainsString('ArrayFindJitHelper', $runtime);

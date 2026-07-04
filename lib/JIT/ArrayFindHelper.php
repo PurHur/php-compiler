@@ -567,21 +567,18 @@ final class ArrayFindHelper
 
     private static function requireNonEmptyFindArray(Context $context, Variable $array, string $fn): void
     {
-        TypeErrorRaise::registerDeclarations($context);
-        TypeErrorRaise::ensureLinked($context);
         $message = \sprintf('%s(): Argument #1 ($array) must not be empty', $fn);
         if (ArrayBuiltinHelper::isNativeArray($array->type)) {
             $sizeT = $context->getTypeFromString('size_t');
             $zero = $sizeT->constInt(0, false);
             $count = $context->constantFromInteger($array->nextFreeElement, 'size_t');
             $isEmpty = $context->builder->icmp(Builder::INT_EQ, $count, $zero);
-            $ok = BasicBlockHelper::append($context, 'array_find_nonempty_ok');
-            $bad = BasicBlockHelper::append($context, 'array_find_nonempty_bad');
-            $context->builder->branchIf($isEmpty, $bad, $ok);
-            $context->builder->positionAtEnd($bad);
-            TypeErrorRaise::emitValueError($context, $message);
-            $context->builder->call($context->lookupFunction('abort'));
-            $context->builder->positionAtEnd($ok);
+            TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+                $context,
+                $context->builder->not($isEmpty),
+                'array_find_nonempty',
+                $message
+            );
 
             return;
         }
@@ -592,12 +589,11 @@ final class ArrayFindHelper
         $sizeT = $context->getTypeFromString('size_t');
         $zero = $sizeT->constInt(0, false);
         $isEmpty = $context->builder->icmp(Builder::INT_EQ, $num, $zero);
-        $ok = BasicBlockHelper::append($context, 'array_find_ht_nonempty_ok');
-        $bad = BasicBlockHelper::append($context, 'array_find_ht_nonempty_bad');
-        $context->builder->branchIf($isEmpty, $bad, $ok);
-        $context->builder->positionAtEnd($bad);
-        TypeErrorRaise::emitValueError($context, $message);
-        $context->builder->call($context->lookupFunction('abort'));
-        $context->builder->positionAtEnd($ok);
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->not($isEmpty),
+            'array_find_ht_nonempty',
+            $message
+        );
     }
 }
