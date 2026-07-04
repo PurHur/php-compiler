@@ -16072,6 +16072,14 @@ class Compiler {
             return $paired;
         }
         if (1 === $producerCount) {
+            // preg_replace_callback_array(['/pat/' => fn(...)], $subj) — pattern map is arg #0, not hoisted closure (#9072).
+            if (
+                ($producers[0] instanceof Op\Expr\ArrowFunction || $producers[0] instanceof Op\Expr\Closure)
+                && 0 === $argIndex
+                && 'preg_replace_callback_array' === $inlineFuncName
+            ) {
+                return null;
+            }
             // preg_replace_callback($pat, fn(...), $subj) / iterator_apply($it, fn(...)) — lone hoisted closure maps to arg 1 (#12755, #15182).
             if (
                 ($producers[0] instanceof Op\Expr\ArrowFunction || $producers[0] instanceof Op\Expr\Closure)
@@ -26800,6 +26808,27 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
+                && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 0 === (int) $argIndex
+            ) {
+                // preg_replace_callback_array(['/pat/' => fn(...)], $subj) — pattern map is arg #0, not hoisted closure (#9072).
+                $patternMapArray = $this->inlineArrayLiteralForDeadCallArg($cfgCallOp, 0, $block);
+                if ($patternMapArray instanceof Op\Expr\Array_) {
+                    $patternMapSlot = $block->slotForOperand($patternMapArray->result);
+                    if (null === $patternMapSlot) {
+                        foreach ($this->compileArrayLiteral($patternMapArray, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                        $patternMapSlot = $block->slotForOperand($patternMapArray->result);
+                    }
+                    if (null !== $patternMapSlot) {
+                        $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $patternMapSlot, $nameSlot, $unpackFlag);
+                        continue;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
                 && null !== $block->orig
                 && 'array_filter' === $this->resolveCfgFuncCallName($cfgCallOp)
                 && 2 === \count($cfgCallOp->args ?? [])
@@ -27439,6 +27468,12 @@ class Compiler {
                     && !$this->callArgIsNullLiteral($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && !$this->isEmbeddedCallLiteralArg($cfgCallOp->args[(int) $argIndex] ?? $arg)
                     && $this->callArgOperandIsClosureValue($arg, $block, $calleeName)
+                    && !(
+                        null !== $cfgCallOp
+                        && 0 === (int) $argIndex
+                        && 'preg_replace_callback_array' === $this->resolveCfgFuncCallName($cfgCallOp)
+                        && $this->callArgOperandExpectsArrayProducer($cfgCallOp->args[(int) $argIndex] ?? $arg)
+                    )
                 ) {
                     $valueSlot = $closureSlot;
                 }
