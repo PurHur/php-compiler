@@ -37,6 +37,10 @@ final class ArrayPadVMTest extends BaseTest
             __DIR__.'/cases/stdlib/array_pad_pad_type.phpt',
             'array_pad_pad_type.phpt'
         );
+        yield 'array_pad_neg_after_udf_array.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/array_pad_neg_after_udf_array.phpt',
+            'array_pad_neg_after_udf_array.phpt'
+        );
     }
 
     public function setUp(): void
