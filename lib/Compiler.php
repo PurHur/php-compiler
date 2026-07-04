@@ -30170,9 +30170,11 @@ class Compiler {
                 }
             }
             // probe('label', in_array(..., g(), true)) — nested callee return, not inner ConstFetch (#14237, #16013).
+            // array_slice([..], array_search(...)) — keep resolveArraySliceInlineCallArgSlot haystack/offset (#13684, #16023).
             if (
                 null !== $cfgCallOp
                 && null !== $block->orig
+                && null === $arraySliceSlot
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
             ) {
                 $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
