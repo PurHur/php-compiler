@@ -60,4 +60,23 @@ PHP;
         $rt->run($block);
         $this->assertSame('b', ob_get_clean());
     }
+
+    public function testVmBareEnumArmWithEnumCaseScrutineeErrors(): void
+    {
+        $code = <<<'PHP'
+enum E { case A; case B; }
+try {
+    echo match (E::A) {
+        A => 'bare',
+    };
+} catch (Throwable $e) {
+    echo get_class($e), ': ', $e->getMessage();
+}
+PHP;
+        $rt = new Runtime();
+        $block = $rt->parseAndCompile("<?php\n".$code, 'enum_match_bare_arm.php');
+        ob_start();
+        $rt->run($block);
+        $this->assertSame('Error: Undefined constant "A"', ob_get_clean());
+    }
 }

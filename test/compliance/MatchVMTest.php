@@ -36,6 +36,7 @@ final class MatchVMTest extends BaseTest
                 'match_nested_call_arg.phpt',
                 'match_switch_enum_strict.phpt',
                 'match_switch_enum_unqualified.phpt',
+                'match_enum_case_qualified.phpt',
                 'switch_match_enum_typed_subject.phpt',
                 'match_duplicate_default.phpt',
                 'match_default_not_last.phpt',
