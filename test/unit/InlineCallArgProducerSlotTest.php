@@ -478,7 +478,12 @@ PHP;
         sort($intersectSends);
         self::assertSame($splitReturnSlots, $intersectSends, 'intersect sends='.json_encode($intersectSends));
 
-        // Inline hoisted sibling slot wiring is asserted above; variable form runtime parity (#15488 follow-up).
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertStringContainsString('ok', $out, 'inline array_intersect/diff repro runtime (#16050)');
+
+        // Variable form runtime parity (#15488 follow-up).
         $variableCode = <<<'PHP'
 <?php
 $left = str_split(str_repeat('ab', 1));
