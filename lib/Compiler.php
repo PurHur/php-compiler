@@ -14697,6 +14697,38 @@ class Compiler {
                 }
                 $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
                 if (false !== $producerOrdinal) {
+                    if (
+                        null !== $cfgCallOp
+                        && null !== $block
+                        && null !== $block->orig
+                        && 2 === $argCount
+                    ) {
+                        $consumerIndex = null;
+                        $funcProducerIndex = null;
+                        foreach ($block->orig->children as $i => $child) {
+                            if ($child === $cfgCallOp) {
+                                $consumerIndex = $i;
+                            }
+                            if ($child === $funcProducer) {
+                                $funcProducerIndex = $i;
+                            }
+                        }
+                        if (
+                            null !== $consumerIndex
+                            && null !== $funcProducerIndex
+                            && $this->isNestedCallArgProducerForConsumer(
+                                $funcProducer,
+                                $cfgCallOp,
+                                $funcProducerIndex,
+                                $consumerIndex,
+                                $block->orig->children
+                            )
+                        ) {
+                            // var_export(f(), true) / array_keys($a, null) — nested result is arg0 (#11272, #10373).
+                            return 0 === $argIndex ? $funcProducer : $constFetch;
+                        }
+                    }
+
                     return 0 === $producerOrdinal ? $constFetch : $funcProducer;
                 }
             }
@@ -17690,6 +17722,54 @@ class Compiler {
     }
 
     /**
+     * Hoisted ConstFetch before a nested sibling FuncCall — feeds callee arg, not the consumer (#11272).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function hoistedConstFetchFeedsNestedSiblingFuncCallArg(
+        Op\Expr\ConstFetch $fetch,
+        int $fetchIndex,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (null === $fetch->result) {
+            return false;
+        }
+        for ($j = $fetchIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch || $mid instanceof Op\Expr\ClassConstFetch) {
+                continue;
+            }
+            if ($mid instanceof Op\Expr\FuncCall || $mid instanceof Op\Expr\NsFuncCall) {
+                if (!property_exists($mid, 'args') || !is_array($mid->args)) {
+                    return false;
+                }
+                $name = $this->staticNameFromOperand($fetch->name);
+                if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    return false;
+                }
+                foreach ($mid->args as $callArg) {
+                    if (null === $callArg) {
+                        continue;
+                    }
+                    if ($this->operandsReferToSameVariable($fetch->result, $callArg)) {
+                        return true;
+                    }
+                    if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    /**
      * php-cfg hoists chained assignment before a call with a dead arg temp (#6758, #9405).
      *
      * @param list<Op\Expr> $producers
@@ -18358,6 +18438,13 @@ class Compiler {
                     )
                 ) {
                     // in_array('x', g(), true) — hoisted ConstFetch between g() and consumer (#13507, #15611, #15612).
+                    continue;
+                }
+                if (
+                    $child instanceof Op\Expr\ConstFetch
+                    && $this->hoistedConstFetchFeedsNestedSiblingFuncCallArg($child, $i, $callIndex, $cfgChildren)
+                ) {
+                    // var_export(array_keys($a, null), true) — null feeds nested callee arg (#11272).
                     continue;
                 }
             }

@@ -2339,6 +2339,46 @@ PHP;
         self::assertStringContainsString("'b'", $out);
     }
 
+    /** Issue #11272 — var_export(array_keys($a, null), true) must not wire inner null literal to arg #0. */
+    public function testVarExportArrayKeysNullSearchLiteralUsesNestedReturnSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$a = [null => 1];
+echo var_export(array_keys($a, null), true);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_array_keys_null_search.php');
+
+        $keysReturnSlot = null;
+        $varExportSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (2 === $fcallOrdinal) {
+                    $varExportSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $keysReturnSlot = $op->arg1;
+            }
+            if (2 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $varExportSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($keysReturnSlot);
+        self::assertCount(2, $varExportSends);
+        self::assertSame($keysReturnSlot, $varExportSends[0], 'arg sends='.json_encode($varExportSends));
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame('array (
+)', ob_get_clean());
+    }
+
     /** Issue #11896 / #13810 — var_export(C::__set_state([]), true) wires StaticCall producer, not dead arg temp. */
     public function testVarExportSetStateInlineStaticCallReturnTrueUsesStaticCallProducerSlot(): void
     {
