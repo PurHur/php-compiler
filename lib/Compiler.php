@@ -23221,6 +23221,13 @@ class Compiler {
                 array_unshift($dimFetches, $child);
                 continue;
             }
+            if (
+                $child instanceof Op\Expr\ConstFetch
+                || $child instanceof Op\Expr\ClassConstFetch
+            ) {
+                // var_export($a[1][0], true) — hoisted literal between dim chain and call (#10495, #15762).
+                continue;
+            }
             break;
         }
         if ($cfgCallOp instanceof Op\Expr\MethodCall || $cfgCallOp instanceof Op\Expr\NullsafeMethodCall) {
@@ -23259,10 +23266,11 @@ class Compiler {
         $opcodeDimIndex = $dimIndex;
         $fetch = $dimFetches[$dimIndex];
         if (
-            1 === \count($callArgs)
+            0 === $argIndex
             && \count($dimFetches) > 1
             && $this->arrayDimFetchesFormProducerChain($dimFetches)
         ) {
+            // var_export($a[1][0], true) — chain tail is arg #0, trailing literals are embedded (#15762).
             $opcodeDimIndex = \count($dimFetches) - 1;
             $fetch = $dimFetches[$opcodeDimIndex];
         }

@@ -4566,6 +4566,26 @@ PHP;
         self::assertStringNotContainsString('ao_bad', $out);
     }
 
+    /** Issue #15762 — var_export($a[1][0], true) wires chained dim-fetch tail, not outer tuple. */
+    public function testVarExportChainedDimFetchWithLiteralReturnFlagUsesTailProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$b = [1 => [0 => 'a', 1 => 0]];
+echo var_export($b[1][0], true), "\n";
+preg_match('/(a)(b)/', 'ab', $m, PREG_OFFSET_CAPTURE);
+echo var_export($m[1][0], true), "\n";
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'var_export_chained_dim_fetch.php');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("'a'\n'a'\n", $out);
+    }
+
     /** Issue #14828 — DateTimeZone::getTransitions(strtotime(), strtotime()) distinct arg slots. */
     public function testDateTimeZoneGetTransitionsDualInlineStrtotimeUsesDistinctArgSlots(): void
     {
