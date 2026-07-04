@@ -42,8 +42,15 @@ final class filter_input extends Internal
             $filter = new Variable();
             $filter->int(VmFilter::FILTER_DEFAULT);
         }
+        $options = null;
         if (4 === $argc) {
-            // Options parsing deferred (#4404); ignore $options when superglobal key is absent.
+            $options = $frame->calledArgs[3]->resolveIndirect();
+            if (!$options->isUndefined()
+                && Variable::TYPE_NULL !== $options->type
+                && Variable::TYPE_INTEGER !== $options->type
+                && Variable::TYPE_ARRAY !== $options->type) {
+                throw new \LogicException('filter_input() options must be an integer flag bitmask or array');
+            }
         }
         if (null === $frame->returnVar) {
             return;
@@ -78,7 +85,7 @@ final class filter_input extends Internal
         if (!VmFilter::isSupportedFilter($filterId)) {
             filter_var::triggerUnknownFilterWarning($frame, $filterId);
         }
-        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, null));
+        filter_var::writeReturn($frame, VmFilter::filterVar($value, $filterId, $options));
     }
 
     public function call(Context $context, JITVariable ...$args): Value

@@ -438,9 +438,24 @@ final class VmFilter
                 throw new \LogicException('filter_var() options[options] must be an array');
             }
             $filterOptions = $nested->toArray();
+        } elseif (self::arrayLooksLikeBareFilterOptions($ht)) {
+            // Named-parameter lowering may pass the inner options hash directly (#4404, #5020).
+            $filterOptions = $ht;
         }
 
         return ['flags' => $flags, 'filterOptions' => $filterOptions];
+    }
+
+    private static function arrayLooksLikeBareFilterOptions(\PHPCompiler\VM\HashTable $ht): bool
+    {
+        foreach (['regexp', 'min_range', 'max_range', 'default', 'decimal'] as $key) {
+            $var = $ht->find($key);
+            if (null !== $var && !$var->isUndefined() && Variable::TYPE_NULL !== $var->type) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

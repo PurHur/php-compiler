@@ -15880,6 +15880,17 @@ class Compiler {
             $leadingConstNested = $this->splitLeadingConstFetchWithNestedArrayLiteralChain($producers);
             if (null !== $leadingConstNested) {
                 [$constFetch, $arrayChain] = $leadingConstNested;
+                /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+                $leadingConsts = [];
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $leadingConsts[] = $producer;
+                        continue;
+                    }
+                    if ($producer instanceof Op\Expr\Array_) {
+                        break;
+                    }
+                }
                 $arrayArgIndex = $argCount - 1;
                 if ($argIndex === $arrayArgIndex) {
                     return $arrayChain[\count($arrayChain) - 1];
@@ -15892,7 +15903,10 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $constFetch;
+                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                }
+                if (isset($leadingConsts[$argIndex])) {
+                    return $leadingConsts[$argIndex];
                 }
 
                 return null;
@@ -15901,6 +15915,17 @@ class Compiler {
             $leadingConstArray = $this->splitLeadingConstFetchWithArrayLiteralCallArg($producers);
             if (null !== $leadingConstArray) {
                 [$constFetch, $array] = $leadingConstArray;
+                /** @var list<Op\Expr\ConstFetch> $leadingConsts */
+                $leadingConsts = [];
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\ConstFetch) {
+                        $leadingConsts[] = $producer;
+                        continue;
+                    }
+                    if ($producer instanceof Op\Expr\Array_) {
+                        break;
+                    }
+                }
                 $arrayArgIndex = $argCount - 1;
                 if ($argIndex === $arrayArgIndex) {
                     return $array;
@@ -15913,7 +15938,10 @@ class Compiler {
                     }
                 }
                 if ($argIndex === $constArgIndex) {
-                    return $constFetch;
+                    return $leadingConsts[\count($leadingConsts) - 1] ?? $constFetch;
+                }
+                if (isset($leadingConsts[$argIndex])) {
+                    return $leadingConsts[$argIndex];
                 }
 
                 return null;
@@ -29935,6 +29963,41 @@ class Compiler {
                             $finalCallArgProbe
                         )
                         : (string) $this->finalizeOperandSlotForAccess($block, (int) $finalNamedSlot, true);
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'filter_input' === strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && (0 === (int) $argIndex || 2 === (int) $argIndex)
+            ) {
+                $callIndex = null;
+                foreach ($block->orig->children as $i => $child) {
+                    if ($child === $cfgCallOp) {
+                        $callIndex = $i;
+                        break;
+                    }
+                }
+                if (null !== $callIndex) {
+                    $wantPrefix = 0 === (int) $argIndex ? 'input_' : 'filter_';
+                    for ($i = $callIndex - 1; $i >= 0; --$i) {
+                        $child = $block->orig->children[$i];
+                        if (!$child instanceof Op\Expr\ConstFetch) {
+                            if ($child instanceof Op\Expr\Assign) {
+                                break;
+                            }
+                            continue;
+                        }
+                        $name = strtolower($this->staticNameFromOperand($child->name) ?? '');
+                        if (!str_starts_with($name, $wantPrefix)) {
+                            continue;
+                        }
+                        $slot = $block->slotForOperand($child->result);
+                        if (null !== $slot) {
+                            $valueSlot = (string) $slot;
+                        }
+                        break;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
