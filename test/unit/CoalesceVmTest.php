@@ -248,6 +248,20 @@ echo "\n";
         );
     }
 
+    /** Issue #10743: chained dim-fetch ?? in func-call arg must read coalesce merge slot, not inner fetch temp. */
+    public function testChainedArrayDimCoalesceFuncCallArg(): void
+    {
+        $this->assertVmOutput(
+            '<?php
+date_create_from_format("!Y-m-d", "2024-02-30");
+$errs = DateTime::getLastErrors();
+var_export($errs["warnings"][10] ?? null);
+echo "\n";
+',
+            "'The parsed date was invalid'\n"
+        );
+    }
+
     /** Issue #11601: stmt ?? before var_export(..., true) after prior call must wire coalesce slot (WeakMap repro). */
     public function testCoalesceFuncCallArgAfterPriorVarExport(): void
     {
