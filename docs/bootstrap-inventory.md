@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4024 |
-| Phase A inventory files (M2 ratio SSOT) | 4024 |
+| PHP files on vm.php path | 4026 |
+| Phase A inventory files (M2 ratio SSOT) | 4026 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10857 |
+| Source constructs flagged (warnings) | 10859 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1355,6 +1355,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ThrowableManifest.php` | 0 | 1 |
 | `ext/standard/TimezoneLocationJitHelper.php` | 0 | 3 |
 | `ext/standard/TimezoneOffsetJitHelper.php` | 0 | 1 |
+| `ext/standard/TraitExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/TriggerErrorJitHelper.php` | 0 | 1 |
 | `ext/standard/UcwordsJitHelper.php` | 0 | 1 |
 | `ext/standard/UmaskJitHelper.php` | 0 | 1 |
@@ -3140,6 +3141,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringSysGetloadavg.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringSyslog.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringTempnam.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringTraitExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTriggerError.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringTriggerErrorJit.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringTrimMask.php` | 0 | 1 |
@@ -13039,6 +13041,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 class method(s)
 
 ### `ext/standard/TimezoneOffsetJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/TraitExistsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -24562,6 +24569,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 1 closure(s)
 
 ### `lib/JIT/Builtin/StringTempnam.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
+### `lib/JIT/Builtin/StringTraitExists.php`
 
 **Warnings** (review for bootstrap subset):
 - 4 class method(s)
