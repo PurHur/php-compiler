@@ -145,6 +145,10 @@ final class DomDocumentVMTest extends BaseTest
             __DIR__.'/cases/stdlib/dom_loadhtml_unclosed_warnings.phpt',
             'dom_loadhtml_unclosed_warnings.phpt'
         );
+        yield 'dom_loadxml_invalid_warning.phpt' => self::parsePHPT(
+            __DIR__.'/cases/stdlib/dom_loadxml_invalid_warning.phpt',
+            'dom_loadxml_invalid_warning.phpt'
+        );
     }
 
     public function setUp(): void
