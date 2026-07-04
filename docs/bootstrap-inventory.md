@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4026 |
-| Phase A inventory files (M2 ratio SSOT) | 4026 |
+| PHP files on vm.php path | 4027 |
+| Phase A inventory files (M2 ratio SSOT) | 4027 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10859 |
+| Source constructs flagged (warnings) | 10861 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -1573,7 +1573,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/VmPopenNative.php` | 0 | 1 |
 | `ext/standard/VmPopenPure.php` | 0 | 1 |
 | `ext/standard/VmPreg.php` | 0 | 8 |
-| `ext/standard/VmPregEngine.php` | 0 | 56 |
+| `ext/standard/VmPregEngine.php` | 0 | 59 |
 | `ext/standard/VmPregFailure.php` | 0 | 1 |
 | `ext/standard/VmPregLimits.php` | 0 | 1 |
 | `ext/standard/VmPregMatches.php` | 0 | 12 |
@@ -3632,7 +3632,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/VM/Builtin/ReflectionEnumUnitCaseConstruct.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseGetAttributes.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseGetName.php` | 0 | 1 |
-| `lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php` | 0 | 2 |
+| `lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseIsBacked.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionEnumUnitCaseIsDeprecated.php` | 0 | 1 |
 | `lib/VM/Builtin/ReflectionExtensionConstruct.php` | 0 | 1 |
@@ -14518,62 +14518,65 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregEngine.php`
 
 **Warnings** (review for bootstrap subset):
-- new self (line 92)
-- new self (line 121)
-- new VmPregAstEmptyNode (line 204)
-- new VmPregCompileException (line 208)
-- new VmPregAstAltNode (line 225)
-- new VmPregAstEmptyNode (line 233)
-- new VmPregAstEmptyNode (line 239)
-- new VmPregAstConcatNode (line 245)
-- new VmPregCompileException (line 255)
-- new VmPregCompileException (line 259)
-- new VmPregCompileException (line 285)
-- new VmPregAstQuantNode (line 327)
-- new VmPregCompileException (line 382)
-- new VmPregCompileException (line 393)
-- new VmPregCompileException (line 399)
-- new VmPregCompileException (line 414)
-- new VmPregAstAnyNode (line 426)
-- new VmPregAstBolNode (line 431)
-- new VmPregAstEolNode (line 436)
-- new VmPregCompileException (line 442)
-- new VmPregAstCharNode (line 446)
-- new VmPregCompileException (line 467)
-- new VmPregAstEmptyNode (line 471)
-- new VmPregCompileException (line 480)
-- new VmPregCompileException (line 486)
-- new VmPregCompileException (line 492)
-- new VmPregAstEmptyNode (line 496)
-- new VmPregCompileException (line 498)
-- new VmPregCompileException (line 511)
-- new VmPregAstGroupNode (line 518)
-- new VmPregCompileException (line 536)
-- new VmPregAstBranchResetAltNode (line 540)
-- new VmPregCompileException (line 565)
-- new VmPregCompileException (line 574)
-- new VmPregCompileException (line 593)
-- new VmPregCompileException (line 601)
-- new VmPregCompileException (line 653)
-- new VmPregAstClassNode (line 657)
-- new VmPregCompileException (line 667)
-- new VmPregCompileException (line 687)
-- new VmPregAstCharNode (line 701)
-- new VmPregCompileException (line 711)
-- new VmPregAstCharNode (line 714)
-- new VmPregAstClassNode (line 719)
-- new VmPregAstClassNode (line 720)
-- new VmPregAstClassNode (line 721)
-- new VmPregAstClassNode (line 722)
-- new VmPregAstClassNode (line 723)
-- new VmPregAstClassNode (line 724)
-- new VmPregAstBolNode (line 725)
-- new VmPregAstKeepOutNode (line 726)
-- new VmPregAstEolNode (line 727)
-- new VmPregAstEolNode (line 728)
-- new VmPregAstCharNode (line 729)
-- new VmPregBacktrackLimitException (line 788)
-- 65 class method(s)
+- new self (line 98)
+- new self (line 128)
+- new VmPregAstEmptyNode (line 213)
+- new VmPregCompileException (line 217)
+- new VmPregAstAltNode (line 234)
+- new VmPregAstEmptyNode (line 242)
+- new VmPregAstEmptyNode (line 248)
+- new VmPregAstConcatNode (line 254)
+- new VmPregCompileException (line 264)
+- new VmPregCompileException (line 268)
+- new VmPregCompileException (line 294)
+- new VmPregAstQuantNode (line 336)
+- new VmPregCompileException (line 391)
+- new VmPregCompileException (line 402)
+- new VmPregCompileException (line 408)
+- new VmPregCompileException (line 423)
+- new VmPregAstAnyNode (line 435)
+- new VmPregAstBolNode (line 440)
+- new VmPregAstEolNode (line 445)
+- new VmPregCompileException (line 451)
+- new VmPregAstCharNode (line 455)
+- new VmPregCompileException (line 476)
+- new VmPregAstEmptyNode (line 480)
+- new VmPregCompileException (line 489)
+- new VmPregCompileException (line 495)
+- new VmPregCompileException (line 501)
+- new VmPregAstRecursionNode (line 505)
+- new VmPregCompileException (line 509)
+- new VmPregAstEmptyNode (line 513)
+- new VmPregCompileException (line 515)
+- new VmPregCompileException (line 528)
+- new VmPregAstGroupNode (line 535)
+- new VmPregCompileException (line 553)
+- new VmPregAstBranchResetAltNode (line 557)
+- new VmPregCompileException (line 582)
+- new VmPregCompileException (line 591)
+- new VmPregCompileException (line 610)
+- new VmPregCompileException (line 618)
+- new VmPregCompileException (line 670)
+- new VmPregAstClassNode (line 674)
+- new VmPregCompileException (line 684)
+- new VmPregCompileException (line 704)
+- new VmPregAstCharNode (line 718)
+- new VmPregCompileException (line 728)
+- new VmPregAstCharNode (line 731)
+- new VmPregAstClassNode (line 736)
+- new VmPregAstClassNode (line 737)
+- new VmPregAstClassNode (line 738)
+- new VmPregAstClassNode (line 739)
+- new VmPregAstClassNode (line 740)
+- new VmPregAstClassNode (line 741)
+- new VmPregAstBolNode (line 742)
+- new VmPregAstKeepOutNode (line 743)
+- new VmPregAstEolNode (line 744)
+- new VmPregAstEolNode (line 745)
+- new VmPregAstCharNode (line 746)
+- new VmPregBacktrackLimitException (line 805)
+- new VmPregJitStackLimitException (line 822)
+- 67 class method(s)
 
 ### `ext/standard/VmPregFailure.php`
 
@@ -14583,7 +14586,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/standard/VmPregLimits.php`
 
 **Warnings** (review for bootstrap subset):
-- 1 class method(s)
+- 2 class method(s)
 
 ### `ext/standard/VmPregMatches.php`
 
@@ -20632,7 +20635,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/BuiltinParamNames.php`
 
 **Warnings** (review for bootstrap subset):
-- new ArgumentCountError (line 406)
+- new ArgumentCountError (line 408)
 - 9 class method(s)
 
 ### `lib/BuiltinTypeClassConstant.php`
@@ -27884,7 +27887,6 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `lib/VM/Builtin/ReflectionEnumUnitCaseGetValue.php`
 
 **Warnings** (review for bootstrap subset):
-- new Error (line 32)
 - 1 class method(s)
 
 ### `lib/VM/Builtin/ReflectionEnumUnitCaseIsBacked.php`
