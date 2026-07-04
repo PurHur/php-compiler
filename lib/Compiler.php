@@ -116,6 +116,8 @@ class Compiler {
     private array $bareRethrowLines = [];
     /** spl_object_id(Coalesce expr) => scope slot for ?? result (stmt ?? before call args, #9479). */
     private array $coalesceResultSlots = [];
+    /** cfgVarRoot / call-arg oid => slot wired by syncCoalesceResultToDistinctFuncCallArg (#15915). */
+    private array $syncedCoalesceFuncCallArgSlots = [];
     /** Trailing source bytes after __halt_compiler(); (issue #3479). */
     private ?string $haltCompilerRemaining = null;
     /** {@see OpCode::ASSIGN_REF_FOREACH_PROPERTY_HOOK} for the next AssignRef compile (#6435). */
@@ -447,6 +449,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
+        $this->syncedCoalesceFuncCallArgSlots = [];
         $this->compileTimeEnumBackedTypes = [];
         $this->compileTimeEnumCaseConstNames = [];
         $this->compileTimeGlobalConsts = [];
@@ -533,6 +536,7 @@ class Compiler {
         $this->abstractClasses = [];
         $this->abstractEnums = [];
         $this->coalesceResultSlots = [];
+        $this->syncedCoalesceFuncCallArgSlots = [];
         $this->classCompileRegistry = new ClassCompileRegistry();
         $this->attributeClassRegistry = new AttributeClassRegistry();
         // Inventory-scale sources declare user functions and/or class-like units; emit-smoke only needs {main}
@@ -3098,6 +3102,196 @@ class Compiler {
         return $block;
     }
 
+    private function registerSyncedCoalesceFuncCallArgSlot(Operand $targetArg, int $slot): void
+    {
+        $this->syncedCoalesceFuncCallArgSlots['oid:' . spl_object_id($targetArg)] = $slot;
+        $root = Block::cfgVarRoot($targetArg);
+        if (null !== $root) {
+            $this->syncedCoalesceFuncCallArgSlots[spl_object_id($root)] = $slot;
+        }
+    }
+
+    private function resolveSyncedCoalesceFuncCallArgSlot(Operand $arg): ?int
+    {
+        $oidKey = 'oid:' . spl_object_id($arg);
+        if (isset($this->syncedCoalesceFuncCallArgSlots[$oidKey])) {
+            return $this->syncedCoalesceFuncCallArgSlots[$oidKey];
+        }
+        $root = Block::cfgVarRoot($arg);
+        if (null !== $root && isset($this->syncedCoalesceFuncCallArgSlots[spl_object_id($root)])) {
+            return $this->syncedCoalesceFuncCallArgSlots[spl_object_id($root)];
+        }
+
+        return null;
+    }
+
+    /**
+     * Stmt-level ?? immediately before a FuncCall (only inline producers in between, #11601, #15915).
+     */
+    private function findStmtCoalesceImmediatelyBeforeFuncCall(Op $callOp, Block $block): ?Op\Expr\BinaryOp\Coalesce
+    {
+        if (null === $block->orig) {
+            return null;
+        }
+        $children = $block->orig->children;
+        $callIndex = null;
+        foreach ($children as $i => $child) {
+            if ($child === $callOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (
+            null === $callIndex
+            && property_exists($callOp, 'result')
+            && null !== $callOp->result
+        ) {
+            foreach ($children as $i => $child) {
+                if (
+                    ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                    && null !== $child->result
+                    && (
+                        $child->result === $callOp->result
+                        || $this->operandsReferToSameVariable($child->result, $callOp->result)
+                    )
+                ) {
+                    $callIndex = $i;
+                    break;
+                }
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        for ($j = $callIndex - 1; $j >= 0; --$j) {
+            $prev = $children[$j];
+            if ($prev instanceof Op\Expr\BinaryOp\Coalesce) {
+                return $prev;
+            }
+            if ($prev instanceof Op\Expr && $this->isInlineExprCallArgProducer($prev)) {
+                continue;
+            }
+
+            break;
+        }
+
+        return null;
+    }
+
+    private function callArgHasPriorStmtCoalesce(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null !== $this->findCoalesceStmtForCallArg($arg, $block)) {
+            return true;
+        }
+        if (null !== $this->resolveSyncedCoalesceFuncCallArgSlot($arg)) {
+            return true;
+        }
+        if (
+            0 === $argIndex
+            && null !== $cfgCallOp
+            && null !== ($stmtCoalesce = $this->findStmtCoalesceImmediatelyBeforeFuncCall($cfgCallOp, $block))
+        ) {
+            $firstArg = $cfgCallOp->args[0] ?? null;
+            $hasOtherCoalesceFedArg = false;
+            foreach ($cfgCallOp->args ?? [] as $idx => $otherArg) {
+                if ((int) $idx === $argIndex || null === $otherArg) {
+                    continue;
+                }
+                if (
+                    [] !== $this->findEmbeddedCoalesces($otherArg)
+                    || $this->operandsReferToSameVariable($stmtCoalesce->result, $otherArg)
+                    || $this->operandsReferToSameVariable($stmtCoalesce->left, $otherArg)
+                ) {
+                    $hasOtherCoalesceFedArg = true;
+                    break;
+                }
+            }
+            if (
+                !$hasOtherCoalesceFedArg
+                && null !== $firstArg
+                && !$this->isEmbeddedCallLiteralArg($arg)
+                && (
+                    $this->operandsReferToSameVariable($firstArg, $arg)
+                    || $this->operandsReferToSameVariable($stmtCoalesce->result, $arg)
+                    || $this->operandsReferToSameVariable($stmtCoalesce->left, $arg)
+                )
+            ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Stmt-level ?? before multi-arg calls must win over hoisted dim-fetch producer slots (#11601, #15915).
+     */
+    private function finalizeStmtCoalesceCallArgSlot(
+        Operand $arg,
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        ?string $valueSlot
+    ): ?string {
+        if ($this->isCallArgDirectArrayDimFetch($arg)) {
+            return $valueSlot;
+        }
+        $callArg = (null !== $cfgCallOp && is_array($cfgCallOp->args ?? null))
+            ? ($cfgCallOp->args[$argIndex] ?? null)
+            : null;
+        foreach (array_filter([$callArg, $arg]) as $probe) {
+            $syncedSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($probe);
+            if (null !== $syncedSlot) {
+                return (string) $syncedSlot;
+            }
+        }
+        $coalesce = $this->findCoalesceStmtForCallArg($arg, $block);
+        if (null === $coalesce && null !== $cfgCallOp && 0 === $argIndex) {
+            $stmtCoalesce = $this->findStmtCoalesceImmediatelyBeforeFuncCall($cfgCallOp, $block);
+            if (null !== $stmtCoalesce) {
+                $firstArg = $cfgCallOp->args[0] ?? null;
+                $hasOtherCoalesceFedArg = false;
+                foreach ($cfgCallOp->args ?? [] as $idx => $otherArg) {
+                    if ((int) $idx === $argIndex || null === $otherArg) {
+                        continue;
+                    }
+                    if (
+                        [] !== $this->findEmbeddedCoalesces($otherArg)
+                        || $this->operandsReferToSameVariable($stmtCoalesce->result, $otherArg)
+                        || $this->operandsReferToSameVariable($stmtCoalesce->left, $otherArg)
+                    ) {
+                        $hasOtherCoalesceFedArg = true;
+                        break;
+                    }
+                }
+                if (
+                    !$hasOtherCoalesceFedArg
+                    && null !== $firstArg
+                    && !$this->isEmbeddedCallLiteralArg($arg)
+                    && (
+                        $this->operandsReferToSameVariable($firstArg, $arg)
+                        || $this->operandsReferToSameVariable($stmtCoalesce->result, $arg)
+                        || $this->operandsReferToSameVariable($stmtCoalesce->left, $arg)
+                    )
+                ) {
+                    $coalesce = $stmtCoalesce;
+                }
+            }
+        }
+        if (null !== $coalesce) {
+            $coalesceSlot = $this->slotForCoalesceResult($block, $coalesce);
+            if (null !== $coalesceSlot) {
+                return (string) $coalesceSlot;
+            }
+        }
+
+        return $valueSlot;
+    }
+
     /**
      * php-cfg may allocate a distinct temp for FuncCall args vs Coalesce->result (#9479, enum_int_cast_warning.phpt).
      */
@@ -3126,23 +3320,72 @@ class Compiler {
                 continue;
             }
             if (!$next instanceof Op\Expr\FuncCall && !$next instanceof Op\Expr\NsFuncCall) {
+                if ($next instanceof Op\Expr && $this->isInlineExprCallArgProducer($next)) {
+                    continue;
+                }
+
                 return;
             }
-            if (1 !== count($next->args)) {
+            if (!property_exists($next, 'args') || !is_array($next->args) || [] === $next->args) {
                 return;
             }
-            $arg = $next->args[0];
-            if ($this->operandsChainEqual($arg, $coalesce->result)) {
+            foreach ($next->args as $embeddedArgProbe) {
+                if (null === $embeddedArgProbe) {
+                    continue;
+                }
+                foreach ($this->findEmbeddedCoalesces($embeddedArgProbe) as $embedded) {
+                    if ($embedded === $coalesce) {
+                        return;
+                    }
+                }
+            }
+            $targetArg = null;
+            foreach ($next->args as $callArg) {
+                if (
+                    null === $callArg
+                    || $this->isCallArgUnrelatedToPriorStmtCoalesce($callArg)
+                ) {
+                    continue;
+                }
+                if (
+                    $this->operandsChainEqual($callArg, $coalesce->result)
+                    || $this->operandsReferToSameVariable($callArg, $coalesce->result)
+                    || $this->operandsReferToSameVariable($callArg, $coalesce->left)
+                ) {
+                    $targetArg = $callArg;
+                    break;
+                }
+            }
+            if (null === $targetArg) {
+                $firstArg = $next->args[0] ?? null;
+                if (
+                    null !== $firstArg
+                    && !$this->isCallArgUnrelatedToPriorStmtCoalesce($firstArg)
+                    && $this->onlyInlineCallArgProducersBetweenIndices($ops, $coalesceIdx, $j)
+                ) {
+                    $targetArg = $firstArg;
+                }
+            }
+            if (null === $targetArg) {
+                return;
+            }
+            if ($this->operandsChainEqual($targetArg, $coalesce->result)) {
+                $this->registerSyncedCoalesceFuncCallArgSlot(
+                    $targetArg,
+                    $this->compileOperand($resultOverride ?? $coalesce->result, $block, true)
+                );
+
                 return;
             }
             $sourceSlot = $this->compileOperand($resultOverride ?? $coalesce->result, $block, true);
-            $destSlot = $this->compileOperand($arg, $block, false);
+            $destSlot = $this->compileOperand($targetArg, $block, false);
             $block->addOpCode(new OpCode(
                 OpCode::TYPE_ASSIGN,
                 $destSlot,
                 $destSlot,
                 $sourceSlot
             ));
+            $this->registerSyncedCoalesceFuncCallArgSlot($targetArg, $destSlot);
 
             return;
         }
@@ -26054,6 +26297,13 @@ class Compiler {
             $prefetchOps = [];
             $assignedNamedLocal = null;
             $valueSlot = null;
+            $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
+            if (null === $syncedCoalesceSlot) {
+                $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($arg);
+            }
+            if (null !== $syncedCoalesceSlot) {
+                $valueSlot = (string) $syncedCoalesceSlot;
+            }
             $callArgConstRoot = $this->unwrapOperandChain($callArgOperand);
             if ($callArgConstRoot instanceof Op\Expr\ConstFetch) {
                 $foldedGlobalConst = $this->tryFoldGlobalConstFetch($callArgConstRoot);
@@ -26061,7 +26311,7 @@ class Compiler {
                     $valueSlot = (string) $block->registerConstant($callArgOperand, $foldedGlobalConst);
                 }
             }
-            if (null !== $dimFetchSlot) {
+            if (null !== $dimFetchSlot && null === $valueSlot) {
                 $valueSlot = $dimFetchSlot;
             } elseif (null !== $inlineArray) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);
@@ -26571,7 +26821,7 @@ class Compiler {
                             break;
                         }
                     }
-                    if (null === $this->findCoalesceStmtForCallArg($arg, $block)) {
+                    if (!$this->callArgHasPriorStmtCoalesce($arg, $block, $cfgCallOp, (int) $argIndex)) {
                         $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                         if (
                             null !== $producerSlot
@@ -27960,13 +28210,13 @@ class Compiler {
                     $valueSlot = $arrayColumnSlot;
                 }
             }
-            // Final pass: stmt-level ?? merge slot beats dim-fetch producer remaps (#11603).
-            if (!$this->isCallArgDirectArrayDimFetch($arg) && null !== $cfgCallOp) {
-                $coalesceSlot = $this->compileCallArgCoalesceSlot($arg, $block, $cfgCallOp, (int) $argIndex);
-                if (null !== $coalesceSlot) {
-                    $valueSlot = (string) $coalesceSlot;
-                }
-            }
+            $valueSlot = $this->finalizeStmtCoalesceCallArgSlot(
+                $arg,
+                $block,
+                $cfgCallOp,
+                (int) $argIndex,
+                $valueSlot
+            );
             if ('proc_open' === strtolower($calleeName ?? '') && null !== $cfgCallOp) {
                 $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot(
                     $block,
