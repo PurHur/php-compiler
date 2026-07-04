@@ -15280,6 +15280,14 @@ class Compiler {
                     if (null !== $outerArray) {
                         return $outerArray;
                     }
+                    $trailingConst = $this->matchNestedArrayTrailingConstFetchCallArgProducer(
+                        $producers,
+                        $callArgs,
+                        $argIndex
+                    );
+                    if (null !== $trailingConst) {
+                        return $trailingConst;
+                    }
                     $byIndex = null;
                 }
                 if ($byIndex instanceof Op\Expr\Array_ && null !== $callArg) {
@@ -17816,6 +17824,67 @@ class Compiler {
         }
 
         return [$arrayChain, $trailing];
+    }
+
+    /**
+     * http_build_query([..], '', '&', PHP_QUERY_RFC3986) — nested Array_ chain + trailing ConstFetch (#15932, #12008).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchNestedArrayTrailingConstFetchCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (
+            !$this->callArgIsDeadInlineTemporary($callArg)
+            || $this->callArgOperandExpectsArrayProducer($callArg)
+        ) {
+            return null;
+        }
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null === $nestedTrailing) {
+            return null;
+        }
+        [, $trailing] = $nestedTrailing;
+        if ([] === $trailing) {
+            return null;
+        }
+        $lastNonEmbedded = null;
+        foreach ($callArgs as $i => $candidate) {
+            if (!$this->isEmbeddedCallLiteralArg($candidate)) {
+                $lastNonEmbedded = (int) $i;
+            }
+        }
+        if (null === $lastNonEmbedded || $argIndex !== $lastNonEmbedded) {
+            return null;
+        }
+        $trailingHoistedOrd = 0;
+        foreach ($callArgs as $i => $candidate) {
+            if ($i <= 0) {
+                continue;
+            }
+            if (
+                !$this->isEmbeddedCallLiteralArg($candidate)
+                && $this->callArgIsDeadInlineTemporary($candidate)
+            ) {
+                ++$trailingHoistedOrd;
+                if ($i === $argIndex) {
+                    break;
+                }
+            }
+        }
+        if ($trailingHoistedOrd < 1) {
+            return null;
+        }
+        $producer = $trailing[$trailingHoistedOrd - 1] ?? null;
+        if ($producer instanceof Op\Expr\ConstFetch || $producer instanceof Op\Expr\ClassConstFetch) {
+            return $producer;
+        }
+
+        return null;
     }
 
     /**
@@ -28444,22 +28513,39 @@ class Compiler {
                                 $block->orig->children,
                                 $cfgCallOp
                             );
-                            $finalProducer = $this->inlineHoistedProducerForCallArgIndex(
-                                $cfgCallOp,
-                                (int) $argIndex,
+                            $trailingConst = $this->matchNestedArrayTrailingConstFetchCallArgProducer(
                                 $finalProducers,
-                                $block->orig->children,
-                                $block
+                                $cfgCallOp->args ?? [],
+                                (int) $argIndex
                             );
-                            if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
-                                if (null === $block->slotForOperand($finalProducer->result)) {
-                                    foreach ($this->compileExpr($finalProducer, $block) as $op) {
+                            if ($trailingConst instanceof Op\Expr) {
+                                if (null === $block->slotForOperand($trailingConst->result)) {
+                                    foreach ($this->compileExpr($trailingConst, $block) as $op) {
                                         $sends[] = $op;
                                     }
                                 }
-                                $finalProducerSlot = $block->slotForOperand($finalProducer->result);
-                                if (null !== $finalProducerSlot) {
-                                    $valueSlot = (string) $finalProducerSlot;
+                                $trailingConstSlot = $block->slotForOperand($trailingConst->result);
+                                if (null !== $trailingConstSlot) {
+                                    $valueSlot = (string) $trailingConstSlot;
+                                }
+                            } else {
+                                $finalProducer = $this->inlineHoistedProducerForCallArgIndex(
+                                    $cfgCallOp,
+                                    (int) $argIndex,
+                                    $finalProducers,
+                                    $block->orig->children,
+                                    $block
+                                );
+                                if ($finalProducer instanceof Op\Expr && null !== $finalProducer->result) {
+                                    if (null === $block->slotForOperand($finalProducer->result)) {
+                                        foreach ($this->compileExpr($finalProducer, $block) as $op) {
+                                            $sends[] = $op;
+                                        }
+                                    }
+                                    $finalProducerSlot = $block->slotForOperand($finalProducer->result);
+                                    if (null !== $finalProducerSlot) {
+                                        $valueSlot = (string) $finalProducerSlot;
+                                    }
                                 }
                             }
                         }
