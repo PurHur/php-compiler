@@ -14452,6 +14452,19 @@ class Compiler {
                 }
             }
         }
+        // array_map($cb, $a, $b, …) — zip hoisted Array_ producers before inlineHoisted slot walk (#4539, #9143).
+        if (
+            'array_map' === $inlineFuncName
+            && $argCount >= 3
+            && $argIndex >= 1
+            && null !== $block
+            && null !== $cfgCallOp
+        ) {
+            $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
+            }
+        }
         if (
             1 === $callbackArgIndex
             && 0 === $argIndex
