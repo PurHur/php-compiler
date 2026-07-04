@@ -12061,6 +12061,16 @@ class Compiler {
                             )
                         )
                     ) {
+                        // array_merge((object)[...], [...]) — trailing Array_ is arg #1, not arg #0 (#15858).
+                        if (
+                            0 === $argIndex
+                            && $this->callArgIsDeadInlineTemporary($callArgProbe)
+                            && $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            && $this->inlineCallArgZeroFedByHoistedCastProducer($cfgChildren, $callOp)
+                        ) {
+                            continue;
+                        }
+
                         return $child;
                     }
                     if (
@@ -12114,6 +12124,42 @@ class Compiler {
             $this->callArgIsDeadInlineTemporary($positionalCallArg)
             && $this->callArgOperandExpectsArrayProducer($positionalCallArg)
         ) {
+            // array_combine(array_keys(...), [...]) — sibling FuncCall feeds arg #0, not trailing Array_ (#15558, #15857).
+            if (
+                'array_combine' === $this->resolveCfgFuncCallName($callOp)
+                && 2 === \count($callOp->args ?? [])
+                && null !== $this->matchArrayCombineInlineProducers($producers, $argIndex)
+            ) {
+                return null;
+            }
+            // array_merge((object)[...], [...]) — Cast feeds arg #0, not trailing Array_ (#15207, #15858).
+            if (
+                0 === $argIndex
+                && \in_array(
+                    $this->resolveCfgFuncCallName($callOp),
+                    [
+                        'array_merge',
+                        'array_merge_recursive',
+                        'array_replace',
+                        'array_replace_recursive',
+                        'array_diff',
+                        'array_intersect',
+                        'array_diff_key',
+                        'array_intersect_key',
+                    ],
+                    true
+                )
+            ) {
+                foreach ($producers as $producer) {
+                    if ($producer instanceof Op\Expr\Cast) {
+                        return null;
+                    }
+                }
+            }
+            $directUnary = $this->matchDirectResultInlineCallArgProducer($producers, $positionalCallArg);
+            if ($directUnary instanceof Op\Expr\Cast) {
+                return null;
+            }
             // array_reverse([...], true) — nested FuncCall feeds the dead temp, not hoisted Array_ (#14042).
             $directCall = $this->matchDirectResultInlineCallArgProducer($producers, $positionalCallArg);
             if (
@@ -12322,6 +12368,7 @@ class Compiler {
             || $matched instanceof Op\Expr\NsFuncCall
             || $matched instanceof Op\Expr\StaticCall
             || $matched instanceof Op\Expr\MethodCall
+            || $matched instanceof Op\Expr\Cast
         ) {
             return $matched;
         }
@@ -12335,7 +12382,8 @@ class Compiler {
     /** Hoisted inline call-arg producers whose Expr::result is the callee operand (#10490, #12763). */
     private function inlineCallArgProducerUsesExprResultSlot(?Op\Expr $matched): bool
     {
-        return $matched instanceof Op\Expr\Array_
+        return $matched instanceof Op\Expr\Cast
+            || $matched instanceof Op\Expr\Array_
             || $matched instanceof Op\Expr\BinaryOp\Plus
             || $matched instanceof Op\Expr\BinaryOp\Concat;
     }
@@ -15269,6 +15317,13 @@ class Compiler {
 
                 return null;
             }
+            // array_combine(array_keys(...), [...]) — inner Array_ prelude + FuncCall + trailing Array_ (#15558, #15857).
+            if ('array_combine' === $inlineFuncName && 2 === $argCount) {
+                $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+                if (null !== $arrayCombinePair) {
+                    return $arrayCombinePair;
+                }
+            }
             // php-cfg emits inner-then-outer Array_ per inline arg (#4738, #10196, #10662).
             if ($this->producersAreNestedArrayLiteralChain($producers) && 0 === $producerCount % $argCount) {
                 $depth = intdiv($producerCount, $argCount);
@@ -15953,7 +16008,7 @@ class Compiler {
         if (
             'array_combine' === $inlineFuncName
             && 2 === \count($callArgs)
-            && 2 === \count($producers)
+            && \count($producers) >= 2
         ) {
             $arrayCombinePair = $this->matchArrayCombineInlineProducers($producers, $argIndex);
             if (null !== $arrayCombinePair) {
@@ -16748,6 +16803,94 @@ class Compiler {
         return $matched;
     }
 
+    /**
+     * array_merge((object)[...], [...]) — hoisted Cast feeds arg #0, not stmt-before Array_ (#15858).
+     *
+     * @param list<Op\Node> $cfgChildren
+     */
+    private function inlineCallArgZeroFedByHoistedCastProducer(array $cfgChildren, Op $callOp): bool
+    {
+        if (!\in_array(
+            $this->resolveCfgFuncCallName($callOp),
+            [
+                'array_merge',
+                'array_merge_recursive',
+                'array_replace',
+                'array_replace_recursive',
+                'array_diff',
+                'array_intersect',
+                'array_diff_key',
+                'array_intersect_key',
+            ],
+            true
+        )) {
+            return false;
+        }
+        foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp) as $producer) {
+            if ($producer instanceof Op\Expr\Cast) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * array_merge((object)[...], [...]) — wire hoisted Cast result to arg #0 (#15207, #15858).
+     */
+    private function resolveHoistedCastInlineCallArgZeroSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName,
+        int $argIndex
+    ): ?string {
+        if (0 !== $argIndex || null === $cfgCallOp) {
+            return null;
+        }
+        $cfgChildren = $this->inlineCallArgProducerCfgChildren($block);
+        if ([] === $cfgChildren && null !== $block->orig) {
+            $cfgChildren = $block->orig->children;
+        }
+        $callIndex = null;
+        foreach ($cfgChildren as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            $containing = $this->findCfgBlockContainingExpr($cfgCallOp);
+            if (null !== $containing) {
+                $cfgChildren = $containing->children;
+                foreach ($cfgChildren as $i => $child) {
+                    if ($child === $cfgCallOp) {
+                        $callIndex = $i;
+                        break;
+                    }
+                }
+            }
+        }
+        if (null === $callIndex || [] === $cfgChildren) {
+            return null;
+        }
+        for ($i = $callIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if (!$child instanceof Op\Expr\Cast) {
+                continue;
+            }
+            if (null === $block->slotForOperand($child->result)) {
+                foreach ($this->compileExpr($child, $block) as $op) {
+                    $block->opCodes[] = $op;
+                }
+            }
+            $slot = $block->slotForOperand($child->result);
+
+            return null !== $slot ? (string) $slot : null;
+        }
+
+        return null;
+    }
+
     private function inlineArrayLiteralStmtBeforeOverriddenBySiblingCallProducer(
         Op $cfgCallOp,
         int $argIndex,
@@ -16772,7 +16915,8 @@ class Compiler {
         return $producerMatch instanceof Op\Expr\FuncCall
             || $producerMatch instanceof Op\Expr\NsFuncCall
             || $producerMatch instanceof Op\Expr\MethodCall
-            || $producerMatch instanceof Op\Expr\StaticCall;
+            || $producerMatch instanceof Op\Expr\StaticCall
+            || $producerMatch instanceof Op\Expr\Cast;
     }
 
     /**
@@ -25388,6 +25532,16 @@ class Compiler {
             $nameSlot = null;
             $unpackFlag = null;
             $inlineArrayLiteralArgWired = false;
+            $castArgZeroSlot = $this->resolveHoistedCastInlineCallArgZeroSlot(
+                $block,
+                $cfgCallOp,
+                $calleeName,
+                (int) $argIndex
+            );
+            if (null !== $castArgZeroSlot) {
+                $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $castArgZeroSlot, $nameSlot, $unpackFlag);
+                continue;
+            }
             $callOrdinal = 0;
             foreach ($block->opCodes as $op) {
                 if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
@@ -25411,7 +25565,11 @@ class Compiler {
                         $cfgCallOp
                     );
                     $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
-                    if ($combineMatch instanceof Op\Expr\Array_) {
+                    if (
+                        $combineMatch instanceof Op\Expr\Array_
+                        || $combineMatch instanceof Op\Expr\FuncCall
+                        || $combineMatch instanceof Op\Expr\NsFuncCall
+                    ) {
                         $inlineArray = $combineMatch;
                     } elseif (
                         $combineMatch instanceof Op\Expr\FuncCall
@@ -25465,6 +25623,12 @@ class Compiler {
                             )
                         ) {
                             // array_combine(array_keys(...), [...]) — arg #0 is sibling FuncCall, not trailing Array_ (#15558, #13776).
+                        } elseif (
+                            0 === (int) $argIndex
+                            && null !== $block->orig
+                            && $this->inlineCallArgZeroFedByHoistedCastProducer($block->orig->children, $cfgCallOp)
+                        ) {
+                            // array_merge((object)[...], [...]) — Cast feeds arg #0 (#15858).
                         } elseif (
                             $this->callArgIsDeadInlineTemporary($callArgProbe)
                             || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)

@@ -2707,6 +2707,40 @@ PHP;
         self::assertNotSame($combineSends[0], $combineSends[1], 'combine sends='.json_encode($combineSends));
     }
 
+    /** Issue #15858 — array_merge((object)[...], [...]) wires hoisted Cast to arg #0, not trailing Array_. */
+    public function testArrayMergeObjectCastInlineCallArgZeroSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_merge((object) ['a' => 1], ['b' => 2]);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_merge_object_cast.php');
+
+        $castSlot = null;
+        $mergeSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $mergeSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mergeSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertCount(2, $mergeSends);
+        self::assertSame($castSlot, $mergeSends[0], 'merge sends='.json_encode($mergeSends));
+        self::assertNotSame($mergeSends[0], $mergeSends[1], 'merge sends='.json_encode($mergeSends));
+    }
+
     /** Issue #10093 — array_merge([1], [2]) sibling inline Array_ literals use distinct producer slots. */
     public function testArrayMergeSiblingInlineLiteralRuntime(): void
     {
