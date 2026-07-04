@@ -194,20 +194,28 @@ final class JitBcmath
 
     public static function powmod(Context $context, JITVariable ...$args): Value
     {
-        if (\count($args) < 3 || \count($args) > 4) {
-            throw new \LogicException('bcpowmod() requires three or four arguments in this compiler build');
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
+        if (\count($args) < 3 || \count($args) > $maxArgs) {
+            throw new \LogicException(
+                5 === $maxArgs
+                    ? 'bcpowmod() requires three to five arguments in this compiler build'
+                    : 'bcpowmod() requires three or four arguments in this compiler build'
+            );
         }
 
         $baseLit = self::compileTimeString($args[0]);
         $expLit = self::compileTimeString($args[1]);
         $modLit = self::compileTimeString($args[2]);
         $scaleLit = isset($args[3]) ? self::compileTimeLong($args[3]) : null;
-        $canFold = null !== $baseLit && null !== $expLit && null !== $modLit && (!isset($args[3]) || null !== $scaleLit);
+        $modeLit = isset($args[4]) ? self::compileTimeRoundMode($context, $args[4]) : null;
+        $canFold = null !== $baseLit && null !== $expLit && null !== $modLit
+            && (!isset($args[3]) || null !== $scaleLit)
+            && (!isset($args[4]) || null !== $modeLit);
         if ($canFold && self::$compileTimeScaleKnown) {
             $scale = null !== $scaleLit ? $scaleLit : self::$compileTimeScale;
 
             return $context->builder->load(
-                $context->constantStringFromString(VmBcmath::powmod($baseLit, $expLit, $modLit, $scale))
+                $context->constantStringFromString(VmBcmath::powmod($baseLit, $expLit, $modLit, $scale, $modeLit))
             );
         }
 
@@ -216,6 +224,7 @@ final class JitBcmath
         $exp = JitStringBuiltinArg::lower($context, $args[1], 'bcpowmod', 1, 'exponent');
         $mod = JitStringBuiltinArg::lower($context, $args[2], 'bcpowmod', 2, 'modulus');
         [$scale, $hasScale] = self::scaleAndFlag($context, $args, 3, 'bcpowmod');
+        [$roundMode, $hasRoundMode] = self::roundModeAndFlag($context, $args, 4, 'bcpowmod');
 
         return $context->builder->call(
             $context->lookupFunction('__compiler_bcpowmod'),
@@ -223,7 +232,9 @@ final class JitBcmath
             $exp,
             $mod,
             $scale,
-            $hasScale
+            $hasScale,
+            $roundMode,
+            $hasRoundMode
         );
     }
 

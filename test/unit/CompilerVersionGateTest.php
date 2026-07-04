@@ -39,6 +39,21 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsMbStrPad());
     }
 
+    public function testSupportsMbStrPadTrueOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $this->assertTrue(CompilerVersion::supportsMbStrPad());
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
+    }
+
     public function testSupportsFpowFalseOnReferenceProfile(): void
     {
         $this->assertFalse(CompilerVersion::supportsFpow());
@@ -490,6 +505,22 @@ final class CompilerVersionGateTest extends TestCase
     {
         $runtime = new Runtime();
         $this->assertFalse(isset($runtime->vmContext->functions['mb_str_pad']));
+    }
+
+    public function testVmRegistersMbStrPadOnForwardProfile(): void
+    {
+        $prev = getenv('PHP_COMPILER_PROFILE');
+        putenv('PHP_COMPILER_PROFILE=8.4');
+        try {
+            $runtime = new Runtime();
+            $this->assertTrue(isset($runtime->vmContext->functions['mb_str_pad']));
+        } finally {
+            if (false === $prev) {
+                putenv('PHP_COMPILER_PROFILE');
+            } else {
+                putenv('PHP_COMPILER_PROFILE='.$prev);
+            }
+        }
     }
 
     public function testVmDoesNotRegisterClockGettimeOnReferenceProfile(): void

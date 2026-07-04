@@ -16,14 +16,17 @@ final class bcpowmod extends BcmathFunction
 
     protected function compute(Frame $frame): string
     {
-        $argc = \count($frame->calledArgs);
-        if ($argc < 3 || $argc > 4) {
-            throw new \LogicException('bcpowmod() requires three or four arguments in this compiler build');
-        }
+        $this->requireTernaryArgCount($frame);
         $base = $this->requireStringArg($frame, 0, 'num');
         $exponent = $this->requireStringArg($frame, 1, 'exponent');
         $modulus = $this->requireStringArg($frame, 2, 'modulus');
 
-        return VmBcmath::powmod($base, $exponent, $modulus, $this->optionalScale($frame, 3));
+        return VmBcmath::powmod(
+            $base,
+            $exponent,
+            $modulus,
+            $this->optionalScale($frame, 3),
+            $this->optionalRoundingMode($frame, 4)
+        );
     }
 }

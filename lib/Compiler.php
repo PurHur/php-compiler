@@ -12247,18 +12247,30 @@ class Compiler {
         if (
             'proc_open' === $this->resolveCfgFuncCallName($callOp)
             && \is_array($callOp->args)
-            && \count($callOp->args) >= 5
         ) {
             $procOpenProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($cfgChildren, $callOp);
             $arrayProducers = array_values(array_filter(
                 $procOpenProducers,
                 static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
             ));
-            if (0 === $argIndex && isset($arrayProducers[0])) {
-                return $arrayProducers[0];
+            if (\count($callOp->args) >= 5) {
+                if (0 === $argIndex && isset($arrayProducers[0])) {
+                    return $arrayProducers[0];
+                }
+                if (4 === $argIndex && [] !== $arrayProducers) {
+                    return $arrayProducers[\count($arrayProducers) - 1];
+                }
             }
-            if (4 === $argIndex && [] !== $arrayProducers) {
-                return $arrayProducers[\count($arrayProducers) - 1];
+            if (1 === $argIndex && [] !== $arrayProducers) {
+                $outer = $this->matchOutermostNestedInlineArrayProducerForCallArg(
+                    $procOpenProducers,
+                    $arrayProducers,
+                    $argIndex,
+                    \count($callOp->args)
+                );
+                if ($outer instanceof Op\Expr\Array_) {
+                    return $outer;
+                }
             }
         }
         $callIndex = null;
@@ -26256,6 +26268,31 @@ class Compiler {
                     : null;
                 $inlineArray = $outerArray instanceof Op\Expr\Array_ ? $outerArray : null;
             }
+            if (
+                null !== $inlineArray
+                && null !== $cfgCallOp
+                && 1 === (int) $argIndex
+                && 'proc_open' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && null !== $block->orig
+            ) {
+                $procOpenProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $procOpenArrayProducers = array_values(array_filter(
+                    $procOpenProducers,
+                    static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+                ));
+                $procOpenOuter = $this->matchOutermostNestedInlineArrayProducerForCallArg(
+                    $procOpenProducers,
+                    $procOpenArrayProducers,
+                    (int) $argIndex,
+                    \count($cfgCallOp->args ?? $args)
+                );
+                if ($procOpenOuter instanceof Op\Expr\Array_) {
+                    $inlineArray = $procOpenOuter;
+                }
+            }
             $prefetchOps = [];
             $assignedNamedLocal = null;
             $valueSlot = null;
@@ -28179,6 +28216,17 @@ class Compiler {
                 (int) $argIndex,
                 $valueSlot
             );
+            if ('proc_open' === strtolower($calleeName ?? '') && null !== $cfgCallOp) {
+                $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $procOpenSlot) {
+                    $valueSlot = $procOpenSlot;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -28265,6 +28313,7 @@ class Compiler {
 
     /**
      * proc_open(['cmd'], $desc, $pipes, null, ['K'=>'V']) — map command/null/env preludes (#9389, #13734).
+     * Three-arg inline nested descriptor_spec uses outermost INIT_ARRAY slot (#11485, #11300).
      */
     private function resolveProcOpenInlineCallArgSlot(
         Block $block,
@@ -28277,8 +28326,24 @@ class Compiler {
             || 'proc_open' !== $this->resolveCfgFuncCallName($cfgCallOp)
             || $this->callIncludesNamedParameter($cfgCallOp)
             || !\is_array($cfgCallOp->args ?? null)
-            || \count($cfgCallOp->args) < 5
         ) {
+            return null;
+        }
+        $argCount = \count($cfgCallOp->args);
+        if (1 === $argIndex && $argCount >= 3 && $argCount < 5) {
+            $descriptorArg = $cfgCallOp->args[1] ?? null;
+            if (
+                $descriptorArg instanceof Operand
+                && $this->callArgIsDeadInlineTemporary($descriptorArg)
+                && $this->callArgOperandExpectsArrayProducer($descriptorArg)
+            ) {
+                return $this->resolveInlineArrayProducerSlotBeforeCfgCall($cfgCallOp, $block)
+                    ?? $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $pendingSends);
+            }
+
+            return null;
+        }
+        if ($argCount < 5) {
             return null;
         }
         $commandSlot = null;
@@ -28318,6 +28383,89 @@ class Compiler {
             4 => $envSlot,
             default => null,
         };
+    }
+
+    /** Outermost hoisted Array_ stmt immediately before a cfg FuncCall (#11485). */
+    private function resolveInlineArrayProducerSlotBeforeCfgCall(Op $callOp, Block $block): ?string
+    {
+        $arrayExpr = $this->inlineArrayProducerImmediatelyBeforeCfgCall($callOp, $block);
+        if (!$arrayExpr instanceof Op\Expr\Array_) {
+            return null;
+        }
+        if (null === $block->slotForOperand($arrayExpr->result)) {
+            foreach ($this->compileExpr($arrayExpr, $block) as $op) {
+                $block->addOpCode($op);
+            }
+        }
+        $slot = $block->slotForOperand($arrayExpr->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * Outermost inline Array_ producer for nested literal call args (descriptor_spec, etc.) (#11485).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Op\Expr\Array_> $arrayProducers
+     */
+    private function matchOutermostNestedInlineArrayProducerForCallArg(
+        array $producers,
+        array $arrayProducers,
+        int $argIndex,
+        int $argCount
+    ): ?Op\Expr\Array_ {
+        if ([] === $arrayProducers) {
+            return null;
+        }
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null !== $nestedTrailing) {
+            [$arrayChain, $trailing] = $nestedTrailing;
+            if (1 + \count($trailing) === $argCount && $argIndex < \count($arrayChain)) {
+                $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+
+                return $outer instanceof Op\Expr\Array_ ? $outer : null;
+            }
+        }
+        if (
+            \count($arrayProducers) >= 2
+            && $this->producersAreNestedArrayLiteralChain($arrayProducers)
+            && $this->arrayProducersFormNestedChain($arrayProducers)
+        ) {
+            $outer = $arrayProducers[\count($arrayProducers) - 1];
+
+            return $outer instanceof Op\Expr\Array_ ? $outer : null;
+        }
+
+        return $arrayProducers[\count($arrayProducers) - 1];
+    }
+
+    /**
+     * Last keyed INIT_ARRAY slot for nested inline array call args (#11485).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function resolveOutermostInitArraySlotBeforePendingFuncCall(
+        Block $block,
+        array $pendingSends = []
+    ): ?string {
+        $outerSlot = null;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1 && null !== $op->arg3) {
+                $outerSlot = (string) $op->arg1;
+            }
+        }
+        if (null !== $outerSlot) {
+            return $outerSlot;
+        }
+        $scanOps = array_merge($block->opCodes, $pendingSends);
+        for ($i = \count($scanOps) - 1; $i >= 0; --$i) {
+            $op = $scanOps[$i];
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
     }
 
     /**

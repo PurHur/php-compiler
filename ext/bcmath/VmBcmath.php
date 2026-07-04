@@ -52,7 +52,7 @@ final class VmBcmath
         return self::formatBinaryResult($result, $scale, $roundingMode);
     }
 
-    public static function div(string $left, string $right, ?int $scale = null): string
+    public static function div(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): string
     {
         $scale = self::resolveScale($scale);
         $a = self::parse($left);
@@ -68,7 +68,7 @@ final class VmBcmath
             $scale
         );
 
-        return self::format($quotient, $scale);
+        return self::formatBinaryResult($quotient, $scale, $roundingMode);
     }
 
     /**
@@ -76,14 +76,14 @@ final class VmBcmath
      *
      * @return array{0: string, 1: string}
      */
-    public static function divmod(string $left, string $right, ?int $scale = null): array
+    public static function divmod(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): array
     {
         $scale = self::resolveScale($scale);
         $b = self::parse($right);
         if (self::isZero($b)) {
             throw new \DivisionByZeroError('Division by zero');
         }
-        $quotient = self::div($left, $right, 0);
+        $quotient = self::div($left, $right, 0, $roundingMode);
         $product = self::mul($quotient, $right, $scale);
         $remainder = self::sub($left, $product, $scale);
 
@@ -193,14 +193,14 @@ final class VmBcmath
     }
 
     /** Remainder of arbitrary-precision division (php-src ext/bcmath/bcmath.c PHP_FUNCTION(bcmod); issue #6042). */
-    public static function mod(string $left, string $right, ?int $scale = null): string
+    public static function mod(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): string
     {
         $scale = self::resolveScale($scale);
         $b = self::parse($right);
         if (self::isZero($b)) {
             throw new \DivisionByZeroError('Division by zero');
         }
-        [, $remainder] = self::divmod($left, $right, $scale);
+        [, $remainder] = self::divmod($left, $right, $scale, $roundingMode);
 
         return $remainder;
     }
@@ -285,7 +285,7 @@ final class VmBcmath
     /**
      * Modular exponentiation (php-src ext/bcmath/libbcmath/src/raisemod.c; issue #6976).
      */
-    public static function powmod(string $base, string $exponent, string $modulus, ?int $scale = null): string
+    public static function powmod(string $base, string $exponent, string $modulus, ?int $scale = null, ?int $roundingMode = null): string
     {
         $scale = self::resolveScale($scale);
         $baseNum = self::parseInteger($base, 1);
@@ -317,7 +317,7 @@ final class VmBcmath
             $expoDigits = self::divDigitStringByTwo($expoDigits);
         }
 
-        return self::format(self::parse($result), $scale);
+        return self::formatBinaryResult(self::parse($result), $scale, $roundingMode);
     }
 
     private static function resolveScale(?int $scale): int
