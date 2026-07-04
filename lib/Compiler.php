@@ -18384,6 +18384,38 @@ class Compiler {
     }
 
     /**
+     * array_multisort([..], $labels = [..]) — map dead inline arg index to hoisted Array_ (#15151).
+     *
+     * php-cfg lowers assign-in-call between the second literal and FuncCall; the first literal is
+     * not stmt-immediate-before the call.
+     */
+    private function inlineArrayMultisortLiteralProducerForArg(?Op $cfgCallOp, Block $block, int $argIndex): ?Op\Expr\Array_
+    {
+        if (null === $cfgCallOp || null === $block->orig || $argIndex < 0) {
+            return null;
+        }
+        $callIndex = null;
+        foreach ($block->orig->children as $i => $child) {
+            if ($child === $cfgCallOp) {
+                $callIndex = $i;
+                break;
+            }
+        }
+        if (null === $callIndex) {
+            return null;
+        }
+        $arrays = [];
+        for ($i = 0; $i < $callIndex; ++$i) {
+            $child = $block->orig->children[$i];
+            if ($child instanceof Op\Expr\Array_) {
+                $arrays[] = $child;
+            }
+        }
+
+        return $arrays[$argIndex] ?? null;
+    }
+
+    /**
      * php-cfg `array_keys([...])` hoists the literal Array_ stmt immediately before the call (#13778).
      * in_array('a', ['a','b'], true) may hoist ConstFetch between Array_ and FuncCall (#15422).
      */
@@ -26005,8 +26037,7 @@ class Compiler {
             ) {
                 $multisortArgProbe = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
                 if (
-                    0 === (int) $argIndex
-                    && $this->callArgIsDeadInlineTemporary($multisortArgProbe)
+                    $this->callArgIsDeadInlineTemporary($multisortArgProbe)
                     && !$this->isCallArgDirectArrayDimFetch($multisortArgProbe)
                     && null === $this->resolvePrecedingArrayDimFetchCallArgSlot(
                         $multisortArgProbe,
@@ -26015,8 +26046,12 @@ class Compiler {
                         (int) $argIndex
                     )
                 ) {
-                    // Inline literal only — not nested Array_ inside $cols = [[...], [...]] (#15151, #6689).
-                    $stmtBefore = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    // Inline literal — assign-in-call may sit between the second Array_ and FuncCall (#15151).
+                    $stmtBefore = $this->inlineArrayMultisortLiteralProducerForArg(
+                        $cfgCallOp,
+                        $block,
+                        (int) $argIndex
+                    ) ?? $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($stmtBefore instanceof Op\Expr\Array_) {
                         if (null === $block->slotForOperand($stmtBefore->result)) {
                             foreach ($this->compileArrayLiteral($stmtBefore, $block) as $op) {
