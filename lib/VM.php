@@ -5163,6 +5163,10 @@ restart:
                         $frame = $finallyFrame;
                         goto restart;
                     }
+                    // Fused finally/end blocks compile as return void; resume pending catch return (#15738).
+                    if ($this->schedulePendingReturnDispatch()) {
+                        goto restart;
+                    }
                     goto return_void_complete;
                 case OpCode::TYPE_RETURN:
                     $frame->returnSiteLine = (int) ($op->arg2 ?? 0);
