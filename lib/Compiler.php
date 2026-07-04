@@ -15767,6 +15767,10 @@ class Compiler {
                 if (0 === $argIndex) {
                     return $nullCallback;
                 }
+                $nullHaystack = $this->arrayMapInlineNullHaystackProducerForArgIndex($cfgCallOp, $block, $argIndex);
+                if ($nullHaystack instanceof Op\Expr\ConstFetch) {
+                    return $nullHaystack;
+                }
                 if (2 === $argCount && 1 === $argIndex) {
                     $immediate = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
                     if ($immediate instanceof Op\Expr\Array_) {
@@ -15789,6 +15793,7 @@ class Compiler {
             && $argIndex >= 1
             && null !== $block
             && null !== $cfgCallOp
+            && null === $this->arrayMapInlineNullHaystackProducerForArgIndex($cfgCallOp, $block, $argIndex)
         ) {
             $mapped = $this->matchInlineArrayProducersToArrayCallArgs($producers, $callArgs, $argIndex);
             if (null !== $mapped) {
@@ -24311,22 +24316,24 @@ class Compiler {
     }
 
     /**
-     * array_map(null, [[..]]) — hoisted null ConstFetch precedes nested Array_ preludes (#9143).
+     * array_map(null, null, …) / array_map(null, [[..]]) — inline null ConstFetch preludes in CFG order (#9143, #16226).
+     *
+     * @return list<Op\Expr\ConstFetch>
      */
-    private function arrayMapNullCallbackProducerBeforeCfgCall(Op $cfgCallOp, Block $block): ?Op\Expr\ConstFetch
+    private function arrayMapInlineNullConstFetchProducersBeforeCfgCall(Op $cfgCallOp, Block $block): array
     {
         if (null === $block->orig) {
-            return null;
+            return [];
         }
         $callbackArg = $cfgCallOp->args[0] ?? null;
         if ($this->isEmbeddedCallLiteralArg($callbackArg)) {
-            return null;
+            return [];
         }
         $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
         if ($leadingCallback instanceof Op\Expr\ArrowFunction
             || $leadingCallback instanceof Op\Expr\Closure
             || $leadingCallback instanceof Op\Expr\FirstClassCallable) {
-            return null;
+            return [];
         }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
@@ -24336,14 +24343,16 @@ class Compiler {
             }
         }
         if (null === $callIndex) {
-            return null;
+            return [];
         }
+        $nulls = [];
         for ($i = $callIndex - 1; $i >= 0; --$i) {
             $child = $block->orig->children[$i];
             if ($child instanceof Op\Expr\ConstFetch) {
                 $constName = $this->staticNameFromOperand($child->name);
                 if (null !== $constName && 'null' === strtolower($constName)) {
-                    return $child;
+                    array_unshift($nulls, $child);
+                    continue;
                 }
             }
             if ($child instanceof Op\Expr\Array_) {
@@ -24354,7 +24363,56 @@ class Compiler {
             }
         }
 
-        return null;
+        return $nulls;
+    }
+
+    /**
+     * array_map(null, [[..]]) — hoisted null ConstFetch precedes nested Array_ preludes (#9143).
+     */
+    private function arrayMapNullCallbackProducerBeforeCfgCall(Op $cfgCallOp, Block $block): ?Op\Expr\ConstFetch
+    {
+        $nulls = $this->arrayMapInlineNullConstFetchProducersBeforeCfgCall($cfgCallOp, $block);
+        $first = $nulls[0] ?? null;
+
+        return $first instanceof Op\Expr\ConstFetch ? $first : null;
+    }
+
+    /**
+     * array_map(null, null, [..]) — inline null haystack operand, not zip Array_ (#16226).
+     */
+    private function arrayMapInlineNullHaystackProducerForArgIndex(
+        Op $cfgCallOp,
+        Block $block,
+        int $argIndex
+    ): ?Op\Expr\ConstFetch {
+        if ($argIndex < 1 || !property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return null;
+        }
+        if ($this->callArgOperandExpectsArrayProducer($callArg)) {
+            return null;
+        }
+        $nullProducers = $this->arrayMapInlineNullConstFetchProducersBeforeCfgCall($cfgCallOp, $block);
+        if (\count($nullProducers) < 2) {
+            return null;
+        }
+        $nullHaystackOrdinal = 0;
+        for ($i = 1; $i < $argIndex; ++$i) {
+            $prior = $cfgCallOp->args[$i] ?? null;
+            if (!$prior instanceof Operand || $this->isEmbeddedCallLiteralArg($prior)) {
+                continue;
+            }
+            if (!$this->callArgOperandExpectsArrayProducer($prior)) {
+                ++$nullHaystackOrdinal;
+            }
+        }
+        $targetIndex = 1 + $nullHaystackOrdinal;
+        $candidate = $nullProducers[$targetIndex] ?? null;
+
+        return $candidate instanceof Op\Expr\ConstFetch ? $candidate : null;
     }
 
     /**
@@ -30122,6 +30180,11 @@ class Compiler {
                     && 'array_map' === $this->resolveCfgFuncCallName($cfgCallOp)
                     && \count($cfgCallOp->args ?? []) >= 3
                     && (int) $argIndex >= 1
+                    && null === $this->arrayMapInlineNullHaystackProducerForArgIndex(
+                        $cfgCallOp,
+                        $block,
+                        (int) $argIndex
+                    )
                 ) {
                     $mapProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                         $block->orig->children,
@@ -30226,13 +30289,16 @@ class Compiler {
                 $fccInlineArgSlot = null;
                 $nullCallback = $this->arrayMapNullCallbackProducerBeforeCfgCall($cfgCallOp, $block);
                 if ($nullCallback instanceof Op\Expr\ConstFetch) {
-                    if (0 === (int) $argIndex) {
-                        $fccInlineArgSlot = $block->slotForOperand($nullCallback->result);
+                    $nullInlineProducer = 0 === (int) $argIndex
+                        ? $nullCallback
+                        : $this->arrayMapInlineNullHaystackProducerForArgIndex($cfgCallOp, $block, (int) $argIndex);
+                    if ($nullInlineProducer instanceof Op\Expr\ConstFetch) {
+                        $fccInlineArgSlot = $block->slotForOperand($nullInlineProducer->result);
                         if (null === $fccInlineArgSlot) {
-                            foreach ($this->compileExpr($nullCallback, $block) as $op) {
+                            foreach ($this->compileExpr($nullInlineProducer, $block) as $op) {
                                 $sends[] = $op;
                             }
-                            $fccInlineArgSlot = $block->slotForOperand($nullCallback->result);
+                            $fccInlineArgSlot = $block->slotForOperand($nullInlineProducer->result);
                         }
                     } elseif (2 === \count($cfgCallOp->args ?? []) && 1 === (int) $argIndex) {
                         $haystackArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
