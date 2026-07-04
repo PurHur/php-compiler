@@ -1167,6 +1167,58 @@ PHP;
         self::assertContains($probeSendSlot, $newSlots, 'probe() must send New_ producer slot, not ctor Array_ prelude');
     }
 
+    /** Issue #13342 — attachIterator(new ArrayIterator([...]), …) wires New_ slot, not ctor Array_ prelude. */
+    public function testMultipleIteratorAttachInlineNewUsesNewProducerSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+$mi = new MultipleIterator(MultipleIterator::MIT_NEED_ALL | MultipleIterator::MIT_KEYS_ASSOC);
+$mi->attachIterator(new ArrayIterator(['a' => 1]), 'k1');
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'multipleiterator_attach_inline_new.php');
+
+        $newSlots = [];
+        $arraySlot = null;
+        $attachSends = [];
+        $inAttach = false;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_NEW === $op->type) {
+                $newSlots[] = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_METHODCALL_INIT === $op->type) {
+                $inAttach = true;
+                $attachSends = [];
+            }
+            if ($inAttach && OpCode::TYPE_ARG_SEND === $op->type) {
+                $attachSends[] = $op->arg1;
+            }
+            if ($inAttach && OpCode::TYPE_FUNCCALL_EXEC_RETURN === $op->type) {
+                $inAttach = false;
+            }
+        }
+
+        self::assertGreaterThanOrEqual(2, \count($attachSends), 'attachIterator must emit iterator + info ARG_SEND');
+        self::assertContains($attachSends[0], $newSlots, 'attachIterator arg #0 must use New_ slot');
+        self::assertNotSame($arraySlot, $attachSends[0], 'attachIterator arg #0 must not use ctor Array_ prelude');
+    }
+
+    /** Issue #13342 — MultipleIterator::attachIterator runtime parity with Zend. */
+    public function testMultipleIteratorAttachInlineNewRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../compliance/cases/spl/multipleiterator_attach_run.php');
+        self::assertIsString($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'multipleiterator_attach_run.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("ok\n", ob_get_clean());
+    }
+
     /** Issue #10143 — var_export((string) NAN) wires Cast producer, not dead arg temp. */
     public function testStringCastNanConstantUsesCastProducerSlot(): void
     {

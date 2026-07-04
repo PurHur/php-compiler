@@ -12580,6 +12580,15 @@ class Compiler {
                             return null;
                         }
                     }
+                    // attachIterator(new ArrayIterator([...]), …) — Array_ feeds inner ctor, not arg #0 (#13342, #13685).
+                    $lastArray = $arrayProducers[\count($arrayProducers) - 1];
+                    $lastIdx = array_search($lastArray, $producers, true);
+                    if (
+                        false !== $lastIdx
+                        && ($producers[$lastIdx + 1] ?? null) instanceof Op\Expr\New_
+                    ) {
+                        return null;
+                    }
                     return $arrayProducers[\count($arrayProducers) - 1];
                 }
             }
@@ -23693,7 +23702,20 @@ class Compiler {
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
         $argCount = \count($cfgCallOp->args);
         if (\count($producers) === $argCount && isset($producers[$argIndex])) {
-            return $producers[$argIndex] instanceof Op\Expr\New_;
+            $positional = $producers[$argIndex];
+            if ($positional instanceof Op\Expr\New_) {
+                return true;
+            }
+            // attachIterator(new ArrayIterator([...]), …) — Array_ is inner-ctor prelude, New_ feeds arg #0 (#13342).
+            if (
+                !(
+                    0 === $argIndex
+                    && $positional instanceof Op\Expr\Array_
+                    && ($producers[$argIndex + 1] ?? null) instanceof Op\Expr\New_
+                )
+            ) {
+                return false;
+            }
         }
 
         $matched = $this->matchInlineCallArgProducer($producers, $cfgCallOp->args, $argIndex, $cfgCallOp, $block);
@@ -23839,7 +23861,7 @@ class Compiler {
     }
 
     /** Slot for hoisted inline `new` when php-cfg dead temps omit result→slot mapping (#11321). */
-    private function slotForInlineNewProducer(Block $block, Op\Expr\New_ $new): ?string
+    private function slotForInlineNewProducer(Block $block, Op\Expr\New_ $new, array $pendingOps = []): ?string
     {
         $slot = $block->slotForOperand($new->result);
         if (null !== $slot) {
@@ -23865,6 +23887,12 @@ class Compiler {
                 return (string) $op->arg1;
             }
             ++$seen;
+        }
+        // compileCallArgSends() may emit New_ into $pendingOps before flushing to $block (#13342).
+        foreach (array_reverse($pendingOps) as $op) {
+            if ($op instanceof OpCode && OpCode::TYPE_NEW === $op->type && null !== $op->arg1) {
+                return (string) $op->arg1;
+            }
         }
 
         return null;
@@ -27371,6 +27399,27 @@ class Compiler {
             }
             if (
                 null !== $cfgCallOp
+                && $cfgCallOp instanceof Op\Expr\New_
+                && 0 === (int) $argIndex
+                && $this->callArgOperandExpectsArrayProducer($arg)
+            ) {
+                $ctorArrayPrelude = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                if ($ctorArrayPrelude instanceof Op\Expr\Array_) {
+                    $ctorArraySlot = $block->slotForOperand($ctorArrayPrelude->result)
+                        ?? $this->slotForRecentInitArrayCallArg($block);
+                    if (null !== $ctorArraySlot) {
+                        $sends[] = new OpCode(
+                            OpCode::TYPE_ARG_SEND,
+                            (string) $ctorArraySlot,
+                            $nameSlot,
+                            $unpackFlag
+                        );
+                        continue;
+                    }
+                }
+            }
+            if (
+                null !== $cfgCallOp
                 && 'array_keys' === $this->resolveCfgFuncCallName($cfgCallOp)
                 && 0 === (int) $argIndex
             ) {
@@ -27560,7 +27609,13 @@ class Compiler {
                         )
                         : null;
                     if (null === $nestedNewLocal) {
-                        $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer);
+                        $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer, $sends);
+                        if (null === $innerNewSlot) {
+                            foreach ($this->compileExpr($inlineNewProducer, $block) as $op) {
+                                $sends[] = $op;
+                            }
+                            $innerNewSlot = $this->slotForInlineNewProducer($block, $inlineNewProducer, $sends);
+                        }
                         if (null !== $innerNewSlot) {
                             $sends[] = new OpCode(
                                 OpCode::TYPE_ARG_SEND,
@@ -27673,6 +27728,20 @@ class Compiler {
                 }
             }
             $callArgOperand = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg;
+            if (null !== $inlineArray && null !== $cfgCallOp && null !== $block->orig) {
+                $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $inlineArrayIdx = array_search($inlineArray, $producers, true);
+                if (
+                    false !== $inlineArrayIdx
+                    && ($producers[$inlineArrayIdx + 1] ?? null) instanceof Op\Expr\New_
+                ) {
+                    // Inline new call arg — inner Array_ is ctor prelude, not the wired operand (#13342).
+                    $inlineArray = null;
+                }
+            }
             if (
                 null !== $inlineArray
                 && null !== $callArgOperand
@@ -27743,6 +27812,16 @@ class Compiler {
                 $valueSlot = $dimFetchSlot;
             } elseif (null !== $inlineArray) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);
+                if (
+                    null === $existingArraySlot
+                    && $cfgCallOp instanceof Op\Expr\New_
+                    && $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) === $inlineArray
+                ) {
+                    $recentInitArraySlot = $this->slotForRecentInitArrayCallArg($block);
+                    if (null !== $recentInitArraySlot) {
+                        $existingArraySlot = (int) $recentInitArraySlot;
+                    }
+                }
                 if (null !== $existingArraySlot) {
                     $valueSlot = (string) $existingArraySlot;
                     $inlineArrayLiteralArgWired = true;
@@ -27752,6 +27831,13 @@ class Compiler {
                         $sends = array_merge($sends, $arrayOps);
                     }
                     $initSlot = $this->slotFromInitArrayLiteralOps($arrayOps);
+                    if (
+                        null === $initSlot
+                        && $cfgCallOp instanceof Op\Expr\New_
+                        && $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) === $inlineArray
+                    ) {
+                        $initSlot = $this->slotForRecentInitArrayCallArg($block);
+                    }
                     $valueSlot = $initSlot ?? $this->compileOperand($inlineArray->result, $block, true);
                     if (null !== $initSlot) {
                         $inlineArrayLiteralArgWired = true;
@@ -27938,11 +28024,11 @@ class Compiler {
                                         $sends[] = $op;
                                     }
                                     $matchedSlot = $matched instanceof Op\Expr\New_
-                                        ? $this->slotForInlineNewProducer($block, $matched)
+                                        ? $this->slotForInlineNewProducer($block, $matched, $sends)
                                         : $block->slotForOperand($matched->result);
                                 } else {
                                     $matchedSlot = $matched instanceof Op\Expr\New_
-                                        ? ($this->slotForInlineNewProducer($block, $matched)
+                                        ? ($this->slotForInlineNewProducer($block, $matched, $sends)
                                             ?? $block->slotForOperand($matched->result))
                                         : $block->slotForOperand($matched->result);
                                 }
@@ -27989,7 +28075,7 @@ class Compiler {
                                 $sends[] = $op;
                             }
                         }
-                        $valueSlot = $this->slotForInlineNewProducer($block, $newProducer);
+                        $valueSlot = $this->slotForInlineNewProducer($block, $newProducer, $sends);
                         if (null !== $valueSlot) {
                             $block->markDeferredArrayLiteralKeepSlot((int) $valueSlot);
                         }
@@ -28248,6 +28334,7 @@ class Compiler {
                 if (
                     null === $assignedNamedLocal
                     && null !== $valueSlot
+                    && !$inlineArrayLiteralArgWired
                     && !$this->isCallArgDirectArrayDimFetch($arg)
                     && null !== $block->orig
                     && ($arg instanceof Operand\Variable || $arg instanceof Operand\Temporary)
@@ -28436,7 +28523,7 @@ class Compiler {
                         $matchedSlot = $this->slotForEmittedIssetOrEmptyProducer($block, $matched)
                             ?? (
                                 $matched instanceof Op\Expr\New_
-                                    ? $this->slotForInlineNewProducer($block, $matched)
+                                    ? $this->slotForInlineNewProducer($block, $matched, $sends)
                                     : $block->slotForOperand($matched->result)
                             );
                         if (null !== $matchedSlot && null === $valueSlot) {
@@ -29501,6 +29588,7 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && !$this->callArgOperandExpectsArrayProducer($arg)
+                && !$inlineArrayLiteralArgWired
                 && ($this->callArgIsDeadInlineTemporary($arg) || $this->isNamedVariableOperand($arg))
             ) {
                 $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
