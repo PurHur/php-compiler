@@ -4346,28 +4346,7 @@ restart:
                     $frame->callSiteLine = $savedCallSiteLine;
                     break;
                 case OpCode::TYPE_JUMP:
-                    $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
-                    $finallyFrame = $this->continueReturnFinallyChain();
-                    if (null !== $finallyFrame) {
-                        $frame = $finallyFrame;
-                        goto restart;
-                    }
-                    if ($this->schedulePendingReturnDispatch()) {
-                        goto restart;
-                    }
-                    $resumeFrame = $this->resumeCatchAfterFinally($frame);
-                    if (null !== $resumeFrame) {
-                        $frame = $resumeFrame;
-                        goto restart;
-                    }
-                    $mergeFrame = $this->resumeMergeAfterFinally($frame);
-                    if (null !== $mergeFrame) {
-                        $frame = $mergeFrame;
-                        goto restart;
-                    }
-                    $gotoFrame = $this->resumeGotoAfterFinally($frame);
-                    if (null !== $gotoFrame) {
-                        $frame = $gotoFrame;
+                    if ($this->completeActiveFinallyUnwind($frame)) {
                         goto restart;
                     }
                     $finallyFrame = $this->beginCatchExitFinallyUnwind($frame, $op->block1);
@@ -5163,8 +5142,8 @@ restart:
                         $frame = $finallyFrame;
                         goto restart;
                     }
-                    // Fused finally/end blocks compile as return void; resume pending catch return (#15738).
-                    if ($this->schedulePendingReturnDispatch()) {
+                    // Empty finally may fuse with merge and end in RETURN_VOID instead of JUMP (#15738).
+                    if ($this->completeActiveFinallyUnwind($frame)) {
                         goto restart;
                     }
                     goto return_void_complete;
@@ -9371,6 +9350,48 @@ restart:
             if ($finallyOp->block1 === $frame->block) {
                 return true;
             }
+        }
+
+        return false;
+    }
+
+    /**
+     * Leaving a finally body (via jump or fused merge RETURN_VOID) — continue return/catch/merge chains.
+     *
+     * @return bool true when the caller should goto restart (frame updated or pending return scheduled)
+     */
+    private function completeActiveFinallyUnwind(Frame &$frame): bool
+    {
+        if (!$this->frameIsInFinallyBody($frame)) {
+            return false;
+        }
+        $this->markFinallyCompletedWhenLeavingFinallyBody($frame);
+        $finallyFrame = $this->continueReturnFinallyChain();
+        if (null !== $finallyFrame) {
+            $frame = $finallyFrame;
+
+            return true;
+        }
+        if ($this->schedulePendingReturnDispatch()) {
+            return true;
+        }
+        $resumeFrame = $this->resumeCatchAfterFinally($frame);
+        if (null !== $resumeFrame) {
+            $frame = $resumeFrame;
+
+            return true;
+        }
+        $mergeFrame = $this->resumeMergeAfterFinally($frame);
+        if (null !== $mergeFrame) {
+            $frame = $mergeFrame;
+
+            return true;
+        }
+        $gotoFrame = $this->resumeGotoAfterFinally($frame);
+        if (null !== $gotoFrame) {
+            $frame = $gotoFrame;
+
+            return true;
         }
 
         return false;
