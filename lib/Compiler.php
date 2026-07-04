@@ -7542,6 +7542,7 @@ class Compiler {
         );
         $return->block1 = $funcBlock;
         $return->deprecatedMetadata = DeprecatedMetadata::fromOp($function);
+        $return->parameterMetadata = $this->parameterMetadataFromParams($function->func->params);
         $this->assignAttributeMetadata($return, $function);
         $this->assignSourceMetadata($return, $function);
         AttributeNames::assertCompileTimeConstTargetOnly($return->attributeNames, 'function');

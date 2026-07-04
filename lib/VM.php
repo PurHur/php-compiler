@@ -5243,6 +5243,9 @@ restart:
                     }
                     $func = new Func\PHP($name, $op->block1);
                     $func->deprecated = $op->deprecatedMetadata;
+                    if ([] !== $op->parameterMetadata) {
+                        $func->parameterMetadata = $op->parameterMetadata;
+                    }
                     $this->context->declareFunction($func);
                     break;
                 case OpCode::TYPE_FUNCCALL_INIT:

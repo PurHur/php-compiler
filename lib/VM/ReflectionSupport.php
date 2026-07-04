@@ -1141,6 +1141,9 @@ final class ReflectionSupport
         }
         $func = self::resolveFunctionForReflectionParameter($ctx, $reflection);
         $index = self::paramIndexFromReflection($reflection);
+        if (isset($func->parameterMetadata[$index])) {
+            return $func->parameterMetadata[$index]->attributes;
+        }
         if (!isset($func->block->paramSensitive[$index])) {
             return [];
         }
@@ -1152,6 +1155,18 @@ final class ReflectionSupport
     {
         foreach (self::parameterAttributeEntries($ctx, $reflection) as $entry) {
             if (AttributeNames::isSensitiveParameter([$entry->name])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function parameterIsDeprecated(Context $ctx, ObjectEntry $reflection): bool
+    {
+        foreach (self::parameterAttributeEntries($ctx, $reflection) as $entry) {
+            $name = ltrim($entry->name, '\\');
+            if ('Deprecated' === $name || str_ends_with($name, '\\Deprecated')) {
                 return true;
             }
         }
