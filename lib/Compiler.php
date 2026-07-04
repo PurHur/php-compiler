@@ -16885,6 +16885,7 @@ class Compiler {
 
     /**
      * array_merge((object)[...], [...]) — hoisted Cast feeds arg #0, not stmt-before Array_ (#15858).
+     * array_walk((object)[...], fn) — same for by-ref arg #0 (#15874).
      *
      * @param list<Op\Node> $cfgChildren
      */
@@ -16901,6 +16902,8 @@ class Compiler {
                 'array_intersect',
                 'array_diff_key',
                 'array_intersect_key',
+                'array_walk',
+                'array_walk_recursive',
             ],
             true
         )) {
@@ -16917,6 +16920,7 @@ class Compiler {
 
     /**
      * array_merge((object)[...], [...]) — wire hoisted Cast result to arg #0 (#15207, #15858).
+     * array_walk((object)[...], fn) — same for by-ref arg #0 (#15874).
      */
     private function resolveHoistedCastInlineCallArgZeroSlot(
         Block $block,
@@ -16941,6 +16945,8 @@ class Compiler {
                     'array_intersect',
                     'array_diff_key',
                     'array_intersect_key',
+                    'array_walk',
+                    'array_walk_recursive',
                 ],
                 true
             )

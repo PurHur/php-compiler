@@ -2747,6 +2747,40 @@ PHP;
         self::assertNotSame($combineSends[0], $combineSends[1], 'combine sends='.json_encode($combineSends));
     }
 
+    /** Issue #15874 — array_walk((object)[...], fn) wires hoisted Cast to by-ref arg #0. */
+    public function testArrayWalkObjectCastInlineCallArgZeroSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+array_walk((object) ['x' => 1], static fn ($v) => $v);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_walk_object_cast.php');
+
+        $castSlot = null;
+        $walkSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CAST_OBJECT === $op->type) {
+                $castSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $walkSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $walkSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($castSlot);
+        self::assertCount(2, $walkSends);
+        self::assertSame($castSlot, $walkSends[0], 'walk sends='.json_encode($walkSends));
+        self::assertNotSame($walkSends[0], $walkSends[1], 'walk sends='.json_encode($walkSends));
+    }
+
     /** Issue #15858 — array_merge((object)[...], [...]) wires hoisted Cast to arg #0, not trailing Array_. */
     public function testArrayMergeObjectCastInlineCallArgZeroSlot(): void
     {

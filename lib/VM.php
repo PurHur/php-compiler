@@ -12232,6 +12232,13 @@ restart:
                 return $frame->scope[$slot];
             }
             if (Variable::TYPE_NULL !== $resolved->type && !$resolved->isUndefined()) {
+                if (
+                    Variable::TYPE_OBJECT === $resolved->type
+                    && null !== $const
+                    && Variable::TYPE_ARRAY === $const->type
+                ) {
+                    return $frame->scope[$slot];
+                }
                 if (null === $const || $resolved->type === $const->type) {
                     return $frame->scope[$slot];
                 }
