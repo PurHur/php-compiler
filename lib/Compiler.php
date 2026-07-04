@@ -8111,9 +8111,18 @@ class Compiler {
             return;
         }
         $suppressResult = $primary->result;
-        $endCompiled->forceBindScopeSlot($suppressResult, $slot);
+        if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($endCompiled)) {
+            return;
+        }
+        if (!$this->endBlockAssignsErrorGetLastAfterSuppress($endCfg)) {
+            $endCompiled->forceBindScopeSlot($suppressResult, $slot);
+        }
         $root = Block::cfgVarRoot($suppressResult);
-        if (null !== $root) {
+        if (
+            null !== $root
+            && !$this->endBlockAssignsErrorGetLastAfterSuppress($endCfg)
+            && !$this->shouldSkipPrebindCfgVarRootForSuppressResult($endCompiled, $endCfg, $suppressResult)
+        ) {
             $endCompiled->prebindCfgVarRoot($root, $slot);
         }
         foreach ($suppressResult->usages as $usage) {
@@ -8347,6 +8356,18 @@ class Compiler {
         Operand $suppressResult,
         int $slot
     ): void {
+        if ($cfgOp instanceof Op\Expr\Assign && $this->assignIsPostSuppressIndependent($cfgOp, $endCompiled->orig)) {
+            if ($cfgOp->expr instanceof Op) {
+                $this->bindErrorSuppressResultOperandUsages($cfgOp->expr, $endCompiled, $suppressResult, $slot);
+            }
+            foreach ($cfgOp->children ?? [] as $child) {
+                if ($child instanceof Op) {
+                    $this->bindErrorSuppressResultOperandUsages($child, $endCompiled, $suppressResult, $slot);
+                }
+            }
+
+            return;
+        }
         if ($cfgOp instanceof Op\Expr) {
             if (property_exists($cfgOp, 'args') && is_array($cfgOp->args)) {
                 foreach ($cfgOp->args as $arg) {
@@ -8371,6 +8392,176 @@ class Compiler {
                 $this->bindErrorSuppressResultOperandUsages($child, $endCompiled, $suppressResult, $slot);
             }
         }
+    }
+
+    /**
+     * Assign from error_get_last() after END_SILENCE must not alias @ inner return slot (#16223).
+     */
+    private function assignRhsIsPostSuppressIndependentCall(Op\Expr\Assign $assign): bool
+    {
+        $expr = $assign->expr ?? null;
+        if (!$expr instanceof Op\Expr\FuncCall && !$expr instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+
+        return $this->cfgOpIsPostSuppressIndependentCall($expr);
+    }
+
+    private function cfgOpIsPostSuppressIndependentCall(Op $op): bool
+    {
+        if (!$op instanceof Op\Expr\FuncCall && !$op instanceof Op\Expr\NsFuncCall) {
+            return false;
+        }
+
+        return \in_array(
+            $this->resolveCfgFuncCallName($op),
+            [
+                'error_get_last',
+                'error_clear_last',
+            ],
+            true
+        );
+    }
+
+    /**
+     * php-cfg may hoist {@see error_get_last}() as a sibling stmt before the Assign (#16223).
+     */
+    private function assignIsPostSuppressIndependent(Op\Expr\Assign $assign, ?CfgBlock $endCfg): bool
+    {
+        if ($this->assignRhsIsPostSuppressIndependentCall($assign)) {
+            return true;
+        }
+        if (null === $endCfg) {
+            return false;
+        }
+        $expr = $assign->expr ?? null;
+        if (!$expr instanceof Operand) {
+            return false;
+        }
+        foreach ($endCfg->children as $child) {
+            if (!$this->cfgOpIsPostSuppressIndependentCall($child) || !isset($child->result)) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($expr, $child->result)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /** True when END_SILENCE block assigns error_get_last() immediately after @ (#16223). */
+    private function endBlockAssignsErrorGetLastAfterSuppress(?CfgBlock $endCfg): bool
+    {
+        if (null === $endCfg) {
+            return false;
+        }
+        foreach ($endCfg->children as $child) {
+            if ($child instanceof Op\Expr\Assign && $this->assignIsPostSuppressIndependent($child, $endCfg)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * True when no call in the post-@ block consumes the suppressed inner expression (#16223).
+     *
+     * Standalone `@f(); $x = error_get_last();` discards the @ return; slot inheritance must not
+     * poison later statements still in the same php-cfg END_SILENCE block.
+     */
+    private function errorSuppressEndBlockInnerResultUnused(
+        ?CfgBlock $endCfg,
+        Block $endCompiled,
+        Operand $suppressResult
+    ): bool {
+        if (null === $endCfg) {
+            return false;
+        }
+        foreach ($endCfg->children as $child) {
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->callInErrorSuppressEndBlockUsesInnerResultAsArg($endCompiled, $child)
+            ) {
+                return false;
+            }
+        }
+        foreach ($suppressResult->usages as $usage) {
+            if (
+                ($usage instanceof Op\Expr\FuncCall || $usage instanceof Op\Expr\NsFuncCall)
+                && \in_array($usage, $endCfg->children, true)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /** True when END_SILENCE block reassigns the suppress result via error_get_last() (#16223). */
+    private function endBlockHasPostSuppressIndependentAssign(?CfgBlock $endCfg, Operand $suppressResult): bool
+    {
+        if (null === $endCfg) {
+            return false;
+        }
+        foreach ($endCfg->children as $child) {
+            if (!$child instanceof Op\Expr\Assign || !$this->assignIsPostSuppressIndependent($child, $endCfg)) {
+                continue;
+            }
+            if ($this->operandsReferToSameVariable($suppressResult, $child->var)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Skip cfg-root prebind when END_SILENCE immediately assigns error_get_last() to the suppress SSA (#16223).
+     *
+     * Keep prebind for nested `@f()` inside a sibling call (var_export(@get_cfg_var(...), true)).
+     */
+    private function shouldSkipPrebindCfgVarRootForSuppressResult(
+        Block $endCompiled,
+        ?CfgBlock $endCfg,
+        Operand $suppressResult
+    ): bool {
+        if (null === $endCfg || !$this->endBlockHasPostSuppressIndependentAssign($endCfg, $suppressResult)) {
+            return false;
+        }
+        foreach ($endCfg->children as $child) {
+            if (
+                ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall)
+                && $this->callInErrorSuppressEndBlockUsesInnerResultAsArg($endCompiled, $child)
+            ) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Standalone `@f(); $x = error_get_last();` — @ return is discarded; skip slot inheritance (#16223).
+     */
+    private function errorSuppressEndBlockDiscardsInnerResultForErrorGetLast(Block $block): bool
+    {
+        $endCfg = $block->orig;
+        if (null === $endCfg || !$this->isErrorSuppressEndBlock($endCfg)) {
+            return false;
+        }
+        $parentCfg = $endCfg->parents[0];
+        if (!$parentCfg instanceof ErrorSuppressBlock) {
+            return false;
+        }
+        $primary = $this->findErrorSuppressPrimaryInnerExpr($parentCfg);
+        if (null === $primary || !isset($primary->result)) {
+            return false;
+        }
+
+        return $this->endBlockAssignsErrorGetLastAfterSuppress($endCfg)
+            && $this->errorSuppressEndBlockInnerResultUnused($endCfg, $block, $primary->result);
     }
 
     /**
@@ -28650,6 +28841,9 @@ class Compiler {
     /** FUNCCALL_EXEC_RETURN slot from the {@see ErrorSuppressBlock} parent (#15916). */
     private function errorSuppressEndBlockInnerResultSlot(Block $block): ?int
     {
+        if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
+            return null;
+        }
         $endCfg = $block->orig;
         if (null === $endCfg || !$this->isErrorSuppressEndBlock($endCfg)) {
             return null;
@@ -28691,6 +28885,9 @@ class Compiler {
         int $argIndex
     ): ?int {
         if (null === $cfgCallOp || !$this->isFirstNonEmbeddedDeadInlineCallArg($cfgCallOp, $argIndex)) {
+            return null;
+        }
+        if ($this->errorSuppressEndBlockDiscardsInnerResultForErrorGetLast($block)) {
             return null;
         }
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($block, $cfgCallOp, $argIndex)) {
