@@ -29250,7 +29250,11 @@ class Compiler {
                     }
                 }
             }
-            if (null !== $cfgCallOp && null !== $block->orig) {
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && null === $this->findStmtCoalesceImmediatelyBeforeFuncCall($cfgCallOp, $block)
+            ) {
                 $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer(
                     $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp),
                     (int) $argIndex
