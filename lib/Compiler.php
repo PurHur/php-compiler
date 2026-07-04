@@ -1823,6 +1823,9 @@ class Compiler {
     }
 
     protected function compileOps(array $ops, Block $block): void {
+        // Enum cases before global const / hoisted class bodies so E::A folds in
+        // class const initializers when enum appears later in source (#15737, #5738).
+        $this->prescanCompileTimeEnumCases($ops);
         // Register file-level `const` / literal define() before class bodies and
         // FUNCDEF defaults so zend_compile_default_value can fold ConstFetch (#6542).
         $this->prescanCompileTimeGlobalConsts($ops, $block);
@@ -6691,6 +6694,83 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Pre-register enum `case` singletons for class/global const folding (#15737).
+     *
+     * Class/interface/trait bodies are hoisted before enum DECLARE opcodes; prescan
+     * mirrors {@see compileEnum} metadata so {@code E::A} folds when enum is later in source.
+     *
+     * @param list<Op> $ops
+     */
+    protected function prescanCompileTimeEnumCases(array $ops): void
+    {
+        foreach ($ops as $child) {
+            if ($child instanceof Op\Stmt\Enum_) {
+                $this->prescanEnumCaseConstants($child);
+            }
+        }
+    }
+
+    protected function prescanEnumCaseConstants(Op\Stmt\Enum_ $enum): void
+    {
+        $enumName = $this->staticNameFromOperand($enum->name);
+        if (null === $enumName) {
+            return;
+        }
+        $enumLc = strtolower(ltrim($enumName, '\\'));
+        $displayName = ltrim($enumName, '\\');
+        $backedTypeName = null;
+        if (null !== $enum->backedType && $enum->backedType instanceof Op\Type\Literal) {
+            $backedTypeName = $enum->backedType->name;
+        }
+        if (!isset($this->compileTimeEnumBackedTypes[$enumLc])) {
+            $this->compileTimeEnumBackedTypes[$enumLc] = $backedTypeName;
+        }
+        if (!isset($this->compileTimeEnumCaseConstNames[$enumLc])) {
+            $this->compileTimeEnumCaseConstNames[$enumLc] = [];
+        }
+        if (!isset($this->runtimeEnumCaseConsts[$enumLc])) {
+            $this->runtimeEnumCaseConsts[$enumLc] = [];
+        }
+
+        $prevClassLc = $this->compilingClassLc;
+        $prevDisplay = $this->compilingClassDisplayName;
+        $this->compilingClassLc = $enumLc;
+        $this->compilingClassDisplayName = $displayName;
+
+        foreach ($enum->stmts->children as $stmt) {
+            if (!$stmt instanceof Op\Terminal\Const_ || !$this->cfgTerminalConstIsEnumCase($stmt)) {
+                continue;
+            }
+            $caseName = $this->staticNameFromOperand($stmt->name);
+            if (null === $caseName) {
+                continue;
+            }
+            $lcCase = strtolower($caseName);
+            if (isset($this->runtimeEnumCaseConsts[$enumLc][$lcCase])) {
+                continue;
+            }
+            $backing = $this->vmVariableFromCfgLiteralOperand($stmt->value);
+            if (null === $backing) {
+                if (null !== $backedTypeName) {
+                    continue;
+                }
+                $backing = new Variable(Variable::TYPE_NULL);
+                $backing->null();
+            }
+            $this->runtimeEnumCaseConsts[$enumLc][$lcCase] = $this->compileTimeEnumCaseVar(
+                $displayName,
+                $caseName,
+                $backing,
+                $backedTypeName
+            );
+            $this->compileTimeEnumCaseConstNames[$enumLc][$lcCase] = true;
+        }
+
+        $this->compilingClassLc = $prevClassLc;
+        $this->compilingClassDisplayName = $prevDisplay;
     }
 
     /**
@@ -11864,6 +11944,19 @@ class Compiler {
             $combineMatch = $this->matchArrayCombineInlineProducers($combineProducers, $argIndex);
             if ($combineMatch instanceof Op\Expr\Array_) {
                 return $combineMatch;
+            }
+        }
+        if (
+            'proc_open' === $this->resolveCfgFuncCallName($callOp)
+            && 0 === $argIndex
+            && \is_array($callOp->args)
+            && \count($callOp->args) >= 5
+        ) {
+            $procOpenProducers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $callOp);
+            foreach ($procOpenProducers as $producer) {
+                if ($producer instanceof Op\Expr\Array_) {
+                    return $producer;
+                }
             }
         }
         $callIndex = null;
@@ -25235,6 +25328,7 @@ class Compiler {
             if (null === $namedAssignDest) {
             if (
                 null !== $cfgCallOp
+                && 'proc_open' !== $this->resolveCfgFuncCallName($cfgCallOp)
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && $this->callArgOperandExpectsArrayProducer($arg)
                 && $this->countDeadArrayInlineCallArgs($cfgCallOp) >= 1
@@ -25901,10 +25995,66 @@ class Compiler {
                     $valueSlot = $assignInCallRhs;
                 }
             }
+            $procOpenSlot = $this->resolveProcOpenInlineCallArgSlot($block, $cfgCallOp, (int) $argIndex);
+            if (null !== $procOpenSlot) {
+                $valueSlot = $procOpenSlot;
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
         return $sends;
+    }
+
+    /**
+     * proc_open(['cmd'], $desc, $pipes, null, ['K'=>'V']) — map command/null/env preludes (#9389, #13734).
+     */
+    private function resolveProcOpenInlineCallArgSlot(Block $block, ?Op $cfgCallOp, int $argIndex): ?string
+    {
+        if (
+            null === $cfgCallOp
+            || 'proc_open' !== $this->resolveCfgFuncCallName($cfgCallOp)
+            || $this->callIncludesNamedParameter($cfgCallOp)
+            || !\is_array($cfgCallOp->args ?? null)
+            || \count($cfgCallOp->args) < 5
+        ) {
+            return null;
+        }
+        $commandSlot = null;
+        $envSlot = null;
+        $nullSlot = null;
+        $recentArrays = [];
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullSlot && null !== $op->arg2) {
+                $const = $block->constants[$op->arg2] ?? null;
+                if (null !== $const && 'null' === $const->toString()) {
+                    $nullSlot = (string) $op->arg1;
+                }
+            }
+            if (OpCode::TYPE_INIT_ARRAY !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $slot = (string) $op->arg1;
+            if ([] === $recentArrays || $recentArrays[0] !== $slot) {
+                $recentArrays[] = $slot;
+            }
+            if (\count($recentArrays) >= 2) {
+                break;
+            }
+        }
+        if (isset($recentArrays[0])) {
+            $envSlot = $recentArrays[0];
+        }
+        if (isset($recentArrays[1])) {
+            $commandSlot = $recentArrays[1];
+        }
+
+        return match ($argIndex) {
+            0 => $commandSlot,
+            3 => $nullSlot,
+            4 => $envSlot,
+            default => null,
+        };
     }
 
     /**
