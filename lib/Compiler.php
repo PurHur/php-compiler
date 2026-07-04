@@ -8666,7 +8666,8 @@ class Compiler {
                 $resultSlot = $this->compileOperand($expr->result, $block, false);
                 $varRoot = Block::cfgVarRoot($expr->var);
                 if (null !== $varRoot) {
-                    $block->registerNamedAssignDest($varRoot, (int) $resultSlot);
+                    // Register the CV lvalue slot — assign.result temps diverge after $a[] writes (#12712).
+                    $block->registerNamedAssignDest($varRoot, (int) $destSlot);
                 }
 
                 $assignOp = new OpCode(
