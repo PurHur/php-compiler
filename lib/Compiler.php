@@ -8195,6 +8195,9 @@ class Compiler {
                     if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)) {
                         continue;
                     }
+                    if ($this->errorSuppressEndBlockCallArgHasInlineArrayProducer($endCompiled, $endChild, (int) $argIndex)) {
+                        continue;
+                    }
                     // First dead temp in the outer call is the @ inner value (#15916, #10302).
                     $endCompiled->forceBindScopeSlot($arg, $slot);
                     break;
@@ -28693,8 +28696,50 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasInlineArrayProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * Post-@ {@see stream_context_create}([]) must not inherit the suppressed call's bool slot (#16205).
+     */
+    private function errorSuppressEndBlockCallArgHasInlineArrayProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || 0 !== $argIndex) {
+            return false;
+        }
+        if (!\in_array(
+            $this->resolveCfgFuncCallName($cfgCallOp),
+            [
+                'stream_context_create',
+                'stream_context_set_options',
+                'stream_context_set_default',
+            ],
+            true
+        )) {
+            return false;
+        }
+        $optionsArg = $cfgCallOp->args[0] ?? null;
+        if (
+            !$optionsArg instanceof Operand
+            || !$this->callArgIsDeadInlineTemporary($optionsArg)
+            || !$this->callArgOperandExpectsArrayProducer($optionsArg)
+        ) {
+            return false;
+        }
+        foreach ($this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp) as $producer) {
+            if ($producer instanceof Op\Expr\Array_) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
