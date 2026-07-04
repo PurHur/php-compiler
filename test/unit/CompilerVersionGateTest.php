@@ -114,7 +114,7 @@ final class CompilerVersionGateTest extends TestCase
         $this->assertFalse(CompilerVersion::supportsGcStatusPhp84Schema());
     }
 
-    public function testSupportsGcStatusPhp84SchemaTrueOnForwardProfile(): void
+    public function testSupportsGcStatusPhp84SchemaTrueWhenProfile84(): void
     {
         $prev = getenv('PHP_COMPILER_PROFILE');
         putenv('PHP_COMPILER_PROFILE=8.4');

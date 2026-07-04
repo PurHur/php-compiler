@@ -545,8 +545,8 @@ final class CompilerVersion
     /**
      * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780, #13673, #14431).
      *
-     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps
-     * legacy runs/collected/threshold/roots (#12993, #13293, #14612); enable via `PHP_COMPILER_PROFILE=8.4`.
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps legacy
+     * runs/collected/threshold/roots (#12993, #13293, #14612, #15784); enable via `PHP_COMPILER_PROFILE=8.4`.
      */
     public static function supportsGcStatusPhp84Schema(): bool
     {
@@ -843,11 +843,12 @@ final class CompilerVersion
     /**
      * PHP 8.3+ parenthesized DNF intersection-only types `(I1&I2) $param` / `(): (I1&I2)`.
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile rejects like Zend 8.2 (#14904).
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile
+     * rejects like Zend 8.2 (#14904); forward profile enables rewriter (#15792).
      * php-src: Zend/zend_compile.c zend_compile_type / DNF normalization.
      */
     public static function supportsParenthesizedDnfIntersectionTypes(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 }

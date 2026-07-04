@@ -531,6 +531,16 @@ class JITTest extends BaseTest {
                 && !str_contains($name, 'bare_throw_reference_profile')) {
                 continue;
             }
+            // gc_status PHP 8.4 schema; forward profile only (#15784, ext/standard/php_gc.c).
+            if (!CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status')
+                && !str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
             // 8.4-target reject gate; skipped when encapsed ?? interpolation enabled (#14063).
             if (CompilerVersion::supportsEncapsedCoalesce()
                 && str_contains($name, 'encapsed_coalesce_parse_error')) {
