@@ -305,7 +305,7 @@ final class VmDns
             $weights[] = $record['weight'];
         }
 
-        return ['hosts' => $hosts, 'weights' => $weights];
+        return ['hosts' => $hosts, 'weights' => $weights, 'records' => $records];
     }
 
     /** php-src DNS_* bitmask → wire qtype (ext/standard/dns.c php_dns_record_types). */
@@ -448,20 +448,31 @@ final class VmDns
             return [];
         }
 
-        $list = self::gethostbynamel($hostname);
-        if (false === $list) {
+        $records = [];
+        $seen = [];
+        $packet = self::queryViaUdp($hostname, self::DNS_RECORD_TYPES['A']);
+        if (null !== $packet) {
+            foreach (self::parseDnsIpv4RecordsWithTtl($packet) as $entry) {
+                $ip = $entry['ip'];
+                if (isset($seen[$ip])) {
+                    continue;
+                }
+                $seen[$ip] = true;
+                $records[] = self::makeDnsRecord($hostname, 'A', ['ttl' => $entry['ttl'], 'ip' => $ip]);
+            }
+        }
+
+        if ([] !== $records) {
+            return $records;
+        }
+
+        $hostsIps = self::resolveViaEtcHosts($hostname);
+        if (null === $hostsIps || [] === $hostsIps) {
             return [];
         }
 
-        $records = [];
-        $seen = [];
-        foreach ($list->iterateKeyed(true) as $pair) {
-            [, $ipVar] = $pair;
-            $ipVar = $ipVar->resolveIndirect();
-            if (Variable::TYPE_STRING !== $ipVar->type) {
-                continue;
-            }
-            $ip = $ipVar->toString();
+        $hostsIps = self::finalizeIpv4ResolverList($hostname, $hostsIps);
+        foreach ($hostsIps as $ip) {
             if (isset($seen[$ip])) {
                 continue;
             }
@@ -519,11 +530,11 @@ final class VmDns
         }
 
         $records = [];
-        foreach ($mx['hosts'] as $index => $target) {
+        foreach ($mx['records'] as $entry) {
             $records[] = self::makeDnsRecord($hostname, 'MX', [
-                'ttl' => 0,
-                'pri' => $mx['weights'][$index] ?? 0,
-                'target' => $target,
+                'ttl' => $entry['ttl'],
+                'pri' => $entry['weight'],
+                'target' => $entry['host'],
             ]);
         }
 
@@ -703,9 +714,12 @@ final class VmDns
             return null;
         }
 
-        $ips = self::parseDnsIpv4Records($packet);
+        $entries = self::parseDnsIpv4RecordsWithTtl($packet);
+        if ([] === $entries) {
+            return null;
+        }
 
-        return [] === $ips ? null : $ips;
+        return \array_values(\array_map(static fn (array $entry): string => $entry['ip'], $entries));
     }
 
     /**
@@ -741,9 +755,9 @@ final class VmDns
     }
 
     /**
-     * @return list<string>
+     * @return list<array{ip: string, ttl: int}>
      */
-    private static function parseDnsIpv4Records(string $packet): array
+    public static function parseDnsIpv4RecordsWithTtl(string $packet): array
     {
         $len = \strlen($packet);
         if ($len < 12) {
@@ -765,7 +779,7 @@ final class VmDns
             }
         }
 
-        $ips = [];
+        $entries = [];
         for ($i = 0; $i < $ancount; ++$i) {
             $parsed = self::readDnsName($packet, $len, $offset);
             if (null === $parsed) {
@@ -776,6 +790,7 @@ final class VmDns
                 break;
             }
             $type = self::readUint16($packet, $offset);
+            $ttl = self::readUint32($packet, $offset + 4);
             $offset += 8;
             $rdlength = self::readUint16($packet, $offset);
             $offset += 2;
@@ -783,12 +798,15 @@ final class VmDns
                 break;
             }
             if (1 === $type && 4 === $rdlength) {
-                $ips[] = \inet_ntop(\substr($packet, $offset, 4)) ?: '';
+                $ip = \inet_ntop(\substr($packet, $offset, 4)) ?: '';
+                if ('' !== $ip) {
+                    $entries[] = ['ip' => $ip, 'ttl' => $ttl];
+                }
             }
             $offset += $rdlength;
         }
 
-        return \array_values(\array_filter($ips, static fn (string $ip): bool => '' !== $ip));
+        return $entries;
     }
 
     private static function buildDnsQueryPacket(string $hostname, int $qtype): string
@@ -861,7 +879,7 @@ final class VmDns
     }
 
     /**
-     * @return list<array{host: string, weight: int}>
+     * @return list<array{host: string, weight: int, ttl: int}>
      */
     private static function parseDnsMxRecords(string $packet): array
     {
@@ -896,6 +914,7 @@ final class VmDns
                 break;
             }
             $type = self::readUint16($packet, $offset);
+            $ttl = self::readUint32($packet, $offset + 4);
             $offset += 8;
             $rdlength = self::readUint16($packet, $offset);
             $offset += 2;
@@ -906,7 +925,7 @@ final class VmDns
                 $weight = self::readUint16($packet, $offset);
                 $exchange = self::readDnsName($packet, $len, $offset + 2);
                 if (null !== $exchange) {
-                    $mx[] = ['host' => $exchange[1], 'weight' => $weight];
+                    $mx[] = ['host' => $exchange[1], 'weight' => $weight, 'ttl' => $ttl];
                 }
             }
             $offset += $rdlength;
@@ -920,6 +939,11 @@ final class VmDns
     private static function readUint16(string $packet, int $offset): int
     {
         return (\ord($packet[$offset]) << 8) | \ord($packet[$offset + 1]);
+    }
+
+    private static function readUint32(string $packet, int $offset): int
+    {
+        return (self::readUint16($packet, $offset) << 16) | self::readUint16($packet, $offset + 2);
     }
 
     private static function skipDnsName(string $packet, int $len, int $offset): ?int
