@@ -7436,6 +7436,13 @@ restart:
                 goto restart;
             }
             return self::FAIL;
+        } catch (\Error $e) {
+            $catchFrame = $this->dispatchVmError($e->getMessage(), $frame);
+            if (null !== $catchFrame) {
+                $frame = $catchFrame;
+                goto restart;
+            }
+            return self::FAIL;
         }
         // Do not null returnVar: it may alias the caller result slot (#1885).
         $this->markObjectConstructedIfLeavingConstruct($frame);
@@ -15346,10 +15353,10 @@ restart:
 
             return;
         }
+        if (null === $value && $this->declaredReturnTypeRequiresValue($block)) {
+            TypeCheck::assertReturnValueProvided();
+        }
         if ($block->returnTypeStatic) {
-            if (null === $value) {
-                return;
-            }
             TypeCheck::assertStaticReturn(
                 $value,
                 $this->lateStaticClassLc($frame),
@@ -15381,7 +15388,7 @@ restart:
 
             return;
         }
-        if (null === $block->returnTypeConstraint || null === $value) {
+        if (null === $block->returnTypeConstraint) {
             return;
         }
         $strict = $block->strictTypes;
@@ -15391,6 +15398,29 @@ restart:
             $block->returnTypeConstraint,
             $block->returnLiteralBoolType
         );
+    }
+
+    private function declaredReturnTypeRequiresValue(Block $block): bool
+    {
+        if ($block->returnTypeStatic) {
+            return true;
+        }
+        if (null !== $block->returnDnfConstraints) {
+            return true;
+        }
+        if (null !== $block->returnClassConstraint) {
+            $returnLabel = ltrim($block->returnDeclaredTypeLabel ?? $block->returnClassConstraint, '\\');
+            if ($block->isGenerator && 'Generator' === $returnLabel) {
+                return false;
+            }
+
+            return true;
+        }
+        if (null !== $block->returnTypeConstraint) {
+            return true;
+        }
+
+        return false;
     }
 
     private function returnTypeCallableName(?\PHPCfg\Func $func): ?string

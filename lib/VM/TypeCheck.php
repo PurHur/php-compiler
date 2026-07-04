@@ -290,6 +290,12 @@ final class TypeCheck
         }
     }
 
+    /** php-src zend_verify_return_error — bare `return;` in a typed non-void function (#16117). */
+    public static function assertReturnValueProvided(): void
+    {
+        throw new \Error('A function with return type must return a value');
+    }
+
     public static function assertNeverReturn(?string $functionName = null): void
     {
         if (null !== $functionName && '' !== $functionName) {
