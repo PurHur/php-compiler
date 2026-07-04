@@ -29599,8 +29599,13 @@ class Compiler {
             } elseif (null !== $inlineArray) {
                 $callArgProbeForArray = ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $callArgOperand;
                 $existingArraySlot = null;
+                // array_combine([...], [...]) — sibling Array_ producers map by index; never reuse "recent" init slot (#16080, #10214).
+                $arrayCombineSiblingArray = null !== $cfgCallOp
+                    && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
+                    && $inlineArray instanceof Op\Expr\Array_;
                 if (
-                    !$this->callArgIsDeadInlineTemporary($callArgProbeForArray)
+                    $arrayCombineSiblingArray
+                    || !$this->callArgIsDeadInlineTemporary($callArgProbeForArray)
                     || !$this->callArgOperandExpectsArrayProducer($callArgProbeForArray)
                 ) {
                     $existingArraySlot = $block->slotForOperand($inlineArray->result);
@@ -29628,6 +29633,7 @@ class Compiler {
                         null === $initSlot
                         && $this->callArgIsDeadInlineTemporary($callArgProbeForArray)
                         && $this->callArgOperandExpectsArrayProducer($callArgProbeForArray)
+                        && !$arrayCombineSiblingArray
                     ) {
                         $initSlot = $this->slotForRecentInitArrayCallArg($block);
                     }
@@ -31829,7 +31835,11 @@ class Compiler {
                     $valueSlot = $arrayColumnSlot;
                 }
             }
-            if ('array_combine' === strtolower($calleeName ?? '') && null !== $cfgCallOp && null !== $block->orig) {
+            if (
+                'array_combine' === strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
                 $arrayCombineSlot = $this->finalizeArrayCombineCallArgSlot(
                     $block,
                     $cfgCallOp,
@@ -32120,6 +32130,21 @@ class Compiler {
                             $valueSlot = (string) $arrayArgSlot;
                         }
                     }
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 'array_combine' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && null !== $block->orig
+            ) {
+                $combineForcedSlot = $this->finalizeArrayCombineCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $combineForcedSlot) {
+                    $valueSlot = $combineForcedSlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
@@ -32459,7 +32484,7 @@ class Compiler {
         int $argIndex,
         array &$sends
     ): ?string {
-        if (2 !== \count($cfgCallOp->args ?? [])) {
+        if (2 !== \count($cfgCallOp->args ?? []) || null === $block->orig) {
             return null;
         }
         $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
@@ -32476,8 +32501,94 @@ class Compiler {
             }
         }
         $slot = $block->slotForOperand($matched->result);
+        if (null !== $slot) {
+            return (string) $slot;
+        }
+        if ($matched instanceof Op\Expr\Array_) {
+            $ordinalSlot = $this->slotForArrayCombineSiblingInitArray(
+                $block,
+                $producers,
+                $argIndex,
+                $sends
+            );
+            if (null !== $ordinalSlot) {
+                return $ordinalSlot;
+            }
+        }
 
-        return null !== $slot ? (string) $slot : null;
+        return $this->slotForArrayCombineInitArrayByArgIndex($block, $cfgCallOp, $argIndex, $sends);
+    }
+
+    /**
+     * array_combine() with inline array literals — map arg index to INIT_ARRAY ordinal (#16080).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function slotForArrayCombineInitArrayByArgIndex(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array $pendingSends
+    ): ?string {
+        if (2 !== \count($cfgCallOp->args ?? [])) {
+            return null;
+        }
+        foreach ($cfgCallOp->args as $callArg) {
+            if (
+                null === $callArg
+                || !$this->callArgIsDeadInlineTemporary($callArg)
+                || !$this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                return null;
+            }
+        }
+        $initSlots = [];
+        foreach (array_merge($block->opCodes, $pendingSends) as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initSlots[] = (string) $op->arg1;
+            }
+        }
+        if (\count($initSlots) <= $argIndex) {
+            return null;
+        }
+
+        return $initSlots[$argIndex];
+    }
+
+    /**
+     * array_combine([...], [...]) — map arg index to sibling INIT_ARRAY slot (#16080, #10214).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function slotForArrayCombineSiblingInitArray(
+        Block $block,
+        array $producers,
+        int $argIndex,
+        array $pendingSends
+    ): ?string {
+        $matched = $this->matchArrayCombineInlineProducers($producers, $argIndex);
+        if (!$matched instanceof Op\Expr\Array_) {
+            return null;
+        }
+        $arrayProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+        ));
+        if (2 !== \count($arrayProducers)) {
+            return null;
+        }
+        $ordinal = array_search($matched, $arrayProducers, true);
+        if (false === $ordinal) {
+            return null;
+        }
+        $initSlots = [];
+        foreach (array_merge($block->opCodes, $pendingSends) as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initSlots[] = (string) $op->arg1;
+            }
+        }
+
+        return $initSlots[$ordinal] ?? null;
     }
 
     /**
@@ -33936,6 +34047,57 @@ class Compiler {
         return [$nested, $outer];
     }
 
+    /**
+     * array_combine([...], [...]) — ARG_SEND must map to sibling INIT_ARRAY slots, not recent-init (#16080, #10214).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $allArgSends
+     */
+    private function rewireArrayCombineInlineArgSendSlots(
+        array &$outerArgSends,
+        Block $block,
+        array $allArgSends,
+        ?string $calleeName,
+        ?Op $cfgCallOp
+    ): void {
+        if (null === $cfgCallOp || 2 !== \count($cfgCallOp->args ?? [])) {
+            return;
+        }
+        $calleeLower = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if ('array_combine' !== $calleeLower) {
+            return;
+        }
+        foreach ($cfgCallOp->args as $callArg) {
+            if (
+                null === $callArg
+                || !$this->callArgIsDeadInlineTemporary($callArg)
+                || !$this->callArgOperandExpectsArrayProducer($callArg)
+            ) {
+                return;
+            }
+        }
+        $initSlots = [];
+        foreach (array_merge($block->opCodes, $allArgSends) as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initSlots[] = (string) $op->arg1;
+            }
+        }
+        if (\count($initSlots) < 2) {
+            return;
+        }
+        $sendOrdinal = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (isset($initSlots[$sendOrdinal])) {
+                $send->arg1 = $initSlots[$sendOrdinal];
+            }
+            ++$sendOrdinal;
+        }
+        unset($send);
+    }
+
     private function isInlineCallArgProducerInitOpcode(OpCode $op): bool
     {
         return OpCode::TYPE_FUNCCALL_INIT === $op->type
@@ -33971,6 +34133,7 @@ class Compiler {
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
+        $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {

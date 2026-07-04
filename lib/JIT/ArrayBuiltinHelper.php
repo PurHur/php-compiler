@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\JIT;
 
+use PHPCompiler\ext\standard\array_combine;
 use PHPCompiler\ext\standard\boolval;
 use PHPCompiler\ext\standard\JitArrayCountRecursive;
 use PHPCompiler\ext\standard\floatval;
@@ -7575,6 +7576,41 @@ final class ArrayBuiltinHelper
     }
 
     /**
+     * array_combine() length guard — ValueError when counts differ (php-src ext/standard/array.c; #16080).
+     *
+     * On success, positions the builder at {@see BasicBlockHelper::append()} `{prefix}_work` (or {@param $okSuffix}).
+     */
+    public static function guardCombinePackedListLengthMismatch(
+        Context $context,
+        Variable $keys,
+        Variable $values,
+        string $okSuffix = 'work'
+    ): void {
+        $sizeT = $context->getTypeFromString('size_t');
+        $zero = $sizeT->constInt(0, false);
+        $keysNum = self::packedListElementCount($context, $keys);
+        $valsNum = self::packedListElementCount($context, $values);
+        $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysNum, $zero);
+        $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsNum, $zero);
+        $bothEmpty = $context->builder->and($keysEmpty, $valsEmpty);
+        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
+        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
+        $returnFalse = $context->builder->or(
+            $context->builder->and($eitherEmpty, $context->builder->not($bothEmpty)),
+            $lengthMismatch
+        );
+
+        TypeErrorRaise::emitBranchOrAbortOnValueErrorFailure(
+            $context,
+            $context->builder->not($returnFalse),
+            'array_combine',
+            array_combine::LENGTH_MISMATCH_ERROR,
+            $okSuffix,
+            'count_mismatch'
+        );
+    }
+
+    /**
      * array_combine() for packed list arrays (subset of PHP; returns __value__*).
      *
      * @return Value
@@ -7593,18 +7629,11 @@ final class ArrayBuiltinHelper
         $keysEmpty = $context->builder->icmp(Builder::INT_EQ, $keysNum, $zero);
         $valsEmpty = $context->builder->icmp(Builder::INT_EQ, $valsNum, $zero);
         $bothEmpty = $context->builder->and($keysEmpty, $valsEmpty);
-        $eitherEmpty = $context->builder->or($keysEmpty, $valsEmpty);
-        $lengthMismatch = $context->builder->icmp(Builder::INT_NE, $keysNum, $valsNum);
-        $returnFalse = $context->builder->or(
-            $context->builder->and($eitherEmpty, $context->builder->not($bothEmpty)),
-            $lengthMismatch
-        );
 
         $exitBlock = BasicBlockHelper::append($context, 'array_combine_exit');
         $bothEmptyBlock = BasicBlockHelper::append($context, 'array_combine_both_empty');
-        $falseBlock = BasicBlockHelper::append($context, 'array_combine_false');
-        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
         $checkFalseBlock = BasicBlockHelper::append($context, 'array_combine_check_false');
+        $workBlock = BasicBlockHelper::append($context, 'array_combine_work');
         $context->builder->branchIf($bothEmpty, $bothEmptyBlock, $checkFalseBlock);
 
         $context->builder->positionAtEnd($bothEmptyBlock);
@@ -7616,11 +7645,7 @@ final class ArrayBuiltinHelper
         $context->builder->branch($exitBlock);
 
         $context->builder->positionAtEnd($checkFalseBlock);
-        $context->builder->branchIf($returnFalse, $falseBlock, $workBlock);
-
-        $context->builder->positionAtEnd($falseBlock);
-        JitValueBox::writeBool($context, $resultSlot, $context->constantFromBool(false));
-        $context->builder->branch($exitBlock);
+        self::guardCombinePackedListLengthMismatch($context, $keys, $values);
 
         $context->builder->positionAtEnd($workBlock);
 
