@@ -12384,12 +12384,18 @@ class Compiler {
             && $this->callArgOperandExpectsArrayProducer($positionalCallArg)
         ) {
             // array_combine(array_keys(...), [...]) — sibling FuncCall feeds arg #0, not trailing Array_ (#15558, #15857).
-            if (
-                'array_combine' === $this->resolveCfgFuncCallName($callOp)
+            $arrayCombinePair = 'array_combine' === $this->resolveCfgFuncCallName($callOp)
                 && 2 === \count($callOp->args ?? [])
-                && null !== $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                ? $this->matchArrayCombineInlineProducers($producers, $argIndex)
+                : null;
+            if (
+                $arrayCombinePair instanceof Op\Expr\FuncCall
+                || $arrayCombinePair instanceof Op\Expr\NsFuncCall
             ) {
                 return null;
+            }
+            if ($arrayCombinePair instanceof Op\Expr\Array_) {
+                return $arrayCombinePair;
             }
             // array_merge((object)[...], [...]) — Cast feeds arg #0, not trailing Array_ (#15207, #15858).
             if (
@@ -28560,6 +28566,7 @@ class Compiler {
                 && \is_array($cfgCallOp->args ?? null)
                 && 2 === \count($cfgCallOp->args)
                 && 'array_slice' !== $this->resolveCfgFuncCallName($cfgCallOp)
+                && 'array_combine' !== $this->resolveCfgFuncCallName($cfgCallOp)
                 && !(
                     isset($cfgCallOp->args[0])
                     && $this->isEmbeddedCallLiteralArg($cfgCallOp->args[0])
@@ -28742,6 +28749,24 @@ class Compiler {
                 );
                 if (null !== $arrayColumnSlot) {
                     $valueSlot = $arrayColumnSlot;
+                }
+            }
+            if ('array_combine' === strtolower($calleeName ?? '') && null !== $cfgCallOp && null !== $block->orig) {
+                $combineProducers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                );
+                $combineMapped = $this->matchArrayCombineInlineProducers($combineProducers, (int) $argIndex);
+                if ($combineMapped instanceof Op\Expr && null !== $combineMapped->result) {
+                    if (null === $block->slotForOperand($combineMapped->result)) {
+                        foreach ($this->compileExpr($combineMapped, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                    }
+                    $combineSlot = $block->slotForOperand($combineMapped->result);
+                    if (null !== $combineSlot) {
+                        $valueSlot = (string) $combineSlot;
+                    }
                 }
             }
             $valueSlot = $this->finalizeStmtCoalesceCallArgSlot(
