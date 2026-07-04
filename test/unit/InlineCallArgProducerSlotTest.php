@@ -567,6 +567,48 @@ PHP;
         self::assertStringContainsString('ok', $out);
     }
 
+    /** Issue #9072 — preg_replace_callback_array(['/pat/' => fn(...)], $subj) wires INIT_ARRAY not closure slot. */
+    public function testPregReplaceCallbackArrayInlineClosureMapRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro-maintainer/preg_replace_callback_array.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'preg_replace_callback_array.php');
+
+        $closureSlot = null;
+        $initArraySlot = null;
+        $sendSlots = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CLOSURE === $op->type) {
+                $closureSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_INIT_ARRAY === $op->type) {
+                $initArraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $sendSlots = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($closureSlot);
+        self::assertNotNull($initArraySlot);
+        self::assertCount(2, $sendSlots, 'sends='.json_encode($sendSlots));
+        self::assertSame((string) $initArraySlot, (string) $sendSlots[0], 'pattern map slot');
+        self::assertNotSame((string) $closureSlot, (string) $sendSlots[0], 'closure must not feed arg #0');
+
+        ob_start();
+        $runtime->run($block);
+        $out = ob_get_clean();
+        self::assertSame("a[1]b[2]\n", $out);
+    }
+
     /** Issue #14119 — var_dump(acosh(), asinh(), atanh()) sibling scalar-literal producers need distinct slots. */
     public function testVarDumpAcoshAsinhAtanhUsesDistinctProducerSlots(): void
     {
