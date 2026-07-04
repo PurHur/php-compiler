@@ -13104,7 +13104,9 @@ restart:
         ];
         if (!isset($declarationOpcodes[$opType])) {
             $this->finalizeDeferredTraitUses();
-            $this->finalizeAllDeferredClassConstants();
+            // Forward-ref class constants (e.g. C::ITEM = E::A before enum E) may stay
+            // pending until a later declaration opcode flushes them (#9664, #15737).
+            $this->flushDeferredClassConstants();
             $this->finalizeDeferredParentInheritance();
         }
     }
