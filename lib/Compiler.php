@@ -6939,7 +6939,12 @@ class Compiler {
 
             return $v;
         }
-        $lc = strtolower($name);
+        if (isset(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lc])) {
+            $v = new Variable(Variable::TYPE_INTEGER);
+            $v->int(\PHPCompiler\ext\standard\StdlibConstants::CORE_INT_BY_NAME[$lc]);
+
+            return $v;
+        }
         if ('inf' === $lc) {
             $v = new Variable(Variable::TYPE_FLOAT);
             $v->float(INF);
@@ -12330,7 +12335,7 @@ class Compiler {
                             continue;
                         }
 
-                        return $child;
+                        return $this->outermostNestedStmtBeforeArrayProducer($cfgChildren, $i);
                     }
                     if (
                         $this->operandsReferToSameVariable($child->result, $arg)
@@ -12439,7 +12444,7 @@ class Compiler {
                     $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
                     if (null !== $nestedTrailing) {
                         [$arrayChain, $trailing] = $nestedTrailing;
-                        if (1 + \count($trailing) === \count($callOp->args) && 0 === $argIndex) {
+                        if ($this->nestedInlineArrayPlusTrailingMatchesCallArgs($callOp->args ?? [], $arrayChain, $trailing) && 0 === $argIndex) {
                             $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
                             if ($outer instanceof Op\Expr\Array_) {
                                 return $outer;
@@ -12486,7 +12491,7 @@ class Compiler {
                 $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
                 if (null !== $nestedTrailing) {
                     [$arrayChain, $trailing] = $nestedTrailing;
-                    if (1 + \count($trailing) === \count($callOp->args)) {
+                    if ($this->nestedInlineArrayPlusTrailingMatchesCallArgs($callOp->args ?? [], $arrayChain, $trailing)) {
                         $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
                         if ($outer instanceof Op\Expr\Array_) {
                             return $outer;
@@ -14886,6 +14891,12 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
+        if ('http_build_query' === $inlineFuncName && \count($callArgs) >= 2) {
+            $mapped = $this->matchHttpBuildQueryInlineCallArgProducer($producers, $callArgs, $argIndex);
+            if (null !== $mapped) {
+                return $mapped;
+            }
+        }
         if (
             0 === $argIndex
             && null !== $cfgCallOp
@@ -15401,7 +15412,7 @@ class Compiler {
                 $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
                 if (null !== $nestedTrailing) {
                     [$arrayChain, $trailing] = $nestedTrailing;
-                    if (1 + \count($trailing) === $argCount && 0 === $argIndex) {
+                    if ($this->nestedInlineArrayPlusTrailingMatchesCallArgs($callArgs, $arrayChain, $trailing) && 0 === $argIndex) {
                         $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
                         if ($outer instanceof Op\Expr\Array_) {
                             return $outer;
@@ -15476,7 +15487,7 @@ class Compiler {
             $nestedArrayTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
             if (null !== $nestedArrayTrailing) {
                 [$arrayChain, $trailing] = $nestedArrayTrailing;
-                if (1 + \count($trailing) === $argCount) {
+                if ($this->nestedInlineArrayPlusTrailingMatchesCallArgs($callArgs, $arrayChain, $trailing)) {
                     if (0 === $argIndex) {
                         return $arrayChain[\count($arrayChain) - 1];
                     }
@@ -17537,6 +17548,11 @@ class Compiler {
                 return true;
             }
         }
+        if ($root instanceof Op\Expr\ConstFetch) {
+            if (null !== $this->tryFoldGlobalConstFetch($root)) {
+                return true;
+            }
+        }
 
         return false;
     }
@@ -17804,6 +17820,201 @@ class Compiler {
         }
 
         return [$arrayChain, $trailing];
+    }
+
+    /**
+     * One nested inline array arg plus embedded middle literals and trailing hoisted producers (#12008, #15932).
+     *
+     * e.g. http_build_query(['a' => ['x', 'y']], '', '&', PHP_QUERY_RFC3986)
+     *
+     * @param list<Operand> $callArgs
+     * @param list<Op\Expr\Array_> $arrayChain
+     * @param list<Op\Expr> $trailing
+     */
+    private function nestedInlineArrayPlusTrailingMatchesCallArgs(
+        array $callArgs,
+        array $arrayChain,
+        array $trailing
+    ): bool {
+        $argCount = \count($callArgs);
+        if ($argCount < 1 + \count($trailing) || [] === $arrayChain) {
+            return false;
+        }
+        $embeddedMiddle = 0;
+        for ($i = 1; $i < $argCount - \count($trailing); ++$i) {
+            $callArg = $callArgs[$i] ?? null;
+            if (null === $callArg || !$this->isEmbeddedCallLiteralArg($callArg)) {
+                return false;
+            }
+            ++$embeddedMiddle;
+        }
+
+        return 1 + $embeddedMiddle + \count($trailing) === $argCount;
+    }
+
+    /**
+     * Final ARG_SEND slot for nested inline http_build_query() calls (#12008, #15932).
+     *
+     * @param list<OpCode> $pendingSends
+     */
+    private function finalizeHttpBuildQueryCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        Operand $callArgOperand,
+        array &$pendingSends
+    ): ?string {
+        if (!property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return null;
+        }
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp);
+        if ([] === $producers) {
+            return null;
+        }
+        $matched = $this->matchHttpBuildQueryInlineCallArgProducer($producers, $cfgCallOp->args, $argIndex);
+        if (!$matched instanceof Op\Expr) {
+            return null;
+        }
+        if ($matched instanceof Op\Expr\Array_) {
+            return $this->compileInlineArrayProducerSlot($matched, $block, $pendingSends);
+        }
+        if ($matched instanceof Op\Expr\ConstFetch) {
+            return $this->compileInlineConstFetchProducerSlot($matched, $callArgOperand, $block, $pendingSends);
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<OpCode> $pendingSends
+     */
+    private function compileInlineArrayProducerSlot(
+        Op\Expr\Array_ $arrayProducer,
+        Block $block,
+        array &$pendingSends
+    ): ?string {
+        $existing = $block->slotForOperand($arrayProducer->result);
+        if (null !== $existing) {
+            return (string) $existing;
+        }
+        $arrayOps = $this->compileArrayLiteral($arrayProducer, $block);
+        if ([] !== $arrayOps) {
+            $pendingSends = array_merge($pendingSends, $arrayOps);
+        }
+        $initSlot = $this->slotFromInitArrayLiteralOps($arrayOps);
+
+        return $initSlot ?? $this->compileOperand($arrayProducer->result, $block, true);
+    }
+
+    /**
+     * @param list<OpCode> $pendingSends
+     */
+    private function compileInlineConstFetchProducerSlot(
+        Op\Expr\ConstFetch $constProducer,
+        Operand $callArgOperand,
+        Block $block,
+        array &$pendingSends
+    ): ?string {
+        $folded = $this->tryFoldGlobalConstFetch($constProducer);
+        if (null !== $folded) {
+            return (string) $block->registerConstant($callArgOperand, $folded);
+        }
+        $existing = $block->slotForOperand($constProducer->result);
+        if (null !== $existing) {
+            return (string) $existing;
+        }
+        foreach ($this->compileExpr($constProducer, $block) as $op) {
+            $pendingSends[] = $op;
+        }
+        $slot = $block->slotForOperand($constProducer->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchHttpBuildQueryInlineCallArgProducer(
+        array $producers,
+        array $callArgs,
+        int $argIndex
+    ): ?Op\Expr {
+        $argCount = \count($callArgs);
+        if (0 === $argCount) {
+            return null;
+        }
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null !== $nestedTrailing) {
+            [$arrayChain, $trailing] = $nestedTrailing;
+            if (
+                0 === $argIndex
+                && $this->nestedInlineArrayPlusTrailingMatchesCallArgs($callArgs, $arrayChain, $trailing)
+            ) {
+                $outer = $arrayChain[\count($arrayChain) - 1] ?? null;
+
+                return $outer instanceof Op\Expr\Array_ ? $outer : null;
+            }
+            if (
+                $argIndex === $argCount - 1
+                && [] !== $trailing
+                && $this->nestedInlineArrayPlusTrailingMatchesCallArgs($callArgs, $arrayChain, $trailing)
+            ) {
+                $encoding = $trailing[\count($trailing) - 1] ?? null;
+
+                return $encoding instanceof Op\Expr ? $encoding : null;
+            }
+
+            return null;
+        }
+        if (0 === $argIndex) {
+            $arrayProducers = array_values(array_filter(
+                $producers,
+                static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\Array_
+            ));
+            if ([] !== $arrayProducers) {
+                $outer = $arrayProducers[\count($arrayProducers) - 1];
+
+                return $outer instanceof Op\Expr\Array_ ? $outer : null;
+            }
+        }
+        if ($argIndex === $argCount - 1) {
+            $last = $producers[\count($producers) - 1] ?? null;
+
+            return $last instanceof Op\Expr ? $last : null;
+        }
+
+        return null;
+    }
+
+    /**
+     * php-cfg nested inline Array_ stmts before a call — return outermost producer (#12008, #15932).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function outermostNestedStmtBeforeArrayProducer(array $cfgChildren, int $innerIndex): Op\Expr\Array_
+    {
+        $chain = [];
+        for ($j = $innerIndex; $j >= 0; --$j) {
+            $candidate = $cfgChildren[$j] ?? null;
+            if (!$candidate instanceof Op\Expr\Array_) {
+                break;
+            }
+            array_unshift($chain, $candidate);
+        }
+        if (\count($chain) >= 2 && $this->arrayProducersFormNestedChain($chain)) {
+            $outer = $chain[\count($chain) - 1];
+            if ($outer instanceof Op\Expr\Array_) {
+                return $outer;
+            }
+        }
+
+        $inner = $cfgChildren[$innerIndex] ?? null;
+        if ($inner instanceof Op\Expr\Array_) {
+            return $inner;
+        }
+
+        throw new \LogicException('expected Array_ producer before inline call');
     }
 
     /**
@@ -26241,9 +26452,14 @@ class Compiler {
                         ) {
                             // array_merge((object)[...], [...]) — Cast feeds arg #0 (#15858).
                         } elseif (
-                            $this->callArgIsDeadInlineTemporary($callArgProbe)
-                            || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
-                            || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                            $this->callArgOperandExpectsArrayProducer($callArgProbe)
+                            && (
+                                (
+                                    $this->callArgIsDeadInlineTemporary($callArgProbe)
+                                )
+                                || $this->operandsReferToSameVariable($stmtBeforeArray->result, $callArgProbe)
+                                || $this->operandsReferToSameVariable($stmtBeforeArray->result, $arg)
+                            )
                         ) {
                             $inlineArray = $stmtBeforeArray;
                         }
@@ -26313,7 +26529,7 @@ class Compiler {
             }
             if (null !== $dimFetchSlot && null === $valueSlot) {
                 $valueSlot = $dimFetchSlot;
-            } elseif (null !== $inlineArray) {
+            } elseif (null !== $inlineArray && null === $valueSlot) {
                 $existingArraySlot = $block->slotForOperand($inlineArray->result);
                 if (null !== $existingArraySlot) {
                     $valueSlot = (string) $existingArraySlot;
@@ -28226,6 +28442,22 @@ class Compiler {
                 );
                 if (null !== $procOpenSlot) {
                     $valueSlot = $procOpenSlot;
+                }
+            }
+            if (
+                'http_build_query' === strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '')
+                && null !== $cfgCallOp
+                && null !== $block->orig
+            ) {
+                $httpBuildQuerySlot = $this->finalizeHttpBuildQueryCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $callArgOperand,
+                    $sends
+                );
+                if (null !== $httpBuildQuerySlot) {
+                    $valueSlot = $httpBuildQuerySlot;
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
