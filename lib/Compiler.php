@@ -15421,6 +15421,10 @@ class Compiler {
             return null;
         }
         if (null !== $callArg) {
+            $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, $argIndex);
+            if (null !== $chainedDimFetch) {
+                return $chainedDimFetch;
+            }
             $arrayUnionPlus = $this->matchArrayUnionPlusInlineCallArgProducer(
                 $producers,
                 $callArg,
@@ -15475,6 +15479,10 @@ class Compiler {
             return $producers[1];
         }
         if ($argCount < $producerCount) {
+            $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, $argIndex);
+            if (null !== $chainedDimFetch) {
+                return $chainedDimFetch;
+            }
             // array_fill_keys([[[1]]], 1) — all Array_ preludes belong to the sole hoisted arg (#10848).
             if (
                 $this->producersAreNestedArrayLiteralChain($producers)
@@ -15735,6 +15743,10 @@ class Compiler {
             return $mapped;
         }
         if ($producerCount === $argCount) {
+            $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer($producers, $argIndex);
+            if (null !== $chainedDimFetch) {
+                return $chainedDimFetch;
+            }
             // str_contains($arr['k'], $fn . '():') — hoisted dim-fetch + concat (#13662, zend_execute.c).
             if (2 === $producerCount) {
                 $dimIdx = null;
@@ -25349,6 +25361,30 @@ class Compiler {
         if ([] === $dimFetches) {
             return null;
         }
+        if (
+            \count($dimFetches) > 1
+            && $this->arrayDimFetchesFormProducerChain($dimFetches)
+        ) {
+            // var_export($a[1][0], true) — chain tail feeds arg #0; trailing literal is not a dim-fetch (#15762, #15945).
+            if ($argIndex > 0) {
+                return null;
+            }
+            $opcodeDimIndex = \count($dimFetches) - 1;
+            $fetch = $dimFetches[$opcodeDimIndex];
+            $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex);
+            if (null === $slot) {
+                $slot = $block->slotForOperand($fetch->result);
+            }
+            if (null === $slot) {
+                foreach ($this->compileExpr($fetch, $block) as $op) {
+                    $block->addOpCode($op);
+                }
+                $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex)
+                    ?? $block->slotForOperand($fetch->result);
+            }
+
+            return null !== $slot ? (string) $slot : null;
+        }
         $callArgs = property_exists($cfgCallOp, 'args') && is_array($cfgCallOp->args)
             ? $cfgCallOp->args
             : [];
@@ -25371,15 +25407,6 @@ class Compiler {
         }
         $opcodeDimIndex = $dimIndex;
         $fetch = $dimFetches[$dimIndex];
-        if (
-            0 === $argIndex
-            && \count($dimFetches) > 1
-            && $this->arrayDimFetchesFormProducerChain($dimFetches)
-        ) {
-            // var_export($a[1][0], true) — chain tail is arg #0, trailing literals are embedded (#15762).
-            $opcodeDimIndex = \count($dimFetches) - 1;
-            $fetch = $dimFetches[$opcodeDimIndex];
-        }
         $slot = $this->compiledArrayDimFetchResultSlotBeforePendingFuncCall($block, $opcodeDimIndex);
         if (null === $slot) {
             $slot = $block->slotForOperand($fetch->result);
@@ -25434,6 +25461,34 @@ class Compiler {
         }
 
         return false;
+    }
+
+    /**
+     * var_export($a[1][0], true) — chained hoisted dim-fetch tail feeds arg #0 only (#15762, #15945).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchChainedArrayDimFetchInlineCallArgProducer(array $producers, int $argIndex): ?Op\Expr
+    {
+        $dimFetches = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => $producer instanceof Op\Expr\ArrayDimFetch
+        ));
+        if (
+            \count($dimFetches) < 2
+            || !$this->arrayDimFetchesFormProducerChain($dimFetches)
+        ) {
+            return null;
+        }
+        if (0 === $argIndex) {
+            return $dimFetches[\count($dimFetches) - 1];
+        }
+        $nonDimProducers = array_values(array_filter(
+            $producers,
+            static fn (Op\Expr $producer): bool => !$producer instanceof Op\Expr\ArrayDimFetch
+        ));
+
+        return $nonDimProducers[$argIndex - 1] ?? null;
     }
 
     /**
@@ -27615,7 +27670,7 @@ class Compiler {
                     (int) $argIndex,
                     $siblingOps
                 );
-                if (null !== $siblingSlot && !$inlineArrayLiteralArgWired) {
+                if (null !== $siblingSlot && !$inlineArrayLiteralArgWired && null === $dimFetchSlot) {
                     if ([] !== $siblingOps) {
                         $sends = array_merge($sends, $siblingOps);
                     }
@@ -28790,6 +28845,23 @@ class Compiler {
                                 $valueSlot = (string) $comparisonSlot;
                             }
                         }
+                    }
+                }
+            }
+            if (null !== $cfgCallOp && null !== $block->orig) {
+                $chainedDimFetch = $this->matchChainedArrayDimFetchInlineCallArgProducer(
+                    $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp),
+                    (int) $argIndex
+                );
+                if ($chainedDimFetch instanceof Op\Expr && null !== $chainedDimFetch->result) {
+                    if (null === $block->slotForOperand($chainedDimFetch->result)) {
+                        foreach ($this->compileExpr($chainedDimFetch, $block) as $op) {
+                            $sends[] = $op;
+                        }
+                    }
+                    $chainSlot = $block->slotForOperand($chainedDimFetch->result);
+                    if (null !== $chainSlot) {
+                        $valueSlot = (string) $chainSlot;
                     }
                 }
             }
