@@ -23842,6 +23842,16 @@ class Compiler {
         if (null === $block->orig) {
             return null;
         }
+        $callbackArg = $cfgCallOp->args[0] ?? null;
+        if ($this->isEmbeddedCallLiteralArg($callbackArg)) {
+            return null;
+        }
+        $leadingCallback = $this->leadingCallbackFirstInlineProducerBeforeCfgCall($cfgCallOp, $block);
+        if ($leadingCallback instanceof Op\Expr\ArrowFunction
+            || $leadingCallback instanceof Op\Expr\Closure
+            || $leadingCallback instanceof Op\Expr\FirstClassCallable) {
+            return null;
+        }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
             if ($child === $cfgCallOp) {

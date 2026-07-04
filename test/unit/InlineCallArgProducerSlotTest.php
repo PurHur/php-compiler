@@ -4256,6 +4256,43 @@ PHP;
         self::assertStringContainsString('2', $out);
     }
 
+    /** Issue #16116 — array_map('strlen', [null]) must not wire haystack null ConstFetch as callback. */
+    public function testArrayMapStringBuiltinNullHaystackUsesDistinctSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+var_export(array_map('strlen', [null]));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'array_map_strlen_null_haystack.php');
+
+        $nullSlot = null;
+        $mapSends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_CONST_FETCH === $op->type && null === $nullSlot) {
+                $nullSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $mapSends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $mapSends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($nullSlot);
+        self::assertCount(2, $mapSends, 'map sends='.json_encode($mapSends));
+        self::assertNotSame($nullSlot, $mapSends[0], 'callback must not reuse haystack null slot');
+
+        ob_start();
+        $runtime->run($block);
+        self::assertSame("array (\n  0 => 0,\n)", ob_get_clean());
+    }
+
     /** Issue #11187 — rename($src, $dst) after file_put_contents must send path locals, not int returns. */
     public function testRenameAfterFilePutContentsUsesNamedPathSlots(): void
     {
