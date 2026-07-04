@@ -17612,6 +17612,22 @@ class Compiler {
             ) {
                 continue;
             }
+            if ($child instanceof Op\Expr\ConstFetch || $child instanceof Op\Expr\ClassConstFetch) {
+                $prevProducer = $cfgChildren[$i - 1] ?? null;
+                if (
+                    ($prevProducer instanceof Op\Expr\FuncCall || $prevProducer instanceof Op\Expr\NsFuncCall)
+                    && $this->isNestedCallArgProducerSeparatedByConsumerLiteralPreludes(
+                        $prevProducer,
+                        $callOp,
+                        $i - 1,
+                        $callIndex,
+                        $cfgChildren
+                    )
+                ) {
+                    // in_array('x', g(), true) — hoisted ConstFetch between g() and consumer (#13507, #15611, #15612).
+                    continue;
+                }
+            }
             array_unshift($producers, $child);
         }
 
@@ -19773,11 +19789,29 @@ class Compiler {
                 return null;
             }
         } else {
-            $siblingCount = $callIndex - $firstSibling;
-            if ($siblingCount < 2 || $argIndex >= $siblingCount) {
-                return null;
+            $producerIndex = null;
+            for ($j = $firstSibling; $j < $callIndex; ++$j) {
+                $scan = $block->orig->children[$j] ?? null;
+                if (!$this->isSiblingInlineCallProducerExpr($scan)) {
+                    continue;
+                }
+                $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                    $j,
+                    $callIndex,
+                    $block->orig->children
+                );
+                if ($targetArg === $argIndex) {
+                    $producerIndex = $j;
+                    break;
+                }
             }
-            $producerIndex = $firstSibling + $argIndex;
+            if (null === $producerIndex) {
+                $siblingCount = $callIndex - $firstSibling;
+                if ($siblingCount < 2 || $argIndex >= $siblingCount) {
+                    return null;
+                }
+                $producerIndex = $firstSibling + $argIndex;
+            }
         }
         $producer = $block->orig->children[$producerIndex] ?? null;
         if (!$this->isSiblingInlineCallProducerExpr($producer)) {
@@ -20920,6 +20954,23 @@ class Compiler {
         $producerCount = \count($producers);
         if ($producerCount < 1 || $producerSlotIndex >= $producerCount) {
             return null;
+        }
+        $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($callIndex, $cfgChildren);
+        if (null !== $firstSibling) {
+            for ($j = $firstSibling; $j < $callIndex; ++$j) {
+                $scan = $cfgChildren[$j] ?? null;
+                if (!$scan instanceof Op\Expr || !\in_array($scan, $producers, true)) {
+                    continue;
+                }
+                $targetArg = $this->siblingMultiArgFuncCallProducerTargetArgIndex(
+                    $j,
+                    $callIndex,
+                    $cfgChildren
+                );
+                if (null !== $targetArg && $targetArg === $argIndex) {
+                    return $scan;
+                }
+            }
         }
         $cfgProducerIndex = $callIndex - $producerCount + $producerSlotIndex;
         if ($cfgProducerIndex < 0 || $cfgProducerIndex >= $callIndex) {
@@ -25520,6 +25571,7 @@ class Compiler {
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
                 && null !== $block->orig
+                && !$this->callArgOperandExpectsArrayProducer($arg)
             ) {
                 $logicalPhi = $this->logicalShortCircuitOrPhiMergeSlot($block);
                 if (null !== $logicalPhi) {
@@ -26197,6 +26249,7 @@ class Compiler {
             if (
                 null !== $cfgCallOp
                 && $this->callArgIsDeadInlineTemporary($arg)
+                && !$this->callArgOperandExpectsArrayProducer($arg)
             ) {
                 $andPhi = $this->logicalShortCircuitPhiMergeSlot($block);
                 if (
@@ -26279,8 +26332,36 @@ class Compiler {
                 (int) $argIndex,
                 $callArgOperand ?? $arg
             );
-            if (null !== $ternaryMergeSlot) {
+            if (
+                null !== $ternaryMergeSlot
+                && !(
+                    $this->callArgIsDeadInlineTemporary($arg)
+                    && $this->callArgOperandExpectsArrayProducer($arg)
+                )
+            ) {
                 $valueSlot = $ternaryMergeSlot;
+            }
+            if (
+                null !== $cfgCallOp
+                && $this->callArgIsDeadInlineTemporary($arg)
+                && $this->callArgOperandExpectsArrayProducer($arg)
+            ) {
+                $arrayProducerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                if (null === $arrayProducerSlot) {
+                    $siblingEmit = [];
+                    $arrayProducerSlot = $this->resolveSiblingInlineCallArgProducerSlot(
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex,
+                        $siblingEmit
+                    );
+                    if ([] !== $siblingEmit) {
+                        $sends = array_merge($sends, $siblingEmit);
+                    }
+                }
+                if (null !== $arrayProducerSlot) {
+                    $valueSlot = (string) $arrayProducerSlot;
+                }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
