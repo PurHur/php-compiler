@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\bcmath;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPCompiler\VM\Variable;
+use PHPCompiler\ext\standard\VmRoundMode;
 use PHPCompiler\ext\standard\VmString;
 use PHPLLVM\Value;
 
@@ -71,5 +73,37 @@ abstract class BcmathFunction extends Internal
         }
 
         return $var->toInt();
+    }
+
+    protected function maxArgCount(): int
+    {
+        return CompilerVersion::supportsRoundingModeEnum() ? 4 : 3;
+    }
+
+    protected function requireBinaryArgCount(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $maxArgs = $this->maxArgCount();
+        if ($argc < 2 || $argc > $maxArgs) {
+            throw new \LogicException(
+                4 === $maxArgs
+                    ? $this->getName().'() requires two to four arguments in this compiler build'
+                    : $this->getName().'() requires two or three arguments in this compiler build'
+            );
+        }
+    }
+
+    protected function optionalRoundingMode(Frame $frame, int $index): ?int
+    {
+        if (\count($frame->calledArgs) <= $index) {
+            return null;
+        }
+
+        return VmRoundMode::resolveRoundModeArg(
+            $frame->calledArgs[$index]->resolveIndirect(),
+            $this->getName(),
+            'rounding_mode',
+            $index + 1
+        );
     }
 }

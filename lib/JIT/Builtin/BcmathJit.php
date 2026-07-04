@@ -74,21 +74,21 @@ final class BcmathJit
             $context,
             '__compiler_bcadd',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::ADD_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::ADD_HELPER);
             }
         );
         self::implementIfMissing(
             $context,
             '__compiler_bcsub',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::SUB_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::SUB_HELPER);
             }
         );
         self::implementIfMissing(
             $context,
             '__compiler_bcmul',
             static function (Context $ctx, LlvmFunction $fn): void {
-                self::implementBinaryStringBridge($ctx, $fn, self::MUL_HELPER);
+                self::implementBinaryStringWithRoundModeBridge($ctx, $fn, self::MUL_HELPER);
             }
         );
         self::implementIfMissing(
@@ -142,7 +142,10 @@ final class BcmathJit
             ),
             '__compiler_bcadd',
             '__compiler_bcsub',
-            '__compiler_bcmul',
+            '__compiler_bcmul' => $context->module->addFunction(
+                $name,
+                $context->context->functionType($str, false, $str, $str, $i64, $i32, $i64, $i32)
+            ),
             '__compiler_bcdiv' => $context->module->addFunction(
                 $name,
                 $context->context->functionType($str, false, $str, $str, $i64, $i32)
@@ -188,6 +191,25 @@ final class BcmathJit
             $fn->getParam(1),
             $fn->getParam(2),
             $fn->getParam(3)
+        );
+        $context->builder->returnValue($result);
+    }
+
+    private static function implementBinaryStringWithRoundModeBridge(
+        Context $context,
+        LlvmFunction $fn,
+        string $helperLogical
+    ): void {
+        $entry = $fn->appendBasicBlock('bcmath_bin_round_bridge_entry');
+        $context->builder->positionAtEnd($entry);
+        $result = $context->builder->call(
+            self::helperFunction($context, $helperLogical),
+            $fn->getParam(0),
+            $fn->getParam(1),
+            $fn->getParam(2),
+            $fn->getParam(3),
+            $fn->getParam(4),
+            $fn->getParam(5)
         );
         $context->builder->returnValue($result);
     }

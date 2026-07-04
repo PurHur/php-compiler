@@ -26,20 +26,22 @@ final class VmBcmath
         return $old;
     }
 
-    public static function add(string $left, string $right, ?int $scale = null): string
+    public static function add(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): string
     {
-        return self::format(self::addNumbers(self::parse($left), self::parse($right)), self::resolveScale($scale));
+        $result = self::addNumbers(self::parse($left), self::parse($right));
+
+        return self::formatBinaryResult($result, $scale, $roundingMode);
     }
 
-    public static function sub(string $left, string $right, ?int $scale = null): string
+    public static function sub(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): string
     {
         $right = self::parse($right);
         $right['sign'] *= -1;
 
-        return self::format(self::addNumbers(self::parse($left), $right), self::resolveScale($scale));
+        return self::formatBinaryResult(self::addNumbers(self::parse($left), $right), $scale, $roundingMode);
     }
 
-    public static function mul(string $left, string $right, ?int $scale = null): string
+    public static function mul(string $left, string $right, ?int $scale = null, ?int $roundingMode = null): string
     {
         $a = self::parse($left);
         $b = self::parse($right);
@@ -47,7 +49,7 @@ final class VmBcmath
         $scaleSum = \strlen($a['frac']) + \strlen($b['frac']);
         $result = self::fromUnscaled($product, $scaleSum, $a['sign'] * $b['sign']);
 
-        return self::format($result, self::resolveScale($scale));
+        return self::formatBinaryResult($result, $scale, $roundingMode);
     }
 
     public static function div(string $left, string $right, ?int $scale = null): string
@@ -321,6 +323,35 @@ final class VmBcmath
     private static function resolveScale(?int $scale): int
     {
         return null !== $scale ? $scale : self::$defaultScale;
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $result
+     */
+    private static function formatBinaryResult(array $result, ?int $scale, ?int $roundingMode): string
+    {
+        if (null !== $roundingMode) {
+            return self::round(self::toExactString($result), self::resolveScale($scale), $roundingMode);
+        }
+
+        return self::format($result, self::resolveScale($scale));
+    }
+
+    /**
+     * @param array{sign:int,int:string,frac:string} $num
+     */
+    private static function toExactString(array $num): string
+    {
+        if (self::isZero($num)) {
+            return '0';
+        }
+        $sign = $num['sign'] < 0 ? '-' : '';
+        $frac = \rtrim($num['frac'], '0');
+        if ('' === $frac) {
+            return $sign.$num['int'];
+        }
+
+        return $sign.$num['int'].'.'.$frac;
     }
 
     /** Validate arbitrary-precision operand (php-src ext/bcmath/bcmath.c; issue #7220). */
