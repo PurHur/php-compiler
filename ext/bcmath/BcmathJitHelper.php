@@ -51,9 +51,24 @@ final class BcmathJitHelper
         );
     }
 
-    public static function div(string $left, string $right, int $scale, int $hasScale): string
+    public static function div(string $left, string $right, int $scale, int $hasScale, int $roundMode, int $hasRoundMode): string
     {
-        return VmBcmath::div($left, $right, self::resolveScale($scale, $hasScale));
+        return VmBcmath::div(
+            $left,
+            $right,
+            self::resolveScale($scale, $hasScale),
+            self::resolveRoundMode($roundMode, $hasRoundMode)
+        );
+    }
+
+    public static function mod(string $left, string $right, int $scale, int $hasScale, int $roundMode, int $hasRoundMode): string
+    {
+        return VmBcmath::mod(
+            $left,
+            $right,
+            self::resolveScale($scale, $hasScale),
+            self::resolveRoundMode($roundMode, $hasRoundMode)
+        );
     }
 
     public static function comp(string $left, string $right, int $scale, int $hasScale): int
@@ -66,9 +81,17 @@ final class BcmathJitHelper
         string $exponent,
         string $modulus,
         int $scale,
-        int $hasScale
+        int $hasScale,
+        int $roundMode,
+        int $hasRoundMode
     ): string {
-        return VmBcmath::powmod($base, $exponent, $modulus, self::resolveScale($scale, $hasScale));
+        return VmBcmath::powmod(
+            $base,
+            $exponent,
+            $modulus,
+            self::resolveScale($scale, $hasScale),
+            self::resolveRoundMode($roundMode, $hasRoundMode)
+        );
     }
 
     public static function round(string $num, int $precision, int $mode): string

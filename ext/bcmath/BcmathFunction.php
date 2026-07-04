@@ -64,7 +64,7 @@ abstract class BcmathFunction extends Internal
 
     protected function optionalScale(Frame $frame, int $index): ?int
     {
-        if (\count($frame->calledArgs) <= $index) {
+        if (!isset($frame->calledArgs[$index])) {
             return null;
         }
         $var = $frame->calledArgs[$index]->resolveIndirect();
@@ -95,7 +95,7 @@ abstract class BcmathFunction extends Internal
 
     protected function optionalRoundingMode(Frame $frame, int $index): ?int
     {
-        if (\count($frame->calledArgs) <= $index) {
+        if (!isset($frame->calledArgs[$index])) {
             return null;
         }
 
@@ -105,5 +105,18 @@ abstract class BcmathFunction extends Internal
             'rounding_mode',
             $index + 1
         );
+    }
+
+    protected function requireTernaryArgCount(Frame $frame): void
+    {
+        $argc = \count($frame->calledArgs);
+        $maxArgs = CompilerVersion::supportsRoundingModeEnum() ? 5 : 4;
+        if ($argc < 3 || $argc > $maxArgs) {
+            throw new \LogicException(
+                5 === $maxArgs
+                    ? $this->getName().'() requires three to five arguments in this compiler build'
+                    : $this->getName().'() requires three or four arguments in this compiler build'
+            );
+        }
     }
 }

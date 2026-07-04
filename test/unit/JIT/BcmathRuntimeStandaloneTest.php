@@ -27,6 +27,7 @@ final class BcmathRuntimeStandaloneTest extends TestCase
             '__compiler_bcsub',
             '__compiler_bcmul',
             '__compiler_bcdiv',
+            '__compiler_bcmod',
             '__compiler_bccomp',
             '__compiler_bcpowmod',
         ] as $name) {
