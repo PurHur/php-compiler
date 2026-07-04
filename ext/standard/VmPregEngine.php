@@ -60,6 +60,12 @@ final class VmPregEngine
 
     private int $matchStart = 0;
 
+    private ?VmPregAstNode $rootAst = null;
+
+    private int $recursionDepth = 0;
+
+    private int $jitStackLimit = 0;
+
     public function resetMatchStart(int $start): void
     {
         $this->matchStart = $start;
@@ -96,6 +102,7 @@ final class VmPregEngine
             if (null === $ast) {
                 return null;
             }
+            $engine->rootAst = $ast;
 
             return [$ast, $engine->groupNameToIndex, $engine->nextGroup - 1];
         } catch (VmPregCompileException $e) {
@@ -121,7 +128,9 @@ final class VmPregEngine
         $engine = new self();
         $engine->applyOptions($opts);
         $engine->groupNameToIndex = $groupNameToIndex;
+        $engine->rootAst = $ast;
         $engine->backtrackLimit = VmPregLimits::backtrackLimit();
+        $engine->jitStackLimit = VmPregLimits::jitStackLimit();
         $len = \strlen($subject);
         if ($offset < 0 || $offset > $len) {
             return null;
@@ -486,6 +495,14 @@ final class VmPregEngine
                     throw new VmPregCompileException();
                 }
                 $this->advance(1);
+            } elseif ('R' === $flag || '0' === $flag) {
+                $this->advance(1);
+                if ($this->peek() !== ')') {
+                    throw new VmPregCompileException();
+                }
+                $this->advance(1);
+
+                return new VmPregAstRecursionNode();
             } elseif ($this->isInlineModifierStart($flag)) {
                 $this->parseInlineModifiers();
                 if ($this->peek() !== ')') {
@@ -792,6 +809,26 @@ final class VmPregEngine
     }
 
     /**
+     * PCRE `(?R)` / `(?0)` — recurse the whole pattern (ext/pcre/php_pcre.c, #16176).
+     *
+     * @param array<int, array{0: int, 1: int}> $captures
+     */
+    public function matchRecursion(string $subject, int $pos, int $len, array &$captures): bool
+    {
+        if (null === $this->rootAst) {
+            return false;
+        }
+        if (++$this->recursionDepth > $this->jitStackLimit) {
+            throw new VmPregJitStackLimitException();
+        }
+        try {
+            return $this->matchNode($this->rootAst, $subject, $pos, $len, $captures);
+        } finally {
+            --$this->recursionDepth;
+        }
+    }
+
+    /**
      * @param array<int, array{0: int, 1: int}> $captures
      */
     public function matchQuant(
@@ -1080,6 +1117,19 @@ final class VmPregCompileException extends \Exception
         public readonly int $compileOffset = 0,
     ) {
         parent::__construct($compileMessage);
+    }
+}
+
+final class VmPregAstRecursionNode implements VmPregAstNode
+{
+    public function match(
+        VmPregEngine $engine,
+        string $subject,
+        int $pos,
+        int $len,
+        array &$captures
+    ): bool {
+        return $engine->matchRecursion($subject, $pos, $len, $captures);
     }
 }
 

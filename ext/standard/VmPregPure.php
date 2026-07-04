@@ -681,6 +681,10 @@ final class VmPregPure
             self::$lastError = StdlibConstants::PREG_BACKTRACK_LIMIT_ERROR;
 
             return false;
+        } catch (VmPregJitStackLimitException) {
+            self::$lastError = StdlibConstants::PREG_JIT_STACKLIMIT_ERROR;
+
+            return false;
         }
     }
 }
