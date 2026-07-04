@@ -56,7 +56,7 @@ final class VmGzStreamNative
         return VmGzStreamPure::gzrewind($handle);
     }
 
-    public static function gzeof(int $handle): int
+    public static function gzeof(int $handle): bool
     {
         return VmGzStreamPure::gzeof($handle);
     }

@@ -86,7 +86,7 @@ final class GzStreamJitHelper
     /** @return 0|1 */
     public static function gzeofArgv(int $handle): int
     {
-        return VmGzStream::gzeof($handle);
+        return VmGzStream::gzeof($handle) ? 1 : 0;
     }
 
     public static function gzReadAllArgv(int $handle): ?string

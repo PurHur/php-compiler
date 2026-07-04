@@ -15,7 +15,7 @@ $fp = gzopen('php://temp', 'rb');
 if (false !== $fp) {
     var_export(gzread($fp, 10));
     echo "\n";
-    var_export(gzeof($fp) === 1);
+    var_export(gzeof($fp));
     echo "\n";
     gzclose($fp);
 }

@@ -138,8 +138,9 @@ final class VmGzStreamRuntimeShrinkTest extends TestCase
 
         $handle = VmGzStream::gzopen('php://temp', 'rb');
         $this->assertNotFalse($handle);
+        $this->assertFalse(VmGzStream::gzeof($handle));
         $this->assertSame('', VmGzStream::gzread($handle, 10));
-        $this->assertSame(1, VmGzStream::gzeof($handle));
+        $this->assertTrue(VmGzStream::gzeof($handle));
         VmGzStream::gzclose($handle);
 
         $this->assertFalse(VmGzStream::gzopen('php://memory', 'wb'));

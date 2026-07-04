@@ -29,7 +29,7 @@ final class gzeof extends Internal
         if (null === $frame->returnVar) {
             return;
         }
-        $frame->returnVar->int(VmGzStream::gzeof($handle));
+        $frame->returnVar->bool(VmGzStream::gzeof($handle));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
