@@ -4644,6 +4644,18 @@ PHP;
         self::assertSame("string\nhhmm\n", ob_get_clean());
     }
 
+    /** Issue #16012 — date_sunrise(time(), SUNFUNCS_RET_STRING, lat, lon) compiles without OOM and runs. */
+    public function testDateSunriseInlineSunfuncsConstFourArgRuntime(): void
+    {
+        $code = file_get_contents(__DIR__.'/../repro/maintainer_gap_date_sunrise_inline_constant.php');
+        self::assertNotFalse($code);
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'maintainer_gap_date_sunrise_inline_constant.php');
+        ob_start();
+        $runtime->run($block);
+        self::assertStringContainsString('ok:', ob_get_clean());
+    }
+
     /** Issue #11336 — date_sun_info(strtotime(...), lat, lon) wires hoisted FuncCall + UnaryMinus slots. */
     public function testDateSunInfoInlineStrtotimeAndUnaryLongitudeUsesProducerSlots(): void
     {
