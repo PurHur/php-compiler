@@ -211,6 +211,16 @@ final class CompilerVersion
         return version_compare(self::VERSION, '8.4.0', '>=');
     }
 
+    /**
+     * PHP 8.4+ #[\Deprecated(message|since)] runtime E_USER_DEPRECATED at use sites (Zend/zend_execute.c, #16090).
+     *
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile matches Zend 8.2 silent gate.
+     */
+    public static function supportsDeprecatedAttributeRuntimeNotices(): bool
+    {
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
+    }
+
     /** PHP 8.4+ #[\NoDiscard] builtin attribute class advertisement (Zend/zend_attributes.c, #11902). */
     public static function advertisesNoDiscardAttributeClass(): bool
     {
