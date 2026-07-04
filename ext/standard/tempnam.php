@@ -7,7 +7,7 @@ namespace PHPCompiler\ext\standard;
 use PHPCompiler\Frame;
 use PHPCompiler\Func\Internal;
 use PHPCompiler\JIT\Context;
-use PHPCompiler\JIT\JitStringArg;
+use PHPCompiler\JIT\JitStringBuiltinArg;
 use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
@@ -46,7 +46,7 @@ final class tempnam extends Internal
         return JitTempnam::invoke(
             $context,
             JitTempnam::lowerDirectory($context, $args[0]),
-            JitStringArg::lower($context, $args[1], 'tempnam() prefix')
+            JitStringBuiltinArg::lowerPath($context, $args[1], 'tempnam', 1, 'prefix')
         );
     }
 }

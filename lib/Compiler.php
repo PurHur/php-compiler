@@ -14438,6 +14438,32 @@ class Compiler {
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
         $producerCount = count($producers);
         $argCount = count($callArgs);
+        // tempnam(sys_get_temp_dir(), E::CASE) — nested FuncCall + trailing enum ClassConstFetch (#10303).
+        if (2 === $argCount && 1 === $producerCount && 1 === $argIndex) {
+            $sole = $producers[0] ?? null;
+            $callArg = $callArgs[$argIndex] ?? null;
+            if (
+                $sole instanceof Op\Expr\ClassConstFetch
+                && null !== $callArg
+                && $this->callArgIsDeadInlineTemporary($callArg)
+            ) {
+                return $sole;
+            }
+        }
+        if (2 === $argCount && $producerCount >= 2) {
+            $funcProducer = null;
+            $enumFetch = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\ClassConstFetch) {
+                    $enumFetch = $producer;
+                }
+            }
+            if (null !== $funcProducer && null !== $enumFetch) {
+                return (0 === $argIndex) ? $funcProducer : $enumFetch;
+            }
+        }
         $mappedArraySplice = $this->matchArraySpliceUnaryOffsetReplacementProducers(
             $producers,
             $argIndex,
@@ -15327,6 +15353,10 @@ class Compiler {
                 if ($producers[0] instanceof Op\Expr\ClassConstFetch) {
                     $pseudoName = $this->staticNameFromOperand($producers[0]->name);
                     if (null !== $pseudoName && 'class' === strtolower($pseudoName)) {
+                        return $producers[0];
+                    }
+                    // tempnam(sys_get_temp_dir(), E::A) — trailing enum case fetch (#10303).
+                    if (null !== $callArg && $this->callArgIsDeadInlineTemporary($callArg)) {
                         return $producers[0];
                     }
                 }
@@ -16677,6 +16707,14 @@ class Compiler {
             }
             if ($i === $argIndex) {
                 $fetch = $precedingFetches[$fetchIndex] ?? null;
+                // Trailing enum case when an earlier arg uses a nested FuncCall (#10303).
+                if (
+                    null === $fetch
+                    && 1 === \count($precedingFetches)
+                    && $i === \count($callOp->args) - 1
+                ) {
+                    $fetch = $precedingFetches[0];
+                }
                 if ($fetch instanceof Op\Expr\ClassConstFetch) {
                     $callArg = $callOp->args[$argIndex] ?? null;
                     // php-cfg dead call-arg temps: ordinal mapping is authoritative (#8796, #9888).
@@ -25122,7 +25160,20 @@ class Compiler {
                         }
                     }
                     if (null === $valueSlot) {
-                        $valueSlot = $this->compileOperand($arg, $block, true);
+                        if (null !== $cfgCallOp && $this->callArgIsDeadInlineTemporary($arg)) {
+                            $classConstSlot = $this->slotForHoistedClassConstFetchCallArg(
+                                $arg,
+                                $block,
+                                $cfgCallOp,
+                                (int) $argIndex
+                            );
+                            if (null !== $classConstSlot) {
+                                $valueSlot = $classConstSlot;
+                            }
+                        }
+                        if (null === $valueSlot) {
+                            $valueSlot = $this->compileOperand($arg, $block, true);
+                        }
                     }
                 }
                 if (null === $valueSlot && $arg instanceof Operand\NullOperand) {
