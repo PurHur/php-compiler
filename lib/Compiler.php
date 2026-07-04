@@ -28803,18 +28803,27 @@ class Compiler {
                 && 0 === (int) $argIndex
             ) {
                 // array_diff_assoc(array_keys(...), array_keys(...)) — stmt-before Array_, not last INIT_ARRAY (#15959, re-#13779).
-                $keysArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                // ['a','b'] === array_keys($a) — stmt-before Array_ feeds Identical, not array_keys arg (#16056).
+                $keysArrayProducer = null;
                 if (
-                    !$keysArrayProducer instanceof Op\Expr\Array_
-                    && $this->callArgIsDeadInlineTemporary($arg)
+                    $this->callArgIsDeadInlineTemporary($arg)
                     && $this->callArgOperandExpectsArrayProducer($arg)
                 ) {
-                    $keysArrayProducer = $this->findInlineArrayProducerForCallArg(
-                        $arg,
-                        $block,
-                        $cfgCallOp,
-                        (int) $argIndex
-                    );
+                    $keysArrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+                    if (!$keysArrayProducer instanceof Op\Expr\Array_) {
+                        $keysArrayProducer = $this->findInlineArrayProducerForCallArg(
+                            $arg,
+                            $block,
+                            $cfgCallOp,
+                            (int) $argIndex
+                        );
+                    }
+                } elseif (
+                    null !== ($immediateKeysArray = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block))
+                    && null !== $immediateKeysArray->result
+                    && $this->operandsReferToSameVariable($immediateKeysArray->result, $arg)
+                ) {
+                    $keysArrayProducer = $immediateKeysArray;
                 }
                 if ($keysArrayProducer instanceof Op\Expr\Array_) {
                     $keysArraySlot = $block->slotForOperand($keysArrayProducer->result);
