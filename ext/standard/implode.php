@@ -59,7 +59,8 @@ final class implode extends Internal
                 $frame->calledArgs[0],
                 $this->getName(),
                 0,
-                'separator'
+                'separator',
+                'array|string'
             );
             $ht = VmArray::requireArrayParam(
                 $frame->calledArgs[1],

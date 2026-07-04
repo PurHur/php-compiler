@@ -103,7 +103,8 @@ final class VmString
         Variable $var,
         string $function,
         int $argIndex = 0,
-        string $paramName = 'string'
+        string $paramName = 'string',
+        string $expectedType = 'string'
     ): string {
         $var = $var->resolveIndirect();
         if (Variable::TYPE_NULL === $var->type) {
@@ -112,7 +113,7 @@ final class VmString
             return '';
         }
         if (Variable::TYPE_ARRAY === $var->type) {
-            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array'));
+            throw new \TypeError(self::stringBuiltinTypeError($function, $argIndex, $paramName, 'array', $expectedType));
         }
         if (RuntimeStrictness::enforceStringBuiltinParityGuards() && EnumCaseSupport::isEnumCaseVariable($var)) {
             throw new \TypeError(
@@ -120,7 +121,8 @@ final class VmString
                     $function,
                     $argIndex,
                     $paramName,
-                    EnumCaseSupport::typeNameForVariable($var)
+                    EnumCaseSupport::typeNameForVariable($var),
+                    $expectedType
                 )
             );
         }
@@ -129,7 +131,7 @@ final class VmString
             $object = $var->toObject();
             if (null === $vm || !$vm->hasInstanceMethod($object->class, '__tostring')) {
                 throw new \TypeError(
-                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name)
+                    self::stringBuiltinTypeError($function, $argIndex, $paramName, $object->class->name, $expectedType)
                 );
             }
         }
@@ -438,13 +440,15 @@ final class VmString
         string $function,
         int $argIndex,
         string $paramName,
-        string $given
+        string $given,
+        string $expectedType = 'string'
     ): string {
         return sprintf(
-            '%s(): Argument #%d ($%s) must be of type string, %s given',
+            '%s(): Argument #%d ($%s) must be of type %s, %s given',
             $function,
             $argIndex + 1,
             $paramName,
+            $expectedType,
             $given
         );
     }
