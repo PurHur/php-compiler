@@ -216,6 +216,10 @@ patch_already_applied() {
         && grep -q '\$elseBlock ?? \$endBlock' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
         && grep -q 'public \$else;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php" 2>/dev/null
       ;;
+    php-cfg-goto-scope.patch)
+      grep -q 'gotoLabelScopes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/FuncContext.php" 2>/dev/null \
+        && grep -q 'function validateGotoScope' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+      ;;
     php-cfg-phi-resolver-null.patch)
       grep -q 'null === \$phi->result' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
       ;;
@@ -5998,8 +6002,8 @@ if [[ -d "$ROOT/vendor/ircmaxell/php-cfg" ]]; then
   apply_patch "$PATCH_DIR/php-cfg-error-suppress-simplifier.patch"
   apply_patch "$PATCH_DIR/php-cfg-simplifier-call-unpack.patch" || true
   apply_patch "$PATCH_DIR/php-cfg-strict-types.patch"
-  apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_patch "$PATCH_DIR/php-cfg-goto-scope.patch"
+  apply_patch "$PATCH_DIR/php-cfg-trycatch.patch"
   apply_php_cfg_process_assertions_overlay || true
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-null.patch"
   apply_patch "$PATCH_DIR/php-cfg-phi-resolver-skip-forwarded.patch"
@@ -6288,6 +6292,10 @@ verify_critical_language_patches() {
     if [[ -f "$trycatch" ]] && ! grep -q 'public \$else;' "$trycatch" 2>/dev/null; then
       missing+=("php-cfg-trycatch-else-TryCatch")
     fi
+  fi
+  if ! grep -q 'gotoLabelScopes' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/FuncContext.php" 2>/dev/null \
+    || ! grep -q 'function validateGotoScope' "$parser" 2>/dev/null; then
+    missing+=("php-cfg-goto-scope")
   fi
   local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null \
