@@ -40,6 +40,9 @@ final class VmDateTimeNative
 
     private static ?string $withTimezoneSavedHostTz = null;
 
+    /** Set when createFromFormat format is satisfied but time has trailing junk (#14173, #16196). */
+    private static bool $createFromFormatTrailingData = false;
+
     /**
      * timezone_identifiers_list() — Olson identifiers from zone.tab (ext/date/php_date.c, #3504).
      *
@@ -912,6 +915,12 @@ final class VmDateTimeNative
      */
     private static function buildCreateFromFormatFailureErrors(string $format, string $time): array
     {
+        if (self::$createFromFormatTrailingData) {
+            self::$createFromFormatTrailingData = false;
+
+            return ['errors' => [10 => 'Trailing data'], 'error_count' => 1];
+        }
+
         /** @var list<array{0: int, 1: string}> $messages */
         $messages = [];
         $add = static function (int $position, string $message) use (&$messages): void {
@@ -1121,6 +1130,7 @@ final class VmDateTimeNative
      */
     private static function matchFormatComponents(string $format, string $time): array|false
     {
+        self::$createFromFormatTrailingData = false;
         $bangReset = false;
         if (\str_starts_with($format, '!')) {
             $bangReset = true;
@@ -1301,6 +1311,8 @@ final class VmDateTimeNative
             }
         }
         if ($pos !== $timeLen) {
+            self::$createFromFormatTrailingData = true;
+
             return false;
         }
         if ($bangReset) {
