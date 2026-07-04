@@ -29436,7 +29436,8 @@ class Compiler {
         $sends = [];
         foreach ($args as $argIndex => $arg) {
             $nameSlot = null;
-            $unpackFlag = null;
+            // Early inline-array ARG_SEND paths continue before the main send site — unpack must be known up front (#16151).
+            $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
             $inlineArrayLiteralArgWired = false;
             $castArgZeroSlot = $this->resolveHoistedCastInlineCallArgZeroSlot(
                 $block,
@@ -30752,7 +30753,6 @@ class Compiler {
                 $nameVar->string($argName);
                 $nameSlot = $block->registerConstant($nameOp, $nameVar);
             }
-            $unpackFlag = $this->callArgUnpack($arg) ? 1 : null;
             if ([] !== $prefetchOps) {
                 $sends = array_merge($sends, $prefetchOps);
             }
