@@ -212,7 +212,9 @@ patch_already_applied() {
       ;;
     php-cfg-trycatch.patch)
       [[ -f "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php" ]] \
-        && grep -q 'new Op\\Stmt\\TryCatch' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null
+        && grep -q 'new Op\\Stmt\\TryCatch' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q '\$elseBlock ?? \$endBlock' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Parser.php" 2>/dev/null \
+        && grep -q 'public \$else;' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php" 2>/dev/null
       ;;
     php-cfg-phi-resolver-null.patch)
       grep -q 'null === \$phi->result' "$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Visitor/PhiResolver.php" 2>/dev/null
@@ -5199,7 +5201,7 @@ apply_php_cfg_trycatch_overlay() {
     return 1
   fi
   if grep -q 'new Op\\Stmt\\TryCatch' "$parser" 2>/dev/null; then
-    if grep -q 'compilerTryCatchElseSource' "$parser" 2>/dev/null \
+    if grep -q '\$elseBlock ?? \$endBlock' "$parser" 2>/dev/null \
       && grep -q 'public \$else;' "$op" 2>/dev/null; then
       echo "Skip php-cfg-trycatch.patch (already applied)"
       return 0
@@ -6277,6 +6279,15 @@ verify_critical_language_patches() {
   fi
   if ! grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null; then
     missing+=("php-types-throw-expr")
+  fi
+  local trycatch="$ROOT/vendor/ircmaxell/php-cfg/lib/PHPCfg/Op/Stmt/TryCatch.php"
+  if grep -q 'function parseStmt_TryCatch' "$parser" 2>/dev/null; then
+    if ! grep -q '\$elseBlock ?? \$endBlock' "$parser" 2>/dev/null; then
+      missing+=("php-cfg-trycatch-else-Parser")
+    fi
+    if [[ -f "$trycatch" ]] && ! grep -q 'public \$else;' "$trycatch" 2>/dev/null; then
+      missing+=("php-cfg-trycatch-else-TryCatch")
+    fi
   fi
   local type_php="$ROOT/vendor/ircmaxell/php-types/lib/PHPTypes/Type.php"
   if grep -q "case 'Expr_Throw':" "$recon" 2>/dev/null \
