@@ -12481,6 +12481,30 @@ class Compiler {
 
                 return null;
             }
+            if (
+                \in_array(
+                    $this->resolveCfgFuncCallName($callOp),
+                    [
+                        'array_merge',
+                        'array_merge_recursive',
+                        'array_replace',
+                        'array_replace_recursive',
+                    ],
+                    true
+                )
+                && \count($callOp->args ?? []) >= 2
+            ) {
+                $mergeProducers = $this->arrayMergeFamilyInlineProducersForCfgCall($cfgChildren, $callOp);
+                $mergeMapped = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
+                    $mergeProducers,
+                    $argIndex,
+                    \count($callOp->args ?? []),
+                    $callOp->args ?? []
+                );
+                if ($mergeMapped instanceof Op\Expr\Array_) {
+                    return $mergeMapped;
+                }
+            }
             $unassigned = $this->findUnassignedInlineArrayProducerForDeadCallArg(
                 $producers,
                 $callOp,
@@ -22053,6 +22077,38 @@ class Compiler {
     }
 
     /**
+     * array_merge* inline hoisted Array_ roots — flat siblings, nested chains, folded first arg (#10230, #15979).
+     *
+     * @param list<Op\Expr> $mergeProducers
+     * @param list<Operand> $callArgs
+     */
+    private function matchArrayMergeFamilyFullInlineCallArgProducer(
+        array $mergeProducers,
+        int $argIndex,
+        int $mergeArgCount,
+        array $callArgs = []
+    ): ?Op\Expr {
+        $mapped = $this->matchArrayMergeFamilyInlineCallArgProducer($mergeProducers, $argIndex);
+        if (null === $mapped) {
+            $mapped = $this->matchSiblingNestedArrayLiteralCallArgProducer(
+                $mergeProducers,
+                $argIndex,
+                $mergeArgCount
+            );
+        }
+        if (null === $mapped && [] !== $callArgs) {
+            $mapped = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
+                $mergeProducers,
+                $argIndex,
+                $mergeArgCount,
+                $callArgs
+            );
+        }
+
+        return $mapped;
+    }
+
+    /**
      * array_merge(array_keys($src), ['b']) — nested FuncCall + trailing Array_, optional stmt Array_ (#15551).
      * array_merge_recursive(['a'=>1], ['a'=>2]) — sibling flat Array_ literals (#15552).
      *
@@ -28808,25 +28864,12 @@ class Compiler {
                 );
                 $mergeArgCount = \count($cfgCallOp->args ?? []);
                 if ($mergeArgCount >= 2 && \count($mergeProducers) >= 2) {
-                    $mergeMapped = $this->matchArrayMergeFamilyInlineCallArgProducer(
+                    $mergeMapped = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
                         $mergeProducers,
-                        (int) $argIndex
+                        (int) $argIndex,
+                        $mergeArgCount,
+                        is_array($cfgCallOp->args ?? null) ? $cfgCallOp->args : []
                     );
-                    if (null === $mergeMapped) {
-                        $mergeMapped = $this->matchSiblingNestedArrayLiteralCallArgProducer(
-                            $mergeProducers,
-                            (int) $argIndex,
-                            $mergeArgCount
-                        );
-                    }
-                    if (null === $mergeMapped && is_array($cfgCallOp->args ?? null)) {
-                        $mergeMapped = $this->matchFoldedFirstNestedSiblingArrayLiteralCallArgProducer(
-                            $mergeProducers,
-                            (int) $argIndex,
-                            $mergeArgCount,
-                            $cfgCallOp->args
-                        );
-                    }
                     if ($mergeMapped instanceof Op\Expr) {
                         $mergeSlot = $block->slotForOperand($mergeMapped->result);
                         if (null === $mergeSlot) {
@@ -29108,9 +29151,11 @@ class Compiler {
                                     $block->orig->children,
                                     $cfgCallOp
                                 );
-                                $mergeFinalMapped = $this->matchArrayMergeFamilyInlineCallArgProducer(
+                                $mergeFinalMapped = $this->matchArrayMergeFamilyFullInlineCallArgProducer(
                                     $mergeFinalProducers,
-                                    (int) $argIndex
+                                    (int) $argIndex,
+                                    \count($cfgCallOp->args ?? []),
+                                    is_array($cfgCallOp->args ?? null) ? $cfgCallOp->args : []
                                 );
                             }
                             if ($mergeFinalMapped instanceof Op\Expr && null !== $mergeFinalMapped->result) {
