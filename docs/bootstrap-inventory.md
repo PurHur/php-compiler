@@ -8,11 +8,11 @@ Regenerate: `php script/bootstrap-inventory.php`
 
 | Metric | Count |
 |--------|------:|
-| PHP files on vm.php path | 4027 |
-| Phase A inventory files (M2 ratio SSOT) | 4027 |
+| PHP files on vm.php path | 4031 |
+| Phase A inventory files (M2 ratio SSOT) | 4031 |
 | Phase A ratio-deferred paths | 0 |
 | Source constructs flagged (blockers) | 0 |
-| Source constructs flagged (warnings) | 10861 |
+| Source constructs flagged (warnings) | 10865 |
 
 ## Compiler CFG gaps (`lib/Compiler.php`)
 
@@ -637,6 +637,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/ChmodJitHelper.php` | 0 | 1 |
 | `ext/standard/ChownJitHelper.php` | 0 | 1 |
 | `ext/standard/ChunkSplitJitHelper.php` | 0 | 1 |
+| `ext/standard/ClassExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/CliArgvJitHelper.php` | 0 | 2 |
 | `ext/standard/ClockGettimeJitHelper.php` | 0 | 1 |
 | `ext/standard/CloneWithJitHelper.php` | 0 | 1 |
@@ -739,6 +740,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `ext/standard/IniIntrospectionJitHelper.php` | 0 | 1 |
 | `ext/standard/IniJitHelper.php` | 0 | 1 |
 | `ext/standard/IniParseQuantityJitHelper.php` | 0 | 1 |
+| `ext/standard/InterfaceExistsJitHelper.php` | 0 | 1 |
 | `ext/standard/IsFiniteJitHelper.php` | 0 | 1 |
 | `ext/standard/IsInfiniteJitHelper.php` | 0 | 1 |
 | `ext/standard/IsNanJitHelper.php` | 0 | 1 |
@@ -2998,6 +3000,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringCaseCompare.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringChmod.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringChunkSplit.php` | 0 | 3 |
+| `lib/JIT/Builtin/StringClassExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettime.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringClockGettimeRuntime.php` | 0 | 2 |
 | `lib/JIT/Builtin/StringConvertUu.php` | 0 | 3 |
@@ -3054,6 +3057,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 | `lib/JIT/Builtin/StringIdate.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringImageTypeToExtension.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringInfo.php` | 0 | 1 |
+| `lib/JIT/Builtin/StringInterfaceExists.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonDecode.php` | 0 | 3 |
 | `lib/JIT/Builtin/StringJsonDecodeInventoryStubs.php` | 0 | 1 |
 | `lib/JIT/Builtin/StringJsonEncode.php` | 0 | 3 |
@@ -5076,45 +5080,45 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - new ObjectEntry (line 1450)
 - new DomNodeState (line 1455)
 - new Variable (line 1460)
-- new ObjectEntry (line 1845)
-- new DomNodeState (line 1847)
-- new DOMException (line 1994)
-- new DOMException (line 2020)
-- new DOMException (line 2038)
-- new DOMException (line 2041)
-- new DOMException (line 2049)
-- new DOMException (line 2075)
-- new DOMException (line 2088)
-- new DOMException (line 2243)
-- new DOMException (line 2337)
-- new DOMException (line 2341)
+- new ObjectEntry (line 1934)
+- new DomNodeState (line 1936)
+- new DOMException (line 2083)
+- new DOMException (line 2109)
+- new DOMException (line 2127)
+- new DOMException (line 2130)
+- new DOMException (line 2138)
+- new DOMException (line 2164)
+- new DOMException (line 2177)
+- new DOMException (line 2332)
+- new DOMException (line 2426)
 - new DOMException (line 2430)
-- new DOMException (line 2434)
-- new DOMException (line 2492)
-- new DOMException (line 2509)
-- new DOMException (line 2538)
-- new DOMException (line 2579)
-- new DOMException (line 2604)
-- new DOMException (line 3038)
-- new Variable (line 3062)
-- new DOMException (line 3252)
-- new DOMException (line 3333)
-- new DOMException (line 3375)
-- new ObjectEntry (line 3452)
-- new DomNodeState (line 3456)
-- new Variable (line 3463)
-- new DOMException (line 3528)
-- new DOMException (line 3535)
-- new DOMException (line 3542)
-- new DOMException (line 3546)
-- new DOMException (line 3549)
-- new DOMException (line 3558)
-- new Variable (line 4206)
-- new Variable (line 4219)
-- new DOMException (line 4297)
-- new DOMException (line 4308)
-- new DOMException (line 4374)
-- 213 class method(s)
+- new DOMException (line 2519)
+- new DOMException (line 2523)
+- new DOMException (line 2581)
+- new DOMException (line 2598)
+- new DOMException (line 2627)
+- new DOMException (line 2668)
+- new DOMException (line 2693)
+- new DOMException (line 3167)
+- new Variable (line 3191)
+- new DOMException (line 3381)
+- new DOMException (line 3462)
+- new DOMException (line 3504)
+- new ObjectEntry (line 3581)
+- new DomNodeState (line 3585)
+- new Variable (line 3592)
+- new DOMException (line 3657)
+- new DOMException (line 3664)
+- new DOMException (line 3671)
+- new DOMException (line 3675)
+- new DOMException (line 3678)
+- new DOMException (line 3687)
+- new Variable (line 4335)
+- new Variable (line 4348)
+- new DOMException (line 4426)
+- new DOMException (line 4437)
+- new DOMException (line 4503)
+- 217 class method(s)
 - 2 closure(s)
 
 ### `ext/filter/BuiltinEnums.php`
@@ -8412,6 +8416,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
 
+### `ext/standard/ClassExistsJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
 ### `ext/standard/CliArgvJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
@@ -8945,6 +8954,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 33 class method(s)
 
 ### `ext/standard/IniParseQuantityJitHelper.php`
+
+**Warnings** (review for bootstrap subset):
+- 1 class method(s)
+
+### `ext/standard/InterfaceExistsJitHelper.php`
 
 **Warnings** (review for bootstrap subset):
 - 1 class method(s)
@@ -20241,7 +20255,7 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 ### `ext/xml/VmXml.php`
 
 **Warnings** (review for bootstrap subset):
-- 13 class method(s)
+- 14 class method(s)
 
 ### `ext/xml/xml_get_error_code.php`
 
@@ -23729,6 +23743,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 - 7 class method(s)
 - 1 closure(s)
 
+### `lib/JIT/Builtin/StringClassExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
+
 ### `lib/JIT/Builtin/StringClockGettime.php`
 
 **Warnings** (review for bootstrap subset):
@@ -24059,6 +24078,11 @@ Rank live CFG gaps across inventory files: `php script/bootstrap-inventory-triag
 
 **Warnings** (review for bootstrap subset):
 - 12 class method(s)
+
+### `lib/JIT/Builtin/StringInterfaceExists.php`
+
+**Warnings** (review for bootstrap subset):
+- 4 class method(s)
 
 ### `lib/JIT/Builtin/StringJsonDecode.php`
 
