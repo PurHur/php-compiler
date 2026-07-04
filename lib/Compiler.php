@@ -15133,6 +15133,10 @@ class Compiler {
         $producers = $this->filterDeadClassConstFetchInlineProducers($producers);
         $producers = $this->filterNestedNewInlineCallArgProducers($producers);
         $producers = $this->filterKnownVoidMethodCallPreludes($producers);
+        $hoistedScalar = $this->matchHoistedScalarConstFetchInlineCallArgProducer($producers, $callArg);
+        if (null !== $hoistedScalar) {
+            return $hoistedScalar;
+        }
         if (
             null !== $cfgCallOp
             && null !== $block
@@ -20347,6 +20351,33 @@ class Compiler {
             }
         }
 
+        $scalarPreludeCount = 0;
+        for ($j = $producerIndex + 1; $j < $consumerIndex; ++$j) {
+            $mid = $cfgChildren[$j] ?? null;
+            if ($mid instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($mid->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    ++$scalarPreludeCount;
+                }
+            }
+        }
+        if ($scalarPreludeCount > 0) {
+            $hoistedArgCount = 0;
+            foreach ($consumer->args as $callArg) {
+                if (
+                    null !== $callArg
+                    && !$this->isEmbeddedCallLiteralArg($callArg)
+                    && $this->callArgIsDeadInlineTemporary($callArg)
+                ) {
+                    ++$hoistedArgCount;
+                }
+            }
+            if ($scalarPreludeCount === $hoistedArgCount) {
+                // var_dump(...); ini_get_all(null, false) — ConstFetch are callee args, not wiring (#15931, #16065).
+                return false;
+            }
+        }
+
         return true;
     }
 
@@ -20873,6 +20904,9 @@ class Compiler {
         }
         $argCount = count($consumer->args);
         if ($argCount < 2) {
+            return false;
+        }
+        if ($this->consumerHasTrailingHoistedScalarConstFetchArgPreludes($consumer, $consumerIndex, $cfgChildren)) {
             return false;
         }
         // Statement-level calls before fscanf($f, '…') are not sibling arg producers (#11093).
@@ -22290,6 +22324,9 @@ class Compiler {
 
             return;
         }
+        if ($this->callHasOnlyTrailingHoistedScalarConstFetchArgs($cfgCallOp, $block)) {
+            return;
+        }
         $loopBound = $arrayPreludeChain ? min($argCount, $siblingFuncCount) : ($callIndex - $firstSibling);
         for ($argIndex = 0; $argIndex < $loopBound; ++$argIndex) {
             if ($this->isEmbeddedCallLiteralArg($cfgCallOp->args[$argIndex] ?? null)) {
@@ -22534,6 +22571,18 @@ class Compiler {
         $argCount = \count($cfgCallOp->args);
         if ($argCount < 2 || $argIndex >= $argCount) {
             return null;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if ($callArg instanceof Operand) {
+            $hoistedScalarSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
+                $callArg,
+                $block,
+                $cfgCallOp,
+                $argIndex
+            );
+            if (null !== $hoistedScalarSlot) {
+                return $hoistedScalarSlot;
+            }
         }
         $callIndex = null;
         foreach ($block->orig->children as $i => $child) {
@@ -28044,6 +28093,34 @@ class Compiler {
     }
 
     /**
+     * php-cfg hoists null/false/true ConstFetch before FuncCall with dead arg temps (#9140, #15931, #16065).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchHoistedScalarConstFetchInlineCallArgProducer(array $producers, ?Operand $callArg): ?Op\Expr\ConstFetch
+    {
+        if (null === $callArg || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return null;
+        }
+        foreach ($producers as $producer) {
+            if (!$producer instanceof Op\Expr\ConstFetch || null === $producer->result) {
+                continue;
+            }
+            if (!$this->operandsReferToSameVariable($producer->result, $callArg)) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($producer->name);
+            if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                continue;
+            }
+
+            return $producer;
+        }
+
+        return null;
+    }
+
+    /**
      * php-cfg hoists `true`/`false`/`null` as a ConstFetch stmt before FuncCall with a dead arg temp (#9140, #9260).
      */
     private function tryFoldHoistedBoolNullLiteralCallArg(
@@ -28056,7 +28133,7 @@ class Compiler {
             return null;
         }
         $callArgs = $cfgCallOp->args;
-        if (!is_array($callArgs) || [] === $callArgs || $argIndex !== \count($callArgs) - 1) {
+        if (!is_array($callArgs) || [] === $callArgs) {
             return null;
         }
         $children = $block->orig->children;
@@ -28070,34 +28147,155 @@ class Compiler {
         if (null === $callIndex) {
             return null;
         }
-        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 4; --$i) {
+        $trailingConstFetches = [];
+        for ($i = $callIndex - 1; $i >= 0 && $callIndex - $i <= 8; --$i) {
             $prev = $children[$i] ?? null;
-            if (!$prev instanceof Op\Expr\ConstFetch) {
-                if ($prev instanceof Op\Expr\Assign) {
+            if ($prev instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($prev->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    array_unshift($trailingConstFetches, $prev);
                     continue;
                 }
-                // Hoisted null feeds Concat operands, not a trailing call arg (#10663, zend_operators.c).
-                if ($prev instanceof Op\Expr\BinaryOp\Concat) {
-                    return null;
-                }
                 break;
             }
-            $name = $this->staticNameFromOperand($prev->name);
-            if (null === $name || !\in_array(strtolower($name), ['true', 'false', 'null'], true)) {
-                break;
+            if ($prev instanceof Op\Expr\Assign) {
+                continue;
             }
-            $callArg = $callArgs[$argIndex] ?? null;
-            if (null !== $callArg && !$this->isEmbeddedCallLiteralArg($callArg)) {
-                $slot = $block->slotForOperand($prev->result);
+            // Hoisted null feeds Concat operands, not a trailing call arg (#10663, zend_operators.c).
+            if ($prev instanceof Op\Expr\BinaryOp\Concat) {
+                return null;
+            }
+            break;
+        }
+        if ([] === $trailingConstFetches) {
+            return null;
+        }
+        $callArg = $callArgs[$argIndex] ?? null;
+        if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return null;
+        }
+        foreach ($trailingConstFetches as $fetch) {
+            if (
+                null !== $fetch->result
+                && $this->operandsReferToSameVariable($fetch->result, $callArg)
+            ) {
+                $slot = $this->slotForHoistedScalarConstFetchCallArg($fetch, $block);
                 if (null !== $slot) {
                     return $slot;
                 }
-                $vm = $this->tryFoldGlobalConstFetch($prev);
-                if (null !== $vm) {
-                    return $block->registerConstant($arg, $vm);
+            }
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($callArgs as $i => $candidate) {
+            if (!$this->isEmbeddedCallLiteralArg($candidate)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+        $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
+        if (false === $producerOrdinal) {
+            return null;
+        }
+        $fetch = $trailingConstFetches[$producerOrdinal] ?? null;
+        if (!$fetch instanceof Op\Expr\ConstFetch) {
+            return null;
+        }
+
+        return $this->slotForHoistedScalarConstFetchCallArg($fetch, $block);
+    }
+
+    /**
+     * var_dump(...); ini_get_all(null, false) — trailing ConstFetch args, not sibling FuncCall returns (#15931, #16065).
+     */
+    private function callHasOnlyTrailingHoistedScalarConstFetchArgs(Op $cfgCallOp, Block $block): bool
+    {
+        if (!property_exists($cfgCallOp, 'args') || !is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $expected = 0;
+        $matched = 0;
+        foreach ($cfgCallOp->args as $i => $callArg) {
+            if (null === $callArg || $this->isEmbeddedCallLiteralArg($callArg)) {
+                continue;
+            }
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                return false;
+            }
+            ++$expected;
+            if (null !== $this->tryFoldHoistedBoolNullLiteralCallArg($callArg, $block, $cfgCallOp, (int) $i)) {
+                ++$matched;
+            }
+        }
+
+        return $expected > 0 && $matched === $expected;
+    }
+
+    /**
+     * @param list<Op> $cfgChildren
+     */
+    private function consumerHasTrailingHoistedScalarConstFetchArgPreludes(
+        Op $consumer,
+        int $consumerIndex,
+        array $cfgChildren
+    ): bool {
+        if (!property_exists($consumer, 'args') || !is_array($consumer->args)) {
+            return false;
+        }
+        $scalarPreludes = [];
+        for ($i = $consumerIndex - 1; $i >= 0; --$i) {
+            $child = $cfgChildren[$i] ?? null;
+            if ($child instanceof Op\Expr\ConstFetch) {
+                $name = $this->staticNameFromOperand($child->name);
+                if (null !== $name && \in_array(strtolower($name), ['true', 'false', 'null'], true)) {
+                    array_unshift($scalarPreludes, $child);
+                    continue;
                 }
+                break;
+            }
+            if (
+                $child instanceof Op\Expr\FuncCall
+                || $child instanceof Op\Expr\NsFuncCall
+                || $child instanceof Op\Expr\StaticCall
+                || $child instanceof Op\Expr\MethodCall
+            ) {
+                break;
+            }
+            if ($child instanceof Op\Expr\Assign) {
+                continue;
             }
             break;
+        }
+        if ([] === $scalarPreludes) {
+            return false;
+        }
+        $hoistedArgCount = 0;
+        foreach ($consumer->args as $callArg) {
+            if (
+                null !== $callArg
+                && !$this->isEmbeddedCallLiteralArg($callArg)
+                && $this->callArgIsDeadInlineTemporary($callArg)
+            ) {
+                ++$hoistedArgCount;
+            }
+        }
+
+        return $hoistedArgCount > 0 && \count($scalarPreludes) === $hoistedArgCount;
+    }
+
+    private function slotForHoistedScalarConstFetchCallArg(Op\Expr\ConstFetch $fetch, Block $block): ?int
+    {
+        $slot = $block->slotForOperand($fetch->result);
+        if (null === $slot) {
+            foreach ($this->compileExpr($fetch, $block) as $op) {
+                $block->addOpCode($op);
+            }
+            $slot = $block->slotForOperand($fetch->result);
+        }
+        if (null !== $slot) {
+            return $slot;
+        }
+        $vm = $this->tryFoldGlobalConstFetch($fetch);
+        if (null !== $vm) {
+            return $block->registerConstant($fetch->result ?? new Operand\Temporary(), $vm);
         }
 
         return null;
@@ -29190,6 +29388,17 @@ class Compiler {
                     if (null !== $hoistedPropertyOrConstSlot) {
                         $valueSlot = $hoistedPropertyOrConstSlot;
                     }
+                }
+            }
+            if (null === $valueSlot && null !== $cfgCallOp) {
+                $hoistedScalarSlot = $this->tryFoldHoistedBoolNullLiteralCallArg(
+                    $callArgOperand,
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex
+                );
+                if (null !== $hoistedScalarSlot) {
+                    $valueSlot = (string) $hoistedScalarSlot;
                 }
             }
             $syncedCoalesceSlot = $this->resolveSyncedCoalesceFuncCallArgSlot($callArgOperand);
