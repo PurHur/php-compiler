@@ -25083,16 +25083,38 @@ class Compiler {
     /**
      * Final adjacent nested probe must not clobber callee-specific arg0 wiring (#16023, #13775).
      */
-    private function shouldSkipFinalAdjacentNestedFuncCallArgProbe(Op $cfgCallOp, int $argIndex): bool
+    private function shouldSkipFinalAdjacentNestedFuncCallArgProbe(Op $cfgCallOp, int $argIndex, ?Block $block = null): bool
     {
-        if (0 !== $argIndex || !\is_array($cfgCallOp->args ?? null)) {
+        if (!\is_array($cfgCallOp->args ?? null)) {
+            return false;
+        }
+        // f(g()) before array_intersect(f(g()), f(g())) — outer sibling ordinal wiring (#16242, #15488).
+        if (null !== $block && $this->isAdjacentOuterHoistedFuncCallBeforeMultiArgConsumer($cfgCallOp, $block)) {
+            return true;
+        }
+        // Multi-array set ops with 2+ hoisted array operands — sibling ordinal wiring (#16242, #15947).
+        $calleeLower = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if ($this->shouldUseArrayProducerCallArgResolution($cfgCallOp, $argIndex, $calleeLower)) {
+            $deadArrayHoisted = 0;
+            foreach ($cfgCallOp->args as $callArg) {
+                if (
+                    $this->callArgIsDeadInlineTemporary($callArg)
+                    && $this->callArgOperandExpectsArrayProducer($callArg)
+                ) {
+                    ++$deadArrayHoisted;
+                }
+            }
+            if ($deadArrayHoisted >= 2) {
+                return true;
+            }
+        }
+        if (0 !== $argIndex) {
             return false;
         }
         $leadingArg = $cfgCallOp->args[0] ?? null;
         if (!$leadingArg instanceof Operand || !$this->callArgOperandExpectsArrayProducer($leadingArg)) {
             return false;
         }
-        $calleeLower = strtolower($this->resolveCfgFuncCallName($cfgCallOp) ?? '');
 
         return 'array_slice' === $calleeLower
             || 'var_export' === $calleeLower
@@ -33297,7 +33319,7 @@ class Compiler {
                 && null === $arraySliceSlot
                 && !$inlineArrayLiteralArgWired
                 && $this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
-                && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex)
+                && !$this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)
             ) {
                 $nestedCallArgSlot = $this->resolveAdjacentNestedFuncCallArgSlot(
                     $block,
@@ -33315,9 +33337,9 @@ class Compiler {
                 || !$this->callArgIsDeadInlineTemporary($cfgCallOp->args[(int) $argIndex] ?? $arg)
             ) {
                 // keep resolved slot
-            } elseif ($this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex)) {
+            } elseif ($this->shouldSkipFinalAdjacentNestedFuncCallArgProbe($cfgCallOp, (int) $argIndex, $block)) {
                 // array_merge(['a'=>1], array_keys(...)) — arg #0 is leading Array_, not adjacent FuncCall (#16028).
-            } else {
+            } elseif (null === $valueSlot) {
                 $callIndex = array_search($cfgCallOp, $block->orig->children, true);
                 if (\is_int($callIndex) && $callIndex > 0) {
                     $prevStmt = $block->orig->children[$callIndex - 1] ?? null;
