@@ -16006,6 +16006,19 @@ class Compiler {
                 }
                 // php-cfg dead call-arg temps for sibling inline Array_ producers (#8561, #10231).
                 if ($paired instanceof Op\Expr\Array_) {
+                    if (
+                        1 === $argCount
+                        && $producerCount >= 2
+                        && $this->arrayProducersFormNestedChain(array_values(array_filter(
+                            $producers,
+                            static fn (Op\Expr $p): bool => $p instanceof Op\Expr\Array_
+                        )))
+                    ) {
+                        $outer = $producers[$producerCount - 1];
+
+                        return $outer instanceof Op\Expr\Array_ ? $outer : $paired;
+                    }
+
                     return $paired;
                 }
                 if ($argIndex < $argCount - 1) {
@@ -24275,13 +24288,14 @@ class Compiler {
      */
     private function slotFromInitArrayLiteralOps(array $arrayOps): ?string
     {
+        $slot = null;
         foreach ($arrayOps as $op) {
             if ($op instanceof OpCode && OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
-                return (string) $op->arg1;
+                $slot = (string) $op->arg1;
             }
         }
 
-        return null;
+        return $slot;
     }
 
     /** First INIT_ARRAY slot in $block — outer haystack for array_slice (#13684). */
@@ -29520,6 +29534,31 @@ class Compiler {
                 );
                 if (null !== $procOpenSlot) {
                     $valueSlot = $procOpenSlot;
+                }
+            }
+            if (
+                null !== $cfgCallOp
+                && 0 === (int) $argIndex
+                && \in_array(
+                    $this->resolveCfgFuncCallName($cfgCallOp),
+                    [
+                        'stream_context_create',
+                        'stream_context_set_options',
+                        'stream_context_set_default',
+                        'stream_context_get_default',
+                    ],
+                    true
+                )
+            ) {
+                $contextOptionsArg = $cfgCallOp->args[0] ?? $arg;
+                if (
+                    $this->callArgIsDeadInlineTemporary($contextOptionsArg)
+                    && $this->callArgOperandExpectsArrayProducer($contextOptionsArg)
+                ) {
+                    $outerSlot = $this->resolveOutermostInitArraySlotBeforePendingFuncCall($block, $sends);
+                    if (null !== $outerSlot) {
+                        $valueSlot = $outerSlot;
+                    }
                 }
             }
             // var_dump(E::A <=> E::B) — immediate spaceship prelude wins over hoisted enum temps (#10203).
