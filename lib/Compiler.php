@@ -14673,6 +14673,18 @@ class Compiler {
                 return $arrayTail[\count($arrayTail) - 1];
             }
         }
+        // array_column([[..]], null, 'x') — nested haystack Array_ chain + trailing null ConstFetch (#15914).
+        if ('array_column' === $inlineFuncName) {
+            $mappedColumn = $this->matchArrayColumnNestedHaystackTrailingProducers(
+                $producers,
+                $callArgs,
+                $argIndex,
+                $cfgCallOp
+            );
+            if (null !== $mappedColumn) {
+                return $mappedColumn;
+            }
+        }
         // tempnam(sys_get_temp_dir(), E::CASE) — nested FuncCall + trailing enum ClassConstFetch (#10303).
         if (2 === $argCount && 1 === $producerCount && 1 === $argIndex) {
             $sole = $producers[0] ?? null;
@@ -27899,6 +27911,17 @@ class Compiler {
                     $valueSlot = $iifeSlot;
                 }
             }
+            if ('array_column' === strtolower($calleeName ?? '') && null !== $cfgCallOp && null !== $block->orig) {
+                $arrayColumnSlot = $this->finalizeArrayColumnCallArgSlot(
+                    $block,
+                    $cfgCallOp,
+                    (int) $argIndex,
+                    $sends
+                );
+                if (null !== $arrayColumnSlot) {
+                    $valueSlot = $arrayColumnSlot;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -28038,6 +28061,88 @@ class Compiler {
             4 => $envSlot,
             default => null,
         };
+    }
+
+    /**
+     * Last-chance ARG_SEND slot for array_column() inline nested haystack + hoisted null (#15914).
+     *
+     * @param list<OpCode> $sends
+     */
+    private function finalizeArrayColumnCallArgSlot(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex,
+        array &$sends
+    ): ?string {
+        $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        );
+        $matched = $this->matchArrayColumnNestedHaystackTrailingProducers(
+            $producers,
+            $cfgCallOp->args ?? [],
+            $argIndex,
+            $cfgCallOp
+        );
+        if (!$matched instanceof Op\Expr) {
+            return null;
+        }
+        if (null === $block->slotForOperand($matched->result)) {
+            foreach ($this->compileExpr($matched, $block) as $op) {
+                $sends[] = $op;
+            }
+        }
+        $slot = $block->slotForOperand($matched->result);
+
+        return null !== $slot ? (string) $slot : null;
+    }
+
+    /**
+     * array_column([[..]], null, 'x') / array_column([[..]], 'name', null) — nested haystack + null (#15914).
+     *
+     * @param list<Op\Expr> $producers
+     * @param list<Operand> $callArgs
+     */
+    private function matchArrayColumnNestedHaystackTrailingProducers(
+        array $producers,
+        array $callArgs,
+        int $argIndex,
+        ?Op $cfgCallOp
+    ): ?Op\Expr {
+        $nestedTrailing = $this->splitNestedArrayLiteralChainWithTrailingProducers($producers);
+        if (null === $nestedTrailing) {
+            return null;
+        }
+        [$arrayChain, $trailing] = $nestedTrailing;
+        if (0 === $argIndex) {
+            return $arrayChain[\count($arrayChain) - 1];
+        }
+        if ($this->isEmbeddedCallLiteralArg($callArgs[$argIndex] ?? null)) {
+            return null;
+        }
+        $nullFetch = null;
+        foreach ($trailing as $producer) {
+            if (!$producer instanceof Op\Expr\ConstFetch) {
+                continue;
+            }
+            $name = $this->staticNameFromOperand($producer->name);
+            if (null !== $name && 'null' === strtolower($name)) {
+                $nullFetch = $producer;
+                break;
+            }
+        }
+        if (null === $nullFetch) {
+            return null;
+        }
+        $nullTarget = $this->arrayColumnNullPreludeArgIndex($cfgCallOp);
+        if (null !== $nullTarget && $argIndex === $nullTarget) {
+            return $nullFetch;
+        }
+        if ($argIndex === \count($callArgs) - 1) {
+            return $nullFetch;
+        }
+
+        return null;
     }
 
     /**
