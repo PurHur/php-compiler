@@ -6343,7 +6343,15 @@ restart:
                         break;
                     }
                     if ($propertyObject->class->allowsDynamicProperties) {
-                        $result->indirect($propertyObject->allocateProperty($name));
+                        $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
+                        $this->context->errors->undefinedPropertyRead(
+                            $propertyObject->class->name,
+                            $name,
+                            $this->context,
+                            $frame,
+                            $scriptFile
+                        );
+                        $result->null();
                         break;
                     }
                     $scriptFile = '' !== $frame->scriptPath ? $frame->scriptPath : null;
