@@ -8192,7 +8192,10 @@ class Compiler {
                     ) {
                         continue;
                     }
-                    if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)) {
+                    if (
+                        $this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($endCompiled, $endChild, (int) $argIndex)
+                        || $this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($endCompiled, $endChild, (int) $argIndex)
+                    ) {
                         continue;
                     }
                     // First dead temp in the outer call is the @ inner value (#15916, #10302).
@@ -28693,8 +28696,53 @@ class Compiler {
         if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedScalarProducer($block, $cfgCallOp, $argIndex)) {
             return null;
         }
+        if ($this->errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer($block, $cfgCallOp, $argIndex)) {
+            return null;
+        }
 
         return $this->errorSuppressEndBlockInnerResultSlot($block);
+    }
+
+    /**
+     * Trailing hoisted Array_ before a post-@ call feeds this dead-temp arg (#16205).
+     */
+    private function errorSuppressEndBlockCallArgHasTrailingHoistedArrayProducer(
+        Block $block,
+        Op $cfgCallOp,
+        int $argIndex
+    ): bool {
+        if (null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        $callArg = $cfgCallOp->args[$argIndex] ?? null;
+        if (!$callArg instanceof Operand || $this->isEmbeddedCallLiteralArg($callArg)) {
+            return false;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+            return false;
+        }
+        $arrayProducer = $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block);
+        if (!$arrayProducer instanceof Op\Expr\Array_) {
+            return false;
+        }
+        if (
+            null !== $arrayProducer->result
+            && $this->operandsReferToSameVariable($arrayProducer->result, $callArg)
+        ) {
+            return true;
+        }
+        $nonEmbeddedArgIndices = [];
+        foreach ($cfgCallOp->args as $i => $candidate) {
+            if (!$this->isEmbeddedCallLiteralArg($candidate)) {
+                $nonEmbeddedArgIndices[] = (int) $i;
+            }
+        }
+        $producerOrdinal = array_search($argIndex, $nonEmbeddedArgIndices, true);
+        if (false === $producerOrdinal) {
+            return false;
+        }
+
+        return 0 === $producerOrdinal;
     }
 
     /**
@@ -28779,7 +28827,7 @@ class Compiler {
     /**
      * True when an outer call in a post-@ block consumes the suppressed inner expression (#10336, #15916).
      *
-     * Standalone `@mkdir(); stream_context_create(null)` must not wire hoisted null to mkdir's return slot.
+     * Standalone `@mkdir(); stream_context_create(null|[])` must not wire hoisted literal to mkdir's return slot.
      */
     private function callInErrorSuppressEndBlockUsesInnerResultAsArg(Block $block, Op $cfgCallOp): bool
     {
