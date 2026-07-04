@@ -335,6 +335,17 @@ class Type extends Builtin {
             $fntypeGetMetaTags
         );
         $this->context->registerFunction('__compiler_get_meta_tags', $fnGetMetaTags);
+        $fntypeGetHeaders = $this->context->context->functionType(
+            $this->context->getTypeFromString('__hashtable__*'),
+            false,
+            $this->context->getTypeFromString('__string__*'),
+            $this->context->getTypeFromString('int1')
+        );
+        $fnGetHeaders = $this->context->module->addFunction(
+            '__compiler_get_headers',
+            $fntypeGetHeaders
+        );
+        $this->context->registerFunction('__compiler_get_headers', $fnGetHeaders);
         $fntypeFilePutContents = $this->context->context->functionType(
             $i64,
             false,
