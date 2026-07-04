@@ -3520,6 +3520,41 @@ PHP, 'fopen_chained_concat_path_warn.php');
         self::assertStringContainsString('/tmp/maint_99/sub/file.txt', $err['message'] ?? '');
     }
 
+    /** Issue #15929 — chained Mul/Div in call operands wires final Div slot, not inner Mul. */
+    public function testSprintfMulFloatDivChainUsesFinalDivSlot(): void
+    {
+        $code = <<<'PHP'
+<?php
+sprintf('%.10F', 5 * 200.0 / 12);
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'sprintf_mul_float_div_chain.php');
+
+        $mulSlot = null;
+        $divSlot = null;
+        $sendSlots = [];
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_MUL === $op->type) {
+                $mulSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_DIV === $op->type) {
+                $divSlot = $op->arg1;
+            }
+            if (OpCode::TYPE_ARG_SEND === $op->type) {
+                $sendSlots[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($mulSlot);
+        self::assertNotNull($divSlot);
+        self::assertSame($divSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+        self::assertNotSame($mulSlot, $sendSlots[1] ?? null, 'arg sends='.json_encode($sendSlots));
+
+        ob_start();
+        $runtime->run($block);
+        ob_get_clean();
+    }
+
     /**
      * @param list<int|string> $concatSlots
      * @param list<int|string> $sendSlots
