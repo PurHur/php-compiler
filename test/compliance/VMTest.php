@@ -606,6 +606,16 @@ class VMTest extends BaseTest {
                 && !str_contains($name, 'dnf_paren_union_only')) {
                 continue;
             }
+            // gc_status PHP 8.4 schema; forward profile only (#15784, ext/standard/php_gc.c).
+            if (!CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status')
+                && !str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
+            if (CompilerVersion::supportsGcStatusPhp84Schema()
+                && str_contains($name, 'gc_status_reference_profile')) {
+                continue;
+            }
             if (!CompilerVersion::supportsClassHasFunctions()
                 && str_contains($name, 'class_has_')) {
                 continue;

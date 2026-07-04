@@ -545,11 +545,12 @@ final class CompilerVersion
     /**
      * PHP 8.4+ gc_status() schema (running/protected/full/buffer_size; ext/standard/php_gc.c, #12780, #13673, #14431).
      *
-     * Gated on stable 8.4.0 so 8.4.0-dev reference profile keeps legacy runs/collected/threshold/roots (#12993, #13293, #14612).
+     * Gated on stable 8.4.0 / {@see languageProfileVersion()} so 8.4.0-dev reference profile keeps legacy
+     * runs/collected/threshold/roots (#12993, #13293, #14612, #15784).
      */
     public static function supportsGcStatusPhp84Schema(): bool
     {
-        return version_compare(self::VERSION, '8.4.0', '>=');
+        return version_compare(self::languageProfileVersion(), '8.4.0', '>=');
     }
 
     /**
