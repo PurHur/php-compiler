@@ -14885,10 +14885,16 @@ class Compiler {
                 $prefixEnd = $producerCount - $trailingForLaterArgs;
                 if ($prefixEnd > 0) {
                     $prefixLast = $producers[$prefixEnd - 1] ?? null;
+                    $callArg = $callArgs[$argIndex] ?? null;
                     if (
                         $this->isComparisonInlineCallArgProducer($prefixLast)
-                        // var_export([...] + [...], true) — Plus prelude before trailing literal (#11511, #10490).
-                        || $prefixLast instanceof Op\Expr\BinaryOp\Plus
+                        && null !== $callArg
+                        && $this->operandsReferToSameVariable($prefixLast->result, $callArg)
+                    ) {
+                        return $prefixLast;
+                    }
+                    if (
+                        $prefixLast instanceof Op\Expr\BinaryOp\Plus
                         || $prefixLast instanceof Op\Expr\BinaryOp\Concat
                     ) {
                         return $prefixLast;
@@ -15063,7 +15069,28 @@ class Compiler {
                 return null;
             }
 
-            return $producers[$mappedIndex] ?? null;
+            $mapped = $producers[$mappedIndex] ?? null;
+            if (
+                $this->isComparisonInlineCallArgProducer($mapped)
+                && (
+                    null === ($callArgs[$argIndex] ?? null)
+                    || !$this->operandsReferToSameVariable($mapped->result, $callArgs[$argIndex])
+                )
+            ) {
+                foreach ($producers as $candidate) {
+                    if (
+                        $candidate instanceof Op\Expr\ConstFetch
+                        && null !== ($callArgs[$argIndex] ?? null)
+                        && $this->operandsReferToSameVariable($candidate->result, $callArgs[$argIndex])
+                    ) {
+                        return $candidate;
+                    }
+                }
+
+                return null;
+            }
+
+            return $mapped;
         }
         if ($producerCount === $argCount) {
             // str_contains($arr['k'], $fn . '():') — hoisted dim-fetch + concat (#13662, zend_execute.c).
@@ -15455,6 +15482,7 @@ class Compiler {
                 && !($producers[0] instanceof Op\Expr\FirstClassCallable)
                 && !($producers[0] instanceof Op\Expr\UnaryMinus)
                 && !($producers[0] instanceof Op\Expr\UnaryPlus)
+                && !$this->isComparisonInlineCallArgProducer($producers[0])
                 && !$this->isEmbeddedCallLiteralArg($callArgs[0] ?? null)
             ) {
                 $callArg = $callArgs[$argIndex] ?? null;
@@ -15595,7 +15623,18 @@ class Compiler {
                 return null;
             }
 
-            return $producers[$argIndex];
+            $paired = $producers[$argIndex] ?? null;
+            if (
+                $this->isComparisonInlineCallArgProducer($paired)
+                && (
+                    null === ($callArgs[$argIndex] ?? null)
+                    || !$this->operandsReferToSameVariable($paired->result, $callArgs[$argIndex])
+                )
+            ) {
+                return null;
+            }
+
+            return $paired;
         }
 
         return null;
@@ -15678,6 +15717,21 @@ class Compiler {
             $arrayMergePair = $this->matchArrayMergeFamilyInlineCallArgProducer($producers, $argIndex);
             if (null !== $arrayMergePair) {
                 return $arrayMergePair;
+            }
+        }
+        // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch prelude + sibling FuncCall (#15833).
+        if ('explode' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
+            $constProducer = null;
+            $funcProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\ConstFetch) {
+                    $constProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                }
+            }
+            if (null !== $constProducer && null !== $funcProducer) {
+                return (0 === $argIndex) ? $constProducer : $funcProducer;
             }
         }
         // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
@@ -17763,6 +17817,13 @@ class Compiler {
                     // in_array('x', g(), true) — hoisted ConstFetch between g() and consumer (#13507, #15611, #15612).
                     continue;
                 }
+            }
+            if (
+                $this->isComparisonInlineCallArgProducer($child)
+                && !$this->inlineCallArgProducerFeedsConsumer($child, $callOp)
+            ) {
+                // explode(PATH_SEPARATOR, …) after `if (':' !== PATH_SEPARATOR || …)` — compare bool must not bind arg #0 (#15833).
+                continue;
             }
             array_unshift($producers, $child);
         }
@@ -24537,6 +24598,12 @@ class Compiler {
             return $multisortFold;
         }
         $root = $this->unwrapOperandChain($arg);
+        if ($root instanceof Op\Expr\ConstFetch) {
+            $vm = $this->tryFoldGlobalConstFetch($root);
+            if (null !== $vm) {
+                return $block->registerConstant($arg, $vm);
+            }
+        }
         if ($root instanceof Op\Expr\ClassConstFetch) {
             $vm = $this->tryFoldClassConstFetchDefault($root, $block, true);
             if (null !== $vm) {
@@ -24875,6 +24942,14 @@ class Compiler {
             }
             $prefetchOps = [];
             $assignedNamedLocal = null;
+            $valueSlot = null;
+            $callArgConstRoot = $this->unwrapOperandChain($callArgOperand);
+            if ($callArgConstRoot instanceof Op\Expr\ConstFetch) {
+                $foldedGlobalConst = $this->tryFoldGlobalConstFetch($callArgConstRoot);
+                if (null !== $foldedGlobalConst) {
+                    $valueSlot = (string) $block->registerConstant($callArgOperand, $foldedGlobalConst);
+                }
+            }
             if (null !== $dimFetchSlot) {
                 $valueSlot = $dimFetchSlot;
             } elseif (null !== $inlineArray) {
@@ -24889,12 +24964,14 @@ class Compiler {
                     $valueSlot = $this->compileOperand($inlineArray->result, $block, true);
                 }
             } else {
-                $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
-                    $arg,
-                    $block,
-                    $cfgCallOp,
-                    (int) $argIndex
-                );
+                if (null === $valueSlot) {
+                    $valueSlot = $this->resolvePrecedingArrayDimFetchCallArgSlot(
+                        $arg,
+                        $block,
+                        $cfgCallOp,
+                        (int) $argIndex
+                    );
+                }
                 if (null === $valueSlot) {
                     $valueSlot = $this->tryResolveEncapsedConcatListCallArgSlot($arg, $block, $sends, $cfgCallOp, (int) $argIndex);
                 }
@@ -25033,14 +25110,31 @@ class Compiler {
                             }
                         }
                         if ($matched instanceof Op\Expr) {
-                            if (null === $block->slotForOperand($matched->result)) {
-                                foreach ($this->compileExpr($matched, $block) as $op) {
-                                    $sends[] = $op;
+                            $callArgForMatch = $cfgCallOp->args[(int) $argIndex] ?? $arg;
+                            if (
+                                $this->isComparisonInlineCallArgProducer($matched)
+                                && null !== $callArgForMatch
+                                && !$this->operandsReferToSameVariable($matched->result, $callArgForMatch)
+                            ) {
+                                $matched = null;
+                                $constRoot = $this->unwrapOperandChain($callArgForMatch);
+                                if ($constRoot instanceof Op\Expr\ConstFetch) {
+                                    $folded = $this->tryFoldGlobalConstFetch($constRoot);
+                                    if (null !== $folded) {
+                                        $valueSlot = (string) $block->registerConstant($callArgForMatch, $folded);
+                                    }
                                 }
                             }
-                            $matchedSlot = $block->slotForOperand($matched->result);
-                            if (null !== $matchedSlot) {
-                                $valueSlot = $matchedSlot;
+                            if ($matched instanceof Op\Expr) {
+                                if (null === $block->slotForOperand($matched->result)) {
+                                    foreach ($this->compileExpr($matched, $block) as $op) {
+                                        $sends[] = $op;
+                                    }
+                                }
+                                $matchedSlot = $block->slotForOperand($matched->result);
+                                if (null !== $matchedSlot) {
+                                    $valueSlot = $matchedSlot;
+                                }
                             }
                         }
                     }
