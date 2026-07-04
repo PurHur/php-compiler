@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\CompilerVersion;
 use PHPCompiler\VM\EnumCaseSupport;
 use PHPCompiler\VM\Variable;
 
@@ -71,17 +72,25 @@ final class VmNumberFormat
             return 'inf';
         }
 
+        // php-src < 8.3: negative $decimals ignored (ext/standard/number_format.c, #15917).
+        if ($decimals < 0 && !CompilerVersion::supportsNumberFormatNegativeDecimals()) {
+            $decimals = 0;
+        }
+
         $negative = $number < 0.0;
         if ($negative) {
             $number = -$number;
+        }
+
+        $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
+        if ($decimals < 0) {
+            $decimals = 0;
         }
 
         $pow = 1;
         for ($i = 0; $i < $decimals; ++$i) {
             $pow *= 10;
         }
-
-        $rounded = VmRound::mathRound($number, $decimals, $roundingMode);
 
         $intPart = (int) floor($rounded);
         $fracPart = 0;
