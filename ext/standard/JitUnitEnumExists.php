@@ -2,52 +2,20 @@
 
 declare(strict_types=1);
 
+/**
+ * JIT/AOT helper for unitenum_exists() via UnitEnumExistsJitHelper PHP (#16169).
+ */
+
 namespace PHPCompiler\ext\standard;
 
-use PHPCompiler\JIT\Builtin\StringCaseCompare;
+use PHPCompiler\JIT\Builtin\StringUnitEnumExists;
 use PHPCompiler\JIT\Context;
-use PHPLLVM\Builder;
 use PHPLLVM\Value;
 
-/** LLVM lowering for unitenum_exists() (#6884). */
 final class JitUnitEnumExists
 {
-    /** @return Value matches defined() / enum_exists() for JUMPIF truthiness */
     public static function invoke(Context $context, Value $nameStr): Value
     {
-        StringCaseCompare::ensureStrcasecmpLinked($context);
-        $i1 = $context->getTypeFromString('int1');
-        $i32 = $context->getTypeFromString('int32');
-        $exists = $i1->constInt(0, false);
-        $strcasecmpFn = $context->lookupFunction('strcasecmp');
-        $nameData = self::stringDataPtr($context, $nameStr);
-
-        $candidates = $context->type->object->allDeclaredUnitEnumLowerNames();
-        if (null !== $context->runtime->vmContext) {
-            foreach ($context->runtime->vmContext->classes as $lc => $entry) {
-                if ($entry->isEnum && null === $entry->backedType) {
-                    $candidates[] = $lc;
-                }
-            }
-            $candidates = array_values(array_unique($candidates));
-        }
-
-        foreach ($candidates as $lc) {
-            $candidate = $context->builder->load($context->constantStringFromString($lc));
-            $candidateData = self::stringDataPtr($context, $candidate);
-            $cmp = $context->builder->call($strcasecmpFn, $nameData, $candidateData);
-            $match = $context->builder->icmp(Builder::INT_EQ, $cmp, $i32->constInt(0, false));
-            $exists = $context->builder->or($exists, $match);
-        }
-
-        return $exists;
-    }
-
-    private static function stringDataPtr(Context $context, Value $strPtr): Value
-    {
-        $structName = $strPtr->typeOf()->getElementType()->getName();
-        $off = $context->structFieldMap[$structName]['value'];
-
-        return $context->builder->structGep($strPtr, $off);
+        return StringUnitEnumExists::invoke($context, $nameStr);
     }
 }
