@@ -22432,6 +22432,44 @@ class Compiler {
     }
 
     /**
+     * FUNCCALL_EXEC_RETURN slots emitted before a hoisted sibling FuncCall chain (e.g. `new` ctor).
+     *
+     * @param list<Op> $cfgChildren
+     */
+    private function execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+        int $firstSibling,
+        array $cfgChildren
+    ): int {
+        $base = 0;
+        for ($j = 0; $j < $firstSibling; ++$j) {
+            $child = $cfgChildren[$j] ?? null;
+            if (!$child instanceof Op\Expr) {
+                continue;
+            }
+            if ($child instanceof Op\Expr\New_) {
+                ++$base;
+                continue;
+            }
+            if ($child instanceof Op\Expr\FuncCall || $child instanceof Op\Expr\NsFuncCall) {
+                ++$base;
+                continue;
+            }
+            if (
+                $child instanceof Op\Expr\MethodCall
+                || $child instanceof Op\Expr\NullsafeMethodCall
+                || $child instanceof Op\Expr\StaticCall
+            ) {
+                $method = $this->staticNameFromOperand($child->name);
+                if (null === $method || !$this->methodCallIsKnownVoidReturn($method)) {
+                    ++$base;
+                }
+            }
+        }
+
+        return $base;
+    }
+
+    /**
      * FUNCCALL_EXEC_RETURN slot for a hoisted inline FuncCall by cfg child index (#15488, #15475).
      *
      * @param list<Op> $cfgChildren
@@ -22450,6 +22488,43 @@ class Compiler {
             && !$producer instanceof Op\Expr\NsFuncCall
         ) {
             return null;
+        }
+        for ($consumerIndex = $producerIndex + 1, $n = \count($cfgChildren); $consumerIndex < $n; ++$consumerIndex) {
+            $consumer = $cfgChildren[$consumerIndex] ?? null;
+            if (!$this->isSiblingMultiArgInlineCallConsumer($consumer)) {
+                continue;
+            }
+            if (!\is_array($consumer->args ?? null) || \count($consumer->args) < 2) {
+                continue;
+            }
+            $firstSibling = $this->firstSiblingInlineFuncCallProducerIndex($consumerIndex, $cfgChildren);
+            if (
+                null === $firstSibling
+                || $producerIndex < $firstSibling
+                || $producerIndex >= $consumerIndex
+            ) {
+                continue;
+            }
+            if (!$this->isSiblingMultiArgFuncCallProducer(
+                $producer,
+                $consumer,
+                $producerIndex,
+                $consumerIndex,
+                $cfgChildren
+            )) {
+                continue;
+            }
+            $siblingOrdinal = $this->siblingInlineFuncCallProducerOrdinal(
+                $producerIndex,
+                $firstSibling,
+                $cfgChildren
+            );
+            $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+                $firstSibling,
+                $cfgChildren
+            ) + $siblingOrdinal;
+
+            return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
         }
         $funcCallOrdinal = 0;
         for ($j = 0; $j <= $producerIndex; ++$j) {
@@ -22507,8 +22582,12 @@ class Compiler {
             $firstSibling,
             $cfgChildren
         );
+        $execOrdinal = $this->execReturnOrdinalBaseBeforeSiblingInlineFuncCallChain(
+            $firstSibling,
+            $cfgChildren
+        ) + $producerOrdinal;
 
-        return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $producerOrdinal);
+        return $this->slotForSiblingInlineFuncCallProducerExecReturnOrdinal($block, $execOrdinal);
     }
 
     /**
