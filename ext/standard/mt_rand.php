@@ -11,15 +11,15 @@ use PHPCompiler\JIT\Variable as JITVariable;
 use PHPLLVM\Value;
 
 /**
- * rand() — Mersenne Twister PRNG (php-src ext/random/random.c, #11908).
+ * mt_rand() — Mersenne Twister PRNG (php-src ext/random/random.c, #3295).
  *
- * VM: {@see VmMt19937}; delegates to same engine as mt_rand() on Zend 8.2.
+ * VM: {@see VmMt19937}; max &lt; min is ValueError (unlike rand() which swaps bounds).
  */
-final class rand_ extends Internal
+final class mt_rand extends Internal
 {
     public function __construct()
     {
-        parent::__construct('rand');
+        parent::__construct('mt_rand');
     }
 
     public function execute(Frame $frame): void
@@ -27,7 +27,7 @@ final class rand_ extends Internal
         $argc = \count($frame->calledArgs);
         if ($argc < 0 || $argc > 2 || 1 === $argc) {
             throw new \ArgumentCountError(
-                \sprintf('rand() expects at most 2 arguments, %d given', $argc)
+                \sprintf('mt_rand() expects at most 2 arguments, %d given', $argc)
             );
         }
         if (null === $frame->returnVar) {
@@ -38,13 +38,13 @@ final class rand_ extends Internal
 
             return;
         }
-        $min = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'rand', 1, 'min');
-        $max = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'rand', 2, 'max');
-        $frame->returnVar->int(VmMt19937::randRange($min, $max));
+        $min = VmMath::parseIntBuiltinArgForFrame($frame, 0, 'mt_rand', 1, 'min');
+        $max = VmMath::parseIntBuiltinArgForFrame($frame, 1, 'mt_rand', 2, 'max');
+        $frame->returnVar->int(VmMt19937::range($min, $max));
     }
 
     public function call(Context $context, JITVariable ...$args): Value
     {
-        return JitRand::call($context, false, 'rand', ...$args);
+        return JitRand::call($context, true, 'mt_rand', ...$args);
     }
 }
