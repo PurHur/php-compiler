@@ -93,7 +93,9 @@ final class TypeErrorRaise
             $successCondition,
             $blockPrefix,
             $errorMessage,
-            static fn (Context $ctx, string $msg): void => self::emitRaise($ctx, $msg),
+            static function (Context $ctx, string $msg): void {
+                self::emitRaise($ctx, $msg);
+            },
             $okSuffix,
             $failSuffix
         );
@@ -113,7 +115,9 @@ final class TypeErrorRaise
             $successCondition,
             $blockPrefix,
             $errorMessage,
-            static fn (Context $ctx, string $msg): void => self::emitValueError($ctx, $msg),
+            static function (Context $ctx, string $msg): void {
+                self::emitValueError($ctx, $msg);
+            },
             $okSuffix,
             $failSuffix
         );
