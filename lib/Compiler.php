@@ -18692,6 +18692,35 @@ class Compiler {
     }
 
     /**
+     * array_replace_recursive(['a' => ['b' => 1]], ['a' => null]) — nested arg #0 + null overlay arg #1 (#12258, #16160).
+     *
+     * @param list<Op\Expr> $producers
+     */
+    private function matchLeadingNestedInlineArrayMergeFamilyCallArgProducer(
+        array $producers,
+        int $argIndex,
+        int $argCount
+    ): ?Op\Expr {
+        if ($argCount < 2) {
+            return null;
+        }
+        $leadingNestedRemaining = $this->splitLeadingNestedArrayLiteralChainWithRemainingProducers($producers);
+        if (null === $leadingNestedRemaining) {
+            return null;
+        }
+        [$prefixChain, $remaining] = $leadingNestedRemaining;
+        $trailingArgCount = $this->countInlineCallArgProducersInRemaining($remaining);
+        if (1 + $trailingArgCount !== $argCount) {
+            return null;
+        }
+        if (0 === $argIndex) {
+            return $prefixChain[\count($prefixChain) - 1];
+        }
+
+        return $this->inlineCallArgProducerAtRemainingIndex($remaining, $argIndex - 1);
+    }
+
+    /**
      * ConstFetch prelude before nested inline Array_ call arg (#12007, filter_var + options array).
      *
      * e.g. filter_var('abc', FILTER_VALIDATE_REGEXP, ['options' => ['regexp' => '/^a/']])
@@ -23886,6 +23915,14 @@ class Compiler {
         int $mergeArgCount,
         array $callArgs = []
     ): ?Op\Expr {
+        $leadingNested = $this->matchLeadingNestedInlineArrayMergeFamilyCallArgProducer(
+            $mergeProducers,
+            $argIndex,
+            $mergeArgCount
+        );
+        if (null !== $leadingNested) {
+            return $leadingNested;
+        }
         $mapped = $this->matchArrayMergeFamilyInlineCallArgProducer($mergeProducers, $argIndex);
         if (null === $mapped) {
             $mapped = $this->matchSiblingNestedArrayLiteralCallArgProducer(
@@ -25128,6 +25165,23 @@ class Compiler {
         }
         $candidate = $cfgChildren[$cfgProducerIndex] ?? null;
         if (!$candidate instanceof Op\Expr || !\in_array($candidate, $producers, true)) {
+            $mergeCallee = strtolower($this->resolveCfgFuncCallName($callOp) ?? '');
+            if (
+                \in_array(
+                    $mergeCallee,
+                    ['array_merge', 'array_merge_recursive', 'array_replace', 'array_replace_recursive'],
+                    true
+                )
+            ) {
+                $leadingNested = $this->matchLeadingNestedInlineArrayMergeFamilyCallArgProducer(
+                    $producers,
+                    $argIndex,
+                    \count($callOp->args)
+                );
+                if (null !== $leadingNested) {
+                    return $leadingNested;
+                }
+            }
             // ConstFetch + BitwiseOr call args with filtered operand ConstFetch preludes (#16152, #11804).
             if ($producerSlotIndex < $producerCount) {
                 $direct = $producers[$producerSlotIndex] ?? null;
