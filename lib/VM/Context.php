@@ -625,7 +625,7 @@ class Context {
     public function recordIncludedFile(string $path): void
     {
         $normalized = ScriptStack::normalize($path);
-        if ('' !== $normalized) {
+        if ('' !== $normalized && !ScriptStack::isVirtualCompileUnit($normalized)) {
             $this->includedFiles[] = $normalized;
         }
     }
