@@ -2264,6 +2264,43 @@ PHP;
         self::assertNotSame($inArraySends[0], $inArraySends[1], 'needle and haystack must differ');
     }
 
+    /** Issue #16096 / re-#10909 — in_array(null, [null], true) wires inline haystack + literal strict slots. */
+    public function testInArrayNullNeedleInlineHaystackStrictUsesArrayAndBoolSlots(): void
+    {
+        $code = <<<'PHP'
+<?php
+declare(strict_types=1);
+var_export(in_array(null, [null], true));
+PHP;
+        $runtime = new Runtime();
+        $block = $runtime->parseAndCompile($code, 'in_array_null_inline_strict.php');
+
+        $arraySlot = null;
+        $inArraySends = [];
+        $fcallOrdinal = 0;
+        foreach ($block->opCodes as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null === $arraySlot) {
+                $arraySlot = $op->arg1;
+            }
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                ++$fcallOrdinal;
+                if (1 === $fcallOrdinal) {
+                    $inArraySends = [];
+                }
+            }
+            if (1 === $fcallOrdinal && OpCode::TYPE_ARG_SEND === $op->type) {
+                $inArraySends[] = $op->arg1;
+            }
+        }
+
+        self::assertNotNull($arraySlot);
+        self::assertCount(3, $inArraySends, 'in_array arg sends='.json_encode($inArraySends));
+        self::assertSame($arraySlot, $inArraySends[1], 'inline haystack slot');
+        self::assertNotSame($inArraySends[0], $inArraySends[1], 'needle and haystack must differ');
+        self::assertNotSame($inArraySends[1], $inArraySends[2], 'haystack and strict must differ');
+        self::assertNotSame($inArraySends[0], $inArraySends[2], 'needle and strict must differ');
+    }
+
     /** Issue #10321 — in_array(1, [1,2,3], strict: true) wires inline haystack + named strict slots. */
     public function testInArrayLiteralNeedleInlineHaystackStrictNamedUsesArrayAndBoolSlots(): void
     {
