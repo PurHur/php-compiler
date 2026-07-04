@@ -16,4 +16,11 @@ if (!str_contains($inline, '2020-01-02')) {
     exit(1);
 }
 
+$a = [true, $dt->format('Y-m-d')];
+$ok = ($a === [true, '2020-01-02']);
+if (!$ok) {
+    fwrite(STDERR, "fail: assigned array mismatch\n");
+    exit(1);
+}
+
 echo "inline_var_export: ok\n";
