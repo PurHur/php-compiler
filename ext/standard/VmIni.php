@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace PHPCompiler\ext\standard;
 
+use PHPCompiler\Frame;
 use PHPCompiler\VM\Context;
 use PHPCompiler\VM\ErrorReporter;
 use PHPCompiler\VM\HashTable;
@@ -41,6 +42,37 @@ final class VmIni
         'variables_order' => 'GPCS',
         'request_order' => 'GP',
         'arg_separator.output' => '&',
+        'from' => '',
+        'session.trans_sid_hosts' => '',
+        'session.trans_sid_tags' => 'a=href,area=href,frame=src,form=',
+        'url_rewriter.hosts' => '',
+        'url_rewriter.tags' => 'form=',
+        'assert.warning' => '1',
+    ];
+
+    /** php-src ext/standard module ini entries (ini.c, #9052). */
+    private const STANDARD_EXTENSION_KEYS = [
+        'assert.active',
+        'assert.bail',
+        'assert.callback',
+        'assert.exception',
+        'assert.warning',
+        'auto_detect_line_endings',
+        'default_socket_timeout',
+        'from',
+        'session.trans_sid_hosts',
+        'session.trans_sid_tags',
+        'unserialize_max_depth',
+        'url_rewriter.hosts',
+        'url_rewriter.tags',
+        'user_agent',
+    ];
+
+    /** php-src ext/pcre module ini entries (php_pcre.c, #9052). */
+    private const PCRE_EXTENSION_KEYS = [
+        'pcre.backtrack_limit',
+        'pcre.jit',
+        'pcre.recursion_limit',
     ];
 
     /** php-src php.ini compile-time default for max_execution_time (ext/standard/ini.c, #12481). */
@@ -622,19 +654,34 @@ final class VmIni
         return $old;
     }
 
+    /** Known ini_get_all() extension filters (ext/standard/ini.c, #9052). */
+    public static function isKnownIniExtension(string $extension): bool
+    {
+        return null !== self::keysForExtension($extension);
+    }
+
     /**
      * ini_get_all() — introspection for supported directives (ext/standard/ini.c, #3205).
      *
      * @return HashTable|false
      */
-    public static function getAll(Context $ctx, ?string $extension, bool $details)
+    public static function getAll(Context $ctx, ?string $extension, bool $details, ?Frame $frame = null)
     {
-        if (null !== $extension && 'core' !== strtolower($extension)) {
+        $keys = self::keysForExtension($extension);
+        if (null === $keys) {
+            $ctx->errors->triggerError(
+                'ini_get_all(): Extension "'.$extension.'" cannot be found',
+                ErrorReporter::E_WARNING,
+                null,
+                $ctx,
+                $frame
+            );
+
             return false;
         }
 
         $result = new HashTable();
-        foreach (self::SUPPORTED_KEYS as $key) {
+        foreach ($keys as $key) {
             $local = self::get($ctx, $key);
             if (false === $local) {
                 continue;
@@ -657,6 +704,21 @@ final class VmIni
         }
 
         return $result;
+    }
+
+    /** @return list<string>|null */
+    private static function keysForExtension(?string $extension): ?array
+    {
+        if (null === $extension) {
+            return self::SUPPORTED_KEYS;
+        }
+
+        return match (strtolower($extension)) {
+            'core' => self::SUPPORTED_KEYS,
+            'standard' => self::STANDARD_EXTENSION_KEYS,
+            'pcre' => self::PCRE_EXTENSION_KEYS,
+            default => null,
+        };
     }
 
     private static function stringVar(string $value): Variable

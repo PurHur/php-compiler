@@ -46,7 +46,7 @@ final class ini_get_all extends Internal
             $details = $arg1->toBool();
         }
 
-        $result = VmIni::getAll($frame->vmContext, $extension, $details);
+        $result = VmIni::getAll($frame->vmContext, $extension, $details, $frame);
         if (false === $result) {
             $frame->returnVar->bool(false);
         } else {

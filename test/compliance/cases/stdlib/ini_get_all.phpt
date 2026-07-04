@@ -9,6 +9,7 @@ $flat = ini_get_all(null, false);
 echo is_string($flat['display_errors']) ? "flat_ok\n" : "flat_fail\n";
 echo ini_get_all('nonexistent') === false ? "ext_false\n" : "ext_bad\n";
 --EXPECT--
+PHP Warning:  ini_get_all(): Extension "nonexistent" cannot be found in - on line 7
 all_ok
 detail_ok
 flat_ok
