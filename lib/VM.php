@@ -4172,8 +4172,8 @@ restart:
                 case OpCode::TYPE_SHIFT_LEFT:
                 case OpCode::TYPE_SHIFT_RIGHT:
                     $arg1 = $frame->scope[$op->arg1];
-                    $readArg2 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg2);
-                    $readArg3 = $this->readScopeOperandForRuntimeRead($frame, (int) $op->arg3);
+                    $readArg2 = $this->readRuntimeOperandForBitwise($frame, (int) $op->arg2);
+                    $readArg3 = $this->readRuntimeOperandForBitwise($frame, (int) $op->arg3);
                     $arg2 = $op->arg1 !== $op->arg2 ? $readArg2 : $frame->scope[$op->arg2];
                     $arg3 = $readArg3;
                     $catchFrame = $this->enforceReadonlyForCompoundAssign($frame, $op, $arg2);
@@ -7823,6 +7823,19 @@ restart:
     {
         if (isset($frame->block->constants[$slot])) {
             return $frame->block->constants[$slot];
+        }
+
+        return $this->readScopeOperandForRuntimeRead($frame, $slot);
+    }
+
+    /** Bitwise ops in CFG branch blocks may inherit polluted literal slots (#15902). */
+    private function readRuntimeOperandForBitwise(Frame $frame, int $slot): Variable
+    {
+        if (isset($frame->block->constants[$slot])) {
+            $copy = new Variable();
+            $copy->duplicateFrom($frame->block->constants[$slot]);
+
+            return $copy;
         }
 
         return $this->readScopeOperandForRuntimeRead($frame, $slot);

@@ -557,8 +557,29 @@ class Block {
 
     public function registerConstant(Operand $operand, Variable $const): int {
         $slot = $this->getVarSlot($operand, false);
+        if (isset($this->constants[$slot]) && !$this->compileTimeConstantsMatch($this->constants[$slot], $const)) {
+            $slot = $this->forceFreshVarSlot($operand);
+        }
         $this->constants[$slot] = $const;
+
         return $slot;
+    }
+
+    /** True when two compile-time slot constants are the same value (#15902). */
+    private function compileTimeConstantsMatch(Variable $existing, Variable $incoming): bool
+    {
+        if ($existing->type !== $incoming->type) {
+            return false;
+        }
+
+        return match ($existing->type) {
+            Variable::TYPE_INTEGER => $existing->toInt() === $incoming->toInt(),
+            Variable::TYPE_FLOAT => $existing->toFloat() === $incoming->toFloat(),
+            Variable::TYPE_BOOLEAN => $existing->toBool() === $incoming->toBool(),
+            Variable::TYPE_STRING => $existing->toString() === $incoming->toString(),
+            Variable::TYPE_NULL => true,
+            default => false,
+        };
     }
 
     /**
@@ -1276,6 +1297,7 @@ class Block {
                     $this->inheritUndefinedLocals
                     && null !== $frame
                     && isset($frame->scope[$pos])
+                    && !isset($this->constants[$pos])
                 ) {
                     $scope[$pos] = $frame->scope[$pos];
                 } else {

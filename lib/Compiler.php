@@ -8499,9 +8499,12 @@ class Compiler {
             if (null !== $expr->right) {
                 $this->compileEmbeddedExprForOperand($expr->right, $block);
             }
+            $resultSlot = $block->inheritUndefinedLocals
+                ? $block->forceFreshVarSlot($expr->result)
+                : $this->compileOperand($expr->result, $block, false);
             $opcode = new OpCode(
                 $this->getOpCodeTypeFromBinaryOp($expr),
-                $this->compileOperand($expr->result, $block, false),
+                $resultSlot,
                 null !== $expr->left ? $this->compileOperand($expr->left, $block, true) : null,
                 null !== $expr->right ? $this->compileOperand($expr->right, $block, true) : null,
             );
@@ -14399,6 +14402,45 @@ class Compiler {
     }
 
     /**
+     * CFG branch blocks inherit stale operand slots — wire decoct($x & 0777) to the fresh AND dest (#15902).
+     *
+     * @param list<OpCode> $emitOps
+     */
+    private function slotForRecentInlineArithmeticCallArg(Block $block, array $emitOps): ?string
+    {
+        foreach (array_reverse($emitOps) as $op) {
+            if ($this->isInlineArithmeticResultOpcode($op->type)) {
+                return (string) $op->arg1;
+            }
+        }
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if ($this->isInlineArithmeticResultOpcode($op->type)) {
+                return (string) $op->arg1;
+            }
+        }
+
+        return null;
+    }
+
+    private function isInlineArithmeticResultOpcode(int $type): bool
+    {
+        return \in_array($type, [
+            OpCode::TYPE_BITWISE_AND,
+            OpCode::TYPE_BITWISE_OR,
+            OpCode::TYPE_BITWISE_XOR,
+            OpCode::TYPE_PLUS,
+            OpCode::TYPE_MINUS,
+            OpCode::TYPE_MUL,
+            OpCode::TYPE_DIV,
+            OpCode::TYPE_MODULO,
+            OpCode::TYPE_POW,
+            OpCode::TYPE_SHIFT_LEFT,
+            OpCode::TYPE_SHIFT_RIGHT,
+        ], true);
+    }
+
+    /**
      * Dead inline array call arg: prefer nested FUNCCALL_EXEC_RETURN over sibling INIT_ARRAY (#14042).
      *
      * When php-cfg marks a nested FuncCall result temp dead, compileCallArgSends must not wire the
@@ -18990,7 +19032,12 @@ class Compiler {
             || $expr instanceof Op\Expr\BinaryOp\Mul
             || $expr instanceof Op\Expr\BinaryOp\Div
             || $expr instanceof Op\Expr\BinaryOp\Mod
-            || $expr instanceof Op\Expr\BinaryOp\Pow;
+            || $expr instanceof Op\Expr\BinaryOp\Pow
+            || $expr instanceof Op\Expr\BinaryOp\BitwiseAnd
+            || $expr instanceof Op\Expr\BinaryOp\BitwiseOr
+            || $expr instanceof Op\Expr\BinaryOp\BitwiseXor
+            || $expr instanceof Op\Expr\BinaryOp\ShiftLeft
+            || $expr instanceof Op\Expr\BinaryOp\ShiftRight;
     }
 
     /**
@@ -25833,6 +25880,11 @@ class Compiler {
                 default:
                     $this->throwCompileLogic('Unknown Literal Operand Type: ' . ($operand->type ?? 'untyped'));
             }
+            // CFG branch blocks inherit parent constant slots; literals must not alias (#15902).
+            if ($block->inheritUndefinedLocals) {
+                return $this->freshLiteralConstantSlot($operand, $block);
+            }
+
             return $block->registerConstant($operand, $return);
         } elseif ($operand instanceof Operand\Variable) {
             if ($this->isDynamicVariableOperand($operand)) {
@@ -28732,7 +28784,13 @@ class Compiler {
         if (null === $last->result) {
             return null;
         }
-        if (null === $block->slotForOperand($last->result)) {
+        if (
+            null === $block->slotForOperand($last->result)
+            || (
+                $block->inheritUndefinedLocals
+                && $this->callArgIsDeadInlineTemporary($arg)
+            )
+        ) {
             foreach ($chain as $arithmetic) {
                 foreach ($this->compileExpr($arithmetic, $block) as $op) {
                     $emitOps[] = $op;
@@ -30047,7 +30105,15 @@ class Compiler {
                                     if (null !== $initSlot) {
                                         $inlineArrayLiteralArgWired = true;
                                     }
-                                } elseif (null === $block->slotForOperand($matched->result)) {
+                                } elseif (
+                                    null === $block->slotForOperand($matched->result)
+                                    || (
+                                        $block->inheritUndefinedLocals
+                                        && $this->callArgIsDeadInlineTemporary(
+                                            $cfgCallOp->args[(int) $argIndex] ?? $arg
+                                        )
+                                    )
+                                ) {
                                     foreach ($this->compileExpr($matched, $block) as $op) {
                                         $sends[] = $op;
                                     }
@@ -32376,6 +32442,17 @@ class Compiler {
                     $valueSlot = $combineForcedSlot;
                 }
             }
+            if (
+                $block->inheritUndefinedLocals
+                && $this->callArgIsDeadInlineTemporary(
+                    ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg
+                )
+            ) {
+                $recentArithmetic = $this->slotForRecentInlineArithmeticCallArg($block, $sends);
+                if (null !== $recentArithmetic) {
+                    $valueSlot = $recentArithmetic;
+                }
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
@@ -34355,6 +34432,39 @@ class Compiler {
     }
 
     /**
+     * decoct(fileperms($f) & 0777) on CFG branch blocks — ARG_SEND must use the AND dest (#15902).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireInlineArithmeticBranchCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp
+    ): void {
+        if (!$block->inheritUndefinedLocals || null === $cfgCallOp) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (1 !== \count($cfgCallOp->args ?? []) || !$this->callArgIsDeadInlineTemporary($callArg)) {
+            return;
+        }
+        $dest = $this->slotForRecentInlineArithmeticCallArg(
+            $block,
+            array_merge($nestedProducerOps, $outerArgSends)
+        );
+        if (null === $dest) {
+            return;
+        }
+        foreach ($outerArgSends as $send) {
+            if (OpCode::TYPE_ARG_SEND === $send->type) {
+                $send->arg1 = $dest;
+            }
+        }
+    }
+
+    /**
      * array_combine([...], [...]) — ARG_SEND must map to sibling INIT_ARRAY slots, not recent-init (#16080, #10214).
      *
      * @param list<OpCode> $outerArgSends
@@ -34520,6 +34630,7 @@ class Compiler {
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
+        $this->rewireInlineArithmeticBranchCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp);
         $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
         $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
