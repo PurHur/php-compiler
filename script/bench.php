@@ -3,138 +3,160 @@
 declare(strict_types=1);
 
 /**
- * This file is part of PHP-Compiler, a PHP CFG Compiler for PHP code
+ * Benchmark harness: Zend php-src vs php-compiler VM / JIT / AOT (#15884-era refresh).
  *
- * @copyright 2015 Anthony Ferrara. All rights reserved
- * @license MIT See LICENSE at the root of the project for more info
+ * Runs each benchmarks/*.php under every PHP_X_Y runtime from the environment
+ * (e.g. PHP_8_2=/usr/bin/php) plus bin/vm.php, bin/jit.php and a phpc-built
+ * native binary, verifies all runtimes agree on output, averages ITERATIONS
+ * runs, and rewrites the table in benchmarks/README.md.
+ *
+ * Usage (pinned env):
+ *   ./script/docker-exec.sh -- bash -lc 'PHP_8_2=$(command -v php) php script/bench.php'
+ *
+ * AOT columns degrade to n/a when the build fails (see #15642) — the harness
+ * must never die on a single broken lowering.
  */
 
 const ITERATIONS = 5;
 
-$runtimes = [];
+$root = dirname(__DIR__);
 
-foreach ($_ENV as $key => $value) {
-    if (substr($key, 0, 4) === 'PHP_' && is_executable($value)) {
+$runtimes = [];
+foreach (getenv() as $key => $value) {
+    if (1 === preg_match("/^PHP_\\d+_\\d+$/", (string) $key) && is_string($value) && is_executable($value)) {
         $runtimes[str_replace('_', '.', substr($key, 4))] = $value;
     }
 }
 ksort($runtimes, \SORT_STRING);
-if (! isset($runtimes['7.4'])) {
-    die("At least a PHP 7.4 runtime must be specified via PHP_7_4\n");
+if ([] === $runtimes) {
+    die("Specify at least one Zend runtime via PHP_X_Y=/path/to/php (e.g. PHP_8_2)\n");
+}
+$harnessPhp = reset($runtimes);
+
+$llvmEnv = '';
+foreach ([getenv('PHP_COMPILER_LLVM_PATH') ?: '', $root.'/.llvm', '/opt/llvm9'] as $dir) {
+    if ('' !== $dir && is_file($dir.'/libLLVM-9.so.1')) {
+        $llvmEnv = 'PHP_COMPILER_LLVM_PATH='.escapeshellarg($dir)
+            .' LD_LIBRARY_PATH='.escapeshellarg($dir);
+        break;
+    }
 }
 
-$it = new GlobIterator(__DIR__.'/../benchmarks/*.php');
+$it = new GlobIterator($root.'/benchmarks/*.php');
 $testResults = [];
 
 echo 'Running '.ITERATIONS." iterations of each test, and averaging\n";
+$files = [];
 foreach ($it as $file) {
-    echo 'Running '.$file->getBasename('.php').":\n";
-    $testResults[$file->getBasename('.php')] = bench($file->getPathname(), $runtimes);
+    $files[$file->getBasename('.php')] = $file->getPathname();
+}
+ksort($files, \SORT_STRING);
+foreach ($files as $name => $path) {
+    echo "Running {$name}:\n";
+    $testResults[$name] = bench($path, $runtimes, $harnessPhp, $llvmEnv, $root);
 }
 
-echo "All Tests Completed, Results: \n\n";
 $results = '| Test Name          ';
 foreach ($runtimes as $name => $path) {
-    $results .= sprintf('| %14s (s)', $name);
+    $results .= sprintf('| Zend %9s (s)', $name);
 }
-$results .= "| bin/jit.php (s) | bin/compile.php (s) | compiled time (s) |\n";
-
+$results .= "| bin/vm.php (s) | bin/jit.php (s) | phpc build (s) | native run (s) |\n";
 $results .= '|--------------------';
 foreach ($runtimes as $name => $path) {
     $results .= '|'.str_repeat('-', 19);
 }
-$results .= "|-----------------|---------------------|-------------------|\n";
+$results .= "|----------------|-----------------|----------------|----------------|\n";
 foreach ($testResults as $name => $resultset) {
     $results .= sprintf('| %18s ', $name);
-    foreach ($runtimes as $name => $_) {
-        $results .= sprintf('|      %12.4f ', $resultset[$name]);
+    foreach (array_keys($runtimes) as $rt) {
+        $results .= sprintf('|      %12.4f ', $resultset[$rt]);
     }
-    $results .= sprintf('|    %12.4f ', $resultset['jit']);
-    $results .= sprintf('|        %12.4f ', $resultset['aotcompile']);
-    $results .= sprintf('|      %12.4f ', $resultset['aot']);
-    $results .= sprintf("|\n");
+    foreach (['vm', 'jit', 'aotcompile', 'aot'] as $col) {
+        $results .= is_float($resultset[$col] ?? null)
+            ? sprintf('|   %12.4f ', $resultset[$col])
+            : sprintf('|   %12s ', 'n/a');
+    }
+    $results .= "|\n";
 }
 
-$readme = file_get_contents(__DIR__.'/../benchmarks/README.md');
+$stamp = sprintf(
+    "Environment: %s · LLVM 9 %s · %d iterations averaged, wall time per run.\n\n",
+    trim((string) shell_exec(escapeshellcmd($harnessPhp).' -r "echo PHP_VERSION;"')),
+    '' !== $llvmEnv ? 'available' : 'unavailable (VM/JIT only)',
+    ITERATIONS
+);
 
-$readme = preg_replace('((<!-- benchmark table start -->)(.*)(<!-- benchmark table end -->))ims', "\$1\n\n".$results."\n\$3", $readme);
-
-file_put_contents(__DIR__.'/../benchmarks/README.md', $readme);
+$readme = file_get_contents($root.'/benchmarks/README.md');
+$readme = preg_replace(
+    '((<!-- benchmark table start -->)(.*)(<!-- benchmark table end -->))ims',
+    "\$1\n\n".$stamp.$results."\n\$3",
+    $readme
+);
+file_put_contents($root.'/benchmarks/README.md', $readme);
 
 echo $results;
 
-function bench(string $file, array $runtimes)
+/** @param array<string, string> $runtimes */
+function bench(string $file, array $runtimes, string $harnessPhp, string $llvmEnv, string $root): array
 {
     echo "Testing each method:\n";
-    $result = trim(runDebug($runtimes['7.4'].' '.__DIR__.'/../bin/jit.php', $file));
-    run($runtimes['7.4'].' '.__DIR__.'/../bin/compile.php', $file);
-    $tmpResult = trim(runDebug(str_replace('.php', '', $file), ''));
-    if ($result !== $tmpResult) {
-        die("Failure for bin/compile.php, found \"${tmpResult}\" but expected \"${result}\"\n");
-    }
+    $expected = trim(capture(escapeshellcmd($harnessPhp).' '.escapeshellarg($file)));
     foreach ($runtimes as $name => $binary) {
-        $tmpResult = trim(runDebug($binary, $file));
-        if ($result !== $tmpResult) {
-            var_dump($result, $tmpResult);
-            die("Failure for test ${name}\n");
+        $got = trim(capture(escapeshellcmd($binary).' '.escapeshellarg($file)));
+        if ($expected !== $got) {
+            die("Failure for Zend {$name}: \"{$got}\" != \"{$expected}\"\n");
         }
     }
-    echo "Tests passed for ${file}, all runtimes agree\n";
+    $vmCmd = escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/vm.php').' '.escapeshellarg($file);
+    $vmOk = trim(capture($vmCmd)) === $expected;
+    if (!$vmOk) {
+        echo "  vm.php output mismatch — vm column n/a\n";
+    }
+
+    $jitCmd = $llvmEnv.' '.escapeshellcmd($harnessPhp).' '.escapeshellarg($root.'/bin/jit.php').' '.escapeshellarg($file);
+    $jitOk = '' !== $llvmEnv && trim(capture($jitCmd)) === $expected;
+    if (!$jitOk) {
+        echo "  jit.php unavailable or mismatch — jit column n/a\n";
+    }
+
+    $binary = tempnam(sys_get_temp_dir(), 'phpcbench');
+    $buildCmd = $llvmEnv.' '.escapeshellcmd($root.'/phpc').' build -o '.escapeshellarg($binary).' '.escapeshellarg($file);
+    $aotOk = false;
+    if ('' !== $llvmEnv) {
+        capture($buildCmd.' 2>&1', $buildRc);
+        $aotOk = 0 === $buildRc && is_executable($binary)
+            && trim(capture(escapeshellarg($binary))) === $expected;
+    }
+    if (!$aotOk) {
+        echo "  phpc build failed or output mismatch — AOT columns n/a (#15642)\n";
+    }
+
     $times = [];
+    foreach ($runtimes as $name => $bin) {
+        $times[$name] = timeCmd(escapeshellcmd($bin).' '.escapeshellarg($file));
+    }
+    $times['vm'] = $vmOk ? timeCmd($vmCmd) : null;
+    $times['jit'] = $jitOk ? timeCmd($jitCmd) : null;
+    $times['aotcompile'] = $aotOk ? timeCmd($buildCmd) : null;
+    $times['aot'] = $aotOk ? timeCmd(escapeshellarg($binary)) : null;
+    @unlink($binary);
+
+    return $times;
+}
+
+function timeCmd(string $cmd): float
+{
     $start = microtime(true);
-    foreach ($runtimes as $name => $binary) {
-        run($binary, $file);
-        $times[$name] = microtime(true);
-    }
-    run($runtimes['7.4'].' '.__DIR__.'/../bin/jit.php', $file);
-    $times['jit'] = microtime(true);
-    run($runtimes['7.4'].' '.__DIR__.'/../bin/compile.php', $file);
-    $times['aotcompile'] = microtime(true);
-    run(str_replace('.php', '', $file), '');
-    $times['aot'] = microtime(true);
-    unlink(str_replace('.php', '', $file));
-
-    $results = [];
-    foreach ($times as $key => $time) {
-        $diff = ($time - $start) / ITERATIONS;
-        $start = $time;
-        $results[$key] = $diff;
-    }
-
-    return $results;
-}
-
-function run(string $BIN, string $file): void
-{
-    runCmd(escapeshellcmd($BIN).' '.escapeshellarg($file));
-}
-
-function runDebug(string $BIN, string $file): string
-{
-    $command = escapeshellcmd($BIN).' '.escapeshellarg($file);
-
-    return _runCmd($command);
-}
-
-function runCmd(string $cmd): void
-{
     for ($i = 0; $i < ITERATIONS; ++$i) {
-        _runCmd($cmd);
+        capture($cmd);
     }
+
+    return (microtime(true) - $start) / ITERATIONS;
 }
 
-function _runCmd(string $cmd): string
+function capture(string $cmd, ?int &$rc = null): string
 {
-    $descriptorSepc = [
-        0 => ['pipe', 'r'],
-        1 => ['pipe', 'w'],
-        2 => ['pipe', 'w'],
-    ];
-    $pipes = [];
-    $proc = proc_open($cmd, $descriptorSepc, $pipes);
-    $result = stream_get_contents($pipes[1]);
-    fclose($pipes[1]);
-    proc_close($proc);
+    exec($cmd.' 2>/dev/null', $lines, $rc);
 
-    return $result;
+    return implode("\n", $lines);
 }
