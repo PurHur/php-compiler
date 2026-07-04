@@ -534,7 +534,8 @@ class VM {
             throw new \LogicException("{$declaring->name}::{$methodName}() is not invokable in this compiler build");
         }
 
-        return $this->invokePhpFunction($func, $thisVar, ...$extraArgs);
+        // Isolated stack: nested user method must not resume the caller frame mid-builtin (#11452).
+        return $this->invokePhpFunctionIsolated($func, $thisVar, ...$extraArgs);
     }
 
     public function objectImplementsArrayAccess(ObjectEntry $object): bool
