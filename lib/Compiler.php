@@ -22999,13 +22999,22 @@ class Compiler {
                 $block->addOpCode($op);
             }
         }
+        $prevSlot = $block->slotForOperand($prev->result);
         $execReturn = $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        if (
+            null !== $prevSlot
+            && null !== $execReturn
+            && $prevSlot !== $execReturn
+            && $this->isAdjacentOuterHoistedFuncCallBeforeMultiArgConsumer($cfgCallOp, $block)
+        ) {
+            // array_intersect(str_split(str_repeat()), …) — sibling g() already emitted; last EXEC_RETURN is a later g() (#16031, #15488).
+            return (string) $prevSlot;
+        }
         if (null !== $execReturn) {
             return (string) $execReturn;
         }
-        $slot = $block->slotForOperand($prev->result);
 
-        return null !== $slot ? (string) $slot : null;
+        return null !== $prevSlot ? (string) $prevSlot : null;
     }
 
     /**
