@@ -24906,7 +24906,10 @@ class Compiler {
                 if (null === $valueSlot) {
                     $valueSlot = $this->outerSiblingInlineCallArgProducerSlot($block, $cfgCallOp, (int) $argIndex);
                 }
-                if (null === $valueSlot) {
+                if (
+                    null === $valueSlot
+                    && !$this->skipInlineExprProducerRemapForConsecutiveTernaryCallArgs($cfgCallOp, $block)
+                ) {
                     $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                 }
                 if (null === $valueSlot && null !== $cfgCallOp) {
@@ -24956,7 +24959,9 @@ class Compiler {
                         && null !== $block->orig
                         && $this->callArgIsDeadInlineTemporary($arg)
                     ) {
-                        $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                        if (!$this->skipInlineExprProducerRemapForConsecutiveTernaryCallArgs($cfgCallOp, $block)) {
+                            $valueSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                        }
                         if (null === $valueSlot) {
                             $producers = $this->precedingInlineCallArgProducersBeforeCfgOp(
                                 $block->orig->children,
@@ -25012,7 +25017,9 @@ class Compiler {
                         }
                     }
                     if (null === $this->findCoalesceStmtForCallArg($arg, $block)) {
-                        $producerSlot = $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
+                        $producerSlot = $this->skipInlineExprProducerRemapForConsecutiveTernaryCallArgs($cfgCallOp, $block)
+                            ? null
+                            : $this->findInlineExprCallArgProducerSlot($arg, $block, $cfgCallOp);
                         if (
                             null !== $producerSlot
                             && !$this->isNamedVariableOperand($arg)
@@ -26195,10 +26202,188 @@ class Compiler {
             if (null !== $procOpenSlot) {
                 $valueSlot = $procOpenSlot;
             }
+            $ternaryPhiSlot = $this->resolveConsecutiveTernaryPhiCallArgSlot(
+                $block,
+                $cfgCallOp,
+                (int) $argIndex,
+                ($cfgCallOp->args[(int) $argIndex] ?? null) ?? $arg
+            );
+            if (null !== $ternaryPhiSlot) {
+                $valueSlot = $ternaryPhiSlot;
+            }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
         }
 
         return $sends;
+    }
+
+    /**
+     * True when a multi-arg call has ≥2 dead inline temps and no hoisted sibling Expr producers (#15816).
+     */
+    private function callHasConsecutiveCfgTernaryDeadArgTemps(?Op $cfgCallOp, Block $block): bool
+    {
+        if (null === $cfgCallOp || null === $block->orig || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return false;
+        }
+        if ([] !== $this->precedingInlineCallArgProducersBeforeCfgOp($block->orig->children, $cfgCallOp)) {
+            return false;
+        }
+        $deadTempCount = 0;
+        foreach ($cfgCallOp->args as $callArg) {
+            if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                ++$deadTempCount;
+            }
+        }
+        if ($deadTempCount < 2) {
+            return false;
+        }
+
+        return \count($this->orderedTernaryMergeAssignDestSlots()) >= $deadTempCount;
+    }
+
+    /**
+     * ?: merge-branch ASSIGN dest slots in source order for nested CFG ternaries (#15816).
+     *
+     * @return list<int>
+     */
+    private function orderedTernaryMergeAssignDestSlots(): array
+    {
+        $seen = $this->seen;
+        if (!$seen instanceof SplObjectStorage) {
+            return [];
+        }
+        $slots = [];
+        $recordedMergeIds = [];
+        foreach ($seen as $cfgBranch) {
+            if (!$cfgBranch instanceof CfgBlock) {
+                continue;
+            }
+            $mergeCfg = $this->branchJumpMergeTarget($cfgBranch);
+            if (null === $mergeCfg || \count($mergeCfg->parents) < 2) {
+                continue;
+            }
+            if ($this->mergeCfgBlockUsesLogicalShortCircuit($mergeCfg)) {
+                continue;
+            }
+            if (null === $this->mergeBranchAssignVarOperand($cfgBranch)) {
+                continue;
+            }
+            $mergeId = spl_object_id($mergeCfg);
+            if (isset($recordedMergeIds[$mergeId])) {
+                continue;
+            }
+            if (!$seen->contains($cfgBranch)) {
+                continue;
+            }
+            $compiled = $seen[$cfgBranch];
+            if (!$compiled instanceof Block) {
+                continue;
+            }
+            $destSlot = $this->ternaryMergeBranchAssignDestSlot($compiled);
+            if (null === $destSlot) {
+                continue;
+            }
+            $recordedMergeIds[$mergeId] = true;
+            $slots[] = $destSlot;
+        }
+
+        return $slots;
+    }
+
+    private function ternaryMergeBranchAssignDestSlot(Block $branch): ?int
+    {
+        foreach ($branch->opCodes as $op) {
+            if (OpCode::TYPE_ASSIGN !== $op->type) {
+                continue;
+            }
+
+            return is_int($op->arg2) ? $op->arg2 : (int) $op->arg2;
+        }
+
+        return null;
+    }
+
+    /**
+     * Consecutive ?: operands as call args — map dead arg temps to distinct merge dest slots (#15816).
+     */
+    private function resolveConsecutiveTernaryPhiCallArgSlot(
+        Block $block,
+        ?Op $cfgCallOp,
+        int $argIndex,
+        Operand $arg
+    ): ?string {
+        if (null === $cfgCallOp || !property_exists($cfgCallOp, 'args') || !\is_array($cfgCallOp->args)) {
+            return null;
+        }
+        if (!$this->callHasConsecutiveCfgTernaryDeadArgTemps($cfgCallOp, $block)) {
+            return null;
+        }
+        if (!$this->callArgIsDeadInlineTemporary($arg)) {
+            return null;
+        }
+        $callArgs = $cfgCallOp->args;
+        $deadTempCount = 0;
+        foreach ($callArgs as $callArg) {
+            if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                ++$deadTempCount;
+            }
+        }
+        if ($deadTempCount < 2) {
+            return null;
+        }
+        $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg(
+            $callArgs,
+            $argIndex,
+            $block,
+            $cfgCallOp
+        );
+        if (null === $producerSlotIndex) {
+            return null;
+        }
+        $mergeSlots = $this->orderedTernaryMergeAssignDestSlots();
+        if (\count($mergeSlots) > $deadTempCount) {
+            $mergeSlots = \array_slice($mergeSlots, -$deadTempCount);
+        }
+        if (!isset($mergeSlots[$producerSlotIndex])) {
+            return null;
+        }
+
+        return (string) $mergeSlots[$producerSlotIndex];
+    }
+
+    /**
+     * Pre-bind consecutive ?: call-arg temps to merge dest slots before ARG_SEND (#15816).
+     */
+    private function bindConsecutiveTernaryCallArgPhiSlots(Block $block, ?Op $cfgCallOp): void
+    {
+        if (!$this->callHasConsecutiveCfgTernaryDeadArgTemps($cfgCallOp, $block)) {
+            return;
+        }
+        $deadTempCount = 0;
+        foreach ($cfgCallOp->args as $callArg) {
+            if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                ++$deadTempCount;
+            }
+        }
+        $mergeSlots = $this->orderedTernaryMergeAssignDestSlots();
+        if (\count($mergeSlots) > $deadTempCount) {
+            $mergeSlots = \array_slice($mergeSlots, -$deadTempCount);
+        }
+        foreach ($cfgCallOp->args as $argIndex => $callArg) {
+            if (!$this->callArgIsDeadInlineTemporary($callArg)) {
+                continue;
+            }
+            $producerSlotIndex = $this->inlineHoistedProducerSlotIndexForCallArg(
+                $cfgCallOp->args,
+                (int) $argIndex,
+                $block,
+                $cfgCallOp
+            );
+            if (null === $producerSlotIndex || !isset($mergeSlots[$producerSlotIndex])) {
+                continue;
+            }
+            $block->bindScopeSlot($callArg, $mergeSlots[$producerSlotIndex]);
+        }
     }
 
     /**
@@ -26279,6 +26464,37 @@ class Compiler {
         }
 
         return null;
+    }
+
+    /**
+     * Consecutive ?: operands as call args — no hoisted sibling Expr producers (#15816).
+     */
+    private function skipInlineExprProducerRemapForConsecutiveTernaryCallArgs(
+        ?Op $cfgCallOp,
+        Block $block
+    ): bool {
+        if (
+            null === $cfgCallOp
+            || null === $block->orig
+            || !property_exists($cfgCallOp, 'args')
+            || !\is_array($cfgCallOp->args)
+        ) {
+            return false;
+        }
+        $deadTempCount = 0;
+        foreach ($cfgCallOp->args as $callArg) {
+            if ($this->callArgIsDeadInlineTemporary($callArg)) {
+                ++$deadTempCount;
+            }
+        }
+        if ($deadTempCount < 2) {
+            return false;
+        }
+
+        return [] === $this->precedingInlineCallArgProducersBeforeCfgOp(
+            $block->orig->children,
+            $cfgCallOp
+        );
     }
 
     /**
@@ -27628,6 +27844,7 @@ class Compiler {
             ?? ($name !== null ? $this->resolveCompileTimeStringSlot($name, $block) : null);
 
         $this->lowerEmbeddedCoalesceCallArgs($args, $block);
+        $this->bindConsecutiveTernaryCallArgPhiSlots($block, $cfgCallOp);
 
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
