@@ -28,6 +28,14 @@ final class VmStreamSocketPureRuntimeShrinkTest extends TestCase
         $this->assertStringNotContainsString('int socket(int domain', $source);
     }
 
+    public function testStreamSocketClientDiscoversSocketFdForHttpsTls(): void
+    {
+        $source = (string) file_get_contents(__DIR__.'/../../ext/standard/VmStreamSocketPure.php');
+        $this->assertStringContainsString('$beforeSockets = VmSockets::enumerateSocketFds();', $source);
+        $this->assertStringContainsString('$socketFd = self::discoverNewSocketFd($beforeSockets);', $source);
+        $this->assertStringContainsString('VmFs::adoptStreamResource($sock, $remote, $socketFd)', $source);
+    }
+
     public function testStreamSocketClientDiscardPortWhenNativeAvailable(): void
     {
         if (!VmStreamSocketPure::available()) {
