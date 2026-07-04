@@ -9791,6 +9791,19 @@ class JIT {
                                 $declaringClass
                             );
                         }
+                        if (
+                            !$forWrite
+                            && !$this->context->type->object->hasProperty($classId, $name->value)
+                            && $this->context->type->object->allowsDynamicProperties($classId)
+                        ) {
+                            JIT\UndefinedPropertyFetchHelper::lowerUndefinedDynamicPropertyRead(
+                                $this->context,
+                                $result,
+                                $declaringClass,
+                                $name->value
+                            );
+                            break;
+                        }
                         JIT\LazyObjectHelper::emitEnsureInitialized(
                             $this->context,
                             $this->loadPropertyFetchReceiver($obj)
