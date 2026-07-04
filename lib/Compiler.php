@@ -15653,6 +15653,21 @@ class Compiler {
                 return $arrayMergePair;
             }
         }
+        // explode(PATH_SEPARATOR, get_include_path()) — ConstFetch prelude + sibling FuncCall (#15833).
+        if ('explode' === $inlineFuncName && 2 === $argCount && $producerCount >= 2) {
+            $constProducer = null;
+            $funcProducer = null;
+            foreach ($producers as $producer) {
+                if ($producer instanceof Op\Expr\ConstFetch) {
+                    $constProducer = $producer;
+                } elseif ($producer instanceof Op\Expr\FuncCall || $producer instanceof Op\Expr\NsFuncCall) {
+                    $funcProducer = $producer;
+                }
+            }
+            if (null !== $constProducer && null !== $funcProducer) {
+                return (0 === $argIndex) ? $constProducer : $funcProducer;
+            }
+        }
         // preg_split(..., -1, PREG_SPLIT_*) / explode(..., -1) — limit/flags from UnaryMinus/ConstFetch, not prior sibling FuncCall (#13423, #13424).
         if (
             ('preg_split' === $inlineFuncName && ($argIndex === 2 || $argIndex === 3))
@@ -26424,6 +26439,27 @@ class Compiler {
                 }
                 if (null !== $arrayProducerSlot) {
                     $valueSlot = (string) $arrayProducerSlot;
+                }
+            }
+            // explode(ConstFetch, …) — embed VmPhpCoreConstants fold at send (#15833).
+            if (
+                null !== $cfgCallOp
+                && null !== $block->orig
+                && 'explode' === $this->resolveCfgFuncCallName($cfgCallOp)
+                && 0 === (int) $argIndex
+            ) {
+                foreach ($this->precedingInlineCallArgProducersBeforeCfgOp(
+                    $block->orig->children,
+                    $cfgCallOp
+                ) as $producer) {
+                    if (!$producer instanceof Op\Expr\ConstFetch) {
+                        continue;
+                    }
+                    $folded = $this->tryFoldGlobalConstFetch($producer);
+                    if (null !== $folded) {
+                        $valueSlot = (string) $block->registerConstant(new Operand\Temporary(), $folded);
+                        break;
+                    }
                 }
             }
             $sends[] = new OpCode(OpCode::TYPE_ARG_SEND, $valueSlot, $nameSlot, $unpackFlag);
