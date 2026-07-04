@@ -34282,6 +34282,75 @@ class Compiler {
         unset($send);
     }
 
+    /**
+     * var_export(array_keys([null => 1], null), true) — arg #0 must use nested FUNCCALL_EXEC_RETURN, not INIT_ARRAY (#16107).
+     *
+     * @param list<OpCode> $outerArgSends
+     * @param list<OpCode> $nestedProducerOps
+     */
+    private function rewireVarExportNestedInlineCallArgSendSlots(
+        array &$outerArgSends,
+        array $nestedProducerOps,
+        Block $block,
+        ?Op $cfgCallOp,
+        ?string $calleeName = null
+    ): void {
+        $callee = strtolower($calleeName ?? $this->resolveCfgFuncCallName($cfgCallOp) ?? '');
+        if ('var_export' !== $callee || null === $cfgCallOp) {
+            return;
+        }
+        $callArg = $cfgCallOp->args[0] ?? null;
+        if (
+            !$callArg instanceof Operand
+            || !$this->callArgIsDeadInlineTemporary($callArg)
+            || $this->inlineArrayProducerImmediatelyBeforeCfgCall($cfgCallOp, $block) instanceof Op\Expr\Array_
+        ) {
+            return;
+        }
+        $execSlot = $this->slotForLastPendingInlineCallResultBeforeFuncCallInit($nestedProducerOps)
+            ?? $this->slotForLastEmittedInlineCallResultBeforePendingFuncCall($block);
+        if (null === $execSlot) {
+            return;
+        }
+        $initSlots = [];
+        foreach (array_merge($block->opCodes, $nestedProducerOps) as $op) {
+            if (OpCode::TYPE_INIT_ARRAY === $op->type && null !== $op->arg1) {
+                $initSlots[] = $op->arg1;
+            }
+        }
+        if ([] === $initSlots) {
+            return;
+        }
+        $trueSlot = null;
+        for ($i = \count($block->opCodes) - 1; $i >= 0; --$i) {
+            $op = $block->opCodes[$i];
+            if (OpCode::TYPE_FUNCCALL_INIT === $op->type) {
+                break;
+            }
+            if (OpCode::TYPE_CONST_FETCH !== $op->type || null === $op->arg2) {
+                continue;
+            }
+            $const = $block->constants[$op->arg2] ?? null;
+            if ($const instanceof Variable && Variable::TYPE_BOOLEAN === $const->type && $const->toBool()) {
+                $trueSlot = $op->arg1;
+                break;
+            }
+        }
+        $sendOrdinal = 0;
+        foreach ($outerArgSends as &$send) {
+            if (OpCode::TYPE_ARG_SEND !== $send->type) {
+                continue;
+            }
+            if (0 === $sendOrdinal && \in_array($send->arg1, $initSlots, true)) {
+                $send->arg1 = $execSlot;
+            } elseif (1 === $sendOrdinal && null !== $trueSlot && (string) $send->arg1 === (string) $execSlot) {
+                $send->arg1 = $trueSlot;
+            }
+            ++$sendOrdinal;
+        }
+        unset($send);
+    }
+
     private function isInlineCallArgProducerInitOpcode(OpCode $op): bool
     {
         return OpCode::TYPE_FUNCCALL_INIT === $op->type
@@ -34318,6 +34387,7 @@ class Compiler {
         $argSends = $this->compileCallArgSends($args, $block, $calleeName, $cfgCallOp);
         [$nestedProducerOps, $outerArgSends] = $this->partitionNestedInlineCallArgProducerOps($argSends);
         $this->rewireArrayCombineInlineArgSendSlots($outerArgSends, $block, $argSends, $calleeName, $cfgCallOp);
+        $this->rewireVarExportNestedInlineCallArgSendSlots($outerArgSends, $nestedProducerOps, $block, $cfgCallOp, $calleeName);
         $return = [];
         foreach ($outerArgSends as $send) {
             if (OpCode::TYPE_ASSIGN === $send->type) {
