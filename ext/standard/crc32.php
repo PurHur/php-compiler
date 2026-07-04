@@ -52,7 +52,7 @@ final class crc32 extends Internal
 
     private static function vmStringArg(Frame $frame, int $argIndex): string
     {
-        return VmString::coerceTypedStringBuiltinArg(
+        return VmString::coerceStringBuiltinArg(
             $frame->calledArgs[$argIndex],
             'crc32',
             $argIndex,
